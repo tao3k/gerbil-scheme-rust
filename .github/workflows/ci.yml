@@ -208,10 +208,4 @@ jobs:
         run: |
           bazel query //...
           bazel build //...
-          if [[ "$RUNNER_OS" == macOS ]]; then
-            # cargo_all intentionally exercises the host Homebrew Gerbil
-            # capability, which is outside Bazel's macOS sandbox inputs.
-            bazel test --strategy=TestRunner=local //:ci
-          else
-            bazel test //:ci
-          fi
+          bazel test //:ci

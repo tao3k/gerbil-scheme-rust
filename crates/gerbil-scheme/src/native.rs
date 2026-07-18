@@ -111,6 +111,19 @@ impl GerbilRuntime {
         Ok(unsafe { gerbil_scheme_rust_add_i64(left, right) })
     }
 
+    /// Tests whether a signed 64-bit integer is even inside Gerbil.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] if called outside the initializing
+    /// thread.
+    pub fn is_even_i64(&self, value: i64) -> Result<bool, NativeError> {
+        self.check_thread()?;
+        // SAFETY: self proves runtime/module lifetime; the scalar c-define ABI
+        // accepts every i64 bit pattern and cannot retain borrowed Rust data.
+        Ok(unsafe { gerbil_scheme_sys::gerbil_scheme_rust_is_even_i64(value) } != 0)
+    }
+
     fn check_thread(&self) -> Result<(), NativeError> {
         let actual = thread::current().id();
         if actual == self.owner {

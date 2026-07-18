@@ -13,9 +13,9 @@ extern "C" {
 typedef enum GerbilStatus {
   GERBIL_STATUS_OK = 0,
   GERBIL_STATUS_NULL_POINTER = 1,
-  GERBIL_STATUS_INVALID_UTF8 = 2,
-  GERBIL_STATUS_TYPE_ERROR = 3,
-  GERBIL_STATUS_OVERFLOW = 4,
+  GERBIL_STATUS_ABI_MISMATCH = 2,
+  GERBIL_STATUS_INVALID_VALUE = 3,
+  GERBIL_STATUS_RUNTIME_UNAVAILABLE = 4,
   GERBIL_STATUS_PANIC = 5,
   GERBIL_STATUS_ALREADY_INITIALIZED = 6,
   GERBIL_STATUS_NOT_INITIALIZED = 7,
@@ -32,9 +32,10 @@ typedef uintptr_t GerbilValueHandle;
 typedef GerbilStatus (*GerbilI64Callback)(int64_t value, void *context);
 
 uint32_t gerbil_scheme_rust_abi_version(void);
-GerbilStatus gerbil_scheme_rust_runtime_init(void);
-GerbilStatus gerbil_scheme_rust_runtime_cleanup(void);
-GerbilStatus gerbil_scheme_rust_add_i64(int64_t lhs, int64_t rhs, int64_t *result);
+int32_t gerbil_scheme_rust_runtime_init(void);
+int32_t gerbil_scheme_rust_runtime_cleanup(void);
+int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);
+int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
 
 #ifdef __cplusplus
 }

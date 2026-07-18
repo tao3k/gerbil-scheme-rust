@@ -16,6 +16,7 @@ extern "C" {
 
 uint32_t gerbil_scheme_rust_abi_version(void);
 int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);
+int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
 int32_t gerbil_scheme_rust_runtime_init(void);
 int32_t gerbil_scheme_rust_runtime_cleanup(void);
 

@@ -11,6 +11,17 @@ fn abi_identity_is_nul_terminated() {
 }
 
 #[test]
+fn public_header_matches_the_live_scalar_abi() {
+    let header = crate::GERBIL_SCHEME_RUST_HEADER_SOURCE;
+
+    assert!(header.contains("#define GERBIL_SCHEME_RUST_ABI_VERSION 1u"));
+    assert!(header.contains("GERBIL_STATUS_ABI_MISMATCH = 2"));
+    assert!(header.contains("int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);"));
+    assert!(header.contains("int32_t gerbil_scheme_rust_is_even_i64(int64_t value);"));
+    assert!(!header.contains("int64_t *result"));
+}
+
+#[test]
 fn status_values_are_stable() {
     assert_eq!(GerbilStatus::Ok as i32, 0);
     assert_eq!(GerbilStatus::Panic as i32, 5);

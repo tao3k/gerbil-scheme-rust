@@ -135,4 +135,13 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_add_i64(left: i64, right: i64) -> i64;
+
+    /// Scalar predicate exported by `scheme/native.ss` through Gambit's
+    /// official `c-define` C interface.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_is_even_i64(value: i64) -> i32;
 }

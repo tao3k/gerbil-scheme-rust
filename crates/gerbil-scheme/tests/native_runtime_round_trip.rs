@@ -28,6 +28,12 @@ fn initialized_runtime_crosses_the_live_gerbil_abi() {
                 .expect("call the exported Gerbil procedure"),
             value + 1,
         );
+        assert_eq!(
+            runtime
+                .is_even_i64(value)
+                .expect("call the exported Gerbil predicate"),
+            value % 2 == 0,
+        );
     }
     assert!(
         started.elapsed() <= scenario.benchmark.max_total.as_duration(),

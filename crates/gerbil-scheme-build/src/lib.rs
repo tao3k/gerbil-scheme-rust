@@ -147,7 +147,7 @@ impl GerbilCompiler {
             });
         }
 
-        let gambit_source = find_single_extension(output_dir, "scm")?;
+        let gambit_source = find_module_extension(output_dir, source.module(), "scm")?;
         Ok(GerbilCompiledArtifact {
             kind: GerbilArtifactKind::GambitSource,
             path: gambit_source,
@@ -229,15 +229,17 @@ impl Error for BuildError {
     }
 }
 
-fn find_single_extension(
+fn find_module_extension(
     output_dir: &Path,
+    module: &str,
     extension: &'static str,
 ) -> Result<PathBuf, BuildError> {
+    let expected_file_name = format!("{module}.{extension}");
     let mut matches = fs::read_dir(output_dir)
         .map_err(BuildError::Io)?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .filter(|path| path.extension() == Some(OsStr::new(extension)))
+        .filter(|path| path.file_name() == Some(OsStr::new(&expected_file_name)))
         .collect::<Vec<_>>();
     matches.sort();
     if matches.len() == 1 {

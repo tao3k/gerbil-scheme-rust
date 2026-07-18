@@ -162,12 +162,22 @@ jobs:
           gerbil_home="$(gxi -e '(display (gerbil-home))')"
           gsc_path="$gerbil_home/bin/gsc"
           test -x "$gsc_path"
-          stable_gsc="$(brew --prefix)/bin/gerbil-gsc"
-          ln -sf "$gsc_path" "$stable_gsc"
-          test -x "$stable_gsc"
+          gsc_wrapper="$RUNNER_TEMP/gerbil-gsc"
+          {
+            printf '#!/bin/sh\n'
+            printf 'exec "%s" "-:~~=%s,~~bin=%s,~~include=%s,~~lib=%s" "$@"\n' \
+              "$gsc_path" \
+              "$gerbil_home" \
+              "$gerbil_home/bin" \
+              "$gerbil_home/include" \
+              "$gerbil_home/lib"
+          } > "$gsc_wrapper"
+          chmod +x "$gsc_wrapper"
+          test -x "$gsc_wrapper"
           gambit_prefix="$gerbil_home"
           {
-            echo "GERBIL_GSC=$stable_gsc"
+            echo "GERBIL_HOME=$gerbil_home"
+            echo "GERBIL_GSC=$gsc_wrapper"
             echo "GAMBOPT=~~bin=$gambit_prefix/bin,~~lib=$gambit_prefix/lib,~~include=$gambit_prefix/include"
           } >> "$GITHUB_ENV"
       - name: Upload macOS Gerbil install receipt

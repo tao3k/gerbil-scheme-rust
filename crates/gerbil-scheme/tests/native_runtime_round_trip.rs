@@ -34,7 +34,25 @@ fn initialized_runtime_crosses_the_live_gerbil_abi() {
                 .expect("call the exported Gerbil predicate"),
             value % 2 == 0,
         );
+        assert_eq!(
+            runtime
+                .compare_i64(value, value + 1)
+                .expect("call the exported Gerbil comparison"),
+            std::cmp::Ordering::Less,
+        );
     }
+    assert_eq!(
+        runtime
+            .compare_i64(i64::MIN, i64::MIN)
+            .expect("compare equal boundary values"),
+        std::cmp::Ordering::Equal,
+    );
+    assert_eq!(
+        runtime
+            .compare_i64(i64::MAX, i64::MIN)
+            .expect("compare opposite boundary values"),
+        std::cmp::Ordering::Greater,
+    );
     assert!(
         started.elapsed() <= scenario.benchmark.max_total.as_duration(),
         "runtime scenario exceeded {:?}: {:?}",

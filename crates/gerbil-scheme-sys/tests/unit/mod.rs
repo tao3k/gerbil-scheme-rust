@@ -18,6 +18,9 @@ fn public_header_matches_the_live_scalar_abi() {
     assert!(header.contains("GERBIL_STATUS_ABI_MISMATCH = 2"));
     assert!(header.contains("int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);"));
     assert!(header.contains("int32_t gerbil_scheme_rust_is_even_i64(int64_t value);"));
+    assert!(
+        header.contains("int32_t gerbil_scheme_rust_compare_i64(int64_t left, int64_t right);")
+    );
     assert!(!header.contains("int64_t *result"));
 }
 

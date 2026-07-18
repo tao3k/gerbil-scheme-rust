@@ -124,6 +124,26 @@ impl GerbilRuntime {
         Ok(unsafe { gerbil_scheme_sys::gerbil_scheme_rust_is_even_i64(value) } != 0)
     }
 
+    /// Compares two signed 64-bit integers inside Gerbil.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] if called outside the initializing
+    /// thread, or [`NativeError::InvalidComparisonResult`] if the native module
+    /// violates the ABI's three-way comparison contract.
+    pub fn compare_i64(&self, left: i64, right: i64) -> Result<std::cmp::Ordering, NativeError> {
+        self.check_thread()?;
+        // SAFETY: self proves runtime/module lifetime; the scalar c-define ABI
+        // accepts every i64 bit pattern and cannot retain borrowed Rust data.
+        let code = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_compare_i64(left, right) };
+        match code {
+            -1 => Ok(std::cmp::Ordering::Less),
+            0 => Ok(std::cmp::Ordering::Equal),
+            1 => Ok(std::cmp::Ordering::Greater),
+            code => Err(NativeError::InvalidComparisonResult { code }),
+        }
+    }
+
     fn check_thread(&self) -> Result<(), NativeError> {
         let actual = thread::current().id();
         if actual == self.owner {
@@ -191,6 +211,11 @@ pub enum NativeError {
         /// Right operand.
         right: i64,
     },
+    /// A three-way comparison returned a value outside `-1`, `0`, and `1`.
+    InvalidComparisonResult {
+        /// Unexpected result returned by the native binding.
+        code: i32,
+    },
 }
 
 impl NativeError {
@@ -208,7 +233,9 @@ impl NativeError {
             Self::RuntimeFinalized => Some(GerbilStatus::RuntimeFinalized),
             Self::Status { code, .. } => GerbilStatus::from_code(*code),
             Self::AbiMismatch { .. } => Some(GerbilStatus::AbiMismatch),
-            Self::IntegerOverflow { .. } => Some(GerbilStatus::InvalidValue),
+            Self::IntegerOverflow { .. } | Self::InvalidComparisonResult { .. } => {
+                Some(GerbilStatus::InvalidValue)
+            }
             Self::InvalidLifecycleState { .. } | Self::WrongThread { .. } => None,
         }
     }
@@ -240,6 +267,9 @@ impl fmt::Display for NativeError {
             ),
             Self::IntegerOverflow { left, right } => {
                 write!(formatter, "Gerbil i64 addition overflows: {left} + {right}")
+            }
+            Self::InvalidComparisonResult { code } => {
+                write!(formatter, "invalid Gerbil i64 comparison result {code}")
             }
         }
     }

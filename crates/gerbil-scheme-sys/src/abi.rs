@@ -127,6 +127,13 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_abi_version() -> u32;
 
+    /// Returns its input through a C-only control path.
+    ///
+    /// # Safety
+    ///
+    /// The caller must link the native support library that owns this symbol.
+    pub fn gerbil_scheme_rust_identity_i64(value: i64) -> i64;
+
     /// Scalar proof exported by `scheme/native.ss` through Gambit's official
     /// `c-define` C interface.
     ///

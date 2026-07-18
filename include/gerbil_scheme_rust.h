@@ -34,6 +34,7 @@ typedef GerbilStatus (*GerbilI64Callback)(int64_t value, void *context);
 uint32_t gerbil_scheme_rust_abi_version(void);
 int32_t gerbil_scheme_rust_runtime_init(void);
 int32_t gerbil_scheme_rust_runtime_cleanup(void);
+int64_t gerbil_scheme_rust_identity_i64(int64_t value);
 int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);
 int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
 int32_t gerbil_scheme_rust_compare_i64(int64_t left, int64_t right);

@@ -12,6 +12,8 @@ ___END_C_LINKAGE
 /* 0 = never initialized, 1 = running, 2 = finalized and not restartable. */
 static int gerbil_scheme_rust_state = 0;
 
+int64_t gerbil_scheme_rust_identity_i64(int64_t value) { return value; }
+
 int32_t gerbil_scheme_rust_runtime_init(void) {
   ___setup_params_struct params;
 

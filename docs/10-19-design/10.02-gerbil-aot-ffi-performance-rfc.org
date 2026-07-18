@@ -1,0 +1,112 @@
+#+title: 10.02 Gerbil AOT FFI Performance RFC
+#+author: gerbil-scheme-rust maintainers
+#+startup: overview
+
+* 10.02.00 Decision Status
+
+Status: Accepted for incremental delivery.
+
+The project treats Gerbil AOT FFI performance as a layered latency contract.
+Aggregate Scenario wall time is a test-runner safety bound; it is not the
+performance claim for one native call.
+
+* 10.02.10 Core Contract
+
+The steady-state Rust-to-Gerbil path MUST be reported in nanoseconds per call
+and MUST be measured after one runtime initialization. A required Scenario MUST
+also remain below a 500 millisecond wall-time guard so CI cannot hang.
+
+No receipt may use aggregate milliseconds alone to claim native-call speed.
+
+* 10.02.20 Problem
+
+One aggregate triplet currently combines addition, predicate, and comparison.
+That receipt proves a bounded workload, but it cannot attribute cost to the safe
+Rust wrapper, the C ABI transition, or the Gerbil AOT export. It therefore
+cannot prove that AOT configuration is responsible for an observed improvement.
+
+* 10.02.30 Goals
+
+- Report median and p95 nanoseconds for every exported scalar operation.
+- Add a C ABI control operation with equivalent call shape and no Gerbil work.
+- Compare safe Rust wrapper, raw sys call, C control, and Gerbil AOT export.
+- Keep runtime initialization outside every steady-state sample.
+- Preserve a sub-second aggregate Scenario hard gate in normal CI.
+- Record cold AOT build, warm incremental build, and steady-state runtime as
+  separate receipts.
+
+* 10.02.35 Non-Goals
+
+- A slow cold compiler invocation does not redefine steady-state FFI latency.
+- The 500 millisecond Scenario guard is not a target for a single FFI call.
+- Scheduler outliers do not replace median and p95 operation-level evidence.
+- Benchmark-framework startup time is not attributed to the native call.
+
+* 10.02.40 Boundary Ownership
+
+| Layer | Owner | Required receipt |
+|-
+| Safe Rust API | =gerbil-scheme= | ns/op for each public scalar method |
+| Raw ABI | =gerbil-scheme-sys= | ns/op for the corresponding extern symbol |
+| C control | native support library | ns/op for an identity/no-op call shape |
+| Gerbil AOT | Scheme export module | ns/op and ratio against the C control |
+| Scenario policy | Rust Project Harness contract | aggregate wall time and regression decision |
+
+* 10.02.50 Minimal Interface
+
+The benchmark matrix begins with three existing operations:
+
+- signed integer addition;
+- even predicate projection;
+- signed integer comparison projection.
+
+The matrix adds one control symbol that crosses the same Rust/C boundary without
+dispatching into Gerbil. Results MUST include operation name, layer, sample
+count, iterations, median ns/op, p95 ns/op, and the AOT-to-control ratio.
+
+* 10.02.60 Runtime Projection Rule
+
+Runtime initialization, library discovery, and link validation occur once
+before sampling. Timed loops contain only the operation under measurement.
+Every result is consumed through a black-box boundary so optimization cannot
+delete the call.
+
+* 10.02.70 Architecture
+
+#+begin_src text
+safe Rust method
+  -> raw gerbil-scheme-sys extern
+    -> C ABI boundary
+      -> Gerbil AOT export
+
+C control benchmark
+  -> raw gerbil-scheme-sys extern
+    -> C ABI identity implementation
+#+end_src
+
+The control path quantifies language-boundary cost. Subtracting it from the AOT
+path is diagnostic rather than a normative arithmetic guarantee, but the ratio
+makes regressions attributable.
+
+Every receipt reports both raw AOT-to-C-control and safe-wrapper-to-raw-AOT
+ratios. The first isolates the Gerbil AOT export path; the second isolates Rust
+thread, overflow, status, and projection checks.
+
+* 10.02.80 Build Truth And Orchestration
+
+Normal CI runs the statistical Scenario and compiles all benchmark targets.
+Changes to the ABI, wrapper, AOT/link configuration, or benchmark policy require
+a release-mode diagnostic receipt. Bazel and Cargo MUST reuse the same generated
+Gerbil AOT artifact; benchmarking a separately compiled implementation is not
+valid evidence.
+
+* 10.02.90 Acceptance Gates
+
+- Aggregate statistical workload: less than or equal to 500 milliseconds.
+- Every scalar operation: median and p95 reported in nanoseconds per operation.
+- C control and raw sys baselines: present before claiming AOT optimization.
+- AOT-to-control ratio: reported and compared against a checked Scenario budget.
+- Documentation for the project-owned policy: Org only.
+
+Until the control and raw-sys layers exist, current results are baseline evidence
+only and MUST NOT be described as proof that Gerbil AOT is fully optimized.

@@ -4,6 +4,7 @@
 * 10--19 Design and contracts
 
 - [[file:10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][10.01 Gerbil Scheme Rust Bindings RFC]]
+- [[file:10-19-design/10.02-gerbil-aot-ffi-performance-rfc.org][10.02 Gerbil AOT FFI Performance RFC]]
 
 * 20--29 Roadmaps and delivery evidence
 

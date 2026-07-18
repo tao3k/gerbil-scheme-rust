@@ -93,7 +93,6 @@ jobs:
           GERBIL_REF: ${{ matrix.gerbil-ref }}
           GERBIL_SRC: ${{ github.workspace }}/.ci/gerbil-src/${{ matrix.gerbil-label }}
           GERBIL_PREFIX: ${{ github.workspace }}/.ci/gerbil/${{ matrix.gerbil-label }}
-          GERBIL_BUILD_CORES: 2
           CCACHE_DIR: ${{ github.workspace }}/.ci/ccache
           CCACHE_MAXSIZE: 2G
         run: tools/bazel/bootstrap_gerbil_toolchain.sh
@@ -163,9 +162,12 @@ jobs:
           gerbil_home="$(gxi -e '(display (gerbil-home))')"
           gsc_path="$gerbil_home/bin/gsc"
           test -x "$gsc_path"
+          stable_gsc="$(brew --prefix)/bin/gerbil-gsc"
+          ln -sf "$gsc_path" "$stable_gsc"
+          test -x "$stable_gsc"
           gambit_prefix="$gerbil_home"
           {
-            echo "GERBIL_GSC=$gsc_path"
+            echo "GERBIL_GSC=$stable_gsc"
             echo "GAMBOPT=~~bin=$gambit_prefix/bin,~~lib=$gambit_prefix/lib,~~include=$gambit_prefix/include"
           } >> "$GITHUB_ENV"
       - name: Upload macOS Gerbil install receipt

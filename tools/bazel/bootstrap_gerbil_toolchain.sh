@@ -8,7 +8,13 @@ set -euo pipefail
 
 receipt="$GERBIL_PREFIX/bootstrap.receipt.json"
 lock_dir="$GERBIL_PREFIX.bootstrap.lock"
-build_cores="${GERBIL_BUILD_CORES:-2}"
+if [[ -n "${GERBIL_BUILD_CORES:-}" ]]; then
+  build_cores="$GERBIL_BUILD_CORES"
+elif command -v nproc >/dev/null; then
+  build_cores="$(nproc)"
+else
+  build_cores="$(sysctl -n hw.logicalcpu)"
+fi
 ccache_max_size="${CCACHE_MAXSIZE:-2G}"
 
 validate_install() {

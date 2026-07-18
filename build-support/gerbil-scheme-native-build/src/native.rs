@@ -15,6 +15,7 @@ pub fn build_native_archive() {
 
 fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_GSC");
+    println!("cargo:rerun-if-env-changed=GERBIL_HOME");
     println!("cargo:rerun-if-env-changed=GERBIL_PATH");
     println!("cargo:rerun-if-changed=../../build.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
@@ -130,6 +131,10 @@ fn compile_c(gsc: &OsStr, source: &Path, object: &Path, operation: &str) {
 }
 
 fn gerbil_prefix(gsc: &OsStr) -> PathBuf {
+    if let Some(home) = env::var_os("GERBIL_HOME") {
+        return PathBuf::from(home);
+    }
+
     let output = Command::new(gsc).arg("-v").output().expect("run gsc -v");
     assert!(output.status.success(), "gsc -v failed");
 

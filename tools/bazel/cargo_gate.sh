@@ -29,24 +29,43 @@ printf 'cargo_gate toolchain: cargo=%s rustc=%s xcrun=%s nix_ldflags=%s\n' \
     "$(test -n "${NIX_LDFLAGS:-}" && printf present || printf missing)"
 
 gate="${1:?usage: cargo_gate.sh check|test|clippy|all}"
-workspace="${TEST_SRCDIR:?}/${TEST_WORKSPACE:?}"
-export CARGO_TARGET_DIR="${TEST_TMPDIR:?}/cargo-target"
+runfiles_workspace="${TEST_SRCDIR:?}/${TEST_WORKSPACE:?}"
+source_workspace="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+workspace="${GERBIL_SCHEME_RUST_WORKSPACE:-${GITHUB_WORKSPACE:-${source_workspace}}}"
+if [[ ! -f "${workspace}/Cargo.toml" ]]; then
+    workspace="${runfiles_workspace}"
+fi
+if [[ -z "${CARGO_TARGET_DIR:-}" ]]; then
+    export CARGO_TARGET_DIR="${XDG_CACHE_HOME:-${HOME:?}/.cache}/gerbil-scheme-rust/bazel-cargo-target"
+fi
+mkdir -p "${CARGO_TARGET_DIR}"
 cd "${workspace}"
 
+run_gate() {
+    local label="$1"
+    shift
+    local started_seconds="${SECONDS}"
+    "$@"
+    printf 'cargo_gate receipt: gate=%s elapsed_seconds=%s target_dir=%s\n' \
+        "${label}" \
+        "$((SECONDS - started_seconds))" \
+        "${CARGO_TARGET_DIR}"
+}
+
 case "${gate}" in
-  check)
-    cargo check --workspace --locked
+check)
+    run_gate check cargo check --workspace --locked
     ;;
-  test)
-    cargo test --workspace --locked
+test)
+    run_gate test cargo test --workspace --locked
     ;;
-  clippy)
-    cargo clippy --workspace --all-targets --locked -- -D warnings
+clippy)
+    run_gate clippy cargo clippy --workspace --all-targets --locked -- -D warnings
     ;;
-  all)
-    cargo check --workspace --locked
-    cargo test --workspace --locked
-    cargo clippy --workspace --all-targets --locked -- -D warnings
+all)
+    run_gate check cargo check --workspace --locked
+    run_gate test cargo test --workspace --locked
+    run_gate clippy cargo clippy --workspace --all-targets --locked -- -D warnings
     ;;
   *)
     echo "unknown Cargo gate: ${gate}" >&2

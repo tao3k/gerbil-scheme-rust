@@ -21,27 +21,9 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
-    name = "native_abi_fingerprint",
-    srcs = ["native_abi_fingerprint.sh"],
-    visibility = ["//visibility:public"],
-)
 
-sh_binary(
-    name = "run_scheme_project",
-    srcs = ["run_scheme_project.sh"],
-)
 
-toolchain_type(
-    name = "gerbil_toolchain_type",
-    visibility = ["//visibility:public"],
-)
 
-alias(
-    name = "native_scheme_env",
-    actual = "@local_gerbil//:native_scheme_env",
-    visibility = ["//visibility:public"],
-)
 exports_files([
     "cargo_gate.sh",
     "gerbil_gate.sh",

@@ -108,6 +108,36 @@
           ]
         ]
       }
+    },
+    "@@gerbil_bazel~//gerbil:extensions.bzl%gerbil": {
+      "general": {
+        "bzlTransitiveDigest": "RLx1E/S0Ur76c5ozWPu+7WdCdtHqXBwmg5MUkQk9zc0=",
+        "usagesDigest": "I0ogvFkGi9hkSXvH36mhFxM9XqU2kDpvVm1agd8Tlpg=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "shared_gerbil": {
+            "bzlFile": "@@gerbil_bazel~//gerbil:repository.bzl",
+            "ruleClassName": "local_gerbil_repository",
+            "attributes": {
+              "darwin_homebrew_formulae": [
+                "openssl@3",
+                "sqlite",
+                "zlib"
+              ],
+              "dependency_roots": [],
+              "environment": {},
+              "expected_version_prefixes": [
+                "Gerbil 07c8481",
+                "Gerbil v0.18.2"
+              ],
+              "tool_paths": {}
+            }
+          }
+        },
+        "recordedRepoMappingEntries": []
+      }
     }
   }
 }

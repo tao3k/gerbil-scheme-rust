@@ -1,4 +1,5 @@
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@gerbil_bazel//gerbil:defs.bzl", "gerbil_project_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -49,8 +50,13 @@ filegroup(
 
 sh_test(
     name = "cargo_all",
+    tags = [
+        "exclusive",
+        "no-sandbox",
+    ],
     env_inherit = [
         "AR",
+        "CARGO_TARGET_DIR",
         "CC",
         "CXX",
         "DEVELOPER_DIR",
@@ -59,6 +65,8 @@ sh_test(
         "GERBIL_GSC",
         "GERBIL_HOME",
         "GERBIL_PATH",
+        "GERBIL_SCHEME_RUST_WORKSPACE",
+        "GITHUB_WORKSPACE",
         "HOME",
         "LD_LIBRARY_PATH",
         "LIBRARY_PATH",
@@ -68,6 +76,7 @@ sh_test(
         "PATH",
         "PKG_CONFIG_PATH",
         "SDKROOT",
+        "XDG_CACHE_HOME",
     ],
     srcs = ["//tools/bazel:cargo_gate.sh"],
     args = ["all"],
@@ -75,30 +84,15 @@ sh_test(
         ":gerbil_sources",
         ":rust_sources",
     ],
-    tags = [
-        "exclusive",
-        "no-sandbox",
-    ],
     timeout = "long",
 )
 
-sh_test(
+gerbil_project_test(
     name = "gerbil_native",
-    env = {
-        "AR": "",
-        "CC": "",
-        "CXX": "",
-        "DEVELOPER_DIR": "",
-        "NIX_CFLAGS_COMPILE": "",
-        "NIX_LDFLAGS": "",
-        "SDKROOT": "",
-    },
-    srcs = ["//tools/bazel:gerbil_gate.sh"],
-    data = [":gerbil_sources"],
-    tags = [
-        "exclusive",
-        "no-sandbox",
-    ],
+    build_args = ["compile"],
+    build_script = "build.ss",
+    tests = ["scheme/test-native.ss"],
+    srcs = [":gerbil_sources"],
 )
 
 test_suite(

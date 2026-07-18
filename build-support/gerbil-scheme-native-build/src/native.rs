@@ -4,7 +4,6 @@
 
 use std::env;
 use std::ffi::OsStr;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
@@ -92,19 +91,15 @@ fn run_native_build() {
         "compile runtime lifecycle shim",
     );
 
-    let archive = out_dir.join("libgerbil_scheme_rust_native.a");
-    if let Err(error) = fs::remove_file(&archive)
-        && error.kind() != std::io::ErrorKind::NotFound
-    {
-        panic!("remove stale native archive: {error}");
-    }
-    run(
-        Command::new("ar")
-            .args([OsStr::new("rcs")])
-            .arg(&archive)
-            .args([&runtime_object, &linker_object, &native_object]),
-        "archive native binding",
-    );
+    let mut archive_build = cc::Build::new();
+    archive_build
+        .cargo_metadata(false)
+        .out_dir(&out_dir)
+        .object(&runtime_object)
+        .object(&linker_object)
+        .object(&native_object)
+        .try_compile("gerbil_scheme_rust_native")
+        .expect("archive native binding objects");
 
     let prefix = gerbil_prefix(&gsc);
     println!("cargo:rustc-link-search=native={}", out_dir.display());

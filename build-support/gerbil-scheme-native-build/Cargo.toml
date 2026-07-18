@@ -8,6 +8,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+cc.workspace = true
 
 [build-dependencies]
 gerbil-scheme-rust-project-harness-policy.workspace = true

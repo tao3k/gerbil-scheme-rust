@@ -275,6 +275,47 @@ those defaults through `RustVerificationReportOptions`, but the upstream
 contract makes the source-vs-cache choice explicit so Agents do not commit every
 large report by accident.
 
+## Native FFI Tooling Policy
+
+Gerbil remains the authority for native code generation. The canonical AOT path
+is `build.ss compile`, followed by `gsc` generation of the named module C source,
+the Gambit linker source, and their object files. Rust build tooling may package
+or verify those products, but it must not silently replace the Gerbil build
+graph or claim ownership of Gerbil optimization semantics.
+
+The native-build helper uses the workspace-managed `cc` crate only to archive the
+already-generated runtime, linker, and module objects. This replaces a
+host-specific `ar rcs` invocation with Cargo target-aware archiver selection.
+It does not compile the Gerbil module, generate Rust declarations, or add a
+runtime dependency to the bindings crates.
+
+The remaining common FFI tools are intentionally conditional:
+
+- `bindgen` is not a consumer-time build dependency while ABI v1 is a small,
+  scalar C surface. The explicit declarations remain reviewable and avoid a
+  mandatory `libclang` toolchain. If the public header grows target-dependent
+  structs, unions, callbacks, or enough declarations that drift becomes a
+  material risk, bindings should be generated in a controlled maintainer/CI
+  lane, checked in, and verified by a drift gate before considering build-time
+  generation.
+- `cbindgen` is not required while Rust consumes the Gerbil C ABI. It becomes
+  relevant only if this project owns a public Rust-to-C export surface whose
+  header must be generated from `#[repr(C)]` Rust types and exported functions.
+- `object` is not an AOT performance dependency. It may be introduced later for
+  target-independent archive/object inspection, symbol auditing, or artifact
+  fingerprints when those checks have concrete verification tasks.
+
+The unsafe boundary stays in the sys crate because calling an external ABI is
+not something Rust can prove safe. Public callers use safe wrappers that validate
+ABI identity/version and translate raw results into Rust types. Code generation
+can reduce declaration drift, but it cannot remove this semantic unsafe boundary
+or make the C call itself faster.
+
+Changes to this policy require receipts for the native round trip, ABI mismatch
+fail-closed behavior, archive/link success on supported targets, locked Cargo
+gates, and the Bazel CI path. Performance claims must distinguish cold Gerbil AOT
+work, warm incremental work, Rust compilation, and test execution.
+
 ## Configurable Surface
 
 Verification config stays library-first. It does not introduce CLI flags or

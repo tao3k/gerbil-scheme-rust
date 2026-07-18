@@ -180,6 +180,27 @@ pub enum NativeError {
     },
 }
 
+impl NativeError {
+    /// Returns the stable ABI status represented by this error, when one exists.
+    ///
+    /// Raw status codes from newer runtimes remain available through the
+    /// [`NativeError::Status`] variant even when this binding cannot decode
+    /// them yet.
+    #[must_use]
+    pub const fn status(&self) -> Option<gerbil_scheme_sys::GerbilStatus> {
+        use gerbil_scheme_sys::GerbilStatus;
+
+        match self {
+            Self::AlreadyInitialized => Some(GerbilStatus::AlreadyInitialized),
+            Self::RuntimeFinalized => Some(GerbilStatus::RuntimeFinalized),
+            Self::Status { code, .. } => GerbilStatus::from_code(*code),
+            Self::AbiMismatch { .. } => Some(GerbilStatus::AbiMismatch),
+            Self::IntegerOverflow { .. } => Some(GerbilStatus::InvalidValue),
+            Self::InvalidLifecycleState { .. } | Self::WrongThread { .. } => None,
+        }
+    }
+}
+
 impl fmt::Display for NativeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

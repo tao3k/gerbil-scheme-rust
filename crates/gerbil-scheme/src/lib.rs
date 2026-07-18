@@ -14,7 +14,9 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
-pub use gerbil_scheme_sys::{GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION};
+pub use gerbil_scheme_sys::{
+    GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GerbilStatus,
+};
 
 mod native;
 

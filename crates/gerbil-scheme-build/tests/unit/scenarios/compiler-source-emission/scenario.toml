@@ -1,0 +1,8 @@
+id = "compiler-source-emission"
+title = "Gerbil source emission hot path"
+policy_ids = ["RUST-AGENT-GERBIL-BUILD-003"]
+agent_goal = "Prove the public build helper emits an opaque Gerbil module through a bounded Rust hot path before external compiler startup."
+reference_repositories = ["tao3k/marlin-agent-core"]
+reference_patterns = ["focused hot-path receipt", "external tool boundary"]
+inputs = "inputs"
+expected = "expected"

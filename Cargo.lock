@@ -153,6 +153,7 @@ dependencies = [
 name = "gerbil-scheme"
 version = "0.1.0"
 dependencies = [
+ "gerbil-scheme-rust-project-harness",
  "gerbil-scheme-sys",
 ]
 
@@ -161,6 +162,7 @@ name = "gerbil-scheme-build"
 version = "0.1.0"
 dependencies = [
  "gerbil-scheme",
+ "gerbil-scheme-rust-project-harness",
 ]
 
 [[package]]

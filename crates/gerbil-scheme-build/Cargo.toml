@@ -12,5 +12,8 @@ publish = false
 [dependencies]
 gerbil-scheme.workspace = true
 
+[dev-dependencies]
+gerbil-scheme-rust-project-harness.workspace = true
+
 [lints]
 workspace = true

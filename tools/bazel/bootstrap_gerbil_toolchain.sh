@@ -31,6 +31,7 @@ if ! command -v ccache >/dev/null; then
   echo "ccache is required for a Gerbil source bootstrap" >&2
   exit 1
 fi
+mkdir -p "$(dirname "$GERBIL_SRC")" "$(dirname "$GERBIL_PREFIX")" "$CCACHE_DIR"
 if ! mkdir "$lock_dir" 2>/dev/null; then
   echo "Gerbil bootstrap lock is already held: $lock_dir" >&2
   exit 1

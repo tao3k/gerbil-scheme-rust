@@ -52,12 +52,12 @@ jobs:
       - name: Install Gerbil (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew tap mighty-gerbils/gerbil
-          brew install mighty-gerbils/gerbil/gerbil-scheme
-          gerbil_prefix="$(brew --prefix gerbil-scheme)"
-          gsc_path="$gerbil_prefix/v0.18.2/bin/gsc"
+          brew tap tao3k/gerbil
+          brew install tao3k/gerbil/gerbil-scheme
+          gerbil_home="$(gxi -e '(display (gerbil-home))')"
+          gsc_path="$gerbil_home/bin/gsc"
           test -x "$gsc_path"
-          gambit_prefix="$(dirname "$(dirname "$gsc_path")")"
+          gambit_prefix="$gerbil_home"
           {
             echo "GERBIL_GSC=$gsc_path"
             echo "GAMBOPT=~~bin=$gambit_prefix/bin,~~lib=$gambit_prefix/lib,~~include=$gambit_prefix/include"

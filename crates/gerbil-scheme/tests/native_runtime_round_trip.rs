@@ -53,10 +53,15 @@ fn initialized_runtime_crosses_the_live_gerbil_abi() {
             .expect("compare opposite boundary values"),
         std::cmp::Ordering::Greater,
     );
+    let elapsed = started.elapsed();
+    eprintln!(
+        "scenario benchmark receipt: id=native-runtime-round-trip scalar_calls=30000 elapsed_ns={}",
+        elapsed.as_nanos(),
+    );
     assert!(
-        started.elapsed() <= scenario.benchmark.max_total.as_duration(),
+        elapsed <= scenario.benchmark.max_total.as_duration(),
         "runtime scenario exceeded {:?}: {:?}",
         scenario.benchmark.max_total.as_duration(),
-        started.elapsed(),
+        elapsed,
     );
 }

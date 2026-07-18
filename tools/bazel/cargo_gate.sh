@@ -52,6 +52,11 @@ run_gate() {
         "${CARGO_TARGET_DIR}"
 }
 
+run_benchmark_smoke_impl() {
+    local command=(cargo test -p gerbil-scheme --bench native_ffi --locked -- --test)
+    run_gate benchmark-smoke "${command[@]}"
+}
+
 case "${gate}" in
 check)
     run_gate check cargo check --workspace --locked
@@ -59,13 +64,16 @@ check)
 test)
     run_gate test cargo test --workspace --locked
     ;;
-clippy)
+    benchmark-smoke)
+        run_benchmark_smoke_impl "$@"
+        ;;
+    clippy)
     run_gate clippy cargo clippy --workspace --all-targets --locked -- -D warnings
     ;;
 all)
-    run_gate check cargo check --workspace --locked
-    run_gate test cargo test --workspace --locked
-    run_gate clippy cargo clippy --workspace --all-targets --locked -- -D warnings
+        run_gate check cargo check --workspace --locked
+        run_gate test cargo test --workspace --locked
+        run_gate clippy cargo clippy --workspace --all-targets --locked -- -D warnings
     ;;
   *)
     echo "unknown Cargo gate: ${gate}" >&2

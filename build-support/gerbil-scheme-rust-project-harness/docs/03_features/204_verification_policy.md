@@ -316,6 +316,22 @@ fail-closed behavior, archive/link success on supported targets, locked Cargo
 gates, and the Bazel CI path. Performance claims must distinguish cold Gerbil AOT
 work, warm incremental work, Rust compilation, and test execution.
 
+Every required runtime scenario lives under `tests/unit/scenarios/<id>` and owns
+both `scenario.toml` and `benchmark.toml`. Functional libtest scenarios enforce
+hard wall-time budgets. The steady-state native FFI hard gate initializes the
+runtime once and records 100 samples of 250 triplets inside a sub-second libtest
+scenario. Its median triplet budget is 1 microsecond. The `native_ffi` Divan
+target remains a deeper diagnostic run with one thread, 100 statistical samples,
+and 1,000 iterations per sample. Scheduler-sensitive slowest and mean values
+remain diagnostic evidence rather than hard regression gates.
+
+CI runs the sub-second statistical scenario as part of the workspace tests and
+compiles the Divan target through the all-targets gate. A full
+`cargo bench -p gerbil-scheme --bench native_ffi --locked` receipt is required
+when changing the native ABI, safe wrapper path, AOT/link configuration, or
+benchmark policy. Cold release compilation time and the warm benchmark result
+must be reported separately.
+
 ## Configurable Surface
 
 Verification config stays library-first. It does not introduce CLI flags or

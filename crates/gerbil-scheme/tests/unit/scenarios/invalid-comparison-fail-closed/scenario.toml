@@ -1,0 +1,8 @@
+id = "invalid-comparison-fail-closed"
+title = "Invalid native comparison fails closed"
+policy_ids = ["RUST-AGENT-GERBIL-ABI-004"]
+agent_goal = "Prove an out-of-contract native comparison code remains a typed safe-wrapper error and projects to InvalidValue."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["fail-closed ABI projection", "forward-compatible native error"]
+inputs = "inputs"
+expected = "expected"

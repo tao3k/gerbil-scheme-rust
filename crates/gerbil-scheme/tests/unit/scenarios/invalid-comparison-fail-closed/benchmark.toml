@@ -1,0 +1,13 @@
+harness = "libtest"
+test = "invalid_comparison_result_fails_closed_as_an_invalid_value"
+phase = "warm"
+target_total = "10ms"
+max_total = "100ms"
+observed_total = "6ms"
+regression_budget = "25ms"
+memory_budget_bytes = 16777216
+observed_memory_bytes = 0
+target_rationale = "Ten thousand typed error projections must remain bounded and preserve the invalid native code without transmute or unchecked enum construction."
+
+[observed_timings]
+invalid_comparison_projection = "6ms"

@@ -33,11 +33,16 @@ fn stable_status_codes_round_trip_without_transmute() {
     }
     assert_eq!(GerbilStatus::from_code(-1), None);
     assert_eq!(GerbilStatus::from_code(9), None);
+    let elapsed = started.elapsed();
+    eprintln!(
+        "scenario benchmark receipt: id=status-contract projections=90000 elapsed_ns={}",
+        elapsed.as_nanos(),
+    );
     assert!(
-        started.elapsed() <= scenario.benchmark.max_total.as_duration(),
+        elapsed <= scenario.benchmark.max_total.as_duration(),
         "status scenario exceeded {:?}: {:?}",
         scenario.benchmark.max_total.as_duration(),
-        started.elapsed(),
+        elapsed,
     );
 }
 

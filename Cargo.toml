@@ -20,6 +20,7 @@ repository = "https://github.com/tao3k/gerbil-scheme-rust"
 
 [workspace.dependencies]
 cc = "1.2.64"
+divan = "0.1.21"
 gerbil-scheme-native-build = { path = "build-support/gerbil-scheme-native-build" }
 gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-scheme-rust-project-harness-policy" }
 gerbil-scheme-rust-project-harness = { path = "build-support/gerbil-scheme-rust-project-harness", version = "0.1.2" }

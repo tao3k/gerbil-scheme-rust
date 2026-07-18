@@ -16,7 +16,7 @@ fn all_required_runtime_scenarios_have_valid_benchmark_contracts() {
         receipt.receipts,
         receipt.violations,
     );
-    assert_eq!(receipt.requirements.len(), 2);
-    assert_eq!(receipt.receipts.len(), 2);
+    assert_eq!(receipt.requirements.len(), 4);
+    assert_eq!(receipt.receipts.len(), 4);
     assert!(receipt.violations.is_empty());
 }

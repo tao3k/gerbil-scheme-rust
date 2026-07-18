@@ -1,0 +1,34 @@
+[workspace]
+members = [
+  "build-support/gerbil-scheme-native-build",
+  "build-support/gerbil-scheme-rust-project-harness-policy",
+  "build-support/gerbil-scheme-rust-project-harness",
+  "crates/gerbil-scheme",
+    "crates/gerbil-scheme-build",
+    "crates/gerbil-scheme-sys",
+]
+
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["gerbil-scheme-rust contributors"]
+license = "Apache-2.0 OR LGPL-2.1-or-later"
+repository = "https://github.com/tao3k/gerbil-scheme-rust"
+
+[workspace.dependencies]
+gerbil-scheme-native-build = { path = "build-support/gerbil-scheme-native-build" }
+gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-scheme-rust-project-harness-policy" }
+gerbil-scheme-rust-project-harness = { path = "build-support/gerbil-scheme-rust-project-harness", version = "0.1.2" }
+gerbil-scheme = { path = "crates/gerbil-scheme", version = "0.1.0" }
+gerbil-scheme-sys = { path = "crates/gerbil-scheme-sys", version = "0.1.0" }
+
+[workspace.lints.rust]
+missing_debug_implementations = "warn"
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

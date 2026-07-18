@@ -1,0 +1,4 @@
+pub(crate) struct Builder {
+    pub(crate) worker_threads: usize,
+    pub(crate) enable_io: bool,
+}

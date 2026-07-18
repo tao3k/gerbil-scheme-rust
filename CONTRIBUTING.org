@@ -1,0 +1,35 @@
+#+title: Contributing to gerbil-scheme-rust
+#+options: toc:nil num:nil
+
+* Scope
+
+Contributions must preserve the bindings-only boundary described by
+[[file:docs/10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][GSR-RFC-0001]].
+Application runtimes, policy schemas, graph semantics, and downstream adapter
+logic belong in their owning repositories.
+
+* License
+
+Unless explicitly stated otherwise, any contribution intentionally submitted
+for inclusion in this repository is offered under either:
+
+#+begin_example
+Apache-2.0 OR LGPL-2.1-or-later
+#+end_example
+
+at the recipient's option.  Contributors must have the right to submit the
+code under both licenses and must preserve third-party notices and provenance.
+
+* Required checks
+
+#+begin_src sh
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --locked
+bazel query //...
+bazel build //...
+bazel test //...
+#+end_src
+
+Changes that cross a real Gerbil boundary must record the Gerbil and Gambit
+versions used for verification.

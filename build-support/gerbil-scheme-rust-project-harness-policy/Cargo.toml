@@ -1,0 +1,14 @@
+[package]
+name = "gerbil-scheme-rust-project-harness-policy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+gerbil-scheme-rust-project-harness.workspace = true
+
+[build-dependencies]
+gerbil-scheme-rust-project-harness.workspace = true

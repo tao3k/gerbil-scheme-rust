@@ -1,0 +1,6 @@
+.devenv
+.direnv
+build-support/gerbil-scheme-rust-project-harness/.devenv
+build-support/gerbil-scheme-rust-project-harness/.direnv
+build-support/gerbil-scheme-rust-project-harness/target
+target

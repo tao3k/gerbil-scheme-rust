@@ -1,0 +1,16 @@
+[package]
+name = "gerbil-scheme-build"
+description = "Gerbil Scheme compiler and native build support for Rust bindings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+gerbil-scheme.workspace = true
+
+[lints]
+workspace = true

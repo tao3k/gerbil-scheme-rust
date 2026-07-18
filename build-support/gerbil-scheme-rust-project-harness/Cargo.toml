@@ -1,0 +1,56 @@
+[package]
+name = "gerbil-scheme-rust-project-harness"
+version = "0.1.2"
+edition = "2024"
+description = "Project-level Rust language harness with compact diagnostics for agents"
+authors = ["CyberXiuXian Artisan workshop"]
+license = "Apache-2.0"
+publish = false
+
+[features]
+default = ["search"]
+search = []
+cli = []
+
+[[bin]]
+name = "rs-harness"
+path = "src/bin/rs-harness.rs"
+required-features = ["cli"]
+
+[[bench]]
+name = "query_search_microbench"
+harness = false
+required-features = ["search"]
+
+[lib]
+name = "rust_lang_project_harness"
+
+[dependencies]
+cargo-lock = "11.0"
+cargo_toml = "1.0.0"
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+regex = "1"
+semver = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+syn = { version = "2", features = ["extra-traits", "full", "parsing", "visit"] }
+toml = "1.1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+panic = "abort"
+
+[dev-dependencies]
+insta = "1"
+rs-harness = { path = "rs-harness" }
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+doc_markdown = "warn"

@@ -1,0 +1,10 @@
+---
+source: tests/unit/agent_policy_snapshot.rs
+expression: rendered
+---
+[RUST-AGENT-SOURCE-MODULE-006] Info: Public module name is generic
+@ $TEMP/src/lib.rs:2:1
+fix: rename this public module to the domain it owns
+line: 2 | /// Shared utility bucket.
+Help: $TEMP/src/lib.rs exposes generic public module `utils`.
+Contract: Name public Rust modules after the domain they own; avoid generic buckets such as utils, common, helpers, or shared.

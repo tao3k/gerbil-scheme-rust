@@ -1,0 +1,15 @@
+---
+source: tests/unit/verification/config/contract.rs
+expression: rendered
+---
+[verify] src/api.rs
+   |owner: src/api
+   |stress: pending phase=before_release fingerprint=rustv:bbbccdc62d977a33
+   |why: stress=profile declares public API or integration surface
+   |requires: stress=tenant_slo,saturation_step
+   |fact: stress.profile=public_api
+   |contract: stress=custom stress skill must report tenant SLO and saturation step
+
+[verify-report]
+   |bundle: renderer=render_rust_verification_report_bundle_json artifact=verification_report_bundle.json artifacts=1
+   |required: verification_plan_json renderer=render_rust_verification_plan_json artifact=verification_plan.json tasks=1 kinds=stress

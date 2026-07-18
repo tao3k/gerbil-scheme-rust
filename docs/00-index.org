@@ -1,0 +1,18 @@
+#+title: gerbil-scheme-rust documentation
+#+options: toc:nil num:nil
+
+* 10--19 Design and contracts
+
+- [[file:10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][10.01 Gerbil Scheme Rust Bindings RFC]]
+
+* 20--29 Roadmaps and delivery evidence
+
+- [[file:20-29-roadmap/20.01-bindings-bootstrap-plan.org][20.01 Bindings Bootstrap And Delivery Plan]]
+
+* Documentation contract
+
+Design documents state ownership, invariants, non-goals, and checked
+boundaries before implementation detail.  Roadmaps separate planned work,
+acceptance gates, current evidence, and remaining gaps.  A completed checkbox
+is not evidence by itself; commands, test receipts, or release artifacts must
+support completion claims.

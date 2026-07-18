@@ -1,0 +1,11 @@
+/target
+**/*.rs.bk
+*.pending-snap
+Cargo.lock
+/.devenv
+/.codex/harness-state/
+/.data/
+.vscode
+.gdb_history
+perf.data*
+.pre-commit-config.yaml

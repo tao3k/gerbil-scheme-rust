@@ -1,0 +1,16 @@
+/target/
+/.gerbil/
+/.ci/
+/bazel-*
+*.ssi
+*.scm
+*.c
+!native/runtime.c
+*.o
+*.so
+*.dylib
+/.devenv/
+.pre-commit-config.yaml
+**/.devenv/
+**/.direnv/
+**/target/

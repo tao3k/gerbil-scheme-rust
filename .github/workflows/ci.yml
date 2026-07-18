@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bindings:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy,rustfmt
+      - uses: bazel-contrib/setup-bazel@0.18.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ runner.os }}
+          repository-cache: true
+      - name: Install Gerbil (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GERBIL_COMMIT: 07c8481588a8b07dbf05832687817cd398902ac0
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git libssl-dev
+          git clone https://github.com/mighty-gerbils/gerbil.git "$RUNNER_TEMP/gerbil"
+          git -C "$RUNNER_TEMP/gerbil" checkout "$GERBIL_COMMIT"
+          cd "$RUNNER_TEMP/gerbil/src"
+          ./build.sh
+          echo "$RUNNER_TEMP/gerbil/bin" >> "$GITHUB_PATH"
+      - name: Install Gerbil (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew tap tao3k/gerbil
+          brew install gerbil-scheme
+      - name: Toolchain receipt
+        run: |
+          rustc --version
+          cargo --version
+          gxi --version
+          bazel version
+      - name: Cargo format
+        run: cargo fmt --all --check
+      - name: Cargo gates
+        run: |
+          cargo check --workspace --locked
+          cargo test --workspace --locked
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Bazel gates
+        run: |
+          bazel query //...
+          bazel build //...
+          bazel test //:ci

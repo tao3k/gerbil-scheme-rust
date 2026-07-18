@@ -1,0 +1,42 @@
+#+title: gerbil-scheme-rust
+#+options: toc:nil num:nil
+
+Rust bindings for Gerbil Scheme.
+
+* Scope
+
+=gerbil-scheme-rust= provides a small, explicit boundary between Gerbil
+Scheme and Rust:
+
+- raw native bindings and ABI declarations;
+- safe Rust wrappers for Gerbil values, modules, and calls;
+- build support for Gerbil packages, AOT objects, and native archives.
+
+The repository does not own an application runtime.  Marlin, =poo-flow=,
+Deck, policy routing, graph execution, resident agents, and workspace policy
+remain downstream concerns.
+
+* Build model
+
+- Cargo owns Rust package metadata and dependency resolution.
+- =build.ss= owns Gerbil package compilation.
+- Bazel owns cross-language orchestration and the CI target graph.
+
+Both Cargo and Bazel are first-class supported entry points.
+
+* License
+
+The intended project license is:
+
+#+begin_example
+Apache-2.0 OR LGPL-2.1-or-later
+#+end_example
+
+The repository is being bootstrapped; the dual-license file layout is part of
+the first implementation slice.
+
+* Documentation
+
+- [[file:docs/00-index.org][Documentation index]]
+- [[file:docs/10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][RFC: Gerbil Scheme Rust bindings]]
+- [[file:docs/20-29-roadmap/20.01-bindings-bootstrap-plan.org][Bindings bootstrap and delivery plan]]

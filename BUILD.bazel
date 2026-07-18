@@ -1,0 +1,104 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "rust_sources",
+    srcs = glob([
+        "build-support/**/*",
+        "crates/**/*.rs",
+        "crates/**/Cargo.toml",
+        "build-support/**/*.rs",
+        "build-support/**/*.md",
+        "build-support/**/Cargo.toml",
+        "include/**/*.h",
+    ]) + [
+        "Cargo.lock",
+        "Cargo.toml",
+        "rust-toolchain.toml",
+    ],
+)
+
+filegroup(
+    name = "gerbil_sources",
+    srcs = glob(["scheme/*"]) + [
+        "build.ss",
+        "gerbil.pkg",
+        "native/runtime.c",
+    ],
+)
+
+[
+    sh_test(
+        name = "cargo_" + gate,
+        srcs = ["//tools/bazel:cargo_gate.sh"],
+        args = [gate],
+        data = [
+            ":gerbil_sources",
+            ":rust_sources",
+        ],
+        tags = ["no-sandbox"],
+    )
+    for gate in [
+        "check",
+        "test",
+        "clippy",
+    ]
+]
+
+sh_test(
+    name = "cargo_all",
+    env_inherit = [
+        "AR",
+        "CC",
+        "CXX",
+        "DEVELOPER_DIR",
+        "DYLD_LIBRARY_PATH",
+        "HOME",
+        "LIBRARY_PATH",
+        "MACOSX_DEPLOYMENT_TARGET",
+        "NIX_CFLAGS_COMPILE",
+        "NIX_LDFLAGS",
+        "PATH",
+        "PKG_CONFIG_PATH",
+        "SDKROOT",
+    ],
+    srcs = ["//tools/bazel:cargo_gate.sh"],
+    args = ["all"],
+    data = [
+        ":gerbil_sources",
+        ":rust_sources",
+    ],
+    tags = [
+        "exclusive",
+        "no-sandbox",
+    ],
+    timeout = "long",
+)
+
+sh_test(
+    name = "gerbil_native",
+    env = {
+        "AR": "",
+        "CC": "",
+        "CXX": "",
+        "DEVELOPER_DIR": "",
+        "NIX_CFLAGS_COMPILE": "",
+        "NIX_LDFLAGS": "",
+        "SDKROOT": "",
+    },
+    srcs = ["//tools/bazel:gerbil_gate.sh"],
+    data = [":gerbil_sources"],
+    tags = [
+        "exclusive",
+        "no-sandbox",
+    ],
+)
+
+test_suite(
+    name = "ci",
+    tests = [
+        ":cargo_all",
+        ":gerbil_native",
+    ],
+)

@@ -8,7 +8,7 @@ bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "gerbil_bazel", version = "0.1.0")
 git_override(
     module_name = "gerbil_bazel",
-    commit = "f499b3555e04bd387b19b219a71df38cf85fa5e9",
+    commit = "a1bc9ce7191c6fa2ea5550854398ca4f9c25c2e3",
     remote = "https://github.com/tao3k/gerbil-bazel.git",
 )
 

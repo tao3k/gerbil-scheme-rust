@@ -8,6 +8,7 @@ filegroup(
         "build-support/**/*",
         "crates/**/*.rs",
         "crates/**/Cargo.toml",
+        "crates/**/tests/unit/scenarios/**",
         "build-support/**/*.rs",
         "build-support/**/*.md",
         "build-support/**/Cargo.toml",

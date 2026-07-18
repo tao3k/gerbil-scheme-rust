@@ -38,9 +38,11 @@ jobs:
           sudo apt-get install -y build-essential git libssl-dev
           git clone https://github.com/mighty-gerbils/gerbil.git "$RUNNER_TEMP/gerbil"
           git -C "$RUNNER_TEMP/gerbil" checkout "$GERBIL_COMMIT"
-          cd "$RUNNER_TEMP/gerbil/src"
-          export GERBIL_PREFIX="$RUNNER_TEMP/gerbil/build"
-          ./build.sh
+          cd "$RUNNER_TEMP/gerbil"
+          export GERBIL_PREFIX="$RUNNER_TEMP/gerbil-install"
+          ./configure --prefix="$GERBIL_PREFIX"
+          make -j"$(nproc)"
+          make install
           echo "$GERBIL_PREFIX/bin" >> "$GITHUB_PATH"
           {
             echo "GERBIL_HOME=$GERBIL_PREFIX"
@@ -50,11 +52,16 @@ jobs:
       - name: Install Gerbil (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew tap tao3k/gerbil
-          brew install gerbil-scheme
-          gsc_path="$(command -v gsc)"
+          brew tap mighty-gerbils/gerbil
+          brew install mighty-gerbils/gerbil/gerbil-scheme
+          gerbil_prefix="$(brew --prefix gerbil-scheme)"
+          gsc_path="$gerbil_prefix/v0.18.2/bin/gsc"
           test -x "$gsc_path"
-          echo "GERBIL_GSC=$gsc_path" >> "$GITHUB_ENV"
+          gambit_prefix="$(dirname "$(dirname "$gsc_path")")"
+          {
+            echo "GERBIL_GSC=$gsc_path"
+            echo "GAMBOPT=~~bin=$gambit_prefix/bin,~~lib=$gambit_prefix/lib,~~include=$gambit_prefix/include"
+          } >> "$GITHUB_ENV"
       - name: Toolchain receipt
         run: |
           rustc --version

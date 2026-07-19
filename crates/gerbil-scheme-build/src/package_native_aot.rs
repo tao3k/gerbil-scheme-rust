@@ -114,6 +114,14 @@ pub fn compile_package_native_aot_artifact(
     toolchain: &GerbilBuildToolchain,
     plan: &GerbilPackageNativeAotCompilePlan<'_>,
 ) -> GerbilNativeAotCommandReceipt {
+    for dependency_source_path in plan.dependency_source_paths {
+        let dependency_receipt =
+            run_package_native_aot_compile(toolchain, plan.package_dir, dependency_source_path);
+        if dependency_receipt.status_code != Some(0) {
+            return dependency_receipt;
+        }
+    }
+
     let compile_receipt =
         run_package_native_aot_compile(toolchain, plan.package_dir, plan.source_path);
     if compile_receipt.status_code != Some(0) {

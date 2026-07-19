@@ -10,7 +10,11 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-gerbil-scheme-sys.workspace = true
+gerbil-scheme-sys = { workspace = true, optional = true }
+
+[features]
+default = []
+native = ["dep:gerbil-scheme-sys"]
 
 [dev-dependencies]
 divan.workspace = true
@@ -19,6 +23,27 @@ gerbil-scheme-rust-project-harness.workspace = true
 [[bench]]
 name = "native_ffi"
 harness = false
+required-features = ["native"]
+
+[[test]]
+name = "native_error_contract"
+required-features = ["native"]
+
+[[test]]
+name = "native_ffi_benchmark"
+required-features = ["native"]
+
+[[test]]
+name = "native_runtime"
+required-features = ["native"]
+
+[[test]]
+name = "native_runtime_round_trip"
+required-features = ["native"]
+
+[[test]]
+name = "status_contract"
+required-features = ["native"]
 
 [lints]
 workspace = true

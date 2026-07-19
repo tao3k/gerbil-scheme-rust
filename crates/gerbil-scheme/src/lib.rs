@@ -14,12 +14,15 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
+#[cfg(feature = "native")]
 pub use gerbil_scheme_sys::{
     GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GerbilStatus,
 };
 
+#[cfg(feature = "native")]
 mod native;
 
+#[cfg(feature = "native")]
 pub use native::{GerbilRuntime, NativeError};
 
 /// Environment variable selecting the Gerbil interpreter.

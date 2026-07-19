@@ -28,6 +28,8 @@ pub use native::{GerbilRuntime, NativeError};
 /// Environment variable selecting the Gerbil interpreter.
 pub const GERBIL_GXI_ENV: &str = "GERBIL_GXI";
 
+pub mod native_environment;
+
 /// Environment variable selecting the Gerbil compiler.
 pub const GERBIL_GXC_ENV: &str = "GERBIL_GXC";
 

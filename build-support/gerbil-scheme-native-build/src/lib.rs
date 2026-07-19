@@ -13,6 +13,9 @@ pub use archive::{
     static_archive_file_name,
 };
 pub use discovery::{GambitLinkSearchDiscovery, discover_gambit_link_search_dir_from_gsc};
-pub use header::{NativeCHeaderDriftReceipt, validate_native_c_header};
+pub use header::{
+    NativeCHeaderDriftReceipt, NativeCHeaderGenerationReceipt, validate_native_c_header,
+    write_native_c_header,
+};
 pub use native::build_native_archive;
 pub use toolchain::{NativeCCompilerTool, discover_native_c_compiler};

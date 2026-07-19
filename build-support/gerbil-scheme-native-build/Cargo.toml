@@ -8,6 +8,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+cbindgen.workspace = true
 cc.workspace = true
 
 [dev-dependencies]

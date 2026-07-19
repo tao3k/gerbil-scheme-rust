@@ -285,3 +285,4 @@ mod tests {
         fs::remove_dir_all(output_dir).expect("scratch directory must be removable");
     }
 }
+pub mod package_native_aot;

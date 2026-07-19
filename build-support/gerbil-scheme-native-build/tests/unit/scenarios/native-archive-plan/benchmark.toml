@@ -1,0 +1,14 @@
+harness = "libtest"
+test = "static_archive_packaging_consumes_real_object_files"
+phase = "warm"
+target_total = "100ms"
+max_total = "500ms"
+observed_total = "20ms"
+regression_budget = "250ms"
+memory_budget_bytes = 134217728
+observed_memory_bytes = 0
+target_rationale = "The parity gate compiles two minimal C objects and packages one platform archive through the neutral upstream plan."
+
+[observed_timings]
+archive_packaging = "20ms"
+archive_packaging_budget = "250ms"

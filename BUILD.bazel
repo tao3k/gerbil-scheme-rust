@@ -39,7 +39,20 @@ filegroup(
             ":gerbil_sources",
             ":rust_sources",
         ],
-        tags = ["no-sandbox"],
+        tags = [
+            "manual",
+            "no-sandbox",
+        ],
+        timeout = {
+            "check": "moderate",
+            "test": "long",
+            "clippy": "long",
+        }[gate],
+        size = {
+            "check": "medium",
+            "test": "large",
+            "clippy": "large",
+        }[gate],
     )
     for gate in [
         "check",
@@ -50,6 +63,7 @@ filegroup(
 
 sh_test(
     name = "cargo_all",
+    size = "large",
     tags = [
         "exclusive",
         "no-sandbox",
@@ -92,6 +106,7 @@ gerbil_project_test(
     build_args = ["compile"],
     build_script = "build.ss",
     tests = ["scheme/test-native.ss"],
+    timeout = "short",
     srcs = [":gerbil_sources"],
 )
 

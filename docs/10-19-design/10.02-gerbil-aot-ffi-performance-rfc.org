@@ -16,6 +16,11 @@ The steady-state Rust-to-Gerbil path MUST be reported in nanoseconds per call
 and MUST be measured after one runtime initialization. A required Scenario MUST
 also remain below a 500 millisecond wall-time guard so CI cannot hang.
 
+Cross-platform debug CI uses a 2 microsecond median guard and a 10 microsecond
+p95 scheduler-noise guard for each safe scalar operation.  Release Divan
+nanoseconds remain the optimization evidence; raising a debug p95 guard does not
+redefine the release performance target.
+
 No receipt may use aggregate milliseconds alone to claim native-call speed.
 
 * 10.02.20 Problem

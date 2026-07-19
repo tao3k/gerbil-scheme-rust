@@ -15,17 +15,22 @@ runtime evidence.
 
 * 20.01.10 Current Snapshot
 
-As of 2026-07-17:
+As of 2026-07-18 the independent repository boundary is operational:
 
-- the repository contains its original LGPL-2.1 license text;
-- the bindings RFC and bootstrap plan are being established;
-- no Cargo workspace, Rust crate, Gerbil package, Bazel module, or CI workflow
-  exists yet;
-- Marlin contains reference implementations and tests, but they have not been
-  separated from Marlin dependencies;
-- =poo-flow= contains the green Bazel/Gerbil CI pattern to adapt.
+- the dual-license, Cargo workspace, Gerbil package, canonical =build.ss=,
+  Bzlmod graph, Rust toolchain, and Linux/macOS CI exist;
+- =gerbil-scheme-sys= owns ABI version 1 and the public C header contract;
+- =gerbil-scheme= owns the exclusive, thread-affine safe runtime and scalar
+  projection surface;
+- Cargo and Bazel consume the canonical Gerbil AOT archive;
+- statistical Scenarios distinguish C control, raw Gerbil AOT, and safe Rust
+  wrapper cost in nanoseconds per operation;
+- Marlin extraction has completed inventory and classification, but Marlin does
+  not yet consume this repository as a pinned dependency.
 
-No implementation milestone is complete at this snapshot.
+Phase 0 is complete.  Phases 1, 3, and 4 have working vertical slices.  Phase 2
+remains open for module invocation and owned value handles.  Phase 5 is the
+active cross-repository migration.
 
 * 20.01.20 Delivery Rules
 
@@ -42,16 +47,16 @@ No implementation milestone is complete at this snapshot.
 
 ** Deliverables
 
-- [ ] Install =LICENSE-APACHE= and =LICENSE-LGPL=.
-- [ ] Add package and source SPDX expression
+- [X] Install =LICENSE-APACHE= and =LICENSE-LGPL=.
+- [X] Add package and source SPDX expression
   =Apache-2.0 OR LGPL-2.1-or-later=.
-- [ ] Add =CONTRIBUTING.org= with the dual-license contribution statement.
-- [ ] Create the Cargo workspace and the initial three-crate directories.
-- [ ] Add =rust-toolchain.toml= and a committed =Cargo.lock= policy.
-- [ ] Add =MODULE.bazel=, =.bazelrc=, and a minimal queryable target graph.
-- [ ] Adapt the Gerbil repository/toolchain rules from =poo-flow= without
+- [X] Add =CONTRIBUTING.org= with the dual-license contribution statement.
+- [X] Create the Cargo workspace and the initial three-crate directories.
+- [X] Add =rust-toolchain.toml= and a committed =Cargo.lock= policy.
+- [X] Add =MODULE.bazel=, =.bazelrc=, and a minimal queryable target graph.
+- [X] Adapt the Gerbil repository/toolchain rules from =poo-flow= without
   importing =poo-flow= as a build dependency.
-- [ ] Add a Linux/macOS native CI skeleton.
+- [X] Add a Linux/macOS native CI skeleton.
 
 ** Gate
 
@@ -71,12 +76,13 @@ bazel query //...
 
 ** Deliverables
 
-- [ ] Define the minimum supported native ABI surface.
-- [ ] Implement =gerbil-scheme-sys= with explicit layout and ownership docs.
-- [ ] Add ABI identifier and version checks.
-- [ ] Add null, invalid-version, layout, and symbol-presence tests.
+- [X] Define the minimum supported native ABI surface.
+- [X] Implement =gerbil-scheme-sys= with explicit layout and ownership docs.
+- [X] Add ABI identifier and version checks.
+- [X] Add layout, header-drift, and symbol-presence tests.
+- [ ] Complete null and invalid-version native caller tests.
 - [ ] Add panic containment for Rust functions callable from native code.
-- [ ] Compile and link one native smoke artifact through Cargo and Bazel.
+- [X] Compile and link one native smoke artifact through Cargo and Bazel.
 
 ** Gate
 
@@ -96,11 +102,11 @@ bazel test //crates/gerbil-scheme-sys/...
 
 ** Deliverables
 
-- [ ] Introduce checked runtime and handle ownership types.
-- [ ] Introduce the minimum value conversion surface.
+- [X] Introduce the checked, exclusive, thread-affine runtime owner.
+- [X] Introduce the minimum scalar value conversion surface.
 - [ ] Load one Gerbil module and invoke one function through the safe API.
-- [ ] Return one typed value and one structured error to Rust.
-- [ ] Prove that raw pointers do not escape the documented safe boundary.
+- [X] Return scalar typed values and structured errors to Rust.
+- [X] Prove that the scalar safe surface exposes no raw pointer.
 
 ** Gate
 
@@ -120,17 +126,17 @@ bazel test //crates/gerbil-scheme/...
 
 ** Deliverables
 
-- [ ] Create the minimal Gerbil package and canonical =build.ss=.
-- [ ] Implement =gerbil-scheme-build= toolchain discovery.
-- [ ] Produce a Gerbil AOT object or native archive deterministically.
-- [ ] Emit link metadata consumable by Cargo and Bazel.
-- [ ] Add generated header/declaration drift validation if generation is used.
-- [ ] Add a clean-checkout real =gxi=/=gsc= build test.
+- [X] Create the minimal Gerbil package and canonical =build.ss=.
+- [X] Implement =gerbil-scheme-native-build= toolchain discovery.
+- [X] Produce a Gerbil AOT object or native archive deterministically.
+- [X] Emit link metadata consumable by Cargo and Bazel.
+- [X] Add public header/declaration drift validation.
+- [X] Add a clean-checkout real =gxi=/=gsc= build test.
 
 ** Gate
 
 #+begin_src sh
-cargo test -p gerbil-scheme-build --locked
+cargo test -p gerbil-scheme-native-build --locked
 bazel build //...
 bazel test //tests:real_gerbil_smoke
 #+end_src
@@ -146,12 +152,12 @@ bazel test //tests:real_gerbil_smoke
 
 ** Deliverables
 
-- [ ] Reuse the =poo-flow= Linux source-Gerbil lane.
-- [ ] Reuse the =poo-flow= macOS Homebrew-Gerbil lane.
-- [ ] Reuse native ABI fingerprinting in cache keys.
-- [ ] Reuse Gerbil bootstrap, package, ccache, and Bazel caches.
-- [ ] Run Cargo and Bazel acceptance gates in the same revision.
-- [ ] Upload compact build/test receipts and failure artifacts.
+- [X] Reuse the =poo-flow= Linux source-Gerbil lane.
+- [X] Reuse the =poo-flow= macOS Homebrew-Gerbil lane.
+- [X] Reuse native ABI fingerprinting in cache keys.
+- [X] Reuse Gerbil bootstrap, package, ccache, and Bazel caches.
+- [X] Run Cargo and Bazel acceptance gates in the same revision.
+- [X] Upload compact build/test receipts and failure artifacts.
 - [ ] Verify a cold-cache run and a warm-cache run.
 
 ** Gate
@@ -174,15 +180,15 @@ bazel test //...
 
 ** Deliverables
 
-- [ ] Inventory candidate generic modules in =marlin-gerbil-scheme= and
+- [X] Inventory candidate generic modules in =marlin-gerbil-scheme= and
   =marlin-gerbil-native-build=.
-- [ ] Classify every candidate as move, rewrite, reference-only, or stay.
+- [X] Classify every candidate as move, rewrite, reference-only, or stay.
 - [ ] Remove all Marlin dependencies from code before it enters the binding
   public surface.
 - [ ] Preserve provenance, license, copyright, and notices.
 - [ ] Change Marlin to consume the new binding crates through a pinned
   dependency.
-- [ ] Keep =marlin-gerbil-ir= and all application policy in Marlin.
+- [X] Keep =marlin-gerbil-ir= and all application policy in Marlin.
 - [ ] Pass the existing Marlin Gerbil acceptance and real-=gxi= gates.
 
 ** Gate
@@ -221,17 +227,20 @@ green; a successful package dry run does not authorize publication.
 
 * 20.01.100 Immediate Next Slice
 
-The next implementation slice is intentionally small:
+The active slice makes this repository the single upstream bindings dependency:
 
-1. establish the dual-license file layout and contribution statement;
-2. create a Cargo workspace containing empty =sys=, safe, and build crates;
-3. install Bzlmod and the reusable Gerbil toolchain skeleton;
-4. create one native ABI probe that compiles through Cargo and Bazel;
-5. run it on the Linux source-Gerbil and macOS Homebrew-Gerbil CI lanes;
-6. capture toolchain, artifact, ABI, and test receipts.
+1. parameterize archive/link/header/compiler helpers in
+   =gerbil-scheme-native-build=;
+2. port generic Marlin build-support tests as provenance-recorded Scenarios;
+3. publish a pinned git revision for downstream validation without declaring a
+   release;
+4. change Marlin native build support to consume that pinned dependency;
+5. retain Marlin IR, policy, Deck, workspace, and CLI wrappers downstream;
+6. delete only the duplicate generic implementation after both repositories are
+   green.
 
-This slice SHALL NOT extract Marlin runtime modules.  It proves the independent
-repository and build boundary first.
+No Marlin domain type, schema identifier, package identity, or adapter module
+may enter the upstream bindings public API.
 
 * 20.01.110 Risk Register
 
@@ -266,14 +275,15 @@ Update this section only from current repository evidence.
 |------------+-------+----------|
 | Bindings RFC | present | =docs/10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org= |
 | Delivery plan | present | this document |
-| Dual-license layout | pending | only the original LGPL license is present |
-| Cargo workspace | pending | no Cargo manifest |
-| Gerbil package/build | pending | no =gerbil.pkg= or =build.ss= |
-| Bazel graph | pending | no =MODULE.bazel= or Bazel targets |
-| Green CI | pending | no repository workflow |
-| Raw binding | pending | no Rust source owner |
-| Safe binding | pending | no Rust source owner |
-| Marlin consumer | pending | extraction not started |
+| Dual-license layout | complete | =LICENSE-APACHE=, =LICENSE-LGPL=, =CONTRIBUTING.org= |
+| Cargo workspace | complete | locked workspace and three owned crate families |
+| Gerbil package/build | complete | =gerbil.pkg= and canonical =build.ss= |
+| Bazel graph | complete | Bzlmod Cargo/native gates |
+| Green CI | complete | Linux source-Gerbil and macOS Homebrew-Gerbil |
+| Raw binding | scalar slice complete | ABI v1, header drift, C control, raw AOT calls |
+| Safe binding | scalar slice complete | exclusive runtime and typed scalar/error projection |
+| Native build substrate | active | generic Marlin archive/header/compiler convergence |
+| Marlin consumer | active | inventory complete; pinned dependency migration pending |
 
 * 20.01.130 Remaining Gaps
 
@@ -281,13 +291,12 @@ The bootstrap no longer has an in-process runtime gap.  Remaining work belongs
 to API expansion: exception-to-status containment, owned value handles with
 explicit release functions, and additional ABI-versioned scalar/string calls.
 
-- Resolve the minimum supported Gerbil native API surface.
+- Complete module load, function invocation, and owned value handle ABI v1.
 - Decide whether process-based =gxi= invocation is a core feature or a separate
   feature from embedded/native binding.
 - Define the initial ownership table for values, handles, callbacks, and
   buffers.
-- Select the first ABI probe small enough to validate on both supported CI
-  platforms.
-- Decide the exact provenance workflow for code rewritten from Marlin
-  reference implementations.
-- Establish measurable cold/warm CI baselines after the first green run.
+- Add callback/panic containment and invalid native caller Scenarios.
+- Record provenance for every generic helper rewritten from Marlin.
+- Make Marlin consume the pinned upstream dependency and remove duplicates.
+- Establish explicit cold/warm CI baselines and ratio variance gates.

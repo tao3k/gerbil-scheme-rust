@@ -1,0 +1,8 @@
+id = "native-archive-plan"
+title = "Parameterized native archive link plan"
+policy_ids = ["RUST-AGENT-GERBIL-BUILD-001"]
+agent_goal = "Prove that real native objects can be packaged through a neutral Gerbil archive plan without Marlin-specific types or names."
+reference_repositories = ["tao3k/marlin-agent-core", "tao3k/gerbil-scheme-rust"]
+reference_patterns = ["static archive link plan", "ordered Cargo directives", "real object packaging"]
+inputs = "inputs"
+expected = "expected"

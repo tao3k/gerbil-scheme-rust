@@ -250,6 +250,7 @@ name = "gerbil-scheme-native-build"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "gerbil-scheme-rust-project-harness",
  "gerbil-scheme-rust-project-harness-policy",
 ]
 

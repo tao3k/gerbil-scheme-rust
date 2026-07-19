@@ -17,6 +17,8 @@ General Public License 2.1 or later, at the recipient's option.
   scalar projection.  It is not described as the native backend.
 - =GerbilRuntime=: safe, exclusive, thread-affine ownership of an initialized
   in-process Gerbil/Gambit runtime, with ABI validation and cleanup on drop.
+- =gerbil-scheme-native-build=: canonical Gerbil AOT, native compiler discovery,
+  archive/link projection, and checked native build orchestration.
 - =gerbil-scheme-build=: opaque source emission, artifact projection, and
   checked =gxc= invocation.
 - =scheme/native.ss=: a scalar C export implemented with Gerbil's official
@@ -42,7 +44,7 @@ Environment:
 Results:
 
 - =cargo fmt --all --check=: pass.
-- =cargo test --workspace --locked=: 10 passed, 0 failed.
+- =cargo test --workspace --locked=: 424 passed, 0 failed, 1 ignored.
 - =cargo clippy --workspace --all-targets --locked -- -D warnings=: pass.
 - =./build.ss compile=: pass.
 - =gxi scheme/test-native.ss=: pass, scalar result 42.
@@ -53,6 +55,50 @@ Results:
   Gerbil gate in 7.7 seconds.  The
   suite serializes native toolchain use instead of compiling the same archive
   concurrently in four test actions.
+
+Current pull-request CI at commit =103c496=:
+
+- macOS 26 with Homebrew Gerbil: pass in 5 minutes 8 seconds;
+- Ubuntu with source Gerbil: pass in 5 minutes 48 seconds;
+- both jobs run Cargo and Bazel gates from the same revision.
+
+* AOT FFI Performance Receipt
+
+The statistical Scenario initializes Gerbil once and measures C control, raw
+Gerbil AOT, and safe Rust wrapper paths independently.  A representative local
+receipt records:
+
+- C identity median: 7 nanoseconds;
+- raw AOT scalar medians: 61--64 nanoseconds;
+- safe even/compare medians: 77 nanoseconds;
+- the complete 175,000-call statistical workload: 27.9 milliseconds;
+- aggregate hard gate: 500 milliseconds.
+
+Release Divan targets contain separate =c_identity=, raw AOT, and safe wrapper
+benchmarks.  These receipts establish a baseline, not a claim that AOT is fully
+optimized; =add_i64= p95 variance remains an active optimization item.
+
+* Marlin Consumer Migration Receipt
+
+The dependency direction is fixed:
+
+#+begin_src text
+gerbil-scheme-rust -> consumed by marlin-agent-core
+#+end_src
+
+Inventory and classification are complete.  =marlin-gerbil-ir=, routing schemas,
+projection/package identities, Deck/workspace semantics, and CLI wrappers stay
+in Marlin.  Generic compiler discovery, archive/link/header receipts, symbol
+audit, and build-plan mechanisms converge upstream.  The migration is not
+complete until Marlin consumes a pinned upstream revision and no longer owns a
+duplicate generic implementation.
+
+The upstream neutral build substrate now owns parameterized static-link plans,
+ordered Cargo directives, native compiler discovery, Gambit discovery through
+Gerbil wrappers, and header drift receipts.  Its acceptance surface records 7
+passing tests, including real C object compilation and archive packaging, plus
+2 valid Harness Scenario contracts.  Package all-target Clippy passes with
+warnings denied.
 
 * Safe In-process Boundary
 

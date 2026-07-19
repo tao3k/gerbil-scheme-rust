@@ -1,0 +1,88 @@
+#+title: 20.02 Marlin Consumer Migration Plan
+#+author: gerbil-scheme-rust maintainers
+#+date: 2026-07-18
+#+status: Active
+#+options: toc:3 num:nil
+
+* 20.02.00 Migration Contract
+
+=gerbil-scheme-rust= is the sole upstream owner of general Gerbil Scheme Rust
+bindings, ABI version 1, safe runtime ownership, AOT build support, native
+compiler discovery, archive/link/header projection, and their Scenarios.
+
+=marlin-agent-core= consumes a pinned revision of these crates.  The upstream
+repository MUST NOT depend on Marlin.
+
+* 20.02.10 Ownership Boundary
+
+| Upstream bindings owner | Downstream Marlin owner |
+|-------------------------+-------------------------|
+| Gerbil ABI and sys declarations | agent-policy routing ABI and schemas |
+| safe runtime/value/handle API | Loop Graph and workspace IR |
+| compiler and Gerbil discovery | Deck and resident runtime semantics |
+| generic archive/link/header plans | named policy/deck archive wrappers |
+| symbol and header drift receipts | Marlin CLI compatibility wrappers |
+| Cargo/Bazel AOT artifact contract | Marlin application adapters |
+
+* 20.02.20 Migration Units
+
+** Rewrite upstream with provenance
+
+- generic native compiler discovery;
+- static archive construction from a parameterized link plan;
+- Cargo static-link directives and archive filename projection;
+- C header generation/drift receipt;
+- native symbol audit using =object=;
+- deterministic inputs and cache fingerprints.
+
+** Keep downstream as thin adapters
+
+- agent-policy and Deck archive builders;
+- the five =marlin-gerbil-*= CLI entrypoints;
+- =generate_gerbil_runtime_assets= orchestration until its Marlin coupling is
+  fully classified;
+- routing/projection ABI identifiers and package identities.
+
+** Never migrate
+
+- =marlin-gerbil-ir=;
+- agent protocol, policy, graph, memory, storage, workspace, or Deck types;
+- Marlin schemas or adapter modules.
+
+* 20.02.30 Delivery Sequence
+
+1. Define neutral upstream build-plan types and receipts.
+2. Port behavior as new code with provenance notes and Scenario parity tests.
+3. Land and push the upstream revision; do not publish a release.
+4. Pin Marlin to the exact git revision.
+5. Replace Marlin generic implementation with delegating adapters.
+6. Run Marlin unit, real-=gxi=, AOT repair, native archive, and consumer gates.
+7. Delete duplicated downstream code only after both CI surfaces are green.
+
+* 20.02.40 Acceptance Gates
+
+- no upstream Cargo dependency path contains =marlin=;
+- Marlin has exactly one pinned upstream dependency revision;
+- policy/deck wrappers preserve current artifact names and public behavior;
+- generic archive/header/compiler behavior has Scenario parity receipts;
+- Cargo and Bazel use the same upstream-generated native artifact;
+- both repositories pass clean-checkout Linux and macOS gates;
+- migration provenance is recorded in Org documentation.
+
+* 20.02.50 Non-Goals
+
+- This migration does not merge the two repositories.
+- It does not move Marlin IR or runtime policy upstream.
+- It does not authorize a crate publication or Version 1 release.
+- It does not change the ABI identifier or ABI version.
+
+* 20.02.60 Current Status
+
+- [X] Independent bindings repository and CI established.
+- [X] Marlin Gerbil crate inventory completed.
+- [X] Move/keep/reference classification completed.
+- [X] Neutral upstream native build API completed.
+- [X] Upstream parity Scenarios completed.
+- [ ] Pinned Marlin dependency installed.
+- [ ] Downstream duplicate implementation removed.
+- [ ] Both repositories green at the migration revision pair.

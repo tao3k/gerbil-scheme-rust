@@ -56,11 +56,12 @@ Results:
   suite serializes native toolchain use instead of compiling the same archive
   concurrently in four test actions.
 
-Current pull-request CI at commit =103c496=:
+Current pull-request CI at commit =74ddf20cda49059cbbe71eff48a4ae20184a3a67=:
 
 - macOS 26 with Homebrew Gerbil: pass in 5 minutes 8 seconds;
 - Ubuntu with source Gerbil: pass in 5 minutes 48 seconds;
 - both jobs run Cargo and Bazel gates from the same revision.
+- Latest matrix receipt: macOS 26/Homebrew passed in 5 minutes; Ubuntu/source passed in 6 minutes 24 seconds.
 
 * AOT FFI Performance Receipt
 
@@ -79,6 +80,8 @@ benchmarks.  These receipts establish a baseline, not a claim that AOT is fully
 optimized; =add_i64= p95 variance remains an active optimization item.
 
 * Marlin Consumer Migration Receipt
+Current downstream state: Marlin declares the upstream crate as a workspace dependency pinned to commit =74ddf20cda49059cbbe71eff48a4ae20184a3a67=. Its native archive and compiler adapters delegate to the upstream substrate while policy, Deck, projection, and runtime semantics remain downstream. Consumer tests and the final duplicate-removal gate remain open until the Marlin validation surface is green.
+
 
 The dependency direction is fixed:
 
@@ -114,6 +117,9 @@ unsupported restart.
 The process-backed implementation remains a separately named fallback during
 the expansion of the native API.  It is not used as evidence for the in-process
 native acceptance gate.
+
+* Official Export Authority Gate
+The generated =src/bootstrap/gerbil/builtin.ssxi.ss= file is bootstrap projection metadata, not binding-definition authority. Version 1 module, procedure, value, rooting, release, and exception APIs therefore require evidence from an official Gerbil/Gambit export owner plus a real linked Scenario before they enter the public Rust surface.
 
 * Next Native Expansion Gate
 

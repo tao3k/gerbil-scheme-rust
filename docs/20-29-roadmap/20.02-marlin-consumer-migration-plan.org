@@ -83,6 +83,6 @@ repository MUST NOT depend on Marlin.
 - [X] Move/keep/reference classification completed.
 - [X] Neutral upstream native build API completed.
 - [X] Upstream parity Scenarios completed.
-- [ ] Pinned Marlin dependency installed.
+- [X] Pinned Marlin dependency installed at =74ddf20cda49059cbbe71eff48a4ae20184a3a67=.
 - [ ] Downstream duplicate implementation removed.
 - [ ] Both repositories green at the migration revision pair.

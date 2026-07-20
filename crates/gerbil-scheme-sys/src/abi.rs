@@ -308,6 +308,134 @@ impl Default for GerbilBorrowedVector {
 pub type GerbilProcedureCallback =
     unsafe extern "C" fn(GerbilValueHandle, *mut c_void) -> GerbilStatus;
 
+/// Return whether a value handle is backed by a Scheme pair.
+///
+/// This ABI entry point is intentionally fail-closed until runtime-backed type
+/// classification exists.  It validates the pointer/status boundary without
+/// dereferencing unmanaged handles.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_value_is_pair(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    unsafe { checked_unbacked_value_predicate(value, out) }
+}
+
+/// Return whether a value handle is backed by a Scheme list.
+///
+/// This ABI entry point is intentionally fail-closed until runtime-backed list
+/// classification exists.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_value_is_list(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    unsafe { checked_unbacked_value_predicate(value, out) }
+}
+
+/// Return whether a value handle is backed by Scheme null.
+///
+/// This ABI entry point is intentionally fail-closed until runtime-backed null
+/// classification exists.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_value_is_null(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    unsafe { checked_unbacked_value_predicate(value, out) }
+}
+
+/// Project the car of a pair value into an output handle.
+///
+/// This ABI entry point is intentionally fail-closed until runtime-backed pair
+/// traversal exists.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_pair_car(
+    value: GerbilValueHandle,
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe { checked_unbacked_value_handle_projection(value, out) }
+}
+
+/// Project the cdr of a pair value into an output handle.
+///
+/// This ABI entry point is intentionally fail-closed until runtime-backed pair
+/// traversal exists.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_pair_cdr(
+    value: GerbilValueHandle,
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe { checked_unbacked_value_handle_projection(value, out) }
+}
+
+/// Project both car and cdr of a pair value.
+///
+/// This ABI entry point is intentionally fail-closed until runtime-backed pair
+/// traversal exists.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilPair`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_pair_parts(
+    value: GerbilValueHandle,
+    out: *mut GerbilPair,
+) -> GerbilStatus {
+    if value.is_null() || out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    GerbilStatus::InvalidValue
+}
+
+unsafe fn checked_unbacked_value_predicate(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    if value.is_null() || out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    // SAFETY: caller provided a non-null output pointer for one GerbilBoolean.
+    unsafe {
+        *out = GerbilBoolean::FALSE;
+    }
+    GerbilStatus::InvalidValue
+}
+
+unsafe fn checked_unbacked_value_handle_projection(
+    value: GerbilValueHandle,
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    if value.is_null() || out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    // SAFETY: caller provided a non-null output pointer for one handle.
+    unsafe {
+        *out = core::ptr::null_mut();
+    }
+    GerbilStatus::InvalidValue
+}
+
 unsafe extern "C" {
     /// Initializes the process-global Gerbil runtime and binding module.
     ///

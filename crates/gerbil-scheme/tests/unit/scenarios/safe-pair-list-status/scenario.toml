@@ -1,0 +1,29 @@
+id = "safe-pair-list-status"
+title = "Safe Pair/List Status Surface"
+policy_ids = [
+  "RUST-AGENT-GERBIL-SCHEME-SAFE-STATUS-001",
+  "RUST-AGENT-GERBIL-SCHEME-PAIR-LIST-001",
+]
+agent_goal = "Expose pair/list/null predicates and pair car/cdr projections through safe NativeResult wrappers while the sys ABI fails closed for unbacked native handles."
+
+reference_repositories = [
+  "gerbil-scheme-rust",
+  "marlin-agent-core",
+]
+reference_patterns = [
+  "gerbil_scheme_rust_value_is_pair",
+  "gerbil_scheme_rust_value_is_list",
+  "gerbil_scheme_rust_value_is_null",
+  "gerbil_scheme_rust_pair_car",
+  "gerbil_scheme_rust_pair_cdr",
+  "gerbil_scheme_rust_pair_parts",
+  "GerbilValue::is_pair",
+  "GerbilValue::pair_parts",
+]
+
+inputs = "A non-null unbacked GerbilValueHandle fixture projected through PhantomData-backed safe GerbilValue wrappers."
+
+expected = "Predicates return NativeResult status InvalidValue with false outputs for non-null unbacked handles; pair projections return NativeResult status InvalidValue without producing safe GerbilValue values; null native inputs return NullPointer."
+
+[benchmark]
+file = "benchmark.toml"

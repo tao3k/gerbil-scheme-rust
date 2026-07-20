@@ -27,9 +27,27 @@ typedef struct GerbilBorrowedUtf8 {
   size_t len;
 } GerbilBorrowedUtf8;
 
+typedef struct GerbilBorrowedBytevector {
+  const uint8_t *ptr;
+  size_t len;
+} GerbilBorrowedBytevector;
+
 typedef struct GerbilRuntimeOpaque GerbilRuntimeOpaque;
 typedef uintptr_t GerbilValueHandle;
+typedef uint8_t GerbilBoolean;
 typedef GerbilStatus (*GerbilI64Callback)(int64_t value, void *context);
+typedef GerbilStatus (*GerbilProcedureCallback)(GerbilValueHandle value,
+                                                void *context);
+
+typedef struct GerbilPair {
+  GerbilValueHandle car;
+  GerbilValueHandle cdr;
+} GerbilPair;
+
+typedef struct GerbilBorrowedVector {
+  const GerbilValueHandle *ptr;
+  size_t len;
+} GerbilBorrowedVector;
 
 uint32_t gerbil_scheme_rust_abi_version(void);
 int32_t gerbil_scheme_rust_runtime_init(void);
@@ -38,6 +56,18 @@ int64_t gerbil_scheme_rust_identity_i64(int64_t value);
 int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);
 int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
 int32_t gerbil_scheme_rust_compare_i64(int64_t left, int64_t right);
+GerbilStatus gerbil_scheme_rust_value_is_pair(GerbilValueHandle value,
+                                              GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_value_is_list(GerbilValueHandle value,
+                                              GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_value_is_null(GerbilValueHandle value,
+                                              GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_pair_car(GerbilValueHandle value,
+                                         GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_pair_cdr(GerbilValueHandle value,
+                                         GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_pair_parts(GerbilValueHandle value,
+                                           GerbilPair *out);
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,12 @@ pub use abi::{
 };
 
 pub use abi::{
+    gerbil_scheme_rust_pair_car, gerbil_scheme_rust_pair_cdr, gerbil_scheme_rust_pair_parts,
+    gerbil_scheme_rust_value_is_list, gerbil_scheme_rust_value_is_null,
+    gerbil_scheme_rust_value_is_pair,
+};
+
+pub use abi::{
     GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GERBIL_SCHEME_RUST_HEADER_PATH,
     GERBIL_SCHEME_RUST_HEADER_SOURCE, GerbilBorrowedUtf8, GerbilI64Callback, GerbilRuntimeOpaque,
     GerbilStatus, GerbilValueHandle, gerbil_scheme_rust_abi_version, gerbil_scheme_rust_add_i64,

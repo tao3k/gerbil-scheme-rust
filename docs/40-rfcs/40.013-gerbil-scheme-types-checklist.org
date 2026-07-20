@@ -1,0 +1,303 @@
+#+TITLE: RFC 40.013 Gerbil Scheme Types Binding Checklist
+#+DATE: 2026-07-20
+#+STATUS: Draft
+
+* Purpose
+
+This checklist tracks the remaining work required for =gerbil-scheme-rust= to
+become a general-purpose Gerbil Scheme Rust bindings library, rather than a
+Marlin-specific extraction.
+
+The checklist is intentionally type-first. Marlin integration should consume
+this crate only after the native Scheme value surface, ownership rules,
+scenario coverage, and performance receipts are clear enough to be reused.
+
+* Current evidence baseline
+
+Current Rust ABI evidence:
+
+- =gerbil-scheme-sys= exposes =GerbilStatus=, =GerbilBorrowedUtf8=,
+  =GerbilRuntimeOpaque=, =GerbilValueHandle=, and =GerbilI64Callback=.
+- =gerbil-scheme= exposes safe =GerbilRuntime=, =GerbilUtf8=,
+  =GerbilValue=, =GerbilI64Callback=, =GerbilI64CallbackAbi=, and
+  =NativeError=.
+- Scalar native operations currently cover i64 identity/addition, i64 parity,
+  and i64 comparison.
+- =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
+  callback trampoline behavior.
+
+Current Scheme source-surface evidence:
+
+- =scheme/asp/native-surface.ss= is still the ASP-projected workaround for the
+  source-surface view.
+- The current projected selector set is exactly 14 selectors:
+  =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
+  =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
+  =gerbil_scheme_rust_add_i64=, =gerbil_scheme_rust_is_even_i64=,
+  =gerbil_scheme_rust_compare_i64=,
+  =gerbil_scheme_rust_runtime_handle_shape=,
+  =gerbil_scheme_rust_status_shape=, =gerbil_scheme_rust_i64_shape=,
+  =gerbil_scheme_rust_bool_shape=,
+  =gerbil_scheme_rust_comparison_shape=,
+  =gerbil_scheme_rust_native_value_shape=, and
+  =gerbil_scheme_rust_native_result_shape=.
+- Direct provider projection of the real =scheme/native.ss= FFI/export owner is
+  not yet closed and remains a provider/source-surface TODO.
+- No current Scheme selector exists for callback, string/UTF-8, nil, void, f64,
+  char, symbol, keyword, pair, list, vector, procedure, error object taxonomy,
+  GC rooting, or explicit value nullability.
+
+* Checklist status legend
+
+- =[X]= implemented and covered by tests or scenario receipts.
+- =[ ]= not implemented or not accepted.
+- =[?]= partially implemented; owner or semantics still need proof.
+
+* Type surface checklist
+
+** Runtime and lifecycle
+
+- [X] Process-global runtime safe owner: =GerbilRuntime=.
+- [X] Thread-affinity check for runtime methods.
+- [X] ABI version check before exposing runtime handle.
+- [X] Drop-time native cleanup path.
+- [ ] Explicit runtime re-entry policy document: what is legal after cleanup,
+  what is process-final, and what must fail closed.
+- [ ] Scenario for wrong-thread access and runtime-finalized behavior.
+- [ ] Public receipt type for runtime initialization, ABI id, ABI version, and
+  native module path.
+
+** Status, error, and result
+
+- [X] Stable raw status enum: =GerbilStatus=.
+- [X] Safe native error enum: =NativeError=.
+- [X] Unknown status preservation in status contract tests.
+- [X] Panic containment for i64 callback trampoline.
+- [ ] Public =GerbilResult<T>= alias or typed result wrapper.
+- [ ] Scheme-side result shape projection for success/error payloads.
+- [ ] Error mapping table from Gerbil exception classes to stable Rust errors.
+- [ ] Scenario that validates status/error/result projection together.
+
+** Nil, void, eof, and unspecified
+
+- [ ] Raw ABI representation for =#<void>=.
+- [ ] Raw ABI representation for =()= / nil.
+- [ ] Raw ABI representation for EOF object if exported.
+- [ ] Raw ABI representation for unspecified values.
+- [ ] Safe Rust marker types for nil/void/eof/unspecified.
+- [ ] Tests proving these sentinels are distinguishable and do not alias null.
+
+** Boolean
+
+- [X] Current scalar bool use through i64 parity operation.
+- [?] Scheme ASP surface contains a boolean shape entry, but safe first-class
+  boolean value projection is not complete.
+- [ ] Raw ABI shape for Scheme boolean values as values, not only Rust bool
+  return.
+- [ ] Safe =GerbilBool= or direct =bool= projection rules.
+- [ ] Scenario for boolean round-trip and invalid boolean raw values.
+
+** Exact integers and machine integers
+
+- [X] i64 identity native round-trip.
+- [X] i64 addition with overflow guard.
+- [X] i64 comparison with invalid-result fail-closed test.
+- [ ] Exact integer / bignum ownership strategy.
+- [ ] Checked conversion rules: exact integer to =i64=, =u64=, =usize=.
+- [ ] Overflow status mapping for exact integer projection.
+- [ ] Scenario with boundary values: =i64::MIN=, =i64::MAX=, bignum outside
+  machine range.
+
+** Inexact numbers
+
+- [ ] Raw ABI for =f64=.
+- [ ] Safe =f64= projection rules for NaN, infinities, and signed zero.
+- [ ] Scenario for =f64= round-trip and comparison caveats.
+- [ ] Performance receipt for numeric scalar round-trips.
+
+** Characters
+
+- [ ] Raw ABI representation for Scheme characters.
+- [ ] Safe Rust =char= projection.
+- [ ] Unicode scalar validation and invalid-codepoint fail-closed path.
+- [ ] Scenario for ASCII, BMP, non-BMP, and invalid scalar values.
+
+** Strings and UTF-8
+
+- [X] Raw borrowed UTF-8 ABI: =GerbilBorrowedUtf8=.
+- [X] Safe borrowed UTF-8 owner view: =GerbilUtf8=.
+- [X] Tests for text bytes and empty string zero-length contract.
+- [ ] Scheme native-surface shape for borrowed UTF-8/string, aligned with Rust
+  =GerbilBorrowedUtf8= and =GerbilUtf8= ownership/nullability rules.
+- [ ] Owned Scheme string handle type.
+- [ ] Borrowed Scheme string view with explicit lifetime/GC-root rule.
+- [ ] Mutability policy: immutable string view vs mutable Scheme string.
+- [ ] Encoding policy for non-UTF-8 bytevectors vs Scheme strings.
+- [ ] Scenario for string allocation, borrow, and release/GC-root behavior.
+
+** Symbols and keywords
+
+- [ ] Raw ABI shape for Scheme symbols.
+- [ ] Raw ABI shape for Gerbil keywords.
+- [ ] Safe borrowed symbol name view.
+- [ ] Safe interned symbol/keyword handle.
+- [ ] Equality semantics: pointer identity vs name equality.
+- [ ] Scenario for symbol/keyword intern and round-trip.
+
+** Pairs and lists
+
+- [ ] Raw ABI shape for pairs.
+- [ ] Safe pair handle with =car= / =cdr= access policy.
+- [ ] Nil-terminated list traversal API.
+- [ ] Improper list detection.
+- [ ] Lifetime/GC-root policy during traversal.
+- [ ] Scenario for proper list, improper list, empty list, and nested list.
+
+** Vectors
+
+- [ ] Raw ABI shape for vectors.
+- [ ] Safe vector handle.
+- [ ] Length query with =usize= overflow guard.
+- [ ] Element access and mutation policy.
+- [ ] Scenario for empty vector, scalar vector, nested value vector, and bounds
+  failure.
+
+** Hash tables and maps
+
+- [ ] Decide whether hash tables are in v1 public surface.
+- [ ] Raw hash table handle if included.
+- [ ] Key/value iteration policy.
+- [ ] Equality/hash semantics across Scheme and Rust.
+- [ ] Scenario if included; otherwise document as post-v1.
+
+** Procedures and callbacks
+
+- [X] Raw =GerbilI64Callback= ABI type.
+- [X] Safe =GerbilI64Callback= owner.
+- [X] Borrowed =GerbilI64CallbackAbi= callback/context pair.
+- [X] Null context and panic containment tests.
+- [ ] Scheme native-surface shape for i64 callback, aligned with Rust
+  =GerbilI64Callback= ABI and panic-to-status behavior.
+- [ ] General procedure handle type.
+- [ ] Calling Scheme procedure from Rust.
+- [ ] Passing Rust callbacks with captured state.
+- [ ] Callback context ownership and drop policy.
+- [ ] Reentrancy rules for callbacks entering Gerbil runtime.
+- [ ] Scenario for callback success, callback error, panic containment, and
+  lifecycle invalidation.
+
+** Opaque values and GC rooting
+
+- [X] Raw opaque value handle: =GerbilValueHandle=.
+- [X] Safe non-null borrowed value wrapper: =GerbilValue<'runtime>=.
+- [X] Null value handle fail-closed test.
+- [ ] Scheme native-surface shape for =GerbilValue= ownership and nullability:
+  non-null, runtime-borrowed, not retained beyond the valid runtime borrow.
+- [ ] Explicit GC-root type.
+- [ ] Scheme native-surface shape for future rooted value contract.
+- [ ] Borrowed value vs owned/rooted value distinction.
+- [ ] Root release/drop policy.
+- [ ] Runtime-affine value marker preventing cross-runtime use.
+- [ ] Scenario proving unrooted borrowed values cannot be retained.
+
+** Bytevectors and binary buffers
+
+- [ ] Raw ABI shape for bytevectors.
+- [ ] Safe borrowed byte slice.
+- [ ] Owned bytevector allocation path.
+- [ ] Mutability policy.
+- [ ] Zero-copy eligibility rules.
+- [ ] Scenario for empty bytes, binary bytes with zeros, and large buffer.
+
+** Ports, continuations, promises, and advanced Scheme objects
+
+- [ ] Decide v1 scope for ports.
+- [ ] Decide v1 scope for continuations.
+- [ ] Decide v1 scope for promises.
+- [ ] Document unsupported advanced objects with explicit status codes.
+
+* Ownership and safety checklist
+
+- [ ] Every public wrapper states whether it is borrowed, owned, rooted, or
+  process-global.
+- [ ] Every raw pointer has a nullability rule.
+- [ ] Every borrowed pointer has a retention rule.
+- [ ] Every callback has a panic containment rule.
+- [ ] Every runtime-bound value has thread-affinity semantics.
+- [ ] Every value crossing FFI has an error/status mapping.
+- [ ] No public safe API exposes =unsafe extern "C"= directly.
+- [ ] Unsafe blocks include narrow safety comments at the actual boundary.
+- [ ] Scenario coverage exists for null, invalid value, panic, wrong thread, and
+  lifecycle-finalized failures.
+
+* Scenario and performance checklist
+
+- [X] =status-contract= scenario.
+- [X] =native-runtime-round-trip= scenario.
+- [X] =native-identity-round-trip= scenario.
+- [X] =native-ffi-steady-state= scenario.
+- [X] =native-value-surface= scenario.
+- [ ] =scheme-sentinel-values= scenario.
+- [ ] =scheme-string-symbol-keyword= scenario.
+- [ ] =scheme-pair-list-vector= scenario.
+- [ ] =scheme-procedure-callback= scenario.
+- [ ] =scheme-gc-rooting= scenario.
+- [ ] =scheme-numeric-boundaries= scenario.
+- [ ] Each scenario has a benchmark contract with sub-millisecond target for
+  pure Rust validation and explicit budget for live Gerbil/AOT paths.
+- [ ] Benchmark receipts distinguish cold startup, warm runtime, and hot FFI
+  steady-state.
+
+* ASP/source-surface checklist
+
+- [X] ASP workaround owner exists: =scheme/asp/native-surface.ss=.
+- [X] Workaround projects current scalar and shape selectors: runtime/status/i64
+  /bool/comparison/native-value/native-result plus scalar exports.
+- [ ] Direct provider projection for real =scheme/native.ss= FFI/export owner.
+- [ ] Fix or document the current =scheme/native.ss= provider blocker:
+  parser-owned search requires a provider query-pack descriptor and exact query
+  currently returns no owner items.
+- [ ] Selector set for every public Scheme export.
+- [ ] Selector set for every Scheme type/shape.
+- [ ] Add Scheme selectors for Rust-supported but Scheme-unprojected shapes:
+  string/UTF-8, callback, opaque value nullability, and GC/rooting policy.
+- [ ] CI check that ASP source-surface selectors match Rust ABI expectations.
+- [ ] Remove or downgrade workaround once direct Scheme FFI/export projection is
+  proven.
+
+* 2026-07-20 audit TODO summary
+
+The immediate next implementation slice should close the mismatch between the
+Rust safe surface and the Scheme ASP surface:
+
+- [ ] Add =gerbil_scheme_rust_utf8_shape= to =scheme/asp/native-surface.ss=.
+- [ ] Add =gerbil_scheme_rust_i64_callback_shape= to
+  =scheme/asp/native-surface.ss=.
+- [ ] Extend =gerbil_scheme_rust_native_value_shape= with explicit
+  non-null/runtime-borrowed/GC-not-rooted value semantics.
+- [ ] Extend =gerbil_scheme_rust_native_result_shape= or add a new result-family
+  shape that maps Rust =NativeError= and unknown status preservation.
+- [ ] Add tests that query Scheme shape selectors and compare them with Rust
+  =sys= and safe selectors for status, UTF-8, opaque value, and callback.
+- [ ] Add a scenario for Scheme source-surface synchronization so drift is
+  visible in CI.
+
+* Marlin convergence checklist
+
+- [ ] Keep this crate generic; do not encode Marlin package inventory policy.
+- [ ] Map Marlin Gerbil package types to this crate's public wrappers.
+- [ ] Replace Marlin-local raw FFI uses with =gerbil-scheme= safe API.
+- [ ] Keep Marlin-specific tests in Marlin; keep reusable Scheme/Rust binding
+  tests here.
+- [ ] Add a downstream integration receipt showing Marlin consumes this crate as
+  a dependency without duplicating binding code.
+
+* Release readiness checklist
+
+- [ ] Public type matrix is documented.
+- [ ] All accepted v1 types have raw ABI, safe wrapper, tests, and scenario.
+- [ ] Unsafe API surface is audited and minimized.
+- [ ] License headers and dual-license policy are confirmed.
+- [ ] Version remains pre-release until v1 API boundary is intentionally cut.
+- [ ] CI green across Linux and macOS.
+- [ ] CHANGELOG/RFC entry records first supported binding surface.

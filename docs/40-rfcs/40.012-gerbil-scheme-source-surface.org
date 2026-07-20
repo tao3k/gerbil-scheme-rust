@@ -1,0 +1,81 @@
+#+title: Gerbil Scheme Source Surface Projection
+#+subtitle: RFC 40.012
+#+date: 2026-07-20
+
+* Status
+
+Draft, active implementation audit.
+
+* Problem
+
+The Rust bindings repository needs a reliable Scheme source surface before
+adding more live native bindings.  The immediate target is
+~scheme/native.ss~, because it owns the native ABI exports used by the Rust
+safe bindings.
+
+Current ASP evidence shows that the Gerbil provider can discover the owner
+path, but cannot extract item selectors from ~scheme/native.ss~.
+
+* Evidence
+
+The following facts are from provider-owned ASP routes in this repository:
+
+- ~scheme/native.ss~ appears in the owner frontier.
+- ~scheme/native.ss~ projection imports only owner-level graph state and emits
+  no item selectors.
+- ~scheme/native-host.ss~ projects an ordinary ~main~ definition.
+- A temporary simple probe file containing ordinary ~export~ and ~def~ forms
+  projected successfully.
+- Three project-side ~gerbil.pkg~ source-scope shapes were tried and all left
+  ~scheme/native.ss~ without item selectors:
+  - top-level ~(source-scope ...)~
+  - package-form internal ~(package-policy (source-scope ...))~
+  - top-level sibling ~(package-policy (source-scope ...))~
+- The provider does not surface a parser diagnostic for ~scheme/native.ss~; the
+  failure mode is silent empty item projection.
+
+* Current conclusion
+
+The blocker is not repository-wide source discovery.  It is specific to
+content-level item extraction for the complex native FFI forms in
+~scheme/native.ss~.
+
+The next implementation must not keep changing ~gerbil.pkg~ without new parser
+evidence.  Source-scope has been ruled out as the immediate fix for this file.
+
+* Required next step
+
+Implement one of these two routes:
+
+1. Provider route: extend the Gerbil source projection to recognize the native
+   FFI/export forms used by ~scheme/native.ss~ and emit stable selectors for
+   the native ABI exports.
+2. Project route: add a parser-visible Scheme source-surface owner that uses
+   ordinary definitions to index the native ABI contract without changing the
+   runtime ABI behavior.
+
+The provider route is preferable because it keeps the source of truth in
+~scheme/native.ss~.
+
+* Acceptance
+
+The fix is accepted only when all are true:
+
+- ~asp gerbil-scheme search owner scheme/native.ss items~ returns selectors for
+  the existing native ABI export surface.
+- At minimum, selectors exist for:
+  - ~gerbil_scheme_rust_add_i64~
+  - ~gerbil_scheme_rust_is_even_i64~
+  - ~gerbil_scheme_rust_compare_i64~
+- No unsupported standalone ~gerbil.pkg~ source-scope workaround is committed.
+- Existing Cargo and Bazel gates remain green.
+
+* Follow-up bindings unlocked by this fix
+
+After the Scheme source surface projects correctly, the next binding slice is
+borrowed UTF-8 input:
+
+- Scheme export: ~gerbil_scheme_rust_utf8_len~
+- Rust raw ABI declaration in ~gerbil-scheme-sys~
+- Safe wrapper: ~GerbilRuntime::utf8_len(&str)~
+- Native round-trip test covering ASCII and non-ASCII UTF-8.

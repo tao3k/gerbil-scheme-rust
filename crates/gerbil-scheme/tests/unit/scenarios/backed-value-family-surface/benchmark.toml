@@ -1,0 +1,13 @@
+harness = "libtest"
+test = "scheme_native_surface_projects_all_backed_value_family_shapes"
+phase = "warm"
+target_total = "10ms"
+max_total = "100ms"
+observed_total = "1ms"
+regression_budget = "25ms"
+memory_budget_bytes = 1048576
+observed_memory_bytes = 0
+target_rationale = "Backed value-family source-surface synchronization is a small contract-token check and must remain sub-millisecond outside test harness startup."
+
+[observed_timings]
+backed_value_family_source_surface = "1ms"

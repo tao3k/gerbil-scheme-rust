@@ -1,0 +1,10 @@
+id = "backed-value-family-surface"
+title = "Backed Scheme value-family source surface"
+policy_ids = ["RUST-AGENT-NATIVE-ABI-003", "RUST-AGENT-SOURCE-SURFACE-004"]
+agent_goal = "Prove every currently sys/safe-backed Scheme value-family shape is projected, while unsupported value families remain blocked until real ABI support exists."
+reference_repositories = ["tao3k/gerbil-scheme-rust", "tao3k/marlin-agent-core"]
+reference_patterns = ["backed Scheme value family", "source-surface selector sync", "unsupported value family gate"]
+inputs = "inputs"
+expected = "expected"
+harness = "libtest"
+test = "scheme_native_surface_projects_all_backed_value_family_shapes"

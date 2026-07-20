@@ -25,12 +25,15 @@ Current Rust ABI evidence:
   and i64 comparison.
 - =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
   callback trampoline behavior.
+- =source-surface-sync= and =backed-value-family-surface= scenarios cover the
+  Scheme ASP source-surface contract for result/error taxonomy and every
+  currently sys/safe-backed value-family shape.
 
 Current Scheme source-surface evidence:
 
 - =scheme/asp/native-surface.ss= is still the ASP-projected workaround for the
   source-surface view.
-- The current projected selector set is exactly 14 selectors:
+- The current projected selector set is exactly 18 selectors:
   =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
   =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
   =gerbil_scheme_rust_add_i64=, =gerbil_scheme_rust_is_even_i64=,
@@ -39,13 +42,17 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_status_shape=, =gerbil_scheme_rust_i64_shape=,
   =gerbil_scheme_rust_bool_shape=,
   =gerbil_scheme_rust_comparison_shape=,
-  =gerbil_scheme_rust_native_value_shape=, and
+  =gerbil_scheme_rust_utf8_shape=,
+  =gerbil_scheme_rust_value_handle_shape=,
+  =gerbil_scheme_rust_i64_callback_shape=,
+  =gerbil_scheme_rust_native_value_shape=,
+  =gerbil_scheme_rust_native_error_shape=, and
   =gerbil_scheme_rust_native_result_shape=.
 - Direct provider projection of the real =scheme/native.ss= FFI/export owner is
   not yet closed and remains a provider/source-surface TODO.
-- No current Scheme selector exists for callback, string/UTF-8, nil, void, f64,
-  char, symbol, keyword, pair, list, vector, procedure, error object taxonomy,
-  GC rooting, or explicit value nullability.
+- No current Scheme selector exists for nil, void, f64, char, symbol, keyword,
+  pair, list, vector, procedure, owned/rooted values, bytevectors, ports,
+  continuations, or advanced Scheme objects.
 
 * Checklist status legend
 
@@ -74,7 +81,9 @@ Current Scheme source-surface evidence:
 - [X] Unknown status preservation in status contract tests.
 - [X] Panic containment for i64 callback trampoline.
 - [ ] Public =GerbilResult<T>= alias or typed result wrapper.
-- [ ] Scheme-side result shape projection for success/error payloads.
+- [?] Scheme-side result shape projection for success/error payloads is present
+  as ASP source-surface taxonomy, but no public =GerbilResult<T>= wrapper exists
+  yet.
 - [ ] Error mapping table from Gerbil exception classes to stable Rust errors.
 - [ ] Scenario that validates status/error/result projection together.
 
@@ -237,12 +246,15 @@ Current Scheme source-surface evidence:
 - [X] =native-identity-round-trip= scenario.
 - [X] =native-ffi-steady-state= scenario.
 - [X] =native-value-surface= scenario.
+- [X] =source-surface-sync= scenario.
+- [X] =backed-value-family-surface= scenario.
 - [ ] =scheme-sentinel-values= scenario.
 - [ ] =scheme-string-symbol-keyword= scenario.
 - [ ] =scheme-pair-list-vector= scenario.
 - [ ] =scheme-procedure-callback= scenario.
 - [ ] =scheme-gc-rooting= scenario.
 - [ ] =scheme-numeric-boundaries= scenario.
+- [X] Every current required scenario has a benchmark contract.
 - [ ] Each scenario has a benchmark contract with sub-millisecond target for
   pure Rust validation and explicit budget for live Gerbil/AOT paths.
 - [ ] Benchmark receipts distinguish cold startup, warm runtime, and hot FFI
@@ -251,17 +263,20 @@ Current Scheme source-surface evidence:
 * ASP/source-surface checklist
 
 - [X] ASP workaround owner exists: =scheme/asp/native-surface.ss=.
-- [X] Workaround projects current scalar and shape selectors: runtime/status/i64
-  /bool/comparison/native-value/native-result plus scalar exports.
+- [X] Workaround projects current scalar and backed shape selectors:
+  runtime/status/i64/bool/comparison/UTF-8/value-handle/i64-callback
+  /native-value/native-error/native-result plus scalar exports.
 - [ ] Direct provider projection for real =scheme/native.ss= FFI/export owner.
 - [ ] Fix or document the current =scheme/native.ss= provider blocker:
   parser-owned search requires a provider query-pack descriptor and exact query
   currently returns no owner items.
 - [ ] Selector set for every public Scheme export.
 - [ ] Selector set for every Scheme type/shape.
-- [ ] Add Scheme selectors for Rust-supported but Scheme-unprojected shapes:
+- [X] Add Scheme selectors for Rust-supported but Scheme-unprojected shapes:
   string/UTF-8, callback, opaque value nullability, and GC/rooting policy.
-- [ ] CI check that ASP source-surface selectors match Rust ABI expectations.
+- [?] CI check that ASP source-surface selectors match Rust ABI expectations is
+  covered by Rust scenario tests for the ASP workaround owner; direct provider
+  projection is still open.
 - [ ] Remove or downgrade workaround once direct Scheme FFI/export projection is
   proven.
 
@@ -312,6 +327,24 @@ Rust safe surface and the Scheme ASP surface:
   vector, hash, bytevector, port, continuation, and advanced Scheme object
   shapes open until the Rust/sys ABI has real support instead of design-only
   placeholders.
+
+** 2026-07-20 third closure receipt
+
+- [X] Added =backed-value-family-surface= scenario manifests and raised the
+  required scenario benchmark suite from 7 to 8 receipts.
+- [X] Added Rust-side source-surface synchronization coverage for the complete
+  currently backed Scheme value-family selector set:
+  i64, bool, comparison, borrowed UTF-8/string, opaque value handle,
+  i64 callback, native value, native error, and native result.
+- [X] Added an explicit negative gate proving unsupported Scheme value-family
+  selectors remain absent until =gerbil-scheme-sys= and safe Rust APIs expose
+  real ABI support.
+- [X] Updated the evidence baseline from the stale 14-selector source-surface
+  inventory to the current 18-selector ASP workaround owner.
+- [ ] Next real implementation family remains sentinel or numeric expansion
+  only after Rust/sys ABI support exists for nil/void/eof/unspecified or f64;
+  otherwise continue reducing Marlin-local duplicated binding code against the
+  current generic surface.
 
 * Marlin convergence checklist
 

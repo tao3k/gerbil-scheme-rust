@@ -134,3 +134,50 @@ fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
         );
     }
 }
+
+#[test]
+fn scheme_native_surface_projects_all_backed_value_family_shapes() {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let native_surface = manifest_dir
+        .ancestors()
+        .nth(2)
+        .expect("workspace root from gerbil-scheme crate")
+        .join("scheme/asp/native-surface.ss");
+    let source = std::fs::read_to_string(&native_surface)
+        .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()));
+
+    let backed_shape_selectors = [
+        "gerbil_scheme_rust_i64_shape",
+        "gerbil_scheme_rust_bool_shape",
+        "gerbil_scheme_rust_comparison_shape",
+        "gerbil_scheme_rust_utf8_shape",
+        "gerbil_scheme_rust_value_handle_shape",
+        "gerbil_scheme_rust_i64_callback_shape",
+        "gerbil_scheme_rust_native_value_shape",
+        "gerbil_scheme_rust_native_error_shape",
+        "gerbil_scheme_rust_native_result_shape",
+    ];
+
+    for required in backed_shape_selectors {
+        assert!(
+            source.contains(required),
+            "missing backed Scheme native-surface shape selector: {required}"
+        );
+    }
+
+    for unsupported in [
+        "gerbil_scheme_rust_nil_shape",
+        "gerbil_scheme_rust_void_shape",
+        "gerbil_scheme_rust_f64_shape",
+        "gerbil_scheme_rust_char_shape",
+        "gerbil_scheme_rust_symbol_shape",
+        "gerbil_scheme_rust_pair_shape",
+        "gerbil_scheme_rust_list_shape",
+        "gerbil_scheme_rust_vector_shape",
+    ] {
+        assert!(
+            !source.contains(unsupported),
+            "unsupported Scheme native-surface selector must remain blocked until sys/safe ABI exists: {unsupported}"
+        );
+    }
+}

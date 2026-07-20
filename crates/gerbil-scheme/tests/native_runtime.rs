@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-use gerbil_scheme::{GERBIL_SCHEME_RUST_ABI_VERSION, GerbilRuntime, NativeError};
+use gerbil_scheme::{
+    GERBIL_SCHEME_RUST_ABI_VERSION, GerbilRuntime, GerbilStatus, GerbilValueProvenance, NativeError,
+};
 
 #[test]
 fn calls_scalar_export_in_process() {
@@ -14,6 +16,11 @@ fn calls_scalar_export_in_process() {
         GERBIL_SCHEME_RUST_ABI_VERSION
     );
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
+    let value = runtime.exported_value().unwrap();
+    assert_eq!(value.provenance(), GerbilValueProvenance::RuntimeExport);
+    assert_eq!(value.is_pair().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_list().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(
         runtime.add_i64(i64::MAX, 1),
         Err(NativeError::IntegerOverflow {

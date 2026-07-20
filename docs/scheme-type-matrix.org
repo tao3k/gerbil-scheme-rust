@@ -64,6 +64,8 @@ the public safe API changes behavior:
   =GerbilValueProvenance::UntrustedRaw=;
 - =UntrustedRaw= proves only non-null shape, not live Gambit/Gerbil object
   ownership, GC reachability, type, or traversal safety;
+- runtime/export-path-produced handles are explicitly tagged separately from
+  =UntrustedRaw= before any pair/list behavior changes;
 - add a runtime-owned value constructor that can only be produced by an
   initialized =GerbilRuntime= or a Gerbil export;
 - keep arbitrary =from_raw= handles fail-closed unless they carry runtime

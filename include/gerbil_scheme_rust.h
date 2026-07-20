@@ -56,6 +56,7 @@ int64_t gerbil_scheme_rust_identity_i64(int64_t value);
 int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);
 int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
 int32_t gerbil_scheme_rust_compare_i64(int64_t left, int64_t right);
+GerbilStatus gerbil_scheme_rust_runtime_exported_value(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_value_is_pair(GerbilValueHandle value,
                                               GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_value_is_list(GerbilValueHandle value,

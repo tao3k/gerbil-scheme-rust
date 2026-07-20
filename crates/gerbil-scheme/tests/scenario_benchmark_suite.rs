@@ -16,11 +16,11 @@ fn all_required_runtime_scenarios_have_valid_benchmark_contracts() {
         receipt.receipts,
         receipt.violations,
     );
-    assert_eq!(receipt.requirements.len(), 8);
-    assert_eq!(receipt.receipts.len(), 8);
-    assert_eq!(receipt.summary.requirement_count, 8);
-    assert_eq!(receipt.summary.receipt_count, 8);
-    assert_eq!(receipt.summary.pass_count, 8);
+    assert_eq!(receipt.requirements.len(), 9);
+    assert_eq!(receipt.receipts.len(), 9);
+    assert_eq!(receipt.summary.requirement_count, 9);
+    assert_eq!(receipt.summary.receipt_count, 9);
+    assert_eq!(receipt.summary.pass_count, 9);
     assert_eq!(receipt.summary.fail_count, 0);
     assert_eq!(receipt.summary.invalid_count, 0);
     assert_eq!(receipt.summary.violation_count, 0);
@@ -29,6 +29,7 @@ fn all_required_runtime_scenarios_have_valid_benchmark_contracts() {
         "tests/unit/scenarios/invalid-comparison-fail-closed",
         "tests/unit/scenarios/native-ffi-steady-state",
         "tests/unit/scenarios/native-identity-round-trip",
+        "tests/unit/scenarios/native-result-contract",
         "tests/unit/scenarios/native-runtime-round-trip",
         "tests/unit/scenarios/native-value-surface",
         "tests/unit/scenarios/source-surface-sync",

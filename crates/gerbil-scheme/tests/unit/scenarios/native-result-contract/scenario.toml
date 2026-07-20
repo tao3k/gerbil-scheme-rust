@@ -1,0 +1,11 @@
+id = "native-result-contract"
+title = "NativeResult projects stable Gerbil status and preserves native errors"
+policy_ids = ["RUST-AGENT-NATIVE-RESULT-001"]
+agent_goal = "Verify the public Rust NativeResult wrapper is a release-auditable Gerbil Scheme native result boundary."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = [
+  "crates/gerbil-scheme/src/native.rs::NativeResult",
+  "crates/gerbil-scheme/tests/native_result_contract.rs::native_result_projects_success_and_error_statuses",
+]
+inputs = "A successful i64 result, a known RuntimeUnavailable native status error, and an unknown future native status code."
+expected = "Success projects to GerbilStatus::Ok, known errors project to their stable GerbilStatus, unknown status codes remain preserved inside NativeError::Status, and conversion to and from Rust Result is lossless."

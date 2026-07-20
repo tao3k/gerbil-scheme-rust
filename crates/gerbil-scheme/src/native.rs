@@ -387,6 +387,78 @@ pub enum NativeError {
     },
 }
 
+/// Result wrapper for safe in-process Gerbil calls.
+///
+/// This keeps the Rust-facing API aligned with the native surface shape:
+/// success projects to `GerbilStatus::Ok`, known native failures project to
+/// their stable status, and unknown status codes stay preserved inside
+/// [`NativeError::Status`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeResult<T> {
+    inner: Result<T, NativeError>,
+}
+
+impl<T> NativeResult<T> {
+    /// Constructs a successful native result.
+    pub const fn ok(value: T) -> Self {
+        Self { inner: Ok(value) }
+    }
+
+    /// Constructs a failed native result.
+    pub const fn err(error: NativeError) -> Self {
+        Self { inner: Err(error) }
+    }
+
+    /// Wraps a standard Rust result at the native boundary.
+    pub const fn from_result(inner: Result<T, NativeError>) -> Self {
+        Self { inner }
+    }
+
+    /// Returns true when the native call succeeded.
+    pub const fn is_ok(&self) -> bool {
+        self.inner.is_ok()
+    }
+
+    /// Returns true when the native call failed.
+    pub const fn is_err(&self) -> bool {
+        self.inner.is_err()
+    }
+
+    /// Projects the result to the stable native status surface.
+    #[must_use]
+    pub const fn status(&self) -> Option<gerbil_scheme_sys::GerbilStatus> {
+        match &self.inner {
+            Ok(_) => Some(gerbil_scheme_sys::GerbilStatus::Ok),
+            Err(error) => error.status(),
+        }
+    }
+
+    /// Borrows the wrapped Rust result.
+    pub const fn as_result(&self) -> Result<&T, &NativeError> {
+        match &self.inner {
+            Ok(value) => Ok(value),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Consumes the wrapper and returns the standard Rust result.
+    pub fn into_result(self) -> Result<T, NativeError> {
+        self.inner
+    }
+}
+
+impl<T> From<Result<T, NativeError>> for NativeResult<T> {
+    fn from(inner: Result<T, NativeError>) -> Self {
+        Self::from_result(inner)
+    }
+}
+
+impl<T> From<NativeResult<T>> for Result<T, NativeError> {
+    fn from(result: NativeResult<T>) -> Self {
+        result.into_result()
+    }
+}
+
 impl NativeError {
     /// Returns the stable ABI status represented by this error, when one exists.
     ///

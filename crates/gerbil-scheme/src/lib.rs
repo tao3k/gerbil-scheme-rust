@@ -25,6 +25,7 @@ mod native;
 #[cfg(feature = "native")]
 pub use native::{
     GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilUtf8, GerbilValue, NativeError,
+    NativeResult,
 };
 
 /// Environment variable selecting the Gerbil interpreter.

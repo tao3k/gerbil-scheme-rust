@@ -1,0 +1,10 @@
+harness = "libtest"
+test = "native_result_projects_success_and_error_statuses"
+target_total = "1ms"
+max_total = "10ms"
+observed_total = "1ms"
+regression_budget = "1ms"
+memory_budget_bytes = 1048576
+observed_memory_bytes = 0
+target_rationale = "NativeResult status projection is a pure Rust wrapper check and should remain comfortably sub-millisecond in normal local execution; the 10ms max keeps CI noise from hiding real regressions."
+observed_timings = { total = "1ms" }

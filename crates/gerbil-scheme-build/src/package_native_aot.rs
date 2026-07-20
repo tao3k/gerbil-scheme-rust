@@ -194,6 +194,12 @@ pub fn stage_local_builder_compiled_scms(
 }
 
 /// Find one generated local-builder artifact under `<package>/.gerbil`.
+///
+/// # Errors
+///
+/// Returns an error when the package manifest has no parent directory, the
+/// local builder root is missing, the builder tree cannot be read, the artifact
+/// is missing, or more than one matching artifact is found.
 pub fn find_local_builder_artifact(
     package_manifest: &std::path::Path,
     staged_scm_file: &str,

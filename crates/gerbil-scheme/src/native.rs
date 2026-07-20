@@ -10,7 +10,7 @@ use std::thread::{self, ThreadId};
 use gerbil_scheme_sys::{
     GERBIL_SCHEME_RUST_ABI_VERSION, gerbil_scheme_rust_abi_version, gerbil_scheme_rust_add_i64,
     gerbil_scheme_rust_identity_i64, gerbil_scheme_rust_runtime_cleanup,
-    gerbil_scheme_rust_runtime_init,
+    gerbil_scheme_rust_runtime_exported_value, gerbil_scheme_rust_runtime_init,
 };
 
 static RUNTIME_LIFECYCLE: Mutex<()> = Mutex::new(());
@@ -95,6 +95,12 @@ pub enum GerbilValueProvenance {
     /// This keeps tests and FFI boundaries fail-closed: the pointer is not
     /// trusted as a live Gambit/Gerbil object.
     UntrustedRaw,
+    /// A handle produced by an initialized runtime/export path.
+    ///
+    /// This proves the handle crossed a versioned Gerbil/Gambit export while
+    /// the owning [`GerbilRuntime`] was alive.  It does not by itself claim GC
+    /// rooting beyond the borrowed runtime lifetime.
+    RuntimeExport,
 }
 
 /// Runtime-borrowed opaque Gerbil value handle.
@@ -277,9 +283,16 @@ fn checked_native_value_projection<'runtime>(
 fn value_from_native_handle<'runtime>(
     raw: gerbil_scheme_sys::GerbilValueHandle,
 ) -> Option<GerbilValue<'runtime>> {
+    value_from_native_handle_with_provenance(raw, GerbilValueProvenance::UntrustedRaw)
+}
+
+fn value_from_native_handle_with_provenance<'runtime>(
+    raw: gerbil_scheme_sys::GerbilValueHandle,
+    provenance: GerbilValueProvenance,
+) -> Option<GerbilValue<'runtime>> {
     std::ptr::NonNull::new(raw).map(|raw| GerbilValue {
         raw,
-        provenance: GerbilValueProvenance::UntrustedRaw,
+        provenance,
         _runtime: PhantomData,
     })
 }
@@ -461,6 +474,33 @@ impl GerbilRuntime {
         // SAFETY: self proves runtime/module lifetime; the scalar c-define ABI
         // accepts every i64 bit pattern and cannot retain borrowed Rust data.
         Ok(unsafe { gerbil_scheme_rust_identity_i64(value) })
+    }
+
+    /// Returns an opaque value handle produced by the initialized runtime/export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a null handle.
+    pub fn exported_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.check_thread()?;
+        let mut out = core::ptr::null_mut();
+        // SAFETY: self proves runtime/module lifetime and `out` is a valid
+        // output slot for one opaque runtime-borrowed value handle.
+        let status = unsafe { gerbil_scheme_rust_runtime_exported_value(&raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "GerbilRuntime::exported_value",
+                code: status as i32,
+            });
+        }
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::RuntimeExport).ok_or(
+            NativeError::Status {
+                operation: "GerbilRuntime::exported_value",
+                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+            },
+        )
     }
 
     /// Adds two signed 64-bit integers inside the initialized Gerbil runtime.

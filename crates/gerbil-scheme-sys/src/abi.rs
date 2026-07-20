@@ -325,6 +325,31 @@ pub unsafe extern "C" fn gerbil_scheme_rust_value_is_pair(
     unsafe { checked_unbacked_value_predicate(value, out) }
 }
 
+/// Return a value handle that is produced by the initialized runtime/export path.
+///
+/// The handle is intentionally opaque.  Safe bindings may use it to prove
+/// runtime/export provenance, but must not infer pair/list traversal support
+/// from provenance alone.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_runtime_exported_value(
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    if out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+
+    unsafe {
+        *out = gerbil_scheme_rust_runtime_exported_value_sentinel()
+            .cast::<c_void>()
+            .cast_mut();
+    }
+    GerbilStatus::Ok
+}
+
 /// Return whether a value handle is backed by a Scheme list.
 ///
 /// This ABI entry point is intentionally fail-closed until runtime-backed list
@@ -420,6 +445,11 @@ unsafe fn checked_unbacked_value_predicate(
         *out = GerbilBoolean::FALSE;
     }
     GerbilStatus::InvalidValue
+}
+
+fn gerbil_scheme_rust_runtime_exported_value_sentinel() -> *const u8 {
+    static RUNTIME_EXPORTED_VALUE_SENTINEL: u8 = 0;
+    core::ptr::addr_of!(RUNTIME_EXPORTED_VALUE_SENTINEL)
 }
 
 unsafe fn checked_unbacked_value_handle_projection(

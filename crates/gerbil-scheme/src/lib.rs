@@ -23,7 +23,7 @@ pub use gerbil_scheme_sys::{
 mod native;
 
 #[cfg(feature = "native")]
-pub use native::{GerbilRuntime, NativeError};
+pub use native::{GerbilRuntime, GerbilUtf8, GerbilValue, NativeError};
 
 /// Environment variable selecting the Gerbil interpreter.
 pub const GERBIL_GXI_ENV: &str = "GERBIL_GXI";

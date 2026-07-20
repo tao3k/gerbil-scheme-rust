@@ -98,6 +98,34 @@ the native FFI/export forms directly.
 
 * Follow-up bindings unlocked by this fix
 
+** 2026-07-20 safe UTF-8 and value-handle surface
+
+This slice keeps the repository boundary narrow: =gerbil-scheme-rust= exposes
+Gerbil Scheme Rust bindings and does not become a Marlin-specific crate.
+
+The raw ABI already contains =GerbilBorrowedUtf8= and =GerbilValueHandle= in
+=gerbil-scheme-sys=. The safe crate now projects those shapes as:
+
+- =GerbilUtf8<'a>=: a Rust-owned borrowed UTF-8 view that can produce the raw
+  one-call =GerbilBorrowedUtf8= ABI shape.
+- =GerbilValue<'runtime>=: a non-owning, non-null opaque Gerbil value handle
+  tied to a live runtime borrow by lifetime.
+
+Acceptance for this slice is not a direct FFI expansion. It is a Rust binding
+surface hardening step:
+
+- null value handles fail closed before crossing FFI;
+- UTF-8 pointer and length are observable at the ABI boundary;
+- no new =bindgen=, =cc=, or release-version bump is introduced;
+- scenario coverage includes =native-value-surface= with a sub-millisecond
+  target for the pure Rust validation path.
+
+The remaining provider debt is unchanged: the runtime implementation still owns
+the real Gerbil FFI/export in =scheme/native.ss=, while
+=scheme/asp/native-surface.ss= is the ASP-projected source-surface workaround.
+Direct Scheme FFI/export projection should replace that workaround before this
+RFC can be marked closed.
+
 After the Scheme source surface projects correctly, the next binding slice is
 borrowed UTF-8 input:
 

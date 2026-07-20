@@ -31,6 +31,91 @@ pub struct GerbilRuntime {
     _not_send_or_sync: PhantomData<Rc<()>>,
 }
 
+/// Safe borrowed UTF-8 view for native Gerbil calls.
+///
+/// The Rust string owner keeps the bytes alive for the full borrow. The raw
+/// [`gerbil_scheme_sys::GerbilBorrowedUtf8`] value may be passed to native code,
+/// but the callee must not retain or free its pointer.
+#[derive(Clone, Copy, Debug)]
+pub struct GerbilUtf8<'a> {
+    text: &'a str,
+    abi: gerbil_scheme_sys::GerbilBorrowedUtf8,
+}
+
+impl<'a> GerbilUtf8<'a> {
+    /// Borrow a Rust string as the stable native UTF-8 ABI shape.
+    #[must_use]
+    pub fn new(text: &'a str) -> Self {
+        Self {
+            text,
+            abi: gerbil_scheme_sys::GerbilBorrowedUtf8::from(text),
+        }
+    }
+
+    /// Return the Rust owner-side string view.
+    #[must_use]
+    pub fn as_str(self) -> &'a str {
+        self.text
+    }
+
+    /// Return the raw C ABI view for one native call.
+    #[must_use]
+    pub fn as_abi(self) -> gerbil_scheme_sys::GerbilBorrowedUtf8 {
+        self.abi
+    }
+
+    /// Return the UTF-8 byte length.
+    #[must_use]
+    pub fn len(self) -> usize {
+        self.abi.len
+    }
+
+    /// Return whether the string is empty.
+    #[must_use]
+    pub fn is_empty(self) -> bool {
+        self.abi.len == 0
+    }
+}
+
+impl<'a> From<&'a str> for GerbilUtf8<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::new(value)
+    }
+}
+
+/// Runtime-borrowed opaque Gerbil value handle.
+///
+/// This wrapper is intentionally non-owning. It proves only that the raw handle
+/// is non-null and is tied to a live [`GerbilRuntime`] borrow by the lifetime
+/// parameter; it does not claim type, ownership, or GC reachability beyond that
+/// borrow.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GerbilValue<'runtime> {
+    raw: std::ptr::NonNull<std::ffi::c_void>,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl<'runtime> GerbilValue<'runtime> {
+    /// Wrap a raw runtime-borrowed value handle, rejecting null handles.
+    pub fn from_raw(raw: gerbil_scheme_sys::GerbilValueHandle) -> Result<Self, NativeError> {
+        let raw = std::ptr::NonNull::new(raw).ok_or(NativeError::Status {
+            operation: "GerbilValue::from_raw",
+            code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+        })?;
+
+        Ok(Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    /// Return the raw borrowed value handle.
+    #[must_use]
+    pub fn as_raw(self) -> gerbil_scheme_sys::GerbilValueHandle {
+        self.raw.as_ptr()
+    }
+}
+
 impl GerbilRuntime {
     /// Initializes the process-global Gerbil runtime and native binding module.
     ///

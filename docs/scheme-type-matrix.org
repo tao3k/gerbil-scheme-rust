@@ -38,11 +38,14 @@ rooting before they can become owned Rust values:
 |-------------------+----------------+------------------------+-------------------|
 | symbol | =SchemeSymbol= | non-null =GerbilValueHandle= | no allocation or interning |
 | keyword | =SchemeKeyword= | non-null =GerbilValueHandle= | no allocation or interning |
-| pair | =SchemePair= | non-null =GerbilValueHandle= | no =car=/=cdr= traversal |
-| list | =SchemeList= | non-null =GerbilValueHandle= | no list traversal |
+| pair | =SchemePair= plus =GerbilValue::pair_car=/=pair_cdr=/=pair_parts= | non-null =GerbilValueHandle= | traversal fails closed until runtime-backed |
+| list | =SchemeList= plus =GerbilValue::is_list=/=is_null= | non-null =GerbilValueHandle= | classification fails closed until runtime-backed |
 
-These types preserve handle identity and reject null pointers.  They do not
-dereference unmanaged memory and do not claim ownership or GC rooting.
+These types preserve handle identity and reject null pointers.  Pair/list
+status wrappers call the sys ABI and report explicit =NativeResult= status
+errors for unbacked handles, so the public API can be consumed before
+runtime-backed traversal is wired in.  They do not dereference unmanaged memory
+and do not claim ownership or GC rooting.
 
 * Gaps
 

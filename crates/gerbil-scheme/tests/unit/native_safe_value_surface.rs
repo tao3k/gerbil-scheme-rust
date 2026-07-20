@@ -1,6 +1,6 @@
 use gerbil_scheme::{
-    SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword, SchemeList, SchemePair,
-    SchemeScalar, SchemeSymbol,
+    GerbilStatus, GerbilValue, SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword,
+    SchemeList, SchemePair, SchemeScalar, SchemeSymbol,
 };
 
 #[test]
@@ -71,4 +71,37 @@ fn scheme_handle_backed_views_preserve_identity_and_reject_null() {
     assert!(SchemeKeyword::from_raw(core::ptr::null_mut()).is_none());
     assert!(SchemePair::from_raw(core::ptr::null_mut()).is_none());
     assert!(SchemeList::from_raw(core::ptr::null_mut()).is_none());
+}
+
+#[test]
+fn scheme_pair_list_status_wrappers_fail_closed_for_unbacked_handles() {
+    let mut raw_value = 42_u8;
+    let raw = (&raw mut raw_value).cast::<core::ffi::c_void>();
+    let value = || GerbilValue::from_raw(raw).expect("non-null value handle");
+
+    let is_pair = value().is_pair();
+    assert!(is_pair.is_err());
+    assert_eq!(is_pair.status(), Some(GerbilStatus::InvalidValue));
+
+    let is_list = value().is_list();
+    assert!(is_list.is_err());
+    assert_eq!(is_list.status(), Some(GerbilStatus::InvalidValue));
+
+    let is_null = value().is_null();
+    assert!(is_null.is_err());
+    assert_eq!(is_null.status(), Some(GerbilStatus::InvalidValue));
+
+    let car = value().pair_car();
+    assert!(car.is_err());
+    assert_eq!(car.status(), Some(GerbilStatus::InvalidValue));
+
+    let cdr = value().pair_cdr();
+    assert!(cdr.is_err());
+    assert_eq!(cdr.status(), Some(GerbilStatus::InvalidValue));
+
+    let parts = value().pair_parts();
+    assert!(parts.is_err());
+    assert_eq!(parts.status(), Some(GerbilStatus::InvalidValue));
+
+    assert!(GerbilValue::from_raw(core::ptr::null_mut()).is_err());
 }

@@ -28,6 +28,22 @@ This matrix tracks the public Scheme value surface exposed by
 | i64 callback | function pointer + context | =GerbilI64Callback= | callback borrow | callback boundary tests |
 | procedure callback | value handle + context | =GerbilProcedureCallback= | callback borrow | unit status boundary |
 
+* Safe handle-backed value views
+
+The safe =gerbil-scheme= crate now exposes handle-backed views for value
+families that require runtime ownership, allocation, interning, traversal, or GC
+rooting before they can become owned Rust values:
+
+| Scheme value kind | Safe Rust view | Backing representation | Explicit non-goal |
+|-------------------+----------------+------------------------+-------------------|
+| symbol | =SchemeSymbol= | non-null =GerbilValueHandle= | no allocation or interning |
+| keyword | =SchemeKeyword= | non-null =GerbilValueHandle= | no allocation or interning |
+| pair | =SchemePair= | non-null =GerbilValueHandle= | no =car=/=cdr= traversal |
+| list | =SchemeList= | non-null =GerbilValueHandle= | no list traversal |
+
+These types preserve handle identity and reject null pointers.  They do not
+dereference unmanaged memory and do not claim ownership or GC rooting.
+
 * Gaps
 
 ** Runtime conversion gaps

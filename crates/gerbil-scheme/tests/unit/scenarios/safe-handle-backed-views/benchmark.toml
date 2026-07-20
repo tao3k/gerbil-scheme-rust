@@ -1,0 +1,14 @@
+harness = "libtest"
+test = "scheme_handle_backed_views_preserve_identity_and_reject_null"
+phase = "warm"
+observed_total = "100us"
+target_total = "1ms"
+target_rationale = "Handle-backed value projection is only a non-null pointer identity check and must stay sub-millisecond."
+max_total = "500ms"
+regression_budget = "10ms"
+observed_memory_bytes = 0
+memory_budget_bytes = 16777216
+
+[observed_timings]
+safe_handle_backed_views = "100us"
+safe_handle_backed_views_budget = "1ms"

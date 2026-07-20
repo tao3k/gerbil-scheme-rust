@@ -1,0 +1,167 @@
+#+title: RFC 40.010: Gerbil Scheme Rust bindings roadmap
+#+startup: overview
+
+* Status
+
+Draft.
+
+* Purpose
+
+~gerbil-scheme-rust~ is a general-purpose Rust library for working with
+Gerbil Scheme.  Marlin is an important downstream consumer, but it must not
+define the public API boundary of this repository.
+
+The repository should converge on reusable bindings, build helpers, native
+runtime safety boundaries, and scenario benchmarks that are useful outside
+Marlin.
+
+* Crate boundaries
+
+** ~gerbil-scheme-sys~
+
+Owns raw ABI declarations and generated or handwritten C FFI surfaces.
+
+- May contain ~unsafe extern "C"~ declarations.
+- May expose ABI constants, opaque runtime types, C-compatible structs, and raw
+  function pointers.
+- Must not expose process orchestration, Marlin package layout, or downstream
+  build receipt semantics.
+
+** ~gerbil-scheme~
+
+Owns the safe user-facing API.
+
+- Toolchain discovery and executable resolution.
+- Process-backed runtime calls such as version and expression evaluation.
+- Safe native runtime handles for in-process calls.
+- Error types that close over spawn, exit, ABI, lifecycle, and projection
+  failures.
+
+This crate is the normal library entry point.
+
+** ~gerbil-scheme-build~
+
+Owns Gerbil compiler helpers usable from normal Rust code and build scripts.
+
+- Source emission.
+- Gerbil compiler invocation.
+- Package/native AOT build plans that do not encode Marlin-specific identity.
+- Stable receipts for generic compiler/build actions.
+
+** ~gerbil-scheme-native-build~
+
+Owns native build helpers.
+
+- C compiler discovery.
+- Static archive packaging.
+- C header generation and drift validation.
+- Generic Cargo link directives.
+
+Archive names, fallback policy, and downstream package identity remain the
+downstream crate's responsibility.
+
+* Safety policy
+
+The public API should keep unsafe code behind narrow module boundaries.
+
+- Raw C ABI belongs in ~gerbil-scheme-sys~.
+- Safe wrappers in ~gerbil-scheme~ must document the lifetime, thread, and
+  ownership proof for every native call.
+- Process-global Gerbil runtime ownership must stay explicit and fail closed on
+  repeated initialization, wrong-thread access, ABI mismatch, and cleanup
+  lifecycle drift.
+- Scalar native calls should validate Rust-side preconditions before crossing
+  the ABI when overflow or invalid projection is possible.
+
+* Binding milestones
+
+** M1: Toolchain and process API
+
+- Stable toolchain discovery from environment and PATH.
+- Explicit toolchain construction.
+- Conventional program mapping for ~gxi~, ~gxc~, and ~gsc~.
+- Process-backed ~version~, ~eval~, and typed projection helpers.
+- Scenario coverage for environment override, PATH fallback, and unknown
+  program preservation.
+
+** M2: Native runtime safe facade
+
+- Safe runtime initialization handle.
+- ABI version check.
+- Fail-closed lifecycle states.
+- Thread-affine runtime ownership.
+- Scalar round-trip examples that prove live Gerbil ABI calls.
+- Scenario coverage for success, wrong-thread, invalid status, invalid
+  comparison result, and steady-state performance.
+
+** M3: Build and AOT facade
+
+- Gerbil source emission.
+- ~gxc~ compile flows.
+- Native object/static archive packaging.
+- C header generation and validation.
+- Scenario coverage for source emission, compiler invocation, archive plan
+  validation, and generated header drift.
+
+** M4: Generalized FFI/export bindings
+
+- Audit Gerbil official FFI/export patterns from the checked-out Gerbil source.
+- Decide whether handwritten ABI declarations, generated bindings, or a hybrid
+  policy is appropriate for each layer.
+- Keep bindgen, if introduced, constrained to ~gerbil-scheme-sys~ or build
+  support; do not leak generated raw surfaces as the primary user API.
+- Add safe wrappers only after ownership, lifetime, callback, and GC behavior
+  are documented by tests.
+
+* Scenario benchmark contract
+
+Every public capability should have a scenario receipt.
+
+Required scenario families:
+
+- toolchain discovery and program mapping;
+- process-backed evaluation;
+- native runtime lifecycle;
+- scalar native FFI steady state;
+- compiler/source emission;
+- native archive/header build helpers;
+- downstream consumer smoke tests.
+
+Cold setup, warm execution, and steady-state FFI loops must be measured
+separately.  A slow cold build can be acceptable when cached CI is explicit; a
+steady-state native FFI scenario should stay in the sub-second range unless the
+scenario intentionally measures cold setup.
+
+* Marlin downstream policy
+
+Marlin should consume this repository as a dependency, not as the design owner.
+
+Can move from Marlin to this repository:
+
+- generic Gerbil toolchain helpers;
+- generic native build helpers;
+- generic C header/static archive helpers;
+- generic Rust-safe wrappers over Gerbil ABI.
+
+Must stay in Marlin:
+
+- Deck runtime and AgentPolicyRouting archive identity;
+- Marlin package layout and embedded runtime assets;
+- Marlin AOT profile, receipt, status, fallback, and directive policy;
+- Marlin-specific build-script decisions.
+
+* Immediate implementation plan
+
+1. Expand scenario coverage for toolchain and process APIs.
+2. Promote native runtime examples into a documented safe facade contract.
+3. Add ORG documentation for crate boundaries and safety policy.
+4. Audit Gerbil official FFI/export surfaces before adding new raw ABI.
+5. Keep Marlin PR green as a downstream compatibility fixture.
+
+* Acceptance gates
+
+- ~cargo fmt --check~
+- ~cargo check --workspace --locked~
+- targeted scenario benchmark tests for changed public APIs
+- native feature tests when the Gerbil toolchain is available
+- Marlin downstream PR CI remains green after dependency bumps

@@ -1,0 +1,13 @@
+harness = "libtest"
+test = "identity_i64_crosses_the_live_gerbil_abi"
+target_total = "50ms"
+max_total = "250ms"
+observed_total = "1ms"
+regression_budget = "25ms"
+memory_budget_bytes = 1048576
+observed_memory_bytes = 0
+target_rationale = "Identity i64 is a scalar ABI round-trip and should stay within the native runtime test budget."
+
+[observed_timings]
+identity_i64_round_trip = "1ms"
+identity_i64_round_trip_budget = "50ms"

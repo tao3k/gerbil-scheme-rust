@@ -1,0 +1,151 @@
+#+title: Gerbil Scheme Source Surface Projection
+#+subtitle: RFC 40.012
+#+date: 2026-07-20
+
+* Status
+
+Accepted project-side workaround, with provider parser backlog.
+
+* Problem
+
+The Rust bindings repository needs a reliable Scheme source surface before
+adding more live native bindings.  The immediate target is
+~scheme/native.ss~, because it owns the native ABI exports used by the Rust
+safe bindings.
+
+Current ASP evidence shows that the Gerbil provider can discover the owner
+path, but cannot extract item selectors from ~scheme/native.ss~.
+
+* Evidence
+
+The following facts are from provider-owned ASP routes in this repository:
+
+- ~scheme/native.ss~ appears in the owner frontier.
+- ~scheme/native.ss~ projection imports only owner-level graph state and emits
+  no item selectors.
+- ~scheme/native-host.ss~ projects an ordinary ~main~ definition.
+- A temporary simple probe file containing ordinary ~export~ and ~def~ forms
+  projected successfully.
+- Three project-side ~gerbil.pkg~ source-scope shapes were tried and all left
+  ~scheme/native.ss~ without item selectors:
+  - top-level ~(source-scope ...)~
+  - package-form internal ~(package-policy (source-scope ...))~
+  - top-level sibling ~(package-policy (source-scope ...))~
+- The provider does not surface a parser diagnostic for ~scheme/native.ss~; the
+  failure mode is silent empty item projection.
+
+* Current conclusion
+
+The blocker is not repository-wide source discovery.  It is specific to
+content-level item extraction for the complex native FFI forms in
+~scheme/native.ss~.
+
+The next implementation must not keep changing ~gerbil.pkg~ without new parser
+evidence.  Source-scope has been ruled out as the immediate fix for this file.
+
+* Required next step
+
+Implement one of these two routes:
+
+1. Provider route: extend the Gerbil source projection to recognize the native
+   FFI/export forms used by ~scheme/native.ss~ and emit stable selectors for
+   the native ABI exports.
+2. Project route: add a parser-visible Scheme source-surface owner that uses
+   ordinary definitions to index the native ABI contract without changing the
+   runtime ABI behavior.
+
+The provider route remains preferable because it keeps the source of truth in
+~scheme/native.ss~.  Until the provider understands the native FFI forms, this
+repository uses the project route.
+
+* Project-side workaround
+
+The repository provides an ASP-only Scheme surface owner:
+
+- ~scheme/asp/native-surface.ss~
+
+This file uses ordinary ~export~ and ~def~ forms so the Gerbil provider can
+emit stable selectors for the native ABI names.  It is intentionally not part
+of the runtime build.  The runtime implementation remains owned by
+~scheme/native.ss~.
+
+The current Bazel native source set is explicit and does not include this
+surface owner.  That preserves runtime behavior while making the ABI contract
+visible to source-analysis tools.
+
+* Acceptance
+
+The project-side workaround is accepted only when all are true:
+
+- ~asp gerbil-scheme query scheme/asp/native-surface.ss~ returns selectors for
+  the existing native ABI export surface.
+- At minimum, selectors exist for:
+  - ~gerbil_scheme_rust_abi_version~
+  - ~gerbil_scheme_rust_runtime_init~
+  - ~gerbil_scheme_rust_runtime_cleanup~
+  - ~gerbil_scheme_rust_identity_i64~
+  - ~gerbil_scheme_rust_add_i64~
+  - ~gerbil_scheme_rust_is_even_i64~
+  - ~gerbil_scheme_rust_compare_i64~
+- ~scheme/asp/native-surface.ss~ is not included in the Bazel
+  ~//:gerbil_sources~ runtime source set.
+- No unsupported standalone ~gerbil.pkg~ source-scope workaround is committed.
+- Existing Cargo and Bazel gates remain green.
+
+The provider parser backlog is accepted only when
+~asp gerbil-scheme search owner scheme/native.ss items~ returns selectors for
+the native FFI/export forms directly.
+
+* Follow-up bindings unlocked by this fix
+
+** 2026-07-20 safe UTF-8 and value-handle surface
+
+*** 2026-07-20 callback trampoline extension
+
+The same safe surface now includes =GerbilI64Callback=. This keeps the raw
+=unsafe extern "C"= ABI in =gerbil-scheme-sys= while exposing a safe Rust owner
+that can produce a borrowed callback/context pair for one native call.
+
+The boundary rules are:
+
+- Rust callers provide a plain function pointer, not an unconstrained captured
+  closure.
+- The C context pointer is tied to the borrowed =GerbilI64Callback= owner.
+- Null callback context returns =GerbilStatus::NullPointer= before invoking
+  Rust code.
+- Panics are caught at the trampoline and returned as =GerbilStatus::Panic=.
+- No new dependency, code generator, or release-version bump is introduced.
+
+This slice keeps the repository boundary narrow: =gerbil-scheme-rust= exposes
+Gerbil Scheme Rust bindings and does not become a Marlin-specific crate.
+
+The raw ABI already contains =GerbilBorrowedUtf8= and =GerbilValueHandle= in
+=gerbil-scheme-sys=. The safe crate now projects those shapes as:
+
+- =GerbilUtf8<'a>=: a Rust-owned borrowed UTF-8 view that can produce the raw
+  one-call =GerbilBorrowedUtf8= ABI shape.
+- =GerbilValue<'runtime>=: a non-owning, non-null opaque Gerbil value handle
+  tied to a live runtime borrow by lifetime.
+
+Acceptance for this slice is not a direct FFI expansion. It is a Rust binding
+surface hardening step:
+
+- null value handles fail closed before crossing FFI;
+- UTF-8 pointer and length are observable at the ABI boundary;
+- no new =bindgen=, =cc=, or release-version bump is introduced;
+- scenario coverage includes =native-value-surface= with a sub-millisecond
+  target for the pure Rust validation path.
+
+The remaining provider debt is unchanged: the runtime implementation still owns
+the real Gerbil FFI/export in =scheme/native.ss=, while
+=scheme/asp/native-surface.ss= is the ASP-projected source-surface workaround.
+Direct Scheme FFI/export projection should replace that workaround before this
+RFC can be marked closed.
+
+After the Scheme source surface projects correctly, the next binding slice is
+borrowed UTF-8 input:
+
+- Scheme export: ~gerbil_scheme_rust_utf8_len~
+- Rust raw ABI declaration in ~gerbil-scheme-sys~
+- Safe wrapper: ~GerbilRuntime::utf8_len(&str)~
+- Native round-trip test covering ASCII and non-ASCII UTF-8.

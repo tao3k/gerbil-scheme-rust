@@ -1,0 +1,8 @@
+id = "native-ffi-steady-state"
+title = "Native Gerbil FFI steady-state throughput"
+policy_ids = ["RUST-AGENT-GERBIL-PERF-003"]
+agent_goal = "Measure a statistically sampled scalar call triplet through the public safe Gerbil runtime API after initialization."
+reference_repositories = ["tao3k/marlin-agent-core", "tao3k/gerbil-scheme-rust"]
+reference_patterns = ["single-threaded live runtime", "sampled native hot path", "safe wrapper receipt"]
+inputs = "inputs"
+expected = "expected"

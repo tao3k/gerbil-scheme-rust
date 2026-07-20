@@ -1,0 +1,30 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+exports_files([
+    "bootstrap_gerbil_toolchain.sh",
+    "gerbil_project.bzl",
+    "gerbil_repository.bzl",
+    "gerbil_toolchain.bzl",
+    "host_system.bzl",
+    "install_gerbil_dependencies.sh.tpl",
+    "local_gerbil.BUILD.bazel.tpl",
+    "native_scheme_env.sh.tpl",
+    "native_abi_fingerprint.sh",
+    "native_tool.sh.tpl",
+    "run_scheme_project.sh",
+    "run_scheme_tests.sh",
+])
+
+sh_binary(
+    name = "bootstrap_gerbil_toolchain",
+    srcs = ["bootstrap_gerbil_toolchain.sh"],
+    visibility = ["//visibility:public"],
+)
+
+
+
+
+exports_files([
+    "cargo_gate.sh",
+    "gerbil_gate.sh",
+])

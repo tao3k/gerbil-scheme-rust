@@ -1,0 +1,13 @@
+harness = "libtest"
+test = "initialized_runtime_crosses_the_live_gerbil_abi"
+phase = "warm"
+target_total = "40ms"
+max_total = "100ms"
+observed_total = "35ms"
+regression_budget = "50ms"
+memory_budget_bytes = 268435456
+observed_memory_bytes = 0
+target_rationale = "The warm runtime path performs one initialization, ABI negotiation, and 30000 scalar calls without allocation ownership transfer."
+
+[observed_timings]
+runtime_round_trip = "35ms"

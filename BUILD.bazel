@@ -1,0 +1,119 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("@gerbil_bazel//gerbil:defs.bzl", "gerbil_project_test")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "rust_sources",
+    srcs = glob([
+        "build-support/**/*",
+        "crates/**/*.rs",
+        "crates/**/Cargo.toml",
+        "crates/**/tests/unit/scenarios/**",
+        "build-support/**/*.rs",
+        "build-support/**/*.md",
+        "build-support/**/Cargo.toml",
+        "include/**/*.h",
+    ]) + [
+        "Cargo.lock",
+        "Cargo.toml",
+        "rust-toolchain.toml",
+    ],
+)
+
+filegroup(
+    name = "gerbil_sources",
+    srcs = glob(["scheme/*"]) + [
+        "build.ss",
+        "gerbil.pkg",
+        "native/runtime.c",
+    ],
+)
+
+[
+    sh_test(
+        name = "cargo_" + gate,
+        srcs = ["//tools/bazel:cargo_gate.sh"],
+        args = [gate],
+        data = [
+            ":gerbil_sources",
+            ":rust_sources",
+        ],
+        tags = [
+            "manual",
+            "no-sandbox",
+        ],
+        timeout = {
+            "check": "moderate",
+            "test": "long",
+            "clippy": "long",
+        }[gate],
+        size = {
+            "check": "medium",
+            "test": "large",
+            "clippy": "large",
+        }[gate],
+    )
+    for gate in [
+        "check",
+        "test",
+        "clippy",
+    ]
+]
+
+sh_test(
+    name = "cargo_all",
+    size = "large",
+    tags = [
+        "exclusive",
+        "no-sandbox",
+    ],
+    env_inherit = [
+        "AR",
+        "CARGO_TARGET_DIR",
+        "CC",
+        "CXX",
+        "DEVELOPER_DIR",
+        "DYLD_LIBRARY_PATH",
+        "GAMBOPT",
+        "GERBIL_GSC",
+        "GERBIL_HOME",
+        "GERBIL_PATH",
+        "GERBIL_SCHEME_RUST_WORKSPACE",
+        "GITHUB_WORKSPACE",
+        "HOME",
+        "LD_LIBRARY_PATH",
+        "LIBRARY_PATH",
+        "MACOSX_DEPLOYMENT_TARGET",
+        "NIX_CFLAGS_COMPILE",
+        "NIX_LDFLAGS",
+        "PATH",
+        "PKG_CONFIG_PATH",
+        "SDKROOT",
+        "XDG_CACHE_HOME",
+    ],
+    srcs = ["//tools/bazel:cargo_gate.sh"],
+    args = ["all"],
+    data = [
+        ":gerbil_sources",
+        ":rust_sources",
+    ],
+    timeout = "long",
+)
+
+gerbil_project_test(
+    name = "gerbil_native",
+    build_args = ["compile"],
+    build_script = "build.ss",
+    tests = ["scheme/test-native.ss"],
+    timeout = "short",
+    srcs = [":gerbil_sources"],
+)
+
+test_suite(
+    name = "ci",
+    tests = [
+        ":cargo_all",
+        ":gerbil_native",
+    ],
+)

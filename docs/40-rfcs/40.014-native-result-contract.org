@@ -1,0 +1,49 @@
+#+TITLE: NativeResult Contract Receipt
+#+DATE: 2026-07-20
+
+* Purpose
+
+This receipt closes the first public Rust API gap behind the documented
+=native-result= Scheme surface. The binding crate now exposes a concrete
+=NativeResult<T>= wrapper instead of keeping =native-result= only as a
+source-surface token.
+
+* Contract
+
+| Case | Rust API | Status projection | Preservation rule |
+|------+----------+-------------------+-------------------|
+| success | =NativeResult::ok(value)= | =Some(GerbilStatus::Ok)= | value round-trips through =Result<T, NativeError>= |
+| known native failure | =NativeResult::err(NativeError::Status { code, .. })= | =Some(GerbilStatus::...)= | stable status code round-trips |
+| unknown native failure | =NativeResult::from_result(Err(NativeError::Status { code, .. }))= | =None= | raw future status code remains in =NativeError::Status= |
+
+* Scenario coverage
+
+The scenario suite now includes:
+
+#+begin_example
+tests/unit/scenarios/native-result-contract
+#+end_example
+
+The scenario validates that =NativeResult<T>= is covered by the same
+harness-managed contract path as status, native-value, and source-surface
+coverage. The required scenario count is intentionally raised from 8 to 9 so a
+future deletion of this receipt fails the suite.
+
+* Receipts
+
+- =crates/gerbil-scheme/src/native.rs= exports =NativeResult<T>= in the native
+  public surface.
+- =crates/gerbil-scheme/src/lib.rs= re-exports =NativeResult= when the =native=
+  feature is enabled.
+- =crates/gerbil-scheme/tests/native_result_contract.rs= checks success,
+  known-error, unknown-error, borrowed-result, and owned-result round trips.
+- =crates/gerbil-scheme/tests/unit/scenarios/native-result-contract= records
+  the scenario and libtest benchmark budget.
+
+* Remaining work
+
+- Fold this receipt back into =40.013-gerbil-scheme-types-checklist.org= once an
+  Org parser-owned route is available, or after a safe exact-text context is
+  obtained.
+- Continue widening the generic Scheme type surface beyond current native ABI
+  exports without introducing Rust-only stubs.

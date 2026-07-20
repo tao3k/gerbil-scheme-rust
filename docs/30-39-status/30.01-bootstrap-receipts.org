@@ -1,0 +1,132 @@
+#+title: Gerbil Scheme Rust Bootstrap Receipts
+#+author: gerbil-scheme-rust maintainers
+#+date: 2026-07-17
+
+* Decision Receipt
+
+The repository is a bindings-only project.  Marlin policy, loop graphs, Deck,
+resident execution, and POO projection remain downstream concerns.
+
+The repository is dual licensed under the Apache License 2.0 or the GNU Lesser
+General Public License 2.1 or later, at the recipient's option.
+
+* Implemented Surface
+
+- =gerbil-scheme-sys=: versioned C ABI types and the native scalar export.
+- =gerbil-scheme=: safe process-backed fallback for version, evaluation, and
+  scalar projection.  It is not described as the native backend.
+- =GerbilRuntime=: safe, exclusive, thread-affine ownership of an initialized
+  in-process Gerbil/Gambit runtime, with ABI validation and cleanup on drop.
+- =gerbil-scheme-native-build=: canonical Gerbil AOT, native compiler discovery,
+  archive/link projection, and checked native build orchestration.
+- =gerbil-scheme-build=: opaque source emission, artifact projection, and
+  checked =gxc= invocation.
+- =scheme/native.ss=: a scalar C export implemented with Gerbil's official
+  =:std/foreign= / Gambit =c-define= path.
+- =scheme/gerbil_scheme_rust.h=: versioned C header matching the Rust sys
+  declarations; the runtime ABI reports version 1.
+- =build.ss=: canonical Gerbil build truth.
+- =native/runtime.c=: minimal setup/cleanup shim around Gambit's supported
+  =___setup= / =___cleanup= lifecycle and the generated module linker.
+- =gerbil-scheme-sys/build.rs=: Cargo-side packaging of canonical =build.ss=
+  output into a native archive; it does not reimplement Gerbil compilation.
+- Bazel: outer orchestration of locked Cargo gates and the canonical Gerbil
+  native gate.
+
+* Local Acceptance Receipts
+
+Environment:
+
+- Rust 1.95.0 from the existing Marlin development environment.
+- Gerbil v0.18.2 on Gambit v4.9.7.
+- Bazel 9.2.0 through ephemeral Bazelisk.
+
+Results:
+
+- =cargo fmt --all --check=: pass.
+- =cargo test --workspace --locked=: 424 passed, 0 failed, 1 ignored.
+- =cargo clippy --workspace --all-targets --locked -- -D warnings=: pass.
+- =./build.ss compile=: pass.
+- =gxi scheme/test-native.ss=: pass, scalar result 42.
+- =bazel query //...=: 7 targets materialized.
+- =bazel build //...=: pass.
+- =bazel test //:ci=: 2 passed, 0 failed.  The consolidated locked Cargo gate
+  completed in 227.7 seconds on the final cold native build and the canonical
+  Gerbil gate in 7.7 seconds.  The
+  suite serializes native toolchain use instead of compiling the same archive
+  concurrently in four test actions.
+
+Current pull-request CI at commit =74ddf20cda49059cbbe71eff48a4ae20184a3a67=:
+
+- macOS 26 with Homebrew Gerbil: pass in 5 minutes 8 seconds;
+- Ubuntu with source Gerbil: pass in 5 minutes 48 seconds;
+- both jobs run Cargo and Bazel gates from the same revision.
+- Latest matrix receipt: macOS 26/Homebrew passed in 5 minutes; Ubuntu/source passed in 6 minutes 24 seconds.
+
+* AOT FFI Performance Receipt
+
+The statistical Scenario initializes Gerbil once and measures C control, raw
+Gerbil AOT, and safe Rust wrapper paths independently.  A representative local
+receipt records:
+
+- C identity median: 7 nanoseconds;
+- raw AOT scalar medians: 61--64 nanoseconds;
+- safe even/compare medians: 77 nanoseconds;
+- the complete 175,000-call statistical workload: 27.9 milliseconds;
+- aggregate hard gate: 500 milliseconds.
+
+Release Divan targets contain separate =c_identity=, raw AOT, and safe wrapper
+benchmarks.  These receipts establish a baseline, not a claim that AOT is fully
+optimized; =add_i64= p95 variance remains an active optimization item.
+
+* Marlin Consumer Migration Receipt
+Current downstream state: Marlin declares the upstream crate as a workspace dependency pinned to commit =74ddf20cda49059cbbe71eff48a4ae20184a3a67=. Its native archive and compiler adapters delegate to the upstream substrate while policy, Deck, projection, and runtime semantics remain downstream. Consumer tests and the final duplicate-removal gate remain open until the Marlin validation surface is green.
+
+
+The dependency direction is fixed:
+
+#+begin_src text
+gerbil-scheme-rust -> consumed by marlin-agent-core
+#+end_src
+
+Inventory and classification are complete.  =marlin-gerbil-ir=, routing schemas,
+projection/package identities, Deck/workspace semantics, and CLI wrappers stay
+in Marlin.  Generic compiler discovery, archive/link/header receipts, symbol
+audit, and build-plan mechanisms converge upstream.  The migration is not
+complete until Marlin consumes a pinned upstream revision and no longer owns a
+duplicate generic implementation.
+
+The upstream neutral build substrate now owns parameterized static-link plans,
+ordered Cargo directives, native compiler discovery, Gambit discovery through
+Gerbil wrappers, and header drift receipts.  Its acceptance surface records 7
+passing tests, including real C object compilation and archive packaging, plus
+2 valid Harness Scenario contracts.  Package all-target Clippy passes with
+warnings denied.
+
+* Safe In-process Boundary
+
+The safe =GerbilRuntime= constructor serializes the process-global lifecycle,
+calls the native setup shim, validates ABI version 1, and only then returns a
+handle.  The handle is neither =Send= nor =Sync=, checks its owner thread, owns
+the loaded module lifetime, and runs cleanup when dropped.  Rust integration
+tests call =gerbil_scheme_rust_add_i64(40, 2)= in process and receive 42; they
+also reject a second live owner.  Cleanup finalizes Gambit for the process, so
+later initialization is rejected with a stable status instead of attempting an
+unsupported restart.
+
+The process-backed implementation remains a separately named fallback during
+the expansion of the native API.  It is not used as evidence for the in-process
+native acceptance gate.
+
+* Official Export Authority Gate
+The generated =src/bootstrap/gerbil/builtin.ssxi.ss= file is bootstrap projection metadata, not binding-definition authority. Version 1 module, procedure, value, rooting, release, and exception APIs therefore require evidence from an official Gerbil/Gambit export owner plus a real linked Scenario before they enter the public Rust surface.
+
+* Next Native Expansion Gate
+
+1. Add status-returning native entry points before introducing operations whose
+   Scheme bodies can raise exceptions.
+2. Contain Scheme exceptions and Rust panics before either crosses the C ABI.
+3. Introduce owned value handles only together with explicit release functions
+   and generation checks tied to =GerbilRuntime=.
+4. Keep every new safe method on the same exclusive, thread-affine handle until
+   the official runtime contract supports a broader threading model.

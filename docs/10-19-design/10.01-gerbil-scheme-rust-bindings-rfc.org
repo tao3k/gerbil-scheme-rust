@@ -1,0 +1,294 @@
+#+title: 10.01 Gerbil Scheme Rust Bindings RFC
+#+author: gerbil-scheme-rust contributors
+#+date: 2026-07-17
+#+status: Active draft
+#+rfc_id: GSR-RFC-0001
+#+options: toc:3 num:nil
+
+* 10.01.00 Decision Status
+
+The project direction is accepted; implementation is pending.
+
+=gerbil-scheme-rust= SHALL be a bindings-only repository.  It SHALL make
+Gerbil Scheme usable from Rust through raw bindings, safe wrappers, and build
+integration.  It SHALL NOT become a home for Marlin or =poo-flow= runtime
+semantics.
+
+The project SHALL support both Cargo and Bazel.  Its CI SHALL reuse the proven
+Gerbil toolchain, native ABI fingerprint, cache, and Linux/macOS matrix pattern
+from =poo-flow=.
+
+The intended license expression is:
+
+#+begin_example
+Apache-2.0 OR LGPL-2.1-or-later
+#+end_example
+
+* 10.01.10 Core Contract
+
+The library answers one question:
+
+#+begin_quote
+How can Rust code build, load, call, and exchange typed values with Gerbil
+Scheme through an explicit, testable, versioned native boundary?
+#+end_quote
+
+The ordinary path SHALL be safe Rust.  Raw pointers, runtime handles, foreign
+symbols, and native ownership rules SHALL be isolated behind a narrow =sys=
+layer.
+
+The public API SHALL use Gerbil and Rust vocabulary.  Names tied to Marlin,
+Deck, POO Flow, agent policy, resident agents, or workspace policy are not part
+of this repository's public contract.
+
+* 10.01.20 Problem
+
+Existing Marlin work already proves several useful techniques: compiling
+Gerbil sources, producing AOT/native artifacts, generating link directives,
+projecting Scheme values into Rust types, validating ABI identities, and
+crossing a real =gxi=/=gsc= boundary.
+
+Those capabilities currently live beside Marlin-specific schemas and runtime
+policy.  This makes them difficult to reuse as a general Gerbil Scheme Rust
+binding without also importing application semantics and a large internal
+dependency graph.
+
+The repository therefore needs an independently buildable binding substrate,
+not a copy of the complete Marlin Gerbil crate.
+
+* 10.01.30 Goals
+
+- Provide raw, versioned Rust declarations for the supported Gerbil native
+  boundary.
+- Provide safe Rust ownership, value, module, invocation, and error APIs.
+- Provide deterministic Gerbil package and AOT build integration.
+- Support Cargo users without requiring Bazel.
+- Support Bazel users without shelling out to an undocumented parallel build.
+- Test real Gerbil/Rust boundary behavior on Linux and macOS.
+- Keep downstream runtimes free to define their own schemas and policies.
+
+* 10.01.35 Non-Goals
+
+- Defining a workflow, graph, agent, Deck, or resident runtime.
+- Owning Marlin typed artifacts or =poo-flow= POO objects.
+- Replacing Gerbil's package system or =build.ss=.
+- Making Bazel the source of truth for Rust dependency metadata.
+- Treating serialized JSON fixtures as the native runtime ABI.
+- Publishing extracted Marlin modules before their Marlin dependencies have
+  been removed.
+
+* 10.01.40 Boundary Ownership
+
+** 10.01.40.10 Repository-owned boundary
+
+The repository owns:
+
+- raw native types, constants, symbols, and calling conventions;
+- handle lifetime and ownership rules;
+- panic and error containment at the FFI boundary;
+- safe value conversion and invocation wrappers;
+- Gerbil compiler/toolchain discovery required by the bindings;
+- Gerbil package, AOT object, native archive, and link metadata helpers;
+- ABI identifiers, versions, manifests, validation, and compatibility tests;
+- Cargo, Bazel, and CI integration for these capabilities.
+
+** 10.01.40.20 Downstream-owned boundary
+
+Downstream repositories own:
+
+- application schemas and typed business projections;
+- runtime scheduling, routing, state, and persistence;
+- policy selection and receipt semantics;
+- POO extension surfaces and flow composition;
+- application-specific generated headers and symbols.
+
+** 10.01.40.30 Unsafe boundary
+
+Unsafe Rust SHALL remain in the raw binding layer unless a reviewed exception
+is documented.  A panic SHALL NOT unwind across a foreign boundary.  Every
+borrowed value, owned value, callback, buffer, string, and runtime handle SHALL
+state who creates it, who may retain it, and who releases it.
+
+* 10.01.50 Minimal Interface
+
+The initial workspace is expected to contain three crates:
+
+| Crate | Responsibility | Forbidden responsibility |
+|-------+----------------+--------------------------|
+| =gerbil-scheme-sys= | Raw ABI declarations and native ownership primitives | Safe policy or application abstractions |
+| =gerbil-scheme= | Safe runtime, value, module, call, and error wrappers | Build orchestration and downstream schemas |
+| =gerbil-scheme-build= | Toolchain discovery, package/AOT compilation, archive and link metadata | Runtime policy and application execution |
+
+The exact crate split MAY change if implementation evidence shows a smaller
+surface, but the raw/safe/build ownership separation SHALL remain visible.
+
+* 10.01.60 Runtime Projection Rule
+
+** Implemented Native Runtime Contract
+
+The raw C ABI remains in =gerbil-scheme-sys=.  Safe callers acquire a single
+=GerbilRuntime= handle which performs Gambit setup, verifies ABI version 1,
+owns the loaded module lifetime, enforces thread affinity through a =!Send= and
+=!Sync= type, and performs cleanup on drop.  Native calls are unavailable
+before construction succeeds.  The lifecycle is one-shot per process:
+=Uninitialized -> Running -> Finalized=; Gambit is not restarted after cleanup.
+
+The process-backed =Gerbil= API is a separately named fallback and is not the
+implementation of =GerbilRuntime=.
+
+Scheme-to-Rust projection SHALL cross a typed native boundary:
+
+1. Gerbil produces a value or native projection described by a versioned
+   contract.
+2. The raw layer checks ABI identity, version, pointer validity, and ownership.
+3. The safe layer converts the checked representation into Rust-owned or
+   explicitly borrowed values.
+4. Downstream code interprets those values using its own domain types.
+
+Serialization MAY be used for fixtures, diagnostics, and debug receipts.  It
+SHALL NOT silently replace the native hot-path contract.
+
+* 10.01.70 Architecture
+
+#+begin_src mermaid
+flowchart LR
+  G["Gerbil Scheme package"] --> B["gerbil-scheme-build"]
+  B --> A["AOT object or native archive"]
+  A --> S["gerbil-scheme-sys"]
+  S --> R["gerbil-scheme safe API"]
+  R --> M["Marlin adapter"]
+  R --> P["poo-flow adapter"]
+  R --> O["Other Rust consumers"]
+#+end_src
+
+No arrow from a downstream adapter may point back into the binding repository
+as a source dependency.
+
+* 10.01.80 Build Truth And Orchestration
+
+The build has three explicit authorities:
+
+| Authority | Owns | Does not own |
+|-----------+------+--------------|
+| Cargo | Rust packages, features, dependencies, lockfile | Gerbil package semantics |
+| =build.ss= | Gerbil package compilation and Gerbil-native build behavior | Rust dependency resolution |
+| Bazel | Hermetic orchestration, toolchains, target graph, CI entry points | A second implementation of Cargo or =build.ss= |
+
+Bazel rules SHALL invoke or model the canonical Cargo and Gerbil build inputs;
+they SHALL NOT maintain hand-copied dependency or source lists that can drift
+without a validation gate.
+
+* 10.01.90 Bazel And CI Contract
+
+The repository SHALL use Bzlmod and SHALL provide a queryable target graph.
+The initial CI matrix SHALL preserve the proven =poo-flow= native pattern:
+
+- Linux with a pinned Gerbil source build;
+- macOS with the pinned =tao3k/gerbil/gerbil-scheme= Homebrew formula;
+- a native ABI fingerprint in toolchain and package cache keys;
+- ccache for native Gerbil compilation;
+- Bazelisk repository and disk caches;
+- explicit Gerbil activation and =gxi=/=gsc= smoke checks;
+- =bazel query //...=, =bazel build //...=, and =bazel test //...= gates.
+
+Cargo remains independently supported.  CI SHALL also run:
+
+#+begin_src sh
+cargo test --workspace --locked
+#+end_src
+
+A Bazel-only green result is insufficient if the ordinary Cargo consumer path
+is broken; a Cargo-only green result is insufficient if the declared Bazel
+support is broken.
+
+* 10.01.100 Marlin Reference Mapping
+
+The current Marlin crates are reference evidence, not the target repository
+layout.
+
+** 10.01.100.10 Candidate source material
+
+The following areas are candidates for extraction after dependency review:
+
+- command/compiler/source compilation primitives;
+- compiled artifact and package asset handling;
+- Gerbil dependency and toolchain discovery;
+- generic AOT probe, build, archive, and link-plan helpers;
+- generic Scheme type and ABI contract primitives;
+- real =gxi= boundary tests;
+- native archive build-support helpers.
+
+** 10.01.100.20 Must remain in Marlin
+
+- =marlin-gerbil-ir= loop graph and workspace policy contracts;
+- agent policy routing and its native projection;
+- Deck runtime native, policy, and script modules;
+- graph loop continuation and loop-case driver semantics;
+- policy-pack and POO projection contracts;
+- resident runtime and working-copy policy;
+- any symbol whose public meaning depends on a Marlin package or schema.
+
+Extraction SHALL proceed by dependency removal and renaming into general
+Gerbil/Rust vocabulary.  Copying a mixed module and promising to clean it up
+later is not an accepted extraction method.
+
+* 10.01.110 Versioning And Compatibility
+
+- Public Rust crates SHALL use semantic versioning.
+- Native ABI contracts SHALL carry an explicit ABI identifier and version.
+- ABI validation SHALL fail closed on an unsupported identity or version.
+- Additive ABI evolution SHALL be distinguishable from breaking layout,
+  ownership, or calling-convention changes.
+- Generated headers and Rust declarations SHALL be checked for drift.
+- Supported Gerbil versions SHALL be explicit toolchain inputs, not ambient
+  PATH assumptions.
+
+* 10.01.120 Licensing And Contribution Contract
+
+Project-owned source SHALL be offered under:
+
+#+begin_example
+Apache-2.0 OR LGPL-2.1-or-later
+#+end_example
+
+The repository SHALL contain both license texts and SHALL use the same SPDX
+expression in package metadata and new source headers.  Existing copyright,
+license, and notice information SHALL be preserved when code is extracted.
+Code not controlled by the project copyright holders SHALL NOT receive a new
+license merely because it was copied into this repository.
+
+Contributions SHALL be submitted under the repository's dual-license terms.
+
+* 10.01.130 Acceptance Criteria
+
+The first stable binding release requires all of the following:
+
+- [ ] The raw, safe, and build boundaries are independently testable.
+- [ ] No public crate depends on a Marlin or =poo-flow= package.
+- [ ] =cargo test --workspace --locked= passes from a clean checkout.
+- [ ] =bazel query //...=, =bazel build //...=, and =bazel test //...= pass.
+- [ ] Linux source-Gerbil and macOS Homebrew-Gerbil CI lanes pass.
+- [ ] A real Gerbil-to-Rust and Rust-to-Gerbil smoke path passes.
+- [ ] ABI identity, version mismatch, null/invalid input, and ownership tests
+  pass.
+- [ ] Panic containment is tested at every Rust entry point callable through
+  the native boundary.
+- [ ] Generated headers and checked-in API declarations have a drift gate.
+- [ ] Cargo and Bazel build the same declared public surface.
+- [ ] Dual-license files, package metadata, and contribution terms agree.
+- [ ] A release artifact contains build and test receipts sufficient to
+  reproduce the supported boundary.
+
+* 10.01.140 Open Questions
+
+- Which Gerbil native surface is stable enough to expose directly, and which
+  operations require a project-owned shim?
+- Should the first release support embedding a runtime, invoking an external
+  =gxi= process, or both behind separate features?
+- Which callbacks can be safely retained across Gerbil GC boundaries?
+- Which generated binding artifacts, if any, should be committed?
+- What minimum Gerbil/Gambit version range will be supported after the pinned
+  CI baseline is proven?
+
+Open questions do not weaken the bindings-only boundary.  They determine the
+smallest safe implementation inside it.

@@ -1,0 +1,8 @@
+id = "native-runtime-round-trip"
+title = "Live Gerbil runtime ABI round trip"
+policy_ids = ["RUST-AGENT-GERBIL-RUNTIME-001"]
+agent_goal = "Prove runtime initialization, ABI negotiation, and repeated typed procedure calls through the native Gerbil module."
+reference_repositories = ["tao3k/marlin-agent-core"]
+reference_patterns = ["live native receipt", "bounded hot-path loop"]
+inputs = "inputs"
+expected = "expected"

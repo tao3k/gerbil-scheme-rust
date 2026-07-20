@@ -1,0 +1,30 @@
+#+title: Gerbil Scheme Rust Project Harness Upstream
+#+date: 2026-07-20
+
+* Upstream source
+
+- Repository: =tao3k/rust-lang-project-harness=
+- Upstream branch: =main=
+- Upstream commit: =4aff691fd517b9ea8766da0ec3f9ca8d95b329d5=
+- Upstream PR: =tao3k/rust-lang-project-harness#17=
+- Merge mode: squash
+
+* Downstream package identity
+
+This vendored harness is adapted for =gerbil-scheme-rust= as a workspace
+member:
+
+- Package name: =gerbil-scheme-rust-project-harness=
+- Library crate name: =rust_lang_project_harness=
+- Publish policy: =publish = false=
+
+The downstream package keeps local workspace/member compatibility overlays where
+the upstream standalone repository layout does not match this repository's Bazel
+and Cargo test environment.
+
+* Required verification after refresh
+
+- =cargo fmt --check=
+- =cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =cargo test --workspace --all-features --locked=
+- =bazel test //:cargo_all=

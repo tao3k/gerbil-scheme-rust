@@ -1,0 +1,10 @@
+id = "source-surface-sync"
+title = "Scheme source-surface result and error synchronization"
+policy_ids = ["RUST-AGENT-SOURCE-SURFACE-004"]
+agent_goal = "Prove the Scheme native source-surface projects Rust native result and error taxonomy without selector drift."
+reference_repositories = ["tao3k/gerbil-scheme-rust", "tao3k/marlin-agent-core"]
+reference_patterns = ["source-surface synchronization", "typed native error taxonomy", "status projection receipt"]
+inputs = "inputs"
+expected = "expected"
+harness = "libtest"
+test = "scheme_native_surface_projects_result_and_error_shapes"

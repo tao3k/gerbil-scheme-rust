@@ -1,0 +1,18 @@
+[package]
+name = "gerbil-scheme-sys"
+build = "build.rs"
+description = "Raw ABI types for Gerbil Scheme bindings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[build-dependencies]
+gerbil-scheme-native-build.workspace = true
+gerbil-scheme-rust-project-harness-policy.workspace = true

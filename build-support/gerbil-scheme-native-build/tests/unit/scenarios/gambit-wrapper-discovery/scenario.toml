@@ -1,0 +1,8 @@
+id = "gambit-wrapper-discovery"
+title = "Gambit discovery through a Gerbil wrapper"
+policy_ids = ["RUST-AGENT-GERBIL-BUILD-002"]
+agent_goal = "Prove that compiler discovery follows a selected Gerbil shell wrapper to its matching Gambit library."
+reference_repositories = ["tao3k/marlin-agent-core", "tao3k/gerbil-scheme-rust"]
+reference_patterns = ["GERBIL_HOME wrapper", "selected gsc identity", "Gambit link search"]
+inputs = "inputs"
+expected = "expected"

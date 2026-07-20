@@ -1,0 +1,213 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bindings:
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    timeout-minutes: ${{ matrix.gerbil-install == 'homebrew' && 12 || 60 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            gerbil-label: source-v0.18.2-07c84815
+            gerbil-ref: 07c8481588a8b07dbf05832687817cd398902ac0
+            gerbil-install: source
+          - os: macos-26
+            gerbil-label: homebrew-tao3k-v0.18.2-07c84815
+            gerbil-ref: 07c8481588a8b07dbf05832687817cd398902ac0
+            gerbil-install: homebrew
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy,rustfmt
+      - name: Compute Gerbil native ABI fingerprint
+        id: gerbil-native-abi
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v gcc >/dev/null; then
+            compiler=gcc
+          else
+            compiler=clang
+          fi
+          fingerprint="$({
+            uname -s
+            uname -m
+            "$compiler" --version | sed -n '1p'
+          } | shasum -a 256 | awk '{print $1}')"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+      - name: Declare Bazel disk-cache generation
+        shell: bash
+        env:
+          BAZEL_CACHE_GENERATION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/bazel-cache-generation
+          printf '# gerbil-scheme-rust CI cache generation: %s\n' \
+            "$BAZEL_CACHE_GENERATION" \
+            > .ci/bazel-cache-generation/BUILD.bazel
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          cache-save: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          disk-cache: ci-${{ runner.os }}-${{ matrix.gerbil-label }}-${{ steps.gerbil-native-abi.outputs.fingerprint }}
+          repository-cache: true
+
+      - name: Restore Gerbil install capability
+        if: matrix.gerbil-install == 'source'
+        id: gerbil-cache
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: .ci/gerbil/${{ matrix.gerbil-label }}
+          key: gerbil-install-${{ runner.os }}-${{ runner.arch }}-${{ matrix.gerbil-label }}-${{ steps.gerbil-native-abi.outputs.fingerprint }}-${{ matrix.gerbil-ref }}
+      - name: Restore Gerbil bootstrap ccache
+        if: matrix.gerbil-install == 'source' && steps.gerbil-cache.outputs.cache-hit != 'true'
+        id: gerbil-ccache
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: .ci/ccache
+          key: gerbil-bootstrap-ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.gerbil-label }}-${{ steps.gerbil-native-abi.outputs.fingerprint }}-${{ matrix.gerbil-ref }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            gerbil-bootstrap-ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.gerbil-label }}-${{ steps.gerbil-native-abi.outputs.fingerprint }}-${{ matrix.gerbil-ref }}-
+      - name: Install Gerbil source dependencies
+        if: matrix.gerbil-install == 'source' && steps.gerbil-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ccache git jq libssl-dev
+      - name: Build Gerbil capability
+        if: matrix.gerbil-install == 'source' && steps.gerbil-cache.outputs.cache-hit != 'true'
+        env:
+          GERBIL_REF: ${{ matrix.gerbil-ref }}
+          GERBIL_SRC: ${{ github.workspace }}/.ci/gerbil-src/${{ matrix.gerbil-label }}
+          GERBIL_PREFIX: ${{ github.workspace }}/.ci/gerbil/${{ matrix.gerbil-label }}
+          CCACHE_DIR: ${{ github.workspace }}/.ci/ccache
+          CCACHE_MAXSIZE: 2G
+        run: tools/bazel/bootstrap_gerbil_toolchain.sh
+      - name: Save Gerbil install capability
+        if: matrix.gerbil-install == 'source' && steps.gerbil-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: .ci/gerbil/${{ matrix.gerbil-label }}
+          key: gerbil-install-${{ runner.os }}-${{ runner.arch }}-${{ matrix.gerbil-label }}-${{ steps.gerbil-native-abi.outputs.fingerprint }}-${{ matrix.gerbil-ref }}
+      - name: Save Gerbil bootstrap ccache
+        if: always() && matrix.gerbil-install == 'source' && steps.gerbil-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: .ci/ccache
+          key: gerbil-bootstrap-ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.gerbil-label }}-${{ steps.gerbil-native-abi.outputs.fingerprint }}-${{ matrix.gerbil-ref }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Activate Gerbil source capability
+        if: matrix.gerbil-install == 'source'
+        run: |
+          set -euo pipefail
+          GERBIL_PREFIX="$GITHUB_WORKSPACE/.ci/gerbil/${{ matrix.gerbil-label }}"
+          receipt="$GERBIL_PREFIX/bootstrap.receipt.json"
+          test -x "$GERBIL_PREFIX/bin/gxi"
+          test -x "$GERBIL_PREFIX/bin/gsc"
+          test -d "$GERBIL_PREFIX/lib"
+          jq -e --arg ref "${{ matrix.gerbil-ref }}" \
+            '.schema == "gerbil-scheme-rust.gerbil-toolchain-bootstrap-receipt.v1" and
+             .status == "success" and .ref == $ref' \
+            "$receipt" >/dev/null
+          echo "$GERBIL_PREFIX/bin" >> "$GITHUB_PATH"
+          {
+            echo "GERBIL_HOME=$GERBIL_PREFIX"
+            echo "GERBIL_GSC=$GERBIL_PREFIX/bin/gsc"
+            echo "LD_LIBRARY_PATH=$GERBIL_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          } >> "$GITHUB_ENV"
+      - name: Install macOS Gerbil bottle
+        if: matrix.gerbil-install == 'homebrew'
+        id: homebrew-gerbil-install
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_BOTTLE_SOURCE_FALLBACK: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+          INSTALL_BUDGET_SECONDS: 120
+        run: |
+          set -euo pipefail
+          brew list --formula ghostscript >/dev/null 2>&1 && brew unlink ghostscript || true
+          brew tap tao3k/gerbil
+          brew install jq
+          start_seconds=$SECONDS
+          brew install --force-bottle tao3k/gerbil/gerbil-scheme
+          install_seconds=$((SECONDS - start_seconds))
+          formula_info="$(brew info --json=v2 tao3k/gerbil/gerbil-scheme)"
+          poured_from_bottle="$(jq -r '.formulae[0].installed[-1].poured_from_bottle // false' <<< "$formula_info")"
+          receipt="$RUNNER_TEMP/gerbil-homebrew-install-receipt.json"
+          jq -n \
+            --arg schema "gerbil-scheme-rust.ci.homebrew-gerbil-receipt.v1" \
+            --argjson pouredFromBottle "$poured_from_bottle" \
+            --argjson installSeconds "$install_seconds" \
+            --argjson budgetSeconds "$INSTALL_BUDGET_SECONDS" \
+            '{schema: $schema, pouredFromBottle: $pouredFromBottle,
+              installSeconds: $installSeconds, budgetSeconds: $budgetSeconds}' \
+            > "$receipt"
+          echo "receipt=$receipt" >> "$GITHUB_OUTPUT"
+          if (( install_seconds > INSTALL_BUDGET_SECONDS )) || [[ "$poured_from_bottle" != true ]]; then
+            echo "Gerbil must be installed from the published bottle within budget" >&2
+            exit 1
+          fi
+          gerbil_home="$(gxi -e '(display (gerbil-home))')"
+          gsc_path="$gerbil_home/bin/gsc"
+          test -x "$gsc_path"
+          gsc_wrapper="$RUNNER_TEMP/gerbil-gsc"
+          {
+            printf '#!/bin/sh\n'
+            printf 'exec "%s" "-:~~=%s,~~bin=%s,~~include=%s,~~lib=%s" "$@"\n' \
+              "$gsc_path" \
+              "$gerbil_home" \
+              "$gerbil_home/bin" \
+              "$gerbil_home/include" \
+              "$gerbil_home/lib"
+          } > "$gsc_wrapper"
+          chmod +x "$gsc_wrapper"
+          test -x "$gsc_wrapper"
+          gambit_prefix="$gerbil_home"
+          {
+            echo "GERBIL_HOME=$gerbil_home"
+            echo "GERBIL_GSC=$gsc_wrapper"
+            echo "GAMBOPT=~~bin=$gambit_prefix/bin,~~lib=$gambit_prefix/lib,~~include=$gambit_prefix/include"
+          } >> "$GITHUB_ENV"
+      - name: Upload macOS Gerbil install receipt
+        if: always() && matrix.gerbil-install == 'homebrew'
+        uses: actions/upload-artifact@v7
+        with:
+          name: homebrew-gerbil-install-receipt-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ steps.homebrew-gerbil-install.outputs.receipt }}
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Toolchain receipt
+        run: |
+          rustc --version
+          cargo --version
+          test -x "$GERBIL_GSC"
+          "$GERBIL_GSC" -v
+          gxc --version
+          gxi --version
+          bazel version
+      - name: Cargo format
+        run: cargo fmt --all --check
+      - name: Cargo gates
+        run: |
+          cargo check --workspace --locked
+          cargo test --workspace --locked
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Bazel gates
+        run: |
+          bazel query //...
+          bazel build //...
+          bazel test //:ci

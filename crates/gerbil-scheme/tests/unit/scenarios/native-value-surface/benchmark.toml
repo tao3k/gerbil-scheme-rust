@@ -1,0 +1,15 @@
+harness = "libtest"
+test = "native_value_surface"
+phase = "warm"
+target_total = "10ms"
+max_total = "100ms"
+observed_total = "1ms"
+regression_budget = "25ms"
+memory_budget_bytes = 1048576
+observed_memory_bytes = 0
+target_rationale = "Safe UTF-8, opaque value handle, and callback trampoline checks are pure Rust pointer/length/status validation and must remain sub-millisecond outside process startup."
+
+[observed_timings]
+borrowed_utf8_surface = "1ms"
+value_handle_surface = "1ms"
+i64_callback_surface = "1ms"

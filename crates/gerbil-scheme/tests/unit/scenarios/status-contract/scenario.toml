@@ -1,0 +1,8 @@
+id = "status-contract"
+title = "Typed native status projection"
+policy_ids = ["RUST-AGENT-GERBIL-STATUS-002"]
+agent_goal = "Prove stable status decoding, unknown-code preservation, and typed NativeError projection under a bounded hot-path loop."
+reference_repositories = ["tao3k/marlin-agent-core"]
+reference_patterns = ["typed status receipt", "forward-compatible unknown code"]
+inputs = "inputs"
+expected = "expected"

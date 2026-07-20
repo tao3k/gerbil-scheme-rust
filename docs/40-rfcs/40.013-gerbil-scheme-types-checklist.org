@@ -88,8 +88,7 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] Opaque value handles carry explicit provenance:
   =GerbilValueProvenance::UntrustedRaw= for caller-supplied non-null raw
   handles.
-- [X] Runtime/export-path-produced opaque value provenance is distinct from
-  =UntrustedRaw=.
+- [X] Runtime-sentinel opaque value provenance is distinct from =UntrustedRaw=.
 - [ ] Runtime/export-produced opaque value provenance that can safely enable
   Gerbil/Gambit predicates and traversal.
 - [X] Thread-affinity check for runtime methods.

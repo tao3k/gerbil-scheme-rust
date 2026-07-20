@@ -10,7 +10,7 @@ use std::thread::{self, ThreadId};
 use gerbil_scheme_sys::{
     GERBIL_SCHEME_RUST_ABI_VERSION, gerbil_scheme_rust_abi_version, gerbil_scheme_rust_add_i64,
     gerbil_scheme_rust_identity_i64, gerbil_scheme_rust_runtime_cleanup,
-    gerbil_scheme_rust_runtime_exported_value, gerbil_scheme_rust_runtime_init,
+    gerbil_scheme_rust_runtime_init, gerbil_scheme_rust_runtime_sentinel_value,
 };
 
 static RUNTIME_LIFECYCLE: Mutex<()> = Mutex::new(());
@@ -95,12 +95,12 @@ pub enum GerbilValueProvenance {
     /// This keeps tests and FFI boundaries fail-closed: the pointer is not
     /// trusted as a live Gambit/Gerbil object.
     UntrustedRaw,
-    /// A handle produced by an initialized runtime/export path.
+    /// A Rust-owned sentinel handle produced through an initialized runtime API path.
     ///
-    /// This proves the handle crossed a versioned Gerbil/Gambit export while
-    /// the owning [`GerbilRuntime`] was alive.  It does not by itself claim GC
-    /// rooting beyond the borrowed runtime lifetime.
-    RuntimeExport,
+    /// This proves the handle was produced while the owning [`GerbilRuntime`]
+    /// was alive. It is not a live Gambit/Gerbil object and does not imply type,
+    /// GC rooting, or traversal safety.
+    RuntimeSentinel,
 }
 
 /// Runtime-borrowed opaque Gerbil value handle.
@@ -476,28 +476,28 @@ impl GerbilRuntime {
         Ok(unsafe { gerbil_scheme_rust_identity_i64(value) })
     }
 
-    /// Returns an opaque value handle produced by the initialized runtime/export path.
+    /// Returns an opaque sentinel value handle through the initialized runtime path.
     ///
     /// # Errors
     ///
     /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
     /// or [`NativeError::Status`] when the native export reports an error or
     /// returns a null handle.
-    pub fn exported_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+    pub fn runtime_sentinel_value(&self) -> Result<GerbilValue<'_>, NativeError> {
         self.check_thread()?;
         let mut out = core::ptr::null_mut();
         // SAFETY: self proves runtime/module lifetime and `out` is a valid
         // output slot for one opaque runtime-borrowed value handle.
-        let status = unsafe { gerbil_scheme_rust_runtime_exported_value(&raw mut out) };
+        let status = unsafe { gerbil_scheme_rust_runtime_sentinel_value(&raw mut out) };
         if status != gerbil_scheme_sys::GerbilStatus::Ok {
             return Err(NativeError::Status {
-                operation: "GerbilRuntime::exported_value",
+                operation: "GerbilRuntime::runtime_sentinel_value",
                 code: status as i32,
             });
         }
-        value_from_native_handle_with_provenance(out, GerbilValueProvenance::RuntimeExport).ok_or(
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::RuntimeSentinel).ok_or(
             NativeError::Status {
-                operation: "GerbilRuntime::exported_value",
+                operation: "GerbilRuntime::runtime_sentinel_value",
                 code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
             },
         )

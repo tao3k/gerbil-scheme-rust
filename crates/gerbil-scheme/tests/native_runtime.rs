@@ -16,8 +16,8 @@ fn calls_scalar_export_in_process() {
         GERBIL_SCHEME_RUST_ABI_VERSION
     );
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
-    let value = runtime.exported_value().unwrap();
-    assert_eq!(value.provenance(), GerbilValueProvenance::RuntimeExport);
+    let value = runtime.runtime_sentinel_value().unwrap();
+    assert_eq!(value.provenance(), GerbilValueProvenance::RuntimeSentinel);
     assert_eq!(value.is_pair().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_list().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));

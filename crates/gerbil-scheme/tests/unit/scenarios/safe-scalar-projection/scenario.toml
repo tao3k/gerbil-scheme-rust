@@ -1,0 +1,9 @@
+id = "safe-scalar-projection"
+title = "Safe Scheme scalar projection"
+policy_ids = ["RUST-AGENT-GERBIL-SAFE-001"]
+agent_goal = "Keep safe scalar Scheme constructors and ABI projections explicit, allocation-free, and sub-millisecond."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["safe scalar constructor", "fixnum ABI projection", "boolean ABI projection", "char ABI projection", "flonum ABI projection"]
+inputs = "none"
+expected = "pass"
+benchmark = "benchmark.toml"

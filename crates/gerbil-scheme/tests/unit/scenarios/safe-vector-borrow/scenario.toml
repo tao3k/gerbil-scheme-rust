@@ -1,0 +1,9 @@
+id = "safe-vector-borrow"
+title = "Safe borrowed vector projection"
+policy_ids = ["RUST-AGENT-GERBIL-SAFE-003"]
+agent_goal = "Keep safe vector handle borrows explicit, non-rooting, and sub-millisecond while runtime ownership remains external."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["safe borrowed vector", "value handle slice", "pointer length ABI projection"]
+inputs = "none"
+expected = "pass"
+benchmark = "benchmark.toml"

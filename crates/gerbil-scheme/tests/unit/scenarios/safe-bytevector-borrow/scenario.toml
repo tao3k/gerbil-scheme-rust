@@ -1,0 +1,9 @@
+id = "safe-bytevector-borrow"
+title = "Safe borrowed bytevector projection"
+policy_ids = ["RUST-AGENT-GERBIL-SAFE-002"]
+agent_goal = "Keep safe bytevector borrows explicit, non-owning, and sub-millisecond before runtime allocation APIs are added."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["safe borrowed bytevector", "slice lifetime", "pointer length ABI projection"]
+inputs = "none"
+expected = "pass"
+benchmark = "benchmark.toml"

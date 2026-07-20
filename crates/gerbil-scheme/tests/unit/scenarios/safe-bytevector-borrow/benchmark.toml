@@ -1,0 +1,14 @@
+harness = "libtest"
+test = "scheme_borrowed_bytevector_preserves_slice_and_abi_projection"
+phase = "warm"
+observed_total = "100us"
+target_total = "1ms"
+target_rationale = "Safe bytevector projection only preserves a borrowed slice pointer and length."
+max_total = "500ms"
+regression_budget = "10ms"
+observed_memory_bytes = 0
+memory_budget_bytes = 16777216
+
+[observed_timings]
+safe_bytevector_borrow = "100us"
+safe_bytevector_borrow_budget = "1ms"

@@ -1,0 +1,14 @@
+harness = "libtest"
+test = "procedure_callback_type_projects_value_handle_status_boundary"
+phase = "warm"
+observed_total = "100us"
+target_total = "1ms"
+target_rationale = "Procedure callback status projection is a direct function-pointer boundary check and should stay sub-millisecond."
+max_total = "500ms"
+regression_budget = "10ms"
+observed_memory_bytes = 0
+memory_budget_bytes = 16777216
+
+[observed_timings]
+procedure_callback_boundary = "100us"
+procedure_callback_boundary_budget = "1ms"

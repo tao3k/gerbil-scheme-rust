@@ -4,6 +4,13 @@ use crate::{
     GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GerbilBorrowedUtf8, GerbilStatus,
 };
 
+use crate::{
+    GerbilBoolean, GerbilBorrowedBytevector, GerbilBorrowedVector, GerbilChar, GerbilFixnum,
+    GerbilFlonum, GerbilPair, GerbilProcedureCallback, GerbilValueHandle,
+};
+
+mod scenario_benchmark_suite;
+
 #[test]
 fn abi_identity_is_nul_terminated() {
     assert_eq!(GERBIL_SCHEME_RUST_ABI_ID.last(), Some(&0));
@@ -71,4 +78,85 @@ fn borrowed_utf8_as_str_rejects_invalid_utf8() {
 
     // SAFETY: `borrowed` points into `bytes`, which is alive for this call.
     assert!(unsafe { borrowed.as_str() }.is_err());
+}
+
+#[test]
+fn scalar_scheme_value_wrappers_have_stable_c_abi_shapes() {
+    assert_eq!(
+        core::mem::size_of::<GerbilFixnum>(),
+        core::mem::size_of::<isize>()
+    );
+    assert_eq!(GerbilFixnum(-42), GerbilFixnum(-42));
+
+    assert_eq!(GerbilBoolean::from_bool(false), GerbilBoolean::FALSE);
+    assert_eq!(GerbilBoolean::from_bool(true), GerbilBoolean::TRUE);
+    assert!(!GerbilBoolean::FALSE.as_bool());
+    assert!(GerbilBoolean::TRUE.as_bool());
+    assert!(GerbilBoolean(7).as_bool());
+
+    let lambda = GerbilChar::from_char('λ');
+    assert_eq!(char::try_from(lambda), Ok('λ'));
+    assert!(char::try_from(GerbilChar(0xD800)).is_err());
+
+    assert_eq!(GerbilFlonum(1.25), GerbilFlonum(1.25));
+}
+
+#[test]
+fn borrowed_collection_surfaces_preserve_pointer_and_length_contracts() {
+    let bytes = [1_u8, 2, 3];
+    let borrowed_bytes = GerbilBorrowedBytevector::from_slice(&bytes);
+    assert_eq!(borrowed_bytes.ptr, bytes.as_ptr());
+    assert_eq!(borrowed_bytes.len, bytes.len());
+    assert!(GerbilBorrowedBytevector::EMPTY.ptr.is_null());
+    assert_eq!(GerbilBorrowedBytevector::EMPTY.len, 0);
+
+    let mut left = 1_u8;
+    let mut right = 2_u8;
+    let handles = [
+        (&raw mut left).cast::<core::ffi::c_void>(),
+        (&raw mut right).cast::<core::ffi::c_void>(),
+    ];
+    let pair = GerbilPair {
+        car: handles[0],
+        cdr: handles[1],
+    };
+    assert_eq!(pair.car, handles[0]);
+    assert_eq!(pair.cdr, handles[1]);
+
+    let vector = GerbilBorrowedVector::from_slice(&handles);
+    assert_eq!(vector.ptr, handles.as_ptr());
+    assert_eq!(vector.len, handles.len());
+    assert!(GerbilBorrowedVector::EMPTY.ptr.is_null());
+    assert_eq!(GerbilBorrowedVector::EMPTY.len, 0);
+}
+
+#[test]
+fn procedure_callback_type_projects_value_handle_status_boundary() {
+    unsafe extern "C" fn callback(
+        value: GerbilValueHandle,
+        context: *mut core::ffi::c_void,
+    ) -> GerbilStatus {
+        if value.is_null() || context.is_null() {
+            GerbilStatus::NullPointer
+        } else {
+            GerbilStatus::Ok
+        }
+    }
+
+    let callback: GerbilProcedureCallback = callback;
+    let mut value = 1_u8;
+    let mut context = 2_u8;
+
+    // SAFETY: both pointers are derived from live stack values for this call.
+    let status = unsafe {
+        callback(
+            (&raw mut value).cast::<core::ffi::c_void>(),
+            (&raw mut context).cast::<core::ffi::c_void>(),
+        )
+    };
+    assert_eq!(status, GerbilStatus::Ok);
+
+    // SAFETY: null pointers are intentionally used to validate fail-closed status projection.
+    let status = unsafe { callback(core::ptr::null_mut(), core::ptr::null_mut()) };
+    assert_eq!(status, GerbilStatus::NullPointer);
 }

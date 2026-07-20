@@ -170,6 +170,144 @@ pub type GerbilValueHandle = *mut c_void;
 /// Callback for a native binding that consumes one signed integer.
 pub type GerbilI64Callback = unsafe extern "C" fn(i64, *mut c_void) -> GerbilStatus;
 
+/// Machine-word fixnum value crossing the ABI by value.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GerbilFixnum(pub isize);
+
+/// Boolean value normalized to `0` or `1` at the ABI boundary.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GerbilBoolean(pub u8);
+
+impl GerbilBoolean {
+    /// ABI false value.
+    pub const FALSE: Self = Self(0);
+    /// ABI true value.
+    pub const TRUE: Self = Self(1);
+
+    /// Project a Rust boolean into the normalized ABI representation.
+    #[must_use]
+    pub const fn from_bool(value: bool) -> Self {
+        if value { Self::TRUE } else { Self::FALSE }
+    }
+
+    /// Interpret only the normalized false value as false.
+    #[must_use]
+    pub const fn as_bool(self) -> bool {
+        self.0 != 0
+    }
+}
+
+/// Unicode scalar value encoded as a 32-bit code point.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GerbilChar(pub u32);
+
+impl GerbilChar {
+    /// Convert a Rust `char` to the ABI code point representation.
+    #[must_use]
+    pub const fn from_char(value: char) -> Self {
+        Self(value as u32)
+    }
+}
+
+impl TryFrom<GerbilChar> for char {
+    type Error = ();
+
+    fn try_from(value: GerbilChar) -> Result<Self, Self::Error> {
+        char::from_u32(value.0).ok_or(())
+    }
+}
+
+/// IEEE-754 double precision flonum value crossing the ABI by value.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct GerbilFlonum(pub f64);
+
+/// Borrowed bytevector bytes crossing the native boundary.
+///
+/// The owner of `ptr` must keep the bytes alive for the complete call.  The
+/// callee must not retain or release the pointer.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct GerbilBorrowedBytevector {
+    /// Pointer to the first byte, or null only when `len` is zero.
+    pub ptr: *const u8,
+    /// Number of bytes available at `ptr`.
+    pub len: usize,
+}
+
+impl GerbilBorrowedBytevector {
+    /// Empty borrowed bytevector.
+    pub const EMPTY: Self = Self {
+        ptr: core::ptr::null(),
+        len: 0,
+    };
+
+    /// Borrow a byte slice for the duration of a native call.
+    #[must_use]
+    pub const fn from_slice(bytes: &[u8]) -> Self {
+        Self {
+            ptr: bytes.as_ptr(),
+            len: bytes.len(),
+        }
+    }
+}
+
+impl Default for GerbilBorrowedBytevector {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
+
+/// Pair value represented as borrowed car/cdr handles.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct GerbilPair {
+    /// First value handle.
+    pub car: GerbilValueHandle,
+    /// Rest value handle.
+    pub cdr: GerbilValueHandle,
+}
+
+/// Vector value represented as a borrowed contiguous handle slice.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct GerbilBorrowedVector {
+    /// Pointer to the first element handle, or null only when `len` is zero.
+    pub ptr: *const GerbilValueHandle,
+    /// Number of value handles available at `ptr`.
+    pub len: usize,
+}
+
+impl GerbilBorrowedVector {
+    /// Empty borrowed vector.
+    pub const EMPTY: Self = Self {
+        ptr: core::ptr::null(),
+        len: 0,
+    };
+
+    /// Borrow a slice of value handles for the duration of a native call.
+    #[must_use]
+    pub const fn from_slice(values: &[GerbilValueHandle]) -> Self {
+        Self {
+            ptr: values.as_ptr(),
+            len: values.len(),
+        }
+    }
+}
+
+impl Default for GerbilBorrowedVector {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
+
+/// Native procedure callback that receives one value handle and user context.
+pub type GerbilProcedureCallback =
+    unsafe extern "C" fn(GerbilValueHandle, *mut c_void) -> GerbilStatus;
+
 unsafe extern "C" {
     /// Initializes the process-global Gerbil runtime and binding module.
     ///

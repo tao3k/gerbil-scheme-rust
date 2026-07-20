@@ -1,0 +1,14 @@
+harness = "libtest"
+test = "scalar_scheme_value_wrappers_have_stable_c_abi_shapes"
+phase = "warm"
+observed_total = "100us"
+target_total = "1ms"
+target_rationale = "Scalar ABI wrapper checks are by-value and should stay comfortably below one millisecond."
+max_total = "500ms"
+regression_budget = "10ms"
+observed_memory_bytes = 0
+memory_budget_bytes = 16777216
+
+[observed_timings]
+scalar_shape = "100us"
+scalar_shape_budget = "1ms"

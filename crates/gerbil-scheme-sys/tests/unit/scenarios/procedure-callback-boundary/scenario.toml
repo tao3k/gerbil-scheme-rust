@@ -1,0 +1,10 @@
+id = "procedure-callback-boundary"
+title = "Procedure callback status boundary"
+description = "Validates value-handle callback dispatch and fail-closed null pointer status projection."
+agent_goal = "Keep native procedure callback status projection explicit, fail-closed, and sub-millisecond."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["procedure callback handle boundary", "null pointer status projection", "panic-free C callback status"]
+inputs = "none"
+expected = "pass"
+policy_ids = ["RUST-AGENT-GERBIL-SYS-003"]
+benchmark = "benchmark.toml"

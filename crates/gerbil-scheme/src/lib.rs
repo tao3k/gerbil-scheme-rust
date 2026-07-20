@@ -92,6 +92,32 @@ impl GerbilToolchain {
     pub fn resolved_gsc(&self) -> PathBuf {
         default_gambit_gsc_program_for_gxi(self.gxi())
     }
+
+    /// Resolve a conventional Gerbil tool name through this toolchain.
+    ///
+    /// Program names `gxi`, `gxc`, and `gsc` are mapped to the configured
+    /// toolchain entries. Paths or other program names are returned unchanged.
+    #[must_use]
+    pub fn program(&self, program: impl AsRef<Path>) -> PathBuf {
+        let program = program.as_ref();
+        let Some(program_name) = program.file_name().and_then(|name| name.to_str()) else {
+            return program.to_path_buf();
+        };
+
+        if program
+            .parent()
+            .is_some_and(|parent| !parent.as_os_str().is_empty())
+        {
+            return program.to_path_buf();
+        }
+
+        match program_name {
+            "gxi" => self.gxi().to_path_buf(),
+            "gxc" => self.gxc().to_path_buf(),
+            "gsc" => self.gsc().to_path_buf(),
+            _ => program.to_path_buf(),
+        }
+    }
 }
 
 /// Resolve a configured Gerbil executable through PATH when it is a program name.

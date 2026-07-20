@@ -49,6 +49,28 @@ and do not claim ownership or GC rooting.
 
 * Gaps
 
+** Runtime-backed pair/list predicate gate
+
+Pair/list/null predicates currently keep the raw sys ABI fail-closed for
+unbacked handles.  A direct Gambit C predicate experiment can classify a fake
+non-null Rust pointer as =Ok(false)= instead of =InvalidValue=; that weakens the
+safe wrapper contract because =GerbilValue::from_raw= can still construct a
+handle from arbitrary non-null pointers.
+
+Runtime-backed predicate support therefore needs a provenance boundary before
+the public safe API changes behavior:
+
+- add a runtime-owned value constructor that can only be produced by an
+  initialized =GerbilRuntime= or a Gerbil export;
+- keep arbitrary =from_raw= handles fail-closed unless they carry runtime
+  provenance;
+- route =pair?=, =list?=, and =null?= through Gerbil/Gambit only for
+  provenance-backed handles;
+- keep =car=, =cdr=, and =pair_parts= fail-closed until traversal, GC rooting,
+  and lifetime ownership are explicitly versioned;
+- keep Marlin as a downstream consumer of this upstream contract, not an owner
+  of Scheme runtime traversal semantics.
+
 ** Runtime conversion gaps
 
 - Bignum is not yet represented separately from fixnum.

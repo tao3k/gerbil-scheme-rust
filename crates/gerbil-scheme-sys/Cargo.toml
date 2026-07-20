@@ -16,3 +16,5 @@ workspace = true
 [build-dependencies]
 gerbil-scheme-native-build.workspace = true
 gerbil-scheme-rust-project-harness-policy.workspace = true
+[dev-dependencies]
+gerbil-scheme-rust-project-harness = { path = "../../build-support/gerbil-scheme-rust-project-harness", package = "gerbil-scheme-rust-project-harness" }

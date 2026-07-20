@@ -1,0 +1,56 @@
+#+title: Gerbil Scheme Rust Type Matrix
+#+date: 2026-07-20
+
+* Purpose
+
+This matrix tracks the public Scheme value surface exposed by
+=gerbil-scheme-rust=.  Each row must eventually connect four receipts:
+
+- C ABI representation
+- Rust public type
+- ownership and lifetime contract
+- unit, scenario, and performance coverage
+
+* Current ABI value surface
+
+| Scheme value kind | C ABI representation | Rust public type | Ownership contract | Current coverage |
+|-------------------+----------------------+------------------+--------------------+------------------|
+| status | =repr(i32)= enum | =GerbilStatus= | by value | unit + native result tests |
+| fixnum | machine word | =GerbilFixnum= | by value | unit ABI shape |
+| boolean | normalized byte | =GerbilBoolean= | by value | unit ABI shape |
+| char | Unicode code point | =GerbilChar= | by value | unit valid/invalid scalar |
+| flonum | =f64= | =GerbilFlonum= | by value | unit ABI shape |
+| borrowed string | pointer + byte length | =GerbilBorrowedUtf8= | caller-owned borrow | unit UTF-8 validation |
+| borrowed bytevector | pointer + byte length | =GerbilBorrowedBytevector= | caller-owned borrow | unit pointer/length |
+| opaque value | runtime-owned pointer | =GerbilValueHandle= | borrowed handle | unit null/identity tests |
+| pair | two value handles | =GerbilPair= | borrowed handles | unit shape |
+| borrowed vector | pointer + handle count | =GerbilBorrowedVector= | caller-owned borrow | unit pointer/length |
+| i64 callback | function pointer + context | =GerbilI64Callback= | callback borrow | callback boundary tests |
+| procedure callback | value handle + context | =GerbilProcedureCallback= | callback borrow | unit status boundary |
+
+* Gaps
+
+** Runtime conversion gaps
+
+- Bignum is not yet represented separately from fixnum.
+- Symbol, keyword, pair/list construction, vector construction, bytevector
+  allocation, and procedure invocation do not yet have live runtime conversion
+  APIs.
+- GC rooting and handle lifetime rules are not yet encoded as Rust types.
+
+** Scenario and performance gaps
+
+- The current matrix has unit coverage for ABI shape, but not enough downstream
+  scenario receipts for each value family.
+- Required scenario receipts should include:
+  - scalar by-value call overhead
+  - string and bytevector borrow/validation overhead
+  - vector/list traversal overhead
+  - callback dispatch overhead
+  - runtime init/cleanup lifecycle overhead
+
+* Next acceptance target
+
+The next closed increment should add a =gerbil-scheme-sys= scenario suite that
+uses the Rust harness scenario benchmark contract and reports sub-millisecond
+timing keys for the value-family cases above.

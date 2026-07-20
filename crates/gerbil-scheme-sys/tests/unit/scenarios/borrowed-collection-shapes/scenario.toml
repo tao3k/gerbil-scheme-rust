@@ -1,0 +1,10 @@
+id = "borrowed-collection-shapes"
+title = "Borrowed Scheme collection ABI shapes"
+description = "Validates bytevector, pair, and vector pointer/length contracts."
+agent_goal = "Keep borrowed Scheme collection shapes explicit, pointer-stable, and sub-millisecond before adding runtime allocation."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["borrowed bytevector pointer length", "pair handle shape", "borrowed vector pointer length"]
+inputs = "none"
+expected = "pass"
+policy_ids = ["RUST-AGENT-GERBIL-SYS-002"]
+benchmark = "benchmark.toml"

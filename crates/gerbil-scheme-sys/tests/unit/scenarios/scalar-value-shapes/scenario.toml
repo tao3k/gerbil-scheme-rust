@@ -1,0 +1,10 @@
+id = "scalar-value-shapes"
+title = "Scalar Scheme value ABI shapes"
+description = "Validates by-value Scheme scalar wrappers for fixnum, boolean, char, and flonum."
+agent_goal = "Keep scalar Scheme ABI wrappers explicit, stable, and sub-millisecond to validate by-value FFI costs."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["fixnum ABI wrapper", "boolean ABI wrapper", "char code point ABI", "flonum ABI wrapper"]
+inputs = "none"
+expected = "pass"
+policy_ids = ["RUST-AGENT-GERBIL-SYS-001"]
+benchmark = "benchmark.toml"

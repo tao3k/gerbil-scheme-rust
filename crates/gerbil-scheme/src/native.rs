@@ -9,7 +9,8 @@ use std::thread::{self, ThreadId};
 
 use gerbil_scheme_sys::{
     GERBIL_SCHEME_RUST_ABI_VERSION, gerbil_scheme_rust_abi_version, gerbil_scheme_rust_add_i64,
-    gerbil_scheme_rust_runtime_cleanup, gerbil_scheme_rust_runtime_init,
+    gerbil_scheme_rust_identity_i64, gerbil_scheme_rust_runtime_cleanup,
+    gerbil_scheme_rust_runtime_init,
 };
 
 static RUNTIME_LIFECYCLE: Mutex<()> = Mutex::new(());
@@ -92,6 +93,19 @@ impl GerbilRuntime {
         // SAFETY: self proves initialization and !Send keeps the call on the
         // owning thread after check_thread succeeds.
         Ok(unsafe { gerbil_scheme_rust_abi_version() })
+    }
+
+    /// Returns a signed 64-bit integer through the initialized Gerbil runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] if called outside the initializing
+    /// thread.
+    pub fn identity_i64(&self, value: i64) -> Result<i64, NativeError> {
+        self.check_thread()?;
+        // SAFETY: self proves runtime/module lifetime; the scalar c-define ABI
+        // accepts every i64 bit pattern and cannot retain borrowed Rust data.
+        Ok(unsafe { gerbil_scheme_rust_identity_i64(value) })
     }
 
     /// Adds two signed 64-bit integers inside the initialized Gerbil runtime.

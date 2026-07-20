@@ -81,3 +81,49 @@ fn native_errors_expose_known_statuses_and_preserve_unknown_codes() {
         Some(GerbilStatus::InvalidValue),
     );
 }
+
+#[test]
+fn scheme_native_surface_projects_result_and_error_shapes() {
+    let scenario = validate_rust_scenario_benchmark(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/unit/scenarios/source-surface-sync"),
+    )
+    .expect("validate the source-surface synchronization scenario benchmark contract");
+    assert_eq!(scenario.status, RustScenarioBenchmarkStatus::Pass);
+
+    let native_surface = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("workspace root from gerbil-scheme crate")
+        .join("scheme/asp/native-surface.ss");
+    let source = std::fs::read_to_string(&native_surface)
+        .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()));
+
+    let started = Instant::now();
+    for required in [
+        "gerbil_scheme_rust_native_error_shape",
+        "(name . native-error)",
+        "(status . gerbil-status-code-preserving)",
+        "(unknown-status-policy . preserve-code)",
+        "(projection . optional-gerbil-status)",
+        "(display-policy . operation-context-preserving)",
+        "(error . native-error)",
+        "(status-projection . optional-gerbil-status)",
+    ] {
+        assert!(
+            source.contains(required),
+            "missing Scheme native-surface result/error contract token: {required}"
+        );
+    }
+
+    let elapsed = started.elapsed();
+    eprintln!(
+        "scenario benchmark receipt: id=source-surface-sync checked_tokens=8 elapsed_ns={}",
+        elapsed.as_nanos(),
+    );
+    assert!(
+        elapsed <= scenario.benchmark.max_total.as_duration(),
+        "source-surface sync scenario exceeded {:?}: {:?}",
+        scenario.benchmark.max_total.as_duration(),
+        elapsed,
+    );
+}

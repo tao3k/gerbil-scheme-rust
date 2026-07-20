@@ -129,9 +129,28 @@
     (nullability . explicit-per-shape)
     (rooting . explicit-per-shape)))
 
+(def gerbil_scheme_rust_native_error_shape
+  '(native-shape
+    (name . native-error)
+    (transport . rust-safe-boundary)
+    (taxonomy
+     (already-initialized . gerbil-status)
+     (runtime-finalized . gerbil-status)
+     (invalid-lifecycle-state . rust-internal)
+     (status . gerbil-status-code-preserving)
+     (abi-mismatch . gerbil-status)
+     (wrong-thread . gerbil-status)
+     (integer-overflow . gerbil-status)
+     (invalid-comparison-result . gerbil-status))
+    (unknown-status-policy . preserve-code)
+    (projection . optional-gerbil-status)
+    (display-policy . operation-context-preserving)))
+
 (def gerbil_scheme_rust_native_result_shape
   '(native-shape
     (name . native-result)
     (ok . native-value)
-    (error . gerbil-status)
+    (error . native-error)
+    (status-projection . optional-gerbil-status)
+    (unknown-status-policy . preserve-code)
     (failure-policy . fail-closed)))

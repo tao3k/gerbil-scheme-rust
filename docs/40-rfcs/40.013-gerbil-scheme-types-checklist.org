@@ -297,6 +297,22 @@ Rust safe surface and the Scheme ASP surface:
 - [ ] Add a scenario for Scheme source-surface synchronization so drift is
   visible in CI.
 
+** 2026-07-20 second closure receipt
+
+- [X] Added =gerbil_scheme_rust_native_error_shape= to project Rust
+  =NativeError= taxonomy into the Scheme native source-surface.
+- [X] Extended =gerbil_scheme_rust_native_result_shape= from status-only
+  errors to =native-error= with optional status projection and unknown-code
+  preservation.
+- [X] Added =source-surface-sync= scenario manifests and raised the required
+  scenario benchmark suite from 6 to 7 receipts.
+- [X] Added Rust-side source-surface synchronization coverage for result/error
+  taxonomy contract tokens.
+- [ ] Keep nil/void/eof/unspecified, f64, char, symbol, keyword, pair, list,
+  vector, hash, bytevector, port, continuation, and advanced Scheme object
+  shapes open until the Rust/sys ABI has real support instead of design-only
+  placeholders.
+
 * Marlin convergence checklist
 
 - [ ] Keep this crate generic; do not encode Marlin package inventory policy.

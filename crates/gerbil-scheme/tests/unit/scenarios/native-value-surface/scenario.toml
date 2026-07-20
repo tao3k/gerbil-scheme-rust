@@ -1,8 +1,8 @@
 id = "native-value-surface"
 title = "Safe native UTF-8 and value handle surface"
 policy_ids = ["RUST-AGENT-NATIVE-ABI-003"]
-agent_goal = "Verify safe Rust bindings for borrowed UTF-8 and opaque Gerbil value handles reject invalid raw state before crossing FFI while distinguishing runtime-produced handle provenance."
+agent_goal = "Verify safe Rust bindings for borrowed UTF-8 and opaque Gerbil value handles reject invalid raw state before crossing FFI while distinguishing runtime-sentinel provenance."
 reference_repositories = ["tao3k/gerbil-scheme-rust", "tao3k/marlin-agent-core"]
-reference_patterns = ["safe native value surface", "borrowed UTF-8 ABI", "opaque Gerbil value handle", "runtime-produced value provenance"]
+reference_patterns = ["safe native value surface", "borrowed UTF-8 ABI", "opaque Gerbil value handle", "runtime-sentinel value provenance"]
 inputs = "inputs"
 expected = "expected"

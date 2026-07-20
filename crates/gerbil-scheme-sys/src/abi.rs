@@ -325,17 +325,17 @@ pub unsafe extern "C" fn gerbil_scheme_rust_value_is_pair(
     unsafe { checked_unbacked_value_predicate(value, out) }
 }
 
-/// Return a value handle that is produced by the initialized runtime/export path.
+/// Return an opaque value sentinel while the runtime is initialized.
 ///
-/// The handle is intentionally opaque.  Safe bindings may use it to prove
-/// runtime/export provenance, but must not infer pair/list traversal support
-/// from provenance alone.
+/// The handle is intentionally Rust-owned and opaque.  Safe bindings may use it
+/// to prove that a runtime-owned API path was used, but must not treat it as a
+/// live Gambit/Gerbil object or infer pair/list traversal support.
 ///
 /// # Safety
 ///
 /// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn gerbil_scheme_rust_runtime_exported_value(
+pub unsafe extern "C" fn gerbil_scheme_rust_runtime_sentinel_value(
     out: *mut GerbilValueHandle,
 ) -> GerbilStatus {
     if out.is_null() {
@@ -343,7 +343,7 @@ pub unsafe extern "C" fn gerbil_scheme_rust_runtime_exported_value(
     }
 
     unsafe {
-        *out = gerbil_scheme_rust_runtime_exported_value_sentinel()
+        *out = gerbil_scheme_rust_runtime_sentinel_value_sentinel()
             .cast::<c_void>()
             .cast_mut();
     }
@@ -447,9 +447,9 @@ unsafe fn checked_unbacked_value_predicate(
     GerbilStatus::InvalidValue
 }
 
-fn gerbil_scheme_rust_runtime_exported_value_sentinel() -> *const u8 {
-    static RUNTIME_EXPORTED_VALUE_SENTINEL: u8 = 0;
-    core::ptr::addr_of!(RUNTIME_EXPORTED_VALUE_SENTINEL)
+fn gerbil_scheme_rust_runtime_sentinel_value_sentinel() -> *const u8 {
+    static RUNTIME_SENTINEL_VALUE: u8 = 0;
+    core::ptr::addr_of!(RUNTIME_SENTINEL_VALUE)
 }
 
 unsafe fn checked_unbacked_value_handle_projection(

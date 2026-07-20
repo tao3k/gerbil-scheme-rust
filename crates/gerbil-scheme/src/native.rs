@@ -418,6 +418,75 @@ pub enum SchemeScalar {
     Flonum(f64),
 }
 
+macro_rules! define_handle_backed_scheme_view {
+    (
+        $(#[$meta:meta])*
+        $name:ident
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        pub struct $name<'runtime> {
+            raw: std::ptr::NonNull<std::ffi::c_void>,
+            _runtime: PhantomData<&'runtime GerbilRuntime>,
+        }
+
+        impl<'runtime> $name<'runtime> {
+            /// Wrap a non-null runtime-owned handle.
+            ///
+            /// This proves only non-null identity. It does not inspect,
+            /// dereference, allocate, free, root, or otherwise claim ownership
+            /// of the Gerbil object behind the handle.
+            #[must_use]
+            pub fn from_raw(raw: gerbil_scheme_sys::GerbilValueHandle) -> Option<Self> {
+                std::ptr::NonNull::new(raw).map(|raw| Self {
+                    raw,
+                    _runtime: PhantomData,
+                })
+            }
+
+            /// Return the borrowed raw handle without dereferencing it.
+            #[must_use]
+            pub const fn as_raw(self) -> gerbil_scheme_sys::GerbilValueHandle {
+                self.raw.as_ptr()
+            }
+        }
+    };
+}
+
+define_handle_backed_scheme_view!(
+    /// Runtime-borrowed handle-backed Scheme symbol view.
+    ///
+    /// This view does not allocate or intern a symbol; it only preserves the
+    /// identity of a non-null runtime-owned value handle that another checked
+    /// boundary has already classified as a symbol.
+    SchemeSymbol
+);
+
+define_handle_backed_scheme_view!(
+    /// Runtime-borrowed handle-backed Scheme keyword view.
+    ///
+    /// This view does not allocate or intern a keyword; it only preserves the
+    /// identity of a non-null runtime-owned value handle that another checked
+    /// boundary has already classified as a keyword.
+    SchemeKeyword
+);
+
+define_handle_backed_scheme_view!(
+    /// Runtime-borrowed handle-backed Scheme pair view.
+    ///
+    /// This view does not expose car/cdr traversal. Pair traversal must first be
+    /// backed by explicit sys ABI functions that own the status/error boundary.
+    SchemePair
+);
+
+define_handle_backed_scheme_view!(
+    /// Runtime-borrowed handle-backed Scheme list view.
+    ///
+    /// This view does not traverse the list. List traversal must first be backed
+    /// by explicit sys ABI functions that own the status/error boundary.
+    SchemeList
+);
+
 impl SchemeScalar {
     /// Project this scalar to its raw fixnum ABI representation when possible.
     #[must_use]

@@ -23,7 +23,10 @@ pub use gerbil_scheme_sys::{
 mod native;
 
 #[cfg(feature = "native")]
-pub use native::{SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeScalar};
+pub use native::{
+    SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword, SchemeList, SchemePair,
+    SchemeScalar, SchemeSymbol,
+};
 
 #[cfg(feature = "native")]
 pub use native::{

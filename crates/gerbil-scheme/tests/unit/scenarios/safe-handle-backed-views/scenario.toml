@@ -1,0 +1,9 @@
+id = "safe-handle-backed-views"
+title = "Safe handle-backed Scheme value projections"
+policy_ids = ["RUST-AGENT-GERBIL-SAFE-004"]
+agent_goal = "Keep symbol, keyword, pair, and list safe views handle-backed, non-owning, null-checked, and sub-millisecond until sys ABI traversal exists."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["symbol handle identity", "keyword handle identity", "pair handle identity", "list handle identity", "null handle rejection"]
+inputs = "none"
+expected = "pass"
+benchmark = "benchmark.toml"

@@ -1,4 +1,7 @@
-use gerbil_scheme::{SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeScalar};
+use gerbil_scheme::{
+    SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword, SchemeList, SchemePair,
+    SchemeScalar, SchemeSymbol,
+};
 
 #[test]
 fn scheme_scalar_projects_to_public_sys_abi_shapes() {
@@ -47,4 +50,25 @@ fn scheme_borrowed_vector_preserves_handle_slice_and_abi_projection() {
     assert_eq!(borrowed.as_values(), handles);
     assert_eq!(abi.ptr, handles.as_ptr());
     assert_eq!(abi.len, handles.len());
+}
+
+#[test]
+fn scheme_handle_backed_views_preserve_identity_and_reject_null() {
+    let mut raw_value = 42_u8;
+    let raw = (&raw mut raw_value).cast::<core::ffi::c_void>();
+
+    let symbol = SchemeSymbol::from_raw(raw).expect("non-null symbol handle");
+    let keyword = SchemeKeyword::from_raw(raw).expect("non-null keyword handle");
+    let pair = SchemePair::from_raw(raw).expect("non-null pair handle");
+    let list = SchemeList::from_raw(raw).expect("non-null list handle");
+
+    assert_eq!(symbol.as_raw(), raw);
+    assert_eq!(keyword.as_raw(), raw);
+    assert_eq!(pair.as_raw(), raw);
+    assert_eq!(list.as_raw(), raw);
+
+    assert!(SchemeSymbol::from_raw(core::ptr::null_mut()).is_none());
+    assert!(SchemeKeyword::from_raw(core::ptr::null_mut()).is_none());
+    assert!(SchemePair::from_raw(core::ptr::null_mut()).is_none());
+    assert!(SchemeList::from_raw(core::ptr::null_mut()).is_none());
 }

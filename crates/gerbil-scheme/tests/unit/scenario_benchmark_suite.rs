@@ -19,6 +19,7 @@ fn all_required_safe_value_scenarios_have_valid_contracts() {
         "safe-scalar-projection",
         "safe-bytevector-borrow",
         "safe-vector-borrow",
+        "safe-handle-backed-views",
     ] {
         assert!(
             requirements.contains(scenario_id),

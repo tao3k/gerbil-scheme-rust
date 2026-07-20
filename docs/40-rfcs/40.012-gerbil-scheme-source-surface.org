@@ -4,7 +4,7 @@
 
 * Status
 
-Draft, active implementation audit.
+Accepted project-side workaround, with provider parser backlog.
 
 * Problem
 
@@ -54,21 +54,47 @@ Implement one of these two routes:
    ordinary definitions to index the native ABI contract without changing the
    runtime ABI behavior.
 
-The provider route is preferable because it keeps the source of truth in
+The provider route remains preferable because it keeps the source of truth in
+~scheme/native.ss~.  Until the provider understands the native FFI forms, this
+repository uses the project route.
+
+* Project-side workaround
+
+The repository provides an ASP-only Scheme surface owner:
+
+- ~scheme/asp/native-surface.ss~
+
+This file uses ordinary ~export~ and ~def~ forms so the Gerbil provider can
+emit stable selectors for the native ABI names.  It is intentionally not part
+of the runtime build.  The runtime implementation remains owned by
 ~scheme/native.ss~.
+
+The current Bazel native source set is explicit and does not include this
+surface owner.  That preserves runtime behavior while making the ABI contract
+visible to source-analysis tools.
 
 * Acceptance
 
-The fix is accepted only when all are true:
+The project-side workaround is accepted only when all are true:
 
-- ~asp gerbil-scheme search owner scheme/native.ss items~ returns selectors for
+- ~asp gerbil-scheme query scheme/asp/native-surface.ss~ returns selectors for
   the existing native ABI export surface.
 - At minimum, selectors exist for:
+  - ~gerbil_scheme_rust_abi_version~
+  - ~gerbil_scheme_rust_runtime_init~
+  - ~gerbil_scheme_rust_runtime_cleanup~
+  - ~gerbil_scheme_rust_identity_i64~
   - ~gerbil_scheme_rust_add_i64~
   - ~gerbil_scheme_rust_is_even_i64~
   - ~gerbil_scheme_rust_compare_i64~
+- ~scheme/asp/native-surface.ss~ is not included in the Bazel
+  ~//:gerbil_sources~ runtime source set.
 - No unsupported standalone ~gerbil.pkg~ source-scope workaround is committed.
 - Existing Cargo and Bazel gates remain green.
+
+The provider parser backlog is accepted only when
+~asp gerbil-scheme search owner scheme/native.ss items~ returns selectors for
+the native FFI/export forms directly.
 
 * Follow-up bindings unlocked by this fix
 

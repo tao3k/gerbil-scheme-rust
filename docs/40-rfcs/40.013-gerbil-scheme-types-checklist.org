@@ -127,7 +127,7 @@ Current Scheme source-surface evidence:
 - [X] Raw borrowed UTF-8 ABI: =GerbilBorrowedUtf8=.
 - [X] Safe borrowed UTF-8 owner view: =GerbilUtf8=.
 - [X] Tests for text bytes and empty string zero-length contract.
-- [ ] Scheme native-surface shape for borrowed UTF-8/string, aligned with Rust
+- [X] Scheme native-surface shape for borrowed UTF-8/string, aligned with Rust
   =GerbilBorrowedUtf8= and =GerbilUtf8= ownership/nullability rules.
 - [ ] Owned Scheme string handle type.
 - [ ] Borrowed Scheme string view with explicit lifetime/GC-root rule.
@@ -176,7 +176,7 @@ Current Scheme source-surface evidence:
 - [X] Safe =GerbilI64Callback= owner.
 - [X] Borrowed =GerbilI64CallbackAbi= callback/context pair.
 - [X] Null context and panic containment tests.
-- [ ] Scheme native-surface shape for i64 callback, aligned with Rust
+- [X] Scheme native-surface shape for i64 callback, aligned with Rust
   =GerbilI64Callback= ABI and panic-to-status behavior.
 - [ ] General procedure handle type.
 - [ ] Calling Scheme procedure from Rust.
@@ -191,7 +191,7 @@ Current Scheme source-surface evidence:
 - [X] Raw opaque value handle: =GerbilValueHandle=.
 - [X] Safe non-null borrowed value wrapper: =GerbilValue<'runtime>=.
 - [X] Null value handle fail-closed test.
-- [ ] Scheme native-surface shape for =GerbilValue= ownership and nullability:
+- [X] Scheme native-surface shape for =GerbilValue= ownership and nullability:
   non-null, runtime-borrowed, not retained beyond the valid runtime borrow.
 - [ ] Explicit GC-root type.
 - [ ] Scheme native-surface shape for future rooted value contract.
@@ -267,17 +267,32 @@ Current Scheme source-surface evidence:
 
 * 2026-07-20 audit TODO summary
 
+** 2026-07-20 first closure receipt
+
+- [X] Added Scheme native-surface selectors:
+  =gerbil_scheme_rust_utf8_shape=, =gerbil_scheme_rust_value_handle_shape=,
+  and =gerbil_scheme_rust_i64_callback_shape=.
+- [X] Extended =gerbil_scheme_rust_native_value_shape= with explicit borrowed
+  values, handle values, callback values, nullability, and rooting contract
+  fields.
+- [X] Added Rust-side source-surface synchronization coverage in
+  =native_value_surface= for the new Scheme shape selectors and key contract
+  tokens.
+- [?] Scenario benchmark suite remains green against the current required
+  scenario set; a dedicated Scheme source-surface scenario should still be
+  added if we want scenario receipts to track selector drift directly.
+
 The immediate next implementation slice should close the mismatch between the
 Rust safe surface and the Scheme ASP surface:
 
-- [ ] Add =gerbil_scheme_rust_utf8_shape= to =scheme/asp/native-surface.ss=.
-- [ ] Add =gerbil_scheme_rust_i64_callback_shape= to
+- [X] Add =gerbil_scheme_rust_utf8_shape= to =scheme/asp/native-surface.ss=.
+- [X] Add =gerbil_scheme_rust_i64_callback_shape= to
   =scheme/asp/native-surface.ss=.
-- [ ] Extend =gerbil_scheme_rust_native_value_shape= with explicit
+- [X] Extend =gerbil_scheme_rust_native_value_shape= with explicit
   non-null/runtime-borrowed/GC-not-rooted value semantics.
 - [ ] Extend =gerbil_scheme_rust_native_result_shape= or add a new result-family
   shape that maps Rust =NativeError= and unknown status preservation.
-- [ ] Add tests that query Scheme shape selectors and compare them with Rust
+- [X] Add tests that query Scheme shape selectors and compare them with Rust
   =sys= and safe selectors for status, UTF-8, opaque value, and callback.
 - [ ] Add a scenario for Scheme source-surface synchronization so drift is
   visible in CI.

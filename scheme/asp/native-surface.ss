@@ -84,12 +84,50 @@
     (equal . 0)
     (greater . 1)))
 
+(def gerbil_scheme_rust_utf8_shape
+  '(native-shape
+    (name . utf8)
+    (transport . c-abi)
+    (repr . borrowed-byte-slice)
+    (encoding . utf-8)
+    (ptr . const-char-pointer)
+    (len . size-t)
+    (ownership . rust-borrowed)
+    (nullability . empty-allows-null-pointer)
+    (lifetime . caller-bounded)))
+
+(def gerbil_scheme_rust_value_handle_shape
+  '(native-shape
+    (name . gerbil-value-handle)
+    (transport . c-abi)
+    (repr . opaque-pointer)
+    (ownership . gerbil-runtime-owned)
+    (nullability . non-null)
+    (dereference-policy . never-deref-in-rust-safe-layer)
+    (rooting . unrooted-borrow)
+    (gc-policy . no-gc-root-guarantee)))
+
+(def gerbil_scheme_rust_i64_callback_shape
+  '(native-shape
+    (name . i64-callback)
+    (transport . c-abi)
+    (repr . function-pointer-plus-context)
+    (input . i64)
+    (return . gerbil-status)
+    (context-nullability . non-null)
+    (panic-policy . contained-as-panic-status)
+    (ownership . rust-owned-callback-context)))
+
 (def gerbil_scheme_rust_native_value_shape
   '(native-shape
     (name . native-value)
     (transport . c-abi)
     (scalar-values (i64 bool comparison status))
-    (handle-values (runtime-handle))))
+    (borrowed-values (utf8))
+    (handle-values (runtime-handle gerbil-value-handle))
+    (callback-values (i64-callback))
+    (nullability . explicit-per-shape)
+    (rooting . explicit-per-shape)))
 
 (def gerbil_scheme_rust_native_result_shape
   '(native-shape

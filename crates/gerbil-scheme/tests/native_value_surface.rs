@@ -104,3 +104,33 @@ fn i64_callback_contains_panic_at_native_boundary() {
         GerbilStatus::Panic,
     );
 }
+
+#[test]
+fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let native_surface = manifest_dir
+        .ancestors()
+        .nth(2)
+        .expect("workspace root from gerbil-scheme crate")
+        .join("scheme/asp/native-surface.ss");
+    let source = std::fs::read_to_string(&native_surface)
+        .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()));
+
+    for required in [
+        "gerbil_scheme_rust_utf8_shape",
+        "gerbil_scheme_rust_value_handle_shape",
+        "gerbil_scheme_rust_i64_callback_shape",
+        "(borrowed-values (utf8))",
+        "(handle-values (runtime-handle gerbil-value-handle))",
+        "(callback-values (i64-callback))",
+        "(nullability . explicit-per-shape)",
+        "(rooting . explicit-per-shape)",
+        "(panic-policy . contained-as-panic-status)",
+        "(gc-policy . no-gc-root-guarantee)",
+    ] {
+        assert!(
+            source.contains(required),
+            "missing Scheme native-surface contract token: {required}"
+        );
+    }
+}

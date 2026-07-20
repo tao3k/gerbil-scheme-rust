@@ -132,6 +132,22 @@ impl GerbilBorrowedUtf8 {
         // SAFETY: guaranteed by the caller of this unsafe function.
         unsafe { std::slice::from_raw_parts(self.ptr.cast(), self.len) }
     }
+
+    /// Reborrow the pointed-to bytes as UTF-8 text.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::str::Utf8Error`] when the borrowed bytes are not valid
+    /// UTF-8.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold the same pointer and lifetime requirements as
+    /// [`GerbilBorrowedUtf8::as_bytes`].
+    pub unsafe fn as_str<'a>(self) -> Result<&'a str, std::str::Utf8Error> {
+        // SAFETY: forwarded from this function's caller.
+        std::str::from_utf8(unsafe { self.as_bytes() })
+    }
 }
 
 impl From<&str> for GerbilBorrowedUtf8 {

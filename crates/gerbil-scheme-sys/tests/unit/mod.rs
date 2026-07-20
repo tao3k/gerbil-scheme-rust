@@ -57,4 +57,18 @@ fn borrowed_utf8_constructors_preserve_rust_string_bytes() {
     assert_eq!(borrowed.ptr.cast::<u8>(), text.as_ptr());
     // SAFETY: `borrowed` points into `text`, which is still alive here.
     assert_eq!(unsafe { borrowed.as_bytes() }, text.as_bytes());
+    // SAFETY: `borrowed` points into valid UTF-8 owned by `text`.
+    assert_eq!(unsafe { borrowed.as_str() }, Ok(text));
+}
+
+#[test]
+fn borrowed_utf8_as_str_rejects_invalid_utf8() {
+    let bytes = [0xff_u8];
+    let borrowed = GerbilBorrowedUtf8 {
+        ptr: bytes.as_ptr().cast(),
+        len: bytes.len(),
+    };
+
+    // SAFETY: `borrowed` points into `bytes`, which is alive for this call.
+    assert!(unsafe { borrowed.as_str() }.is_err());
 }

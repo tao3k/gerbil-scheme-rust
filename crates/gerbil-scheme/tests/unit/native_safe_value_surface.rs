@@ -1,6 +1,6 @@
 use gerbil_scheme::{
-    GerbilStatus, GerbilValue, SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword,
-    SchemeList, SchemePair, SchemeScalar, SchemeSymbol,
+    GerbilStatus, GerbilValue, GerbilValueProvenance, SchemeBorrowedBytevector,
+    SchemeBorrowedVector, SchemeKeyword, SchemeList, SchemePair, SchemeScalar, SchemeSymbol,
 };
 
 #[test]
@@ -78,6 +78,7 @@ fn scheme_pair_list_status_wrappers_fail_closed_for_unbacked_handles() {
     let mut raw_value = 42_u8;
     let raw = (&raw mut raw_value).cast::<core::ffi::c_void>();
     let value = || GerbilValue::from_raw(raw).expect("non-null value handle");
+    assert_eq!(value().provenance(), GerbilValueProvenance::UntrustedRaw);
 
     let is_pair = value().is_pair();
     assert!(is_pair.is_err());

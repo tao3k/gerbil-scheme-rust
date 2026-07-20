@@ -115,10 +115,7 @@ fn borrowed_collection_surfaces_preserve_pointer_and_length_contracts() {
 
     let mut left = 1_u8;
     let mut right = 2_u8;
-    let handles = [
-        (&raw mut left).cast::<core::ffi::c_void>(),
-        (&raw mut right).cast::<core::ffi::c_void>(),
-    ];
+    let handles = [(&raw mut left).addr(), (&raw mut right).addr()];
     let pair = GerbilPair {
         car: handles[0],
         cdr: handles[1],
@@ -139,7 +136,7 @@ fn procedure_callback_type_projects_value_handle_status_boundary() {
         value: GerbilValueHandle,
         context: *mut core::ffi::c_void,
     ) -> GerbilStatus {
-        if value.is_null() || context.is_null() {
+        if value == 0 || context.is_null() {
             GerbilStatus::NullPointer
         } else {
             GerbilStatus::Ok
@@ -153,21 +150,21 @@ fn procedure_callback_type_projects_value_handle_status_boundary() {
     // SAFETY: both pointers are derived from live stack values for this call.
     let status = unsafe {
         callback(
-            (&raw mut value).cast::<core::ffi::c_void>(),
+            (&raw mut value).addr(),
             (&raw mut context).cast::<core::ffi::c_void>(),
         )
     };
     assert_eq!(status, GerbilStatus::Ok);
 
     // SAFETY: null pointers are intentionally used to validate fail-closed status projection.
-    let status = unsafe { callback(core::ptr::null_mut(), core::ptr::null_mut()) };
+    let status = unsafe { callback(0, core::ptr::null_mut()) };
     assert_eq!(status, GerbilStatus::NullPointer);
 }
 
 #[test]
 fn pair_and_list_status_abi_fails_closed_until_runtime_backed() {
     let mut value = 1_u8;
-    let handle = (&raw mut value).cast::<core::ffi::c_void>();
+    let handle = (&raw mut value).addr();
     let mut predicate = GerbilBoolean::TRUE;
     let mut projected = handle;
     let mut pair = GerbilPair {
@@ -203,7 +200,7 @@ fn pair_and_list_status_abi_fails_closed_until_runtime_backed() {
         unsafe { gerbil_scheme_rust_pair_car(handle, &raw mut projected) },
         GerbilStatus::InvalidValue
     );
-    assert!(projected.is_null());
+    assert_eq!(projected, 0);
 
     projected = handle;
     // SAFETY: output pointers are valid for one value each.
@@ -211,7 +208,7 @@ fn pair_and_list_status_abi_fails_closed_until_runtime_backed() {
         unsafe { gerbil_scheme_rust_pair_cdr(handle, &raw mut projected) },
         GerbilStatus::InvalidValue
     );
-    assert!(projected.is_null());
+    assert_eq!(projected, 0);
 
     // SAFETY: output pointers are valid for one value each.
     assert_eq!(
@@ -225,17 +222,14 @@ fn pair_and_list_status_abi_fails_closed_until_runtime_backed() {
 #[test]
 fn pair_and_list_status_abi_rejects_null_inputs() {
     let mut predicate = GerbilBoolean::FALSE;
-    let mut projected = core::ptr::null_mut();
-    let mut pair = GerbilPair {
-        car: core::ptr::null_mut(),
-        cdr: core::ptr::null_mut(),
-    };
+    let mut projected = 0;
+    let mut pair = GerbilPair { car: 0, cdr: 0 };
     let mut value = 1_u8;
-    let handle = (&raw mut value).cast::<core::ffi::c_void>();
+    let handle = (&raw mut value).addr();
 
     // SAFETY: null inputs are intentional fail-closed boundary checks.
     assert_eq!(
-        unsafe { gerbil_scheme_rust_value_is_pair(core::ptr::null_mut(), &raw mut predicate) },
+        unsafe { gerbil_scheme_rust_value_is_pair(0, &raw mut predicate) },
         GerbilStatus::NullPointer
     );
     // SAFETY: null inputs are intentional fail-closed boundary checks.
@@ -250,7 +244,7 @@ fn pair_and_list_status_abi_rejects_null_inputs() {
     );
     // SAFETY: null inputs are intentional fail-closed boundary checks.
     assert_eq!(
-        unsafe { gerbil_scheme_rust_pair_car(core::ptr::null_mut(), &raw mut projected) },
+        unsafe { gerbil_scheme_rust_pair_car(0, &raw mut projected) },
         GerbilStatus::NullPointer
     );
     // SAFETY: null inputs are intentional fail-closed boundary checks.
@@ -265,7 +259,7 @@ fn pair_and_list_status_abi_rejects_null_inputs() {
     );
     // SAFETY: output pointer is valid for one pair.
     assert_eq!(
-        unsafe { gerbil_scheme_rust_pair_parts(core::ptr::null_mut(), &raw mut pair) },
+        unsafe { gerbil_scheme_rust_pair_parts(0, &raw mut pair) },
         GerbilStatus::NullPointer
     );
 }

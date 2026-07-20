@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Mutex, PoisonError};
@@ -85,12 +86,12 @@ impl<'a> From<&'a str> for GerbilUtf8<'a> {
 
 /// Provenance attached to a borrowed Gerbil value handle.
 ///
-/// This is deliberately narrower than "non-null pointer".  Runtime-backed
+/// This is deliberately narrower than "non-zero word".  Runtime-backed
 /// Scheme predicates and traversal must only use handles whose provenance is
 /// produced by an initialized runtime/export path.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GerbilValueProvenance {
-    /// A raw non-null handle supplied by the caller.
+    /// A raw non-zero handle supplied by the caller.
     ///
     /// This keeps tests and FFI boundaries fail-closed: the pointer is not
     /// trusted as a live Gambit/Gerbil object.
@@ -106,12 +107,12 @@ pub enum GerbilValueProvenance {
 /// Runtime-borrowed opaque Gerbil value handle.
 ///
 /// This wrapper is intentionally non-owning. It proves only that the raw handle
-/// is non-null. Runtime provenance is tracked explicitly by
+/// is non-zero. Runtime provenance is tracked explicitly by
 /// [`GerbilValueProvenance`]; a caller-created raw handle is not enough to
 /// claim type, ownership, GC reachability, or validity as a Gambit object.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GerbilValue<'runtime> {
-    raw: std::ptr::NonNull<std::ffi::c_void>,
+    raw: NonZeroUsize,
     provenance: GerbilValueProvenance,
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
@@ -134,7 +135,7 @@ impl<'runtime> GerbilValue<'runtime> {
     pub fn is_pair(self) -> NativeResult<bool> {
         checked_native_predicate(
             "gerbil_scheme_rust_value_is_pair",
-            self.raw.as_ptr(),
+            self.raw.get(),
             gerbil_scheme_sys::gerbil_scheme_rust_value_is_pair,
         )
     }
@@ -147,7 +148,7 @@ impl<'runtime> GerbilValue<'runtime> {
     pub fn is_list(self) -> NativeResult<bool> {
         checked_native_predicate(
             "gerbil_scheme_rust_value_is_list",
-            self.raw.as_ptr(),
+            self.raw.get(),
             gerbil_scheme_sys::gerbil_scheme_rust_value_is_list,
         )
     }
@@ -160,7 +161,7 @@ impl<'runtime> GerbilValue<'runtime> {
     pub fn is_null(self) -> NativeResult<bool> {
         checked_native_predicate(
             "gerbil_scheme_rust_value_is_null",
-            self.raw.as_ptr(),
+            self.raw.get(),
             gerbil_scheme_sys::gerbil_scheme_rust_value_is_null,
         )
     }
@@ -173,7 +174,7 @@ impl<'runtime> GerbilValue<'runtime> {
     pub fn pair_car(self) -> NativeResult<Self> {
         checked_native_value_projection(
             "gerbil_scheme_rust_pair_car",
-            self.raw.as_ptr(),
+            self.raw.get(),
             gerbil_scheme_sys::gerbil_scheme_rust_pair_car,
         )
     }
@@ -186,7 +187,7 @@ impl<'runtime> GerbilValue<'runtime> {
     pub fn pair_cdr(self) -> NativeResult<Self> {
         checked_native_value_projection(
             "gerbil_scheme_rust_pair_cdr",
-            self.raw.as_ptr(),
+            self.raw.get(),
             gerbil_scheme_sys::gerbil_scheme_rust_pair_cdr,
         )
     }
@@ -197,13 +198,10 @@ impl<'runtime> GerbilValue<'runtime> {
     /// traversal is runtime-backed.
     #[must_use]
     pub fn pair_parts(self) -> NativeResult<SchemePairParts<'runtime>> {
-        let mut pair = gerbil_scheme_sys::GerbilPair {
-            car: core::ptr::null_mut(),
-            cdr: core::ptr::null_mut(),
-        };
+        let mut pair = gerbil_scheme_sys::GerbilPair { car: 0, cdr: 0 };
         // SAFETY: `pair` is a valid output slot for one GerbilPair.
         let status = unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_pair_parts(self.raw.as_ptr(), &raw mut pair)
+            gerbil_scheme_sys::gerbil_scheme_rust_pair_parts(self.raw.get(), &raw mut pair)
         };
         if status != gerbil_scheme_sys::GerbilStatus::Ok {
             return NativeResult::err(NativeError::Status {
@@ -260,7 +258,7 @@ fn checked_native_value_projection<'runtime>(
     value: gerbil_scheme_sys::GerbilValueHandle,
     projection: NativeValueProjection,
 ) -> NativeResult<GerbilValue<'runtime>> {
-    let mut out = core::ptr::null_mut();
+    let mut out = 0;
     // SAFETY: `out` is a valid output slot for one value handle.
     let status = unsafe { projection(value, &raw mut out) };
     if status != gerbil_scheme_sys::GerbilStatus::Ok {
@@ -290,7 +288,7 @@ fn value_from_native_handle_with_provenance<'runtime>(
     raw: gerbil_scheme_sys::GerbilValueHandle,
     provenance: GerbilValueProvenance,
 ) -> Option<GerbilValue<'runtime>> {
-    std::ptr::NonNull::new(raw).map(|raw| GerbilValue {
+    NonZeroUsize::new(raw).map(|raw| GerbilValue {
         raw,
         provenance,
         _runtime: PhantomData,
@@ -298,13 +296,13 @@ fn value_from_native_handle_with_provenance<'runtime>(
 }
 
 impl GerbilValue<'_> {
-    /// Wrap a raw runtime-borrowed value handle, rejecting null handles.
+    /// Wrap a raw runtime-borrowed value handle, rejecting zero handles.
     ///
     /// # Errors
     ///
-    /// Returns [`NativeError::Status`] with `NullPointer` when `raw` is null.
+    /// Returns [`NativeError::Status`] with `NullPointer` when `raw` is zero.
     pub fn from_raw(raw: gerbil_scheme_sys::GerbilValueHandle) -> Result<Self, NativeError> {
-        let raw = std::ptr::NonNull::new(raw).ok_or(NativeError::Status {
+        let raw = NonZeroUsize::new(raw).ok_or(NativeError::Status {
             operation: "GerbilValue::from_raw",
             code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
         })?;
@@ -319,7 +317,7 @@ impl GerbilValue<'_> {
     /// Return the raw borrowed value handle.
     #[must_use]
     pub fn as_raw(self) -> gerbil_scheme_sys::GerbilValueHandle {
-        self.raw.as_ptr()
+        self.raw.get()
     }
 
     /// Return the provenance attached to this borrowed value handle.
@@ -482,10 +480,10 @@ impl GerbilRuntime {
     ///
     /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
     /// or [`NativeError::Status`] when the native export reports an error or
-    /// returns a null handle.
+    /// returns a zero handle.
     pub fn runtime_sentinel_value(&self) -> Result<GerbilValue<'_>, NativeError> {
         self.check_thread()?;
-        let mut out = core::ptr::null_mut();
+        let mut out = 0;
         // SAFETY: self proves runtime/module lifetime and `out` is a valid
         // output slot for one opaque runtime-borrowed value handle.
         let status = unsafe { gerbil_scheme_rust_runtime_sentinel_value(&raw mut out) };
@@ -662,19 +660,19 @@ macro_rules! define_handle_backed_scheme_view {
         $(#[$meta])*
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         pub struct $name<'runtime> {
-            raw: std::ptr::NonNull<std::ffi::c_void>,
+            raw: NonZeroUsize,
             _runtime: PhantomData<&'runtime GerbilRuntime>,
         }
 
         impl<'runtime> $name<'runtime> {
-            /// Wrap a non-null runtime-owned handle.
+            /// Wrap a non-zero runtime-owned handle.
             ///
-            /// This proves only non-null identity. It does not inspect,
+            /// This proves only non-zero identity. It does not inspect,
             /// dereference, allocate, free, root, or otherwise claim ownership
             /// of the Gerbil object behind the handle.
             #[must_use]
             pub fn from_raw(raw: gerbil_scheme_sys::GerbilValueHandle) -> Option<Self> {
-                std::ptr::NonNull::new(raw).map(|raw| Self {
+                NonZeroUsize::new(raw).map(|raw| Self {
                     raw,
                     _runtime: PhantomData,
                 })
@@ -683,7 +681,7 @@ macro_rules! define_handle_backed_scheme_view {
             /// Return the borrowed raw handle without dereferencing it.
             #[must_use]
             pub const fn as_raw(self) -> gerbil_scheme_sys::GerbilValueHandle {
-                self.raw.as_ptr()
+                self.raw.get()
             }
         }
     };
@@ -693,7 +691,7 @@ define_handle_backed_scheme_view!(
     /// Runtime-borrowed handle-backed Scheme symbol view.
     ///
     /// This view does not allocate or intern a symbol; it only preserves the
-    /// identity of a non-null runtime-owned value handle that another checked
+    /// identity of a non-zero runtime-owned value handle that another checked
     /// boundary has already classified as a symbol.
     SchemeSymbol
 );
@@ -702,7 +700,7 @@ define_handle_backed_scheme_view!(
     /// Runtime-borrowed handle-backed Scheme keyword view.
     ///
     /// This view does not allocate or intern a keyword; it only preserves the
-    /// identity of a non-null runtime-owned value handle that another checked
+    /// identity of a non-zero runtime-owned value handle that another checked
     /// boundary has already classified as a keyword.
     SchemeKeyword
 );

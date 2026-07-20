@@ -22,7 +22,7 @@ This matrix tracks the public Scheme value surface exposed by
 | flonum | =f64= | =GerbilFlonum= | by value | unit ABI shape |
 | borrowed string | pointer + byte length | =GerbilBorrowedUtf8= | caller-owned borrow | unit UTF-8 validation |
 | borrowed bytevector | pointer + byte length | =GerbilBorrowedBytevector= | caller-owned borrow | unit pointer/length |
-| opaque value | runtime-owned pointer | =GerbilValueHandle= | borrowed handle | unit null/identity tests |
+| opaque value | runtime-owned word handle | =GerbilValueHandle= | borrowed handle | unit zero/identity tests |
 | pair | two value handles | =GerbilPair= | borrowed handles | unit shape |
 | borrowed vector | pointer + handle count | =GerbilBorrowedVector= | caller-owned borrow | unit pointer/length |
 | i64 callback | function pointer + context | =GerbilI64Callback= | callback borrow | callback boundary tests |
@@ -36,12 +36,12 @@ rooting before they can become owned Rust values:
 
 | Scheme value kind | Safe Rust view | Backing representation | Explicit non-goal |
 |-------------------+----------------+------------------------+-------------------|
-| symbol | =SchemeSymbol= | non-null =GerbilValueHandle= | no allocation or interning |
-| keyword | =SchemeKeyword= | non-null =GerbilValueHandle= | no allocation or interning |
-| pair | =SchemePair= plus =GerbilValue::pair_car=/=pair_cdr=/=pair_parts= | non-null =GerbilValueHandle= | traversal fails closed until runtime-backed |
-| list | =SchemeList= plus =GerbilValue::is_list=/=is_null= | non-null =GerbilValueHandle= | classification fails closed until runtime-backed |
+| symbol | =SchemeSymbol= | non-zero =GerbilValueHandle= | no allocation or interning |
+| keyword | =SchemeKeyword= | non-zero =GerbilValueHandle= | no allocation or interning |
+| pair | =SchemePair= plus =GerbilValue::pair_car=/=pair_cdr=/=pair_parts= | non-zero =GerbilValueHandle= | traversal fails closed until runtime-backed |
+| list | =SchemeList= plus =GerbilValue::is_list=/=is_null= | non-zero =GerbilValueHandle= | classification fails closed until runtime-backed |
 
-These types preserve handle identity and reject null pointers.  Pair/list
+These types preserve handle identity and reject zero handles.  Pair/list
 status wrappers call the sys ABI and report explicit =NativeResult= status
 errors for unbacked handles, so the public API can be consumed before
 runtime-backed traversal is wired in.  They do not dereference unmanaged memory
@@ -53,16 +53,16 @@ and do not claim ownership or GC rooting.
 
 Pair/list/null predicates currently keep the raw sys ABI fail-closed for
 unbacked handles.  A direct Gambit C predicate experiment can classify a fake
-non-null Rust pointer as =Ok(false)= instead of =InvalidValue=; that weakens the
+non-zero Rust address as =Ok(false)= instead of =InvalidValue=; that weakens the
 safe wrapper contract because =GerbilValue::from_raw= can still construct a
-handle from arbitrary non-null pointers.
+handle from arbitrary non-zero words.
 
 Runtime-backed predicate support therefore needs a provenance boundary before
 the public safe API changes behavior:
 
 - current =GerbilValue::from_raw= handles are explicitly tagged as
   =GerbilValueProvenance::UntrustedRaw=;
-- =UntrustedRaw= proves only non-null shape, not live Gambit/Gerbil object
+- =UntrustedRaw= proves only non-zero shape, not live Gambit/Gerbil object
   ownership, GC reachability, type, or traversal safety;
 - runtime-sentinel handles are explicitly tagged separately from =UntrustedRaw=
   before any pair/list behavior changes;

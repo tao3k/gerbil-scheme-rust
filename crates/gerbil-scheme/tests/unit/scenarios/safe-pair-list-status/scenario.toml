@@ -21,9 +21,9 @@ reference_patterns = [
   "GerbilValue::pair_parts",
 ]
 
-inputs = "A non-null unbacked GerbilValueHandle fixture projected through PhantomData-backed safe GerbilValue wrappers."
+inputs = "A non-zero unbacked GerbilValueHandle fixture projected through PhantomData-backed safe GerbilValue wrappers."
 
-expected = "Predicates return NativeResult status InvalidValue with false outputs for non-null unbacked handles; pair projections return NativeResult status InvalidValue without producing safe GerbilValue values; null native inputs return NullPointer."
+expected = "Predicates return NativeResult status InvalidValue with false outputs for non-zero unbacked handles; pair projections return NativeResult status InvalidValue without producing safe GerbilValue values; zero native inputs return NullPointer."
 
 [benchmark]
 file = "benchmark.toml"

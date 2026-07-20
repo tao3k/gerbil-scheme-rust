@@ -88,6 +88,58 @@ pub struct GerbilBorrowedUtf8 {
     pub len: usize,
 }
 
+impl GerbilBorrowedUtf8 {
+    /// Construct an empty borrowed UTF-8 value.
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            ptr: std::ptr::null(),
+            len: 0,
+        }
+    }
+
+    /// Borrow a Rust UTF-8 string for the duration of one native call.
+    #[must_use]
+    pub fn from_utf8_str(value: &str) -> Self {
+        if value.is_empty() {
+            return Self::empty();
+        }
+        Self {
+            ptr: value.as_ptr().cast(),
+            len: value.len(),
+        }
+    }
+
+    /// Returns whether this borrowed value is empty.
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.len == 0
+    }
+
+    /// Reborrow the pointed-to bytes.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure `ptr` is either null with `len == 0`, or points
+    /// to `len` initialized bytes that remain alive for the returned borrow.
+    /// The bytes must be valid UTF-8 when the value is interpreted as a Scheme
+    /// string.
+    #[must_use]
+    pub unsafe fn as_bytes<'a>(self) -> &'a [u8] {
+        if self.len == 0 {
+            return &[];
+        }
+        // SAFETY: guaranteed by the caller of this unsafe function.
+        unsafe { std::slice::from_raw_parts(self.ptr.cast(), self.len) }
+    }
+}
+
+impl From<&str> for GerbilBorrowedUtf8 {
+    fn from(value: &str) -> Self {
+        Self::from_utf8_str(value)
+    }
+}
+
 /// Opaque runtime handle owned by the safe binding layer.
 #[repr(C)]
 #[derive(Debug)]

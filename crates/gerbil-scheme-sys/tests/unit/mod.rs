@@ -40,3 +40,21 @@ fn borrowed_utf8_matches_pointer_and_length_layout() {
         core::mem::size_of::<*const c_char>() + core::mem::size_of::<usize>()
     );
 }
+
+#[test]
+fn borrowed_utf8_constructors_preserve_rust_string_bytes() {
+    let empty = GerbilBorrowedUtf8::empty();
+    assert!(empty.is_empty());
+    assert!(empty.ptr.is_null());
+    assert_eq!(empty.len, 0);
+    // SAFETY: empty() guarantees null with zero length.
+    assert_eq!(unsafe { empty.as_bytes() }, b"");
+
+    let text = "hello λ";
+    let borrowed = GerbilBorrowedUtf8::from(text);
+    assert!(!borrowed.is_empty());
+    assert_eq!(borrowed.len, text.len());
+    assert_eq!(borrowed.ptr.cast::<u8>(), text.as_ptr());
+    // SAFETY: `borrowed` points into `text`, which is still alive here.
+    assert_eq!(unsafe { borrowed.as_bytes() }, text.as_bytes());
+}

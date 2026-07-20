@@ -58,6 +58,12 @@ fn steady_state_native_ffi_reports_statistical_receipt() {
         black_box(value);
     });
     let (mut raw_add_ns, mut raw_even_ns, mut raw_compare_ns) = sample_raw_aot();
+    let mut identity_ns = sample_operation(|| {
+        let value = runtime
+            .identity_i64(black_box(41))
+            .expect("benchmark Gerbil identity");
+        black_box(value);
+    });
     let mut add_ns = sample_operation(|| {
         let sum = runtime
             .add_i64(black_box(41), black_box(1))
@@ -81,9 +87,11 @@ fn steady_state_native_ffi_reports_statistical_receipt() {
     let (raw_add_median_ns, raw_add_p95_ns) = summarize(&mut raw_add_ns);
     let (raw_even_median_ns, raw_even_p95_ns) = summarize(&mut raw_even_ns);
     let (raw_compare_median_ns, raw_compare_p95_ns) = summarize(&mut raw_compare_ns);
+    let (identity_median_ns, identity_p95_ns) = summarize(&mut identity_ns);
     let (add_median_ns, add_p95_ns) = summarize(&mut add_ns);
     let (even_median_ns, even_p95_ns) = summarize(&mut even_ns);
     let (compare_median_ns, compare_p95_ns) = summarize(&mut compare_ns);
+    let identity_vs_c_x100 = identity_median_ns * 100 / c_identity_median_ns;
     let add_vs_c_x100 = add_median_ns * 100 / c_identity_median_ns;
     let even_vs_c_x100 = even_median_ns * 100 / c_identity_median_ns;
     let compare_vs_c_x100 = compare_median_ns * 100 / c_identity_median_ns;
@@ -101,7 +109,7 @@ fn steady_state_native_ffi_reports_statistical_receipt() {
     };
 
     eprintln!(
-        "scenario benchmark receipt: id=native-ffi-steady-state samples={SAMPLE_COUNT} iterations_per_sample={ITERATIONS_PER_SAMPLE} c_identity_median_ns={c_identity_median_ns} c_identity_p95_ns={c_identity_p95_ns} raw_add_median_ns={raw_add_median_ns} raw_add_p95_ns={raw_add_p95_ns} add_median_ns={add_median_ns} add_p95_ns={add_p95_ns} add_vs_c_x100={add_vs_c_x100} add_safe_vs_raw_x100={add_safe_vs_raw_x100} raw_even_median_ns={raw_even_median_ns} raw_even_p95_ns={raw_even_p95_ns} even_median_ns={even_median_ns} even_p95_ns={even_p95_ns} even_vs_c_x100={even_vs_c_x100} even_safe_vs_raw_x100={even_safe_vs_raw_x100} raw_compare_median_ns={raw_compare_median_ns} raw_compare_p95_ns={raw_compare_p95_ns} compare_median_ns={compare_median_ns} compare_p95_ns={compare_p95_ns} compare_vs_c_x100={compare_vs_c_x100} compare_safe_vs_raw_x100={compare_safe_vs_raw_x100} elapsed_ns={}",
+        "scenario benchmark receipt: id=native-ffi-steady-state samples={SAMPLE_COUNT} iterations_per_sample={ITERATIONS_PER_SAMPLE} c_identity_median_ns={c_identity_median_ns} c_identity_p95_ns={c_identity_p95_ns} identity_median_ns={identity_median_ns} identity_p95_ns={identity_p95_ns} identity_vs_c_x100={identity_vs_c_x100} raw_add_median_ns={raw_add_median_ns} raw_add_p95_ns={raw_add_p95_ns} add_median_ns={add_median_ns} add_p95_ns={add_p95_ns} add_vs_c_x100={add_vs_c_x100} add_safe_vs_raw_x100={add_safe_vs_raw_x100} raw_even_median_ns={raw_even_median_ns} raw_even_p95_ns={raw_even_p95_ns} even_median_ns={even_median_ns} even_p95_ns={even_p95_ns} even_vs_c_x100={even_vs_c_x100} even_safe_vs_raw_x100={even_safe_vs_raw_x100} raw_compare_median_ns={raw_compare_median_ns} raw_compare_p95_ns={raw_compare_p95_ns} compare_median_ns={compare_median_ns} compare_p95_ns={compare_p95_ns} compare_vs_c_x100={compare_vs_c_x100} compare_safe_vs_raw_x100={compare_safe_vs_raw_x100} elapsed_ns={}",
         total.as_nanos(),
     );
     for (name, observed_ns, budget_name) in [
@@ -115,6 +123,12 @@ fn steady_state_native_ffi_reports_statistical_receipt() {
             c_identity_p95_ns,
             "p95_c_identity_i64_budget",
         ),
+        (
+            "identity median",
+            identity_median_ns,
+            "median_identity_i64_budget",
+        ),
+        ("identity p95", identity_p95_ns, "p95_identity_i64_budget"),
         ("add median", add_median_ns, "median_add_i64_budget"),
         ("add p95", add_p95_ns, "p95_add_i64_budget"),
         ("even median", even_median_ns, "median_is_even_i64_budget"),

@@ -1,0 +1,8 @@
+id = "native-identity-round-trip"
+title = "Native identity i64 round trip"
+policy_ids = ["RUST-AGENT-NATIVE-ABI-001"]
+agent_goal = "Verify the native identity i64 ABI path remains covered by a dedicated scenario."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["native identity i64 ABI round-trip"]
+inputs = "inputs"
+expected = "expected"

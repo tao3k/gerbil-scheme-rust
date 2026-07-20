@@ -81,8 +81,10 @@ pub fn validate_required_rust_scenario_benchmarks(
         Vec::new()
     };
     let status = scenario_benchmark_suite_status(&receipts, &violations);
+    let summary = scenario_benchmark_suite_summary(&requirements, &receipts, &violations);
     Ok(RustScenarioBenchmarkSuiteReceipt {
         root: crate_root.to_path_buf(),
+        summary,
         requirements,
         receipts,
         policy_coverage,
@@ -364,6 +366,101 @@ fn scenario_benchmark_suite_status(
         return RustScenarioBenchmarkStatus::Fail;
     }
     RustScenarioBenchmarkStatus::Pass
+}
+
+fn scenario_benchmark_suite_summary(
+    requirements: &[RustScenarioBenchmarkRequirement],
+    receipts: &[RustScenarioBenchmarkReceipt],
+    violations: &[RustScenarioBenchmarkViolation],
+) -> super::types::RustScenarioBenchmarkSuiteSummary {
+    let mut summary = super::types::RustScenarioBenchmarkSuiteSummary {
+        requirement_count: requirements.len(),
+        receipt_count: receipts.len(),
+        violation_count: violations.len(),
+        ..super::types::RustScenarioBenchmarkSuiteSummary::default()
+    };
+
+    for receipt in receipts {
+        match receipt.status {
+            RustScenarioBenchmarkStatus::Pass => summary.pass_count += 1,
+            RustScenarioBenchmarkStatus::Fail => summary.fail_count += 1,
+            RustScenarioBenchmarkStatus::Invalid => summary.invalid_count += 1,
+        }
+
+        summary.violation_count += receipt.violations.len();
+        accumulate_scenario_benchmark_violation_counts(&mut summary, &receipt.violations);
+
+        summary.worst_observed_total_target_basis_points = max_optional_u64(
+            summary.worst_observed_total_target_basis_points,
+            duration_ratio_basis_points(
+                receipt.benchmark.observed_total,
+                receipt.benchmark.target_total,
+            ),
+        );
+        summary.worst_observed_total_max_basis_points = max_optional_u64(
+            summary.worst_observed_total_max_basis_points,
+            duration_ratio_basis_points(
+                receipt.benchmark.observed_total,
+                receipt.benchmark.max_total,
+            ),
+        );
+        summary.worst_observed_memory_budget_basis_points = max_optional_u64(
+            summary.worst_observed_memory_budget_basis_points,
+            memory_ratio_basis_points(
+                receipt.benchmark.observed_memory_bytes,
+                receipt.benchmark.memory_budget_bytes,
+            ),
+        );
+    }
+
+    accumulate_scenario_benchmark_violation_counts(&mut summary, violations);
+    summary
+}
+
+fn accumulate_scenario_benchmark_violation_counts(
+    summary: &mut super::types::RustScenarioBenchmarkSuiteSummary,
+    violations: &[RustScenarioBenchmarkViolation],
+) {
+    for violation in violations {
+        match violation.kind {
+            RustScenarioBenchmarkViolationKind::Contract => summary.contract_violation_count += 1,
+            RustScenarioBenchmarkViolationKind::Performance => {
+                summary.performance_violation_count += 1;
+            }
+            RustScenarioBenchmarkViolationKind::Memory => summary.memory_violation_count += 1,
+        }
+    }
+}
+
+fn duration_ratio_basis_points(
+    observed: RustScenarioBenchmarkDuration,
+    budget: RustScenarioBenchmarkDuration,
+) -> Option<u64> {
+    ratio_basis_points(observed.0.as_nanos(), budget.0.as_nanos())
+}
+
+fn memory_ratio_basis_points(
+    observed: super::contract::RustScenarioBenchmarkMemoryBytes,
+    budget: super::contract::RustScenarioBenchmarkMemoryBytes,
+) -> Option<u64> {
+    ratio_basis_points(u128::from(observed.0), u128::from(budget.0))
+}
+
+fn ratio_basis_points(observed: u128, budget: u128) -> Option<u64> {
+    if budget == 0 {
+        return None;
+    }
+    let ratio = observed.saturating_mul(10_000) / budget;
+    Some(u64::try_from(ratio).unwrap_or(u64::MAX))
+}
+
+fn max_optional_u64(left: Option<u64>, right: Option<u64>) -> Option<u64> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left.max(right)),
+        (Some(left), None) => Some(left),
+        (None, Some(right)) => Some(right),
+        (None, None) => None,
+    }
 }
 
 fn scenario_benchmark_violations(

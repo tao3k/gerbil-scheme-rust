@@ -18,5 +18,29 @@ fn all_required_compiler_scenarios_have_valid_benchmark_contracts() {
     );
     assert_eq!(receipt.requirements.len(), 1);
     assert_eq!(receipt.receipts.len(), 1);
+    assert_eq!(receipt.summary.requirement_count, 1);
+    assert_eq!(receipt.summary.receipt_count, 1);
+    assert_eq!(receipt.summary.pass_count, 1);
+    assert_eq!(receipt.summary.fail_count, 0);
+    assert_eq!(receipt.summary.invalid_count, 0);
+    assert_eq!(receipt.summary.violation_count, 0);
+    assert!(
+        receipt
+            .summary
+            .worst_observed_total_target_basis_points
+            .is_some()
+    );
+    assert!(
+        receipt
+            .summary
+            .worst_observed_total_max_basis_points
+            .is_some()
+    );
+    assert!(
+        receipt
+            .summary
+            .worst_observed_memory_budget_basis_points
+            .is_some()
+    );
     assert!(receipt.violations.is_empty());
 }

@@ -23,6 +23,9 @@ pub use gerbil_scheme_sys::{
 mod native;
 
 #[cfg(feature = "native")]
+pub use native::{SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeScalar};
+
+#[cfg(feature = "native")]
 pub use native::{
     GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilUtf8, GerbilValue, NativeError,
     NativeResult,

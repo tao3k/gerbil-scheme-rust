@@ -1,0 +1,14 @@
+harness = "libtest"
+test = "scheme_scalar_projects_to_public_sys_abi_shapes"
+phase = "warm"
+observed_total = "100us"
+target_total = "1ms"
+target_rationale = "Safe scalar projections are allocation-free enum matches over by-value ABI wrappers."
+max_total = "500ms"
+regression_budget = "10ms"
+observed_memory_bytes = 0
+memory_budget_bytes = 16777216
+
+[observed_timings]
+safe_scalar_projection = "100us"
+safe_scalar_projection_budget = "1ms"

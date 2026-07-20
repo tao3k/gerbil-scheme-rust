@@ -402,6 +402,150 @@ pub struct NativeResult<T> {
     inner: Result<T, NativeError>,
 }
 
+/// Safe by-value Scheme scalar surface.
+///
+/// This enum is intentionally limited to values that can cross the C ABI by
+/// value without claiming runtime allocation, GC rooting, or object ownership.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SchemeScalar {
+    /// Gerbil fixnum represented as a machine word.
+    Fixnum(isize),
+    /// Gerbil boolean.
+    Boolean(bool),
+    /// Gerbil character represented as a Unicode scalar.
+    Char(char),
+    /// Gerbil flonum represented as IEEE-754 double precision.
+    Flonum(f64),
+}
+
+impl SchemeScalar {
+    /// Project this scalar to its raw fixnum ABI representation when possible.
+    #[must_use]
+    pub const fn as_fixnum_abi(self) -> Option<gerbil_scheme_sys::GerbilFixnum> {
+        match self {
+            Self::Fixnum(value) => Some(gerbil_scheme_sys::GerbilFixnum(value)),
+            Self::Boolean(_) | Self::Char(_) | Self::Flonum(_) => None,
+        }
+    }
+
+    /// Project this scalar to its raw boolean ABI representation when possible.
+    #[must_use]
+    pub const fn as_boolean_abi(self) -> Option<gerbil_scheme_sys::GerbilBoolean> {
+        match self {
+            Self::Boolean(value) => Some(gerbil_scheme_sys::GerbilBoolean::from_bool(value)),
+            Self::Fixnum(_) | Self::Char(_) | Self::Flonum(_) => None,
+        }
+    }
+
+    /// Project this scalar to its raw character ABI representation when possible.
+    #[must_use]
+    pub const fn as_char_abi(self) -> Option<gerbil_scheme_sys::GerbilChar> {
+        match self {
+            Self::Char(value) => Some(gerbil_scheme_sys::GerbilChar::from_char(value)),
+            Self::Fixnum(_) | Self::Boolean(_) | Self::Flonum(_) => None,
+        }
+    }
+
+    /// Project this scalar to its raw flonum ABI representation when possible.
+    #[must_use]
+    pub const fn as_flonum_abi(self) -> Option<gerbil_scheme_sys::GerbilFlonum> {
+        match self {
+            Self::Flonum(value) => Some(gerbil_scheme_sys::GerbilFlonum(value)),
+            Self::Fixnum(_) | Self::Boolean(_) | Self::Char(_) => None,
+        }
+    }
+}
+
+impl From<isize> for SchemeScalar {
+    fn from(value: isize) -> Self {
+        Self::Fixnum(value)
+    }
+}
+
+impl From<bool> for SchemeScalar {
+    fn from(value: bool) -> Self {
+        Self::Boolean(value)
+    }
+}
+
+impl From<char> for SchemeScalar {
+    fn from(value: char) -> Self {
+        Self::Char(value)
+    }
+}
+
+impl From<f64> for SchemeScalar {
+    fn from(value: f64) -> Self {
+        Self::Flonum(value)
+    }
+}
+
+/// Safe borrowed bytevector view for native Gerbil calls.
+///
+/// The Rust slice owner keeps the bytes alive for the full borrow. The native
+/// callee must not retain or free the pointer.
+#[derive(Clone, Copy, Debug)]
+pub struct SchemeBorrowedBytevector<'a> {
+    bytes: &'a [u8],
+    abi: gerbil_scheme_sys::GerbilBorrowedBytevector,
+}
+
+impl<'a> SchemeBorrowedBytevector<'a> {
+    /// Borrow a byte slice for the duration of a native call.
+    #[must_use]
+    pub const fn new(bytes: &'a [u8]) -> Self {
+        Self {
+            bytes,
+            abi: gerbil_scheme_sys::GerbilBorrowedBytevector::from_slice(bytes),
+        }
+    }
+
+    /// Return the original borrowed bytes.
+    #[must_use]
+    pub const fn as_bytes(self) -> &'a [u8] {
+        self.bytes
+    }
+
+    /// Return the C ABI projection for this borrow.
+    #[must_use]
+    pub const fn as_abi(self) -> gerbil_scheme_sys::GerbilBorrowedBytevector {
+        self.abi
+    }
+}
+
+/// Safe borrowed vector view for native Gerbil value handles.
+///
+/// This does not root or own the values. It only preserves the handle slice
+/// shape for a native call whose runtime ownership is managed elsewhere.
+#[derive(Clone, Copy, Debug)]
+pub struct SchemeBorrowedVector<'a> {
+    values: &'a [gerbil_scheme_sys::GerbilValueHandle],
+    abi: gerbil_scheme_sys::GerbilBorrowedVector,
+}
+
+impl<'a> SchemeBorrowedVector<'a> {
+    /// Borrow a value-handle slice for the duration of a native call.
+    #[must_use]
+    pub const fn new(values: &'a [gerbil_scheme_sys::GerbilValueHandle]) -> Self {
+        Self {
+            values,
+            abi: gerbil_scheme_sys::GerbilBorrowedVector::from_slice(values),
+        }
+    }
+
+    /// Return the original borrowed value handles.
+    #[must_use]
+    pub const fn as_values(self) -> &'a [gerbil_scheme_sys::GerbilValueHandle] {
+        self.values
+    }
+
+    /// Return the C ABI projection for this borrow.
+    #[must_use]
+    pub const fn as_abi(self) -> gerbil_scheme_sys::GerbilBorrowedVector {
+        self.abi
+    }
+}
+
 impl<T> NativeResult<T> {
     /// Constructs a successful native result.
     pub const fn ok(value: T) -> Self {

@@ -1,6 +1,6 @@
 #![cfg(feature = "native")]
 
-use gerbil_scheme::{GerbilStatus, GerbilUtf8, GerbilValue, NativeError};
+use gerbil_scheme::{GerbilI64Callback, GerbilStatus, GerbilUtf8, GerbilValue, NativeError};
 
 #[test]
 fn borrowed_utf8_surface_preserves_text_and_abi_bytes() {
@@ -49,4 +49,58 @@ fn value_handle_preserves_non_null_raw_identity_without_deref() {
     let value = GerbilValue::from_raw(raw).expect("non-null opaque handle");
 
     assert_eq!(value.as_raw(), raw);
+}
+
+#[test]
+fn i64_callback_projects_rust_function_to_native_pair() {
+    fn accept_positive(value: i64) -> GerbilStatus {
+        if value > 0 {
+            GerbilStatus::Ok
+        } else {
+            GerbilStatus::InvalidValue
+        }
+    }
+
+    let callback = GerbilI64Callback::new(accept_positive);
+    let abi = callback.as_abi();
+
+    assert!(!abi.context().is_null());
+    assert_eq!(
+        unsafe { (abi.callback())(41, abi.context()) },
+        GerbilStatus::Ok
+    );
+    assert_eq!(
+        unsafe { (abi.callback())(0, abi.context()) },
+        GerbilStatus::InvalidValue,
+    );
+}
+
+#[test]
+fn i64_callback_rejects_null_context_before_rust_call() {
+    fn unreachable_callback(_: i64) -> GerbilStatus {
+        panic!("null context must not call the Rust callback");
+    }
+
+    let callback = GerbilI64Callback::new(unreachable_callback);
+    let abi = callback.as_abi();
+
+    assert_eq!(
+        unsafe { (abi.callback())(1, std::ptr::null_mut()) },
+        GerbilStatus::NullPointer,
+    );
+}
+
+#[test]
+fn i64_callback_contains_panic_at_native_boundary() {
+    fn panic_callback(_: i64) -> GerbilStatus {
+        panic!("contained panic");
+    }
+
+    let callback = GerbilI64Callback::new(panic_callback);
+    let abi = callback.as_abi();
+
+    assert_eq!(
+        unsafe { (abi.callback())(1, abi.context()) },
+        GerbilStatus::Panic,
+    );
 }

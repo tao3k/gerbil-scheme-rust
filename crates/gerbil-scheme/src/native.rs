@@ -116,6 +116,76 @@ impl<'runtime> GerbilValue<'runtime> {
     }
 }
 
+/// Safe owner for a one-argument native i64 callback.
+///
+/// This wrapper accepts a plain Rust function pointer and exposes a borrowed C
+/// ABI callback view for one native call. Panics are contained at the trampoline
+/// and reported as [`gerbil_scheme_sys::GerbilStatus::Panic`].
+#[derive(Clone, Copy, Debug)]
+pub struct GerbilI64Callback {
+    callback: fn(i64) -> gerbil_scheme_sys::GerbilStatus,
+}
+
+impl GerbilI64Callback {
+    /// Build a native-safe callback wrapper from a Rust function pointer.
+    #[must_use]
+    pub fn new(callback: fn(i64) -> gerbil_scheme_sys::GerbilStatus) -> Self {
+        Self { callback }
+    }
+
+    /// Borrow this callback as a C ABI callback/context pair.
+    #[must_use]
+    pub fn as_abi(&self) -> GerbilI64CallbackAbi<'_> {
+        GerbilI64CallbackAbi {
+            callback: gerbil_i64_callback_trampoline,
+            context: std::ptr::from_ref(self).cast_mut().cast(),
+            _callback: PhantomData,
+        }
+    }
+}
+
+/// Borrowed C ABI view of a [`GerbilI64Callback`].
+#[derive(Clone, Copy, Debug)]
+pub struct GerbilI64CallbackAbi<'callback> {
+    callback: gerbil_scheme_sys::GerbilI64Callback,
+    context: *mut std::ffi::c_void,
+    _callback: PhantomData<&'callback GerbilI64Callback>,
+}
+
+impl<'callback> GerbilI64CallbackAbi<'callback> {
+    /// Return the raw C callback function pointer.
+    #[must_use]
+    pub fn callback(self) -> gerbil_scheme_sys::GerbilI64Callback {
+        self.callback
+    }
+
+    /// Return the raw borrowed callback context.
+    #[must_use]
+    pub fn context(self) -> *mut std::ffi::c_void {
+        self.context
+    }
+}
+
+unsafe extern "C" fn gerbil_i64_callback_trampoline(
+    value: i64,
+    context: *mut std::ffi::c_void,
+) -> gerbil_scheme_sys::GerbilStatus {
+    let Some(callback) = std::ptr::NonNull::<GerbilI64Callback>::new(context.cast()) else {
+        return gerbil_scheme_sys::GerbilStatus::NullPointer;
+    };
+
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: `GerbilI64Callback::as_abi` creates this context from a live
+        // shared borrow and ties the returned ABI view to that borrow. External
+        // callers that manufacture a context bypass the safe API and receive
+        // only panic/null containment here.
+        unsafe { (callback.as_ref().callback)(value) }
+    })) {
+        Ok(status) => status,
+        Err(_) => gerbil_scheme_sys::GerbilStatus::Panic,
+    }
+}
+
 impl GerbilRuntime {
     /// Initializes the process-global Gerbil runtime and native binding module.
     ///

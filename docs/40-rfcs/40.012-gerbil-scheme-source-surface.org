@@ -100,6 +100,22 @@ the native FFI/export forms directly.
 
 ** 2026-07-20 safe UTF-8 and value-handle surface
 
+*** 2026-07-20 callback trampoline extension
+
+The same safe surface now includes =GerbilI64Callback=. This keeps the raw
+=unsafe extern "C"= ABI in =gerbil-scheme-sys= while exposing a safe Rust owner
+that can produce a borrowed callback/context pair for one native call.
+
+The boundary rules are:
+
+- Rust callers provide a plain function pointer, not an unconstrained captured
+  closure.
+- The C context pointer is tied to the borrowed =GerbilI64Callback= owner.
+- Null callback context returns =GerbilStatus::NullPointer= before invoking
+  Rust code.
+- Panics are caught at the trampoline and returned as =GerbilStatus::Panic=.
+- No new dependency, code generator, or release-version bump is introduced.
+
 This slice keeps the repository boundary narrow: =gerbil-scheme-rust= exposes
 Gerbil Scheme Rust bindings and does not become a Marlin-specific crate.
 

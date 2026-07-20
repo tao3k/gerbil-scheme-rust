@@ -2,6 +2,165 @@
 
 use gerbil_scheme::{GerbilI64Callback, GerbilStatus, GerbilUtf8, GerbilValue, NativeError};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct BackedTypeMatrixEntry {
+    family: &'static str,
+    scheme_selector: &'static str,
+    raw_abi: &'static str,
+    safe_surface: &'static str,
+    ownership: &'static str,
+    nullability: &'static str,
+    failure_policy: &'static str,
+    scenario: &'static str,
+}
+
+const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
+    BackedTypeMatrixEntry {
+        family: "status",
+        scheme_selector: "gerbil_scheme_rust_status_shape",
+        raw_abi: "GerbilStatus",
+        safe_surface: "NativeError::status",
+        ownership: "copy status code",
+        nullability: "not pointer-backed",
+        failure_policy: "unknown status preserves code",
+        scenario: "status-contract",
+    },
+    BackedTypeMatrixEntry {
+        family: "i64",
+        scheme_selector: "gerbil_scheme_rust_i64_shape",
+        raw_abi: "i64",
+        safe_surface: "GerbilRuntime::{identity_i64,add_i64}",
+        ownership: "copy scalar",
+        nullability: "not pointer-backed",
+        failure_policy: "overflow maps to IntegerOverflow",
+        scenario: "native-identity-round-trip",
+    },
+    BackedTypeMatrixEntry {
+        family: "bool",
+        scheme_selector: "gerbil_scheme_rust_bool_shape",
+        raw_abi: "GerbilStatus + Rust bool return",
+        safe_surface: "GerbilRuntime::is_even_i64",
+        ownership: "copy scalar",
+        nullability: "not pointer-backed",
+        failure_policy: "status fail-closed before bool projection",
+        scenario: "native-runtime-round-trip",
+    },
+    BackedTypeMatrixEntry {
+        family: "comparison",
+        scheme_selector: "gerbil_scheme_rust_comparison_shape",
+        raw_abi: "i32 comparison result",
+        safe_surface: "GerbilRuntime::compare_i64",
+        ownership: "copy scalar",
+        nullability: "not pointer-backed",
+        failure_policy: "invalid result maps to InvalidComparisonResult",
+        scenario: "invalid-comparison-fail-closed",
+    },
+    BackedTypeMatrixEntry {
+        family: "borrowed-utf8",
+        scheme_selector: "gerbil_scheme_rust_utf8_shape",
+        raw_abi: "GerbilBorrowedUtf8",
+        safe_surface: "GerbilUtf8",
+        ownership: "borrowed Rust UTF-8 bytes",
+        nullability: "empty string may use null pointer with zero length",
+        failure_policy: "non-UTF-8 belongs to bytevector future surface",
+        scenario: "native-value-surface",
+    },
+    BackedTypeMatrixEntry {
+        family: "opaque-value-handle",
+        scheme_selector: "gerbil_scheme_rust_value_handle_shape",
+        raw_abi: "GerbilValueHandle",
+        safe_surface: "GerbilValue<'runtime>",
+        ownership: "runtime-borrowed opaque handle",
+        nullability: "null rejected before FFI crossing",
+        failure_policy: "null maps to NullPointer status",
+        scenario: "backed-value-family-surface",
+    },
+    BackedTypeMatrixEntry {
+        family: "i64-callback",
+        scheme_selector: "gerbil_scheme_rust_i64_callback_shape",
+        raw_abi: "GerbilI64Callback",
+        safe_surface: "GerbilI64Callback + GerbilI64CallbackAbi",
+        ownership: "borrowed callback/context pair",
+        nullability: "null context rejected before Rust call",
+        failure_policy: "panic contained at native boundary",
+        scenario: "native-value-surface",
+    },
+    BackedTypeMatrixEntry {
+        family: "native-value",
+        scheme_selector: "gerbil_scheme_rust_native_value_shape",
+        raw_abi: "current backed C ABI value families",
+        safe_surface: "GerbilRuntime + GerbilUtf8 + GerbilValue + GerbilI64Callback",
+        ownership: "aggregate of scalar, borrowed, handle, and callback shapes",
+        nullability: "explicit per concrete shape",
+        failure_policy: "delegated to concrete backed value family",
+        scenario: "backed-value-family-surface",
+    },
+    BackedTypeMatrixEntry {
+        family: "native-error",
+        scheme_selector: "gerbil_scheme_rust_native_error_shape",
+        raw_abi: "GerbilStatus",
+        safe_surface: "NativeError",
+        ownership: "Rust safe-boundary error enum",
+        nullability: "optional status projection",
+        failure_policy: "unknown status preserves code",
+        scenario: "source-surface-sync",
+    },
+    BackedTypeMatrixEntry {
+        family: "native-result",
+        scheme_selector: "gerbil_scheme_rust_native_result_shape",
+        raw_abi: "GerbilStatus + native value payload",
+        safe_surface: "Result<T, NativeError>",
+        ownership: "ok native value or native error",
+        nullability: "delegated to value/error shape",
+        failure_policy: "fail-closed",
+        scenario: "source-surface-sync",
+    },
+];
+
+#[test]
+fn public_backed_type_matrix_covers_current_native_surface() {
+    let source = read_native_surface_source();
+    assert_eq!(
+        BACKED_TYPE_MATRIX.len(),
+        10,
+        "the release-auditable backed type matrix must change deliberately",
+    );
+
+    for entry in BACKED_TYPE_MATRIX {
+        assert!(
+            source.contains(entry.scheme_selector),
+            "type matrix selector is missing from Scheme native surface: {entry:?}",
+        );
+        assert_non_empty_matrix_field(entry.family, "raw_abi", entry.raw_abi);
+        assert_non_empty_matrix_field(entry.family, "safe_surface", entry.safe_surface);
+        assert_non_empty_matrix_field(entry.family, "ownership", entry.ownership);
+        assert_non_empty_matrix_field(entry.family, "nullability", entry.nullability);
+        assert_non_empty_matrix_field(entry.family, "failure_policy", entry.failure_policy);
+        assert_non_empty_matrix_field(entry.family, "scenario", entry.scenario);
+    }
+
+    let aggregate_shape =
+        native_surface_shape_section(&source, "gerbil_scheme_rust_native_value_shape");
+    for required_family in [
+        "(scalar-values (i64 bool comparison status))",
+        "(borrowed-values (utf8))",
+        "(handle-values (runtime-handle gerbil-value-handle))",
+        "(callback-values (i64-callback))",
+    ] {
+        assert!(
+            aggregate_shape.contains(required_family),
+            "native-value aggregate shape must stay aligned with the backed type matrix: {required_family}",
+        );
+    }
+}
+
+fn assert_non_empty_matrix_field(family: &str, field: &str, value: &str) {
+    assert!(
+        !value.trim().is_empty(),
+        "backed type matrix field must not be empty: family={family} field={field}",
+    );
+}
+
 #[test]
 fn borrowed_utf8_surface_preserves_text_and_abi_bytes() {
     let text = "λ gerbil 🐹";
@@ -107,14 +266,7 @@ fn i64_callback_contains_panic_at_native_boundary() {
 
 #[test]
 fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
-    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let native_surface = manifest_dir
-        .ancestors()
-        .nth(2)
-        .expect("workspace root from gerbil-scheme crate")
-        .join("scheme/asp/native-surface.ss");
-    let source = std::fs::read_to_string(&native_surface)
-        .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()));
+    let source = read_native_surface_source();
 
     for required in [
         "gerbil_scheme_rust_utf8_shape",
@@ -137,14 +289,7 @@ fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
 
 #[test]
 fn scheme_native_surface_projects_all_backed_value_family_shapes() {
-    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let native_surface = manifest_dir
-        .ancestors()
-        .nth(2)
-        .expect("workspace root from gerbil-scheme crate")
-        .join("scheme/asp/native-surface.ss");
-    let source = std::fs::read_to_string(&native_surface)
-        .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()));
+    let source = read_native_surface_source();
 
     assert_native_surface_shape_contract(
         &source,
@@ -207,6 +352,17 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
             "unsupported Scheme native-surface selector must remain blocked until sys/safe ABI exists: {unsupported}"
         );
     }
+}
+
+fn read_native_surface_source() -> String {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let native_surface = manifest_dir
+        .ancestors()
+        .nth(2)
+        .expect("workspace root from gerbil-scheme crate")
+        .join("scheme/asp/native-surface.ss");
+    std::fs::read_to_string(&native_surface)
+        .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()))
 }
 
 fn assert_native_surface_shape_contract(source: &str, selector: &str, required_fields: &[&str]) {

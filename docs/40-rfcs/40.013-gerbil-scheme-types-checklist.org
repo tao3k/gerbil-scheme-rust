@@ -60,6 +60,26 @@ Current Scheme source-surface evidence:
 - =[ ]= not implemented or not accepted.
 - =[?]= partially implemented; owner or semantics still need proof.
 
+* Public backed type matrix
+
+This matrix is the current release-auditable v0 binding surface. A type family
+is accepted only when the raw ABI, safe Rust surface, Scheme native-surface
+selector, ownership/nullability rule, failure policy, and scenario coverage are
+all present. The Rust test =public_backed_type_matrix_covers_current_native_surface=
+keeps this table aligned with the Scheme source-surface projection.
+
+| Family | Scheme selector | Raw ABI | Safe Rust surface | Ownership/rooting | Nullability | Failure policy | Scenario |
+| status | =gerbil_scheme_rust_status_shape= | =GerbilStatus= | =NativeError::status= | copy status code | not pointer-backed | unknown status preserves code | =status-contract= |
+| i64 | =gerbil_scheme_rust_i64_shape= | =i64= | =GerbilRuntime::{identity_i64,add_i64}= | copy scalar | not pointer-backed | overflow maps to =IntegerOverflow= | =native-identity-round-trip= |
+| bool return | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return | =GerbilRuntime::is_even_i64= | copy scalar | not pointer-backed | status fail-closed before bool projection | =native-runtime-round-trip= |
+| comparison | =gerbil_scheme_rust_comparison_shape= | =i32= comparison result | =GerbilRuntime::compare_i64= | copy scalar | not pointer-backed | invalid result maps to =InvalidComparisonResult= | =invalid-comparison-fail-closed= |
+| borrowed UTF-8 | =gerbil_scheme_rust_utf8_shape= | =GerbilBorrowedUtf8= | =GerbilUtf8= | borrowed Rust UTF-8 bytes | empty string may use null pointer with zero length | non-UTF-8 is reserved for future bytevector surface | =native-value-surface= |
+| opaque value handle | =gerbil_scheme_rust_value_handle_shape= | =GerbilValueHandle= | =GerbilValue<'runtime>= | runtime-borrowed opaque handle, not rooted | null rejected before FFI crossing | null maps to =NullPointer= status | =backed-value-family-surface= |
+| i64 callback | =gerbil_scheme_rust_i64_callback_shape= | =GerbilI64Callback= | =GerbilI64Callback= and =GerbilI64CallbackAbi= | borrowed callback/context pair | null context rejected before Rust call | panic contained at native boundary | =native-value-surface= |
+| native value | =gerbil_scheme_rust_native_value_shape= | current backed C ABI value families | =GerbilRuntime=, =GerbilUtf8=, =GerbilValue=, and =GerbilI64Callback= | aggregate of scalar, borrowed, handle, and callback shapes | explicit per concrete shape | delegated to concrete backed value family | =backed-value-family-surface= |
+| native error | =gerbil_scheme_rust_native_error_shape= | =GerbilStatus= | =NativeError= | Rust safe-boundary error enum | optional status projection | unknown status preserves code | =source-surface-sync= |
+| native result | =gerbil_scheme_rust_native_result_shape= | =GerbilStatus= plus native value payload | =Result<T, NativeError>= | ok native value or native error | delegated to value/error shape | fail-closed | =source-surface-sync= |
+
 * Type surface checklist
 
 ** Runtime and lifecycle
@@ -372,18 +392,33 @@ shape placeholders and instead add one real sys/safe-backed value family at a
 time. Each accepted family must land as raw ABI, safe wrapper, Scheme
 native-surface projection, scenario benchmark, and Marlin-consumer reduction.
 
+** 2026-07-20 fifth closure receipt
+
+- [X] Added the public backed type matrix as a first-class ORG table covering
+  the current v0 release-auditable surface.
+- [X] Added =public_backed_type_matrix_covers_current_native_surface= so CI
+  fails when a backed family lacks a Scheme selector, raw ABI owner, safe Rust
+  surface, ownership/rooting rule, nullability rule, failure policy, or
+  scenario receipt.
+- [X] Included the aggregate =native-value= shape as its own release row so the
+  current scalar/borrowed/handle/callback grouping cannot drift silently.
+- [X] Kept unsupported value families blocked; this slice does not add
+  design-only placeholders for unimplemented Scheme families.
+- [X] Verified =cargo test -p gerbil-scheme --features native --test
+  native_value_surface= with 10 passing tests.
+
 * Next execution plan
 
 ** Phase 1: make the current v0 surface release-auditable
 
-- [ ] Add an explicit public type matrix section covering every currently
+- [X] Add an explicit public type matrix section covering every currently
   backed shape:
   status, i64, bool return, comparison, borrowed UTF-8, opaque value handle,
   i64 callback, native value, native error, and native result.
-- [ ] For each backed shape, document:
+- [X] For each backed shape, document:
   raw ABI owner, safe Rust wrapper, nullability, ownership/rooting, failure
   status, and scenario coverage.
-- [ ] Add a release-readiness test or harness receipt that fails if the public
+- [X] Add a release-readiness test or harness receipt that fails if the public
   type matrix omits a currently backed shape.
 - [ ] Add native result/error scenario coverage that validates status,
   unknown-code preservation, optional status projection, and fail-closed

@@ -85,6 +85,11 @@ keeps this table aligned with the Scheme source-surface projection.
 ** Runtime and lifecycle
 
 - [X] Process-global runtime safe owner: =GerbilRuntime=.
+- [X] Opaque value handles carry explicit provenance:
+  =GerbilValueProvenance::UntrustedRaw= for caller-supplied non-null raw
+  handles.
+- [ ] Runtime/export-produced opaque value provenance that can safely enable
+  Gerbil/Gambit predicates and traversal.
 - [X] Thread-affinity check for runtime methods.
 - [X] ABI version check before exposing runtime handle.
 - [X] Drop-time native cleanup path.
@@ -180,6 +185,10 @@ keeps this table aligned with the Scheme source-surface projection.
 - [ ] Nil-terminated list traversal API.
 - [ ] Improper list detection.
 - [ ] Lifetime/GC-root policy during traversal.
+- [X] Caller-supplied pair/list/null handles remain fail-closed through
+  =UntrustedRaw= provenance.
+- [ ] Runtime-backed pair/list/null predicates gated on runtime/export
+  provenance.
 - [ ] Scenario for proper list, improper list, empty list, and nested list.
 
 ** Vectors

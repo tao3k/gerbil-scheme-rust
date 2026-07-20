@@ -83,15 +83,30 @@ impl<'a> From<&'a str> for GerbilUtf8<'a> {
     }
 }
 
+/// Provenance attached to a borrowed Gerbil value handle.
+///
+/// This is deliberately narrower than "non-null pointer".  Runtime-backed
+/// Scheme predicates and traversal must only use handles whose provenance is
+/// produced by an initialized runtime/export path.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GerbilValueProvenance {
+    /// A raw non-null handle supplied by the caller.
+    ///
+    /// This keeps tests and FFI boundaries fail-closed: the pointer is not
+    /// trusted as a live Gambit/Gerbil object.
+    UntrustedRaw,
+}
+
 /// Runtime-borrowed opaque Gerbil value handle.
 ///
 /// This wrapper is intentionally non-owning. It proves only that the raw handle
-/// is non-null and is tied to a live [`GerbilRuntime`] borrow by the lifetime
-/// parameter; it does not claim type, ownership, or GC reachability beyond that
-/// borrow.
+/// is non-null. Runtime provenance is tracked explicitly by
+/// [`GerbilValueProvenance`]; a caller-created raw handle is not enough to
+/// claim type, ownership, GC reachability, or validity as a Gambit object.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GerbilValue<'runtime> {
     raw: std::ptr::NonNull<std::ffi::c_void>,
+    provenance: GerbilValueProvenance,
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
 
@@ -264,6 +279,7 @@ fn value_from_native_handle<'runtime>(
 ) -> Option<GerbilValue<'runtime>> {
     std::ptr::NonNull::new(raw).map(|raw| GerbilValue {
         raw,
+        provenance: GerbilValueProvenance::UntrustedRaw,
         _runtime: PhantomData,
     })
 }
@@ -282,6 +298,7 @@ impl GerbilValue<'_> {
 
         Ok(Self {
             raw,
+            provenance: GerbilValueProvenance::UntrustedRaw,
             _runtime: PhantomData,
         })
     }
@@ -290,6 +307,12 @@ impl GerbilValue<'_> {
     #[must_use]
     pub fn as_raw(self) -> gerbil_scheme_sys::GerbilValueHandle {
         self.raw.as_ptr()
+    }
+
+    /// Return the provenance attached to this borrowed value handle.
+    #[must_use]
+    pub const fn provenance(self) -> GerbilValueProvenance {
+        self.provenance
     }
 }
 

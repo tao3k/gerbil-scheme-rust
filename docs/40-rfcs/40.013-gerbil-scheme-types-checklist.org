@@ -346,6 +346,106 @@ Rust safe surface and the Scheme ASP surface:
   otherwise continue reducing Marlin-local duplicated binding code against the
   current generic surface.
 
+** 2026-07-20 fourth closure receipt
+
+- [X] Raised =native_value_surface= from selector-presence checks to
+  field-level Scheme native-shape contract checks for:
+  =native-value=, =native-error=, and =native-result=.
+- [X] Locked the current runtime scenario benchmark suite to the exact 8
+  required scenario roots so future count-only drift cannot hide deletion or
+  replacement of a critical FFI/type/performance scenario.
+- [X] Confirmed every current required runtime scenario is still
+  =scenario.toml=-backed.
+- [X] Verified local receipts:
+  =cargo check --workspace --all-targets --locked=,
+  =cargo test --workspace --locked=,
+  =cargo clippy --workspace --all-targets --locked -- -D warnings=, and
+  =cargo test -p gerbil-scheme --features native --test native_value_surface=.
+- [X] Verified remote CI receipt for commit =44d15ec=:
+  Linux and macOS bindings jobs both green, including Cargo and Bazel gates.
+- [X] Verified the Marlin consumer PR remains the downstream integration lane:
+  Marlin PR #1 consumed the local convergence work and its CI was green before
+  this checklist update.
+
+The next implementation slice should now stop expanding design-only Scheme
+shape placeholders and instead add one real sys/safe-backed value family at a
+time. Each accepted family must land as raw ABI, safe wrapper, Scheme
+native-surface projection, scenario benchmark, and Marlin-consumer reduction.
+
+* Next execution plan
+
+** Phase 1: make the current v0 surface release-auditable
+
+- [ ] Add an explicit public type matrix section covering every currently
+  backed shape:
+  status, i64, bool return, comparison, borrowed UTF-8, opaque value handle,
+  i64 callback, native value, native error, and native result.
+- [ ] For each backed shape, document:
+  raw ABI owner, safe Rust wrapper, nullability, ownership/rooting, failure
+  status, and scenario coverage.
+- [ ] Add a release-readiness test or harness receipt that fails if the public
+  type matrix omits a currently backed shape.
+- [ ] Add native result/error scenario coverage that validates status,
+  unknown-code preservation, optional status projection, and fail-closed
+  behavior together.
+- [ ] Keep unsupported families explicitly absent until raw ABI and safe Rust
+  support exist; do not add Scheme source-surface placeholders for nil, void,
+  f64, char, symbol, keyword, pair, list, vector, bytevector, procedure, port,
+  or continuation.
+
+** Phase 2: choose the first real new Scheme value family
+
+- [ ] Prefer sentinel values first if the C ABI can expose them cleanly:
+  nil, void, EOF, and unspecified.
+- [ ] Alternative first expansion is =f64= if numeric scalar performance is the
+  priority.
+- [ ] Do not implement list/vector/string ownership before the GC-rooting model
+  is explicit.
+- [ ] For the chosen family, land all five artifacts in one slice:
+  =gerbil-scheme-sys= ABI, =gerbil-scheme= safe wrapper, Scheme
+  native-surface shape, scenario benchmark, and native value-surface test.
+- [ ] Add failure cases first: null/invalid sentinel, invalid f64, overflow, or
+  unsupported conversion depending on the selected family.
+
+** Phase 3: FFI generation and header ownership decision
+
+- [ ] Audit the current =cbindgen= usage and generated-header validation owner.
+- [ ] Decide whether v0/v1 public C ABI is:
+  handwritten-minimal, generated-by-cbindgen, or mixed with generated header
+  validation only.
+- [ ] If =bindgen= is considered, document why it is or is not worth adding:
+  dependency cost, generated Rust stability, cross-platform reproducibility,
+  auditability of =unsafe extern "C"= declarations, and Bazel/Cargo cache
+  impact.
+- [ ] Keep =unsafe extern "C"= contained in =gerbil-scheme-sys=; safe crates
+  must expose typed wrappers and status-preserving errors, not raw externs.
+
+** Phase 4: scenario and performance expansion
+
+- [ ] Split scenario budgets by lane:
+  pure Rust validation, warm native ABI call, real Gerbil toolchain execution,
+  and AOT/native build path.
+- [ ] Keep pure Rust validation in sub-millisecond territory.
+- [ ] Track live Gerbil/AOT paths separately; do not let cold startup dominate
+  hot FFI steady-state receipts.
+- [ ] Add scenario receipts for the next accepted family and one invalid/failure
+  case per family.
+- [ ] Keep the explicit 8-root scenario suite list updated deliberately when a
+  new required scenario is added.
+
+** Phase 5: Marlin convergence and dependency boundary
+
+- [ ] Treat Marlin as downstream consumer, not as the owner of this crate's API.
+- [ ] In Marlin, replace duplicated Gerbil binding code with
+  =gerbil-scheme-rust= dependency usage only after the matching generic wrapper
+  exists here.
+- [ ] Keep Marlin-specific package inventory, policy packs, and storage receipts
+  in Marlin.
+- [ ] Add a downstream integration receipt proving Marlin consumes this crate
+  without reintroducing raw FFI or local duplicated binding catalogs.
+- [ ] Backport only generic lessons from Marlin, such as loadpath/toolchain
+  handling or scenario harness behavior; avoid importing Marlin domain objects.
+
 * Marlin convergence checklist
 
 - [ ] Keep this crate generic; do not encode Marlin package inventory policy.

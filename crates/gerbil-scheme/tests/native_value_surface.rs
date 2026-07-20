@@ -71,8 +71,8 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         raw_abi: "GerbilValueHandle",
         safe_surface: "GerbilValue<'runtime>",
         ownership: "runtime-borrowed opaque handle",
-        nullability: "null rejected before FFI crossing",
-        failure_policy: "null maps to NullPointer status",
+        nullability: "zero rejected before FFI crossing",
+        failure_policy: "zero maps to NullPointer status",
         scenario: "backed-value-family-surface",
     },
     BackedTypeMatrixEntry {
@@ -189,7 +189,7 @@ fn empty_borrowed_utf8_keeps_zero_length_contract() {
 
 #[test]
 fn value_handle_rejects_null_without_crossing_ffi() {
-    let err = GerbilValue::from_raw(std::ptr::null_mut()).expect_err("null handle must fail");
+    let err = GerbilValue::from_raw(0).expect_err("zero handle must fail");
 
     assert_eq!(
         err,
@@ -202,10 +202,8 @@ fn value_handle_rejects_null_without_crossing_ffi() {
 
 #[test]
 fn value_handle_preserves_non_null_raw_identity_without_deref() {
-    let raw = std::ptr::NonNull::<u8>::dangling()
-        .as_ptr()
-        .cast::<std::ffi::c_void>();
-    let value = GerbilValue::from_raw(raw).expect("non-null opaque handle");
+    let raw = std::ptr::NonNull::<u8>::dangling().as_ptr().addr();
+    let value = GerbilValue::from_raw(raw).expect("non-zero opaque handle");
 
     assert_eq!(value.as_raw(), raw);
 }

@@ -124,13 +124,13 @@ The raw ABI already contains =GerbilBorrowedUtf8= and =GerbilValueHandle= in
 
 - =GerbilUtf8<'a>=: a Rust-owned borrowed UTF-8 view that can produce the raw
   one-call =GerbilBorrowedUtf8= ABI shape.
-- =GerbilValue<'runtime>=: a non-owning, non-null opaque Gerbil value handle
+- =GerbilValue<'runtime>=: a non-owning, non-zero opaque Gerbil value handle
   tied to a live runtime borrow by lifetime.
 
 Acceptance for this slice is not a direct FFI expansion. It is a Rust binding
 surface hardening step:
 
-- null value handles fail closed before crossing FFI;
+- zero value handles fail closed before crossing FFI;
 - UTF-8 pointer and length are observable at the ABI boundary;
 - no new =bindgen=, =cc=, or release-version bump is introduced;
 - scenario coverage includes =native-value-surface= with a sub-millisecond

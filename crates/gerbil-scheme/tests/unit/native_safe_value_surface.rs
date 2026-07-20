@@ -40,10 +40,7 @@ fn scheme_borrowed_bytevector_preserves_slice_and_abi_projection() {
 fn scheme_borrowed_vector_preserves_handle_slice_and_abi_projection() {
     let mut left = 1_u8;
     let mut right = 2_u8;
-    let handles = [
-        (&raw mut left).cast::<core::ffi::c_void>(),
-        (&raw mut right).cast::<core::ffi::c_void>(),
-    ];
+    let handles = [(&raw mut left).addr(), (&raw mut right).addr()];
     let borrowed = SchemeBorrowedVector::new(&handles);
     let abi = borrowed.as_abi();
 
@@ -55,29 +52,29 @@ fn scheme_borrowed_vector_preserves_handle_slice_and_abi_projection() {
 #[test]
 fn scheme_handle_backed_views_preserve_identity_and_reject_null() {
     let mut raw_value = 42_u8;
-    let raw = (&raw mut raw_value).cast::<core::ffi::c_void>();
+    let raw = (&raw mut raw_value).addr();
 
-    let symbol = SchemeSymbol::from_raw(raw).expect("non-null symbol handle");
-    let keyword = SchemeKeyword::from_raw(raw).expect("non-null keyword handle");
-    let pair = SchemePair::from_raw(raw).expect("non-null pair handle");
-    let list = SchemeList::from_raw(raw).expect("non-null list handle");
+    let symbol = SchemeSymbol::from_raw(raw).expect("non-zero symbol handle");
+    let keyword = SchemeKeyword::from_raw(raw).expect("non-zero keyword handle");
+    let pair = SchemePair::from_raw(raw).expect("non-zero pair handle");
+    let list = SchemeList::from_raw(raw).expect("non-zero list handle");
 
     assert_eq!(symbol.as_raw(), raw);
     assert_eq!(keyword.as_raw(), raw);
     assert_eq!(pair.as_raw(), raw);
     assert_eq!(list.as_raw(), raw);
 
-    assert!(SchemeSymbol::from_raw(core::ptr::null_mut()).is_none());
-    assert!(SchemeKeyword::from_raw(core::ptr::null_mut()).is_none());
-    assert!(SchemePair::from_raw(core::ptr::null_mut()).is_none());
-    assert!(SchemeList::from_raw(core::ptr::null_mut()).is_none());
+    assert!(SchemeSymbol::from_raw(0).is_none());
+    assert!(SchemeKeyword::from_raw(0).is_none());
+    assert!(SchemePair::from_raw(0).is_none());
+    assert!(SchemeList::from_raw(0).is_none());
 }
 
 #[test]
 fn scheme_pair_list_status_wrappers_fail_closed_for_unbacked_handles() {
     let mut raw_value = 42_u8;
-    let raw = (&raw mut raw_value).cast::<core::ffi::c_void>();
-    let value = || GerbilValue::from_raw(raw).expect("non-null value handle");
+    let raw = (&raw mut raw_value).addr();
+    let value = || GerbilValue::from_raw(raw).expect("non-zero value handle");
     assert_eq!(value().provenance(), GerbilValueProvenance::UntrustedRaw);
 
     let is_pair = value().is_pair();
@@ -104,5 +101,5 @@ fn scheme_pair_list_status_wrappers_fail_closed_for_unbacked_handles() {
     assert!(parts.is_err());
     assert_eq!(parts.status(), Some(GerbilStatus::InvalidValue));
 
-    assert!(GerbilValue::from_raw(core::ptr::null_mut()).is_err());
+    assert!(GerbilValue::from_raw(0).is_err());
 }

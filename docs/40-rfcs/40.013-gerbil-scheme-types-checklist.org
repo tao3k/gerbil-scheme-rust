@@ -74,7 +74,7 @@ keeps this table aligned with the Scheme source-surface projection.
 | bool return | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return | =GerbilRuntime::is_even_i64= | copy scalar | not pointer-backed | status fail-closed before bool projection | =native-runtime-round-trip= |
 | comparison | =gerbil_scheme_rust_comparison_shape= | =i32= comparison result | =GerbilRuntime::compare_i64= | copy scalar | not pointer-backed | invalid result maps to =InvalidComparisonResult= | =invalid-comparison-fail-closed= |
 | borrowed UTF-8 | =gerbil_scheme_rust_utf8_shape= | =GerbilBorrowedUtf8= | =GerbilUtf8= | borrowed Rust UTF-8 bytes | empty string may use null pointer with zero length | non-UTF-8 is reserved for future bytevector surface | =native-value-surface= |
-| opaque value handle | =gerbil_scheme_rust_value_handle_shape= | =GerbilValueHandle= | =GerbilValue<'runtime>= | runtime-borrowed opaque handle, not rooted | null rejected before FFI crossing | null maps to =NullPointer= status | =backed-value-family-surface= |
+| opaque value handle | =gerbil_scheme_rust_value_handle_shape= | =GerbilValueHandle= | =GerbilValue<'runtime>= | runtime-borrowed word-sized opaque handle, not rooted | zero rejected before FFI crossing | zero maps to =NullPointer= status | =backed-value-family-surface= |
 | i64 callback | =gerbil_scheme_rust_i64_callback_shape= | =GerbilI64Callback= | =GerbilI64Callback= and =GerbilI64CallbackAbi= | borrowed callback/context pair | null context rejected before Rust call | panic contained at native boundary | =native-value-surface= |
 | native value | =gerbil_scheme_rust_native_value_shape= | current backed C ABI value families | =GerbilRuntime=, =GerbilUtf8=, =GerbilValue=, and =GerbilI64Callback= | aggregate of scalar, borrowed, handle, and callback shapes | explicit per concrete shape | delegated to concrete backed value family | =backed-value-family-surface= |
 | native error | =gerbil_scheme_rust_native_error_shape= | =GerbilStatus= | =NativeError= | Rust safe-boundary error enum | optional status projection | unknown status preserves code | =source-surface-sync= |
@@ -86,7 +86,7 @@ keeps this table aligned with the Scheme source-surface projection.
 
 - [X] Process-global runtime safe owner: =GerbilRuntime=.
 - [X] Opaque value handles carry explicit provenance:
-  =GerbilValueProvenance::UntrustedRaw= for caller-supplied non-null raw
+  =GerbilValueProvenance::UntrustedRaw= for caller-supplied non-zero raw
   handles.
 - [X] Runtime-sentinel opaque value provenance is distinct from =UntrustedRaw=.
 - [ ] Runtime/export-produced opaque value provenance that can safely enable
@@ -228,10 +228,10 @@ keeps this table aligned with the Scheme source-surface projection.
 ** Opaque values and GC rooting
 
 - [X] Raw opaque value handle: =GerbilValueHandle=.
-- [X] Safe non-null borrowed value wrapper: =GerbilValue<'runtime>=.
-- [X] Null value handle fail-closed test.
+- [X] Safe non-zero borrowed value wrapper: =GerbilValue<'runtime>=.
+- [X] Zero value handle fail-closed test.
 - [X] Scheme native-surface shape for =GerbilValue= ownership and nullability:
-  non-null, runtime-borrowed, not retained beyond the valid runtime borrow.
+  non-zero, runtime-borrowed, not retained beyond the valid runtime borrow.
 - [ ] Explicit GC-root type.
 - [ ] Scheme native-surface shape for future rooted value contract.
 - [ ] Borrowed value vs owned/rooted value distinction.
@@ -334,7 +334,7 @@ Rust safe surface and the Scheme ASP surface:
 - [X] Add =gerbil_scheme_rust_i64_callback_shape= to
   =scheme/asp/native-surface.ss=.
 - [X] Extend =gerbil_scheme_rust_native_value_shape= with explicit
-  non-null/runtime-borrowed/GC-not-rooted value semantics.
+  non-zero/runtime-borrowed/GC-not-rooted value semantics.
 - [ ] Extend =gerbil_scheme_rust_native_result_shape= or add a new result-family
   shape that maps Rust =NativeError= and unknown status preservation.
 - [X] Add tests that query Scheme shape selectors and compare them with Rust

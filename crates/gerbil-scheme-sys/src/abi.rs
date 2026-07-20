@@ -165,7 +165,11 @@ pub struct GerbilRuntimeOpaque {
 }
 
 /// Opaque value handle borrowed from a runtime.
-pub type GerbilValueHandle = *mut c_void;
+///
+/// Gambit represents the universal Scheme object (`scheme-object` in Gerbil
+/// FFI) as a machine word. Keep the Rust ABI aligned with the public C header's
+/// `uintptr_t` instead of modelling it as a dereferenceable pointer.
+pub type GerbilValueHandle = usize;
 
 /// Callback for a native binding that consumes one signed integer.
 pub type GerbilI64Callback = unsafe extern "C" fn(i64, *mut c_void) -> GerbilStatus;
@@ -311,7 +315,7 @@ pub type GerbilProcedureCallback =
 /// Return whether a value handle is backed by a Scheme pair.
 ///
 /// This ABI entry point is intentionally fail-closed until runtime-backed type
-/// classification exists.  It validates the pointer/status boundary without
+/// classification exists.  It validates the handle/status boundary without
 /// dereferencing unmanaged handles.
 ///
 /// # Safety
@@ -343,9 +347,7 @@ pub unsafe extern "C" fn gerbil_scheme_rust_runtime_sentinel_value(
     }
 
     unsafe {
-        *out = gerbil_scheme_rust_runtime_sentinel_value_sentinel()
-            .cast::<c_void>()
-            .cast_mut();
+        *out = gerbil_scheme_rust_runtime_sentinel_value_sentinel().addr();
     }
     GerbilStatus::Ok
 }
@@ -427,7 +429,7 @@ pub unsafe extern "C" fn gerbil_scheme_rust_pair_parts(
     value: GerbilValueHandle,
     out: *mut GerbilPair,
 ) -> GerbilStatus {
-    if value.is_null() || out.is_null() {
+    if value == 0 || out.is_null() {
         return GerbilStatus::NullPointer;
     }
     GerbilStatus::InvalidValue
@@ -437,7 +439,7 @@ unsafe fn checked_unbacked_value_predicate(
     value: GerbilValueHandle,
     out: *mut GerbilBoolean,
 ) -> GerbilStatus {
-    if value.is_null() || out.is_null() {
+    if value == 0 || out.is_null() {
         return GerbilStatus::NullPointer;
     }
     // SAFETY: caller provided a non-null output pointer for one GerbilBoolean.
@@ -456,12 +458,12 @@ unsafe fn checked_unbacked_value_handle_projection(
     value: GerbilValueHandle,
     out: *mut GerbilValueHandle,
 ) -> GerbilStatus {
-    if value.is_null() || out.is_null() {
+    if value == 0 || out.is_null() {
         return GerbilStatus::NullPointer;
     }
     // SAFETY: caller provided a non-null output pointer for one handle.
     unsafe {
-        *out = core::ptr::null_mut();
+        *out = 0;
     }
     GerbilStatus::InvalidValue
 }

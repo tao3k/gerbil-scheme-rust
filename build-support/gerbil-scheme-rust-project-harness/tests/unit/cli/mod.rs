@@ -86,6 +86,8 @@ mod schema;
 #[cfg(feature = "search")]
 mod search;
 #[cfg(feature = "search")]
+mod search_api_callables;
+#[cfg(feature = "search")]
 mod search_json_type_surfaces;
 #[cfg(feature = "search")]
 mod search_lab;

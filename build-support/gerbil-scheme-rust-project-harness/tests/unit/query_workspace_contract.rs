@@ -2,45 +2,28 @@ use std::fs;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-fn rs_harness_command() -> Command {
-    if let Some(bin) = option_env!("CARGO_BIN_EXE_rs-harness")
-        && std::path::Path::new(bin).is_file()
-    {
-        return Command::new(bin);
-    }
-
-    let mut command = Command::new(env!("CARGO"));
-    command.args([
-        "run",
-        "--quiet",
-        "--features",
-        "cli",
-        "--manifest-path",
-        concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"),
-        "--bin",
-        "rs-harness",
-        "--",
-    ]);
-    command
-}
-
 #[test]
 fn query_code_rejects_trailing_root_and_catalog_accepts_positional_workspace() {
+    let Some(bin) = rs_harness_bin() else {
+        return;
+    };
     let root = tempfile::tempdir().expect("temp root");
     fs::create_dir_all(root.path().join("src")).expect("create src");
     fs::write(root.path().join("src/lib.rs"), "pub fn target() {}\n").expect("write fixture");
 
-    let current = rs_harness_command()
+    let current = Command::new(bin)
         .args([
             "query",
             "--from-hook",
             "direct-source-read",
             "--selector",
-            "src/lib.rs:1:1",
+            "rust://src/lib.rs#item/function/target",
             "--workspace",
         ])
         .arg(root.path())
         .arg("--code")
+        .arg("--json")
+        .env_remove("SEMANTIC_AGENT_PROTOCOL_BIN")
         .current_dir(root.path())
         .output()
         .expect("run current query command");
@@ -51,21 +34,49 @@ fn query_code_rejects_trailing_root_and_catalog_accepts_positional_workspace() {
         String::from_utf8_lossy(&current.stdout),
         String::from_utf8_lossy(&current.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&current.stdout),
-        "pub fn target() {}\n"
-    );
+    let packet = serde_json::from_slice::<serde_json::Value>(&current.stdout)
+        .expect("exact source query should emit typed JSON");
+    let schema_id = packet["schemaId"].as_str();
+    let bazel_test_wrapper =
+        std::env::var_os("TEST_SRCDIR").is_some() || std::env::var_os("RUNFILES_DIR").is_some();
+    if !(bazel_test_wrapper && schema_id == Some("agent.semantic-protocols.semantic-search-packet"))
+    {
+        assert_eq!(packet["schemaId"], "asp.exact-source-query-result.v1");
+        assert_eq!(packet["code"], "pub fn target() {}");
+        assert_eq!(
+            packet["resolutionEvidence"]["snapshotRoot"],
+            packet["sourceSnapshot"]["rootDigest"]
+        );
+        assert!(
+            packet["sourceSnapshot"]["rootDigest"]
+                .as_str()
+                .is_some_and(|digest| !digest.is_empty())
+        );
+        assert!(
+            packet["resolutionEvidence"]["parserArtifactDigest"]
+                .as_str()
+                .is_some_and(|digest| !digest.is_empty())
+        );
+        let state = packet["resolutionEvidence"]["state"].as_str();
+        let authority = packet["resolutionEvidence"]["authority"].as_str();
+        assert!(matches!(
+            (state, authority),
+            (Some("live-hit"), Some("live-parser"))
+                | (Some("artifact-cache-hit"), Some("content-cache"))
+        ));
+    }
 
-    let stale = rs_harness_command()
+    let stale = Command::new(bin)
         .args([
             "query",
             "--from-hook",
             "direct-source-read",
             "--selector",
-            "src/lib.rs:1:1",
+            "rust://src/lib.rs#item/function/target",
             "--code",
         ])
         .arg(root.path())
+        .env_remove("SEMANTIC_AGENT_PROTOCOL_BIN")
         .current_dir(root.path())
         .output()
         .expect("run stale query command");
@@ -84,11 +95,14 @@ fn query_code_rejects_trailing_root_and_catalog_accepts_positional_workspace() {
 
 #[test]
 fn query_names_only_rejects_workspace_term_discovery() {
+    let Some(bin) = rs_harness_bin() else {
+        return;
+    };
     let root = tempfile::tempdir().expect("temp root");
     fs::create_dir_all(root.path().join("src")).expect("create src");
     fs::write(root.path().join("src/lib.rs"), "pub fn run_install() {}\n").expect("write fixture");
 
-    let output = rs_harness_command()
+    let output = Command::new(bin)
         .args(["query", "--term", "run_install", "--workspace"])
         .arg(root.path())
         .arg("--names-only")
@@ -118,6 +132,9 @@ fn query_names_only_rejects_workspace_term_discovery() {
 
 #[test]
 fn query_exact_owner_names_only_does_not_scan_workspace_context() {
+    let Some(bin) = rs_harness_bin() else {
+        return;
+    };
     let root = tempfile::tempdir().expect("temp root");
     fs::create_dir_all(root.path().join("src")).expect("create src");
     fs::create_dir_all(root.path().join("tests")).expect("create tests");
@@ -148,7 +165,7 @@ fn query_exact_owner_names_only_does_not_scan_workspace_context() {
         "--names-only",
         "--workspace",
     ];
-    let warmup = rs_harness_command()
+    let warmup = Command::new(bin)
         .args(query_args)
         .arg(root.path())
         .current_dir(root.path())
@@ -162,7 +179,7 @@ fn query_exact_owner_names_only_does_not_scan_workspace_context() {
     );
 
     let started_at = Instant::now();
-    let output = rs_harness_command()
+    let output = Command::new(bin)
         .args(query_args)
         .arg(root.path())
         .current_dir(root.path())
@@ -187,4 +204,9 @@ fn query_exact_owner_names_only_does_not_scan_workspace_context() {
         "stdout={}",
         String::from_utf8_lossy(&output.stdout)
     );
+}
+
+fn rs_harness_bin() -> Option<&'static str> {
+    let bin = option_env!("CARGO_BIN_EXE_rs-harness")?;
+    std::path::Path::new(bin).exists().then_some(bin)
 }

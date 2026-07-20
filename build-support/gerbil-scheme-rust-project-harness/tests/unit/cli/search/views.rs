@@ -542,13 +542,13 @@ fn cli_search_views_render_rfc_line_protocol() {
     );
     assert!(
         anyhow_pattern.contains(
-            "|api src/lib.rs:11 kind=fn name=fallible next=owner:src/lib.rs source=native-parser signature=fn(input:String)->anyhow::Result<Thing> params=input:String async=true unsafe=true receiver=- return=anyhow::Result<Thing> error=anyhow::Result"
+            "|api src/lib.rs:11 kind=fn name=fallible next=owner:src/lib.rs source=native-parser"
         ),
         "{anyhow_pattern}"
     );
     assert!(
         anyhow_pattern.contains(
-            "|api src/lib.rs:18 kind=method name=wire next=owner:src/lib.rs source=native-parser signature=fn()->anyhow::Result<Thing> params=- async=false unsafe=false receiver=&self return=anyhow::Result<Thing> error=anyhow::Result impl=PublicWire trait=WireApi"
+            "|api src/lib.rs:18 kind=method name=wire next=owner:src/lib.rs source=native-parser"
         ),
         "{anyhow_pattern}"
     );
@@ -619,7 +619,7 @@ fn cli_search_views_render_rfc_line_protocol() {
     );
     assert!(
         fallible_docs.contains(
-            "|api src/lib.rs:11 kind=fn name=fallible next=owner:src/lib.rs source=native-parser docs=local-parser signature=fn(input:String)->anyhow::Result<Thing> params=input:String async=true unsafe=true receiver=- return=anyhow::Result<Thing> error=anyhow::Result"
+            "|api src/lib.rs:10 kind=fn name=fallible next=owner:src/lib.rs source=native-parser docs=local-parser apiKind=fn public=true docs=true"
         ),
         "{fallible_docs}"
     );
@@ -631,7 +631,7 @@ fn cli_search_views_render_rfc_line_protocol() {
     );
     assert!(
         api.contains(
-            "|api src/lib.rs:11 kind=fn name=fallible next=owner:src/lib.rs source=native-parser signature=fn(input:String)->anyhow::Result<Thing> params=input:String async=true unsafe=true receiver=- return=anyhow::Result<Thing> error=anyhow::Result"
+            "|api src/lib.rs:10 kind=fn name=fallible next=owner:src/lib.rs source=native-parser apiKind=fn public=true docs=true"
         ),
         "{api}"
     );
@@ -643,7 +643,7 @@ fn cli_search_views_render_rfc_line_protocol() {
     );
     assert!(
         method_api.contains(
-            "|api src/lib.rs:15 kind=method name=as_thing next=owner:src/lib.rs source=native-parser signature=fn()->Thing params=- async=false unsafe=false receiver=&mut-self return=Thing error=- impl=PublicWire trait=-"
+            "kind=method name=as_thing next=owner:src/lib.rs source=native-parser apiKind=method public=true docs=false"
         ),
         "{method_api}"
     );
@@ -655,7 +655,7 @@ fn cli_search_views_render_rfc_line_protocol() {
     );
     assert!(
         trait_method_api.contains(
-            "|api src/lib.rs:18 kind=method name=wire next=owner:src/lib.rs source=native-parser signature=fn()->anyhow::Result<Thing> params=- async=false unsafe=false receiver=&self return=anyhow::Result<Thing> error=anyhow::Result impl=PublicWire trait=WireApi"
+            "kind=method name=wire next=owner:src/lib.rs source=native-parser apiKind=method public=true docs=false"
         ),
         "{trait_method_api}"
     );

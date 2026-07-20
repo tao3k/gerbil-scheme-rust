@@ -109,8 +109,6 @@ impl RustScenarioBenchmarkPolicyId {
 pub struct RustScenarioBenchmarkSuiteReceipt {
     /// Crate root used for scenario discovery.
     pub root: PathBuf,
-    /// Stable aggregate summary for agent-facing scenario/performance reports.
-    pub summary: RustScenarioBenchmarkSuiteSummary,
     /// Required scenario roots discovered from fixture conventions.
     pub requirements: Vec<RustScenarioBenchmarkRequirement>,
     /// Successfully loaded per-scenario benchmark receipts.
@@ -121,37 +119,6 @@ pub struct RustScenarioBenchmarkSuiteReceipt {
     pub violations: Vec<RustScenarioBenchmarkViolation>,
     /// Overall suite validation status.
     pub status: RustScenarioBenchmarkStatus,
-}
-
-/// Stable aggregate scenario benchmark summary.
-///
-/// Ratio fields use basis points, where `10_000` means 100%.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct RustScenarioBenchmarkSuiteSummary {
-    /// Number of required scenario benchmark contracts.
-    pub requirement_count: usize,
-    /// Number of loaded scenario benchmark receipts.
-    pub receipt_count: usize,
-    /// Number of passing scenario benchmark receipts.
-    pub pass_count: usize,
-    /// Number of failing scenario benchmark receipts.
-    pub fail_count: usize,
-    /// Number of invalid scenario benchmark receipts.
-    pub invalid_count: usize,
-    /// Total suite and receipt violation count.
-    pub violation_count: usize,
-    /// Number of contract-shape violations.
-    pub contract_violation_count: usize,
-    /// Number of duration/performance violations.
-    pub performance_violation_count: usize,
-    /// Number of memory budget violations.
-    pub memory_violation_count: usize,
-    /// Worst observed duration divided by target duration, in basis points.
-    pub worst_observed_total_target_basis_points: Option<u64>,
-    /// Worst observed duration divided by hard maximum duration, in basis points.
-    pub worst_observed_total_max_basis_points: Option<u64>,
-    /// Worst observed memory divided by memory budget, in basis points.
-    pub worst_observed_memory_budget_basis_points: Option<u64>,
 }
 
 /// Agent-visible scenario metadata loaded from `scenario.toml`.

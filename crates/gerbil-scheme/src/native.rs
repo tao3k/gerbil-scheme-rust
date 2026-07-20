@@ -95,8 +95,12 @@ pub struct GerbilValue<'runtime> {
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
 
-impl<'runtime> GerbilValue<'runtime> {
+impl GerbilValue<'_> {
     /// Wrap a raw runtime-borrowed value handle, rejecting null handles.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::Status`] with `NullPointer` when `raw` is null.
     pub fn from_raw(raw: gerbil_scheme_sys::GerbilValueHandle) -> Result<Self, NativeError> {
         let raw = std::ptr::NonNull::new(raw).ok_or(NativeError::Status {
             operation: "GerbilValue::from_raw",
@@ -152,7 +156,7 @@ pub struct GerbilI64CallbackAbi<'callback> {
     _callback: PhantomData<&'callback GerbilI64Callback>,
 }
 
-impl<'callback> GerbilI64CallbackAbi<'callback> {
+impl GerbilI64CallbackAbi<'_> {
     /// Return the raw C callback function pointer.
     #[must_use]
     pub fn callback(self) -> gerbil_scheme_sys::GerbilI64Callback {
@@ -405,6 +409,7 @@ impl<T> NativeResult<T> {
     }
 
     /// Constructs a failed native result.
+    #[must_use]
     pub const fn err(error: NativeError) -> Self {
         Self { inner: Err(error) }
     }
@@ -434,6 +439,10 @@ impl<T> NativeResult<T> {
     }
 
     /// Borrows the wrapped Rust result.
+    ///
+    /// # Errors
+    ///
+    /// Returns a borrowed [`NativeError`] when the wrapped native call failed.
     pub const fn as_result(&self) -> Result<&T, &NativeError> {
         match &self.inner {
             Ok(value) => Ok(value),
@@ -442,6 +451,10 @@ impl<T> NativeResult<T> {
     }
 
     /// Consumes the wrapper and returns the standard Rust result.
+    ///
+    /// # Errors
+    ///
+    /// Returns the owned [`NativeError`] when the wrapped native call failed.
     pub fn into_result(self) -> Result<T, NativeError> {
         self.inner
     }

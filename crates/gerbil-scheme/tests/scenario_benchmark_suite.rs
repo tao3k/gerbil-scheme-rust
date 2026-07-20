@@ -18,12 +18,30 @@ fn all_required_runtime_scenarios_have_valid_benchmark_contracts() {
     );
     assert_eq!(receipt.requirements.len(), 9);
     assert_eq!(receipt.receipts.len(), 9);
-    assert_eq!(receipt.summary.requirement_count, 9);
-    assert_eq!(receipt.summary.receipt_count, 9);
-    assert_eq!(receipt.summary.pass_count, 9);
-    assert_eq!(receipt.summary.fail_count, 0);
-    assert_eq!(receipt.summary.invalid_count, 0);
-    assert_eq!(receipt.summary.violation_count, 0);
+    assert_eq!(
+        receipt
+            .receipts
+            .iter()
+            .filter(|scenario| scenario.status == RustScenarioBenchmarkStatus::Pass)
+            .count(),
+        9
+    );
+    assert_eq!(
+        receipt
+            .receipts
+            .iter()
+            .filter(|scenario| scenario.status == RustScenarioBenchmarkStatus::Fail)
+            .count(),
+        0
+    );
+    assert_eq!(
+        receipt
+            .receipts
+            .iter()
+            .filter(|scenario| scenario.status == RustScenarioBenchmarkStatus::Invalid)
+            .count(),
+        0
+    );
     let expected_requirement_roots = [
         "tests/unit/scenarios/backed-value-family-surface",
         "tests/unit/scenarios/invalid-comparison-fail-closed",
@@ -66,21 +84,22 @@ fn all_required_runtime_scenarios_have_valid_benchmark_contracts() {
     );
     assert!(
         receipt
-            .summary
-            .worst_observed_total_target_basis_points
-            .is_some()
+            .receipts
+            .iter()
+            .all(|scenario| !scenario.benchmark.observed_timings.is_empty()),
+        "each Gerbil runtime scenario should expose observed timing contracts: {:#?}",
+        receipt.receipts
     );
     assert!(
-        receipt
-            .summary
-            .worst_observed_total_max_basis_points
-            .is_some()
-    );
-    assert!(
-        receipt
-            .summary
-            .worst_observed_memory_budget_basis_points
-            .is_some()
+        receipt.receipts.iter().any(|scenario| {
+            scenario
+                .benchmark
+                .observed_timings
+                .keys()
+                .any(|key| key.starts_with("p95_") || key.contains("_p95"))
+        }),
+        "scenario benchmark suite should include percentile timing coverage: {:#?}",
+        receipt.receipts
     );
     assert!(receipt.violations.is_empty());
 }

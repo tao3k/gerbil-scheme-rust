@@ -26,10 +26,6 @@ pub fn rust_project_harness_policy_for_project(
             "Gerbil Scheme bindings require stable ABI behavior and bounded native build latency",
         ),
     );
-    if config.verification_policy.stability_picture.is_none() {
-        config.verification_policy.stability_picture =
-            Some(rust_lang_project_harness::RustVerificationStabilityPictureConfig::default());
-    }
     RustProjectHarnessDownstreamPolicy::new("gerbil-scheme-rust", config)
 }
 

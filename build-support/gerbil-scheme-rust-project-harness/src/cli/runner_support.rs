@@ -231,6 +231,10 @@ pub(super) fn rust_project_root_for_path(path: &Path) -> Result<PathBuf, String>
     crate::parser::cargo_project_root_for_path(path)
 }
 
+pub(super) fn rust_package_root_for_path(path: &Path) -> Result<PathBuf, String> {
+    crate::parser::cargo_package_root_for_path(path)
+}
+
 pub(super) fn parse_usize_option(option: &str, value: &str) -> Result<usize, String> {
     value
         .parse()

@@ -388,7 +388,6 @@ fn native_surface_shape_section<'a>(source: &'a str, selector: &str) -> &'a str 
     let next_shape = tail
         .get(start_marker.len()..)
         .and_then(|after_selector| after_selector.find("\n(def gerbil_scheme_rust_"))
-        .map(|offset| start_marker.len() + offset)
-        .unwrap_or(tail.len());
+        .map_or(tail.len(), |offset| start_marker.len() + offset);
     &tail[..next_shape]
 }

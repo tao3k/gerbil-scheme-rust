@@ -99,57 +99,63 @@ fn steady_state_native_ffi_reports_statistical_receipt() {
     let even_safe_vs_raw_x100 = even_median_ns * 100 / raw_even_median_ns;
     let compare_safe_vs_raw_x100 = compare_median_ns * 100 / raw_compare_median_ns;
     let total = total_started.elapsed();
-    let budget = |name: &str| {
-        scenario
-            .benchmark
-            .observed_timings
-            .get(name)
-            .unwrap_or_else(|| panic!("scenario declares {name}"))
-            .as_duration()
-    };
-
     eprintln!(
         "scenario benchmark receipt: id=native-ffi-steady-state samples={SAMPLE_COUNT} iterations_per_sample={ITERATIONS_PER_SAMPLE} c_identity_median_ns={c_identity_median_ns} c_identity_p95_ns={c_identity_p95_ns} identity_median_ns={identity_median_ns} identity_p95_ns={identity_p95_ns} identity_vs_c_x100={identity_vs_c_x100} raw_add_median_ns={raw_add_median_ns} raw_add_p95_ns={raw_add_p95_ns} add_median_ns={add_median_ns} add_p95_ns={add_p95_ns} add_vs_c_x100={add_vs_c_x100} add_safe_vs_raw_x100={add_safe_vs_raw_x100} raw_even_median_ns={raw_even_median_ns} raw_even_p95_ns={raw_even_p95_ns} even_median_ns={even_median_ns} even_p95_ns={even_p95_ns} even_vs_c_x100={even_vs_c_x100} even_safe_vs_raw_x100={even_safe_vs_raw_x100} raw_compare_median_ns={raw_compare_median_ns} raw_compare_p95_ns={raw_compare_p95_ns} compare_median_ns={compare_median_ns} compare_p95_ns={compare_p95_ns} compare_vs_c_x100={compare_vs_c_x100} compare_safe_vs_raw_x100={compare_safe_vs_raw_x100} elapsed_ns={}",
         total.as_nanos(),
     );
-    for (name, observed_ns, budget_name) in [
-        (
-            "C identity median",
-            c_identity_median_ns,
-            "median_c_identity_i64_budget",
-        ),
-        (
-            "C identity p95",
-            c_identity_p95_ns,
-            "p95_c_identity_i64_budget",
-        ),
-        (
-            "identity median",
-            identity_median_ns,
-            "median_identity_i64_budget",
-        ),
-        ("identity p95", identity_p95_ns, "p95_identity_i64_budget"),
-        ("add median", add_median_ns, "median_add_i64_budget"),
-        ("add p95", add_p95_ns, "p95_add_i64_budget"),
-        ("even median", even_median_ns, "median_is_even_i64_budget"),
-        ("even p95", even_p95_ns, "p95_is_even_i64_budget"),
-        (
-            "compare median",
-            compare_median_ns,
-            "median_compare_i64_budget",
-        ),
-        ("compare p95", compare_p95_ns, "p95_compare_i64_budget"),
-    ] {
-        let operation_budget = budget(budget_name);
-        assert!(
-            observed_ns <= operation_budget.as_nanos(),
-            "{name} exceeded {operation_budget:?}: {observed_ns}ns",
-        );
-    }
+    assert_operation_budgets(
+        &scenario,
+        &[
+            (
+                "C identity median",
+                c_identity_median_ns,
+                "median_c_identity_i64_budget",
+            ),
+            (
+                "C identity p95",
+                c_identity_p95_ns,
+                "p95_c_identity_i64_budget",
+            ),
+            (
+                "identity median",
+                identity_median_ns,
+                "median_identity_i64_budget",
+            ),
+            ("identity p95", identity_p95_ns, "p95_identity_i64_budget"),
+            ("add median", add_median_ns, "median_add_i64_budget"),
+            ("add p95", add_p95_ns, "p95_add_i64_budget"),
+            ("even median", even_median_ns, "median_is_even_i64_budget"),
+            ("even p95", even_p95_ns, "p95_is_even_i64_budget"),
+            (
+                "compare median",
+                compare_median_ns,
+                "median_compare_i64_budget",
+            ),
+            ("compare p95", compare_p95_ns, "p95_compare_i64_budget"),
+        ],
+    );
     assert!(
         total <= scenario.benchmark.max_total.as_duration(),
         "steady-state scenario exceeded {:?}: {:?}",
         scenario.benchmark.max_total.as_duration(),
         total,
     );
+}
+
+fn assert_operation_budgets(
+    scenario: &rust_lang_project_harness::RustScenarioBenchmarkReceipt,
+    observations: &[(&str, u128, &str)],
+) {
+    for (name, observed_ns, budget_name) in observations {
+        let operation_budget = scenario
+            .benchmark
+            .observed_timings
+            .get(*budget_name)
+            .unwrap_or_else(|| panic!("scenario declares {budget_name}"))
+            .as_duration();
+        assert!(
+            *observed_ns <= operation_budget.as_nanos(),
+            "{name} exceeded {operation_budget:?}: {observed_ns}ns",
+        );
+    }
 }

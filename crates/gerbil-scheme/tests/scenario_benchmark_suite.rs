@@ -24,6 +24,45 @@ fn all_required_runtime_scenarios_have_valid_benchmark_contracts() {
     assert_eq!(receipt.summary.fail_count, 0);
     assert_eq!(receipt.summary.invalid_count, 0);
     assert_eq!(receipt.summary.violation_count, 0);
+    let expected_requirement_roots = [
+        "tests/unit/scenarios/backed-value-family-surface",
+        "tests/unit/scenarios/invalid-comparison-fail-closed",
+        "tests/unit/scenarios/native-ffi-steady-state",
+        "tests/unit/scenarios/native-identity-round-trip",
+        "tests/unit/scenarios/native-runtime-round-trip",
+        "tests/unit/scenarios/native-value-surface",
+        "tests/unit/scenarios/source-surface-sync",
+        "tests/unit/scenarios/status-contract",
+    ];
+    let requirement_roots = receipt
+        .requirements
+        .iter()
+        .map(|requirement| {
+            requirement
+                .root
+                .strip_prefix(&receipt.root)
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "scenario requirement root must be under crate root: {}; err={err}",
+                        requirement.root.display()
+                    )
+                })
+                .to_string_lossy()
+                .replace('\\', "/")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        requirement_roots, expected_requirement_roots,
+        "required runtime scenarios drifted; update the explicit scenario contract deliberately",
+    );
+    assert!(
+        receipt
+            .requirements
+            .iter()
+            .all(|requirement| format!("{:?}", requirement.manifest_kind) == "ScenarioToml"),
+        "all gerbil-scheme runtime scenario requirements should currently be scenario.toml-backed: {:#?}",
+        receipt.requirements
+    );
     assert!(
         receipt
             .summary

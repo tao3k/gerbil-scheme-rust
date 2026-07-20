@@ -146,24 +146,51 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
     let source = std::fs::read_to_string(&native_surface)
         .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()));
 
-    let backed_shape_selectors = [
-        "gerbil_scheme_rust_i64_shape",
-        "gerbil_scheme_rust_bool_shape",
-        "gerbil_scheme_rust_comparison_shape",
-        "gerbil_scheme_rust_utf8_shape",
-        "gerbil_scheme_rust_value_handle_shape",
-        "gerbil_scheme_rust_i64_callback_shape",
+    assert_native_surface_shape_contract(
+        &source,
         "gerbil_scheme_rust_native_value_shape",
+        &[
+            "(name . native-value)",
+            "(transport . c-abi)",
+            "(scalar-values (i64 bool comparison status))",
+            "(borrowed-values (utf8))",
+            "(handle-values (runtime-handle gerbil-value-handle))",
+            "(callback-values (i64-callback))",
+            "(nullability . explicit-per-shape)",
+            "(rooting . explicit-per-shape)",
+        ],
+    );
+    assert_native_surface_shape_contract(
+        &source,
         "gerbil_scheme_rust_native_error_shape",
+        &[
+            "(name . native-error)",
+            "(transport . rust-safe-boundary)",
+            "(already-initialized . gerbil-status)",
+            "(runtime-finalized . gerbil-status)",
+            "(invalid-lifecycle-state . rust-internal)",
+            "(status . gerbil-status-code-preserving)",
+            "(abi-mismatch . gerbil-status)",
+            "(wrong-thread . gerbil-status)",
+            "(integer-overflow . gerbil-status)",
+            "(invalid-comparison-result . gerbil-status)",
+            "(unknown-status-policy . preserve-code)",
+            "(projection . optional-gerbil-status)",
+            "(display-policy . operation-context-preserving)",
+        ],
+    );
+    assert_native_surface_shape_contract(
+        &source,
         "gerbil_scheme_rust_native_result_shape",
-    ];
-
-    for required in backed_shape_selectors {
-        assert!(
-            source.contains(required),
-            "missing backed Scheme native-surface shape selector: {required}"
-        );
-    }
+        &[
+            "(name . native-result)",
+            "(ok . native-value)",
+            "(error . native-error)",
+            "(status-projection . optional-gerbil-status)",
+            "(unknown-status-policy . preserve-code)",
+            "(failure-policy . fail-closed)",
+        ],
+    );
 
     for unsupported in [
         "gerbil_scheme_rust_nil_shape",
@@ -180,4 +207,32 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
             "unsupported Scheme native-surface selector must remain blocked until sys/safe ABI exists: {unsupported}"
         );
     }
+}
+
+fn assert_native_surface_shape_contract(source: &str, selector: &str, required_fields: &[&str]) {
+    let shape = native_surface_shape_section(source, selector);
+    assert!(
+        shape.contains("'(native-shape"),
+        "Scheme native-surface selector must project a native-shape receipt: {selector}"
+    );
+    for required in required_fields {
+        assert!(
+            shape.contains(required),
+            "missing Scheme native-surface field `{required}` in selector {selector}:\n{shape}"
+        );
+    }
+}
+
+fn native_surface_shape_section<'a>(source: &'a str, selector: &str) -> &'a str {
+    let start_marker = format!("(def {selector}");
+    let start = source.find(&start_marker).unwrap_or_else(|| {
+        panic!("missing backed Scheme native-surface shape selector: {selector}")
+    });
+    let tail = &source[start..];
+    let next_shape = tail
+        .get(start_marker.len()..)
+        .and_then(|after_selector| after_selector.find("\n(def gerbil_scheme_rust_"))
+        .map(|offset| start_marker.len() + offset)
+        .unwrap_or(tail.len());
+    &tail[..next_shape]
 }

@@ -1,0 +1,123 @@
+#+TITLE: Rooted Bytestring Conversion Bindings Slice
+#+DATE: 2026-07-21
+#+OPTIONS: toc:nil
+
+* Outcome
+
+This slice binds Gerbil's official =:std/misc/bytes= hexadecimal conversion
+surface without returning an unrooted, newly allocated =scheme-object= to
+Rust.
+
+The accepted Rust APIs are:
+
+- =SchemeBytevector::to_bytestring=
+- =GerbilRuntime::bytevector_from_bytestring=
+- =RootedSchemeString=
+- =RootedSchemeBytevector=
+- =BytestringDelimiter::{SPACE, Compact, Character}=
+
+The =bytevector= spellings are official aliases of the =u8vector= functions,
+so one binding implementation supports all four names:
+
+- =u8vector->bytestring= / =bytevector->bytestring=
+- =bytestring->u8vector= / =bytestring->bytevector=
+
+* Official Gerbil semantics
+
+The implementation owner is =:std/misc/bytes= in the tracked Gerbil checkout.
+It establishes these rules:
+
+- hexadecimal digits are uppercase;
+- the default delimiter is one space;
+- =#f= selects compact output;
+- a delimiter may be any Unicode scalar character;
+- delimited input must contain exactly two hexadecimal digits per byte and the
+  selected delimiter between adjacent bytes;
+- malformed input raises a Gerbil error.
+
+The native bridge detects conversion failures and maps them to root token zero.
+The checked Rust ABI maps zero to =GerbilStatus::InvalidValue=.
+
+The embedded archive intentionally links only the binding module and Gambit,
+not the complete Gerbil std module graph. Therefore =scheme/native.ss= carries
+a small AOT bridge implementation that pins the official
+=:std/misc/bytes= wire semantics. It does not move conversion into Rust, and it
+does not depend on unresolved std/prelude procedures such as =__with-catch=.
+Validation is branch-based and returns token zero instead of raising across the
+C ABI. The lowered =scheme/generated/native.scm= remains tracked and drift
+checked.
+
+* Root ownership contract
+
+Conversion allocates a Scheme string or u8vector. Returning its raw Gambit word
+would not keep it reachable after the FFI call, so this slice adds a module-owned
+root table.
+
+1. Scheme converts and stores the new object in the root table.
+2. The C ABI returns a positive signed 64-bit =GerbilRootId=.
+3. Rust accessors address the value only through that root id.
+4. =RootedSchemeString= or =RootedSchemeBytevector= owns exactly one root.
+5. =Drop= calls =gerbil_scheme_rust_root_release= on the runtime owner thread.
+6. Zero, stale, wrong-type, and already released roots fail closed.
+
+The rooted wrappers are neither =Clone= nor =Copy=. Their lifetime is tied to
+=GerbilRuntime=, so safe Rust cannot finalize the runtime while roots remain.
+
+* C ABI
+
+The public v1 header now declares:
+
+- =GerbilRootId=
+- =gerbil_scheme_rust_bytevector_to_bytestring_root=
+- =gerbil_scheme_rust_bytestring_to_bytevector_root=
+- rooted string length and character projection;
+- rooted bytevector length and byte projection;
+- =gerbil_scheme_rust_root_release=.
+
+The same header update closes existing declaration drift for the void and
+read-only bytevector functions added by the preceding slices. The ABI major
+version remains =1=: the project has not released v1, and these declarations
+complete that version rather than creating a second ABI.
+
+* Scenario and performance contract
+
+=bytevector-bytestring-round-trip= executes two warm paths:
+
+- five-byte Scheme bytevector to spaced uppercase bytestring, including root,
+  Rust copy, and release;
+- spaced bytestring to Scheme bytevector, including root, Rust copy, and
+  release.
+
+Each path records median and p95 in nanoseconds. Both median budgets are below
+=500us= and both p95 budgets are below =900us=. The total scenario, including
+runtime initialization, must remain below the harness hard maximum of =500ms=.
+
+These are hard sub-millisecond operation gates, not millisecond-only display
+values. The receipt keeps exact =*_ns= observations so later bulk-copy or root
+table optimizations are directly comparable.
+
+The first local AOT receipt is:
+
+| operation | median | p95 |
+|-----------+--------+-----|
+| bytevector to bytestring | 4717ns | 13595ns |
+| bytestring to bytevector | 2467ns | 5215ns |
+
+The complete measured scenario took =34212125ns=.
+
+* Remaining byte utility checklist
+
+- [X] read-only bytevector classification, length, byte projection, and copy;
+- [X] uppercase bytestring encoding with default and compact delimiter modes;
+- [X] bytestring decoding to a rooted Scheme bytevector;
+- [X] GC reachability and deterministic release for conversion results;
+- [X] median and p95 nanosecond Scenario receipts;
+- [ ] =u8vector->uint= and =uint->u8vector= with explicit endian and width
+  policy;
+- [ ] =u8vector->sint= and =sint->u8vector= with two's-complement and overflow
+  policy;
+- [ ] =u8vector-init!= and =u8vector-every=;
+- [ ] =u8vector-reverse= and =u8vector-reverse!= with identity/mutation
+  scenarios;
+- [ ] replace linear root lookup only if Scenario evidence shows it is on the
+  performance frontier.

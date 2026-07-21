@@ -1,0 +1,11 @@
+id = "bytevector-bytestring-round-trip"
+title = "Rooted bytevector and bytestring round trip"
+policy_ids = ["RUST-AGENT-GERBIL-PERF-004", "RUST-AGENT-GERBIL-GC-001"]
+agent_goal = "Prove Gerbil AOT hexadecimal conversion, explicit Scheme rooting, Rust RAII release, and sub-millisecond steady-state latency."
+reference_repositories = ["tao3k/gerbil", "tao3k/gerbil-scheme-rust"]
+reference_patterns = ["std/misc/bytes", "root token", "RAII release", "p95 nanosecond receipt"]
+inputs = "none"
+expected = "pass"
+benchmark = "benchmark.toml"
+harness = "libtest"
+test = "rooted_bytestring_round_trip_stays_sub_millisecond"

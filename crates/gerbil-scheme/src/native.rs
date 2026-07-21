@@ -212,7 +212,56 @@ pub struct SchemeBytevector<'runtime> {
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
 
-impl SchemeBytevector<'_> {
+/// Delimiter policy for Gerbil hexadecimal bytestring conversions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BytestringDelimiter {
+    /// Emit two uppercase hexadecimal digits per byte with no separator.
+    Compact,
+    /// Place one Unicode scalar between adjacent encoded bytes.
+    Character(char),
+}
+
+impl BytestringDelimiter {
+    /// Gerbil's default bytestring representation: uppercase bytes separated by spaces.
+    pub const SPACE: Self = Self::Character(' ');
+
+    const fn abi_code(self) -> i32 {
+        match self {
+            Self::Compact => -1,
+            Self::Character(character) => character as i32,
+        }
+    }
+}
+
+impl Default for BytestringDelimiter {
+    fn default() -> Self {
+        Self::SPACE
+    }
+}
+
+/// Owned root for a Scheme string created by a native conversion.
+///
+/// The root is released automatically on the Gerbil runtime owner thread. It
+/// is deliberately neither [`Clone`] nor [`Copy`] because release has exactly
+/// one owner.
+#[derive(Debug)]
+pub struct RootedSchemeString<'runtime> {
+    root: gerbil_scheme_sys::GerbilRootId,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+/// Owned root for a Scheme bytevector created by a native conversion.
+///
+/// The root is released automatically on the Gerbil runtime owner thread. It
+/// is deliberately neither [`Clone`] nor [`Copy`] because release has exactly
+/// one owner.
+#[derive(Debug)]
+pub struct RootedSchemeBytevector<'runtime> {
+    root: gerbil_scheme_sys::GerbilRootId,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl<'runtime> SchemeBytevector<'runtime> {
     fn from_raw(raw: usize) -> Option<Self> {
         NonZeroUsize::new(raw).map(|raw| Self {
             raw,
@@ -290,6 +339,188 @@ impl SchemeBytevector<'_> {
             }
         }
         NativeResult::ok(bytes)
+    }
+
+    /// Convert this bytevector through Gerbil's AOT bytestring implementation.
+    ///
+    /// The returned Scheme string is held by a native root and releases that
+    /// root on drop. Gerbil emits uppercase hexadecimal digits and applies the
+    /// requested delimiter between adjacent bytes.
+    #[must_use]
+    pub fn to_bytestring(
+        &self,
+        delimiter: BytestringDelimiter,
+    ) -> NativeResult<RootedSchemeString<'runtime>> {
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytevector_to_bytestring_root(
+                self.raw.get(),
+                delimiter.abi_code(),
+                &raw mut root,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(RootedSchemeString {
+                root,
+                _runtime: PhantomData,
+            })
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_bytevector_to_bytestring_root",
+                code: status as i32,
+            })
+        }
+    }
+}
+
+impl RootedSchemeString<'_> {
+    /// Return the number of Scheme characters in this rooted string.
+    #[must_use]
+    pub fn len(&self) -> NativeResult<usize> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_length(self.root, &raw mut out)
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_string_length",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Return whether this rooted string is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> NativeResult<bool> {
+        match self.len().into_result() {
+            Ok(length) => NativeResult::ok(length == 0),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Return the Scheme character at `index`.
+    #[must_use]
+    pub fn char_at(&self, index: usize) -> NativeResult<char> {
+        let mut out = gerbil_scheme_sys::GerbilChar::default();
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_char_ref(
+                self.root,
+                index,
+                &raw mut out,
+            )
+        };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_string_char_ref",
+                code: status as i32,
+            });
+        }
+        match char::try_from(out) {
+            Ok(character) => NativeResult::ok(character),
+            Err(()) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_string_char_ref",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+        }
+    }
+
+    /// Copy this rooted Scheme string into owned Rust UTF-8 storage.
+    #[must_use]
+    pub fn to_string(&self) -> NativeResult<String> {
+        let length = match self.len().into_result() {
+            Ok(length) => length,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut text = String::with_capacity(length);
+        for index in 0..length {
+            match self.char_at(index).into_result() {
+                Ok(character) => text.push(character),
+                Err(error) => return NativeResult::err(error),
+            }
+        }
+        NativeResult::ok(text)
+    }
+}
+
+impl Drop for RootedSchemeString<'_> {
+    fn drop(&mut self) {
+        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
+        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
+    }
+}
+
+impl RootedSchemeBytevector<'_> {
+    /// Return this rooted bytevector's byte length.
+    #[must_use]
+    pub fn len(&self) -> NativeResult<usize> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_length(self.root, &raw mut out)
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_bytevector_length",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Return whether this rooted bytevector is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> NativeResult<bool> {
+        match self.len().into_result() {
+            Ok(length) => NativeResult::ok(length == 0),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Return the byte at `index`.
+    #[must_use]
+    pub fn u8_at(&self, index: usize) -> NativeResult<u8> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_u8_ref(
+                self.root,
+                index,
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_bytevector_u8_ref",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Copy this rooted Scheme bytevector into owned Rust memory.
+    #[must_use]
+    pub fn to_vec(&self) -> NativeResult<Vec<u8>> {
+        let length = match self.len().into_result() {
+            Ok(length) => length,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut bytes = Vec::with_capacity(length);
+        for index in 0..length {
+            match self.u8_at(index).into_result() {
+                Ok(byte) => bytes.push(byte),
+                Err(error) => return NativeResult::err(error),
+            }
+        }
+        NativeResult::ok(bytes)
+    }
+}
+
+impl Drop for RootedSchemeBytevector<'_> {
+    fn drop(&mut self) {
+        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
+        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
     }
 }
 
@@ -1331,6 +1562,43 @@ impl GerbilRuntime {
             "GerbilRuntime::fixture_bytevector_value",
             gerbil_scheme_sys::gerbil_scheme_rust_fixture_bytevector,
         )
+    }
+
+    /// Parse an ASCII hexadecimal bytestring through Gerbil's AOT converter.
+    ///
+    /// The returned bytevector is rooted in the Gerbil module and releases its
+    /// root automatically on drop.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] outside the runtime owner thread,
+    /// or [`NativeError::Status`] when the bytestring or delimiter does not
+    /// satisfy Gerbil's conversion contract.
+    pub fn bytevector_from_bytestring(
+        &self,
+        bytestring: &str,
+        delimiter: BytestringDelimiter,
+    ) -> Result<RootedSchemeBytevector<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytestring_to_bytevector_root(
+                gerbil_scheme_sys::GerbilBorrowedUtf8::from(bytestring),
+                delimiter.abi_code(),
+                &raw mut root,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            Ok(RootedSchemeBytevector {
+                root,
+                _runtime: PhantomData,
+            })
+        } else {
+            Err(NativeError::Status {
+                operation: "gerbil_scheme_rust_bytestring_to_bytevector_root",
+                code: status as i32,
+            })
+        }
     }
 
     fn checked_scheme_object_fixture(

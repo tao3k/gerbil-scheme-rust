@@ -7,7 +7,9 @@ use super::abi::{
 
 unsafe extern "C" {
     fn gerbil_scheme_rust_fixture_bytevector_raw() -> GerbilValueHandle;
-    fn gerbil_scheme_rust_scheme_object_is_bytevector_raw(value: GerbilValueHandle) -> i32;
+    pub(crate) fn gerbil_scheme_rust_scheme_object_is_bytevector_raw(
+        value: GerbilValueHandle,
+    ) -> i32;
     fn gerbil_scheme_rust_scheme_object_bytevector_length_raw(value: GerbilValueHandle) -> i64;
     fn gerbil_scheme_rust_scheme_object_bytevector_u8_ref_raw(
         value: GerbilValueHandle,

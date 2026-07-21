@@ -35,6 +35,10 @@ typedef struct GerbilBorrowedBytevector {
 typedef struct GerbilRuntimeOpaque GerbilRuntimeOpaque;
 typedef uintptr_t GerbilValueHandle;
 typedef uint8_t GerbilBoolean;
+typedef intptr_t GerbilFixnum;
+typedef uint32_t GerbilChar;
+typedef double GerbilFlonum;
+typedef int64_t GerbilRootId;
 typedef GerbilStatus (*GerbilI64Callback)(int64_t value, void *context);
 typedef GerbilStatus (*GerbilProcedureCallback)(GerbilValueHandle value,
                                                 void *context);
@@ -58,6 +62,7 @@ int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
 int32_t gerbil_scheme_rust_compare_i64(int64_t left, int64_t right);
 GerbilStatus gerbil_scheme_rust_runtime_sentinel_value(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_null(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_void(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_pair(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_proper_list(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_improper_list(GerbilValueHandle *out);
@@ -72,6 +77,7 @@ GerbilStatus gerbil_scheme_rust_fixture_flonum_nan(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_flonum_pos_inf(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_flonum_neg_inf(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_flonum_neg_zero(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_bytevector(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_value_is_pair(GerbilValueHandle value,
                                               GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_value_is_list(GerbilValueHandle value,
@@ -84,6 +90,10 @@ GerbilStatus gerbil_scheme_rust_scheme_object_is_list(GerbilValueHandle value,
                                                       GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_is_null(GerbilValueHandle value,
                                                       GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_void(GerbilValueHandle value,
+                                                      GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_bytevector(
+    GerbilValueHandle value, GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_is_boolean(
     GerbilValueHandle value, GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_as_boolean(
@@ -100,6 +110,25 @@ GerbilStatus gerbil_scheme_rust_scheme_object_is_flonum(GerbilValueHandle value,
                                                         GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_as_flonum(GerbilValueHandle value,
                                                         GerbilFlonum *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_bytevector_length(
+    GerbilValueHandle value, size_t *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_bytevector_u8_ref(
+    GerbilValueHandle value, size_t index, uint8_t *out);
+GerbilStatus gerbil_scheme_rust_bytevector_to_bytestring_root(
+    GerbilValueHandle value, int32_t delimiter, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_bytestring_to_bytevector_root(
+    GerbilBorrowedUtf8 value, int32_t delimiter, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_root_string_length(GerbilRootId root,
+                                                   size_t *out);
+GerbilStatus gerbil_scheme_rust_root_string_char_ref(GerbilRootId root,
+                                                     size_t index,
+                                                     GerbilChar *out);
+GerbilStatus gerbil_scheme_rust_root_bytevector_length(GerbilRootId root,
+                                                       size_t *out);
+GerbilStatus gerbil_scheme_rust_root_bytevector_u8_ref(GerbilRootId root,
+                                                       size_t index,
+                                                       uint8_t *out);
+GerbilStatus gerbil_scheme_rust_root_release(GerbilRootId root);
 GerbilStatus gerbil_scheme_rust_pair_car(GerbilValueHandle value,
                                          GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_pair_cdr(GerbilValueHandle value,

@@ -31,5 +31,9 @@ fn all_required_safe_value_scenarios_have_valid_contracts() {
             "missing scenario receipt {scenario_id}: {receipts}",
         );
     }
+    assert!(
+        receipts.contains("bytevector-bytestring-round-trip"),
+        "missing rooted bytestring scenario receipt: {receipts}",
+    );
     assert!(receipt.violations.is_empty(), "{:#?}", receipt.violations);
 }

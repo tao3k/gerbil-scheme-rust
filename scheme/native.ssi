@@ -49,5 +49,12 @@
   gerbil-rs-scheme-object-flonum-value-raw
   gerbil-rs-scheme-object-bytevector-length-raw
   gerbil-rs-scheme-object-bytevector-u8-ref-raw
+  gerbil-rs-bytevector->bytestring-root-raw
+  gerbil-rs-bytestring->bytevector-root-raw
+  gerbil-rs-root-string-length-raw
+  gerbil-rs-root-string-char-ref-raw
+  gerbil-rs-root-bytevector-length-raw
+  gerbil-rs-root-bytevector-u8-ref-raw
+  gerbil-rs-root-release-raw
   gerbil-rs-scheme-object-pair-car-raw
   gerbil-rs-scheme-object-pair-cdr-raw)

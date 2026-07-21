@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 use gerbil_scheme::{
-    GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GerbilRuntime, GerbilRuntimeReceipt,
-    GerbilStatus, GerbilValueProvenance, NativeError,
+    BytestringDelimiter, GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GerbilRuntime,
+    GerbilRuntimeReceipt, GerbilStatus, GerbilValueProvenance, NativeError,
 };
 
 #[test]
@@ -277,6 +277,64 @@ fn exports_bytevector_object(runtime: &GerbilRuntime) {
     assert_eq!(
         projected.to_vec().into_result().expect("copy bytevector"),
         vec![255, 127, 11, 1, 0]
+    );
+    let spaced = projected
+        .to_bytestring(BytestringDelimiter::SPACE)
+        .into_result()
+        .expect("convert bytevector to spaced bytestring");
+    assert_eq!(spaced.len().as_result(), Ok(&14));
+    assert_eq!(spaced.char_at(0).as_result(), Ok(&'F'));
+    assert_eq!(
+        spaced.to_string().into_result().expect("copy bytestring"),
+        "FF 7F 0B 01 00"
+    );
+    drop(spaced);
+
+    let compact = projected
+        .to_bytestring(BytestringDelimiter::Compact)
+        .into_result()
+        .expect("convert bytevector to compact bytestring");
+    assert_eq!(
+        compact
+            .to_string()
+            .into_result()
+            .expect("copy compact bytestring"),
+        "FF7F0B0100"
+    );
+    drop(compact);
+
+    let parsed = runtime
+        .bytevector_from_bytestring("FF AB 00", BytestringDelimiter::SPACE)
+        .expect("parse spaced bytestring");
+    assert_eq!(parsed.len().as_result(), Ok(&3));
+    assert_eq!(parsed.u8_at(1).as_result(), Ok(&171));
+    assert_eq!(
+        parsed
+            .to_vec()
+            .into_result()
+            .expect("copy parsed bytevector"),
+        vec![255, 171, 0]
+    );
+    drop(parsed);
+
+    let compact_parsed = runtime
+        .bytevector_from_bytestring("010203", BytestringDelimiter::Compact)
+        .expect("parse compact bytestring");
+    assert_eq!(
+        compact_parsed
+            .to_vec()
+            .into_result()
+            .expect("copy compact parsed bytevector"),
+        vec![1, 2, 3]
+    );
+    drop(compact_parsed);
+
+    assert_eq!(
+        runtime
+            .bytevector_from_bytestring("GG", BytestringDelimiter::Compact)
+            .expect_err("invalid hexadecimal bytestring must fail")
+            .status(),
+        Some(GerbilStatus::InvalidValue)
     );
     assert_eq!(scheme_bytevector.is_boolean().as_result(), Ok(&false));
     assert_eq!(

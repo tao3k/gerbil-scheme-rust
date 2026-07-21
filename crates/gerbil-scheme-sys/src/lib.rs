@@ -2,6 +2,7 @@
 
 mod abi;
 mod abi_bytevector;
+mod abi_rooted_bytes;
 mod abi_sentinel;
 mod scheme_char;
 mod scheme_fixnum;
@@ -28,6 +29,12 @@ pub use abi_bytevector::{
     gerbil_scheme_rust_fixture_bytevector, gerbil_scheme_rust_scheme_object_bytevector_length,
     gerbil_scheme_rust_scheme_object_bytevector_u8_ref,
     gerbil_scheme_rust_scheme_object_is_bytevector,
+};
+pub use abi_rooted_bytes::{
+    GerbilRootId, gerbil_scheme_rust_bytestring_to_bytevector_root,
+    gerbil_scheme_rust_bytevector_to_bytestring_root, gerbil_scheme_rust_root_bytevector_length,
+    gerbil_scheme_rust_root_bytevector_u8_ref, gerbil_scheme_rust_root_release,
+    gerbil_scheme_rust_root_string_char_ref, gerbil_scheme_rust_root_string_length,
 };
 pub use abi_sentinel::{gerbil_scheme_rust_fixture_void, gerbil_scheme_rust_scheme_object_is_void};
 

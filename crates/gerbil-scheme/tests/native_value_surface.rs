@@ -111,11 +111,21 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         family: "bytevector",
         scheme_selector: "gerbil_scheme_rust_bytevector_shape",
         raw_abi: "GerbilValueHandle",
-        safe_surface: "GerbilValue::as_bytevector + SchemeBytevector",
+        safe_surface: "GerbilValue::as_bytevector + SchemeBytevector::to_bytestring",
         ownership: "runtime-borrowed Scheme object",
         nullability: "non-zero handle; distinct from null pointer",
         failure_policy: "non-bytevector objects and raw provenance fail closed",
         scenario: "native-runtime-round-trip",
+    },
+    BackedTypeMatrixEntry {
+        family: "rooted-bytes",
+        scheme_selector: "gerbil_scheme_rust_rooted_bytes_shape",
+        raw_abi: "GerbilRootId",
+        safe_surface: "RootedSchemeString + RootedSchemeBytevector",
+        ownership: "single-owner Scheme root released by Rust Drop",
+        nullability: "positive root token; zero is conversion failure",
+        failure_policy: "invalid input and stale roots fail closed",
+        scenario: "bytevector-bytestring-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "borrowed-utf8",
@@ -184,7 +194,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     let source = read_native_surface_source();
     assert_eq!(
         BACKED_TYPE_MATRIX.len(),
-        16,
+        17,
         "the release-auditable backed type matrix must change deliberately",
     );
 
@@ -207,6 +217,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
         "(scalar-values (i64 bool comparison status fixnum char flonum))",
         "(sentinel-values (nil void))",
         "(borrowed-values (bytevector utf8))",
+        "(rooted-values (bytestring bytevector))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
     ] {
@@ -381,6 +392,7 @@ fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
         "gerbil_scheme_rust_value_handle_shape",
         "gerbil_scheme_rust_i64_callback_shape",
         "(borrowed-values (bytevector utf8))",
+        "(rooted-values (bytestring bytevector))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
         "(nullability . explicit-per-shape)",

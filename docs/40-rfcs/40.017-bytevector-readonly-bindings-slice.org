@@ -14,10 +14,10 @@ signedness policies are specified:
 - =u8vector-init!=
 - =u8vector-every=
 - =u8vector-reverse= and =u8vector-reverse!=
-- =u8vector->bytestring= and =bytestring->u8vector=
+- =u8vector->bytestring= and =bytestring->u8vector= (closed by 40.018)
 - =u8vector->uint= and =uint->u8vector=
 - =u8vector->sint= and =sint->u8vector=
-- =bytevector->bytestring= and =bytestring->bytevector=
+- =bytevector->bytestring= and =bytestring->bytevector= (closed by 40.018)
 - =bytevector->uint= and =uint->bytevector=
 
 * Accepted surface
@@ -61,8 +61,8 @@ zero.
 
 * Next checklist expansion
 
-- Add bytestring conversion only after defining whether hex formatting belongs
-  in the Scheme bridge or in Rust helper APIs.
+- [X] Add bytestring conversion in the Scheme AOT bridge with explicit rooted
+  result tokens and Rust RAII release; see =40.018=.
 - Add unsigned integer conversion after locking endian argument representation.
 - Add signed integer conversion after locking two's-complement width and
   overflow policy.

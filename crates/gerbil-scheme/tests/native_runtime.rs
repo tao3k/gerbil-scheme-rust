@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 use gerbil_scheme::{
-    GERBIL_SCHEME_RUST_ABI_VERSION, GerbilRuntime, GerbilStatus, GerbilValueProvenance, NativeError,
+    GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GerbilRuntime, GerbilRuntimeReceipt,
+    GerbilStatus, GerbilValueProvenance, NativeError,
 };
 
 #[test]
@@ -14,6 +15,14 @@ fn calls_scalar_export_in_process() {
     assert_eq!(
         runtime.abi_version().unwrap(),
         GERBIL_SCHEME_RUST_ABI_VERSION
+    );
+    let receipt = runtime.receipt().expect("runtime receipt");
+    assert_eq!(receipt.abi_id, GERBIL_SCHEME_RUST_ABI_ID);
+    assert_eq!(receipt.abi_version, GERBIL_SCHEME_RUST_ABI_VERSION);
+    assert_eq!(receipt.header_path, "include/gerbil_scheme_rust.h");
+    assert_eq!(
+        receipt.native_module_path,
+        GerbilRuntimeReceipt::NATIVE_MODULE_PATH
     );
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
     exports_scheme_objects_and_traverses_pairs(&runtime);

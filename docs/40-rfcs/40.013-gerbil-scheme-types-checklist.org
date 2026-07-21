@@ -22,8 +22,8 @@ Current Rust ABI evidence:
 - =gerbil-scheme-sys= exposes =GerbilStatus=, =GerbilBorrowedUtf8=,
   =GerbilRuntimeOpaque=, =GerbilValueHandle=, and =GerbilI64Callback=.
 - =gerbil-scheme= exposes safe =GerbilRuntime=, =GerbilUtf8=,
-  =GerbilValue=, =GerbilI64Callback=, =GerbilI64CallbackAbi=, and
-  =NativeError=.
+  =GerbilRuntimeReceipt=, =GerbilValue=, =GerbilI64Callback=,
+  =GerbilI64CallbackAbi=, and =NativeError=.
 - Scalar native operations currently cover i64 identity/addition, i64 parity,
   and i64 comparison.
 - =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
@@ -81,6 +81,7 @@ keeps this table aligned with the Scheme source-surface projection.
 
 | Family | Scheme selector | Raw ABI | Safe Rust surface | Ownership/rooting | Nullability | Failure policy | Scenario |
 | status | =gerbil_scheme_rust_status_shape= | =GerbilStatus= | =NativeError::status= | copy status code | not pointer-backed | unknown status preserves code | =status-contract= |
+| runtime lifecycle | =gerbil_scheme_rust_runtime_handle_shape= | process-global native runtime init/cleanup | =GerbilRuntime= and =GerbilRuntimeReceipt= | one-shot process-global owner, thread-affine safe handle | not pointer-backed | live re-entry returns =AlreadyInitialized=; finalized runtime returns =RuntimeFinalized=; wrong-thread is blocked by =!Send=/=!Sync= and defensively checked | =native-runtime-round-trip= |
 | i64 | =gerbil_scheme_rust_i64_shape= | =i64= | =GerbilRuntime::{identity_i64,add_i64}= | copy scalar | not pointer-backed | overflow maps to =IntegerOverflow= | =native-identity-round-trip= |
 | bool return | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return | =GerbilRuntime::is_even_i64= | copy scalar | not pointer-backed | status fail-closed before bool projection | =native-runtime-round-trip= |
 | comparison | =gerbil_scheme_rust_comparison_shape= | =i32= comparison result | =GerbilRuntime::compare_i64= | copy scalar | not pointer-backed | invalid result maps to =InvalidComparisonResult= | =invalid-comparison-fail-closed= |
@@ -108,10 +109,13 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] Thread-affinity check for runtime methods.
 - [X] ABI version check before exposing runtime handle.
 - [X] Drop-time native cleanup path.
-- [ ] Explicit runtime re-entry policy document: what is legal after cleanup,
+- [X] Explicit runtime re-entry policy document: what is legal after cleanup,
   what is process-final, and what must fail closed.
-- [ ] Scenario for wrong-thread access and runtime-finalized behavior.
-- [ ] Public receipt type for runtime initialization, ABI id, ABI version, and
+- [X] Scenario for live re-entry and runtime-finalized behavior.
+- [ ] Compile-time or defensive scenario for wrong-thread access. Safe
+  =GerbilRuntime= is intentionally =!Send=/=!Sync=, so a runtime wrong-thread
+  scenario must not weaken the public API just to make the branch reachable.
+- [X] Public receipt type for runtime initialization, ABI id, ABI version, and
   native module path.
 
 ** Status, error, and result

@@ -49,6 +49,24 @@ pub struct GerbilRuntime {
     _not_send_or_sync: PhantomData<Rc<()>>,
 }
 
+/// Public receipt describing the initialized native runtime binding surface.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GerbilRuntimeReceipt {
+    /// Stable ABI family identifier, including its terminating NUL byte.
+    pub abi_id: &'static [u8],
+    /// ABI major version accepted by this Rust binding.
+    pub abi_version: u32,
+    /// Repository-relative public C header path.
+    pub header_path: &'static str,
+    /// Gerbil module initialized for the native bridge.
+    pub native_module_path: &'static str,
+}
+
+impl GerbilRuntimeReceipt {
+    /// Runtime module loaded by the native bridge.
+    pub const NATIVE_MODULE_PATH: &'static str = "gerbil-scheme-rust/scheme/native";
+}
+
 /// Safe borrowed UTF-8 view for native Gerbil calls.
 ///
 /// The Rust string owner keeps the bytes alive for the full borrow. The raw
@@ -735,6 +753,22 @@ impl GerbilRuntime {
         // SAFETY: self proves initialization and !Send keeps the call on the
         // owning thread after check_thread succeeds.
         Ok(unsafe { gerbil_scheme_rust_abi_version() })
+    }
+
+    /// Returns a stable receipt for the initialized runtime binding surface.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] if called outside the initializing
+    /// thread.
+    pub fn receipt(&self) -> Result<GerbilRuntimeReceipt, NativeError> {
+        self.check_thread()?;
+        Ok(GerbilRuntimeReceipt {
+            abi_id: gerbil_scheme_sys::GERBIL_SCHEME_RUST_ABI_ID,
+            abi_version: GERBIL_SCHEME_RUST_ABI_VERSION,
+            header_path: gerbil_scheme_sys::GERBIL_SCHEME_RUST_HEADER_PATH,
+            native_module_path: GerbilRuntimeReceipt::NATIVE_MODULE_PATH,
+        })
     }
 
     /// Returns a signed 64-bit integer through the initialized Gerbil runtime.

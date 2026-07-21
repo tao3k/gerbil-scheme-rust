@@ -113,6 +113,36 @@ from the type checklist into this section only when it has:
   fail-closed behavior;
 - local =cargo=, =clippy=, and Bazel receipts.
 
+** Runtime lifecycle receipt
+
+Status: accepted.
+
+The runtime lifecycle slice makes the native runtime boundary explicit before
+any Scheme object projection is exposed. =GerbilRuntime= remains a
+process-global, one-shot, thread-affine safe owner. Initialization loads the
+native Gerbil bridge module and checks the ABI version before returning the safe
+handle.
+
+The accepted lifecycle boundary is:
+
+- a second initialization while the runtime is live returns
+  =NativeError::AlreadyInitialized=;
+- after =GerbilRuntime= is dropped, the process is finalized for this bridge
+  and later initialization returns =NativeError::RuntimeFinalized=;
+- safe =GerbilRuntime= is intentionally =!Send=/=!Sync=, so wrong-thread access
+  is blocked by the Rust type system under safe code;
+- method-level =check_thread= remains a defensive fail-closed guard and returns
+  =NativeError::WrongThread= if an unsafe or future internal caller violates
+  thread affinity;
+- =GerbilRuntime::receipt= exposes the accepted ABI id, ABI version, public C
+  header path, and native Gerbil module path without exposing raw externs.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
 ** Boolean Scheme-object projection
 
 Status: accepted.

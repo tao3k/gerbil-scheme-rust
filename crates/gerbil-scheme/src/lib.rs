@@ -30,8 +30,8 @@ pub use native::{
 
 #[cfg(feature = "native")]
 pub use native::{
-    GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilUtf8, GerbilValue,
-    GerbilValueProvenance, NativeError, NativeResult,
+    GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilRuntimeReceipt, GerbilUtf8,
+    GerbilValue, GerbilValueProvenance, NativeError, NativeResult,
 };
 
 /// Environment variable selecting the Gerbil interpreter.

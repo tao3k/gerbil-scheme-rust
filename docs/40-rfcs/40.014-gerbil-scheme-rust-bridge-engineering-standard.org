@@ -144,6 +144,29 @@ Implementation receipt:
 - =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
 - =direnv exec . bazel test //:cargo_all=
 
+** Character Scheme-object projection
+
+Status: accepted.
+
+The character slice exports runtime-backed ASCII, BMP, and non-BMP Scheme
+character fixtures, checks =char?= in Gerbil, and exposes
+=GerbilValue::is_char= and =GerbilValue::as_char= in Rust.
+
+The accepted failure boundary is:
+
+- non-character Scheme values return =InvalidValue= for =as_char=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for character inspection;
+- Rust validates the returned =GerbilChar= as a Unicode scalar before exposing
+  =char=;
+- flonum projection and numeric edge-case policy remain outside this slice.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
 * Downstream policy
 
 Marlin consumes =gerbil-scheme-rust= as a dependency. It must not be the owner

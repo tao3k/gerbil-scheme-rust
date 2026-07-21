@@ -25,6 +25,7 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     exports_null_object(runtime);
     exports_boolean_objects(runtime);
     exports_fixnum_object(runtime);
+    exports_char_objects(runtime);
     exports_pair_object(runtime);
     exports_proper_list_object(runtime);
     exports_improper_list_object(runtime);
@@ -97,6 +98,41 @@ fn exports_fixnum_object(runtime: &GerbilRuntime) {
     assert_eq!(scheme_fixnum.as_fixnum_i64().as_result(), Ok(&42));
     assert_fail_closed_traversal(scheme_fixnum);
     assert_untrusted_raw_fail_closed(scheme_fixnum);
+}
+
+fn exports_char_objects(runtime: &GerbilRuntime) {
+    let ascii = runtime
+        .fixture_char_ascii_value()
+        .expect("export ASCII Scheme character through native runtime");
+    assert_char_fixture(ascii, 'A');
+
+    let bmp = runtime
+        .fixture_char_bmp_value()
+        .expect("export BMP Scheme character through native runtime");
+    assert_char_fixture(bmp, 'λ');
+
+    let non_bmp = runtime
+        .fixture_char_non_bmp_value()
+        .expect("export non-BMP Scheme character through native runtime");
+    assert_char_fixture(non_bmp, '🙂');
+}
+
+fn assert_char_fixture(value: gerbil_scheme::GerbilValue<'_>, expected: char) {
+    assert_scheme_object_export(value);
+    assert_eq!(value.is_pair().as_result(), Ok(&false));
+    assert_eq!(value.is_list().as_result(), Ok(&false));
+    assert_eq!(value.is_null().as_result(), Ok(&false));
+    assert_eq!(value.is_boolean().as_result(), Ok(&false));
+    assert_eq!(
+        value.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(value.is_fixnum().as_result(), Ok(&false));
+    assert_eq!(value.as_fixnum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_char().as_result(), Ok(&true));
+    assert_eq!(value.as_char().as_result(), Ok(&expected));
+    assert_fail_closed_traversal(value);
+    assert_untrusted_raw_fail_closed(value);
 }
 
 fn exports_pair_object(runtime: &GerbilRuntime) {
@@ -200,6 +236,8 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
         value.as_fixnum_i64().status(),
         Some(GerbilStatus::InvalidValue)
     );
+    assert_eq!(value.is_char().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.as_char().status(), Some(GerbilStatus::InvalidValue));
     assert_fail_closed_traversal(value);
 }
 

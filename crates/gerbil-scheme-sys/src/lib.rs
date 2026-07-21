@@ -1,6 +1,7 @@
 //! Raw C ABI bindings for the Gerbil Scheme runtime bridge.
 
 mod abi;
+mod scheme_char;
 mod scheme_fixnum;
 
 pub use abi::gerbil_scheme_rust_fixture_false;
@@ -16,6 +17,11 @@ pub use abi::gerbil_scheme_rust_scheme_object_is_pair;
 pub use abi::gerbil_scheme_rust_scheme_object_pair_car;
 pub use abi::gerbil_scheme_rust_scheme_object_pair_cdr;
 pub use abi::gerbil_scheme_rust_scheme_object_pair_parts;
+pub use scheme_char::gerbil_scheme_rust_fixture_char_ascii;
+pub use scheme_char::gerbil_scheme_rust_fixture_char_bmp;
+pub use scheme_char::gerbil_scheme_rust_fixture_char_non_bmp;
+pub use scheme_char::gerbil_scheme_rust_scheme_object_as_char;
+pub use scheme_char::gerbil_scheme_rust_scheme_object_is_char;
 pub use scheme_fixnum::gerbil_scheme_rust_fixture_fixnum;
 pub use scheme_fixnum::gerbil_scheme_rust_scheme_object_as_fixnum;
 pub use scheme_fixnum::gerbil_scheme_rust_scheme_object_is_fixnum;

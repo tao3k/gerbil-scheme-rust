@@ -64,6 +64,9 @@ GerbilStatus gerbil_scheme_rust_fixture_improper_list(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_true(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_false(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_fixnum(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_char_ascii(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_char_bmp(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_char_non_bmp(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_value_is_pair(GerbilValueHandle value,
                                               GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_value_is_list(GerbilValueHandle value,
@@ -84,6 +87,10 @@ GerbilStatus gerbil_scheme_rust_scheme_object_is_fixnum(GerbilValueHandle value,
                                                         GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_as_fixnum(GerbilValueHandle value,
                                                         GerbilFixnum *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_char(GerbilValueHandle value,
+                                                      GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_as_char(GerbilValueHandle value,
+                                                      GerbilChar *out);
 GerbilStatus gerbil_scheme_rust_pair_car(GerbilValueHandle value,
                                          GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_pair_cdr(GerbilValueHandle value,

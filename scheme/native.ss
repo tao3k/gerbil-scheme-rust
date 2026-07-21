@@ -13,6 +13,9 @@
   gerbil-rs-fixture-true-raw
   gerbil-rs-fixture-false-raw
   gerbil-rs-fixture-fixnum-raw
+  gerbil-rs-fixture-char-ascii-raw
+  gerbil-rs-fixture-char-bmp-raw
+  gerbil-rs-fixture-char-non-bmp-raw
   gerbil-rs-scheme-object-null?-raw
   gerbil-rs-scheme-object-pair?-raw
   gerbil-rs-scheme-object-list?-raw
@@ -20,6 +23,8 @@
   gerbil-rs-scheme-object-boolean-value-raw
   gerbil-rs-scheme-object-fixnum?-raw
   gerbil-rs-scheme-object-fixnum-value-raw
+  gerbil-rs-scheme-object-char?-raw
+  gerbil-rs-scheme-object-char-value-raw
   gerbil-rs-scheme-object-pair-car-raw
   gerbil-rs-scheme-object-pair-cdr-raw)
 
@@ -37,6 +42,9 @@
    gerbil-rs-fixture-true-raw
    gerbil-rs-fixture-false-raw
    gerbil-rs-fixture-fixnum-raw
+   gerbil-rs-fixture-char-ascii-raw
+   gerbil-rs-fixture-char-bmp-raw
+   gerbil-rs-fixture-char-non-bmp-raw
    gerbil-rs-scheme-object-null?-raw
    gerbil-rs-scheme-object-pair?-raw
    gerbil-rs-scheme-object-list?-raw
@@ -44,6 +52,8 @@
    gerbil-rs-scheme-object-boolean-value-raw
    gerbil-rs-scheme-object-fixnum?-raw
    gerbil-rs-scheme-object-fixnum-value-raw
+   gerbil-rs-scheme-object-char?-raw
+   gerbil-rs-scheme-object-char-value-raw
    gerbil-rs-scheme-object-pair-car-raw
    gerbil-rs-scheme-object-pair-cdr-raw)
   (c-define (gerbil-rs-abi-version)
@@ -122,6 +132,27 @@
       "extern"
     42)
 
+  (c-define (gerbil-rs-fixture-char-ascii-raw)
+      ()
+      scheme-object
+      "gerbil_scheme_rust_fixture_char_ascii_raw"
+      "extern"
+    #\A)
+
+  (c-define (gerbil-rs-fixture-char-bmp-raw)
+      ()
+      scheme-object
+      "gerbil_scheme_rust_fixture_char_bmp_raw"
+      "extern"
+    (integer->char #x03bb))
+
+  (c-define (gerbil-rs-fixture-char-non-bmp-raw)
+      ()
+      scheme-object
+      "gerbil_scheme_rust_fixture_char_non_bmp_raw"
+      "extern"
+    (integer->char #x1f642))
+
   (c-define (gerbil-rs-scheme-object-null?-raw value)
       (scheme-object)
       int32
@@ -170,6 +201,20 @@
       "gerbil_scheme_rust_scheme_object_fixnum_value_raw"
       "extern"
     value)
+
+  (c-define (gerbil-rs-scheme-object-char?-raw value)
+      (scheme-object)
+      int32
+      "gerbil_scheme_rust_scheme_object_is_char_raw"
+      "extern"
+    (if (char? value) 1 0))
+
+  (c-define (gerbil-rs-scheme-object-char-value-raw value)
+      (scheme-object)
+      int32
+      "gerbil_scheme_rust_scheme_object_char_value_raw"
+      "extern"
+    (char->integer value))
 
   (c-define (gerbil-rs-scheme-object-pair-car-raw value)
       (scheme-object)

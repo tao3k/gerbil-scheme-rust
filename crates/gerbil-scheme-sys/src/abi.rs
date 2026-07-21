@@ -915,6 +915,12 @@ unsafe extern "C" {
 
     pub(crate) fn gerbil_scheme_rust_fixture_fixnum_raw() -> GerbilValueHandle;
 
+    pub(crate) fn gerbil_scheme_rust_fixture_char_ascii_raw() -> GerbilValueHandle;
+
+    pub(crate) fn gerbil_scheme_rust_fixture_char_bmp_raw() -> GerbilValueHandle;
+
+    pub(crate) fn gerbil_scheme_rust_fixture_char_non_bmp_raw() -> GerbilValueHandle;
+
     /// Raw Scheme-object pair predicate exported by `scheme/native.ss`.
     ///
     /// # Safety
@@ -960,6 +966,10 @@ unsafe extern "C" {
     pub(crate) fn gerbil_scheme_rust_scheme_object_fixnum_value_raw(
         value: GerbilValueHandle,
     ) -> isize;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_is_char_raw(value: GerbilValueHandle) -> i32;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_char_value_raw(value: GerbilValueHandle) -> i32;
 
     /// Raw Scheme-object pair car projection exported by `scheme/native.ss`.
     ///

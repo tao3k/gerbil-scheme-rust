@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 use gerbil_scheme_sys::{
-    gerbil_scheme_rust_fixture_false, gerbil_scheme_rust_fixture_fixnum,
-    gerbil_scheme_rust_fixture_improper_list, gerbil_scheme_rust_fixture_pair,
-    gerbil_scheme_rust_fixture_proper_list, gerbil_scheme_rust_fixture_true,
-    gerbil_scheme_rust_scheme_object_as_boolean, gerbil_scheme_rust_scheme_object_as_fixnum,
-    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_fixnum,
-    gerbil_scheme_rust_scheme_object_is_list, gerbil_scheme_rust_scheme_object_is_pair,
+    gerbil_scheme_rust_fixture_char_ascii, gerbil_scheme_rust_fixture_char_bmp,
+    gerbil_scheme_rust_fixture_char_non_bmp, gerbil_scheme_rust_fixture_false,
+    gerbil_scheme_rust_fixture_fixnum, gerbil_scheme_rust_fixture_improper_list,
+    gerbil_scheme_rust_fixture_pair, gerbil_scheme_rust_fixture_proper_list,
+    gerbil_scheme_rust_fixture_true, gerbil_scheme_rust_scheme_object_as_boolean,
+    gerbil_scheme_rust_scheme_object_as_char, gerbil_scheme_rust_scheme_object_as_fixnum,
+    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_char,
+    gerbil_scheme_rust_scheme_object_is_fixnum, gerbil_scheme_rust_scheme_object_is_list,
+    gerbil_scheme_rust_scheme_object_is_pair,
 };
 
 use std::fmt;
@@ -312,6 +315,60 @@ impl<'runtime> GerbilValue<'runtime> {
         match self.as_fixnum().as_result() {
             Ok(value) => NativeResult::ok(*value as i64),
             Err(error) => NativeResult::err(*error),
+        }
+    }
+
+    /// Returns whether this value is a Scheme character.
+    ///
+    /// This only succeeds for Scheme-object exports; untrusted raw handles and
+    /// runtime sentinels fail closed with `InvalidValue`.
+    #[must_use]
+    pub fn is_char(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_char",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_char,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_char",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme character.
+    ///
+    /// The sys layer returns a Unicode scalar value carrier and this method
+    /// performs Rust scalar validation before exposing `char`.
+    #[must_use]
+    pub fn as_char(self) -> NativeResult<char> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_char",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        let mut out = gerbil_scheme_sys::GerbilChar::default();
+        // SAFETY: `out` is a valid output slot for one GerbilChar.
+        let status =
+            unsafe { gerbil_scheme_rust_scheme_object_as_char(self.raw.get(), &raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_char",
+                code: status as i32,
+            });
+        }
+
+        match char::try_from(out) {
+            Ok(value) => NativeResult::ok(value),
+            Err(()) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_char",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
         }
     }
 
@@ -770,6 +827,42 @@ impl GerbilRuntime {
         self.checked_scheme_object_fixture(
             "gerbil_scheme_rust_fixture_fixnum",
             gerbil_scheme_rust_fixture_fixnum,
+        )
+    }
+
+    /// Exports an ASCII Scheme character fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_char_ascii_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_char_ascii",
+            gerbil_scheme_rust_fixture_char_ascii,
+        )
+    }
+
+    /// Exports a BMP Scheme character fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_char_bmp_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_char_bmp",
+            gerbil_scheme_rust_fixture_char_bmp,
+        )
+    }
+
+    /// Exports a non-BMP Scheme character fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_char_non_bmp_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_char_non_bmp",
+            gerbil_scheme_rust_fixture_char_non_bmp,
         )
     }
 

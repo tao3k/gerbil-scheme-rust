@@ -166,10 +166,10 @@ keeps this table aligned with the Scheme source-surface projection.
 
 ** Characters
 
-- [ ] Raw ABI representation for Scheme characters.
-- [ ] Safe Rust =char= projection.
-- [ ] Unicode scalar validation and invalid-codepoint fail-closed path.
-- [ ] Scenario for ASCII, BMP, non-BMP, and invalid scalar values.
+- [X] Raw ABI representation for Scheme characters.
+- [X] Safe Rust =char= projection.
+- [X] Unicode scalar validation and invalid-codepoint fail-closed path.
+- [X] Scenario for ASCII, BMP, non-BMP, and invalid scalar values.
 
 ** Strings and UTF-8
 

@@ -191,8 +191,13 @@ keeps this table aligned with the Scheme source-surface projection.
 - [ ] Lifetime/GC-root policy during traversal.
 - [X] Caller-supplied pair/list/null handles remain fail-closed through
   =UntrustedRaw= provenance.
-- [ ] Runtime-backed pair/list/null predicates gated on runtime/export
+- [X] Runtime-backed pair/list/null predicates gated on runtime/export
   provenance.
+- [X] Runtime-backed pair =car= / =cdr= / =pair_parts= projections gated on
+  =SchemeObjectExport= provenance, while =UntrustedRaw= and =RuntimeSentinel=
+  remain fail-closed.
+- [ ] Recursive list traversal remains out of scope until traversal lifetime and
+  GC-root policy are versioned.
 - [ ] Scenario for proper list, improper list, empty list, and nested list.
 
 ** Vectors

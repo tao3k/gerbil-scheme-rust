@@ -12,7 +12,9 @@
   gerbil-rs-fixture-improper-list-raw
   gerbil-rs-scheme-object-null?-raw
   gerbil-rs-scheme-object-pair?-raw
-  gerbil-rs-scheme-object-list?-raw)
+  gerbil-rs-scheme-object-list?-raw
+  gerbil-rs-scheme-object-pair-car-raw
+  gerbil-rs-scheme-object-pair-cdr-raw)
 
 ;; This is intentionally a scalar ABI proof. Rich values stay behind an opaque
 ;; runtime boundary until ownership, error, and thread contracts are versioned.
@@ -27,7 +29,9 @@
    gerbil-rs-fixture-improper-list-raw
    gerbil-rs-scheme-object-null?-raw
    gerbil-rs-scheme-object-pair?-raw
-   gerbil-rs-scheme-object-list?-raw)
+   gerbil-rs-scheme-object-list?-raw
+   gerbil-rs-scheme-object-pair-car-raw
+   gerbil-rs-scheme-object-pair-cdr-raw)
   (c-define (gerbil-rs-abi-version)
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
@@ -102,4 +106,18 @@
       int32
       "gerbil_scheme_rust_scheme_object_is_list_raw"
       "extern"
-    (if (list? value) 1 0)))
+    (if (list? value) 1 0))
+
+  (c-define (gerbil-rs-scheme-object-pair-car-raw value)
+      (scheme-object)
+      scheme-object
+      "gerbil_scheme_rust_scheme_object_pair_car_raw"
+      "extern"
+    (if (pair? value) (car value) #f))
+
+  (c-define (gerbil-rs-scheme-object-pair-cdr-raw value)
+      (scheme-object)
+      scheme-object
+      "gerbil_scheme_rust_scheme_object_pair_cdr_raw"
+      "extern"
+    (if (pair? value) (cdr value) #f)))

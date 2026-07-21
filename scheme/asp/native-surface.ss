@@ -172,7 +172,7 @@
   '(native-shape
     (name . native-value)
     (transport . c-abi)
-    (scalar-values (i64 bool comparison status))
+    (scalar-values (i64 bool comparison status fixnum char flonum))
     (borrowed-values (utf8))
     (handle-values (runtime-handle gerbil-value-handle))
     (callback-values (i64-callback))

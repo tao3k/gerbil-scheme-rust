@@ -1,6 +1,8 @@
 #![cfg(feature = "native")]
 
-use gerbil_scheme::{GerbilI64Callback, GerbilStatus, GerbilUtf8, GerbilValue, NativeError};
+use gerbil_scheme::{
+    GerbilI64Callback, GerbilStatus, GerbilUtf8, GerbilValue, NativeError, NativeResult,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct BackedTypeMatrixEntry {
@@ -38,11 +40,11 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
     BackedTypeMatrixEntry {
         family: "bool",
         scheme_selector: "gerbil_scheme_rust_bool_shape",
-        raw_abi: "GerbilStatus + Rust bool return",
-        safe_surface: "GerbilRuntime::is_even_i64",
-        ownership: "copy scalar",
+        raw_abi: "GerbilStatus + Rust bool return + Scheme boolean handle",
+        safe_surface: "GerbilRuntime::is_even_i64 + GerbilValue::as_boolean",
+        ownership: "copy scalar or runtime-borrowed Scheme object",
         nullability: "not pointer-backed",
-        failure_policy: "status fail-closed before bool projection",
+        failure_policy: "status fail-closed before bool projection; raw provenance rejected",
         scenario: "native-runtime-round-trip",
     },
     BackedTypeMatrixEntry {
@@ -54,6 +56,36 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         nullability: "not pointer-backed",
         failure_policy: "invalid result maps to InvalidComparisonResult",
         scenario: "invalid-comparison-fail-closed",
+    },
+    BackedTypeMatrixEntry {
+        family: "fixnum",
+        scheme_selector: "gerbil_scheme_rust_fixnum_shape",
+        raw_abi: "GerbilFixnum",
+        safe_surface: "GerbilValue::{is_fixnum,as_fixnum,as_fixnum_i64}",
+        ownership: "runtime-borrowed Scheme object",
+        nullability: "not pointer-backed",
+        failure_policy: "non-fixnum and raw provenance fail closed",
+        scenario: "native-runtime-round-trip",
+    },
+    BackedTypeMatrixEntry {
+        family: "char",
+        scheme_selector: "gerbil_scheme_rust_char_shape",
+        raw_abi: "GerbilChar",
+        safe_surface: "GerbilValue::{is_char,as_char}",
+        ownership: "runtime-borrowed Scheme object",
+        nullability: "not pointer-backed",
+        failure_policy: "invalid Unicode scalar and raw provenance fail closed",
+        scenario: "native-runtime-round-trip",
+    },
+    BackedTypeMatrixEntry {
+        family: "flonum",
+        scheme_selector: "gerbil_scheme_rust_flonum_shape",
+        raw_abi: "GerbilFlonum",
+        safe_surface: "GerbilValue::{is_flonum,as_flonum}",
+        ownership: "runtime-borrowed Scheme object",
+        nullability: "not pointer-backed",
+        failure_policy: "non-flonum and raw provenance fail closed",
+        scenario: "native-runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "borrowed-utf8",
@@ -122,7 +154,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     let source = read_native_surface_source();
     assert_eq!(
         BACKED_TYPE_MATRIX.len(),
-        10,
+        13,
         "the release-auditable backed type matrix must change deliberately",
     );
 
@@ -142,7 +174,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     let aggregate_shape =
         native_surface_shape_section(&source, "gerbil_scheme_rust_native_value_shape");
     for required_family in [
-        "(scalar-values (i64 bool comparison status))",
+        "(scalar-values (i64 bool comparison status fixnum char flonum))",
         "(borrowed-values (utf8))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
@@ -159,6 +191,53 @@ fn assert_non_empty_matrix_field(family: &str, field: &str, value: &str) {
         !value.trim().is_empty(),
         "backed type matrix field must not be empty: family={family} field={field}",
     );
+}
+
+#[test]
+fn native_result_projects_status_and_preserves_unknown_codes() {
+    let ok = NativeResult::ok(42_i64);
+    assert!(ok.is_ok());
+    assert!(!ok.is_err());
+    assert_eq!(ok.status(), Some(GerbilStatus::Ok));
+    assert_eq!(ok.as_result(), Ok(&42));
+    assert_eq!(ok.into_result(), Ok(42));
+
+    let known_status_error = NativeError::Status {
+        operation: "native-result-status-test",
+        code: GerbilStatus::NullPointer.code(),
+    };
+    assert_eq!(known_status_error.status(), Some(GerbilStatus::NullPointer));
+
+    let known_status_result = NativeResult::<i64>::err(known_status_error);
+    assert!(known_status_result.is_err());
+    assert_eq!(
+        known_status_result.status(),
+        Some(GerbilStatus::NullPointer)
+    );
+    assert_eq!(known_status_result.as_result(), Err(&known_status_error));
+    assert_eq!(known_status_result.into_result(), Err(known_status_error));
+
+    let unknown_status_error = NativeError::Status {
+        operation: "native-result-status-test",
+        code: 9999,
+    };
+    assert_eq!(unknown_status_error.status(), None);
+    assert_eq!(
+        NativeResult::<()>::err(unknown_status_error).into_result(),
+        Err(unknown_status_error)
+    );
+    assert_eq!(NativeResult::<()>::err(unknown_status_error).status(), None);
+
+    let invalid_value_result =
+        NativeResult::<()>::from_result(Err(NativeError::InvalidComparisonResult { code: 99 }));
+    assert_eq!(
+        invalid_value_result.status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+
+    let unprojected_lifecycle_result =
+        NativeResult::<()>::from_result(Err(NativeError::InvalidLifecycleState { state: 42 }));
+    assert_eq!(unprojected_lifecycle_result.status(), None);
 }
 
 #[test]
@@ -295,7 +374,7 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
         &[
             "(name . native-value)",
             "(transport . c-abi)",
-            "(scalar-values (i64 bool comparison status))",
+            "(scalar-values (i64 bool comparison status fixnum char flonum))",
             "(borrowed-values (utf8))",
             "(handle-values (runtime-handle gerbil-value-handle))",
             "(callback-values (i64-callback))",
@@ -339,7 +418,6 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
         "gerbil_scheme_rust_nil_shape",
         "gerbil_scheme_rust_void_shape",
         "gerbil_scheme_rust_f64_shape",
-        "gerbil_scheme_rust_char_shape",
         "gerbil_scheme_rust_symbol_shape",
         "gerbil_scheme_rust_pair_shape",
         "gerbil_scheme_rust_list_shape",

@@ -83,8 +83,11 @@ keeps this table aligned with the Scheme source-surface projection.
 | status | =gerbil_scheme_rust_status_shape= | =GerbilStatus= | =NativeError::status= | copy status code | not pointer-backed | unknown status preserves code | =status-contract= |
 | runtime lifecycle | =gerbil_scheme_rust_runtime_handle_shape= | process-global native runtime init/cleanup | =GerbilRuntime= and =GerbilRuntimeReceipt= | one-shot process-global owner, thread-affine safe handle | not pointer-backed | live re-entry returns =AlreadyInitialized=; finalized runtime returns =RuntimeFinalized=; wrong-thread is blocked by =!Send=/=!Sync= and defensively checked | =native-runtime-round-trip= |
 | i64 | =gerbil_scheme_rust_i64_shape= | =i64= | =GerbilRuntime::{identity_i64,add_i64}= | copy scalar | not pointer-backed | overflow maps to =IntegerOverflow= | =native-identity-round-trip= |
-| bool return | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return | =GerbilRuntime::is_even_i64= | copy scalar | not pointer-backed | status fail-closed before bool projection | =native-runtime-round-trip= |
+| bool | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return plus Scheme boolean handle | =GerbilRuntime::is_even_i64= and =GerbilValue::as_boolean= | copy scalar or runtime-borrowed Scheme object | not pointer-backed | status fail-closed before bool projection; raw provenance rejected | =native-runtime-round-trip= |
 | comparison | =gerbil_scheme_rust_comparison_shape= | =i32= comparison result | =GerbilRuntime::compare_i64= | copy scalar | not pointer-backed | invalid result maps to =InvalidComparisonResult= | =invalid-comparison-fail-closed= |
+| fixnum | =gerbil_scheme_rust_fixnum_shape= | =GerbilFixnum= | =GerbilValue::{is_fixnum,as_fixnum,as_fixnum_i64}= | runtime-borrowed Scheme object | not pointer-backed | non-fixnum and raw provenance fail closed | =native-runtime-round-trip= |
+| char | =gerbil_scheme_rust_char_shape= | =GerbilChar= | =GerbilValue::{is_char,as_char}= | runtime-borrowed Scheme object | not pointer-backed | invalid Unicode scalar and raw provenance fail closed | =native-runtime-round-trip= |
+| flonum | =gerbil_scheme_rust_flonum_shape= | =GerbilFlonum= | =GerbilValue::{is_flonum,as_flonum}= | runtime-borrowed Scheme object | not pointer-backed | non-flonum and raw provenance fail closed | =native-runtime-round-trip= |
 | borrowed UTF-8 | =gerbil_scheme_rust_utf8_shape= | =GerbilBorrowedUtf8= | =GerbilUtf8= | borrowed Rust UTF-8 bytes | empty string may use null pointer with zero length | non-UTF-8 is reserved for future bytevector surface | =native-value-surface= |
 | opaque value handle | =gerbil_scheme_rust_value_handle_shape= | =GerbilValueHandle= | =GerbilValue<'runtime>= | runtime-borrowed word-sized opaque handle, not rooted | zero rejected before FFI crossing | zero maps to =NullPointer= status | =backed-value-family-surface= |
 | i64 callback | =gerbil_scheme_rust_i64_callback_shape= | =GerbilI64Callback= | =GerbilI64Callback= and =GerbilI64CallbackAbi= | borrowed callback/context pair | null context rejected before Rust call | panic contained at native boundary | =native-value-surface= |
@@ -129,7 +132,9 @@ keeps this table aligned with the Scheme source-surface projection.
   as ASP source-surface taxonomy, but no public =GerbilResult<T>= wrapper exists
   yet.
 - [ ] Error mapping table from Gerbil exception classes to stable Rust errors.
-- [ ] Scenario that validates status/error/result projection together.
+- [X] Rust scenario/test receipt that validates status/error/result projection
+  together, including unknown status preservation and optional status
+  projection.
 
 ** Nil, void, eof, and unspecified
 
@@ -453,7 +458,36 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
 - [X] Kept unsupported value families blocked; this slice does not add
   design-only placeholders for unimplemented Scheme families.
 - [X] Verified =cargo test -p gerbil-scheme --features native --test
-  native_value_surface= with 10 passing tests.
+  native_value_surface= with 10 passing tests before the runtime lifecycle and
+  result/error follow-up slices.
+
+** 2026-07-20 seventh closure receipt
+
+- [X] Added pure Rust =NativeResult= / =NativeError= projection coverage for:
+  successful native result status, known status projection, unknown status code
+  preservation, =from_result= wrapping, =as_result= borrowing, and
+  =into_result= ownership handoff.
+- [X] Raised the release-auditable backed type matrix from 10 to 13 rows by
+  adding first-class =fixnum=, =char=, and =flonum= rows instead of leaving
+  accepted Scheme-object projections as implicit runtime test coverage.
+- [X] Updated =gerbil_scheme_rust_native_value_shape= so aggregate scalar values
+  include =fixnum=, =char=, and =flonum= alongside =i64=, =bool=,
+  =comparison=, and =status=.
+- [?] Local full-gate follow-up is partially verified in this turn:
+  =native_value_surface= and =source_surface= pass, but the ASP-required
+  =asp-testing= resident is in =Repair= due model mismatch, so
+  =gerbil-scheme-sys= drift gate, workspace clippy, and Bazel must be rerun
+  after the typed testing resident is repaired or by remote CI.
+- [X] Kept unknown raw status codes fail-closed at the typed projection layer:
+  =NativeError::Status= retains the raw code, while =status= returns =None=
+  for codes outside the stable =GerbilStatus= ABI enum.
+- [X] Covered non-status safe errors that intentionally map to
+  =GerbilStatus::InvalidValue= and internal lifecycle errors that intentionally
+  do not expose a stable status projection.
+- [ ] This slice does not add a new benchmark scenario root; it closes the
+  pure Rust result/error projection gap under the existing native value-surface
+  test owner. Add a dedicated scenario root only when the benchmark manifest
+  taxonomy is expanded deliberately.
 
 * Next execution plan
 
@@ -468,7 +502,7 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
   status, and scenario coverage.
 - [X] Add a release-readiness test or harness receipt that fails if the public
   type matrix omits a currently backed shape.
-- [ ] Add native result/error scenario coverage that validates status,
+- [X] Add native result/error scenario coverage that validates status,
   unknown-code preservation, optional status projection, and fail-closed
   behavior together.
 - [ ] Keep unsupported families explicitly absent until raw ABI and safe Rust

@@ -37,10 +37,7 @@ fn calls_scalar_export_in_process() {
         scheme_null.is_list().status(),
         Some(GerbilStatus::InvalidValue)
     );
-    assert_eq!(
-        scheme_null.is_null().status(),
-        Some(GerbilStatus::InvalidValue)
-    );
+    assert_eq!(scheme_null.is_null().as_result(), Ok(&true));
     assert_eq!(
         runtime.add_i64(i64::MAX, 1),
         Err(NativeError::IntegerOverflow {

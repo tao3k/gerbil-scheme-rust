@@ -416,6 +416,36 @@ pub unsafe extern "C" fn gerbil_scheme_rust_value_is_null(
     unsafe { checked_unbacked_value_predicate(value, out) }
 }
 
+/// Return whether a runtime-produced Scheme object handle is Scheme null.
+///
+/// This gate is intentionally narrower than [`gerbil_scheme_rust_value_is_null`]:
+/// callers must route only values known to come from a Gerbil `scheme-object`
+/// export. Untrusted raw handles continue to use the fail-closed predicate ABI.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`]. The
+/// Gerbil runtime and native module must be initialized, and `value` must be a
+/// runtime-produced Scheme object handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_null(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    if value == 0 || out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+
+    // SAFETY: caller proves the Gerbil runtime/module is initialized and
+    // routes only Scheme-object export handles into this predicate.
+    let is_null = unsafe { gerbil_scheme_rust_scheme_object_is_null_raw(value) };
+    // SAFETY: caller provided a non-null output pointer for one GerbilBoolean.
+    unsafe {
+        *out = GerbilBoolean::from_bool(is_null != 0);
+    }
+    GerbilStatus::Ok
+}
+
 /// Project the car of a pair value into an output handle.
 ///
 /// This ABI entry point is intentionally fail-closed until runtime-backed pair
@@ -566,4 +596,12 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_null_value_raw() -> GerbilValueHandle;
+
+    /// Raw Scheme-object null predicate exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_object_is_null_raw(value: GerbilValueHandle) -> i32;
 }

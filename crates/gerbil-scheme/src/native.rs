@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::thread::{self, ThreadId};
 
+use gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_is_null;
 use gerbil_scheme_sys::{
     GERBIL_SCHEME_RUST_ABI_VERSION, gerbil_scheme_rust_abi_version, gerbil_scheme_rust_add_i64,
     gerbil_scheme_rust_fixture_null, gerbil_scheme_rust_identity_i64,
@@ -166,11 +167,20 @@ impl<'runtime> GerbilValue<'runtime> {
     /// fail-closed [`NativeError::Status`] instead of guessing.
     #[must_use]
     pub fn is_null(self) -> NativeResult<bool> {
-        checked_native_predicate(
-            "gerbil_scheme_rust_value_is_null",
-            self.raw.get(),
-            gerbil_scheme_sys::gerbil_scheme_rust_value_is_null,
-        )
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_null",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_null,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                checked_native_predicate(
+                    "gerbil_scheme_rust_value_is_null",
+                    self.raw.get(),
+                    gerbil_scheme_sys::gerbil_scheme_rust_value_is_null,
+                )
+            }
+        }
     }
 
     /// Project this value's car if it is backed by a pair.

@@ -24,8 +24,9 @@ Current Rust ABI evidence:
 - =gerbil-scheme= exposes safe =GerbilRuntime=, =GerbilUtf8=,
   =GerbilRuntimeReceipt=, =GerbilValue=, =GerbilI64Callback=,
   =GerbilI64CallbackAbi=, and =NativeError=.
-- Scalar native operations currently cover i64 identity/addition, i64 parity,
-  and i64 comparison.
+- Scalar native operations cover i64 identity/addition, i64 parity, and i64
+  comparison; integer/bytevector conversions additionally cover machine =u64=
+  and =i64= with explicit byte order, width, and truncation policy.
 - =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
   callback trampoline behavior.
 - =source_surface= integration tests cover the Scheme ASP source-surface export
@@ -41,7 +42,7 @@ Current Scheme source-surface evidence:
   workaround for the source-surface view; it must stay out of =build.ss= and can
   be retired once the provider projects =scheme/native.ss= plus
   =scheme/native.ssi= directly.
-- The current projected selector set is exactly 21 selectors:
+- The current projected selector set is exactly 26 selectors:
   =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
   =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
   =gerbil_scheme_rust_add_i64=, =gerbil_scheme_rust_is_even_i64=,
@@ -53,18 +54,21 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_fixnum_shape=,
   =gerbil_scheme_rust_char_shape=,
   =gerbil_scheme_rust_flonum_shape=,
+  =gerbil_scheme_rust_bytevector_shape=,
+  =gerbil_scheme_rust_rooted_bytes_shape=,
+  =gerbil_scheme_rust_integer_bytes_shape=,
   =gerbil_scheme_rust_utf8_shape=,
   =gerbil_scheme_rust_value_handle_shape=,
   =gerbil_scheme_rust_nil_shape=,
+  =gerbil_scheme_rust_void_shape=,
   =gerbil_scheme_rust_i64_callback_shape=,
   =gerbil_scheme_rust_native_value_shape=,
   =gerbil_scheme_rust_native_error_shape=, and
   =gerbil_scheme_rust_native_result_shape=.
 - Direct provider projection of the real =scheme/native.ss= FFI/export owner is
   not yet closed and remains a provider/source-surface TODO.
-- No current Scheme selector exists for void, symbol, keyword, pair, list,
-  vector, procedure, owned/rooted values, bytevectors, ports,
-  continuations, or advanced Scheme objects.
+- No current Scheme selector exists for symbol, keyword, general pair/list,
+  vector, procedure, ports, continuations, or advanced Scheme objects.
 
 * Checklist status legend
 
@@ -87,9 +91,13 @@ keeps this table aligned with the Scheme source-surface projection.
 | bool | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return plus Scheme boolean handle | =GerbilRuntime::is_even_i64= and =GerbilValue::as_boolean= | copy scalar or runtime-borrowed Scheme object | not pointer-backed | status fail-closed before bool projection; raw provenance rejected | =native-runtime-round-trip= |
 | comparison | =gerbil_scheme_rust_comparison_shape= | =i32= comparison result | =GerbilRuntime::compare_i64= | copy scalar | not pointer-backed | invalid result maps to =InvalidComparisonResult= | =invalid-comparison-fail-closed= |
 | nil | =gerbil_scheme_rust_nil_shape= | =GerbilValueHandle= | =GerbilValue::as_nil= and =SchemeNil= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-null objects and raw provenance fail closed | =native-runtime-round-trip= |
+| void | =gerbil_scheme_rust_void_shape= | =GerbilValueHandle= | =GerbilValue::as_void= and =SchemeVoid= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer and nil | non-void objects and raw provenance fail closed | =native-runtime-round-trip= |
 | fixnum | =gerbil_scheme_rust_fixnum_shape= | =GerbilFixnum= | =GerbilValue::{is_fixnum,as_fixnum,as_fixnum_i64}= | runtime-borrowed Scheme object | not pointer-backed | non-fixnum and raw provenance fail closed | =native-runtime-round-trip= |
 | char | =gerbil_scheme_rust_char_shape= | =GerbilChar= | =GerbilValue::{is_char,as_char}= | runtime-borrowed Scheme object | not pointer-backed | invalid Unicode scalar and raw provenance fail closed | =native-runtime-round-trip= |
 | flonum | =gerbil_scheme_rust_flonum_shape= | =GerbilFlonum= | =GerbilValue::{is_flonum,as_flonum}= | runtime-borrowed Scheme object | not pointer-backed | non-flonum and raw provenance fail closed | =native-runtime-round-trip= |
+| bytevector | =gerbil_scheme_rust_bytevector_shape= | =GerbilValueHandle= | =GerbilValue::as_bytevector= and =SchemeBytevector= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-bytevector objects and raw provenance fail closed | =native-runtime-round-trip= |
+| rooted bytes | =gerbil_scheme_rust_rooted_bytes_shape= | =GerbilRootId= | =RootedSchemeString= and =RootedSchemeBytevector= | single-owner Scheme root released by Rust =Drop= | positive root token, zero is conversion failure | invalid input and stale roots fail closed | =bytevector-bytestring-round-trip= |
+| integer/bytevector conversion | =gerbil_scheme_rust_integer_bytes_shape= | =u64=, =i64=, =GerbilRootId=, and =GerbilStatus= | =ByteOrder=, =IntegerWidth=, =IntegerEncoding=, =IntegerDecoding=, runtime encode and bytevector decode methods | copy integer input/result and single-owner rooted bytevector output | integer values are not pointer-backed; root token must be positive | invalid width/status fail closed and truncation requires explicit opt-in | =integer-bytevector-round-trip= |
 | borrowed UTF-8 | =gerbil_scheme_rust_utf8_shape= | =GerbilBorrowedUtf8= | =GerbilUtf8= | borrowed Rust UTF-8 bytes | empty string may use null pointer with zero length | non-UTF-8 is reserved for future bytevector surface | =native-value-surface= |
 | opaque value handle | =gerbil_scheme_rust_value_handle_shape= | =GerbilValueHandle= | =GerbilValue<'runtime>= | runtime-borrowed word-sized opaque handle, not rooted | zero rejected before FFI crossing | zero maps to =NullPointer= status | =backed-value-family-surface= |
 | i64 callback | =gerbil_scheme_rust_i64_callback_shape= | =GerbilI64Callback= | =GerbilI64Callback= and =GerbilI64CallbackAbi= | borrowed callback/context pair | null context rejected before Rust call | panic contained at native boundary | =native-value-surface= |
@@ -140,16 +148,17 @@ keeps this table aligned with the Scheme source-surface projection.
 
 ** Nil, void, eof, and unspecified
 
-- [ ] Raw ABI representation for =#<void>=.
+- [X] Raw ABI representation for =#<void>= as a non-zero
+  =GerbilValueHandle= returned by the initialized Gerbil fixture export.
 - [X] Raw ABI representation for =()= / nil as non-zero
   =GerbilValueHandle= returned by the initialized Gerbil fixture export.
 - [ ] Raw ABI representation for EOF object if exported.
 - [ ] Raw ABI representation for unspecified values.
-- [?] Safe Rust marker types for nil/void/eof/unspecified: =SchemeNil= is
-  implemented; void, EOF, and unspecified remain open.
+- [?] Safe Rust marker types for nil/void/eof/unspecified: =SchemeNil= and
+  =SchemeVoid= are implemented; EOF and unspecified remain open.
 - [?] Tests proving these sentinels are distinguishable and do not alias null:
-  nil is proven as a non-zero handle distinct from null pointer; void, EOF, and
-  unspecified remain open.
+  nil and void are proven as distinct non-zero handles; EOF and unspecified
+  remain open.
 
 ** Boolean
 
@@ -174,6 +183,12 @@ keeps this table aligned with the Scheme source-surface projection.
   =GerbilValue::as_fixnum_i64=.
 - [X] Scenario for fixnum fixture projection plus non-fixnum and raw
   provenance fail-closed coverage.
+- [X] Machine =u64=/=i64= conversion to and from Scheme bytevectors with
+  =big=, =little=, and =native= byte order.
+- [X] Minimal-width unsigned and signed two's-complement encoding.
+- [X] Safe fixed-width overflow rejection with an explicit truncation opt-in.
+- [X] Empty decode, prefix decode, rooted ownership, and nanosecond median/p95
+  Scenario coverage.
 - [ ] Exact integer / bignum ownership strategy.
 - [ ] Checked conversion rules: exact integer to =i64=, =u64=, =usize=.
 - [ ] Overflow status mapping for exact integer projection.
@@ -290,9 +305,12 @@ keeps this table aligned with the Scheme source-surface projection.
 
 ** Bytevectors and binary buffers
 
-- [ ] Raw ABI shape for bytevectors.
-- [ ] Safe borrowed byte slice.
-- [ ] Owned bytevector allocation path.
+- [X] Raw ABI shape for bytevectors and rooted bytevector results.
+- [X] Safe borrowed byte slice and runtime-backed read-only bytevector view.
+- [X] Owned/rooted bytevector allocation through bytestring and integer
+  conversions.
+- [X] Integer encode/decode aliases, byte order, width, and signed
+  two's-complement policy.
 - [ ] Mutability policy.
 - [ ] Zero-copy eligibility rules.
 - [ ] Scenario for empty bytes, binary bytes with zeros, and large buffer.
@@ -327,6 +345,8 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] =native-value-surface= scenario.
 - [X] =source-surface-sync= scenario.
 - [X] =backed-value-family-surface= scenario.
+- [X] =bytevector-bytestring-round-trip= scenario.
+- [X] =integer-bytevector-round-trip= scenario.
 - [ ] =scheme-sentinel-values= scenario.
 - [ ] =scheme-string-symbol-keyword= scenario.
 - [ ] =scheme-pair-list-vector= scenario.
@@ -343,8 +363,9 @@ keeps this table aligned with the Scheme source-surface projection.
 
 - [X] ASP workaround owner exists: =scheme/asp/native-surface.ss=.
 - [X] Workaround projects current scalar and backed shape selectors:
-  runtime/status/i64/bool/comparison/UTF-8/value-handle/i64-callback
-  /native-value/native-error/native-result plus scalar exports.
+  runtime/status/i64/bool/comparison/fixnum/char/flonum/bytevector/rooted-bytes
+  /integer-bytes/UTF-8/value-handle/nil/void/i64-callback/native-value
+  /native-error/native-result plus scalar exports.
 - [ ] Direct provider projection for real =scheme/native.ss= FFI/export owner.
 - [ ] Fix or document the current =scheme/native.ss= provider blocker:
   parser-owned search requires a provider query-pack descriptor and exact query
@@ -515,6 +536,20 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
   and =bazel test //:cargo_all=.
 - [ ] Void, EOF, and unspecified are intentionally not added in this slice.
 
+** 2026-07-21 integer/bytevector closure receipt
+
+- [X] Added =gerbil_scheme_rust_integer_bytes_shape= and raised the Rust-backed
+  type matrix to 18 accepted rows.
+- [X] Added raw/safe/rooted support for the four official
+  =:std/misc/bytes= integer conversion families and their bytevector aliases.
+- [X] Added =integer-bytevector-round-trip= with unsigned median/p95
+  =627ns=/=686ns= and signed median/p95 =935ns=/=14321ns=.
+- [X] Corrected ordinary Cargo AOT module-link basename drift while preserving
+  fresh-source compilation and tracked-SCM check mode.
+- [X] Kept runtime dependencies parser-free: no Rowan or Gerbil language
+  project harness is needed to convert values across the C ABI.
+- [ ] Exact Gerbil bignums remain outside this machine-integer slice.
+
 * Next execution plan
 
 ** Phase 1: make the current v0 surface release-auditable
@@ -532,18 +567,21 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
   unknown-code preservation, optional status projection, and fail-closed
   behavior together.
 - [X] Keep unsupported families explicitly absent until raw ABI and safe Rust
-  support exist; do not add Scheme source-surface placeholders for void,
-  f64, char, symbol, keyword, pair, list, vector, bytevector, procedure, port,
-  or continuation.
+  support exist; do not add Scheme source-surface placeholders for EOF,
+  unspecified, symbol, keyword, general vector, procedure, port, or
+  continuation.
 
-** Phase 2: choose the first real new Scheme value family
+** Phase 2: choose the next real Scheme value family
 
-- [?] Prefer sentinel values first if the C ABI can expose them cleanly:
-  nil, void, EOF, and unspecified.
-- [ ] Alternative first expansion is =f64= if numeric scalar performance is the
-  priority.
-- [ ] Do not implement list/vector/string ownership before the GC-rooting model
-  is explicit.
+- [X] Nil, void, =f64=, character, bytevector, rooted bytestring conversion, and
+  machine integer/bytevector conversion slices now have real sys/safe backing.
+- [ ] Prefer exact integers/bignums next if numeric completeness remains the
+  priority: define ownership plus checked =i64=/=u64=/=usize= conversion before
+  exposing a public wrapper.
+- [ ] Alternative expansion is an owned Scheme string/symbol family after the
+  general GC-rooting model is explicit.
+- [ ] Do not implement generic list/vector/string ownership before that rooting
+  model is explicit.
 - [ ] For the chosen family, land all five artifacts in one slice:
   =gerbil-scheme-sys= ABI, =gerbil-scheme= safe wrapper, Scheme
   native-surface shape, scenario benchmark, and native value-surface test.
@@ -573,8 +611,8 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
   hot FFI steady-state receipts.
 - [ ] Add scenario receipts for the next accepted family and one invalid/failure
   case per family.
-- [ ] Keep the explicit 8-root scenario suite list updated deliberately when a
-  new required scenario is added.
+- [ ] Keep the explicit required-scenario suite list updated deliberately when a
+  new required scenario is added; do not freeze a stale count in this plan.
 
 ** Phase 5: Marlin convergence and dependency boundary
 
@@ -601,7 +639,7 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
 
 * Release readiness checklist
 
-- [ ] Public type matrix is documented.
+- [X] Public type matrix is documented.
 - [ ] All accepted v1 types have raw ABI, safe wrapper, tests, and scenario.
 - [ ] Unsafe API surface is audited and minimized.
 - [ ] License headers and dual-license policy are confirmed.

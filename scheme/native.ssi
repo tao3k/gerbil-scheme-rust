@@ -51,6 +51,12 @@
   gerbil-rs-scheme-object-bytevector-u8-ref-raw
   gerbil-rs-bytevector->bytestring-root-raw
   gerbil-rs-bytestring->bytevector-root-raw
+  gerbil-rs-bytevector->uint-raw
+  gerbil-rs-bytevector->sint-raw
+  gerbil-rs-root-bytevector->uint-raw
+  gerbil-rs-root-bytevector->sint-raw
+  gerbil-rs-uint->bytevector-root-raw
+  gerbil-rs-sint->bytevector-root-raw
   gerbil-rs-root-string-length-raw
   gerbil-rs-root-string-char-ref-raw
   gerbil-rs-root-bytevector-length-raw

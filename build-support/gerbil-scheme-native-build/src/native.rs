@@ -160,7 +160,17 @@ fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
     if update || check {
         tracked_scm
     } else {
-        native_scm.to_path_buf()
+        // Gerbil's canonical output filename encodes the complete module path.
+        // Gambit's `-link` derives its expected LNK symbol from that basename,
+        // while `compile-file-to-target` emits the stable short module symbol.
+        // Give both operations the same short basename so ordinary Cargo builds
+        // link the fresh artifact just like tracked-SCM check builds do.
+        let transient_scm = native_scm
+            .parent()
+            .expect("generated native SCM must have a parent")
+            .join("native.scm");
+        fs::copy(native_scm, &transient_scm).expect("stage fresh native SCM with stable basename");
+        transient_scm
     }
 }
 

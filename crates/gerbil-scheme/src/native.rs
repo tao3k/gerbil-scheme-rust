@@ -17,7 +17,7 @@ use gerbil_scheme_sys::{
 
 use std::fmt;
 use std::marker::PhantomData;
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU8, NonZeroUsize};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Mutex, PoisonError};
@@ -239,6 +239,159 @@ impl Default for BytestringDelimiter {
     }
 }
 
+/// Byte order used by Gerbil integer/bytevector conversions.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ByteOrder {
+    /// Most-significant byte first, matching Gerbil's default.
+    #[default]
+    Big,
+    /// Least-significant byte first.
+    Little,
+    /// Native byte order of the compiled Rust/Gerbil runtime.
+    Native,
+}
+
+impl ByteOrder {
+    const fn abi_code(self) -> i32 {
+        match self {
+            Self::Big => gerbil_scheme_sys::GerbilByteOrder::Big.code(),
+            Self::Little => gerbil_scheme_sys::GerbilByteOrder::Little.code(),
+            Self::Native => gerbil_scheme_sys::GerbilByteOrder::Native.code(),
+        }
+    }
+}
+
+/// Checked byte width for `u64` / `i64` bytevector conversion.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IntegerWidth(NonZeroU8);
+
+impl IntegerWidth {
+    /// Largest supported width for the machine-integer ABI.
+    pub const MAX: u8 = gerbil_scheme_sys::GERBIL_SCHEME_RUST_MAX_INTEGER_BYTES;
+
+    /// Construct a non-zero width no larger than eight bytes.
+    #[must_use]
+    pub const fn new(width: u8) -> Option<Self> {
+        match NonZeroU8::new(width) {
+            Some(width) if width.get() <= Self::MAX => Some(Self(width)),
+            Some(_) | None => None,
+        }
+    }
+
+    /// Return the width in bytes.
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0.get()
+    }
+}
+
+/// Width, byte-order, and overflow policy for integer-to-bytevector encoding.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IntegerEncoding {
+    byte_order: ByteOrder,
+    width: Option<IntegerWidth>,
+    truncating: bool,
+}
+
+impl IntegerEncoding {
+    /// Use Gerbil's minimal-width encoding for the selected byte order.
+    #[must_use]
+    pub const fn minimal(byte_order: ByteOrder) -> Self {
+        Self {
+            byte_order,
+            width: None,
+            truncating: false,
+        }
+    }
+
+    /// Use an explicit fixed width and reject values that do not fit.
+    #[must_use]
+    pub const fn fixed(byte_order: ByteOrder, width: IntegerWidth) -> Self {
+        Self {
+            byte_order,
+            width: Some(width),
+            truncating: false,
+        }
+    }
+
+    /// Explicitly opt into Gerbil's fixed-width high-bit truncation semantics.
+    #[must_use]
+    pub const fn truncating(mut self) -> Self {
+        self.truncating = true;
+        self
+    }
+
+    /// Selected byte order.
+    #[must_use]
+    pub const fn byte_order(self) -> ByteOrder {
+        self.byte_order
+    }
+
+    /// Explicit width, or `None` for Gerbil's minimal representation.
+    #[must_use]
+    pub const fn width(self) -> Option<IntegerWidth> {
+        self.width
+    }
+
+    /// Whether a too-small fixed width may truncate high bits.
+    #[must_use]
+    pub const fn allows_truncation(self) -> bool {
+        self.truncating
+    }
+}
+
+impl Default for IntegerEncoding {
+    fn default() -> Self {
+        Self::minimal(ByteOrder::Big)
+    }
+}
+
+/// Byte-order and optional prefix width for bytevector-to-integer decoding.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IntegerDecoding {
+    byte_order: ByteOrder,
+    width: Option<IntegerWidth>,
+}
+
+impl IntegerDecoding {
+    /// Decode the complete bytevector, matching Gerbil's default size.
+    #[must_use]
+    pub const fn entire(byte_order: ByteOrder) -> Self {
+        Self {
+            byte_order,
+            width: None,
+        }
+    }
+
+    /// Decode exactly the first `width` bytes of the bytevector.
+    #[must_use]
+    pub const fn prefix(byte_order: ByteOrder, width: IntegerWidth) -> Self {
+        Self {
+            byte_order,
+            width: Some(width),
+        }
+    }
+
+    /// Selected byte order.
+    #[must_use]
+    pub const fn byte_order(self) -> ByteOrder {
+        self.byte_order
+    }
+
+    /// Prefix width, or `None` to decode the complete bytevector.
+    #[must_use]
+    pub const fn width(self) -> Option<IntegerWidth> {
+        self.width
+    }
+}
+
+impl Default for IntegerDecoding {
+    fn default() -> Self {
+        Self::entire(ByteOrder::Big)
+    }
+}
+
 /// Owned root for a Scheme string created by a native conversion.
 ///
 /// The root is released automatically on the Gerbil runtime owner thread. It
@@ -339,6 +492,44 @@ impl<'runtime> SchemeBytevector<'runtime> {
             }
         }
         NativeResult::ok(bytes)
+    }
+
+    /// Decode this Scheme bytevector as an unsigned integer.
+    #[must_use]
+    pub fn to_uint(&self, decoding: IntegerDecoding) -> NativeResult<u64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytevector_to_uint(
+                self.raw.get(),
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_bytevector_to_uint")
+    }
+
+    /// Decode this Scheme bytevector as a signed two's-complement integer.
+    #[must_use]
+    pub fn to_sint(&self, decoding: IntegerDecoding) -> NativeResult<i64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytevector_to_sint(
+                self.raw.get(),
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_bytevector_to_sint")
     }
 
     /// Convert this bytevector through Gerbil's AOT bytestring implementation.
@@ -515,6 +706,44 @@ impl RootedSchemeBytevector<'_> {
         }
         NativeResult::ok(bytes)
     }
+
+    /// Decode this rooted Scheme bytevector as an unsigned integer.
+    #[must_use]
+    pub fn to_uint(&self, decoding: IntegerDecoding) -> NativeResult<u64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_to_uint(
+                self.root,
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_root_bytevector_to_uint")
+    }
+
+    /// Decode this rooted Scheme bytevector as a signed two's-complement integer.
+    #[must_use]
+    pub fn to_sint(&self, decoding: IntegerDecoding) -> NativeResult<i64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_to_sint(
+                self.root,
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_root_bytevector_to_sint")
+    }
 }
 
 impl Drop for RootedSchemeBytevector<'_> {
@@ -522,6 +751,110 @@ impl Drop for RootedSchemeBytevector<'_> {
         let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
         debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
     }
+}
+
+fn checked_integer_decoding_size(
+    length: NativeResult<usize>,
+    decoding: IntegerDecoding,
+) -> Result<usize, NativeError> {
+    let length = length.into_result()?;
+    let size = decoding
+        .width()
+        .map_or(length, |width| usize::from(width.get()));
+    if size > length || size > usize::from(gerbil_scheme_sys::GERBIL_SCHEME_RUST_MAX_INTEGER_BYTES)
+    {
+        return Err(NativeError::Status {
+            operation: "integer bytevector decoding width",
+            code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+        });
+    }
+    Ok(size)
+}
+
+fn checked_integer_projection<T>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    value: T,
+    operation: &'static str,
+) -> NativeResult<T> {
+    if status == gerbil_scheme_sys::GerbilStatus::Ok {
+        NativeResult::ok(value)
+    } else {
+        NativeResult::err(NativeError::Status {
+            operation,
+            code: status as i32,
+        })
+    }
+}
+
+fn rooted_integer_bytevector<'runtime>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    root: gerbil_scheme_sys::GerbilRootId,
+    operation: &'static str,
+) -> Result<RootedSchemeBytevector<'runtime>, NativeError> {
+    if status == gerbil_scheme_sys::GerbilStatus::Ok && root.is_valid() {
+        Ok(RootedSchemeBytevector {
+            root,
+            _runtime: PhantomData,
+        })
+    } else {
+        Err(NativeError::Status {
+            operation,
+            code: if status == gerbil_scheme_sys::GerbilStatus::Ok {
+                gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+            } else {
+                status as i32
+            },
+        })
+    }
+}
+
+fn resolved_unsigned_encoding_width(
+    value: u64,
+    encoding: IntegerEncoding,
+) -> Result<usize, NativeError> {
+    let width = encoding.width().map_or_else(
+        || {
+            let bits = u64::BITS - value.leading_zeros();
+            u8::try_from(bits.div_ceil(8).max(1)).expect("u64 requires at most eight bytes")
+        },
+        IntegerWidth::get,
+    );
+    if !encoding.allows_truncation() && !unsigned_integer_fits(value, width) {
+        return Err(NativeError::UnsignedIntegerWidth { value, width });
+    }
+    Ok(usize::from(width))
+}
+
+fn resolved_signed_encoding_width(
+    value: i64,
+    encoding: IntegerEncoding,
+) -> Result<usize, NativeError> {
+    let width = encoding.width().map_or_else(
+        || {
+            (1..=IntegerWidth::MAX)
+                .find(|width| signed_integer_fits(value, *width))
+                .expect("every i64 fits in eight bytes")
+        },
+        IntegerWidth::get,
+    );
+    if !encoding.allows_truncation() && !signed_integer_fits(value, width) {
+        return Err(NativeError::SignedIntegerWidth { value, width });
+    }
+    Ok(usize::from(width))
+}
+
+const fn unsigned_integer_fits(value: u64, width: u8) -> bool {
+    width == IntegerWidth::MAX || value < (1_u64 << ((width as u32) * 8))
+}
+
+const fn signed_integer_fits(value: i64, width: u8) -> bool {
+    if width == IntegerWidth::MAX {
+        return true;
+    }
+    let magnitude_bits = (width as u32) * 8 - 1;
+    let minimum = -(1_i64 << magnitude_bits);
+    let maximum = (1_i64 << magnitude_bits) - 1;
+    value >= minimum && value <= maximum
 }
 
 impl SchemeNil<'_> {
@@ -1564,6 +1897,56 @@ impl GerbilRuntime {
         )
     }
 
+    /// Encode an unsigned integer as a newly rooted Scheme bytevector.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error, or [`NativeError::UnsignedIntegerWidth`]
+    /// when a non-truncating fixed width cannot represent `value`.
+    pub fn uint_to_bytevector(
+        &self,
+        value: u64,
+        encoding: IntegerEncoding,
+    ) -> Result<RootedSchemeBytevector<'_>, NativeError> {
+        self.check_thread()?;
+        let size = resolved_unsigned_encoding_width(value, encoding)?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_uint_to_bytevector_root(
+                value,
+                encoding.byte_order().abi_code(),
+                size,
+                &raw mut root,
+            )
+        };
+        rooted_integer_bytevector(status, root, "gerbil_scheme_rust_uint_to_bytevector_root")
+    }
+
+    /// Encode a signed integer as a newly rooted two's-complement bytevector.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error, or [`NativeError::SignedIntegerWidth`]
+    /// when a non-truncating fixed width cannot represent `value`.
+    pub fn sint_to_bytevector(
+        &self,
+        value: i64,
+        encoding: IntegerEncoding,
+    ) -> Result<RootedSchemeBytevector<'_>, NativeError> {
+        self.check_thread()?;
+        let size = resolved_signed_encoding_width(value, encoding)?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_sint_to_bytevector_root(
+                value,
+                encoding.byte_order().abi_code(),
+                size,
+                &raw mut root,
+            )
+        };
+        rooted_integer_bytevector(status, root, "gerbil_scheme_rust_sint_to_bytevector_root")
+    }
+
     /// Parse an ASCII hexadecimal bytestring through Gerbil's AOT converter.
     ///
     /// The returned bytevector is rooted in the Gerbil module and releases its
@@ -1742,6 +2125,20 @@ pub enum NativeError {
         left: i64,
         /// Right operand.
         right: i64,
+    },
+    /// An unsigned value does not fit a checked fixed-width encoding.
+    UnsignedIntegerWidth {
+        /// Value that would lose high bits.
+        value: u64,
+        /// Requested width in bytes.
+        width: u8,
+    },
+    /// A signed value does not fit a checked fixed-width encoding.
+    SignedIntegerWidth {
+        /// Value that cannot be represented at the requested width.
+        value: i64,
+        /// Requested width in bytes.
+        width: u8,
     },
     /// A three-way comparison returned a value outside `-1`, `0`, and `1`.
     InvalidComparisonResult {
@@ -2059,9 +2456,10 @@ impl NativeError {
             Self::RuntimeFinalized => Some(GerbilStatus::RuntimeFinalized),
             Self::Status { code, .. } => GerbilStatus::from_code(*code),
             Self::AbiMismatch { .. } => Some(GerbilStatus::AbiMismatch),
-            Self::IntegerOverflow { .. } | Self::InvalidComparisonResult { .. } => {
-                Some(GerbilStatus::InvalidValue)
-            }
+            Self::IntegerOverflow { .. }
+            | Self::UnsignedIntegerWidth { .. }
+            | Self::SignedIntegerWidth { .. }
+            | Self::InvalidComparisonResult { .. } => Some(GerbilStatus::InvalidValue),
             Self::InvalidLifecycleState { .. } | Self::WrongThread { .. } => None,
         }
     }
@@ -2094,6 +2492,14 @@ impl fmt::Display for NativeError {
             Self::IntegerOverflow { left, right } => {
                 write!(formatter, "Gerbil i64 addition overflows: {left} + {right}")
             }
+            Self::UnsignedIntegerWidth { value, width } => write!(
+                formatter,
+                "unsigned integer {value} does not fit a {width}-byte encoding"
+            ),
+            Self::SignedIntegerWidth { value, width } => write!(
+                formatter,
+                "signed integer {value} does not fit a {width}-byte encoding"
+            ),
             Self::InvalidComparisonResult { code } => {
                 write!(formatter, "invalid Gerbil i64 comparison result {code}")
             }

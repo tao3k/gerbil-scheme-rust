@@ -34,7 +34,7 @@ unsafe extern "C" {
     ) -> i64;
     fn gerbil_scheme_rust_root_string_length_raw(root: i64) -> i64;
     fn gerbil_scheme_rust_root_string_char_ref_raw(root: i64, index: i64) -> i32;
-    fn gerbil_scheme_rust_root_bytevector_length_raw(root: i64) -> i64;
+    pub(crate) fn gerbil_scheme_rust_root_bytevector_length_raw(root: i64) -> i64;
     fn gerbil_scheme_rust_root_bytevector_u8_ref_raw(root: i64, index: i64) -> i32;
     fn gerbil_scheme_rust_root_release_raw(root: i64) -> i32;
 }

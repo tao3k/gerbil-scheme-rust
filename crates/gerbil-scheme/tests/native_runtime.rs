@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 use gerbil_scheme::{
-    BytestringDelimiter, GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GerbilRuntime,
-    GerbilRuntimeReceipt, GerbilStatus, GerbilValueProvenance, NativeError,
+    ByteOrder, BytestringDelimiter, GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION,
+    GerbilRuntime, GerbilRuntimeReceipt, GerbilStatus, GerbilValueProvenance, IntegerDecoding,
+    IntegerEncoding, IntegerWidth, NativeError,
 };
 
 #[test]
@@ -26,7 +27,172 @@ fn calls_scalar_export_in_process() {
     );
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
     exports_scheme_objects_and_traverses_pairs(&runtime);
+    exercises_integer_bytevector_conversions(&runtime);
     reports_overflow_and_finalized_runtime_boundaries(runtime);
+}
+
+fn exercises_integer_bytevector_conversions(runtime: &GerbilRuntime) {
+    exercises_integer_bytevector_decoding(runtime);
+    exercises_integer_bytevector_minimal_encoding(runtime);
+    exercises_integer_bytevector_width_policy(runtime);
+}
+
+fn exercises_integer_bytevector_decoding(runtime: &GerbilRuntime) {
+    let fixture = runtime
+        .fixture_bytevector_value()
+        .expect("export bytevector fixture");
+    let fixture = fixture
+        .as_bytevector()
+        .into_result()
+        .expect("project bytevector fixture");
+    assert_eq!(
+        fixture
+            .to_uint(IntegerDecoding::prefix(ByteOrder::Big, integer_width(1)))
+            .as_result(),
+        Ok(&255)
+    );
+    assert_eq!(
+        fixture
+            .to_sint(IntegerDecoding::prefix(ByteOrder::Big, integer_width(1)))
+            .as_result(),
+        Ok(&-1)
+    );
+
+    let big_one = runtime
+        .uint_to_bytevector(1, IntegerEncoding::fixed(ByteOrder::Big, integer_width(2)))
+        .expect("encode big-endian uint");
+    assert_eq!(big_one.to_vec().into_result(), Ok(vec![0, 1]));
+    assert_eq!(
+        big_one.to_uint(IntegerDecoding::default()).as_result(),
+        Ok(&1)
+    );
+
+    let little_one = runtime
+        .uint_to_bytevector(
+            1,
+            IntegerEncoding::fixed(ByteOrder::Little, integer_width(2)),
+        )
+        .expect("encode little-endian uint");
+    assert_eq!(little_one.to_vec().into_result(), Ok(vec![1, 0]));
+    assert_eq!(
+        little_one
+            .to_uint(IntegerDecoding::entire(ByteOrder::Little))
+            .as_result(),
+        Ok(&1)
+    );
+
+    let native_one = runtime
+        .uint_to_bytevector(
+            1,
+            IntegerEncoding::fixed(ByteOrder::Native, integer_width(2)),
+        )
+        .expect("encode native-endian uint");
+    assert_eq!(
+        native_one.to_vec().into_result(),
+        Ok(if cfg!(target_endian = "little") {
+            vec![1, 0]
+        } else {
+            vec![0, 1]
+        })
+    );
+}
+
+fn exercises_integer_bytevector_minimal_encoding(runtime: &GerbilRuntime) {
+    let minimal_uint = runtime
+        .uint_to_bytevector(258, IntegerEncoding::default())
+        .expect("encode minimal uint");
+    assert_eq!(minimal_uint.to_vec().into_result(), Ok(vec![1, 2]));
+    assert_eq!(
+        minimal_uint.to_uint(IntegerDecoding::default()).as_result(),
+        Ok(&258)
+    );
+
+    let negative = runtime
+        .sint_to_bytevector(-23, IntegerEncoding::default())
+        .expect("encode minimal negative sint");
+    assert_eq!(negative.to_vec().into_result(), Ok(vec![233]));
+    assert_eq!(
+        negative.to_sint(IntegerDecoding::default()).as_result(),
+        Ok(&-23)
+    );
+
+    let positive = runtime
+        .sint_to_bytevector(233, IntegerEncoding::default())
+        .expect("encode minimal positive sint");
+    assert_eq!(positive.to_vec().into_result(), Ok(vec![0, 233]));
+    assert_eq!(
+        positive.to_sint(IntegerDecoding::default()).as_result(),
+        Ok(&233)
+    );
+}
+
+fn exercises_integer_bytevector_width_policy(runtime: &GerbilRuntime) {
+    assert!(matches!(
+        runtime.uint_to_bytevector(
+            258,
+            IntegerEncoding::fixed(ByteOrder::Big, integer_width(1))
+        ),
+        Err(NativeError::UnsignedIntegerWidth {
+            value: 258,
+            width: 1,
+        })
+    ));
+    assert!(matches!(
+        runtime.sint_to_bytevector(
+            233,
+            IntegerEncoding::fixed(ByteOrder::Big, integer_width(1))
+        ),
+        Err(NativeError::SignedIntegerWidth {
+            value: 233,
+            width: 1,
+        })
+    ));
+
+    let truncated_unsigned = runtime
+        .uint_to_bytevector(
+            258,
+            IntegerEncoding::fixed(ByteOrder::Big, integer_width(1)).truncating(),
+        )
+        .expect("explicitly truncate uint");
+    assert_eq!(truncated_unsigned.to_vec().into_result(), Ok(vec![2]));
+
+    let truncated_signed = runtime
+        .sint_to_bytevector(
+            233,
+            IntegerEncoding::fixed(ByteOrder::Big, integer_width(1)).truncating(),
+        )
+        .expect("explicitly truncate sint");
+    assert_eq!(truncated_signed.to_vec().into_result(), Ok(vec![233]));
+    assert_eq!(
+        truncated_signed
+            .to_sint(IntegerDecoding::default())
+            .as_result(),
+        Ok(&-23)
+    );
+
+    let empty = runtime
+        .bytevector_from_bytestring("", BytestringDelimiter::Compact)
+        .expect("root empty bytevector");
+    assert_eq!(
+        empty.to_uint(IntegerDecoding::default()).as_result(),
+        Ok(&0)
+    );
+    assert_eq!(
+        empty.to_sint(IntegerDecoding::default()).as_result(),
+        Ok(&0)
+    );
+
+    let nine_bytes = runtime
+        .bytevector_from_bytestring("000000000000000000", BytestringDelimiter::Compact)
+        .expect("root nine-byte vector");
+    assert_eq!(
+        nine_bytes.to_uint(IntegerDecoding::default()).status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+}
+
+fn integer_width(width: u8) -> IntegerWidth {
+    IntegerWidth::new(width).expect("test width is in 1..=8")
 }
 
 fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {

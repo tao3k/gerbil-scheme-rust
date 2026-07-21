@@ -128,6 +128,16 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         scenario: "bytevector-bytestring-round-trip",
     },
     BackedTypeMatrixEntry {
+        family: "integer-bytevector-conversion",
+        scheme_selector: "gerbil_scheme_rust_integer_bytes_shape",
+        raw_abi: "u64 + i64 + GerbilRootId + GerbilStatus",
+        safe_surface: "ByteOrder + IntegerWidth + IntegerEncoding + IntegerDecoding",
+        ownership: "copy integer input/result; single-owner rooted bytevector output",
+        nullability: "non-pointer integer values; positive root token",
+        failure_policy: "invalid width/status fail closed; truncation requires explicit opt-in",
+        scenario: "integer-bytevector-round-trip",
+    },
+    BackedTypeMatrixEntry {
         family: "borrowed-utf8",
         scheme_selector: "gerbil_scheme_rust_utf8_shape",
         raw_abi: "GerbilBorrowedUtf8",
@@ -194,7 +204,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     let source = read_native_surface_source();
     assert_eq!(
         BACKED_TYPE_MATRIX.len(),
-        17,
+        18,
         "the release-auditable backed type matrix must change deliberately",
     );
 
@@ -218,6 +228,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
         "(sentinel-values (nil void))",
         "(borrowed-values (bytevector utf8))",
         "(rooted-values (bytestring bytevector))",
+        "(conversion-values (integer-bytevector))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
     ] {
@@ -393,6 +404,7 @@ fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
         "gerbil_scheme_rust_i64_callback_shape",
         "(borrowed-values (bytevector utf8))",
         "(rooted-values (bytestring bytevector))",
+        "(conversion-values (integer-bytevector))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
         "(nullability . explicit-per-shape)",
@@ -423,6 +435,19 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
             "(callback-values (i64-callback))",
             "(nullability . explicit-per-shape)",
             "(rooting . explicit-per-shape)",
+        ],
+    );
+    assert_native_surface_shape_contract(
+        &source,
+        "gerbil_scheme_rust_integer_bytes_shape",
+        &[
+            "(name . integer-bytevector-conversion)",
+            "(machine-results (u64 i64))",
+            "(byte-orders (big little native))",
+            "(signed-representation . twos-complement)",
+            "(overflow-policy . reject-unless-explicitly-truncating)",
+            "(ownership . rooted-output-bytevector)",
+            "(failure-policy . status-preserving-fail-closed)",
         ],
     );
     assert_native_surface_shape_contract(

@@ -142,9 +142,9 @@ runtime bindings or their generated-artifact provenance gate.
 - [X] bytestring decoding to a rooted Scheme bytevector;
 - [X] GC reachability and deterministic release for conversion results;
 - [X] median and p95 nanosecond Scenario receipts;
-- [ ] =u8vector->uint= and =uint->u8vector= with explicit endian and width
+- [X] =u8vector->uint= and =uint->u8vector= with explicit endian and width
   policy;
-- [ ] =u8vector->sint= and =sint->u8vector= with two's-complement and overflow
+- [X] =u8vector->sint= and =sint->u8vector= with two's-complement and overflow
   policy;
 - [ ] =u8vector-init!= and =u8vector-every=;
 - [ ] =u8vector-reverse= and =u8vector-reverse!= with identity/mutation

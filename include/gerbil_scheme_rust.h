@@ -22,6 +22,12 @@ typedef enum GerbilStatus {
   GERBIL_STATUS_RUNTIME_FINALIZED = 8
 } GerbilStatus;
 
+typedef enum GerbilByteOrder {
+  GERBIL_BYTE_ORDER_BIG = 0,
+  GERBIL_BYTE_ORDER_LITTLE = 1,
+  GERBIL_BYTE_ORDER_NATIVE = 2
+} GerbilByteOrder;
+
 typedef struct GerbilBorrowedUtf8 {
   const char *ptr;
   size_t len;
@@ -118,6 +124,18 @@ GerbilStatus gerbil_scheme_rust_bytevector_to_bytestring_root(
     GerbilValueHandle value, int32_t delimiter, GerbilRootId *out);
 GerbilStatus gerbil_scheme_rust_bytestring_to_bytevector_root(
     GerbilBorrowedUtf8 value, int32_t delimiter, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_bytevector_to_uint(
+    GerbilValueHandle value, int32_t byte_order, size_t size, uint64_t *out);
+GerbilStatus gerbil_scheme_rust_bytevector_to_sint(
+    GerbilValueHandle value, int32_t byte_order, size_t size, int64_t *out);
+GerbilStatus gerbil_scheme_rust_root_bytevector_to_uint(
+    GerbilRootId root, int32_t byte_order, size_t size, uint64_t *out);
+GerbilStatus gerbil_scheme_rust_root_bytevector_to_sint(
+    GerbilRootId root, int32_t byte_order, size_t size, int64_t *out);
+GerbilStatus gerbil_scheme_rust_uint_to_bytevector_root(
+    uint64_t value, int32_t byte_order, size_t size, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_sint_to_bytevector_root(
+    int64_t value, int32_t byte_order, size_t size, GerbilRootId *out);
 GerbilStatus gerbil_scheme_rust_root_string_length(GerbilRootId root,
                                                    size_t *out);
 GerbilStatus gerbil_scheme_rust_root_string_char_ref(GerbilRootId root,

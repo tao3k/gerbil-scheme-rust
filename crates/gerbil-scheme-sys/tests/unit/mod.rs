@@ -12,6 +12,7 @@ use crate::{
     gerbil_scheme_rust_value_is_pair,
 };
 
+mod abi_integer_bytes;
 mod scenario_benchmark_suite;
 
 #[test]
@@ -31,6 +32,11 @@ fn public_header_matches_the_live_scalar_abi() {
     assert!(
         header.contains("int32_t gerbil_scheme_rust_compare_i64(int64_t left, int64_t right);")
     );
+    assert!(header.contains("GERBIL_BYTE_ORDER_NATIVE = 2"));
+    assert!(header.contains("gerbil_scheme_rust_bytevector_to_uint("));
+    assert!(header.contains("gerbil_scheme_rust_bytevector_to_sint("));
+    assert!(header.contains("gerbil_scheme_rust_uint_to_bytevector_root("));
+    assert!(header.contains("gerbil_scheme_rust_sint_to_bytevector_root("));
     assert!(!header.contains("int64_t *result"));
 }
 

@@ -40,6 +40,12 @@
   gerbil-rs-scheme-object-bytevector-u8-ref-raw
   gerbil-rs-bytevector->bytestring-root-raw
   gerbil-rs-bytestring->bytevector-root-raw
+  gerbil-rs-bytevector->uint-raw
+  gerbil-rs-bytevector->sint-raw
+  gerbil-rs-root-bytevector->uint-raw
+  gerbil-rs-root-bytevector->sint-raw
+  gerbil-rs-uint->bytevector-root-raw
+  gerbil-rs-sint->bytevector-root-raw
   gerbil-rs-root-string-length-raw
   gerbil-rs-root-string-char-ref-raw
   gerbil-rs-root-bytevector-length-raw
@@ -187,6 +193,67 @@
          (gerbil-rs-bytestring-delimiter delimiter-code)))
     (if bytevector (gerbil-rs-rooted-value-store! bytevector) 0)))
 
+;; Integer/bytevector conversions pin the wire semantics of :std/misc/bytes in
+;; this standalone AOT module. The checked Rust ABI validates byte order,
+;; width, type, and root identity before these internal helpers run.
+(def (gerbil-rs-u8vector->uint value byte-order size)
+  (let lp ((index (if (= byte-order 0) 0 (1- size))) (result 0))
+    (if (if (= byte-order 0) (< index size) (>= index 0))
+      (lp (if (= byte-order 0) (1+ index) (1- index))
+          (bitwise-ior
+           (arithmetic-shift result 8)
+           (u8vector-ref value index)))
+      result)))
+
+(def (gerbil-rs-u8vector->sint value byte-order size)
+  (if (zero? size)
+    0
+    (let* ((uint (gerbil-rs-u8vector->uint value byte-order size))
+           (bits (* size 8))
+           (sign-bit (arithmetic-shift 1 (1- bits))))
+      (if (zero? (bitwise-and uint sign-bit))
+        uint
+        (- uint (arithmetic-shift 1 bits))))))
+
+(def (gerbil-rs-uint->u8vector uint byte-order size)
+  (let ((value (make-u8vector size)))
+    (let lp ((index 0) (rest uint))
+      (when (< index size)
+        (u8vector-set!
+         value
+         (if (= byte-order 0) (- size index 1) index)
+         (bitwise-and rest #xff))
+        (lp (1+ index) (arithmetic-shift rest -8))))
+    value))
+
+(def (gerbil-rs-sint->u8vector sint byte-order size)
+  (gerbil-rs-uint->u8vector
+   (if (< sint 0)
+     (+ sint (arithmetic-shift 1 (* size 8)))
+     sint)
+   byte-order
+   size))
+
+(def (gerbil-rs-root-bytevector->uint root-id byte-order size)
+  (let ((value (gerbil-rs-rooted-value-ref root-id)))
+    (if (u8vector? value)
+      (gerbil-rs-u8vector->uint value byte-order size)
+      0)))
+
+(def (gerbil-rs-root-bytevector->sint root-id byte-order size)
+  (let ((value (gerbil-rs-rooted-value-ref root-id)))
+    (if (u8vector? value)
+      (gerbil-rs-u8vector->sint value byte-order size)
+      0)))
+
+(def (gerbil-rs-uint->bytevector-root uint byte-order size)
+  (gerbil-rs-rooted-value-store!
+   (gerbil-rs-uint->u8vector uint byte-order size)))
+
+(def (gerbil-rs-sint->bytevector-root sint byte-order size)
+  (gerbil-rs-rooted-value-store!
+   (gerbil-rs-sint->u8vector sint byte-order size)))
+
 ;; This is intentionally a scalar ABI proof. Rich values stay behind an opaque
 ;; runtime boundary until ownership, error, and thread contracts are versioned.
 (begin-ffi
@@ -228,6 +295,12 @@
    gerbil-rs-scheme-object-bytevector-u8-ref-raw
    gerbil-rs-bytevector->bytestring-root-raw
    gerbil-rs-bytestring->bytevector-root-raw
+   gerbil-rs-bytevector->uint-raw
+   gerbil-rs-bytevector->sint-raw
+   gerbil-rs-root-bytevector->uint-raw
+   gerbil-rs-root-bytevector->sint-raw
+   gerbil-rs-uint->bytevector-root-raw
+   gerbil-rs-sint->bytevector-root-raw
    gerbil-rs-root-string-length-raw
    gerbil-rs-root-string-char-ref-raw
    gerbil-rs-root-bytevector-length-raw
@@ -507,6 +580,66 @@
   (gerbil-scheme-rust/scheme/native#gerbil-rs-bytestring->bytevector-root
    bytestring
    delimiter-code))
+
+(c-define (gerbil-rs-bytevector->uint-raw value byte-order size)
+    (scheme-object int32 int64)
+    unsigned-int64
+    "gerbil_scheme_rust_bytevector_to_uint_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-u8vector->uint
+   value
+   byte-order
+   size))
+
+(c-define (gerbil-rs-bytevector->sint-raw value byte-order size)
+    (scheme-object int32 int64)
+    int64
+    "gerbil_scheme_rust_bytevector_to_sint_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-u8vector->sint
+   value
+   byte-order
+   size))
+
+(c-define (gerbil-rs-root-bytevector->uint-raw root-id byte-order size)
+    (int64 int32 int64)
+    unsigned-int64
+    "gerbil_scheme_rust_root_bytevector_to_uint_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector->uint
+   root-id
+   byte-order
+   size))
+
+(c-define (gerbil-rs-root-bytevector->sint-raw root-id byte-order size)
+    (int64 int32 int64)
+    int64
+    "gerbil_scheme_rust_root_bytevector_to_sint_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector->sint
+   root-id
+   byte-order
+   size))
+
+(c-define (gerbil-rs-uint->bytevector-root-raw uint byte-order size)
+    (unsigned-int64 int32 int64)
+    int64
+    "gerbil_scheme_rust_uint_to_bytevector_root_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-uint->bytevector-root
+   uint
+   byte-order
+   size))
+
+(c-define (gerbil-rs-sint->bytevector-root-raw sint byte-order size)
+    (int64 int32 int64)
+    int64
+    "gerbil_scheme_rust_sint_to_bytevector_root_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-sint->bytevector-root
+   sint
+   byte-order
+   size))
 
 (c-define (gerbil-rs-root-string-length-raw root-id)
     (int64)

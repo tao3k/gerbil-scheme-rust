@@ -15,6 +15,7 @@
          gerbil_scheme_rust_flonum_shape
          gerbil_scheme_rust_bytevector_shape
          gerbil_scheme_rust_rooted_bytes_shape
+         gerbil_scheme_rust_integer_bytes_shape
          gerbil_scheme_rust_utf8_shape
          gerbil_scheme_rust_value_handle_shape
          gerbil_scheme_rust_nil_shape
@@ -215,6 +216,24 @@
     (thread-affinity . runtime-owner-thread)
     (failure-policy . zero-root-to-invalid-value)))
 
+(def gerbil_scheme_rust_integer_bytes_shape
+  '(native-shape
+    (name . integer-bytevector-conversion)
+    (transport . c-abi)
+    (scheme-operations
+     (u8vector->uint uint->u8vector u8vector->sint sint->u8vector))
+    (bytevector-aliases
+     (bytevector->uint uint->bytevector bytevector->sint sint->bytevector))
+    (machine-results (u64 i64))
+    (byte-orders (big little native))
+    (width-range . zero-through-eight-at-raw-abi)
+    (safe-explicit-width-range . one-through-eight)
+    (default-width . minimal-on-encode-entire-vector-on-decode)
+    (signed-representation . twos-complement)
+    (overflow-policy . reject-unless-explicitly-truncating)
+    (ownership . rooted-output-bytevector)
+    (failure-policy . status-preserving-fail-closed)))
+
 (def gerbil_scheme_rust_i64_callback_shape
   '(native-shape
     (name . i64-callback)
@@ -234,6 +253,7 @@
     (sentinel-values (nil void))
     (borrowed-values (bytevector utf8))
     (rooted-values (bytestring bytevector))
+    (conversion-values (integer-bytevector))
     (handle-values (runtime-handle gerbil-value-handle))
     (callback-values (i64-callback))
     (nullability . explicit-per-shape)

@@ -1,6 +1,6 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/native::timestamp 1784611633)
+  (define gerbil-scheme-rust/scheme/native::timestamp 1784656004)
   (begin
     (define-macro (define-guard guard defn)
       (if (eval `(cond-expand
@@ -267,6 +267,7 @@
       gerbil-rs-scheme-object-boolean?-raw
       gerbil-rs-scheme-object-list?-raw
       gerbil-rs-scheme-object-pair?-raw
+      gerbil-rs-scheme-object-void?-raw
       gerbil-rs-scheme-object-null?-raw
       gerbil-rs-fixture-flonum-neg-zero-raw
       gerbil-rs-fixture-flonum-neg-inf-raw
@@ -282,6 +283,7 @@
       gerbil-rs-fixture-improper-list-raw
       gerbil-rs-fixture-proper-list-raw
       gerbil-rs-fixture-pair-raw
+      gerbil-rs-fixture-void-raw
       gerbil-rs-scheme-null-value-raw
       gerbil-rs-compare-i64
       gerbil-rs-is-even-i64
@@ -322,6 +324,13 @@
      "gerbil_scheme_rust_scheme_null_value_raw"
      "extern"
      '())
+    (c-define
+     (gerbil-rs-fixture-void-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_void_raw"
+     "extern"
+     #!void)
     (c-define
      (gerbil-rs-fixture-pair-raw)
      ()
@@ -427,6 +436,13 @@
      "gerbil_scheme_rust_scheme_object_is_null_raw"
      "extern"
      (if (null? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-void?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_void_raw"
+     "extern"
+     (if (eq? value #!void) 1 0))
     (c-define
      (gerbil-rs-scheme-object-pair?-raw value)
      (scheme-object)

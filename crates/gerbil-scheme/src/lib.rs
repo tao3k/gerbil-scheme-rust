@@ -25,7 +25,7 @@ mod native;
 #[cfg(feature = "native")]
 pub use native::{
     SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword, SchemeList, SchemeNil,
-    SchemePair, SchemePairParts, SchemeScalar, SchemeSymbol,
+    SchemePair, SchemePairParts, SchemeScalar, SchemeSymbol, SchemeVoid,
 };
 
 #[cfg(feature = "native")]

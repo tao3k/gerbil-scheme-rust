@@ -7,6 +7,7 @@
   gerbil-rs-is-even-i64
   gerbil-rs-compare-i64
   gerbil-rs-scheme-null-value-raw
+  gerbil-rs-fixture-void-raw
   gerbil-rs-fixture-pair-raw
   gerbil-rs-fixture-proper-list-raw
   gerbil-rs-fixture-improper-list-raw
@@ -22,6 +23,7 @@
   gerbil-rs-fixture-flonum-neg-inf-raw
   gerbil-rs-fixture-flonum-neg-zero-raw
   gerbil-rs-scheme-object-null?-raw
+  gerbil-rs-scheme-object-void?-raw
   gerbil-rs-scheme-object-pair?-raw
   gerbil-rs-scheme-object-list?-raw
   gerbil-rs-scheme-object-boolean?-raw
@@ -43,6 +45,7 @@
    gerbil-rs-is-even-i64
    gerbil-rs-compare-i64
    gerbil-rs-scheme-null-value-raw
+   gerbil-rs-fixture-void-raw
    gerbil-rs-fixture-pair-raw
    gerbil-rs-fixture-proper-list-raw
    gerbil-rs-fixture-improper-list-raw
@@ -58,6 +61,7 @@
    gerbil-rs-fixture-flonum-neg-inf-raw
    gerbil-rs-fixture-flonum-neg-zero-raw
    gerbil-rs-scheme-object-null?-raw
+   gerbil-rs-scheme-object-void?-raw
    gerbil-rs-scheme-object-pair?-raw
    gerbil-rs-scheme-object-list?-raw
    gerbil-rs-scheme-object-boolean?-raw
@@ -97,14 +101,21 @@
      ((> left right) 1)
      (else 0)))
 
-  (c-define (gerbil-rs-scheme-null-value-raw)
-      ()
-      scheme-object
-      "gerbil_scheme_rust_scheme_null_value_raw"
-      "extern"
-    '())
+(c-define (gerbil-rs-scheme-null-value-raw)
+    ()
+    scheme-object
+    "gerbil_scheme_rust_scheme_null_value_raw"
+    "extern"
+  '())
 
-  (c-define (gerbil-rs-fixture-pair-raw)
+(c-define (gerbil-rs-fixture-void-raw)
+    ()
+    scheme-object
+    "gerbil_scheme_rust_fixture_void_raw"
+    "extern"
+  #!void)
+
+(c-define (gerbil-rs-fixture-pair-raw)
       ()
       scheme-object
       "gerbil_scheme_rust_fixture_pair_raw"
@@ -202,14 +213,21 @@
       "extern"
     -0.0)
 
-  (c-define (gerbil-rs-scheme-object-null?-raw value)
-      (scheme-object)
-      int32
-      "gerbil_scheme_rust_scheme_object_is_null_raw"
-      "extern"
-    (if (null? value) 1 0))
+(c-define (gerbil-rs-scheme-object-null?-raw value)
+    (scheme-object)
+    int32
+    "gerbil_scheme_rust_scheme_object_is_null_raw"
+    "extern"
+  (if (null? value) 1 0))
 
-  (c-define (gerbil-rs-scheme-object-pair?-raw value)
+(c-define (gerbil-rs-scheme-object-void?-raw value)
+    (scheme-object)
+    int32
+    "gerbil_scheme_rust_scheme_object_is_void_raw"
+    "extern"
+  (if (eq? value #!void) 1 0))
+
+(c-define (gerbil-rs-scheme-object-pair?-raw value)
       (scheme-object)
       int32
       "gerbil_scheme_rust_scheme_object_is_pair_raw"

@@ -14,6 +14,7 @@
 
   ;; Scheme object fixtures.
   gerbil-rs-scheme-null-value-raw
+  gerbil-rs-fixture-void-raw
   gerbil-rs-fixture-pair-raw
   gerbil-rs-fixture-proper-list-raw
   gerbil-rs-fixture-improper-list-raw
@@ -31,6 +32,7 @@
 
   ;; Scheme object predicates.
   gerbil-rs-scheme-object-null?-raw
+  gerbil-rs-scheme-object-void?-raw
   gerbil-rs-scheme-object-pair?-raw
   gerbil-rs-scheme-object-list?-raw
   gerbil-rs-scheme-object-boolean?-raw

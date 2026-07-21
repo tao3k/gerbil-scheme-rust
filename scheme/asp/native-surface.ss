@@ -16,6 +16,7 @@
          gerbil_scheme_rust_utf8_shape
          gerbil_scheme_rust_value_handle_shape
          gerbil_scheme_rust_nil_shape
+         gerbil_scheme_rust_void_shape
          gerbil_scheme_rust_i64_callback_shape
          gerbil_scheme_rust_native_value_shape
          gerbil_scheme_rust_native_error_shape
@@ -171,6 +172,19 @@
     (rooting . unrooted-borrow)
     (gc-policy . no-gc-root-guarantee)))
 
+(def gerbil_scheme_rust_void_shape
+  '(native-shape
+    (name . void)
+    (transport . c-abi)
+    (repr . gerbil-value-handle)
+    (ownership . gerbil-runtime-owned)
+    (nullability . non-zero-handle)
+    (sentinel . void)
+    (predicate . eq?-#!void)
+    (projection . SchemeVoid)
+    (rooting . unrooted-borrow)
+    (gc-policy . no-gc-root-guarantee)))
+
 (def gerbil_scheme_rust_i64_callback_shape
   '(native-shape
     (name . i64-callback)
@@ -187,7 +201,7 @@
     (name . native-value)
     (transport . c-abi)
     (scalar-values (i64 bool comparison status fixnum char flonum))
-    (sentinel-values (nil))
+    (sentinel-values (nil void))
     (borrowed-values (utf8))
     (handle-values (runtime-handle gerbil-value-handle))
     (callback-values (i64-callback))

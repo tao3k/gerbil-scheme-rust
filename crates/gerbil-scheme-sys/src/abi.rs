@@ -169,6 +169,7 @@ pub struct GerbilRuntimeOpaque {
 /// Gambit represents the universal Scheme object (`scheme-object` in Gerbil
 /// FFI) as a machine word. Keep the Rust ABI aligned with the public C header's
 /// `uintptr_t` instead of modelling it as a dereferenceable pointer.
+/// Opaque Gambit/Gerbil Scheme object word.
 pub type GerbilValueHandle = usize;
 
 /// Callback for a native binding that consumes one signed integer.

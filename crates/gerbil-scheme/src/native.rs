@@ -177,6 +177,30 @@ pub struct SchemeNil<'runtime> {
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
 
+/// Borrowed, runtime-backed Scheme void marker.
+///
+/// This proves only that a Gerbil-owned Scheme object export satisfied `void?`
+/// at projection time. It does not root, retain, or own the underlying object.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeVoid<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl SchemeVoid<'_> {
+    fn from_raw(raw: usize) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    #[must_use]
+    pub fn as_raw(&self) -> usize {
+        self.raw.get()
+    }
+}
+
 impl SchemeNil<'_> {
     /// Wrap a non-zero runtime-owned nil handle.
     ///
@@ -294,6 +318,58 @@ impl<'runtime> GerbilValue<'runtime> {
             ),
             Ok(false) => NativeResult::err(NativeError::Status {
                 operation: "gerbil_scheme_rust_scheme_object_as_nil",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Checks whether this value is Scheme void.
+    ///
+    /// This only succeeds for values exported by the initialized Gerbil runtime.
+    #[must_use]
+    pub fn is_void(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_void",
+                self.raw.get(),
+                gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_is_void,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_void",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as Scheme void.
+    ///
+    /// This succeeds only for runtime-produced Scheme-object exports that
+    /// satisfy `void?`. It returns a borrowed marker around the same opaque
+    /// handle and does not claim ownership or GC rooting.
+    #[must_use]
+    pub fn as_void(self) -> NativeResult<SchemeVoid<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_void",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_void().into_result() {
+            Ok(true) => SchemeVoid::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_void",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_void",
                 code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
             }),
             Err(error) => NativeResult::err(error),
@@ -895,6 +971,32 @@ impl GerbilRuntime {
         value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
             .ok_or(NativeError::Status {
                 operation: "GerbilRuntime::fixture_null_value",
+                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+            })
+    }
+
+    /// Returns the Scheme void object through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_void_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.check_thread()?;
+        let mut out = 0;
+        // SAFETY: self proves runtime/module lifetime and `out` is a valid
+        // output slot for one borrowed Scheme object handle.
+        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_fixture_void(&raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "GerbilRuntime::fixture_void_value",
+                code: status as i32,
+            });
+        }
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
+            .ok_or(NativeError::Status {
+                operation: "GerbilRuntime::fixture_void_value",
                 code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
             })
     }

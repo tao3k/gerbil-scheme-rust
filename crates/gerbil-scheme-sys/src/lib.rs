@@ -1,6 +1,7 @@
 //! Raw C ABI bindings for the Gerbil Scheme runtime bridge.
 
 mod abi;
+mod abi_sentinel;
 mod scheme_char;
 mod scheme_fixnum;
 mod scheme_flonum;
@@ -22,6 +23,7 @@ pub use abi::{
     gerbil_scheme_rust_scheme_object_pair_parts, gerbil_scheme_rust_value_is_list,
     gerbil_scheme_rust_value_is_null, gerbil_scheme_rust_value_is_pair,
 };
+pub use abi_sentinel::{gerbil_scheme_rust_fixture_void, gerbil_scheme_rust_scheme_object_is_void};
 
 pub use abi::{
     GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION, GERBIL_SCHEME_RUST_HEADER_PATH,

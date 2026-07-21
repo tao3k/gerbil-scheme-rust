@@ -32,6 +32,7 @@ fn calls_scalar_export_in_process() {
 fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     exports_runtime_sentinel(runtime);
     exports_null_object(runtime);
+    exports_void_object(runtime);
     exports_boolean_objects(runtime);
     exports_fixnum_object(runtime);
     exports_char_objects(runtime);
@@ -56,14 +57,46 @@ fn exports_null_object(runtime: &GerbilRuntime) {
     assert_eq!(scheme_null.is_pair().as_result(), Ok(&false));
     assert_eq!(scheme_null.is_list().as_result(), Ok(&true));
     assert_eq!(scheme_null.is_null().as_result(), Ok(&true));
+    assert_eq!(scheme_null.is_void().as_result(), Ok(&false));
     let scheme_nil = scheme_null.as_nil().into_result().expect("project nil");
     assert_eq!(scheme_nil.as_raw(), scheme_null.as_raw());
+    assert_eq!(
+        scheme_null.as_void().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_eq!(scheme_null.is_boolean().as_result(), Ok(&false));
     assert_eq!(
         scheme_null.as_boolean().status(),
         Some(GerbilStatus::InvalidValue)
     );
     assert_fail_closed_traversal(scheme_null);
+}
+
+fn exports_void_object(runtime: &GerbilRuntime) {
+    let scheme_void = runtime
+        .fixture_void_value()
+        .expect("export Scheme void object through native runtime");
+    assert_ne!(scheme_void.as_raw(), 0);
+    assert_scheme_object_export(scheme_void);
+    assert_eq!(scheme_void.is_pair().as_result(), Ok(&false));
+    assert_eq!(scheme_void.is_list().as_result(), Ok(&false));
+    assert_eq!(scheme_void.is_null().as_result(), Ok(&false));
+    assert_eq!(
+        scheme_void.as_nil().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(scheme_void.is_void().as_result(), Ok(&true));
+    let projected_void = scheme_void
+        .as_void()
+        .into_result()
+        .expect("project Scheme void");
+    assert_eq!(projected_void.as_raw(), scheme_void.as_raw());
+    assert_eq!(scheme_void.is_boolean().as_result(), Ok(&false));
+    assert_eq!(
+        scheme_void.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_fail_closed_traversal(scheme_void);
 }
 
 fn exports_boolean_objects(runtime: &GerbilRuntime) {
@@ -295,6 +328,7 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
     assert_eq!(value.is_pair().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_list().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_void().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(
         value.is_boolean().status(),
         Some(GerbilStatus::InvalidValue)
@@ -305,6 +339,7 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
     );
     assert_eq!(value.is_fixnum().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.as_nil().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.as_void().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.as_fixnum().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(
         value.as_fixnum_i64().status(),

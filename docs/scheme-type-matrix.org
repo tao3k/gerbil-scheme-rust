@@ -39,7 +39,7 @@ rooting before they can become owned Rust values:
 | symbol | =SchemeSymbol= | non-zero =GerbilValueHandle= | no allocation or interning |
 | keyword | =SchemeKeyword= | non-zero =GerbilValueHandle= | no allocation or interning |
 | pair | =SchemePair= plus =GerbilValue::pair_car=/=pair_cdr=/=pair_parts= | non-zero =GerbilValueHandle= | traversal fails closed until runtime-backed |
-| list | =SchemeList= plus =GerbilValue::is_list=/=is_null= | non-zero =GerbilValueHandle= | classification fails closed until runtime-backed |
+| list | =SchemeList= plus =GerbilValue::is_list=/=is_null= | non-zero =GerbilValueHandle= | =is_null= is runtime-backed for Scheme object exports; list classification remains fail-closed |
 
 These types preserve handle identity and reject zero handles.  Pair/list
 status wrappers call the sys ABI and report explicit =NativeResult= status
@@ -68,6 +68,7 @@ the public safe API changes behavior:
   before any pair/list behavior changes;
 - Scheme object exports are explicitly tagged as
   =GerbilValueProvenance::SchemeObjectExport= and remain borrowed/unrooted;
+- =is_null= routes to Gerbil =null?= only for =SchemeObjectExport= handles;
 - add a runtime-owned value constructor that can only be produced by an
   initialized =GerbilRuntime= or a Gerbil export;
 - keep arbitrary =from_raw= handles fail-closed unless they carry runtime

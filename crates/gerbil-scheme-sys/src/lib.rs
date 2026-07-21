@@ -2,6 +2,8 @@
 
 mod abi;
 
+pub use abi::gerbil_scheme_rust_scheme_object_is_null;
+
 pub use abi::{
     GerbilBoolean, GerbilBorrowedBytevector, GerbilBorrowedVector, GerbilChar, GerbilFixnum,
     GerbilFlonum, GerbilPair, GerbilProcedureCallback,

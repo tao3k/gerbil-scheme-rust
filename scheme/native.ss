@@ -6,7 +6,8 @@
   gerbil-rs-add-i64
   gerbil-rs-is-even-i64
   gerbil-rs-compare-i64
-  gerbil-rs-scheme-null-value-raw)
+  gerbil-rs-scheme-null-value-raw
+  gerbil-rs-scheme-object-null?-raw)
 
 ;; This is intentionally a scalar ABI proof. Rich values stay behind an opaque
 ;; runtime boundary until ownership, error, and thread contracts are versioned.
@@ -15,7 +16,8 @@
    gerbil-rs-add-i64
    gerbil-rs-is-even-i64
    gerbil-rs-compare-i64
-   gerbil-rs-scheme-null-value-raw)
+   gerbil-rs-scheme-null-value-raw
+   gerbil-rs-scheme-object-null?-raw)
   (c-define (gerbil-rs-abi-version)
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
@@ -48,4 +50,11 @@
       scheme-object
       "gerbil_scheme_rust_scheme_null_value_raw"
       "extern"
-    '()))
+    '())
+
+  (c-define (gerbil-rs-scheme-object-null?-raw value)
+      (scheme-object)
+      int32
+      "gerbil_scheme_rust_scheme_object_is_null_raw"
+      "extern"
+    (if (null? value) 1 0)))

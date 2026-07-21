@@ -64,6 +64,8 @@ GerbilStatus gerbil_scheme_rust_value_is_list(GerbilValueHandle value,
                                               GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_value_is_null(GerbilValueHandle value,
                                               GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_null(GerbilValueHandle value,
+                                                      GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_pair_car(GerbilValueHandle value,
                                          GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_pair_cdr(GerbilValueHandle value,

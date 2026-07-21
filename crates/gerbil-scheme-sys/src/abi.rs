@@ -423,6 +423,30 @@ pub unsafe extern "C" fn gerbil_scheme_rust_fixture_improper_list(
     unsafe { checked_scheme_object_fixture(out, gerbil_scheme_rust_fixture_improper_list_raw) }
 }
 
+/// Export a Scheme true object fixture through the initialized runtime.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_fixture_true(
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe { checked_scheme_object_fixture(out, gerbil_scheme_rust_fixture_true_raw) }
+}
+
+/// Export a Scheme false object fixture through the initialized runtime.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_fixture_false(
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe { checked_scheme_object_fixture(out, gerbil_scheme_rust_fixture_false_raw) }
+}
+
 /// Return whether a value handle is backed by a Scheme list.
 ///
 /// This ABI entry point is intentionally fail-closed until runtime-backed list
@@ -516,6 +540,46 @@ pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_null(
     unsafe {
         checked_scheme_object_predicate(value, out, gerbil_scheme_rust_scheme_object_is_null_raw)
     }
+}
+
+/// Checks whether a Scheme-object export is a boolean.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_boolean(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    unsafe {
+        checked_scheme_object_predicate(value, out, gerbil_scheme_rust_scheme_object_is_boolean_raw)
+    }
+}
+
+/// Projects a Scheme-object boolean into the boolean ABI carrier.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_as_boolean(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    if value == 0 || out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    if unsafe { gerbil_scheme_rust_scheme_object_is_boolean_raw(value) } == 0 {
+        return GerbilStatus::InvalidValue;
+    }
+
+    let projected = unsafe { gerbil_scheme_rust_scheme_object_boolean_value_raw(value) } != 0;
+    // SAFETY: caller provided a non-null output pointer for one GerbilBoolean.
+    unsafe {
+        *out = GerbilBoolean::from_bool(projected);
+    }
+    GerbilStatus::Ok
 }
 
 unsafe fn checked_scheme_object_predicate(
@@ -833,6 +897,22 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_fixture_improper_list_raw() -> GerbilValueHandle;
 
+    /// Raw Scheme-object true fixture exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_fixture_true_raw() -> GerbilValueHandle;
+
+    /// Raw Scheme-object false fixture exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_fixture_false_raw() -> GerbilValueHandle;
+
     /// Raw Scheme-object pair predicate exported by `scheme/native.ss`.
     ///
     /// # Safety
@@ -856,6 +936,22 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_is_null_raw(value: GerbilValueHandle) -> i32;
+
+    /// Raw Scheme-object boolean predicate exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_object_is_boolean_raw(value: GerbilValueHandle) -> i32;
+
+    /// Raw Scheme-object boolean value projection exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_object_boolean_value_raw(value: GerbilValueHandle) -> i32;
 
     /// Raw Scheme-object pair car projection exported by `scheme/native.ss`.
     ///

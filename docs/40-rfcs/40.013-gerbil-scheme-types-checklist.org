@@ -128,12 +128,15 @@ keeps this table aligned with the Scheme source-surface projection.
 ** Boolean
 
 - [X] Current scalar bool use through i64 parity operation.
-- [?] Scheme ASP surface contains a boolean shape entry, but safe first-class
-  boolean value projection is not complete.
-- [ ] Raw ABI shape for Scheme boolean values as values, not only Rust bool
+- [X] Scheme ASP surface contains a boolean shape entry, and safe first-class
+  boolean value projection is complete for =SchemeObjectExport= handles.
+- [X] Raw ABI shape for Scheme boolean values as values, not only Rust bool
   return.
-- [ ] Safe =GerbilBool= or direct =bool= projection rules.
-- [ ] Scenario for boolean round-trip and invalid boolean raw values.
+- [X] Safe direct =bool= projection rules through =GerbilValue::as_boolean=.
+- [X] Scenario for boolean round-trip through runtime-exported =#t= and =#f=
+  fixtures.
+- [ ] Scenario for invalid boolean raw values beyond provenance fail-closed
+  coverage.
 
 ** Exact integers and machine integers
 

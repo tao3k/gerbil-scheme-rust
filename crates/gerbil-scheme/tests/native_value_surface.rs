@@ -108,6 +108,16 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         scenario: "native-runtime-round-trip",
     },
     BackedTypeMatrixEntry {
+        family: "bytevector",
+        scheme_selector: "gerbil_scheme_rust_bytevector_shape",
+        raw_abi: "GerbilValueHandle",
+        safe_surface: "GerbilValue::as_bytevector + SchemeBytevector",
+        ownership: "runtime-borrowed Scheme object",
+        nullability: "non-zero handle; distinct from null pointer",
+        failure_policy: "non-bytevector objects and raw provenance fail closed",
+        scenario: "native-runtime-round-trip",
+    },
+    BackedTypeMatrixEntry {
         family: "borrowed-utf8",
         scheme_selector: "gerbil_scheme_rust_utf8_shape",
         raw_abi: "GerbilBorrowedUtf8",
@@ -174,7 +184,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     let source = read_native_surface_source();
     assert_eq!(
         BACKED_TYPE_MATRIX.len(),
-        15,
+        16,
         "the release-auditable backed type matrix must change deliberately",
     );
 
@@ -196,7 +206,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     for required_family in [
         "(scalar-values (i64 bool comparison status fixnum char flonum))",
         "(sentinel-values (nil void))",
-        "(borrowed-values (utf8))",
+        "(borrowed-values (bytevector utf8))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
     ] {
@@ -370,7 +380,7 @@ fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
         "gerbil_scheme_rust_utf8_shape",
         "gerbil_scheme_rust_value_handle_shape",
         "gerbil_scheme_rust_i64_callback_shape",
-        "(borrowed-values (utf8))",
+        "(borrowed-values (bytevector utf8))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
         "(nullability . explicit-per-shape)",
@@ -396,7 +406,7 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
             "(name . native-value)",
             "(transport . c-abi)",
             "(scalar-values (i64 bool comparison status fixnum char flonum))",
-            "(borrowed-values (utf8))",
+            "(borrowed-values (bytevector utf8))",
             "(handle-values (runtime-handle gerbil-value-handle))",
             "(callback-values (i64-callback))",
             "(nullability . explicit-per-shape)",

@@ -13,6 +13,7 @@
          gerbil_scheme_rust_fixnum_shape
          gerbil_scheme_rust_char_shape
          gerbil_scheme_rust_flonum_shape
+         gerbil_scheme_rust_bytevector_shape
          gerbil_scheme_rust_utf8_shape
          gerbil_scheme_rust_value_handle_shape
          gerbil_scheme_rust_nil_shape
@@ -185,6 +186,19 @@
     (rooting . unrooted-borrow)
     (gc-policy . no-gc-root-guarantee)))
 
+(def gerbil_scheme_rust_bytevector_shape
+  '(native-shape
+    (name . bytevector)
+    (transport . c-abi)
+    (repr . gerbil-value-handle)
+    (ownership . gerbil-runtime-owned)
+    (nullability . non-zero-handle)
+    (predicate . u8vector?)
+    (projection . SchemeBytevector)
+    (accessors (length u8-ref to-vec))
+    (rooting . unrooted-borrow)
+    (gc-policy . no-gc-root-guarantee)))
+
 (def gerbil_scheme_rust_i64_callback_shape
   '(native-shape
     (name . i64-callback)
@@ -202,7 +216,7 @@
     (transport . c-abi)
     (scalar-values (i64 bool comparison status fixnum char flonum))
     (sentinel-values (nil void))
-    (borrowed-values (utf8))
+    (borrowed-values (bytevector utf8))
     (handle-values (runtime-handle gerbil-value-handle))
     (callback-values (i64-callback))
     (nullability . explicit-per-shape)

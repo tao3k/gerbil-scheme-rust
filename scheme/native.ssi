@@ -29,10 +29,12 @@
   gerbil-rs-fixture-flonum-pos-inf-raw
   gerbil-rs-fixture-flonum-neg-inf-raw
   gerbil-rs-fixture-flonum-neg-zero-raw
+  gerbil-rs-fixture-bytevector-raw
 
   ;; Scheme object predicates.
   gerbil-rs-scheme-object-null?-raw
   gerbil-rs-scheme-object-void?-raw
+  gerbil-rs-scheme-object-bytevector?-raw
   gerbil-rs-scheme-object-pair?-raw
   gerbil-rs-scheme-object-list?-raw
   gerbil-rs-scheme-object-boolean?-raw
@@ -45,5 +47,7 @@
   gerbil-rs-scheme-object-fixnum-value-raw
   gerbil-rs-scheme-object-char-value-raw
   gerbil-rs-scheme-object-flonum-value-raw
+  gerbil-rs-scheme-object-bytevector-length-raw
+  gerbil-rs-scheme-object-bytevector-u8-ref-raw
   gerbil-rs-scheme-object-pair-car-raw
   gerbil-rs-scheme-object-pair-cdr-raw)

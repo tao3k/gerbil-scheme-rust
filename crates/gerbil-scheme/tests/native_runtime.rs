@@ -37,6 +37,7 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     exports_fixnum_object(runtime);
     exports_char_objects(runtime);
     exports_flonum_objects(runtime);
+    exports_bytevector_object(runtime);
     exports_pair_object(runtime);
     exports_proper_list_object(runtime);
     exports_improper_list_object(runtime);
@@ -241,6 +242,50 @@ fn assert_flonum_fixture(
     assert_untrusted_raw_fail_closed(value);
 }
 
+fn exports_bytevector_object(runtime: &GerbilRuntime) {
+    let scheme_bytevector = runtime
+        .fixture_bytevector_value()
+        .expect("export Scheme bytevector object through native runtime");
+    assert_ne!(scheme_bytevector.as_raw(), 0);
+    assert_scheme_object_export(scheme_bytevector);
+    assert_eq!(scheme_bytevector.is_pair().as_result(), Ok(&false));
+    assert_eq!(scheme_bytevector.is_list().as_result(), Ok(&false));
+    assert_eq!(scheme_bytevector.is_null().as_result(), Ok(&false));
+    assert_eq!(scheme_bytevector.is_void().as_result(), Ok(&false));
+    assert_eq!(
+        scheme_bytevector.as_nil().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(
+        scheme_bytevector.as_void().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(scheme_bytevector.is_bytevector().as_result(), Ok(&true));
+    let projected = scheme_bytevector
+        .as_bytevector()
+        .into_result()
+        .expect("project Scheme bytevector");
+    assert_eq!(projected.as_raw(), scheme_bytevector.as_raw());
+    assert_eq!(projected.len().as_result(), Ok(&5));
+    assert_eq!(projected.is_empty().as_result(), Ok(&false));
+    assert_eq!(projected.u8_at(0).as_result(), Ok(&255));
+    assert_eq!(projected.u8_at(4).as_result(), Ok(&0));
+    assert_eq!(
+        projected.u8_at(5).status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(
+        projected.to_vec().into_result().expect("copy bytevector"),
+        vec![255, 127, 11, 1, 0]
+    );
+    assert_eq!(scheme_bytevector.is_boolean().as_result(), Ok(&false));
+    assert_eq!(
+        scheme_bytevector.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_fail_closed_traversal(scheme_bytevector);
+}
+
 fn exports_pair_object(runtime: &GerbilRuntime) {
     let pair = runtime
         .fixture_pair_value()
@@ -330,6 +375,10 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
     assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_void().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(
+        value.is_bytevector().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(
         value.is_boolean().status(),
         Some(GerbilStatus::InvalidValue)
     );
@@ -340,6 +389,10 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
     assert_eq!(value.is_fixnum().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.as_nil().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.as_void().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(
+        value.as_bytevector().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_eq!(value.as_fixnum().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(
         value.as_fixnum_i64().status(),

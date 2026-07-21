@@ -201,6 +201,98 @@ impl SchemeVoid<'_> {
     }
 }
 
+/// Borrowed, runtime-backed Scheme bytevector marker.
+///
+/// This proves only that a Gerbil-owned Scheme object export satisfied
+/// `u8vector?` at projection time. It does not root, retain, or own the
+/// underlying object.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeBytevector<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl SchemeBytevector<'_> {
+    fn from_raw(raw: usize) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    #[must_use]
+    pub fn as_raw(&self) -> usize {
+        self.raw.get()
+    }
+
+    /// Return this bytevector's byte length.
+    #[must_use]
+    pub fn len(&self) -> NativeResult<usize> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_bytevector_length(
+                self.raw.get(),
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_bytevector_length",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Return whether this bytevector has no bytes.
+    #[must_use]
+    pub fn is_empty(&self) -> NativeResult<bool> {
+        match self.len().into_result() {
+            Ok(len) => NativeResult::ok(len == 0),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Return the byte at `index`.
+    #[must_use]
+    pub fn u8_at(&self, index: usize) -> NativeResult<u8> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_bytevector_u8_ref(
+                self.raw.get(),
+                index,
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_bytevector_u8_ref",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Copy this runtime-backed bytevector into owned Rust memory.
+    #[must_use]
+    pub fn to_vec(&self) -> NativeResult<Vec<u8>> {
+        let len = match self.len().into_result() {
+            Ok(len) => len,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut bytes = Vec::with_capacity(len);
+        for index in 0..len {
+            match self.u8_at(index).into_result() {
+                Ok(byte) => bytes.push(byte),
+                Err(error) => return NativeResult::err(error),
+            }
+        }
+        NativeResult::ok(bytes)
+    }
+}
+
 impl SchemeNil<'_> {
     /// Wrap a non-zero runtime-owned nil handle.
     ///
@@ -370,6 +462,58 @@ impl<'runtime> GerbilValue<'runtime> {
             ),
             Ok(false) => NativeResult::err(NativeError::Status {
                 operation: "gerbil_scheme_rust_scheme_object_as_void",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Checks whether this value is a Scheme bytevector.
+    ///
+    /// This only succeeds for values exported by the initialized Gerbil runtime.
+    #[must_use]
+    pub fn is_bytevector(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_bytevector",
+                self.raw.get(),
+                gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_is_bytevector,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_bytevector",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme bytevector.
+    ///
+    /// This succeeds only for runtime-produced Scheme-object exports that
+    /// satisfy `u8vector?`. It returns a borrowed marker around the same opaque
+    /// handle and does not claim ownership or GC rooting.
+    #[must_use]
+    pub fn as_bytevector(self) -> NativeResult<SchemeBytevector<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_bytevector",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_bytevector().into_result() {
+            Ok(true) => SchemeBytevector::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_bytevector",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_bytevector",
                 code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
             }),
             Err(error) => NativeResult::err(error),
@@ -1172,6 +1316,20 @@ impl GerbilRuntime {
         self.checked_scheme_object_fixture(
             "gerbil_scheme_rust_fixture_flonum_neg_zero",
             gerbil_scheme_rust_fixture_flonum_neg_zero,
+        )
+    }
+
+    /// Returns a Scheme bytevector fixture through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_bytevector_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "GerbilRuntime::fixture_bytevector_value",
+            gerbil_scheme_sys::gerbil_scheme_rust_fixture_bytevector,
         )
     }
 

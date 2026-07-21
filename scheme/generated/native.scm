@@ -1,6 +1,6 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/native::timestamp 1784656004)
+  (define gerbil-scheme-rust/scheme/native::timestamp 1784659963)
   (begin
     (define-macro (define-guard guard defn)
       (if (eval `(cond-expand
@@ -257,6 +257,8 @@
      ("gerbil-scheme-rust/scheme/native#"
       gerbil-rs-scheme-object-pair-cdr-raw
       gerbil-rs-scheme-object-pair-car-raw
+      gerbil-rs-scheme-object-bytevector-u8-ref-raw
+      gerbil-rs-scheme-object-bytevector-length-raw
       gerbil-rs-scheme-object-flonum-value-raw
       gerbil-rs-scheme-object-flonum?-raw
       gerbil-rs-scheme-object-char-value-raw
@@ -267,8 +269,10 @@
       gerbil-rs-scheme-object-boolean?-raw
       gerbil-rs-scheme-object-list?-raw
       gerbil-rs-scheme-object-pair?-raw
+      gerbil-rs-scheme-object-bytevector?-raw
       gerbil-rs-scheme-object-void?-raw
       gerbil-rs-scheme-object-null?-raw
+      gerbil-rs-fixture-bytevector-raw
       gerbil-rs-fixture-flonum-neg-zero-raw
       gerbil-rs-fixture-flonum-neg-inf-raw
       gerbil-rs-fixture-flonum-pos-inf-raw
@@ -430,6 +434,13 @@
      "extern"
      -0.)
     (c-define
+     (gerbil-rs-fixture-bytevector-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_bytevector_raw"
+     "extern"
+     #u8(255 127 11 1 0))
+    (c-define
      (gerbil-rs-scheme-object-null?-raw value)
      (scheme-object)
      int32
@@ -443,6 +454,13 @@
      "gerbil_scheme_rust_scheme_object_is_void_raw"
      "extern"
      (if (eq? value #!void) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-bytevector?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_bytevector_raw"
+     "extern"
+     (if (u8vector? value) 1 0))
     (c-define
      (gerbil-rs-scheme-object-pair?-raw value)
      (scheme-object)
@@ -513,6 +531,22 @@
      "gerbil_scheme_rust_scheme_object_flonum_value_raw"
      "extern"
      value)
+    (c-define
+     (gerbil-rs-scheme-object-bytevector-length-raw value)
+     (scheme-object)
+     int64
+     "gerbil_scheme_rust_scheme_object_bytevector_length_raw"
+     "extern"
+     (if (u8vector? value) (u8vector-length value) -1))
+    (c-define
+     (gerbil-rs-scheme-object-bytevector-u8-ref-raw value index)
+     (scheme-object int64)
+     int32
+     "gerbil_scheme_rust_scheme_object_bytevector_u8_ref_raw"
+     "extern"
+     (if (and (u8vector? value) (>= index 0) (< index (u8vector-length value)))
+         (u8vector-ref value index)
+         -1))
     (c-define
      (gerbil-rs-scheme-object-pair-car-raw value)
      (scheme-object)

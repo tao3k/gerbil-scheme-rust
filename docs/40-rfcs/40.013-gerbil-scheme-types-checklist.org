@@ -88,6 +88,9 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] Opaque value handles carry explicit provenance:
   =GerbilValueProvenance::UntrustedRaw= for caller-supplied non-zero raw
   handles.
+- [X] Real Scheme object export handles carry explicit provenance:
+  =GerbilValueProvenance::SchemeObjectExport= for borrowed/unrooted values
+  produced by the initialized Gerbil native module.
 - [X] Runtime-sentinel opaque value provenance is distinct from =UntrustedRaw=.
 - [ ] Runtime/export-produced opaque value provenance that can safely enable
   Gerbil/Gambit predicates and traversal.
@@ -230,6 +233,8 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] Raw opaque value handle: =GerbilValueHandle=.
 - [X] Safe non-zero borrowed value wrapper: =GerbilValue<'runtime>=.
 - [X] Zero value handle fail-closed test.
+- [X] First real =scheme-object= export fixture: Scheme null object as a
+  borrowed, unrooted =GerbilValueHandle=.
 - [X] Scheme native-surface shape for =GerbilValue= ownership and nullability:
   non-zero, runtime-borrowed, not retained beyond the valid runtime borrow.
 - [ ] Explicit GC-root type.

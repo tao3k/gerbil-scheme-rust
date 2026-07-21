@@ -21,6 +21,26 @@ fn calls_scalar_export_in_process() {
     assert_eq!(value.is_pair().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_list().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));
+    let scheme_null = runtime
+        .fixture_null_value()
+        .expect("export Scheme null object through native runtime");
+    assert_ne!(scheme_null.as_raw(), 0);
+    assert_eq!(
+        scheme_null.provenance(),
+        GerbilValueProvenance::SchemeObjectExport
+    );
+    assert_eq!(
+        scheme_null.is_pair().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(
+        scheme_null.is_list().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(
+        scheme_null.is_null().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_eq!(
         runtime.add_i64(i64::MAX, 1),
         Err(NativeError::IntegerOverflow {

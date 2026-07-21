@@ -22,7 +22,7 @@ This matrix tracks the public Scheme value surface exposed by
 | flonum | =f64= | =GerbilFlonum= | by value | unit ABI shape |
 | borrowed string | pointer + byte length | =GerbilBorrowedUtf8= | caller-owned borrow | unit UTF-8 validation |
 | borrowed bytevector | pointer + byte length | =GerbilBorrowedBytevector= | caller-owned borrow | unit pointer/length |
-| opaque value | runtime-owned word handle | =GerbilValueHandle= | borrowed handle | unit zero/identity tests |
+| opaque value | runtime-owned word handle | =GerbilValueHandle= | borrowed handle | unit zero/identity tests plus Scheme null export |
 | pair | two value handles | =GerbilPair= | borrowed handles | unit shape |
 | borrowed vector | pointer + handle count | =GerbilBorrowedVector= | caller-owned borrow | unit pointer/length |
 | i64 callback | function pointer + context | =GerbilI64Callback= | callback borrow | callback boundary tests |
@@ -66,6 +66,8 @@ the public safe API changes behavior:
   ownership, GC reachability, type, or traversal safety;
 - runtime-sentinel handles are explicitly tagged separately from =UntrustedRaw=
   before any pair/list behavior changes;
+- Scheme object exports are explicitly tagged as
+  =GerbilValueProvenance::SchemeObjectExport= and remain borrowed/unrooted;
 - add a runtime-owned value constructor that can only be produced by an
   initialized =GerbilRuntime= or a Gerbil export;
 - keep arbitrary =from_raw= handles fail-closed unless they carry runtime

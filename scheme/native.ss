@@ -1,11 +1,21 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 (import :std/foreign)
-(export gerbil-rs-abi-version gerbil-rs-add-i64 gerbil-rs-is-even-i64 gerbil-rs-compare-i64)
+(export
+  gerbil-rs-abi-version
+  gerbil-rs-add-i64
+  gerbil-rs-is-even-i64
+  gerbil-rs-compare-i64
+  gerbil-rs-scheme-null-value-raw)
 
 ;; This is intentionally a scalar ABI proof. Rich values stay behind an opaque
 ;; runtime boundary until ownership, error, and thread contracts are versioned.
-(begin-ffi (gerbil-rs-abi-version gerbil-rs-add-i64 gerbil-rs-is-even-i64 gerbil-rs-compare-i64)
+(begin-ffi
+  (gerbil-rs-abi-version
+   gerbil-rs-add-i64
+   gerbil-rs-is-even-i64
+   gerbil-rs-compare-i64
+   gerbil-rs-scheme-null-value-raw)
   (c-define (gerbil-rs-abi-version)
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
@@ -31,4 +41,11 @@
     (cond
      ((< left right) -1)
      ((> left right) 1)
-     (else 0))))
+     (else 0)))
+
+  (c-define (gerbil-rs-scheme-null-value-raw)
+      ()
+      scheme-object
+      "gerbil_scheme_rust_scheme_null_value_raw"
+      "extern"
+    '()))

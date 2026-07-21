@@ -352,6 +352,38 @@ pub unsafe extern "C" fn gerbil_scheme_rust_runtime_sentinel_value(
     GerbilStatus::Ok
 }
 
+/// Return a real Scheme null object produced by the Gerbil native module.
+///
+/// This is the first runtime-backed `scheme-object` fixture. It deliberately
+/// exposes only the borrowed object handle; classification, traversal, and GC
+/// rooting remain separate gates.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+/// The Gerbil runtime and native module must be initialized.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_fixture_null(
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    if out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+
+    // SAFETY: caller proves the Gerbil runtime/module is initialized. The
+    // raw Gerbil export returns Gambit's universal Scheme object word.
+    let value = unsafe { gerbil_scheme_rust_scheme_null_value_raw() };
+    if value == 0 {
+        return GerbilStatus::NullPointer;
+    }
+
+    // SAFETY: caller provided a non-null output pointer for one handle.
+    unsafe {
+        *out = value;
+    }
+    GerbilStatus::Ok
+}
+
 /// Return whether a value handle is backed by a Scheme list.
 ///
 /// This ABI entry point is intentionally fail-closed until runtime-backed list
@@ -526,4 +558,12 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_compare_i64(left: i64, right: i64) -> i32;
+
+    /// Raw `scheme-object` fixture exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_null_value_raw() -> GerbilValueHandle;
 }

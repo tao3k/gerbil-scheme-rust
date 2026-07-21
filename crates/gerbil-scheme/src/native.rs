@@ -10,8 +10,9 @@ use std::thread::{self, ThreadId};
 
 use gerbil_scheme_sys::{
     GERBIL_SCHEME_RUST_ABI_VERSION, gerbil_scheme_rust_abi_version, gerbil_scheme_rust_add_i64,
-    gerbil_scheme_rust_identity_i64, gerbil_scheme_rust_runtime_cleanup,
-    gerbil_scheme_rust_runtime_init, gerbil_scheme_rust_runtime_sentinel_value,
+    gerbil_scheme_rust_fixture_null, gerbil_scheme_rust_identity_i64,
+    gerbil_scheme_rust_runtime_cleanup, gerbil_scheme_rust_runtime_init,
+    gerbil_scheme_rust_runtime_sentinel_value,
 };
 
 static RUNTIME_LIFECYCLE: Mutex<()> = Mutex::new(());
@@ -102,6 +103,12 @@ pub enum GerbilValueProvenance {
     /// was alive. It is not a live Gambit/Gerbil object and does not imply type,
     /// GC rooting, or traversal safety.
     RuntimeSentinel,
+    /// A borrowed Scheme object produced by the initialized Gerbil native module.
+    ///
+    /// This proves the handle came from a Gerbil `scheme-object` export while
+    /// the owning [`GerbilRuntime`] was alive. It is still borrowed and
+    /// unrooted, so traversal and retention remain gated by later APIs.
+    SchemeObjectExport,
 }
 
 /// Runtime-borrowed opaque Gerbil value handle.
@@ -499,6 +506,32 @@ impl GerbilRuntime {
                 code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
             },
         )
+    }
+
+    /// Returns the Scheme null object through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_null_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.check_thread()?;
+        let mut out = 0;
+        // SAFETY: self proves runtime/module lifetime and `out` is a valid
+        // output slot for one borrowed Scheme object handle.
+        let status = unsafe { gerbil_scheme_rust_fixture_null(&raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "GerbilRuntime::fixture_null_value",
+                code: status as i32,
+            });
+        }
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
+            .ok_or(NativeError::Status {
+                operation: "GerbilRuntime::fixture_null_value",
+                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+            })
     }
 
     /// Adds two signed 64-bit integers inside the initialized Gerbil runtime.

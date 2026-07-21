@@ -8,9 +8,10 @@ pub use abi::{
 };
 
 pub use abi::{
-    gerbil_scheme_rust_pair_car, gerbil_scheme_rust_pair_cdr, gerbil_scheme_rust_pair_parts,
-    gerbil_scheme_rust_runtime_sentinel_value, gerbil_scheme_rust_value_is_list,
-    gerbil_scheme_rust_value_is_null, gerbil_scheme_rust_value_is_pair,
+    gerbil_scheme_rust_fixture_null, gerbil_scheme_rust_pair_car, gerbil_scheme_rust_pair_cdr,
+    gerbil_scheme_rust_pair_parts, gerbil_scheme_rust_runtime_sentinel_value,
+    gerbil_scheme_rust_value_is_list, gerbil_scheme_rust_value_is_null,
+    gerbil_scheme_rust_value_is_pair,
 };
 
 pub use abi::{

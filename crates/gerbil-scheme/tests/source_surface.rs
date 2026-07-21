@@ -21,6 +21,7 @@ fn asp_native_surface_exports_current_shape_selectors() {
         "gerbil_scheme_rust_comparison_shape",
         "gerbil_scheme_rust_fixnum_shape",
         "gerbil_scheme_rust_char_shape",
+        "gerbil_scheme_rust_flonum_shape",
         "gerbil_scheme_rust_utf8_shape",
         "gerbil_scheme_rust_value_handle_shape",
         "gerbil_scheme_rust_i64_callback_shape",
@@ -66,8 +67,10 @@ fn native_signature_is_the_tracked_gerbil_contract() {
         "gerbil-rs-fixture-char-ascii-raw",
         "gerbil-rs-scheme-object-fixnum?-raw",
         "gerbil-rs-scheme-object-char?-raw",
+        "gerbil-rs-scheme-object-flonum?-raw",
         "gerbil-rs-scheme-object-fixnum-value-raw",
         "gerbil-rs-scheme-object-char-value-raw",
+        "gerbil-rs-scheme-object-flonum-value-raw",
     ] {
         assert!(
             NATIVE_SIGNATURE.contains(symbol),

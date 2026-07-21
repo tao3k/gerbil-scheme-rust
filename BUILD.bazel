@@ -92,6 +92,9 @@ sh_test(
         "SDKROOT",
         "XDG_CACHE_HOME",
     ],
+    env = {
+        "GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM": "1",
+    },
     srcs = ["//tools/bazel:cargo_gate.sh"],
     args = ["all"],
     data = [

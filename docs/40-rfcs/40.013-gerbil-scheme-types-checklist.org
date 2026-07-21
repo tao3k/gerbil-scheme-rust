@@ -41,7 +41,7 @@ Current Scheme source-surface evidence:
   workaround for the source-surface view; it must stay out of =build.ss= and can
   be retired once the provider projects =scheme/native.ss= plus
   =scheme/native.ssi= directly.
-- The current projected selector set is exactly 20 selectors:
+- The current projected selector set is exactly 21 selectors:
   =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
   =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
   =gerbil_scheme_rust_add_i64=, =gerbil_scheme_rust_is_even_i64=,
@@ -52,6 +52,7 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_comparison_shape=,
   =gerbil_scheme_rust_fixnum_shape=,
   =gerbil_scheme_rust_char_shape=,
+  =gerbil_scheme_rust_flonum_shape=,
   =gerbil_scheme_rust_utf8_shape=,
   =gerbil_scheme_rust_value_handle_shape=,
   =gerbil_scheme_rust_i64_callback_shape=,
@@ -60,7 +61,7 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_native_result_shape=.
 - Direct provider projection of the real =scheme/native.ss= FFI/export owner is
   not yet closed and remains a provider/source-surface TODO.
-- No current Scheme selector exists for nil, void, f64, symbol, keyword, pair,
+- No current Scheme selector exists for nil, void, symbol, keyword, pair,
   list, vector, procedure, owned/rooted values, bytevectors, ports,
   continuations, or advanced Scheme objects.
 
@@ -166,8 +167,10 @@ keeps this table aligned with the Scheme source-surface projection.
 
 ** Inexact numbers
 
-- [ ] Raw ABI for =f64=.
-- [ ] Safe =f64= projection rules for NaN, infinities, and signed zero.
+- [X] Raw ABI for =f64=.
+- [X] Safe =f64= projection rules for NaN, infinities, and signed zero.
+- [X] Scenario for finite, NaN, infinities, signed zero, and raw provenance
+  fail-closed flonum projection.
 - [ ] Scenario for =f64= round-trip and comparison caveats.
 - [ ] Performance receipt for numeric scalar round-trips.
 

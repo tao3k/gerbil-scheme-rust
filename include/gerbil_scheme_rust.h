@@ -67,6 +67,11 @@ GerbilStatus gerbil_scheme_rust_fixture_fixnum(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_char_ascii(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_char_bmp(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_char_non_bmp(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_flonum_finite(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_flonum_nan(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_flonum_pos_inf(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_flonum_neg_inf(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_flonum_neg_zero(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_value_is_pair(GerbilValueHandle value,
                                               GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_value_is_list(GerbilValueHandle value,
@@ -91,6 +96,10 @@ GerbilStatus gerbil_scheme_rust_scheme_object_is_char(GerbilValueHandle value,
                                                       GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_as_char(GerbilValueHandle value,
                                                       GerbilChar *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_flonum(GerbilValueHandle value,
+                                                        GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_as_flonum(GerbilValueHandle value,
+                                                        GerbilFlonum *out);
 GerbilStatus gerbil_scheme_rust_pair_car(GerbilValueHandle value,
                                          GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_pair_cdr(GerbilValueHandle value,

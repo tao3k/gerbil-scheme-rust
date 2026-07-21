@@ -3,13 +3,16 @@
 use gerbil_scheme_sys::{
     gerbil_scheme_rust_fixture_char_ascii, gerbil_scheme_rust_fixture_char_bmp,
     gerbil_scheme_rust_fixture_char_non_bmp, gerbil_scheme_rust_fixture_false,
-    gerbil_scheme_rust_fixture_fixnum, gerbil_scheme_rust_fixture_improper_list,
-    gerbil_scheme_rust_fixture_pair, gerbil_scheme_rust_fixture_proper_list,
-    gerbil_scheme_rust_fixture_true, gerbil_scheme_rust_scheme_object_as_boolean,
-    gerbil_scheme_rust_scheme_object_as_char, gerbil_scheme_rust_scheme_object_as_fixnum,
+    gerbil_scheme_rust_fixture_fixnum, gerbil_scheme_rust_fixture_flonum_finite,
+    gerbil_scheme_rust_fixture_flonum_nan, gerbil_scheme_rust_fixture_flonum_neg_inf,
+    gerbil_scheme_rust_fixture_flonum_neg_zero, gerbil_scheme_rust_fixture_flonum_pos_inf,
+    gerbil_scheme_rust_fixture_improper_list, gerbil_scheme_rust_fixture_pair,
+    gerbil_scheme_rust_fixture_proper_list, gerbil_scheme_rust_fixture_true,
+    gerbil_scheme_rust_scheme_object_as_boolean, gerbil_scheme_rust_scheme_object_as_char,
+    gerbil_scheme_rust_scheme_object_as_fixnum, gerbil_scheme_rust_scheme_object_as_flonum,
     gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_char,
-    gerbil_scheme_rust_scheme_object_is_fixnum, gerbil_scheme_rust_scheme_object_is_list,
-    gerbil_scheme_rust_scheme_object_is_pair,
+    gerbil_scheme_rust_scheme_object_is_fixnum, gerbil_scheme_rust_scheme_object_is_flonum,
+    gerbil_scheme_rust_scheme_object_is_list, gerbil_scheme_rust_scheme_object_is_pair,
 };
 
 use std::fmt;
@@ -370,6 +373,54 @@ impl<'runtime> GerbilValue<'runtime> {
                 code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
             }),
         }
+    }
+
+    /// Returns whether this value is a Scheme flonum.
+    ///
+    /// This only succeeds for Scheme-object exports; untrusted raw handles and
+    /// runtime sentinels fail closed with `InvalidValue`.
+    #[must_use]
+    pub fn is_flonum(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_flonum",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_flonum,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_flonum",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme flonum.
+    ///
+    /// The Rust side preserves IEEE-754 `f64` semantics, including NaN,
+    /// infinities, and signed zero.
+    #[must_use]
+    pub fn as_flonum(self) -> NativeResult<f64> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_flonum",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        let mut out = gerbil_scheme_sys::GerbilFlonum::default();
+        // SAFETY: `out` is a valid output slot for one GerbilFlonum.
+        let status =
+            unsafe { gerbil_scheme_rust_scheme_object_as_flonum(self.raw.get(), &raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_flonum",
+                code: status as i32,
+            });
+        }
+
+        NativeResult::ok(out.0)
     }
 
     /// Project this value's car if it is backed by a pair.
@@ -863,6 +914,66 @@ impl GerbilRuntime {
         self.checked_scheme_object_fixture(
             "gerbil_scheme_rust_fixture_char_non_bmp",
             gerbil_scheme_rust_fixture_char_non_bmp,
+        )
+    }
+
+    /// Exports a finite Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_finite_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_finite",
+            gerbil_scheme_rust_fixture_flonum_finite,
+        )
+    }
+
+    /// Exports a NaN Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_nan_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_nan",
+            gerbil_scheme_rust_fixture_flonum_nan,
+        )
+    }
+
+    /// Exports a positive infinity Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_pos_inf_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_pos_inf",
+            gerbil_scheme_rust_fixture_flonum_pos_inf,
+        )
+    }
+
+    /// Exports a negative infinity Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_neg_inf_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_neg_inf",
+            gerbil_scheme_rust_fixture_flonum_neg_inf,
+        )
+    }
+
+    /// Exports a negative-zero Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_neg_zero_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_neg_zero",
+            gerbil_scheme_rust_fixture_flonum_neg_zero,
         )
     }
 

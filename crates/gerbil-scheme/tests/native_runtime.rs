@@ -26,6 +26,7 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     exports_boolean_objects(runtime);
     exports_fixnum_object(runtime);
     exports_char_objects(runtime);
+    exports_flonum_objects(runtime);
     exports_pair_object(runtime);
     exports_proper_list_object(runtime);
     exports_improper_list_object(runtime);
@@ -135,6 +136,67 @@ fn assert_char_fixture(value: gerbil_scheme::GerbilValue<'_>, expected: char) {
     assert_untrusted_raw_fail_closed(value);
 }
 
+fn exports_flonum_objects(runtime: &GerbilRuntime) {
+    let finite = runtime
+        .fixture_flonum_finite_value()
+        .expect("export finite Scheme flonum through native runtime");
+    assert_flonum_fixture(finite, |value| {
+        assert_eq!(value.to_bits(), 42.5f64.to_bits());
+    });
+
+    let nan = runtime
+        .fixture_flonum_nan_value()
+        .expect("export NaN Scheme flonum through native runtime");
+    assert_flonum_fixture(nan, |value| assert!(value.is_nan()));
+
+    let pos_inf = runtime
+        .fixture_flonum_pos_inf_value()
+        .expect("export positive-infinity Scheme flonum through native runtime");
+    assert_flonum_fixture(pos_inf, |value| {
+        assert!(value.is_infinite());
+        assert!(value.is_sign_positive());
+    });
+
+    let neg_inf = runtime
+        .fixture_flonum_neg_inf_value()
+        .expect("export negative-infinity Scheme flonum through native runtime");
+    assert_flonum_fixture(neg_inf, |value| {
+        assert!(value.is_infinite());
+        assert!(value.is_sign_negative());
+    });
+
+    let neg_zero = runtime
+        .fixture_flonum_neg_zero_value()
+        .expect("export negative-zero Scheme flonum through native runtime");
+    assert_flonum_fixture(neg_zero, |value| {
+        assert_eq!(value.to_bits(), (-0.0f64).to_bits());
+        assert!(value.is_sign_negative());
+    });
+}
+
+fn assert_flonum_fixture(
+    value: gerbil_scheme::GerbilValue<'_>,
+    assert_projection: impl FnOnce(f64),
+) {
+    assert_scheme_object_export(value);
+    assert_eq!(value.is_pair().as_result(), Ok(&false));
+    assert_eq!(value.is_list().as_result(), Ok(&false));
+    assert_eq!(value.is_null().as_result(), Ok(&false));
+    assert_eq!(value.is_boolean().as_result(), Ok(&false));
+    assert_eq!(
+        value.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(value.is_fixnum().as_result(), Ok(&false));
+    assert_eq!(value.as_fixnum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_char().as_result(), Ok(&false));
+    assert_eq!(value.as_char().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_flonum().as_result(), Ok(&true));
+    assert_projection(*value.as_flonum().as_result().expect("project flonum"));
+    assert_fail_closed_traversal(value);
+    assert_untrusted_raw_fail_closed(value);
+}
+
 fn exports_pair_object(runtime: &GerbilRuntime) {
     let pair = runtime
         .fixture_pair_value()
@@ -238,6 +300,8 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
     );
     assert_eq!(value.is_char().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.as_char().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_flonum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.as_flonum().status(), Some(GerbilStatus::InvalidValue));
     assert_fail_closed_traversal(value);
 }
 

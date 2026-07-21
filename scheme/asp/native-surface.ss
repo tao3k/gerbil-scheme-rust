@@ -12,6 +12,7 @@
          gerbil_scheme_rust_comparison_shape
          gerbil_scheme_rust_fixnum_shape
          gerbil_scheme_rust_char_shape
+         gerbil_scheme_rust_flonum_shape
          gerbil_scheme_rust_utf8_shape
          gerbil_scheme_rust_value_handle_shape
          gerbil_scheme_rust_i64_callback_shape
@@ -116,6 +117,21 @@
     (fixtures (ascii bmp non-bmp))
     (safe-methods (is-char as-char))
     (validation . rust-unicode-scalar)
+    (failure-policy . fail-closed)))
+
+(def gerbil_scheme_rust_flonum_shape
+  '(native-shape
+    (name . flonum)
+    (transport . c-abi)
+    (repr . ieee-754-f64)
+    (ownership . by-value-or-scheme-object-export)
+    (predicate . gerbil-rs-scheme-object-flonum?-raw)
+    (projection . gerbil-rs-scheme-object-flonum-value-raw)
+    (fixtures (finite nan positive-infinity negative-infinity negative-zero))
+    (safe-methods (is-flonum as-flonum))
+    (nan-policy . preserve-rust-is-nan)
+    (infinity-policy . preserve-sign)
+    (zero-policy . preserve-sign)
     (failure-policy . fail-closed)))
 
 (def gerbil_scheme_rust_utf8_shape

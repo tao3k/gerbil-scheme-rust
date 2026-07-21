@@ -172,6 +172,34 @@ Implementation receipt:
 - =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
 - =direnv exec . bazel test //:cargo_all=
 
+** Flonum Scheme-object projection
+
+Status: accepted.
+
+The flonum slice exports runtime-backed finite, NaN, positive infinity,
+negative infinity, and negative-zero Scheme flonum fixtures, checks =flonum?=
+in Gerbil, and exposes =GerbilValue::is_flonum= and
+=GerbilValue::as_flonum= in Rust.
+
+The accepted failure and edge-value boundary is:
+
+- non-flonum Scheme values return =InvalidValue= for =as_flonum=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for flonum inspection;
+- NaN is preserved to the Rust =is_nan= observable boundary, without promising
+  payload preservation;
+- infinities preserve sign;
+- signed zero preserves sign;
+- exact integer, rational, and complex numeric conversion remain outside this
+  slice.
+
+Implementation receipt:
+
+- =direnv exec . env GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo test -p gerbil-scheme --test source_surface --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
 * Downstream policy
 
 Marlin consumes =gerbil-scheme-rust= as a dependency. It must not be the owner

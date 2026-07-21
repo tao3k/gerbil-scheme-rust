@@ -3,28 +3,7 @@
 mod abi;
 mod scheme_char;
 mod scheme_fixnum;
-
-pub use abi::gerbil_scheme_rust_fixture_false;
-pub use abi::gerbil_scheme_rust_fixture_improper_list;
-pub use abi::gerbil_scheme_rust_fixture_pair;
-pub use abi::gerbil_scheme_rust_fixture_proper_list;
-pub use abi::gerbil_scheme_rust_fixture_true;
-pub use abi::gerbil_scheme_rust_scheme_object_as_boolean;
-pub use abi::gerbil_scheme_rust_scheme_object_is_boolean;
-pub use abi::gerbil_scheme_rust_scheme_object_is_list;
-pub use abi::gerbil_scheme_rust_scheme_object_is_null;
-pub use abi::gerbil_scheme_rust_scheme_object_is_pair;
-pub use abi::gerbil_scheme_rust_scheme_object_pair_car;
-pub use abi::gerbil_scheme_rust_scheme_object_pair_cdr;
-pub use abi::gerbil_scheme_rust_scheme_object_pair_parts;
-pub use scheme_char::gerbil_scheme_rust_fixture_char_ascii;
-pub use scheme_char::gerbil_scheme_rust_fixture_char_bmp;
-pub use scheme_char::gerbil_scheme_rust_fixture_char_non_bmp;
-pub use scheme_char::gerbil_scheme_rust_scheme_object_as_char;
-pub use scheme_char::gerbil_scheme_rust_scheme_object_is_char;
-pub use scheme_fixnum::gerbil_scheme_rust_fixture_fixnum;
-pub use scheme_fixnum::gerbil_scheme_rust_scheme_object_as_fixnum;
-pub use scheme_fixnum::gerbil_scheme_rust_scheme_object_is_fixnum;
+mod scheme_flonum;
 
 pub use abi::{
     GerbilBoolean, GerbilBorrowedBytevector, GerbilBorrowedVector, GerbilChar, GerbilFixnum,
@@ -32,10 +11,16 @@ pub use abi::{
 };
 
 pub use abi::{
-    gerbil_scheme_rust_fixture_null, gerbil_scheme_rust_pair_car, gerbil_scheme_rust_pair_cdr,
-    gerbil_scheme_rust_pair_parts, gerbil_scheme_rust_runtime_sentinel_value,
-    gerbil_scheme_rust_value_is_list, gerbil_scheme_rust_value_is_null,
-    gerbil_scheme_rust_value_is_pair,
+    gerbil_scheme_rust_fixture_false, gerbil_scheme_rust_fixture_improper_list,
+    gerbil_scheme_rust_fixture_null, gerbil_scheme_rust_fixture_pair,
+    gerbil_scheme_rust_fixture_proper_list, gerbil_scheme_rust_fixture_true,
+    gerbil_scheme_rust_pair_car, gerbil_scheme_rust_pair_cdr, gerbil_scheme_rust_pair_parts,
+    gerbil_scheme_rust_runtime_sentinel_value, gerbil_scheme_rust_scheme_object_as_boolean,
+    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_list,
+    gerbil_scheme_rust_scheme_object_is_null, gerbil_scheme_rust_scheme_object_is_pair,
+    gerbil_scheme_rust_scheme_object_pair_car, gerbil_scheme_rust_scheme_object_pair_cdr,
+    gerbil_scheme_rust_scheme_object_pair_parts, gerbil_scheme_rust_value_is_list,
+    gerbil_scheme_rust_value_is_null, gerbil_scheme_rust_value_is_pair,
 };
 
 pub use abi::{
@@ -45,6 +30,22 @@ pub use abi::{
     gerbil_scheme_rust_compare_i64, gerbil_scheme_rust_identity_i64,
     gerbil_scheme_rust_is_even_i64, gerbil_scheme_rust_runtime_cleanup,
     gerbil_scheme_rust_runtime_init,
+};
+
+pub use scheme_char::{
+    gerbil_scheme_rust_fixture_char_ascii, gerbil_scheme_rust_fixture_char_bmp,
+    gerbil_scheme_rust_fixture_char_non_bmp, gerbil_scheme_rust_scheme_object_as_char,
+    gerbil_scheme_rust_scheme_object_is_char,
+};
+pub use scheme_fixnum::{
+    gerbil_scheme_rust_fixture_fixnum, gerbil_scheme_rust_scheme_object_as_fixnum,
+    gerbil_scheme_rust_scheme_object_is_fixnum,
+};
+pub use scheme_flonum::{
+    gerbil_scheme_rust_fixture_flonum_finite, gerbil_scheme_rust_fixture_flonum_nan,
+    gerbil_scheme_rust_fixture_flonum_neg_inf, gerbil_scheme_rust_fixture_flonum_neg_zero,
+    gerbil_scheme_rust_fixture_flonum_pos_inf, gerbil_scheme_rust_scheme_object_as_flonum,
+    gerbil_scheme_rust_scheme_object_is_flonum,
 };
 
 #[cfg(test)]

@@ -23,7 +23,7 @@ This matrix tracks the public Scheme value surface exposed by
 | fixnum | machine word | =GerbilFixnum= plus =GerbilValue::is_fixnum=/=as_fixnum=/=as_fixnum_i64= | by value or =SchemeObjectExport= handle | unit ABI shape plus runtime-backed projection for =SchemeObjectExport=; =UntrustedRaw= and =RuntimeSentinel= remain fail-closed |
 | boolean | normalized byte | =GerbilBoolean= plus =GerbilValue::is_boolean=/=as_boolean= | by value or =SchemeObjectExport= handle | unit ABI shape plus runtime-backed projection for =SchemeObjectExport=; =UntrustedRaw= and =RuntimeSentinel= remain fail-closed |
 | char | Unicode code point | =GerbilChar= plus =GerbilValue::is_char=/=as_char= | by value or =SchemeObjectExport= handle | unit valid/invalid scalar plus runtime-backed ASCII, BMP, and non-BMP projection; =UntrustedRaw= and =RuntimeSentinel= remain fail-closed |
-| flonum | =f64= | =GerbilFlonum= | by value | unit ABI shape |
+| flonum | =f64= | =GerbilFlonum= plus =GerbilValue::is_flonum=/=as_flonum= | by value or =SchemeObjectExport= handle | unit ABI shape plus runtime-backed finite, NaN, infinities, and signed-zero projection; =UntrustedRaw= and =RuntimeSentinel= remain fail-closed |
 | borrowed string | pointer + byte length | =GerbilBorrowedUtf8= | caller-owned borrow | unit UTF-8 validation |
 | borrowed bytevector | pointer + byte length | =GerbilBorrowedBytevector= | caller-owned borrow | unit pointer/length |
 | opaque value | runtime-owned word handle | =GerbilValueHandle= | borrowed handle | unit zero/identity tests plus Scheme null export |

@@ -1,6 +1,6 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/native::timestamp 1784607138)
+  (define gerbil-scheme-rust/scheme/native::timestamp 1784611633)
   (begin
     (define-macro (define-guard guard defn)
       (if (eval `(cond-expand
@@ -257,6 +257,8 @@
      ("gerbil-scheme-rust/scheme/native#"
       gerbil-rs-scheme-object-pair-cdr-raw
       gerbil-rs-scheme-object-pair-car-raw
+      gerbil-rs-scheme-object-flonum-value-raw
+      gerbil-rs-scheme-object-flonum?-raw
       gerbil-rs-scheme-object-char-value-raw
       gerbil-rs-scheme-object-char?-raw
       gerbil-rs-scheme-object-fixnum-value-raw
@@ -266,6 +268,11 @@
       gerbil-rs-scheme-object-list?-raw
       gerbil-rs-scheme-object-pair?-raw
       gerbil-rs-scheme-object-null?-raw
+      gerbil-rs-fixture-flonum-neg-zero-raw
+      gerbil-rs-fixture-flonum-neg-inf-raw
+      gerbil-rs-fixture-flonum-pos-inf-raw
+      gerbil-rs-fixture-flonum-nan-raw
+      gerbil-rs-fixture-flonum-finite-raw
       gerbil-rs-fixture-char-non-bmp-raw
       gerbil-rs-fixture-char-bmp-raw
       gerbil-rs-fixture-char-ascii-raw
@@ -379,6 +386,41 @@
      "extern"
      (integer->char 128578))
     (c-define
+     (gerbil-rs-fixture-flonum-finite-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_flonum_finite_raw"
+     "extern"
+     42.5)
+    (c-define
+     (gerbil-rs-fixture-flonum-nan-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_flonum_nan_raw"
+     "extern"
+     +nan.0)
+    (c-define
+     (gerbil-rs-fixture-flonum-pos-inf-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_flonum_pos_inf_raw"
+     "extern"
+     +inf.0)
+    (c-define
+     (gerbil-rs-fixture-flonum-neg-inf-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_flonum_neg_inf_raw"
+     "extern"
+     -inf.0)
+    (c-define
+     (gerbil-rs-fixture-flonum-neg-zero-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_flonum_neg_zero_raw"
+     "extern"
+     -0.)
+    (c-define
      (gerbil-rs-scheme-object-null?-raw value)
      (scheme-object)
      int32
@@ -441,6 +483,20 @@
      "gerbil_scheme_rust_scheme_object_char_value_raw"
      "extern"
      (char->integer value))
+    (c-define
+     (gerbil-rs-scheme-object-flonum?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_flonum_raw"
+     "extern"
+     (if (flonum? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-flonum-value-raw value)
+     (scheme-object)
+     double
+     "gerbil_scheme_rust_scheme_object_flonum_value_raw"
+     "extern"
+     value)
     (c-define
      (gerbil-rs-scheme-object-pair-car-raw value)
      (scheme-object)

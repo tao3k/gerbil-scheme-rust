@@ -8,6 +8,9 @@ pub use abi::gerbil_scheme_rust_fixture_proper_list;
 pub use abi::gerbil_scheme_rust_scheme_object_is_list;
 pub use abi::gerbil_scheme_rust_scheme_object_is_null;
 pub use abi::gerbil_scheme_rust_scheme_object_is_pair;
+pub use abi::gerbil_scheme_rust_scheme_object_pair_car;
+pub use abi::gerbil_scheme_rust_scheme_object_pair_cdr;
+pub use abi::gerbil_scheme_rust_scheme_object_pair_parts;
 
 pub use abi::{
     GerbilBoolean, GerbilBorrowedBytevector, GerbilBorrowedVector, GerbilChar, GerbilFixnum,

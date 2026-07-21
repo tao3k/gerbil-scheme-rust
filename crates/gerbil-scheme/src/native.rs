@@ -209,40 +209,50 @@ impl<'runtime> GerbilValue<'runtime> {
 
     /// Project this value's car if it is backed by a pair.
     ///
-    /// This delegates to the sys ABI and therefore fails closed until pair
-    /// traversal is runtime-backed.
+    /// This delegates to the sys ABI and only succeeds for Scheme-object
+    /// exports.
     #[must_use]
     pub fn pair_car(self) -> NativeResult<Self> {
-        checked_native_value_projection(
+        checked_scheme_object_projection(
             "gerbil_scheme_rust_pair_car",
-            self.raw.get(),
-            gerbil_scheme_sys::gerbil_scheme_rust_pair_car,
+            self,
+            gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_pair_car,
         )
     }
 
     /// Project this value's cdr if it is backed by a pair.
     ///
-    /// This delegates to the sys ABI and therefore fails closed until pair
-    /// traversal is runtime-backed.
+    /// This delegates to the sys ABI and only succeeds for Scheme-object
+    /// exports.
     #[must_use]
     pub fn pair_cdr(self) -> NativeResult<Self> {
-        checked_native_value_projection(
+        checked_scheme_object_projection(
             "gerbil_scheme_rust_pair_cdr",
-            self.raw.get(),
-            gerbil_scheme_sys::gerbil_scheme_rust_pair_cdr,
+            self,
+            gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_pair_cdr,
         )
     }
 
     /// Project this value's pair parts if it is backed by a pair.
     ///
-    /// This delegates to the sys ABI and therefore fails closed until pair
-    /// traversal is runtime-backed.
+    /// This delegates to the sys ABI and only succeeds for Scheme-object
+    /// exports.
     #[must_use]
     pub fn pair_parts(self) -> NativeResult<SchemePairParts<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_pair_parts",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
         let mut pair = gerbil_scheme_sys::GerbilPair { car: 0, cdr: 0 };
         // SAFETY: `pair` is a valid output slot for one GerbilPair.
         let status = unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_pair_parts(self.raw.get(), &raw mut pair)
+            gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_pair_parts(
+                self.raw.get(),
+                &raw mut pair,
+            )
         };
         if status != gerbil_scheme_sys::GerbilStatus::Ok {
             return NativeResult::err(NativeError::Status {
@@ -250,13 +260,19 @@ impl<'runtime> GerbilValue<'runtime> {
                 code: status as i32,
             });
         }
-        let Some(car) = value_from_native_handle(pair.car) else {
+        let Some(car) = value_from_native_handle_with_provenance(
+            pair.car,
+            GerbilValueProvenance::SchemeObjectExport,
+        ) else {
             return NativeResult::err(NativeError::Status {
                 operation: "gerbil_scheme_rust_pair_parts.car",
                 code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
             });
         };
-        let Some(cdr) = value_from_native_handle(pair.cdr) else {
+        let Some(cdr) = value_from_native_handle_with_provenance(
+            pair.cdr,
+            GerbilValueProvenance::SchemeObjectExport,
+        ) else {
             return NativeResult::err(NativeError::Status {
                 operation: "gerbil_scheme_rust_pair_parts.cdr",
                 code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
@@ -294,35 +310,38 @@ fn checked_native_predicate(
     }
 }
 
-fn checked_native_value_projection<'runtime>(
+fn checked_scheme_object_projection<'runtime>(
     operation: &'static str,
-    value: gerbil_scheme_sys::GerbilValueHandle,
+    value: GerbilValue<'runtime>,
     projection: NativeValueProjection,
 ) -> NativeResult<GerbilValue<'runtime>> {
+    if value.provenance != GerbilValueProvenance::SchemeObjectExport {
+        return NativeResult::err(NativeError::Status {
+            operation,
+            code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+        });
+    }
+
     let mut out = 0;
-    // SAFETY: `out` is a valid output slot for one value handle.
-    let status = unsafe { projection(value, &raw mut out) };
+    // SAFETY: `out` is a valid output slot for one Gerbil value handle.
+    let status = unsafe { projection(value.raw.get(), &raw mut out) };
     if status != gerbil_scheme_sys::GerbilStatus::Ok {
         return NativeResult::err(NativeError::Status {
             operation,
             code: status as i32,
         });
     }
-    value_from_native_handle(out).map_or_else(
-        || {
-            NativeResult::err(NativeError::Status {
-                operation,
-                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
-            })
-        },
-        NativeResult::ok,
-    )
-}
 
-fn value_from_native_handle<'runtime>(
-    raw: gerbil_scheme_sys::GerbilValueHandle,
-) -> Option<GerbilValue<'runtime>> {
-    value_from_native_handle_with_provenance(raw, GerbilValueProvenance::UntrustedRaw)
+    value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
+        .map_or_else(
+            || {
+                NativeResult::err(NativeError::Status {
+                    operation,
+                    code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                })
+            },
+            NativeResult::ok,
+        )
 }
 
 fn value_from_native_handle_with_provenance<'runtime>(

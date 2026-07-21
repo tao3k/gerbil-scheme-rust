@@ -610,6 +610,81 @@ pub unsafe extern "C" fn gerbil_scheme_rust_pair_parts(
     GerbilStatus::InvalidValue
 }
 
+/// Project the car of a Scheme-object pair value into an output handle.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_pair_car(
+    value: GerbilValueHandle,
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe {
+        checked_scheme_object_projection(value, out, gerbil_scheme_rust_scheme_object_pair_car_raw)
+    }
+}
+
+/// Project the cdr of a Scheme-object pair value into an output handle.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_pair_cdr(
+    value: GerbilValueHandle,
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe {
+        checked_scheme_object_projection(value, out, gerbil_scheme_rust_scheme_object_pair_cdr_raw)
+    }
+}
+
+/// Project both car and cdr of a Scheme-object pair value.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilPair`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_pair_parts(
+    value: GerbilValueHandle,
+    out: *mut GerbilPair,
+) -> GerbilStatus {
+    if value == 0 || out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+
+    let mut car = 0;
+    let status = unsafe {
+        checked_scheme_object_projection(
+            value,
+            &raw mut car,
+            gerbil_scheme_rust_scheme_object_pair_car_raw,
+        )
+    };
+    if status != GerbilStatus::Ok {
+        return status;
+    }
+
+    let mut cdr = 0;
+    let status = unsafe {
+        checked_scheme_object_projection(
+            value,
+            &raw mut cdr,
+            gerbil_scheme_rust_scheme_object_pair_cdr_raw,
+        )
+    };
+    if status != GerbilStatus::Ok {
+        return status;
+    }
+
+    // SAFETY: caller provided a non-null output pointer for one GerbilPair.
+    unsafe {
+        *out = GerbilPair { car, cdr };
+    }
+    GerbilStatus::Ok
+}
+
 unsafe fn checked_unbacked_value_predicate(
     value: GerbilValueHandle,
     out: *mut GerbilBoolean,
@@ -641,6 +716,30 @@ unsafe fn checked_unbacked_value_handle_projection(
         *out = 0;
     }
     GerbilStatus::InvalidValue
+}
+
+unsafe fn checked_scheme_object_projection(
+    value: GerbilValueHandle,
+    out: *mut GerbilValueHandle,
+    projection: unsafe extern "C" fn(GerbilValueHandle) -> GerbilValueHandle,
+) -> GerbilStatus {
+    if value == 0 || out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    if unsafe { gerbil_scheme_rust_scheme_object_is_pair_raw(value) } == 0 {
+        return GerbilStatus::InvalidValue;
+    }
+
+    let projected = unsafe { projection(value) };
+    if projected == 0 {
+        return GerbilStatus::NullPointer;
+    }
+
+    // SAFETY: caller provided a non-null output pointer for one handle.
+    unsafe {
+        *out = projected;
+    }
+    GerbilStatus::Ok
 }
 
 unsafe extern "C" {
@@ -757,4 +856,24 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_is_null_raw(value: GerbilValueHandle) -> i32;
+
+    /// Raw Scheme-object pair car projection exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_object_pair_car_raw(
+        value: GerbilValueHandle,
+    ) -> GerbilValueHandle;
+
+    /// Raw Scheme-object pair cdr projection exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_object_pair_cdr_raw(
+        value: GerbilValueHandle,
+    ) -> GerbilValueHandle;
 }

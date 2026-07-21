@@ -38,7 +38,7 @@ rooting before they can become owned Rust values:
 |-------------------+----------------+------------------------+-------------------|
 | symbol | =SchemeSymbol= | non-zero =GerbilValueHandle= | no allocation or interning |
 | keyword | =SchemeKeyword= | non-zero =GerbilValueHandle= | no allocation or interning |
-| pair | =SchemePair= plus =GerbilValue::is_pair=/=pair_car=/=pair_cdr=/=pair_parts= | non-zero =GerbilValueHandle= | =is_pair= is runtime-backed for Scheme object exports; traversal remains fail-closed |
+| pair | =SchemePair= plus =GerbilValue::is_pair=/=pair_car=/=pair_cdr=/=pair_parts= | non-zero =GerbilValueHandle= | =is_pair= and =pair_car=/=pair_cdr=/=pair_parts= are runtime-backed only for =SchemeObjectExport=; =UntrustedRaw= and =RuntimeSentinel= remain fail-closed |
 | list | =SchemeList= plus =GerbilValue::is_list=/=is_null= | non-zero =GerbilValueHandle= | =is_list= and =is_null= are runtime-backed for Scheme object exports |
 
 These types preserve handle identity and reject zero handles.  Pair/list
@@ -77,8 +77,10 @@ the public safe API changes behavior:
   provenance;
 - route =pair?=, =list?=, and =null?= through Gerbil/Gambit only for
   provenance-backed handles;
-- keep =car=, =cdr=, and =pair_parts= fail-closed until traversal, GC rooting,
-  and lifetime ownership are explicitly versioned;
+- route =car=, =cdr=, and =pair_parts= through Gerbil only for
+  =SchemeObjectExport= handles while keeping =UntrustedRaw= and
+  =RuntimeSentinel= fail-closed;
+- do not add recursive list traversal in this gate;
 - keep Marlin as a downstream consumer of this upstream contract, not an owner
   of Scheme runtime traversal semantics.
 

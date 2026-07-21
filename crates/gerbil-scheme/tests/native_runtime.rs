@@ -16,61 +16,80 @@ fn calls_scalar_export_in_process() {
         GERBIL_SCHEME_RUST_ABI_VERSION
     );
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
+    exports_scheme_objects_and_traverses_pairs(&runtime);
+    reports_overflow_and_finalized_runtime_boundaries(runtime);
+}
+
+fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     let value = runtime.runtime_sentinel_value().unwrap();
     assert_eq!(value.provenance(), GerbilValueProvenance::RuntimeSentinel);
-    assert_eq!(value.is_pair().status(), Some(GerbilStatus::InvalidValue));
-    assert_eq!(value.is_list().status(), Some(GerbilStatus::InvalidValue));
-    assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));
+    assert_fail_closed_value(value);
+
     let scheme_null = runtime
         .fixture_null_value()
         .expect("export Scheme null object through native runtime");
     assert_ne!(scheme_null.as_raw(), 0);
-    assert_eq!(
-        scheme_null.provenance(),
-        GerbilValueProvenance::SchemeObjectExport
-    );
+    assert_scheme_object_export(scheme_null);
     assert_eq!(scheme_null.is_pair().as_result(), Ok(&false));
     assert_eq!(scheme_null.is_list().as_result(), Ok(&true));
     assert_eq!(scheme_null.is_null().as_result(), Ok(&true));
+    assert_fail_closed_traversal(scheme_null);
 
     let pair = runtime
         .fixture_pair_value()
         .expect("export Scheme pair object through native runtime");
-    assert_eq!(pair.provenance(), GerbilValueProvenance::SchemeObjectExport);
+    assert_scheme_object_export(pair);
     assert_eq!(pair.is_pair().as_result(), Ok(&true));
     assert_eq!(pair.is_list().as_result(), Ok(&false));
     assert_eq!(pair.is_null().as_result(), Ok(&false));
-    assert_eq!(pair.pair_car().status(), Some(GerbilStatus::InvalidValue));
+    let pair_head = pair.pair_car().into_result().expect("project pair car");
+    let pair_tail = pair.pair_cdr().into_result().expect("project pair cdr");
+    let pair_parts = pair.pair_parts().into_result().expect("project pair parts");
+    assert_scheme_object_export(pair_head);
+    assert_scheme_object_export(pair_tail);
+    assert_eq!(pair_parts.car, pair_head);
+    assert_eq!(pair_parts.cdr, pair_tail);
 
     let proper_list = runtime
         .fixture_proper_list_value()
         .expect("export proper Scheme list object through native runtime");
-    assert_eq!(
-        proper_list.provenance(),
-        GerbilValueProvenance::SchemeObjectExport
-    );
+    assert_scheme_object_export(proper_list);
     assert_eq!(proper_list.is_pair().as_result(), Ok(&true));
     assert_eq!(proper_list.is_list().as_result(), Ok(&true));
     assert_eq!(proper_list.is_null().as_result(), Ok(&false));
-    assert_eq!(
-        proper_list.pair_cdr().status(),
-        Some(GerbilStatus::InvalidValue)
-    );
+    let proper_tail = proper_list
+        .pair_cdr()
+        .into_result()
+        .expect("project proper-list cdr");
+    assert_scheme_object_export(proper_tail);
+    let proper_parts = proper_list
+        .pair_parts()
+        .into_result()
+        .expect("project proper-list pair parts");
+    assert_scheme_object_export(proper_parts.car);
+    assert_eq!(proper_parts.cdr, proper_tail);
 
     let improper_list = runtime
         .fixture_improper_list_value()
         .expect("export improper Scheme list object through native runtime");
-    assert_eq!(
-        improper_list.provenance(),
-        GerbilValueProvenance::SchemeObjectExport
-    );
+    assert_scheme_object_export(improper_list);
     assert_eq!(improper_list.is_pair().as_result(), Ok(&true));
     assert_eq!(improper_list.is_list().as_result(), Ok(&false));
     assert_eq!(improper_list.is_null().as_result(), Ok(&false));
-    assert_eq!(
-        improper_list.pair_parts().status(),
-        Some(GerbilStatus::InvalidValue)
-    );
+    let improper_head = improper_list
+        .pair_car()
+        .into_result()
+        .expect("project improper-list car");
+    let improper_parts = improper_list
+        .pair_parts()
+        .into_result()
+        .expect("project improper-list pair parts");
+    assert_scheme_object_export(improper_head);
+    assert_eq!(improper_parts.car, improper_head);
+    assert_scheme_object_export(improper_parts.cdr);
+}
+
+fn reports_overflow_and_finalized_runtime_boundaries(runtime: GerbilRuntime) {
     assert_eq!(
         runtime.add_i64(i64::MAX, 1),
         Err(NativeError::IntegerOverflow {
@@ -84,4 +103,27 @@ fn calls_scalar_export_in_process() {
         GerbilRuntime::initialize(),
         Err(NativeError::RuntimeFinalized)
     ));
+}
+
+fn assert_scheme_object_export(value: gerbil_scheme::GerbilValue<'_>) {
+    assert_eq!(
+        value.provenance(),
+        GerbilValueProvenance::SchemeObjectExport
+    );
+}
+
+fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
+    assert_eq!(value.is_pair().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_list().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));
+    assert_fail_closed_traversal(value);
+}
+
+fn assert_fail_closed_traversal(value: gerbil_scheme::GerbilValue<'_>) {
+    assert_eq!(value.pair_car().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.pair_cdr().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(
+        value.pair_parts().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
 }

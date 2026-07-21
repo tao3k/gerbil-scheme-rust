@@ -93,6 +93,57 @@ Each slice must update:
 - runtime scenario tests;
 - ORG docs/checklist.
 
+* Current accepted slices
+
+Accepted slices are implementation receipts for this standard. A slice may move
+from the type checklist into this section only when it has:
+
+- Gerbil-owned projection logic in =scheme/native.ss=;
+- stable C ABI declarations in =include/gerbil_scheme_rust.h=;
+- sys crate checked wrappers that guard null pointers and invalid Scheme
+  values;
+- safe Rust methods that preserve =SchemeObjectExport= provenance and reject
+  =UntrustedRaw= / =RuntimeSentinel=;
+- scenario coverage for success, non-matching Scheme values, and raw provenance
+  fail-closed behavior;
+- local =cargo=, =clippy=, and Bazel receipts.
+
+** Boolean Scheme-object projection
+
+Status: accepted.
+
+The boolean slice exports runtime-backed Scheme =#t= and =#f= fixtures, checks
+=boolean?= in Gerbil, and exposes =GerbilValue::is_boolean= /
+=GerbilValue::as_boolean= in Rust.
+
+The accepted failure boundary is:
+
+- non-boolean Scheme values return =InvalidValue= for =as_boolean=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for boolean inspection;
+- Rust never decodes the raw Scheme object handle.
+
+** Fixnum Scheme-object projection
+
+Status: accepted for fixnum only.
+
+The fixnum slice exports a runtime-backed Scheme fixnum fixture, checks
+=fixnum?= in Gerbil, and exposes =GerbilValue::is_fixnum=,
+=GerbilValue::as_fixnum=, and =GerbilValue::as_fixnum_i64= in Rust.
+
+The accepted failure boundary is:
+
+- non-fixnum Scheme values return =InvalidValue= for =as_fixnum=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for fixnum inspection;
+- bignum and full exact integer conversion remain outside this slice;
+- Rust consumes =GerbilFixnum= as a carrier and does not decode =SCM= layout.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
 * Downstream policy
 
 Marlin consumes =gerbil-scheme-rust= as a dependency. It must not be the owner

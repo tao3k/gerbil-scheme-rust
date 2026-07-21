@@ -33,7 +33,34 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     assert_eq!(scheme_null.is_pair().as_result(), Ok(&false));
     assert_eq!(scheme_null.is_list().as_result(), Ok(&true));
     assert_eq!(scheme_null.is_null().as_result(), Ok(&true));
+    assert_eq!(scheme_null.is_boolean().as_result(), Ok(&false));
+    assert_eq!(
+        scheme_null.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_fail_closed_traversal(scheme_null);
+
+    let scheme_true = runtime
+        .fixture_true_value()
+        .expect("export Scheme true object through native runtime");
+    assert_scheme_object_export(scheme_true);
+    assert_eq!(scheme_true.is_pair().as_result(), Ok(&false));
+    assert_eq!(scheme_true.is_list().as_result(), Ok(&false));
+    assert_eq!(scheme_true.is_null().as_result(), Ok(&false));
+    assert_eq!(scheme_true.is_boolean().as_result(), Ok(&true));
+    assert_eq!(scheme_true.as_boolean().as_result(), Ok(&true));
+    assert_fail_closed_traversal(scheme_true);
+
+    let scheme_false = runtime
+        .fixture_false_value()
+        .expect("export Scheme false object through native runtime");
+    assert_scheme_object_export(scheme_false);
+    assert_eq!(scheme_false.is_pair().as_result(), Ok(&false));
+    assert_eq!(scheme_false.is_list().as_result(), Ok(&false));
+    assert_eq!(scheme_false.is_null().as_result(), Ok(&false));
+    assert_eq!(scheme_false.is_boolean().as_result(), Ok(&true));
+    assert_eq!(scheme_false.as_boolean().as_result(), Ok(&false));
+    assert_fail_closed_traversal(scheme_false);
 
     let pair = runtime
         .fixture_pair_value()
@@ -116,6 +143,14 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
     assert_eq!(value.is_pair().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_list().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.is_null().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(
+        value.is_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(
+        value.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_fail_closed_traversal(value);
 }
 

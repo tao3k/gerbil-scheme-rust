@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 use gerbil_scheme_sys::{
-    gerbil_scheme_rust_fixture_improper_list, gerbil_scheme_rust_fixture_pair,
-    gerbil_scheme_rust_fixture_proper_list, gerbil_scheme_rust_scheme_object_is_list,
+    gerbil_scheme_rust_fixture_false, gerbil_scheme_rust_fixture_improper_list,
+    gerbil_scheme_rust_fixture_pair, gerbil_scheme_rust_fixture_proper_list,
+    gerbil_scheme_rust_fixture_true, gerbil_scheme_rust_scheme_object_as_boolean,
+    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_list,
     gerbil_scheme_rust_scheme_object_is_pair,
 };
 
@@ -205,6 +207,55 @@ impl<'runtime> GerbilValue<'runtime> {
                 )
             }
         }
+    }
+
+    /// Project this value's car if it is backed by a pair.
+    ///
+    /// This delegates to the sys ABI and only succeeds for Scheme-object
+    /// exports.
+    /// Checks whether this value is a Scheme boolean.
+    ///
+    /// This only succeeds for values exported by the initialized Gerbil runtime.
+    #[must_use]
+    pub fn is_boolean(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_boolean",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_boolean,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_boolean",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme boolean.
+    ///
+    /// This only succeeds for Scheme-object exports that satisfy `boolean?`.
+    #[must_use]
+    pub fn as_boolean(self) -> NativeResult<bool> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_boolean",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        let mut out = gerbil_scheme_sys::GerbilBoolean::from_bool(false);
+        // SAFETY: `out` is a valid output slot for one GerbilBoolean.
+        let status =
+            unsafe { gerbil_scheme_rust_scheme_object_as_boolean(self.raw.get(), &raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_boolean",
+                code: status as i32,
+            });
+        }
+        NativeResult::ok(out.as_bool())
     }
 
     /// Project this value's car if it is backed by a pair.
@@ -626,6 +677,30 @@ impl GerbilRuntime {
         self.checked_scheme_object_fixture(
             "GerbilRuntime::fixture_improper_list_value",
             gerbil_scheme_rust_fixture_improper_list,
+        )
+    }
+
+    /// Exports a Scheme true fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_true_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_true",
+            gerbil_scheme_rust_fixture_true,
+        )
+    }
+
+    /// Exports a Scheme false fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_false_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_false",
+            gerbil_scheme_rust_fixture_false,
         )
     }
 

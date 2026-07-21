@@ -167,6 +167,36 @@ pub struct SchemePairParts<'runtime> {
     pub cdr: GerbilValue<'runtime>,
 }
 
+/// Borrowed, runtime-backed Scheme nil / empty-list marker.
+///
+/// This proves only that a Gerbil-owned Scheme object export satisfied `null?`
+/// at projection time. It does not root, retain, or own the underlying object.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeNil<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl SchemeNil<'_> {
+    /// Wrap a non-zero runtime-owned nil handle.
+    ///
+    /// This constructor does not inspect the handle; callers must prove the
+    /// handle came from a runtime-backed `null?` projection before using it.
+    #[must_use]
+    pub fn from_raw(raw: gerbil_scheme_sys::GerbilValueHandle) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    /// Return the borrowed raw handle without dereferencing it.
+    #[must_use]
+    pub const fn as_raw(self) -> gerbil_scheme_sys::GerbilValueHandle {
+        self.raw.get()
+    }
+}
+
 impl<'runtime> GerbilValue<'runtime> {
     /// Return whether this value is known to be a pair.
     ///
@@ -238,6 +268,38 @@ impl<'runtime> GerbilValue<'runtime> {
     ///
     /// This delegates to the sys ABI and only succeeds for Scheme-object
     /// exports.
+    /// Projects this value as Scheme nil / the empty list.
+    ///
+    /// This succeeds only for runtime-produced Scheme-object exports that
+    /// satisfy `null?`. It returns a borrowed marker around the same opaque
+    /// handle and does not claim ownership or GC rooting.
+    #[must_use]
+    pub fn as_nil(self) -> NativeResult<SchemeNil<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_nil",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_null().into_result() {
+            Ok(true) => SchemeNil::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_nil",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_nil",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
     /// Checks whether this value is a Scheme boolean.
     ///
     /// This only succeeds for values exported by the initialized Gerbil runtime.

@@ -230,6 +230,35 @@ Implementation receipt:
 - =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
 - =direnv exec . bazel test //:cargo_all=
 
+** Nil Scheme-object projection
+
+Status: accepted for nil / empty-list only.
+
+The nil slice reuses the runtime-backed Scheme null fixture and Gerbil-owned
+=null?= predicate path, and exposes =GerbilValue::as_nil= plus the borrowed
+=SchemeNil= marker in Rust.
+
+The accepted failure and ownership boundary is:
+
+- only =SchemeObjectExport= values may project as =SchemeNil=;
+- non-null Scheme objects return =InvalidValue= for =as_nil=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for nil projection;
+- the marker wraps a non-zero =GerbilValueHandle= and is therefore distinct
+  from null pointers;
+- =SchemeNil= is borrowed and unrooted; it does not retain, free, root, or
+  decode the underlying =SCM= object;
+- void, EOF, unspecified, recursive list traversal, and GC-rooted sentinel
+  ownership remain outside this slice.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_value_surface --locked -- --nocapture=
+- =direnv exec . cargo test -p gerbil-scheme --test source_surface --locked -- --nocapture=
+- =direnv exec . env GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
 * Downstream policy
 
 Marlin consumes =gerbil-scheme-rust= as a dependency. It must not be the owner

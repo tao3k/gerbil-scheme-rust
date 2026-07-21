@@ -58,6 +58,16 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         scenario: "invalid-comparison-fail-closed",
     },
     BackedTypeMatrixEntry {
+        family: "nil",
+        scheme_selector: "gerbil_scheme_rust_nil_shape",
+        raw_abi: "GerbilValueHandle",
+        safe_surface: "GerbilValue::as_nil + SchemeNil",
+        ownership: "runtime-borrowed Scheme object",
+        nullability: "non-zero handle; distinct from null pointer",
+        failure_policy: "non-null objects and raw provenance fail closed",
+        scenario: "native-runtime-round-trip",
+    },
+    BackedTypeMatrixEntry {
         family: "fixnum",
         scheme_selector: "gerbil_scheme_rust_fixnum_shape",
         raw_abi: "GerbilFixnum",
@@ -154,7 +164,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     let source = read_native_surface_source();
     assert_eq!(
         BACKED_TYPE_MATRIX.len(),
-        13,
+        14,
         "the release-auditable backed type matrix must change deliberately",
     );
 
@@ -175,6 +185,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
         native_surface_shape_section(&source, "gerbil_scheme_rust_native_value_shape");
     for required_family in [
         "(scalar-values (i64 bool comparison status fixnum char flonum))",
+        "(sentinel-values (nil))",
         "(borrowed-values (utf8))",
         "(handle-values (runtime-handle gerbil-value-handle))",
         "(callback-values (i64-callback))",
@@ -415,7 +426,6 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
     );
 
     for unsupported in [
-        "gerbil_scheme_rust_nil_shape",
         "gerbil_scheme_rust_void_shape",
         "gerbil_scheme_rust_f64_shape",
         "gerbil_scheme_rust_symbol_shape",

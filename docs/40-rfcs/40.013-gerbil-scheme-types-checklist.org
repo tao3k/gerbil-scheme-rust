@@ -55,14 +55,15 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_flonum_shape=,
   =gerbil_scheme_rust_utf8_shape=,
   =gerbil_scheme_rust_value_handle_shape=,
+  =gerbil_scheme_rust_nil_shape=,
   =gerbil_scheme_rust_i64_callback_shape=,
   =gerbil_scheme_rust_native_value_shape=,
   =gerbil_scheme_rust_native_error_shape=, and
   =gerbil_scheme_rust_native_result_shape=.
 - Direct provider projection of the real =scheme/native.ss= FFI/export owner is
   not yet closed and remains a provider/source-surface TODO.
-- No current Scheme selector exists for nil, void, symbol, keyword, pair,
-  list, vector, procedure, owned/rooted values, bytevectors, ports,
+- No current Scheme selector exists for void, symbol, keyword, pair, list,
+  vector, procedure, owned/rooted values, bytevectors, ports,
   continuations, or advanced Scheme objects.
 
 * Checklist status legend
@@ -85,6 +86,7 @@ keeps this table aligned with the Scheme source-surface projection.
 | i64 | =gerbil_scheme_rust_i64_shape= | =i64= | =GerbilRuntime::{identity_i64,add_i64}= | copy scalar | not pointer-backed | overflow maps to =IntegerOverflow= | =native-identity-round-trip= |
 | bool | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return plus Scheme boolean handle | =GerbilRuntime::is_even_i64= and =GerbilValue::as_boolean= | copy scalar or runtime-borrowed Scheme object | not pointer-backed | status fail-closed before bool projection; raw provenance rejected | =native-runtime-round-trip= |
 | comparison | =gerbil_scheme_rust_comparison_shape= | =i32= comparison result | =GerbilRuntime::compare_i64= | copy scalar | not pointer-backed | invalid result maps to =InvalidComparisonResult= | =invalid-comparison-fail-closed= |
+| nil | =gerbil_scheme_rust_nil_shape= | =GerbilValueHandle= | =GerbilValue::as_nil= and =SchemeNil= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-null objects and raw provenance fail closed | =native-runtime-round-trip= |
 | fixnum | =gerbil_scheme_rust_fixnum_shape= | =GerbilFixnum= | =GerbilValue::{is_fixnum,as_fixnum,as_fixnum_i64}= | runtime-borrowed Scheme object | not pointer-backed | non-fixnum and raw provenance fail closed | =native-runtime-round-trip= |
 | char | =gerbil_scheme_rust_char_shape= | =GerbilChar= | =GerbilValue::{is_char,as_char}= | runtime-borrowed Scheme object | not pointer-backed | invalid Unicode scalar and raw provenance fail closed | =native-runtime-round-trip= |
 | flonum | =gerbil_scheme_rust_flonum_shape= | =GerbilFlonum= | =GerbilValue::{is_flonum,as_flonum}= | runtime-borrowed Scheme object | not pointer-backed | non-flonum and raw provenance fail closed | =native-runtime-round-trip= |
@@ -139,11 +141,15 @@ keeps this table aligned with the Scheme source-surface projection.
 ** Nil, void, eof, and unspecified
 
 - [ ] Raw ABI representation for =#<void>=.
-- [ ] Raw ABI representation for =()= / nil.
+- [X] Raw ABI representation for =()= / nil as non-zero
+  =GerbilValueHandle= returned by the initialized Gerbil fixture export.
 - [ ] Raw ABI representation for EOF object if exported.
 - [ ] Raw ABI representation for unspecified values.
-- [ ] Safe Rust marker types for nil/void/eof/unspecified.
-- [ ] Tests proving these sentinels are distinguishable and do not alias null.
+- [?] Safe Rust marker types for nil/void/eof/unspecified: =SchemeNil= is
+  implemented; void, EOF, and unspecified remain open.
+- [?] Tests proving these sentinels are distinguishable and do not alias null:
+  nil is proven as a non-zero handle distinct from null pointer; void, EOF, and
+  unspecified remain open.
 
 ** Boolean
 
@@ -473,11 +479,9 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
 - [X] Updated =gerbil_scheme_rust_native_value_shape= so aggregate scalar values
   include =fixnum=, =char=, and =flonum= alongside =i64=, =bool=,
   =comparison=, and =status=.
-- [?] Local full-gate follow-up is partially verified in this turn:
-  =native_value_surface= and =source_surface= pass, but the ASP-required
-  =asp-testing= resident is in =Repair= due model mismatch, so
-  =gerbil-scheme-sys= drift gate, workspace clippy, and Bazel must be rerun
-  after the typed testing resident is repaired or by remote CI.
+- [X] Local full-gate follow-up was reverified after the testing-lane repair
+  issue: =gerbil-scheme-sys= drift gate, workspace clippy, and Bazel
+  =//:cargo_all= all pass locally.
 - [X] Kept unknown raw status codes fail-closed at the typed projection layer:
   =NativeError::Status= retains the raw code, while =status= returns =None=
   for codes outside the stable =GerbilStatus= ABI enum.
@@ -488,6 +492,28 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
   pure Rust result/error projection gap under the existing native value-surface
   test owner. Add a dedicated scenario root only when the benchmark manifest
   taxonomy is expanded deliberately.
+
+** 2026-07-21 eighth closure receipt
+
+- [X] Added =SchemeNil= as a borrowed runtime-backed marker for Scheme nil /
+  empty-list values that satisfy =null?= through the Gerbil-owned predicate
+  path.
+- [X] Added =GerbilValue::as_nil= with provenance gating: only
+  =SchemeObjectExport= values can project as nil; =UntrustedRaw= and
+  =RuntimeSentinel= remain fail-closed.
+- [X] Added =gerbil_scheme_rust_nil_shape= to the ASP native source-surface and
+  =sentinel-values (nil)= to the aggregate native-value shape.
+- [X] Raised the release-auditable backed type matrix from 13 to 14 rows with a
+  first-class =nil= row.
+- [X] Verified focused local receipts:
+  =cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=,
+  =cargo test -p gerbil-scheme --features native --test native_value_surface --locked -- --nocapture=,
+  and =cargo test -p gerbil-scheme --test source_surface --locked -- --nocapture=.
+- [X] Verified full local gate receipts:
+  =env GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo test -p gerbil-scheme-sys --locked=,
+  =cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=,
+  and =bazel test //:cargo_all=.
+- [ ] Void, EOF, and unspecified are intentionally not added in this slice.
 
 * Next execution plan
 
@@ -505,14 +531,14 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
 - [X] Add native result/error scenario coverage that validates status,
   unknown-code preservation, optional status projection, and fail-closed
   behavior together.
-- [ ] Keep unsupported families explicitly absent until raw ABI and safe Rust
-  support exist; do not add Scheme source-surface placeholders for nil, void,
+- [X] Keep unsupported families explicitly absent until raw ABI and safe Rust
+  support exist; do not add Scheme source-surface placeholders for void,
   f64, char, symbol, keyword, pair, list, vector, bytevector, procedure, port,
   or continuation.
 
 ** Phase 2: choose the first real new Scheme value family
 
-- [ ] Prefer sentinel values first if the C ABI can expose them cleanly:
+- [?] Prefer sentinel values first if the C ABI can expose them cleanly:
   nil, void, EOF, and unspecified.
 - [ ] Alternative first expansion is =f64= if numeric scalar performance is the
   priority.

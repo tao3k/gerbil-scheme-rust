@@ -24,6 +24,7 @@ fn asp_native_surface_exports_current_shape_selectors() {
         "gerbil_scheme_rust_flonum_shape",
         "gerbil_scheme_rust_utf8_shape",
         "gerbil_scheme_rust_value_handle_shape",
+        "gerbil_scheme_rust_nil_shape",
         "gerbil_scheme_rust_i64_callback_shape",
         "gerbil_scheme_rust_native_value_shape",
         "gerbil_scheme_rust_native_error_shape",

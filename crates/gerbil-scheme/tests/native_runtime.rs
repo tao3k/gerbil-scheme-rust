@@ -56,6 +56,8 @@ fn exports_null_object(runtime: &GerbilRuntime) {
     assert_eq!(scheme_null.is_pair().as_result(), Ok(&false));
     assert_eq!(scheme_null.is_list().as_result(), Ok(&true));
     assert_eq!(scheme_null.is_null().as_result(), Ok(&true));
+    let scheme_nil = scheme_null.as_nil().into_result().expect("project nil");
+    assert_eq!(scheme_nil.as_raw(), scheme_null.as_raw());
     assert_eq!(scheme_null.is_boolean().as_result(), Ok(&false));
     assert_eq!(
         scheme_null.as_boolean().status(),
@@ -302,6 +304,7 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
         Some(GerbilStatus::InvalidValue)
     );
     assert_eq!(value.is_fixnum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.as_nil().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.as_fixnum().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(
         value.as_fixnum_i64().status(),

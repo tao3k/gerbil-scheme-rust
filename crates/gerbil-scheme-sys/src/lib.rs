@@ -2,7 +2,12 @@
 
 mod abi;
 
+pub use abi::gerbil_scheme_rust_fixture_improper_list;
+pub use abi::gerbil_scheme_rust_fixture_pair;
+pub use abi::gerbil_scheme_rust_fixture_proper_list;
+pub use abi::gerbil_scheme_rust_scheme_object_is_list;
 pub use abi::gerbil_scheme_rust_scheme_object_is_null;
+pub use abi::gerbil_scheme_rust_scheme_object_is_pair;
 
 pub use abi::{
     GerbilBoolean, GerbilBorrowedBytevector, GerbilBorrowedVector, GerbilChar, GerbilFixnum,

@@ -58,12 +58,19 @@ int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
 int32_t gerbil_scheme_rust_compare_i64(int64_t left, int64_t right);
 GerbilStatus gerbil_scheme_rust_runtime_sentinel_value(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_null(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_pair(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_proper_list(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_improper_list(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_value_is_pair(GerbilValueHandle value,
                                               GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_value_is_list(GerbilValueHandle value,
                                               GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_value_is_null(GerbilValueHandle value,
                                               GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_pair(GerbilValueHandle value,
+                                                      GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_list(GerbilValueHandle value,
+                                                      GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_is_null(GerbilValueHandle value,
                                                       GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_pair_car(GerbilValueHandle value,

@@ -236,6 +236,8 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] First real =scheme-object= export fixture: Scheme null object as a
   borrowed, unrooted =GerbilValueHandle=.
 - [X] Runtime-backed =null?= predicate gate for =SchemeObjectExport= handles.
+- [X] Runtime-backed =pair?= and =list?= predicate gates for
+  =SchemeObjectExport= handles, with pair/proper-list/improper-list fixtures.
 - [X] Scheme native-surface shape for =GerbilValue= ownership and nullability:
   non-zero, runtime-borrowed, not retained beyond the valid runtime borrow.
 - [ ] Explicit GC-root type.

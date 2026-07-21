@@ -28,15 +28,20 @@ Current Rust ABI evidence:
   and i64 comparison.
 - =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
   callback trampoline behavior.
-- =source-surface-sync= and =backed-value-family-surface= scenarios cover the
-  Scheme ASP source-surface contract for result/error taxonomy and every
-  currently sys/safe-backed value-family shape.
+- =source_surface= integration tests cover the Scheme ASP source-surface export
+  set, the tracked =scheme/native.ssi= contract, and the rule that
+  =scheme/asp/native-surface.ss= stays out of the runtime build.
 
 Current Scheme source-surface evidence:
 
-- =scheme/asp/native-surface.ss= is still the ASP-projected workaround for the
-  source-surface view.
-- The current projected selector set is exactly 18 selectors:
+- =scheme/native.ss= remains the runtime implementation owner.
+- =scheme/native.ssi= is the tracked Gerbil signature contract for exported
+  bridge symbols.
+- =scheme/asp/native-surface.ss= is still the temporary ASP-projected
+  workaround for the source-surface view; it must stay out of =build.ss= and can
+  be retired once the provider projects =scheme/native.ss= plus
+  =scheme/native.ssi= directly.
+- The current projected selector set is exactly 20 selectors:
   =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
   =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
   =gerbil_scheme_rust_add_i64=, =gerbil_scheme_rust_is_even_i64=,
@@ -45,6 +50,8 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_status_shape=, =gerbil_scheme_rust_i64_shape=,
   =gerbil_scheme_rust_bool_shape=,
   =gerbil_scheme_rust_comparison_shape=,
+  =gerbil_scheme_rust_fixnum_shape=,
+  =gerbil_scheme_rust_char_shape=,
   =gerbil_scheme_rust_utf8_shape=,
   =gerbil_scheme_rust_value_handle_shape=,
   =gerbil_scheme_rust_i64_callback_shape=,
@@ -53,8 +60,8 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_native_result_shape=.
 - Direct provider projection of the real =scheme/native.ss= FFI/export owner is
   not yet closed and remains a provider/source-surface TODO.
-- No current Scheme selector exists for nil, void, f64, char, symbol, keyword,
-  pair, list, vector, procedure, owned/rooted values, bytevectors, ports,
+- No current Scheme selector exists for nil, void, f64, symbol, keyword, pair,
+  list, vector, procedure, owned/rooted values, bytevectors, ports,
   continuations, or advanced Scheme objects.
 
 * Checklist status legend

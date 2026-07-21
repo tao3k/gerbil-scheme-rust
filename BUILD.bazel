@@ -23,7 +23,7 @@ filegroup(
 
 filegroup(
     name = "gerbil_sources",
-    srcs = glob(["scheme/*"]) + [
+    srcs = glob(["scheme/**/*"]) + [
         "build.ss",
         "gerbil.pkg",
         "native/runtime.c",

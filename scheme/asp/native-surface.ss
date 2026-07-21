@@ -10,14 +10,24 @@
          gerbil_scheme_rust_i64_shape
          gerbil_scheme_rust_bool_shape
          gerbil_scheme_rust_comparison_shape
+         gerbil_scheme_rust_fixnum_shape
+         gerbil_scheme_rust_char_shape
+         gerbil_scheme_rust_utf8_shape
+         gerbil_scheme_rust_value_handle_shape
+         gerbil_scheme_rust_i64_callback_shape
          gerbil_scheme_rust_native_value_shape
+         gerbil_scheme_rust_native_error_shape
          gerbil_scheme_rust_native_result_shape)
 
-;; ASP-only source surface for the native Gerbil/Rust ABI exports.
+;; ASP-only source-analysis projection for the native Gerbil/Rust ABI surface.
 ;;
 ;; Keep this file out of the runtime build.  The implementation owner remains
-;; scheme/native.ss; this file gives source-analysis tools ordinary Gerbil
-;; definitions for ABI names whose implementation uses native FFI forms.
+;; scheme/native.ss and the tracked Gerbil contract is scheme/native.ssi.  This
+;; file gives source-analysis tools ordinary Gerbil definitions for ABI names
+;; and value-family shapes whose implementation uses native FFI forms.
+;;
+;; Removal criterion: retire this projection when the Gerbil provider can
+;; directly project scheme/native.ss plus scheme/native.ssi FFI exports.
 
 (def gerbil_scheme_rust_abi_version
   'native-abi-export)
@@ -83,6 +93,30 @@
     (less . -1)
     (equal . 0)
     (greater . 1)))
+
+(def gerbil_scheme_rust_fixnum_shape
+  '(native-shape
+    (name . fixnum)
+    (transport . c-abi)
+    (repr . machine-word)
+    (ownership . by-value-or-scheme-object-export)
+    (predicate . gerbil-rs-scheme-object-fixnum?-raw)
+    (projection . gerbil-rs-scheme-object-fixnum-value-raw)
+    (safe-methods (is-fixnum as-fixnum as-fixnum-i64))
+    (failure-policy . fail-closed)))
+
+(def gerbil_scheme_rust_char_shape
+  '(native-shape
+    (name . char)
+    (transport . c-abi)
+    (repr . unicode-scalar-u32)
+    (ownership . by-value-or-scheme-object-export)
+    (predicate . gerbil-rs-scheme-object-char?-raw)
+    (projection . gerbil-rs-scheme-object-char-value-raw)
+    (fixtures (ascii bmp non-bmp))
+    (safe-methods (is-char as-char))
+    (validation . rust-unicode-scalar)
+    (failure-policy . fail-closed)))
 
 (def gerbil_scheme_rust_utf8_shape
   '(native-shape

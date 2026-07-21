@@ -34,6 +34,11 @@ Gerbil =.ssi= files should become the bridge contract for exported Scheme
 symbols. New bridge slices should add or update signatures alongside =.ss=
 implementation when the exported surface is meant to be stable.
 
+=scheme/native.ssi= is the tracked source contract for the current native
+bridge. Generated =.scm= files may be tracked when they are treated as
+Gerbil/Gambit lowered generated-source artifacts, but only with a deterministic
+regeneration check that fails on drift.
+
 The signature layer should make these boundaries explicit:
 
 - exported bridge symbol names;

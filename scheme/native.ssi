@@ -1,0 +1,39 @@
+;;; Gerbil Scheme Rust bridge exported symbol contract.
+;;;
+;;; This signature mirrors the stable bridge surface implemented by
+;;; `scheme/native.ss`.  The generated `.scm` files are build artifacts and are
+;;; not tracked as source.
+
+(export
+  ;; Scalar control proofs.
+  gerbil-rs-abi-version
+  gerbil-rs-add-i64
+  gerbil-rs-is-even-i64
+  gerbil-rs-compare-i64
+
+  ;; Scheme object fixtures.
+  gerbil-rs-scheme-null-value-raw
+  gerbil-rs-fixture-pair-raw
+  gerbil-rs-fixture-proper-list-raw
+  gerbil-rs-fixture-improper-list-raw
+  gerbil-rs-fixture-true-raw
+  gerbil-rs-fixture-false-raw
+  gerbil-rs-fixture-fixnum-raw
+  gerbil-rs-fixture-char-ascii-raw
+  gerbil-rs-fixture-char-bmp-raw
+  gerbil-rs-fixture-char-non-bmp-raw
+
+  ;; Scheme object predicates.
+  gerbil-rs-scheme-object-null?-raw
+  gerbil-rs-scheme-object-pair?-raw
+  gerbil-rs-scheme-object-list?-raw
+  gerbil-rs-scheme-object-boolean?-raw
+  gerbil-rs-scheme-object-fixnum?-raw
+  gerbil-rs-scheme-object-char?-raw
+
+  ;; Scheme object projections.
+  gerbil-rs-scheme-object-boolean-value-raw
+  gerbil-rs-scheme-object-fixnum-value-raw
+  gerbil-rs-scheme-object-char-value-raw
+  gerbil-rs-scheme-object-pair-car-raw
+  gerbil-rs-scheme-object-pair-cdr-raw)

@@ -1,0 +1,459 @@
+(declare (block) (standard-bindings) (extended-bindings))
+(begin
+  (define gerbil-scheme-rust/scheme/native::timestamp 1784607138)
+  (begin
+    (define-macro (define-guard guard defn)
+      (if (eval `(cond-expand
+                  (gerbil-separate-compilation #f)
+                  (,guard #t)
+                  (else #f)))
+          '(begin)
+          (begin (eval `(define-cond-expand-feature ,guard)) defn)))
+    (define-macro (define-c-lambda id args ret #!optional (name #f))
+      (let ((name (or name (symbol->string id))))
+        `(define ,id (c-lambda ,args ,ret ,name))))
+    (define-macro (define-const symbol)
+      (let* ((str (symbol->string symbol))
+             (ref (string-append "___return (" str ");")))
+        `(define ,symbol ((c-lambda () int ,ref)))))
+    (define-macro (define-const* symbol #!optional (ccond #f))
+      (let* ((str (symbol->string symbol))
+             (code (string-append
+                    "#if "
+                    (or ccond (string-append "defined(" str ")"))
+                    "\n"
+                    "___return (___FIX ("
+                    str
+                    "));\n"
+                    "#else \n"
+                    "___return (___FAL);\n"
+                    "#endif")))
+        `(define ,symbol ((c-lambda () scheme-object ,code)))))
+    (define-macro (define-with-errno symbol ffi-symbol args)
+      `(define (,symbol ,@args)
+         (declare (not interrupts-enabled))
+         (let ((r (,ffi-symbol ,@args)))
+           (if (##fx< r 0)
+               (##fx- (##c-code "___RESULT = ___FIX (errno);"))
+               r))))
+    (define-macro (define-c-struct
+                   struct
+                   #!optional
+                   (members '())
+                   release-function
+                   compatible-tags
+                   as-typedef)
+      (let* ((struct-str (symbol->string struct))
+             (struct-ptr (string->symbol (string-append struct-str "*")))
+             (shallow-ptr
+              (string->symbol (string-append struct-str "-shallow-ptr*")))
+             (borrowed-ptr
+              (string->symbol (string-append struct-str "-borrowed-ptr*")))
+             (struct-keyword? (if as-typedef "" "struct "))
+             (string-types
+              '(char-string
+                nonull-char-string
+                UTF-8-string
+                nonnull-UTF-8-string
+                UTF-16-string
+                nonnull-UTF16-string))
+             (string-compat-required?
+              (let loop ((m members))
+                (cond ((null? m) #f)
+                      ((member (cdr (car m)) string-types) #t)
+                      (else (loop (cdr m))))))
+             (string-setter-body
+              (lambda (member-name)
+                (let ((m (string-append "___arg1->" member-name)))
+                  (string-append
+                   "if("
+                   m
+                   " == NULL)"
+                   "\n"
+                   m
+                   "= strdup(___arg2);"
+                   "\n"
+                   "else if (strcmp("
+                   m
+                   ", ___arg2) != 0) {"
+                   "\n"
+                   "free("
+                   m
+                   ");"
+                   "\n"
+                   m
+                   "= strdup(___arg2);"
+                   "\n"
+                   "}"
+                   "\n"
+                   "___return;"
+                   "\n"))))
+             (default-free-body
+              (and string-compat-required?
+                   (string-append
+                    "___SCMOBJ "
+                    struct-str
+                    "_ffi_free (void *ptr) {"
+                    "\n"
+                    struct-keyword?
+                    struct-str
+                    " *obj = ("
+                    struct-keyword?
+                    struct-str
+                    "*) ptr;"
+                    "\n"
+                    (apply string-append
+                           (map (lambda (m)
+                                  (cond ((memq (cdr m) string-types)
+                                         (let ((mem-name
+                                                (symbol->string (car m))))
+                                           (string-append
+                                            "if(obj->"
+                                            mem-name
+                                            ") "
+                                            "free(obj->"
+                                            mem-name
+                                            ");"
+                                            "\n")))
+                                        (else "")))
+                                members))
+                    "free(obj);"
+                    "\n"
+                    "return ___FIX (___NO_ERR);"
+                    "\n"
+                    "}")))
+             (release-function
+              (or release-function
+                  (if string-compat-required?
+                      (string-append struct-str "_ffi_free")
+                      "ffi_free")))
+             (string-compat-types
+              (if string-compat-required?
+                  `((c-declare ,default-free-body)
+                    (c-define-type
+                     ,shallow-ptr
+                     (pointer ,struct (,struct-ptr) "ffi_free")))
+                  '()))
+             (compatible-tags (or compatible-tags '()))
+             (ptr-tags
+              (map (lambda (t)
+                     (string->symbol (string-append (symbol->string t) "*")))
+                   compatible-tags)))
+        `(begin
+           (c-define-type
+            ,struct
+            (,(if as-typedef 'type 'struct)
+             ,struct-str
+             (,struct ,@compatible-tags)))
+           (c-define-type
+            ,struct-ptr
+            (pointer ,struct (,struct-ptr ,@ptr-tags) ,release-function))
+           (c-define-type ,borrowed-ptr (pointer ,struct (,struct-ptr)))
+           ,@string-compat-types
+           (define ,(string->symbol (string-append struct-str "-ptr?"))
+             (lambda (obj)
+               (and (foreign? obj) (member ',struct-ptr (foreign-tags obj)))))
+           ,@(apply append
+                    (map (lambda (m)
+                           (let* ((member-name (symbol->string (car m)))
+                                  (member-type (cdr m))
+                                  (getter-name
+                                   (string-append struct-str "-" member-name))
+                                  (setter-body
+                                   (cond ((member member-type string-types)
+                                          (string-setter-body member-name))
+                                         (else
+                                          (string-append
+                                           "___arg1->"
+                                           member-name
+                                           " = ___arg2;"
+                                           "\n"
+                                           "___return;"
+                                           "\n")))))
+                             `((define ,(string->symbol getter-name)
+                                 (c-lambda
+                                  (,struct-ptr)
+                                  ,member-type
+                                  ,(string-append
+                                    "___return(___arg1->"
+                                    member-name
+                                    ");")))
+                               (define ,(string->symbol
+                                         (string-append getter-name "-set!"))
+                                 (c-lambda
+                                  (,struct-ptr ,member-type)
+                                  void
+                                  ,setter-body)))))
+                         members))
+           (define ,(string->symbol (string-append "malloc-" struct-str))
+             (c-lambda
+              ()
+              ,struct-ptr
+              ,(string-append
+                struct-keyword?
+                struct-str
+                "* var = ("
+                struct-keyword?
+                struct-str
+                " *) malloc(sizeof("
+                struct-keyword?
+                struct-str
+                "));"
+                "\n"
+                "if (var == NULL)"
+                "\n"
+                "    ___return (NULL);"
+                "\n"
+                "memset(var, 0, sizeof("
+                struct-keyword?
+                struct-str
+                "));"
+                "___return(var);")))
+           (define ,(string->symbol (string-append "ptr->" struct-str))
+             (c-lambda (,struct-ptr) ,struct "___return(*___arg1);"))
+           (define ,(string->symbol
+                     (string-append "malloc-" struct-str "-array"))
+             (c-lambda
+              (unsigned-int32)
+              ,(if string-compat-required? shallow-ptr struct-ptr)
+              ,(string-append
+                struct-keyword?
+                struct-str
+                " *arr_var=("
+                struct-keyword?
+                struct-str
+                " *) malloc(___arg1*sizeof("
+                struct-keyword?
+                struct-str
+                "));"
+                "\n"
+                "if (arr_var == NULL)"
+                "\n"
+                "    ___return (NULL);"
+                "\n"
+                "memset(arr_var, 0, ___arg1*sizeof("
+                struct-keyword?
+                struct-str
+                "));"
+                "\n"
+                "___return(arr_var);")))
+           (define ,(string->symbol (string-append struct-str "-array-ref"))
+             (c-lambda
+              (,struct-ptr unsigned-int32)
+              ,borrowed-ptr
+              "___return (___arg1 + ___arg2);"))
+           (define ,(string->symbol (string-append struct-str "-array-set!"))
+             (c-lambda
+              (,struct-ptr unsigned-int32 ,struct-ptr)
+              void
+              "*(___arg1 + ___arg2) = *___arg3; ___return;")))))
+    (c-declare "#include <stdlib.h>")
+    (c-declare "#include <string.h>")
+    (c-declare "#include <errno.h>")
+    (c-declare "static ___SCMOBJ ffi_free (void *ptr);")
+    (c-declare
+     "#ifndef ___HAVE_FFI_U8VECTOR\n#define ___HAVE_FFI_U8VECTOR\n#define U8_DATA(obj) ___CAST (___U8*, ___BODY_AS (obj, ___tSUBTYPED))\n#define U8_LEN(obj) ___HD_BYTES (___HEADER (obj))\n#endif")
+    (namespace
+     ("gerbil-scheme-rust/scheme/native#"
+      gerbil-rs-scheme-object-pair-cdr-raw
+      gerbil-rs-scheme-object-pair-car-raw
+      gerbil-rs-scheme-object-char-value-raw
+      gerbil-rs-scheme-object-char?-raw
+      gerbil-rs-scheme-object-fixnum-value-raw
+      gerbil-rs-scheme-object-fixnum?-raw
+      gerbil-rs-scheme-object-boolean-value-raw
+      gerbil-rs-scheme-object-boolean?-raw
+      gerbil-rs-scheme-object-list?-raw
+      gerbil-rs-scheme-object-pair?-raw
+      gerbil-rs-scheme-object-null?-raw
+      gerbil-rs-fixture-char-non-bmp-raw
+      gerbil-rs-fixture-char-bmp-raw
+      gerbil-rs-fixture-char-ascii-raw
+      gerbil-rs-fixture-fixnum-raw
+      gerbil-rs-fixture-false-raw
+      gerbil-rs-fixture-true-raw
+      gerbil-rs-fixture-improper-list-raw
+      gerbil-rs-fixture-proper-list-raw
+      gerbil-rs-fixture-pair-raw
+      gerbil-rs-scheme-null-value-raw
+      gerbil-rs-compare-i64
+      gerbil-rs-is-even-i64
+      gerbil-rs-add-i64
+      gerbil-rs-abi-version))
+    (c-define
+     (gerbil-rs-abi-version)
+     ()
+     unsigned-int32
+     "gerbil_scheme_rust_abi_version"
+     "extern"
+     1)
+    (c-define
+     (gerbil-rs-add-i64 left right)
+     (int64 int64)
+     int64
+     "gerbil_scheme_rust_add_i64"
+     "extern"
+     (+ left right))
+    (c-define
+     (gerbil-rs-is-even-i64 value)
+     (int64)
+     int32
+     "gerbil_scheme_rust_is_even_i64"
+     "extern"
+     (if (even? value) 1 0))
+    (c-define
+     (gerbil-rs-compare-i64 left right)
+     (int64 int64)
+     int32
+     "gerbil_scheme_rust_compare_i64"
+     "extern"
+     (cond ((< left right) -1) ((> left right) 1) (else 0)))
+    (c-define
+     (gerbil-rs-scheme-null-value-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_scheme_null_value_raw"
+     "extern"
+     '())
+    (c-define
+     (gerbil-rs-fixture-pair-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_pair_raw"
+     "extern"
+     (cons 1 2))
+    (c-define
+     (gerbil-rs-fixture-proper-list-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_proper_list_raw"
+     "extern"
+     (list 1 2))
+    (c-define
+     (gerbil-rs-fixture-improper-list-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_improper_list_raw"
+     "extern"
+     (cons 1 2))
+    (c-define
+     (gerbil-rs-fixture-true-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_true_raw"
+     "extern"
+     #t)
+    (c-define
+     (gerbil-rs-fixture-false-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_false_raw"
+     "extern"
+     #f)
+    (c-define
+     (gerbil-rs-fixture-fixnum-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_fixnum_raw"
+     "extern"
+     42)
+    (c-define
+     (gerbil-rs-fixture-char-ascii-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_char_ascii_raw"
+     "extern"
+     #\A)
+    (c-define
+     (gerbil-rs-fixture-char-bmp-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_char_bmp_raw"
+     "extern"
+     (integer->char 955))
+    (c-define
+     (gerbil-rs-fixture-char-non-bmp-raw)
+     ()
+     scheme-object
+     "gerbil_scheme_rust_fixture_char_non_bmp_raw"
+     "extern"
+     (integer->char 128578))
+    (c-define
+     (gerbil-rs-scheme-object-null?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_null_raw"
+     "extern"
+     (if (null? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-pair?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_pair_raw"
+     "extern"
+     (if (pair? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-list?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_list_raw"
+     "extern"
+     (if (list? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-boolean?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_boolean_raw"
+     "extern"
+     (if (boolean? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-boolean-value-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_boolean_value_raw"
+     "extern"
+     (if value 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-fixnum?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_fixnum_raw"
+     "extern"
+     (if (fixnum? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-fixnum-value-raw value)
+     (scheme-object)
+     long
+     "gerbil_scheme_rust_scheme_object_fixnum_value_raw"
+     "extern"
+     value)
+    (c-define
+     (gerbil-rs-scheme-object-char?-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_is_char_raw"
+     "extern"
+     (if (char? value) 1 0))
+    (c-define
+     (gerbil-rs-scheme-object-char-value-raw value)
+     (scheme-object)
+     int32
+     "gerbil_scheme_rust_scheme_object_char_value_raw"
+     "extern"
+     (char->integer value))
+    (c-define
+     (gerbil-rs-scheme-object-pair-car-raw value)
+     (scheme-object)
+     scheme-object
+     "gerbil_scheme_rust_scheme_object_pair_car_raw"
+     "extern"
+     (if (pair? value) (car value) #f))
+    (c-define
+     (gerbil-rs-scheme-object-pair-cdr-raw value)
+     (scheme-object)
+     scheme-object
+     "gerbil_scheme_rust_scheme_object_pair_cdr_raw"
+     "extern"
+     (if (pair? value) (cdr value) #f))
+    (c-declare
+     "#ifndef ___HAVE_FFI_FREE\n#define ___HAVE_FFI_FREE\n___SCMOBJ ffi_free (void *ptr)\n{\n free (ptr);\n return ___FIX (___NO_ERR);\n}\n#endif")))

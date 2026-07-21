@@ -4,6 +4,7 @@
 
 use std::env;
 use std::ffi::OsStr;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
@@ -16,9 +17,13 @@ fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_GSC");
     println!("cargo:rerun-if-env-changed=GERBIL_HOME");
     println!("cargo:rerun-if-env-changed=GERBIL_PATH");
+    println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM");
+    println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM");
     println!("cargo:rerun-if-changed=../../build.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/native.ss");
+    println!("cargo:rerun-if-changed=../../scheme/native.ssi");
+    println!("cargo:rerun-if-changed=../../scheme/generated/native.scm");
     println!("cargo:rerun-if-changed=../../native/runtime.c");
 
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
@@ -39,6 +44,7 @@ fn run_native_build() {
     run(&mut canonical_build, "canonical Gerbil build");
 
     let native_scm = gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__native.scm");
+    sync_generated_scm(&workspace, &native_scm);
     let native_c = native_scm.with_extension("c");
     let native_object = out_dir.join("native.o");
     let linker_c = out_dir.join("native_link.c");
@@ -112,6 +118,31 @@ fn run_native_build() {
     println!("cargo:rustc-link-lib=dylib=m");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         println!("cargo:rustc-link-lib=dylib=dl");
+    }
+}
+
+fn sync_generated_scm(workspace: &Path, native_scm: &Path) {
+    let tracked_scm = workspace.join("scheme/generated/native.scm");
+    let update = env::var("GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM").as_deref() == Ok("1");
+    let check = env::var("GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM").as_deref() == Ok("1");
+
+    if update {
+        let parent = tracked_scm
+            .parent()
+            .expect("tracked generated SCM path must have a parent");
+        fs::create_dir_all(parent).expect("create tracked generated SCM directory");
+        fs::copy(native_scm, &tracked_scm).expect("update tracked generated SCM");
+    }
+
+    if check {
+        let generated = fs::read(native_scm).expect("read generated native SCM");
+        let tracked = fs::read(&tracked_scm).expect(
+            "read tracked generated SCM; run with GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1",
+        );
+        assert_eq!(
+            generated, tracked,
+            "tracked generated SCM is stale; run with GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1"
+        );
     }
 }
 

@@ -582,7 +582,7 @@ pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_as_boolean(
     GerbilStatus::Ok
 }
 
-unsafe fn checked_scheme_object_predicate(
+pub(crate) unsafe fn checked_scheme_object_predicate(
     value: GerbilValueHandle,
     out: *mut GerbilBoolean,
     predicate: unsafe extern "C" fn(GerbilValueHandle) -> i32,
@@ -601,7 +601,7 @@ unsafe fn checked_scheme_object_predicate(
     GerbilStatus::Ok
 }
 
-unsafe fn checked_scheme_object_fixture(
+pub(crate) unsafe fn checked_scheme_object_fixture(
     out: *mut GerbilValueHandle,
     fixture: unsafe extern "C" fn() -> GerbilValueHandle,
 ) -> GerbilStatus {
@@ -913,6 +913,8 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_fixture_false_raw() -> GerbilValueHandle;
 
+    pub(crate) fn gerbil_scheme_rust_fixture_fixnum_raw() -> GerbilValueHandle;
+
     /// Raw Scheme-object pair predicate exported by `scheme/native.ss`.
     ///
     /// # Safety
@@ -952,6 +954,12 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_boolean_value_raw(value: GerbilValueHandle) -> i32;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_is_fixnum_raw(value: GerbilValueHandle) -> i32;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_fixnum_value_raw(
+        value: GerbilValueHandle,
+    ) -> isize;
 
     /// Raw Scheme-object pair car projection exported by `scheme/native.ss`.
     ///

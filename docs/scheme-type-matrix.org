@@ -20,7 +20,7 @@ This matrix tracks the public Scheme value surface exposed by
 | Scheme value kind | C ABI representation | Rust public type | Ownership contract | Current coverage |
 |-------------------+----------------------+------------------+--------------------+------------------|
 | status | =repr(i32)= enum | =GerbilStatus= | by value | unit + native result tests |
-| fixnum | machine word | =GerbilFixnum= | by value | unit ABI shape |
+| fixnum | machine word | =GerbilFixnum= plus =GerbilValue::is_fixnum=/=as_fixnum=/=as_fixnum_i64= | by value or =SchemeObjectExport= handle | unit ABI shape plus runtime-backed projection for =SchemeObjectExport=; =UntrustedRaw= and =RuntimeSentinel= remain fail-closed |
 | boolean | normalized byte | =GerbilBoolean= plus =GerbilValue::is_boolean=/=as_boolean= | by value or =SchemeObjectExport= handle | unit ABI shape plus runtime-backed projection for =SchemeObjectExport=; =UntrustedRaw= and =RuntimeSentinel= remain fail-closed |
 | char | Unicode code point | =GerbilChar= | by value | unit valid/invalid scalar |
 | flonum | =f64= | =GerbilFlonum= | by value | unit ABI shape |

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 use gerbil_scheme_sys::{
-    gerbil_scheme_rust_fixture_false, gerbil_scheme_rust_fixture_improper_list,
-    gerbil_scheme_rust_fixture_pair, gerbil_scheme_rust_fixture_proper_list,
-    gerbil_scheme_rust_fixture_true, gerbil_scheme_rust_scheme_object_as_boolean,
-    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_list,
-    gerbil_scheme_rust_scheme_object_is_pair,
+    gerbil_scheme_rust_fixture_false, gerbil_scheme_rust_fixture_fixnum,
+    gerbil_scheme_rust_fixture_improper_list, gerbil_scheme_rust_fixture_pair,
+    gerbil_scheme_rust_fixture_proper_list, gerbil_scheme_rust_fixture_true,
+    gerbil_scheme_rust_scheme_object_as_boolean, gerbil_scheme_rust_scheme_object_as_fixnum,
+    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_fixnum,
+    gerbil_scheme_rust_scheme_object_is_list, gerbil_scheme_rust_scheme_object_is_pair,
 };
 
 use std::fmt;
@@ -256,6 +257,62 @@ impl<'runtime> GerbilValue<'runtime> {
             });
         }
         NativeResult::ok(out.as_bool())
+    }
+
+    /// Returns whether this value is a Scheme fixnum.
+    ///
+    /// This only succeeds for Scheme-object exports; untrusted raw handles and
+    /// runtime sentinels fail closed with `InvalidValue`.
+    #[must_use]
+    pub fn is_fixnum(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_fixnum",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_fixnum,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_fixnum",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme fixnum.
+    ///
+    /// This intentionally covers only Gerbil fixnums. Bignums and other exact
+    /// integer objects must use a later, explicitly versioned projection path.
+    #[must_use]
+    pub fn as_fixnum(self) -> NativeResult<isize> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_fixnum",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        let mut out = gerbil_scheme_sys::GerbilFixnum::default();
+        // SAFETY: `out` is a valid output slot for one GerbilFixnum.
+        let status =
+            unsafe { gerbil_scheme_rust_scheme_object_as_fixnum(self.raw.get(), &raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_fixnum",
+                code: status as i32,
+            });
+        }
+        NativeResult::ok(out.0)
+    }
+
+    /// Projects this value as a Scheme fixnum widened to `i64`.
+    #[must_use]
+    pub fn as_fixnum_i64(self) -> NativeResult<i64> {
+        match self.as_fixnum().as_result() {
+            Ok(value) => NativeResult::ok(*value as i64),
+            Err(error) => NativeResult::err(*error),
+        }
     }
 
     /// Project this value's car if it is backed by a pair.
@@ -701,6 +758,18 @@ impl GerbilRuntime {
         self.checked_scheme_object_fixture(
             "gerbil_scheme_rust_fixture_false",
             gerbil_scheme_rust_fixture_false,
+        )
+    }
+
+    /// Exports a Scheme fixnum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_fixnum_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_fixnum",
+            gerbil_scheme_rust_fixture_fixnum,
         )
     }
 

@@ -12,11 +12,14 @@
   gerbil-rs-fixture-improper-list-raw
   gerbil-rs-fixture-true-raw
   gerbil-rs-fixture-false-raw
+  gerbil-rs-fixture-fixnum-raw
   gerbil-rs-scheme-object-null?-raw
   gerbil-rs-scheme-object-pair?-raw
   gerbil-rs-scheme-object-list?-raw
   gerbil-rs-scheme-object-boolean?-raw
   gerbil-rs-scheme-object-boolean-value-raw
+  gerbil-rs-scheme-object-fixnum?-raw
+  gerbil-rs-scheme-object-fixnum-value-raw
   gerbil-rs-scheme-object-pair-car-raw
   gerbil-rs-scheme-object-pair-cdr-raw)
 
@@ -33,11 +36,14 @@
    gerbil-rs-fixture-improper-list-raw
    gerbil-rs-fixture-true-raw
    gerbil-rs-fixture-false-raw
+   gerbil-rs-fixture-fixnum-raw
    gerbil-rs-scheme-object-null?-raw
    gerbil-rs-scheme-object-pair?-raw
    gerbil-rs-scheme-object-list?-raw
    gerbil-rs-scheme-object-boolean?-raw
    gerbil-rs-scheme-object-boolean-value-raw
+   gerbil-rs-scheme-object-fixnum?-raw
+   gerbil-rs-scheme-object-fixnum-value-raw
    gerbil-rs-scheme-object-pair-car-raw
    gerbil-rs-scheme-object-pair-cdr-raw)
   (c-define (gerbil-rs-abi-version)
@@ -109,6 +115,13 @@
       "extern"
     #f)
 
+  (c-define (gerbil-rs-fixture-fixnum-raw)
+      ()
+      scheme-object
+      "gerbil_scheme_rust_fixture_fixnum_raw"
+      "extern"
+    42)
+
   (c-define (gerbil-rs-scheme-object-null?-raw value)
       (scheme-object)
       int32
@@ -143,6 +156,20 @@
       "gerbil_scheme_rust_scheme_object_boolean_value_raw"
       "extern"
     (if value 1 0))
+
+  (c-define (gerbil-rs-scheme-object-fixnum?-raw value)
+      (scheme-object)
+      int32
+      "gerbil_scheme_rust_scheme_object_is_fixnum_raw"
+      "extern"
+    (if (fixnum? value) 1 0))
+
+  (c-define (gerbil-rs-scheme-object-fixnum-value-raw value)
+      (scheme-object)
+      long
+      "gerbil_scheme_rust_scheme_object_fixnum_value_raw"
+      "extern"
+    value)
 
   (c-define (gerbil-rs-scheme-object-pair-car-raw value)
       (scheme-object)

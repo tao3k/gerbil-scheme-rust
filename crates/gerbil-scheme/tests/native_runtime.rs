@@ -21,10 +21,22 @@ fn calls_scalar_export_in_process() {
 }
 
 fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
+    exports_runtime_sentinel(runtime);
+    exports_null_object(runtime);
+    exports_boolean_objects(runtime);
+    exports_fixnum_object(runtime);
+    exports_pair_object(runtime);
+    exports_proper_list_object(runtime);
+    exports_improper_list_object(runtime);
+}
+
+fn exports_runtime_sentinel(runtime: &GerbilRuntime) {
     let value = runtime.runtime_sentinel_value().unwrap();
     assert_eq!(value.provenance(), GerbilValueProvenance::RuntimeSentinel);
     assert_fail_closed_value(value);
+}
 
+fn exports_null_object(runtime: &GerbilRuntime) {
     let scheme_null = runtime
         .fixture_null_value()
         .expect("export Scheme null object through native runtime");
@@ -39,7 +51,9 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
         Some(GerbilStatus::InvalidValue)
     );
     assert_fail_closed_traversal(scheme_null);
+}
 
+fn exports_boolean_objects(runtime: &GerbilRuntime) {
     let scheme_true = runtime
         .fixture_true_value()
         .expect("export Scheme true object through native runtime");
@@ -63,7 +77,29 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     assert_eq!(scheme_false.as_boolean().as_result(), Ok(&false));
     assert_fail_closed_traversal(scheme_false);
     assert_untrusted_raw_fail_closed(scheme_false);
+}
 
+fn exports_fixnum_object(runtime: &GerbilRuntime) {
+    let scheme_fixnum = runtime
+        .fixture_fixnum_value()
+        .expect("export Scheme fixnum object through native runtime");
+    assert_scheme_object_export(scheme_fixnum);
+    assert_eq!(scheme_fixnum.is_pair().as_result(), Ok(&false));
+    assert_eq!(scheme_fixnum.is_list().as_result(), Ok(&false));
+    assert_eq!(scheme_fixnum.is_null().as_result(), Ok(&false));
+    assert_eq!(scheme_fixnum.is_boolean().as_result(), Ok(&false));
+    assert_eq!(
+        scheme_fixnum.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(scheme_fixnum.is_fixnum().as_result(), Ok(&true));
+    assert_eq!(scheme_fixnum.as_fixnum().as_result(), Ok(&42));
+    assert_eq!(scheme_fixnum.as_fixnum_i64().as_result(), Ok(&42));
+    assert_fail_closed_traversal(scheme_fixnum);
+    assert_untrusted_raw_fail_closed(scheme_fixnum);
+}
+
+fn exports_pair_object(runtime: &GerbilRuntime) {
     let pair = runtime
         .fixture_pair_value()
         .expect("export Scheme pair object through native runtime");
@@ -79,7 +115,9 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     assert_eq!(pair_parts.car, pair_head);
     assert_eq!(pair_parts.cdr, pair_tail);
     assert_untrusted_raw_fail_closed(pair);
+}
 
+fn exports_proper_list_object(runtime: &GerbilRuntime) {
     let proper_list = runtime
         .fixture_proper_list_value()
         .expect("export proper Scheme list object through native runtime");
@@ -98,7 +136,9 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
         .expect("project proper-list pair parts");
     assert_scheme_object_export(proper_parts.car);
     assert_eq!(proper_parts.cdr, proper_tail);
+}
 
+fn exports_improper_list_object(runtime: &GerbilRuntime) {
     let improper_list = runtime
         .fixture_improper_list_value()
         .expect("export improper Scheme list object through native runtime");
@@ -152,6 +192,12 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
     );
     assert_eq!(
         value.as_boolean().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+    assert_eq!(value.is_fixnum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(value.as_fixnum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(
+        value.as_fixnum_i64().status(),
         Some(GerbilStatus::InvalidValue)
     );
     assert_fail_closed_traversal(value);

@@ -146,6 +146,11 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] i64 identity native round-trip.
 - [X] i64 addition with overflow guard.
 - [X] i64 comparison with invalid-result fail-closed test.
+- [X] Fixnum-only =SchemeObjectExport= projection through
+  =GerbilValue::is_fixnum=, =GerbilValue::as_fixnum=, and
+  =GerbilValue::as_fixnum_i64=.
+- [X] Scenario for fixnum fixture projection plus non-fixnum and raw
+  provenance fail-closed coverage.
 - [ ] Exact integer / bignum ownership strategy.
 - [ ] Checked conversion rules: exact integer to =i64=, =u64=, =usize=.
 - [ ] Overflow status mapping for exact integer projection.

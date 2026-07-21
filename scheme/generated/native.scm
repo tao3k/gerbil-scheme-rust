@@ -1,6 +1,7 @@
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=53177f1e9dc629b81e0a035d8fd0efe55fa6daa6be19751f072abf5e972bcb8d body-sha256=966c612148699bbad44cd9bbdd0160d8847441a36f98c62a0a56804aff06593f
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/native::timestamp 1784664718)
+  (define gerbil-scheme-rust/scheme/native::timestamp 1784667801)
   (begin
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-next-root-id '1)
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values '())

@@ -3,6 +3,7 @@
 
 mod archive;
 mod discovery;
+mod generated_scm;
 mod header;
 mod native;
 mod toolchain;

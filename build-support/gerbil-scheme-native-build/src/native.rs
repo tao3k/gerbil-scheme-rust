@@ -8,6 +8,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
+use crate::generated_scm::{
+    stamp_generated_scm, validate_generated_scm, workspace_input_fingerprint,
+};
+
 /// Build the native Gerbil and Gambit archive for the consuming Cargo package.
 pub fn build_native_archive() {
     run_native_build();
@@ -43,9 +47,10 @@ fn run_native_build() {
         .env("GERBIL_PATH", &gerbil_path);
     run(&mut canonical_build, "canonical Gerbil build");
 
-    let native_scm = gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__native.scm");
-    sync_generated_scm(&workspace, &native_scm);
-    let native_c = native_scm.with_extension("c");
+    let generated_native_scm =
+        gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__native.scm");
+    let native_scm = sync_generated_scm(&workspace, &generated_native_scm);
+    let native_c = out_dir.join("native.c");
     let native_object = out_dir.join("native.o");
     let linker_c = out_dir.join("native_link.c");
     let linker_object = out_dir.join("native_link.o");
@@ -121,47 +126,42 @@ fn run_native_build() {
     }
 }
 
-fn sync_generated_scm(workspace: &Path, native_scm: &Path) {
+fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
     let tracked_scm = workspace.join("scheme/generated/native.scm");
     let update = env::var("GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM").as_deref() == Ok("1");
     let check = env::var("GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM").as_deref() == Ok("1");
+    let input_fingerprint = workspace_input_fingerprint(workspace);
 
     if update {
         let parent = tracked_scm
             .parent()
             .expect("tracked generated SCM path must have a parent");
         fs::create_dir_all(parent).expect("create tracked generated SCM directory");
-        fs::copy(native_scm, &tracked_scm).expect("update tracked generated SCM");
+        let generated = fs::read_to_string(native_scm).expect("read generated native SCM");
+        fs::write(
+            &tracked_scm,
+            stamp_generated_scm(&generated, &input_fingerprint),
+        )
+        .expect("update tracked generated SCM with provenance");
     }
 
     if check {
-        let generated = fs::read_to_string(native_scm).expect("read generated native SCM");
         let tracked = fs::read_to_string(&tracked_scm).expect(
             "read tracked generated SCM; run with GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1",
         );
-        assert_eq!(
-            normalize_generated_scm(&generated),
-            normalize_generated_scm(&tracked),
-            "tracked generated SCM is stale; run with GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1"
-        );
+        validate_generated_scm(&tracked, &input_fingerprint).unwrap_or_else(|error| {
+            panic!(
+                "tracked generated SCM provenance is invalid: {error}; run with \
+                 GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1"
+            )
+        });
     }
-}
 
-fn normalize_generated_scm(source: &str) -> String {
-    source
-        .lines()
-        .map(|line| {
-            if line.contains("::timestamp ") {
-                line.split_once("::timestamp ").map_or_else(
-                    || line.to_owned(),
-                    |(prefix, _)| format!("{prefix}::timestamp 0)"),
-                )
-            } else {
-                line.to_owned()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+    if update || check {
+        tracked_scm
+    } else {
+        native_scm.to_path_buf()
+    }
 }
 
 fn compile_c(gsc: &OsStr, source: &Path, object: &Path, operation: &str) {

@@ -105,6 +105,36 @@ The first local AOT receipt is:
 
 The complete measured scenario took =34212125ns=.
 
+* Generated SCM provenance boundary
+
+The committed =scheme/generated/native.scm= is an AOT build artifact, not a
+Rust source-analysis input.  The bindings crates therefore do not depend on a
+Gerbil parser, Rowan, or =gerbil-scheme-language-project-harness=.
+
+The CI matrix originally compared regenerated SCM byte for byte after only
+normalizing the compiler timestamp.  Gerbil installations built from the same
+revision can allocate different numeric suffixes to internal compiler gensyms,
+so that check rejected semantically equivalent output on both Linux/source and
+macOS/Homebrew runners.  Parsing Scheme inside the bindings repository would
+put language-tooling policy on the wrong side of the C ABI boundary.
+
+The replacement contract is syntax independent:
+
+1. =GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1= writes the compiler output and
+   a provenance header together.
+2. The header binds the artifact to SHA-256 fingerprints of =build.ss=,
+   =gerbil.pkg=, =scheme/native.ss=, and =scheme/native.ssi=.
+3. A second SHA-256 fingerprint covers the committed SCM body, so manual body
+   drift fails closed.
+4. =GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1= validates both fingerprints and
+   selects the committed SCM as the actual Gambit compile input.
+5. All matrix lanes still compile, link, and execute the C ABI; none parse
+   Scheme syntax or normalize compiler identifiers.
+
+The language project harness remains an upstream development and policy tool.
+It may test Gerbil language semantics, but it is not a dependency of the
+runtime bindings or their generated-artifact provenance gate.
+
 * Remaining byte utility checklist
 
 - [X] read-only bytevector classification, length, byte projection, and copy;

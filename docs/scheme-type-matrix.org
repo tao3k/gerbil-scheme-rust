@@ -1,6 +1,10 @@
 #+title: Gerbil Scheme Rust Type Matrix
 #+date: 2026-07-20
 
+Every matrix row must satisfy the bridge layering, opaque handle, provenance,
+and merge-policy rules in
+[[file:40-rfcs/40.014-gerbil-scheme-rust-bridge-engineering-standard.org][RFC 40.014]].
+
 * Purpose
 
 This matrix tracks the public Scheme value surface exposed by

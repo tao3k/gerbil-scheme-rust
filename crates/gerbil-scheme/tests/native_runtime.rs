@@ -50,6 +50,7 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     assert_eq!(scheme_true.is_boolean().as_result(), Ok(&true));
     assert_eq!(scheme_true.as_boolean().as_result(), Ok(&true));
     assert_fail_closed_traversal(scheme_true);
+    assert_untrusted_raw_fail_closed(scheme_true);
 
     let scheme_false = runtime
         .fixture_false_value()
@@ -61,6 +62,7 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     assert_eq!(scheme_false.is_boolean().as_result(), Ok(&true));
     assert_eq!(scheme_false.as_boolean().as_result(), Ok(&false));
     assert_fail_closed_traversal(scheme_false);
+    assert_untrusted_raw_fail_closed(scheme_false);
 
     let pair = runtime
         .fixture_pair_value()
@@ -76,6 +78,7 @@ fn exports_scheme_objects_and_traverses_pairs(runtime: &GerbilRuntime) {
     assert_scheme_object_export(pair_tail);
     assert_eq!(pair_parts.car, pair_head);
     assert_eq!(pair_parts.cdr, pair_tail);
+    assert_untrusted_raw_fail_closed(pair);
 
     let proper_list = runtime
         .fixture_proper_list_value()
@@ -152,6 +155,16 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
         Some(GerbilStatus::InvalidValue)
     );
     assert_fail_closed_traversal(value);
+}
+
+fn assert_untrusted_raw_fail_closed(value: gerbil_scheme::GerbilValue<'_>) {
+    // This deliberately re-wraps an exported non-zero handle as UntrustedRaw
+    // without dereferencing it, so the test proves provenance gates reject raw
+    // handles even when their bits came from live Scheme objects.
+    let untrusted =
+        gerbil_scheme::GerbilValue::from_raw(value.as_raw()).expect("wrap exported handle as raw");
+    assert_eq!(untrusted.provenance(), GerbilValueProvenance::UntrustedRaw);
+    assert_fail_closed_value(untrusted);
 }
 
 fn assert_fail_closed_traversal(value: gerbil_scheme::GerbilValue<'_>) {

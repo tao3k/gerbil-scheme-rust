@@ -2,6 +2,9 @@
 #+DATE: 2026-07-20
 #+STATUS: Draft
 
+Bridge engineering rules for all checklist items live in
+[[file:40.014-gerbil-scheme-rust-bridge-engineering-standard.org][RFC 40.014]].
+
 * Purpose
 
 This checklist tracks the remaining work required for =gerbil-scheme-rust= to
@@ -135,7 +138,7 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] Safe direct =bool= projection rules through =GerbilValue::as_boolean=.
 - [X] Scenario for boolean round-trip through runtime-exported =#t= and =#f=
   fixtures.
-- [ ] Scenario for invalid boolean raw values beyond provenance fail-closed
+- [X] Scenario for invalid boolean raw values beyond provenance fail-closed
   coverage.
 
 ** Exact integers and machine integers

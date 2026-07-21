@@ -384,6 +384,45 @@ pub unsafe extern "C" fn gerbil_scheme_rust_fixture_null(
     GerbilStatus::Ok
 }
 
+/// Return a real Scheme pair object produced by the Gerbil native module.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+/// The Gerbil runtime and native module must be initialized.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_fixture_pair(
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe { checked_scheme_object_fixture(out, gerbil_scheme_rust_fixture_pair_raw) }
+}
+
+/// Return a real proper Scheme list object produced by the Gerbil native module.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+/// The Gerbil runtime and native module must be initialized.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_fixture_proper_list(
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe { checked_scheme_object_fixture(out, gerbil_scheme_rust_fixture_proper_list_raw) }
+}
+
+/// Return a real improper Scheme list object produced by the Gerbil native module.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilValueHandle`].
+/// The Gerbil runtime and native module must be initialized.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_fixture_improper_list(
+    out: *mut GerbilValueHandle,
+) -> GerbilStatus {
+    unsafe { checked_scheme_object_fixture(out, gerbil_scheme_rust_fixture_improper_list_raw) }
+}
+
 /// Return whether a value handle is backed by a Scheme list.
 ///
 /// This ABI entry point is intentionally fail-closed until runtime-backed list
@@ -416,6 +455,48 @@ pub unsafe extern "C" fn gerbil_scheme_rust_value_is_null(
     unsafe { checked_unbacked_value_predicate(value, out) }
 }
 
+/// Return whether a runtime-produced Scheme object handle is a pair.
+///
+/// This gate is intentionally narrower than [`gerbil_scheme_rust_value_is_pair`]:
+/// callers must route only values known to come from a Gerbil `scheme-object`
+/// export. Untrusted raw handles continue to use the fail-closed predicate ABI.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`]. The
+/// Gerbil runtime and native module must be initialized, and `value` must be a
+/// runtime-produced Scheme object handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_pair(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    unsafe {
+        checked_scheme_object_predicate(value, out, gerbil_scheme_rust_scheme_object_is_pair_raw)
+    }
+}
+
+/// Return whether a runtime-produced Scheme object handle is a proper list.
+///
+/// This gate is intentionally narrower than [`gerbil_scheme_rust_value_is_list`]:
+/// callers must route only values known to come from a Gerbil `scheme-object`
+/// export. Untrusted raw handles continue to use the fail-closed predicate ABI.
+///
+/// # Safety
+///
+/// `out` must be non-null and valid for writing one [`GerbilBoolean`]. The
+/// Gerbil runtime and native module must be initialized, and `value` must be a
+/// runtime-produced Scheme object handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_list(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+) -> GerbilStatus {
+    unsafe {
+        checked_scheme_object_predicate(value, out, gerbil_scheme_rust_scheme_object_is_list_raw)
+    }
+}
+
 /// Return whether a runtime-produced Scheme object handle is Scheme null.
 ///
 /// This gate is intentionally narrower than [`gerbil_scheme_rust_value_is_null`]:
@@ -432,16 +513,48 @@ pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_null(
     value: GerbilValueHandle,
     out: *mut GerbilBoolean,
 ) -> GerbilStatus {
+    unsafe {
+        checked_scheme_object_predicate(value, out, gerbil_scheme_rust_scheme_object_is_null_raw)
+    }
+}
+
+unsafe fn checked_scheme_object_predicate(
+    value: GerbilValueHandle,
+    out: *mut GerbilBoolean,
+    predicate: unsafe extern "C" fn(GerbilValueHandle) -> i32,
+) -> GerbilStatus {
     if value == 0 || out.is_null() {
         return GerbilStatus::NullPointer;
     }
 
     // SAFETY: caller proves the Gerbil runtime/module is initialized and
     // routes only Scheme-object export handles into this predicate.
-    let is_null = unsafe { gerbil_scheme_rust_scheme_object_is_null_raw(value) };
+    let result = unsafe { predicate(value) };
     // SAFETY: caller provided a non-null output pointer for one GerbilBoolean.
     unsafe {
-        *out = GerbilBoolean::from_bool(is_null != 0);
+        *out = GerbilBoolean::from_bool(result != 0);
+    }
+    GerbilStatus::Ok
+}
+
+unsafe fn checked_scheme_object_fixture(
+    out: *mut GerbilValueHandle,
+    fixture: unsafe extern "C" fn() -> GerbilValueHandle,
+) -> GerbilStatus {
+    if out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+
+    // SAFETY: caller proves the Gerbil runtime/module is initialized. The
+    // raw Gerbil export returns Gambit's universal Scheme object word.
+    let value = unsafe { fixture() };
+    if value == 0 {
+        return GerbilStatus::NullPointer;
+    }
+
+    // SAFETY: caller provided a non-null output pointer for one handle.
+    unsafe {
+        *out = value;
     }
     GerbilStatus::Ok
 }
@@ -596,6 +709,46 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_null_value_raw() -> GerbilValueHandle;
+
+    /// Raw Scheme pair fixture exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_fixture_pair_raw() -> GerbilValueHandle;
+
+    /// Raw proper Scheme list fixture exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_fixture_proper_list_raw() -> GerbilValueHandle;
+
+    /// Raw improper Scheme list fixture exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_fixture_improper_list_raw() -> GerbilValueHandle;
+
+    /// Raw Scheme-object pair predicate exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_object_is_pair_raw(value: GerbilValueHandle) -> i32;
+
+    /// Raw Scheme-object proper-list predicate exported by `scheme/native.ss`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the Gerbil runtime is initialized for the
+    /// current process and that the exporting module remains loaded.
+    pub fn gerbil_scheme_rust_scheme_object_is_list_raw(value: GerbilValueHandle) -> i32;
 
     /// Raw Scheme-object null predicate exported by `scheme/native.ss`.
     ///

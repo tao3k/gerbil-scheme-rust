@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
+use gerbil_scheme_sys::{
+    gerbil_scheme_rust_fixture_improper_list, gerbil_scheme_rust_fixture_pair,
+    gerbil_scheme_rust_fixture_proper_list, gerbil_scheme_rust_scheme_object_is_list,
+    gerbil_scheme_rust_scheme_object_is_pair,
+};
+
 use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
@@ -141,11 +147,20 @@ impl<'runtime> GerbilValue<'runtime> {
     /// fail-closed [`NativeError::Status`] instead of guessing.
     #[must_use]
     pub fn is_pair(self) -> NativeResult<bool> {
-        checked_native_predicate(
-            "gerbil_scheme_rust_value_is_pair",
-            self.raw.get(),
-            gerbil_scheme_sys::gerbil_scheme_rust_value_is_pair,
-        )
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_pair",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_pair,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                checked_native_predicate(
+                    "gerbil_scheme_rust_value_is_pair",
+                    self.raw.get(),
+                    gerbil_scheme_sys::gerbil_scheme_rust_value_is_pair,
+                )
+            }
+        }
     }
 
     /// Return whether this value is known to be a list.
@@ -154,11 +169,20 @@ impl<'runtime> GerbilValue<'runtime> {
     /// fail-closed [`NativeError::Status`] instead of guessing.
     #[must_use]
     pub fn is_list(self) -> NativeResult<bool> {
-        checked_native_predicate(
-            "gerbil_scheme_rust_value_is_list",
-            self.raw.get(),
-            gerbil_scheme_sys::gerbil_scheme_rust_value_is_list,
-        )
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_list",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_list,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                checked_native_predicate(
+                    "gerbil_scheme_rust_value_is_list",
+                    self.raw.get(),
+                    gerbil_scheme_sys::gerbil_scheme_rust_value_is_list,
+                )
+            }
+        }
     }
 
     /// Return whether this value is known to be Scheme null.
@@ -540,6 +564,73 @@ impl GerbilRuntime {
         value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
             .ok_or(NativeError::Status {
                 operation: "GerbilRuntime::fixture_null_value",
+                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+            })
+    }
+
+    /// Returns a Scheme pair fixture through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_pair_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "GerbilRuntime::fixture_pair_value",
+            gerbil_scheme_rust_fixture_pair,
+        )
+    }
+
+    /// Returns a proper Scheme list fixture through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_proper_list_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "GerbilRuntime::fixture_proper_list_value",
+            gerbil_scheme_rust_fixture_proper_list,
+        )
+    }
+
+    /// Returns an improper Scheme list fixture through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_improper_list_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "GerbilRuntime::fixture_improper_list_value",
+            gerbil_scheme_rust_fixture_improper_list,
+        )
+    }
+
+    fn checked_scheme_object_fixture(
+        &self,
+        operation: &'static str,
+        fixture: unsafe extern "C" fn(
+            *mut gerbil_scheme_sys::GerbilValueHandle,
+        ) -> gerbil_scheme_sys::GerbilStatus,
+    ) -> Result<GerbilValue<'_>, NativeError> {
+        self.check_thread()?;
+        let mut out = 0;
+        // SAFETY: self proves runtime/module lifetime and `out` is a valid
+        // output slot for one borrowed Scheme object handle.
+        let status = unsafe { fixture(&raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation,
+                code: status as i32,
+            });
+        }
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
+            .ok_or(NativeError::Status {
+                operation,
                 code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
             })
     }

@@ -29,15 +29,48 @@ fn calls_scalar_export_in_process() {
         scheme_null.provenance(),
         GerbilValueProvenance::SchemeObjectExport
     );
-    assert_eq!(
-        scheme_null.is_pair().status(),
-        Some(GerbilStatus::InvalidValue)
-    );
-    assert_eq!(
-        scheme_null.is_list().status(),
-        Some(GerbilStatus::InvalidValue)
-    );
+    assert_eq!(scheme_null.is_pair().as_result(), Ok(&false));
+    assert_eq!(scheme_null.is_list().as_result(), Ok(&true));
     assert_eq!(scheme_null.is_null().as_result(), Ok(&true));
+
+    let pair = runtime
+        .fixture_pair_value()
+        .expect("export Scheme pair object through native runtime");
+    assert_eq!(pair.provenance(), GerbilValueProvenance::SchemeObjectExport);
+    assert_eq!(pair.is_pair().as_result(), Ok(&true));
+    assert_eq!(pair.is_list().as_result(), Ok(&false));
+    assert_eq!(pair.is_null().as_result(), Ok(&false));
+    assert_eq!(pair.pair_car().status(), Some(GerbilStatus::InvalidValue));
+
+    let proper_list = runtime
+        .fixture_proper_list_value()
+        .expect("export proper Scheme list object through native runtime");
+    assert_eq!(
+        proper_list.provenance(),
+        GerbilValueProvenance::SchemeObjectExport
+    );
+    assert_eq!(proper_list.is_pair().as_result(), Ok(&true));
+    assert_eq!(proper_list.is_list().as_result(), Ok(&true));
+    assert_eq!(proper_list.is_null().as_result(), Ok(&false));
+    assert_eq!(
+        proper_list.pair_cdr().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
+
+    let improper_list = runtime
+        .fixture_improper_list_value()
+        .expect("export improper Scheme list object through native runtime");
+    assert_eq!(
+        improper_list.provenance(),
+        GerbilValueProvenance::SchemeObjectExport
+    );
+    assert_eq!(improper_list.is_pair().as_result(), Ok(&true));
+    assert_eq!(improper_list.is_list().as_result(), Ok(&false));
+    assert_eq!(improper_list.is_null().as_result(), Ok(&false));
+    assert_eq!(
+        improper_list.pair_parts().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_eq!(
         runtime.add_i64(i64::MAX, 1),
         Err(NativeError::IntegerOverflow {

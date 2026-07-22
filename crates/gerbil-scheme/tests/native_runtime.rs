@@ -611,6 +611,10 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
         Some(GerbilStatus::InvalidValue)
     );
     assert_eq!(value.is_fixnum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(
+        value.is_exact_integer().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_eq!(value.as_nil().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(value.as_void().status(), Some(GerbilStatus::InvalidValue));
     assert_eq!(
@@ -618,6 +622,10 @@ fn assert_fail_closed_value(value: gerbil_scheme::GerbilValue<'_>) {
         Some(GerbilStatus::InvalidValue)
     );
     assert_eq!(value.as_fixnum().status(), Some(GerbilStatus::InvalidValue));
+    assert_eq!(
+        value.as_exact_integer().status(),
+        Some(GerbilStatus::InvalidValue)
+    );
     assert_eq!(
         value.as_fixnum_i64().status(),
         Some(GerbilStatus::InvalidValue)

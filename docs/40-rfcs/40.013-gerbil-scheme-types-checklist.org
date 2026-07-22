@@ -42,7 +42,7 @@ Current Scheme source-surface evidence:
   workaround for the source-surface view; it must stay out of =build.ss= and can
   be retired once the provider projects =scheme/native.ss= plus
   =scheme/native.ssi= directly.
-- The current projected selector set is exactly 26 selectors:
+- The current projected selector set is exactly 27 selectors:
   =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
   =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
   =gerbil_scheme_rust_add_i64=, =gerbil_scheme_rust_is_even_i64=,
@@ -52,6 +52,7 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_bool_shape=,
   =gerbil_scheme_rust_comparison_shape=,
   =gerbil_scheme_rust_fixnum_shape=,
+  =gerbil_scheme_rust_exact_integer_shape=,
   =gerbil_scheme_rust_char_shape=,
   =gerbil_scheme_rust_flonum_shape=,
   =gerbil_scheme_rust_bytevector_shape=,
@@ -93,6 +94,7 @@ keeps this table aligned with the Scheme source-surface projection.
 | nil | =gerbil_scheme_rust_nil_shape= | =GerbilValueHandle= | =GerbilValue::as_nil= and =SchemeNil= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-null objects and raw provenance fail closed | =native-runtime-round-trip= |
 | void | =gerbil_scheme_rust_void_shape= | =GerbilValueHandle= | =GerbilValue::as_void= and =SchemeVoid= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer and nil | non-void objects and raw provenance fail closed | =native-runtime-round-trip= |
 | fixnum | =gerbil_scheme_rust_fixnum_shape= | =GerbilFixnum= | =GerbilValue::{is_fixnum,as_fixnum,as_fixnum_i64}= | runtime-borrowed Scheme object | not pointer-backed | non-fixnum and raw provenance fail closed | =native-runtime-round-trip= |
+| exact integer | =gerbil_scheme_rust_exact_integer_shape= | =GerbilValueHandle=, =GerbilRootId=, =i64=, and =u64= | =SchemeExactInteger= and =RootedSchemeExactInteger= checked projections | runtime-borrowed Scheme object or single-owner Scheme root | non-zero handle or positive root token | non-exact and out-of-range values fail closed without truncation | =exact-integer-projection-round-trip= |
 | char | =gerbil_scheme_rust_char_shape= | =GerbilChar= | =GerbilValue::{is_char,as_char}= | runtime-borrowed Scheme object | not pointer-backed | invalid Unicode scalar and raw provenance fail closed | =native-runtime-round-trip= |
 | flonum | =gerbil_scheme_rust_flonum_shape= | =GerbilFlonum= | =GerbilValue::{is_flonum,as_flonum}= | runtime-borrowed Scheme object | not pointer-backed | non-flonum and raw provenance fail closed | =native-runtime-round-trip= |
 | bytevector | =gerbil_scheme_rust_bytevector_shape= | =GerbilValueHandle= | =GerbilValue::as_bytevector= and =SchemeBytevector= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-bytevector objects and raw provenance fail closed | =native-runtime-round-trip= |
@@ -189,11 +191,13 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] Safe fixed-width overflow rejection with an explicit truncation opt-in.
 - [X] Empty decode, prefix decode, rooted ownership, and nanosecond median/p95
   Scenario coverage.
-- [ ] Exact integer / bignum ownership strategy.
-- [ ] Checked conversion rules: exact integer to =i64=, =u64=, =usize=.
-- [ ] Overflow status mapping for exact integer projection.
-- [ ] Scenario with boundary values: =i64::MIN=, =i64::MAX=, bignum outside
-  machine range.
+- [X] Exact integer / bignum ownership strategy: runtime-borrowed handles plus
+  single-owner roots for Rust-created =i64=/=u64= values.
+- [X] Checked conversion rules: exact integer to =i64=, =u64=, =usize=.
+- [X] Overflow status mapping through =ExactIntegerOutOfRange { target }=.
+- [X] Scenario with boundary values: =i64::MIN=, =i64::MAX=, =u64::MAX=,
+  and positive/negative bignums outside machine range.
+- [ ] Copy arbitrary-precision digits into a Rust bigint representation.
 
 ** Inexact numbers
 
@@ -347,6 +351,7 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] =backed-value-family-surface= scenario.
 - [X] =bytevector-bytestring-round-trip= scenario.
 - [X] =integer-bytevector-round-trip= scenario.
+- [X] =exact-integer-projection-round-trip= scenario.
 - [ ] =scheme-sentinel-values= scenario.
 - [ ] =scheme-string-symbol-keyword= scenario.
 - [ ] =scheme-pair-list-vector= scenario.
@@ -364,7 +369,7 @@ keeps this table aligned with the Scheme source-surface projection.
 - [X] ASP workaround owner exists: =scheme/asp/native-surface.ss=.
 - [X] Workaround projects current scalar and backed shape selectors:
   runtime/status/i64/bool/comparison/fixnum/char/flonum/bytevector/rooted-bytes
-  /integer-bytes/UTF-8/value-handle/nil/void/i64-callback/native-value
+  /integer-bytes/exact-integer/UTF-8/value-handle/nil/void/i64-callback/native-value
   /native-error/native-result plus scalar exports.
 - [ ] Direct provider projection for real =scheme/native.ss= FFI/export owner.
 - [ ] Fix or document the current =scheme/native.ss= provider blocker:
@@ -550,6 +555,20 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
   project harness is needed to convert values across the C ABI.
 - [ ] Exact Gerbil bignums remain outside this machine-integer slice.
 
+** 2026-07-21 exact-integer closure receipt
+
+- [X] Added =SchemeExactInteger= and =RootedSchemeExactInteger= without adding a
+  Rust parser or claiming arbitrary-precision digits cross the C ABI.
+- [X] Added checked =i64=/=u64=/=usize= projections for fixnums and bignums.
+- [X] Added explicit positive/negative =2^80= bignum fixtures and fail-closed
+  out-of-range coverage.
+- [X] Added =exact-integer-projection-round-trip= with signed median/p95
+  =512ns=/=691ns=, unsigned =515ns=/=561ns=, and rejection =175ns=/=218ns=.
+- [X] Reused the general Scheme root table with Rust RAII release instead of
+  introducing an integer-only root owner.
+- [ ] General promotion of arbitrary borrowed Scheme objects into owned roots
+  remains the next ownership prerequisite.
+
 * Next execution plan
 
 ** Phase 1: make the current v0 surface release-auditable
@@ -575,11 +594,11 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
 
 - [X] Nil, void, =f64=, character, bytevector, rooted bytestring conversion, and
   machine integer/bytevector conversion slices now have real sys/safe backing.
-- [ ] Prefer exact integers/bignums next if numeric completeness remains the
-  priority: define ownership plus checked =i64=/=u64=/=usize= conversion before
-  exposing a public wrapper.
-- [ ] Alternative expansion is an owned Scheme string/symbol family after the
-  general GC-rooting model is explicit.
+- [X] Exact integers/bignums now have borrowed/rooted identity plus checked
+  =i64=/=u64=/=usize= projection; arbitrary Rust bigint digit transfer remains
+  intentionally open.
+- [ ] Next implement a general =RootedSchemeValue= promotion contract, then use
+  it for owned Scheme string/symbol/keyword families.
 - [ ] Do not implement generic list/vector/string ownership before that rooting
   model is explicit.
 - [ ] For the chosen family, land all five artifacts in one slice:

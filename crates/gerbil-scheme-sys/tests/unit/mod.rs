@@ -14,6 +14,7 @@ use crate::{
 
 mod abi_integer_bytes;
 mod scenario_benchmark_suite;
+mod scheme_exact_integer;
 
 #[test]
 fn abi_identity_is_nul_terminated() {
@@ -37,6 +38,13 @@ fn public_header_matches_the_live_scalar_abi() {
     assert!(header.contains("gerbil_scheme_rust_bytevector_to_sint("));
     assert!(header.contains("gerbil_scheme_rust_uint_to_bytevector_root("));
     assert!(header.contains("gerbil_scheme_rust_sint_to_bytevector_root("));
+    assert!(header.contains("gerbil_scheme_rust_scheme_object_is_exact_integer("));
+    assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_i64("));
+    assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_u64("));
+    assert!(header.contains("gerbil_scheme_rust_i64_to_exact_integer_root("));
+    assert!(header.contains("gerbil_scheme_rust_u64_to_exact_integer_root("));
+    assert!(header.contains("gerbil_scheme_rust_root_exact_integer_to_i64("));
+    assert!(header.contains("gerbil_scheme_rust_root_exact_integer_to_u64("));
     assert!(!header.contains("int64_t *result"));
 }
 

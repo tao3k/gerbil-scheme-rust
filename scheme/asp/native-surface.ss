@@ -11,6 +11,7 @@
          gerbil_scheme_rust_bool_shape
          gerbil_scheme_rust_comparison_shape
          gerbil_scheme_rust_fixnum_shape
+         gerbil_scheme_rust_exact_integer_shape
          gerbil_scheme_rust_char_shape
          gerbil_scheme_rust_flonum_shape
          gerbil_scheme_rust_bytevector_shape
@@ -110,6 +111,22 @@
     (projection . gerbil-rs-scheme-object-fixnum-value-raw)
     (safe-methods (is-fixnum as-fixnum as-fixnum-i64))
     (failure-policy . fail-closed)))
+
+(def gerbil_scheme_rust_exact_integer_shape
+  '(native-shape
+    (name . exact-integer)
+    (transport . c-abi)
+    (repr . gerbil-value-handle)
+    (scheme-representations (fixnum bignum))
+    (ownership (runtime-borrowed single-owner-rooted))
+    (predicate . gerbil-rs-scheme-object-exact-integer?-raw)
+    (checked-projections (i64 u64 usize))
+    (constructors (i64->exact-integer-root u64->exact-integer-root))
+    (safe-types (SchemeExactInteger RootedSchemeExactInteger))
+    (range-policy . reject-out-of-range-without-truncation)
+    (rooting . scheme-module-root-table)
+    (release . rust-raii-drop)
+    (failure-policy . status-preserving-fail-closed)))
 
 (def gerbil_scheme_rust_char_shape
   '(native-shape
@@ -252,9 +269,9 @@
     (scalar-values (i64 bool comparison status fixnum char flonum))
     (sentinel-values (nil void))
     (borrowed-values (bytevector utf8))
-    (rooted-values (bytestring bytevector))
+    (rooted-values (bytestring bytevector exact-integer))
     (conversion-values (integer-bytevector))
-    (handle-values (runtime-handle gerbil-value-handle))
+    (handle-values (runtime-handle gerbil-value-handle exact-integer))
     (callback-values (i64-callback))
     (nullability . explicit-per-shape)
     (rooting . explicit-per-shape)))
@@ -271,6 +288,7 @@
      (abi-mismatch . gerbil-status)
      (wrong-thread . gerbil-status)
      (integer-overflow . gerbil-status)
+     (exact-integer-out-of-range . gerbil-status)
      (invalid-comparison-result . gerbil-status))
     (unknown-status-policy . preserve-code)
     (projection . optional-gerbil-status)

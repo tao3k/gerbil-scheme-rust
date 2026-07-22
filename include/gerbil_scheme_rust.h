@@ -75,6 +75,10 @@ GerbilStatus gerbil_scheme_rust_fixture_improper_list(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_true(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_false(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_fixnum(GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_exact_integer_large_positive(
+    GerbilValueHandle *out);
+GerbilStatus gerbil_scheme_rust_fixture_exact_integer_large_negative(
+    GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_char_ascii(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_char_bmp(GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_fixture_char_non_bmp(GerbilValueHandle *out);
@@ -108,6 +112,12 @@ GerbilStatus gerbil_scheme_rust_scheme_object_is_fixnum(GerbilValueHandle value,
                                                         GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_as_fixnum(GerbilValueHandle value,
                                                         GerbilFixnum *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_is_exact_integer(
+    GerbilValueHandle value, GerbilBoolean *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_exact_integer_to_i64(
+    GerbilValueHandle value, int64_t *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_exact_integer_to_u64(
+    GerbilValueHandle value, uint64_t *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_is_char(GerbilValueHandle value,
                                                       GerbilBoolean *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_as_char(GerbilValueHandle value,
@@ -136,6 +146,14 @@ GerbilStatus gerbil_scheme_rust_uint_to_bytevector_root(
     uint64_t value, int32_t byte_order, size_t size, GerbilRootId *out);
 GerbilStatus gerbil_scheme_rust_sint_to_bytevector_root(
     int64_t value, int32_t byte_order, size_t size, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_i64_to_exact_integer_root(
+    int64_t value, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_u64_to_exact_integer_root(
+    uint64_t value, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_root_exact_integer_to_i64(
+    GerbilRootId root, int64_t *out);
+GerbilStatus gerbil_scheme_rust_root_exact_integer_to_u64(
+    GerbilRootId root, uint64_t *out);
 GerbilStatus gerbil_scheme_rust_root_string_length(GerbilRootId root,
                                                    size_t *out);
 GerbilStatus gerbil_scheme_rust_root_string_char_ref(GerbilRootId root,

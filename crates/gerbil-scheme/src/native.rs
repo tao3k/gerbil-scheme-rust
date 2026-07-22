@@ -15,6 +15,14 @@ use gerbil_scheme_sys::{
     gerbil_scheme_rust_scheme_object_is_list, gerbil_scheme_rust_scheme_object_is_pair,
 };
 
+use gerbil_scheme_sys::{
+    gerbil_scheme_rust_fixture_exact_integer_large_negative,
+    gerbil_scheme_rust_fixture_exact_integer_large_positive,
+    gerbil_scheme_rust_scheme_object_exact_integer_to_i64,
+    gerbil_scheme_rust_scheme_object_exact_integer_to_u64,
+    gerbil_scheme_rust_scheme_object_is_exact_integer,
+};
+
 use std::fmt;
 use std::marker::PhantomData;
 use std::num::{NonZeroU8, NonZeroUsize};
@@ -208,6 +216,17 @@ impl SchemeVoid<'_> {
 /// underlying object.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SchemeBytevector<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+/// Borrowed, runtime-backed Scheme exact-integer marker.
+///
+/// This preserves the identity of fixnums and bignums without claiming that an
+/// arbitrary-size integer can cross the C ABI by value. Machine projections are
+/// checked explicitly through [`ExactIntegerTarget`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeExactInteger<'runtime> {
     raw: NonZeroUsize,
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
@@ -414,6 +433,27 @@ pub struct RootedSchemeBytevector<'runtime> {
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
 
+/// Owned root for a Scheme exact integer created from a Rust machine integer.
+///
+/// The Scheme object may be a fixnum or bignum depending on its magnitude. The
+/// root has one Rust owner and releases automatically on drop.
+#[derive(Debug)]
+pub struct RootedSchemeExactInteger<'runtime> {
+    root: gerbil_scheme_sys::GerbilRootId,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+/// Rust machine target requested for a checked Scheme exact-integer projection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExactIntegerTarget {
+    /// Signed 64-bit integer.
+    I64,
+    /// Unsigned 64-bit integer.
+    U64,
+    /// Target-platform pointer-sized unsigned integer.
+    Usize,
+}
+
 impl<'runtime> SchemeBytevector<'runtime> {
     fn from_raw(raw: usize) -> Option<Self> {
         NonZeroUsize::new(raw).map(|raw| Self {
@@ -561,6 +601,116 @@ impl<'runtime> SchemeBytevector<'runtime> {
                 code: status as i32,
             })
         }
+    }
+}
+
+impl SchemeExactInteger<'_> {
+    fn from_raw(raw: usize) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    /// Return the borrowed Scheme-object handle.
+    #[must_use]
+    pub const fn as_raw(self) -> usize {
+        self.raw.get()
+    }
+
+    /// Project this exact integer to `i64`, rejecting values outside the range.
+    #[must_use]
+    pub fn to_i64(self) -> NativeResult<i64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_rust_scheme_object_exact_integer_to_i64(self.raw.get(), &raw mut out)
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_scheme_object_exact_integer_to_i64",
+            ExactIntegerTarget::I64,
+        )
+    }
+
+    /// Project this exact integer to `u64`, rejecting negative or oversized values.
+    #[must_use]
+    pub fn to_u64(self) -> NativeResult<u64> {
+        self.to_unsigned_target(ExactIntegerTarget::U64)
+    }
+
+    /// Project this exact integer to `usize` for the current Rust target.
+    #[must_use]
+    pub fn to_usize(self) -> NativeResult<usize> {
+        checked_exact_integer_usize(self.to_unsigned_target(ExactIntegerTarget::Usize))
+    }
+
+    fn to_unsigned_target(self, target: ExactIntegerTarget) -> NativeResult<u64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_rust_scheme_object_exact_integer_to_u64(self.raw.get(), &raw mut out)
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_scheme_object_exact_integer_to_u64",
+            target,
+        )
+    }
+}
+
+impl RootedSchemeExactInteger<'_> {
+    /// Return the owned native root token without transferring ownership.
+    #[must_use]
+    pub const fn root_id(&self) -> gerbil_scheme_sys::GerbilRootId {
+        self.root
+    }
+
+    /// Project this rooted exact integer to `i64` with range checking.
+    #[must_use]
+    pub fn to_i64(&self) -> NativeResult<i64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_i64(self.root, &raw mut out)
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_root_exact_integer_to_i64",
+            ExactIntegerTarget::I64,
+        )
+    }
+
+    /// Project this rooted exact integer to `u64` with range checking.
+    #[must_use]
+    pub fn to_u64(&self) -> NativeResult<u64> {
+        self.to_unsigned_target(ExactIntegerTarget::U64)
+    }
+
+    /// Project this rooted exact integer to `usize` for the current Rust target.
+    #[must_use]
+    pub fn to_usize(&self) -> NativeResult<usize> {
+        checked_exact_integer_usize(self.to_unsigned_target(ExactIntegerTarget::Usize))
+    }
+
+    fn to_unsigned_target(&self, target: ExactIntegerTarget) -> NativeResult<u64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_u64(self.root, &raw mut out)
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_root_exact_integer_to_u64",
+            target,
+        )
+    }
+}
+
+impl Drop for RootedSchemeExactInteger<'_> {
+    fn drop(&mut self) {
+        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
+        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
     }
 }
 
@@ -750,6 +900,60 @@ impl Drop for RootedSchemeBytevector<'_> {
     fn drop(&mut self) {
         let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
         debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
+    }
+}
+
+fn rooted_exact_integer<'runtime>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    root: gerbil_scheme_sys::GerbilRootId,
+    operation: &'static str,
+) -> Result<RootedSchemeExactInteger<'runtime>, NativeError> {
+    if status == gerbil_scheme_sys::GerbilStatus::Ok && root.is_valid() {
+        Ok(RootedSchemeExactInteger {
+            root,
+            _runtime: PhantomData,
+        })
+    } else {
+        Err(NativeError::Status {
+            operation,
+            code: if status == gerbil_scheme_sys::GerbilStatus::Ok {
+                gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+            } else {
+                status as i32
+            },
+        })
+    }
+}
+
+fn checked_exact_integer_projection<T>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    value: T,
+    operation: &'static str,
+    target: ExactIntegerTarget,
+) -> NativeResult<T> {
+    match status {
+        gerbil_scheme_sys::GerbilStatus::Ok => NativeResult::ok(value),
+        gerbil_scheme_sys::GerbilStatus::InvalidValue => {
+            NativeResult::err(NativeError::ExactIntegerOutOfRange { target })
+        }
+        status => NativeResult::err(NativeError::Status {
+            operation,
+            code: status as i32,
+        }),
+    }
+}
+
+fn checked_exact_integer_usize(value: NativeResult<u64>) -> NativeResult<usize> {
+    match value.into_result() {
+        Ok(value) => usize::try_from(value).map_or_else(
+            |_| {
+                NativeResult::err(NativeError::ExactIntegerOutOfRange {
+                    target: ExactIntegerTarget::Usize,
+                })
+            },
+            NativeResult::ok,
+        ),
+        Err(error) => NativeResult::err(error),
     }
 }
 
@@ -1182,6 +1386,58 @@ impl<'runtime> GerbilValue<'runtime> {
         match self.as_fixnum().as_result() {
             Ok(value) => NativeResult::ok(*value as i64),
             Err(error) => NativeResult::err(*error),
+        }
+    }
+
+    /// Return whether this runtime-backed Scheme object is an exact integer.
+    ///
+    /// Both fixnums and bignums satisfy this predicate. Untrusted raw handles and
+    /// runtime sentinels remain fail-closed.
+    #[must_use]
+    pub fn is_exact_integer(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_exact_integer",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_exact_integer,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_exact_integer",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Project this runtime-backed Scheme object as an exact integer handle.
+    ///
+    /// The returned marker is borrowed and unrooted. Use its checked machine
+    /// projections without retaining it beyond the runtime borrow.
+    #[must_use]
+    pub fn as_exact_integer(self) -> NativeResult<SchemeExactInteger<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_exact_integer().into_result() {
+            Ok(true) => SchemeExactInteger::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
         }
     }
 
@@ -2046,6 +2302,97 @@ impl GerbilRuntime {
     /// Returns [`NativeError::WrongThread`] if called outside the initializing
     /// thread, or [`NativeError::InvalidComparisonResult`] if the native module
     /// violates the ABI's three-way comparison contract.
+    /// Export a positive exact-integer fixture larger than `u64::MAX`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error when the runtime cannot export the fixture.
+    pub fn fixture_exact_integer_large_positive_value(
+        &self,
+    ) -> Result<GerbilValue<'_>, NativeError> {
+        self.scheme_object_fixture(
+            "GerbilRuntime::fixture_exact_integer_large_positive_value",
+            gerbil_scheme_rust_fixture_exact_integer_large_positive,
+        )
+    }
+
+    /// Export a negative exact-integer fixture smaller than `i64::MIN`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error when the runtime cannot export the fixture.
+    pub fn fixture_exact_integer_large_negative_value(
+        &self,
+    ) -> Result<GerbilValue<'_>, NativeError> {
+        self.scheme_object_fixture(
+            "GerbilRuntime::fixture_exact_integer_large_negative_value",
+            gerbil_scheme_rust_fixture_exact_integer_large_negative,
+        )
+    }
+
+    /// Construct an owned, rooted Scheme exact integer from an `i64`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error if the native root cannot be created.
+    pub fn exact_integer_from_i64(
+        &self,
+        value: i64,
+    ) -> Result<RootedSchemeExactInteger<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_i64_to_exact_integer_root(value, &raw mut root)
+        };
+        rooted_exact_integer(status, root, "gerbil_scheme_rust_i64_to_exact_integer_root")
+    }
+
+    /// Construct an owned, rooted Scheme exact integer from a `u64`.
+    ///
+    /// Values larger than `i64::MAX` remain exact Scheme bignums.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error if the native root cannot be created.
+    pub fn exact_integer_from_u64(
+        &self,
+        value: u64,
+    ) -> Result<RootedSchemeExactInteger<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_u64_to_exact_integer_root(value, &raw mut root)
+        };
+        rooted_exact_integer(status, root, "gerbil_scheme_rust_u64_to_exact_integer_root")
+    }
+
+    fn scheme_object_fixture(
+        &self,
+        operation: &'static str,
+        fixture: unsafe extern "C" fn(
+            *mut gerbil_scheme_sys::GerbilValueHandle,
+        ) -> gerbil_scheme_sys::GerbilStatus,
+    ) -> Result<GerbilValue<'_>, NativeError> {
+        self.check_thread()?;
+        let mut out = 0;
+        let status = unsafe { fixture(&raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation,
+                code: status as i32,
+            });
+        }
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
+            .ok_or(NativeError::Status {
+                operation,
+                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+            })
+    }
+
+    /// # Errors
+    ///
+    /// Returns [`NativeError`] when the native runtime rejects the comparison
+    /// or returns an invalid ordering value.
     pub fn compare_i64(&self, left: i64, right: i64) -> Result<std::cmp::Ordering, NativeError> {
         self.check_thread()?;
         // SAFETY: self proves runtime/module lifetime; the scalar c-define ABI
@@ -2139,6 +2486,11 @@ pub enum NativeError {
         value: i64,
         /// Requested width in bytes.
         width: u8,
+    },
+    /// A Scheme exact integer cannot be represented by the requested Rust target.
+    ExactIntegerOutOfRange {
+        /// Checked Rust machine target.
+        target: ExactIntegerTarget,
     },
     /// A three-way comparison returned a value outside `-1`, `0`, and `1`.
     InvalidComparisonResult {
@@ -2459,6 +2811,7 @@ impl NativeError {
             Self::IntegerOverflow { .. }
             | Self::UnsignedIntegerWidth { .. }
             | Self::SignedIntegerWidth { .. }
+            | Self::ExactIntegerOutOfRange { .. }
             | Self::InvalidComparisonResult { .. } => Some(GerbilStatus::InvalidValue),
             Self::InvalidLifecycleState { .. } | Self::WrongThread { .. } => None,
         }
@@ -2500,6 +2853,12 @@ impl fmt::Display for NativeError {
                 formatter,
                 "signed integer {value} does not fit a {width}-byte encoding"
             ),
+            Self::ExactIntegerOutOfRange { target } => {
+                write!(
+                    formatter,
+                    "Scheme exact integer does not fit Rust {target:?}"
+                )
+            }
             Self::InvalidComparisonResult { code } => {
                 write!(formatter, "invalid Gerbil i64 comparison result {code}")
             }

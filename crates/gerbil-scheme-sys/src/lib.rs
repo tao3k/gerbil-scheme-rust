@@ -6,6 +6,7 @@ mod abi_integer_bytes;
 mod abi_rooted_bytes;
 mod abi_sentinel;
 mod scheme_char;
+mod scheme_exact_integer;
 mod scheme_fixnum;
 mod scheme_flonum;
 
@@ -58,6 +59,16 @@ pub use scheme_char::{
     gerbil_scheme_rust_fixture_char_ascii, gerbil_scheme_rust_fixture_char_bmp,
     gerbil_scheme_rust_fixture_char_non_bmp, gerbil_scheme_rust_scheme_object_as_char,
     gerbil_scheme_rust_scheme_object_is_char,
+};
+pub use scheme_exact_integer::{
+    gerbil_scheme_rust_fixture_exact_integer_large_negative,
+    gerbil_scheme_rust_fixture_exact_integer_large_positive,
+    gerbil_scheme_rust_i64_to_exact_integer_root, gerbil_scheme_rust_root_exact_integer_to_i64,
+    gerbil_scheme_rust_root_exact_integer_to_u64,
+    gerbil_scheme_rust_scheme_object_exact_integer_to_i64,
+    gerbil_scheme_rust_scheme_object_exact_integer_to_u64,
+    gerbil_scheme_rust_scheme_object_is_exact_integer,
+    gerbil_scheme_rust_u64_to_exact_integer_root,
 };
 pub use scheme_fixnum::{
     gerbil_scheme_rust_fixture_fixnum, gerbil_scheme_rust_scheme_object_as_fixnum,

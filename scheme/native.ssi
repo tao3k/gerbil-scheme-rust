@@ -21,6 +21,8 @@
   gerbil-rs-fixture-true-raw
   gerbil-rs-fixture-false-raw
   gerbil-rs-fixture-fixnum-raw
+  gerbil-rs-fixture-exact-integer-large-positive-raw
+  gerbil-rs-fixture-exact-integer-large-negative-raw
   gerbil-rs-fixture-char-ascii-raw
   gerbil-rs-fixture-char-bmp-raw
   gerbil-rs-fixture-char-non-bmp-raw
@@ -45,6 +47,11 @@
   ;; Scheme object projections.
   gerbil-rs-scheme-object-boolean-value-raw
   gerbil-rs-scheme-object-fixnum-value-raw
+  gerbil-rs-scheme-object-exact-integer?-raw
+  gerbil-rs-scheme-object-exact-integer-fits-i64?-raw
+  gerbil-rs-scheme-object-exact-integer-fits-u64?-raw
+  gerbil-rs-scheme-object-exact-integer-i64-value-raw
+  gerbil-rs-scheme-object-exact-integer-u64-value-raw
   gerbil-rs-scheme-object-char-value-raw
   gerbil-rs-scheme-object-flonum-value-raw
   gerbil-rs-scheme-object-bytevector-length-raw
@@ -57,6 +64,13 @@
   gerbil-rs-root-bytevector->sint-raw
   gerbil-rs-uint->bytevector-root-raw
   gerbil-rs-sint->bytevector-root-raw
+  gerbil-rs-i64->exact-integer-root-raw
+  gerbil-rs-u64->exact-integer-root-raw
+  gerbil-rs-root-exact-integer?-raw
+  gerbil-rs-root-exact-integer-fits-i64?-raw
+  gerbil-rs-root-exact-integer-fits-u64?-raw
+  gerbil-rs-root-exact-integer-i64-value-raw
+  gerbil-rs-root-exact-integer-u64-value-raw
   gerbil-rs-root-string-length-raw
   gerbil-rs-root-string-char-ref-raw
   gerbil-rs-root-bytevector-length-raw

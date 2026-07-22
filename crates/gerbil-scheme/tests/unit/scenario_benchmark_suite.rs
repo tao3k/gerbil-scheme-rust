@@ -39,5 +39,9 @@ fn all_required_safe_value_scenarios_have_valid_contracts() {
         receipts.contains("integer-bytevector-round-trip"),
         "missing integer bytevector scenario receipt: {receipts}",
     );
+    assert!(
+        receipts.contains("exact-integer-projection-round-trip"),
+        "missing exact integer scenario receipt: {receipts}",
+    );
     assert!(receipt.violations.is_empty(), "{:#?}", receipt.violations);
 }

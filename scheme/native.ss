@@ -14,6 +14,8 @@
   gerbil-rs-fixture-true-raw
   gerbil-rs-fixture-false-raw
   gerbil-rs-fixture-fixnum-raw
+  gerbil-rs-fixture-exact-integer-large-positive-raw
+  gerbil-rs-fixture-exact-integer-large-negative-raw
   gerbil-rs-fixture-char-ascii-raw
   gerbil-rs-fixture-char-bmp-raw
   gerbil-rs-fixture-char-non-bmp-raw
@@ -32,6 +34,11 @@
   gerbil-rs-scheme-object-boolean-value-raw
   gerbil-rs-scheme-object-fixnum?-raw
   gerbil-rs-scheme-object-fixnum-value-raw
+  gerbil-rs-scheme-object-exact-integer?-raw
+  gerbil-rs-scheme-object-exact-integer-fits-i64?-raw
+  gerbil-rs-scheme-object-exact-integer-fits-u64?-raw
+  gerbil-rs-scheme-object-exact-integer-i64-value-raw
+  gerbil-rs-scheme-object-exact-integer-u64-value-raw
   gerbil-rs-scheme-object-char?-raw
   gerbil-rs-scheme-object-char-value-raw
   gerbil-rs-scheme-object-flonum?-raw
@@ -46,6 +53,13 @@
   gerbil-rs-root-bytevector->sint-raw
   gerbil-rs-uint->bytevector-root-raw
   gerbil-rs-sint->bytevector-root-raw
+  gerbil-rs-i64->exact-integer-root-raw
+  gerbil-rs-u64->exact-integer-root-raw
+  gerbil-rs-root-exact-integer?-raw
+  gerbil-rs-root-exact-integer-fits-i64?-raw
+  gerbil-rs-root-exact-integer-fits-u64?-raw
+  gerbil-rs-root-exact-integer-i64-value-raw
+  gerbil-rs-root-exact-integer-u64-value-raw
   gerbil-rs-root-string-length-raw
   gerbil-rs-root-string-char-ref-raw
   gerbil-rs-root-bytevector-length-raw
@@ -254,6 +268,30 @@
   (gerbil-rs-rooted-value-store!
    (gerbil-rs-sint->u8vector sint byte-order size)))
 
+;; Exact integers remain Scheme objects. The C ABI only projects them after an
+;; explicit signed/unsigned machine-width check, so bignums never truncate at
+;; the language boundary.
+(def gerbil-rs-i64-min (- (arithmetic-shift 1 63)))
+(def gerbil-rs-i64-max (1- (arithmetic-shift 1 63)))
+(def gerbil-rs-u64-max (1- (arithmetic-shift 1 64)))
+
+(def (gerbil-rs-exact-integer? value)
+  (and (integer? value) (exact? value)))
+
+(def (gerbil-rs-exact-integer-fits-i64? value)
+  (and (gerbil-rs-exact-integer? value)
+       (<= gerbil-rs-i64-min value gerbil-rs-i64-max)))
+
+(def (gerbil-rs-exact-integer-fits-u64? value)
+  (and (gerbil-rs-exact-integer? value)
+       (<= 0 value gerbil-rs-u64-max)))
+
+(def (gerbil-rs-i64->exact-integer-root value)
+  (gerbil-rs-rooted-value-store! value))
+
+(def (gerbil-rs-u64->exact-integer-root value)
+  (gerbil-rs-rooted-value-store! value))
+
 ;; This is intentionally a scalar ABI proof. Rich values stay behind an opaque
 ;; runtime boundary until ownership, error, and thread contracts are versioned.
 (begin-ffi
@@ -269,6 +307,8 @@
    gerbil-rs-fixture-true-raw
    gerbil-rs-fixture-false-raw
    gerbil-rs-fixture-fixnum-raw
+   gerbil-rs-fixture-exact-integer-large-positive-raw
+   gerbil-rs-fixture-exact-integer-large-negative-raw
    gerbil-rs-fixture-char-ascii-raw
    gerbil-rs-fixture-char-bmp-raw
    gerbil-rs-fixture-char-non-bmp-raw
@@ -287,6 +327,11 @@
    gerbil-rs-scheme-object-boolean-value-raw
    gerbil-rs-scheme-object-fixnum?-raw
    gerbil-rs-scheme-object-fixnum-value-raw
+   gerbil-rs-scheme-object-exact-integer?-raw
+   gerbil-rs-scheme-object-exact-integer-fits-i64?-raw
+   gerbil-rs-scheme-object-exact-integer-fits-u64?-raw
+   gerbil-rs-scheme-object-exact-integer-i64-value-raw
+   gerbil-rs-scheme-object-exact-integer-u64-value-raw
    gerbil-rs-scheme-object-char?-raw
    gerbil-rs-scheme-object-char-value-raw
    gerbil-rs-scheme-object-flonum?-raw
@@ -301,6 +346,13 @@
    gerbil-rs-root-bytevector->sint-raw
    gerbil-rs-uint->bytevector-root-raw
    gerbil-rs-sint->bytevector-root-raw
+   gerbil-rs-i64->exact-integer-root-raw
+   gerbil-rs-u64->exact-integer-root-raw
+   gerbil-rs-root-exact-integer?-raw
+   gerbil-rs-root-exact-integer-fits-i64?-raw
+   gerbil-rs-root-exact-integer-fits-u64?-raw
+   gerbil-rs-root-exact-integer-i64-value-raw
+   gerbil-rs-root-exact-integer-u64-value-raw
    gerbil-rs-root-string-length-raw
    gerbil-rs-root-string-char-ref-raw
    gerbil-rs-root-bytevector-length-raw
@@ -390,6 +442,20 @@
       "gerbil_scheme_rust_fixture_fixnum_raw"
       "extern"
     42)
+
+  (c-define (gerbil-rs-fixture-exact-integer-large-positive-raw)
+      ()
+      scheme-object
+      "gerbil_scheme_rust_fixture_exact_integer_large_positive_raw"
+      "extern"
+    (arithmetic-shift 1 80))
+
+  (c-define (gerbil-rs-fixture-exact-integer-large-negative-raw)
+      ()
+      scheme-object
+      "gerbil_scheme_rust_fixture_exact_integer_large_negative_raw"
+      "extern"
+    (- (arithmetic-shift 1 80)))
 
   (c-define (gerbil-rs-fixture-char-ascii-raw)
       ()
@@ -517,6 +583,41 @@
       "extern"
     value)
 
+  (c-define (gerbil-rs-scheme-object-exact-integer?-raw value)
+      (scheme-object)
+      int32
+      "gerbil_scheme_rust_scheme_object_is_exact_integer_raw"
+      "extern"
+    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer? value) 1 0))
+
+  (c-define (gerbil-rs-scheme-object-exact-integer-fits-i64?-raw value)
+      (scheme-object)
+      int32
+      "gerbil_scheme_rust_scheme_object_exact_integer_fits_i64_raw"
+      "extern"
+    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-i64? value) 1 0))
+
+  (c-define (gerbil-rs-scheme-object-exact-integer-fits-u64?-raw value)
+      (scheme-object)
+      int32
+      "gerbil_scheme_rust_scheme_object_exact_integer_fits_u64_raw"
+      "extern"
+    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-u64? value) 1 0))
+
+  (c-define (gerbil-rs-scheme-object-exact-integer-i64-value-raw value)
+      (scheme-object)
+      int64
+      "gerbil_scheme_rust_scheme_object_exact_integer_i64_value_raw"
+      "extern"
+    value)
+
+  (c-define (gerbil-rs-scheme-object-exact-integer-u64-value-raw value)
+      (scheme-object)
+      unsigned-int64
+      "gerbil_scheme_rust_scheme_object_exact_integer_u64_value_raw"
+      "extern"
+    value)
+
   (c-define (gerbil-rs-scheme-object-char?-raw value)
       (scheme-object)
       int32
@@ -640,6 +741,61 @@
    sint
    byte-order
    size))
+
+(c-define (gerbil-rs-i64->exact-integer-root-raw value)
+    (int64)
+    int64
+    "gerbil_scheme_rust_i64_to_exact_integer_root_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-i64->exact-integer-root value))
+
+(c-define (gerbil-rs-u64->exact-integer-root-raw value)
+    (unsigned-int64)
+    int64
+    "gerbil_scheme_rust_u64_to_exact_integer_root_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-u64->exact-integer-root value))
+
+(c-define (gerbil-rs-root-exact-integer?-raw root-id)
+    (int64)
+    int32
+    "gerbil_scheme_rust_root_is_exact_integer_raw"
+    "extern"
+  (let ((value
+         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer? value) 1 0)))
+
+(c-define (gerbil-rs-root-exact-integer-fits-i64?-raw root-id)
+    (int64)
+    int32
+    "gerbil_scheme_rust_root_exact_integer_fits_i64_raw"
+    "extern"
+  (let ((value
+         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-i64? value) 1 0)))
+
+(c-define (gerbil-rs-root-exact-integer-fits-u64?-raw root-id)
+    (int64)
+    int32
+    "gerbil_scheme_rust_root_exact_integer_fits_u64_raw"
+    "extern"
+  (let ((value
+         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-u64? value) 1 0)))
+
+(c-define (gerbil-rs-root-exact-integer-i64-value-raw root-id)
+    (int64)
+    int64
+    "gerbil_scheme_rust_root_exact_integer_i64_value_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id))
+
+(c-define (gerbil-rs-root-exact-integer-u64-value-raw root-id)
+    (int64)
+    unsigned-int64
+    "gerbil_scheme_rust_root_exact_integer_u64_value_raw"
+    "extern"
+  (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id))
 
 (c-define (gerbil-rs-root-string-length-raw root-id)
     (int64)

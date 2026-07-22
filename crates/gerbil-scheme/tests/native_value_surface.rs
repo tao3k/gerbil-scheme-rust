@@ -88,6 +88,16 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         scenario: "native-runtime-round-trip",
     },
     BackedTypeMatrixEntry {
+        family: "exact-integer",
+        scheme_selector: "gerbil_scheme_rust_exact_integer_shape",
+        raw_abi: "GerbilValueHandle + GerbilRootId + i64 + u64",
+        safe_surface: "SchemeExactInteger + RootedSchemeExactInteger",
+        ownership: "runtime-borrowed handle or single-owner Scheme root",
+        nullability: "non-zero handle or positive root token",
+        failure_policy: "checked projection rejects out-of-range without truncation",
+        scenario: "exact-integer-projection-round-trip",
+    },
+    BackedTypeMatrixEntry {
         family: "char",
         scheme_selector: "gerbil_scheme_rust_char_shape",
         raw_abi: "GerbilChar",
@@ -204,7 +214,7 @@ fn public_backed_type_matrix_covers_current_native_surface() {
     let source = read_native_surface_source();
     assert_eq!(
         BACKED_TYPE_MATRIX.len(),
-        18,
+        19,
         "the release-auditable backed type matrix must change deliberately",
     );
 
@@ -227,9 +237,9 @@ fn public_backed_type_matrix_covers_current_native_surface() {
         "(scalar-values (i64 bool comparison status fixnum char flonum))",
         "(sentinel-values (nil void))",
         "(borrowed-values (bytevector utf8))",
-        "(rooted-values (bytestring bytevector))",
+        "(rooted-values (bytestring bytevector exact-integer))",
         "(conversion-values (integer-bytevector))",
-        "(handle-values (runtime-handle gerbil-value-handle))",
+        "(handle-values (runtime-handle gerbil-value-handle exact-integer))",
         "(callback-values (i64-callback))",
     ] {
         assert!(
@@ -403,9 +413,9 @@ fn scheme_native_surface_projects_value_utf8_and_callback_shapes() {
         "gerbil_scheme_rust_value_handle_shape",
         "gerbil_scheme_rust_i64_callback_shape",
         "(borrowed-values (bytevector utf8))",
-        "(rooted-values (bytestring bytevector))",
+        "(rooted-values (bytestring bytevector exact-integer))",
         "(conversion-values (integer-bytevector))",
-        "(handle-values (runtime-handle gerbil-value-handle))",
+        "(handle-values (runtime-handle gerbil-value-handle exact-integer))",
         "(callback-values (i64-callback))",
         "(nullability . explicit-per-shape)",
         "(rooting . explicit-per-shape)",
@@ -431,7 +441,7 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
             "(transport . c-abi)",
             "(scalar-values (i64 bool comparison status fixnum char flonum))",
             "(borrowed-values (bytevector utf8))",
-            "(handle-values (runtime-handle gerbil-value-handle))",
+            "(handle-values (runtime-handle gerbil-value-handle exact-integer))",
             "(callback-values (i64-callback))",
             "(nullability . explicit-per-shape)",
             "(rooting . explicit-per-shape)",
@@ -452,6 +462,19 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
     );
     assert_native_surface_shape_contract(
         &source,
+        "gerbil_scheme_rust_exact_integer_shape",
+        &[
+            "(name . exact-integer)",
+            "(scheme-representations (fixnum bignum))",
+            "(checked-projections (i64 u64 usize))",
+            "(safe-types (SchemeExactInteger RootedSchemeExactInteger))",
+            "(range-policy . reject-out-of-range-without-truncation)",
+            "(release . rust-raii-drop)",
+            "(failure-policy . status-preserving-fail-closed)",
+        ],
+    );
+    assert_native_surface_shape_contract(
+        &source,
         "gerbil_scheme_rust_native_error_shape",
         &[
             "(name . native-error)",
@@ -463,6 +486,7 @@ fn scheme_native_surface_projects_all_backed_value_family_shapes() {
             "(abi-mismatch . gerbil-status)",
             "(wrong-thread . gerbil-status)",
             "(integer-overflow . gerbil-status)",
+            "(exact-integer-out-of-range . gerbil-status)",
             "(invalid-comparison-result . gerbil-status)",
             "(unknown-status-policy . preserve-code)",
             "(projection . optional-gerbil-status)",

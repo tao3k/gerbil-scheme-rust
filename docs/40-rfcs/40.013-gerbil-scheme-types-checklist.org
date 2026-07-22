@@ -592,6 +592,15 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
 
 ** Phase 2: choose the next real Scheme value family
 
+- [X] Publish =RootedSchemeValue= as the heterogeneous safe owner for the
+  currently backed exact-integer, string, and bytevector roots.
+- [X] Preserve typed projections and single-owner Drop by carrying the existing
+  typed rooted wrappers as enum variants; do not add a parallel C ABI.
+- [X] Cover all three variants with one live Scenario and nanosecond p50/p95
+  receipts.
+- [ ] Converge the three wrapper internals onto one private root-owner field
+  after the public sum-type boundary is stable.
+
 - [X] Nil, void, =f64=, character, bytevector, rooted bytestring conversion, and
   machine integer/bytevector conversion slices now have real sys/safe backing.
 - [X] Exact integers/bignums now have borrowed/rooted identity plus checked

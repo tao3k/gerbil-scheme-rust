@@ -43,5 +43,9 @@ fn all_required_safe_value_scenarios_have_valid_contracts() {
         receipts.contains("exact-integer-projection-round-trip"),
         "missing exact integer scenario receipt: {receipts}",
     );
+    assert!(
+        receipts.contains("rooted-scheme-value-round-trip"),
+        "missing generic rooted Scheme value scenario receipt: {receipts}",
+    );
     assert!(receipt.violations.is_empty(), "{:#?}", receipt.violations);
 }

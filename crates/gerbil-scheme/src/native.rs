@@ -433,6 +433,89 @@ pub struct RootedSchemeBytevector<'runtime> {
     _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
 
+/// Runtime-backed type carried by a [`RootedSchemeValue`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RootedSchemeValueKind {
+    /// A Scheme exact integer, including both fixnums and bignums.
+    ExactInteger,
+    /// A Scheme string.
+    String,
+    /// A Scheme bytevector.
+    Bytevector,
+}
+
+/// One owned Scheme root with a type-preserving safe Rust projection.
+///
+/// Each variant retains the existing typed wrapper as the sole owner of the
+/// native root. Dropping this value therefore releases exactly one Scheme
+/// root without introducing a parallel C ABI or a second ownership path.
+#[derive(Debug)]
+pub enum RootedSchemeValue<'runtime> {
+    /// A rooted Scheme exact integer.
+    ExactInteger(RootedSchemeExactInteger<'runtime>),
+    /// A rooted Scheme string.
+    String(RootedSchemeString<'runtime>),
+    /// A rooted Scheme bytevector.
+    Bytevector(RootedSchemeBytevector<'runtime>),
+}
+
+impl<'runtime> RootedSchemeValue<'runtime> {
+    /// Return the runtime-backed type carried by this root.
+    #[must_use]
+    pub const fn kind(&self) -> RootedSchemeValueKind {
+        match self {
+            Self::ExactInteger(_) => RootedSchemeValueKind::ExactInteger,
+            Self::String(_) => RootedSchemeValueKind::String,
+            Self::Bytevector(_) => RootedSchemeValueKind::Bytevector,
+        }
+    }
+
+    /// Borrow the typed exact-integer projection when this root carries one.
+    #[must_use]
+    pub const fn as_exact_integer(&self) -> Option<&RootedSchemeExactInteger<'runtime>> {
+        match self {
+            Self::ExactInteger(value) => Some(value),
+            Self::String(_) | Self::Bytevector(_) => None,
+        }
+    }
+
+    /// Borrow the typed string projection when this root carries one.
+    #[must_use]
+    pub const fn as_string(&self) -> Option<&RootedSchemeString<'runtime>> {
+        match self {
+            Self::String(value) => Some(value),
+            Self::ExactInteger(_) | Self::Bytevector(_) => None,
+        }
+    }
+
+    /// Borrow the typed bytevector projection when this root carries one.
+    #[must_use]
+    pub const fn as_bytevector(&self) -> Option<&RootedSchemeBytevector<'runtime>> {
+        match self {
+            Self::Bytevector(value) => Some(value),
+            Self::ExactInteger(_) | Self::String(_) => None,
+        }
+    }
+}
+
+impl<'runtime> From<RootedSchemeExactInteger<'runtime>> for RootedSchemeValue<'runtime> {
+    fn from(value: RootedSchemeExactInteger<'runtime>) -> Self {
+        Self::ExactInteger(value)
+    }
+}
+
+impl<'runtime> From<RootedSchemeString<'runtime>> for RootedSchemeValue<'runtime> {
+    fn from(value: RootedSchemeString<'runtime>) -> Self {
+        Self::String(value)
+    }
+}
+
+impl<'runtime> From<RootedSchemeBytevector<'runtime>> for RootedSchemeValue<'runtime> {
+    fn from(value: RootedSchemeBytevector<'runtime>) -> Self {
+        Self::Bytevector(value)
+    }
+}
+
 /// Owned root for a Scheme exact integer created from a Rust machine integer.
 ///
 /// The Scheme object may be a fixnum or bignum depending on its magnitude. The

@@ -1,0 +1,24 @@
+harness = "libtest"
+test = "rooted_scheme_value_round_trip_stays_sub_millisecond"
+phase = "warm"
+target_total = "250ms"
+max_total = "500ms"
+observed_total = "14.205708ms"
+regression_budget = "250ms"
+memory_budget_bytes = 16777216
+observed_memory_bytes = 0
+target_rationale = "Each sample allocates one Scheme value, transfers it into the generic typed root surface, projects through the existing C ABI, and releases the sole root owner."
+
+[observed_timings]
+median_exact_integer_root = "473ns"
+median_exact_integer_root_budget = "500us"
+p95_exact_integer_root = "733ns"
+p95_exact_integer_root_budget = "900us"
+median_bytevector_root = "648ns"
+median_bytevector_root_budget = "500us"
+p95_bytevector_root = "900ns"
+p95_bytevector_root_budget = "900us"
+median_string_root = "1.938us"
+median_string_root_budget = "500us"
+p95_string_root = "2.743us"
+p95_string_root_budget = "900us"

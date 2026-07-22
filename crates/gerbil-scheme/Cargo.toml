@@ -28,6 +28,14 @@ required-features = ["native"]
 name = "native_exact_integer_benchmark"
 required-features = ["native"]
 
+[[test]]
+name = "native_rooted_value"
+required-features = ["native"]
+
+[[test]]
+name = "native_rooted_value_benchmark"
+required-features = ["native"]
+
 [[bench]]
 name = "native_ffi"
 harness = false

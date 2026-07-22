@@ -1,0 +1,11 @@
+id = "rooted-scheme-value-round-trip"
+title = "Generic rooted Scheme value typed round trip"
+policy_ids = ["RUST-AGENT-GERBIL-PERF-005", "RUST-AGENT-GERBIL-FFI-002"]
+agent_goal = "Prove one heterogeneous Rust owner surface for exact integers, strings, and bytevectors while preserving typed projections, single-owner drop, and sub-millisecond warm AOT latency."
+reference_repositories = ["tao3k/gerbil", "tao3k/gerbil-scheme-rust"]
+reference_patterns = ["RootedSchemeValue", "typed projection", "GerbilRootId", "single-owner drop", "p95 nanosecond receipt"]
+inputs = "none"
+expected = "pass"
+benchmark = "benchmark.toml"
+harness = "libtest"
+test = "rooted_scheme_value_round_trip_stays_sub_millisecond"

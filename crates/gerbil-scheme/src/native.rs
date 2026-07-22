@@ -418,8 +418,7 @@ impl Default for IntegerDecoding {
 /// one owner.
 #[derive(Debug)]
 pub struct RootedSchemeString<'runtime> {
-    root: gerbil_scheme_sys::GerbilRootId,
-    _runtime: PhantomData<&'runtime GerbilRuntime>,
+    owner: RootedSchemeOwner<'runtime>,
 }
 
 /// Owned root for a Scheme bytevector created by a native conversion.
@@ -429,8 +428,93 @@ pub struct RootedSchemeString<'runtime> {
 /// one owner.
 #[derive(Debug)]
 pub struct RootedSchemeBytevector<'runtime> {
+    owner: RootedSchemeOwner<'runtime>,
+}
+
+/// Single private owner for one live Scheme root.
+///
+/// Public typed wrappers compose this owner so root validation and release
+/// cannot drift across Scheme value families.
+#[derive(Debug)]
+struct RootedSchemeOwner<'runtime> {
     root: gerbil_scheme_sys::GerbilRootId,
     _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl RootedSchemeOwner<'_> {
+    fn new(
+        status: gerbil_scheme_sys::GerbilStatus,
+        root: gerbil_scheme_sys::GerbilRootId,
+        operation: &'static str,
+    ) -> Result<Self, NativeError> {
+        if status == gerbil_scheme_sys::GerbilStatus::Ok && root.is_valid() {
+            Ok(Self {
+                root,
+                _runtime: PhantomData,
+            })
+        } else {
+            Err(NativeError::Status {
+                operation,
+                code: if status == gerbil_scheme_sys::GerbilStatus::Ok {
+                    gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+                } else {
+                    status as i32
+                },
+            })
+        }
+    }
+
+    const fn root_id(&self) -> gerbil_scheme_sys::GerbilRootId {
+        self.root
+    }
+}
+
+impl Drop for RootedSchemeOwner<'_> {
+    fn drop(&mut self) {
+        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
+        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
+    }
+}
+
+#[cfg(test)]
+mod rooted_scheme_owner_tests {
+    use super::{NativeError, RootedSchemeOwner};
+
+    #[test]
+    fn ok_status_with_an_invalid_root_fails_closed() {
+        let error = RootedSchemeOwner::new(
+            gerbil_scheme_sys::GerbilStatus::Ok,
+            gerbil_scheme_sys::GerbilRootId(0),
+            "rooted-owner-test",
+        )
+        .expect_err("an invalid root must not acquire a safe owner");
+
+        assert!(matches!(
+            error,
+            NativeError::Status {
+                operation: "rooted-owner-test",
+                code,
+            } if code == gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+        ));
+    }
+
+    #[test]
+    fn non_ok_status_never_acquires_a_root_owner() {
+        let error = RootedSchemeOwner::new(
+            gerbil_scheme_sys::GerbilStatus::InvalidValue,
+            gerbil_scheme_sys::GerbilRootId(1),
+            "rooted-owner-test",
+        )
+        .expect_err("a failed ABI status must not acquire a safe owner");
+
+        assert!(matches!(
+            error,
+            NativeError::Status {
+                operation: "rooted-owner-test",
+                code,
+            } if code == gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+        ));
+    }
 }
 
 /// Runtime-backed type carried by a [`RootedSchemeValue`].
@@ -522,8 +606,7 @@ impl<'runtime> From<RootedSchemeBytevector<'runtime>> for RootedSchemeValue<'run
 /// root has one Rust owner and releases automatically on drop.
 #[derive(Debug)]
 pub struct RootedSchemeExactInteger<'runtime> {
-    root: gerbil_scheme_sys::GerbilRootId,
-    _runtime: PhantomData<&'runtime GerbilRuntime>,
+    owner: RootedSchemeOwner<'runtime>,
 }
 
 /// Rust machine target requested for a checked Scheme exact-integer projection.
@@ -673,16 +756,13 @@ impl<'runtime> SchemeBytevector<'runtime> {
                 &raw mut root,
             )
         };
-        if status == gerbil_scheme_sys::GerbilStatus::Ok {
-            NativeResult::ok(RootedSchemeString {
-                root,
-                _runtime: PhantomData,
-            })
-        } else {
-            NativeResult::err(NativeError::Status {
-                operation: "gerbil_scheme_rust_bytevector_to_bytestring_root",
-                code: status as i32,
-            })
+        match RootedSchemeOwner::new(
+            status,
+            root,
+            "gerbil_scheme_rust_bytevector_to_bytestring_root",
+        ) {
+            Ok(owner) => NativeResult::ok(RootedSchemeString { owner }),
+            Err(error) => NativeResult::err(error),
         }
     }
 }
@@ -746,7 +826,7 @@ impl RootedSchemeExactInteger<'_> {
     /// Return the owned native root token without transferring ownership.
     #[must_use]
     pub const fn root_id(&self) -> gerbil_scheme_sys::GerbilRootId {
-        self.root
+        self.owner.root_id()
     }
 
     /// Project this rooted exact integer to `i64` with range checking.
@@ -754,7 +834,10 @@ impl RootedSchemeExactInteger<'_> {
     pub fn to_i64(&self) -> NativeResult<i64> {
         let mut out = 0;
         let status = unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_i64(self.root, &raw mut out)
+            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_i64(
+                self.owner.root_id(),
+                &raw mut out,
+            )
         };
         checked_exact_integer_projection(
             status,
@@ -779,7 +862,10 @@ impl RootedSchemeExactInteger<'_> {
     fn to_unsigned_target(&self, target: ExactIntegerTarget) -> NativeResult<u64> {
         let mut out = 0;
         let status = unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_u64(self.root, &raw mut out)
+            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_u64(
+                self.owner.root_id(),
+                &raw mut out,
+            )
         };
         checked_exact_integer_projection(
             status,
@@ -790,20 +876,16 @@ impl RootedSchemeExactInteger<'_> {
     }
 }
 
-impl Drop for RootedSchemeExactInteger<'_> {
-    fn drop(&mut self) {
-        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
-        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
-    }
-}
-
 impl RootedSchemeString<'_> {
     /// Return the number of Scheme characters in this rooted string.
     #[must_use]
     pub fn len(&self) -> NativeResult<usize> {
         let mut out = 0;
         let status = unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_root_string_length(self.root, &raw mut out)
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_length(
+                self.owner.root_id(),
+                &raw mut out,
+            )
         };
         if status == gerbil_scheme_sys::GerbilStatus::Ok {
             NativeResult::ok(out)
@@ -830,7 +912,7 @@ impl RootedSchemeString<'_> {
         let mut out = gerbil_scheme_sys::GerbilChar::default();
         let status = unsafe {
             gerbil_scheme_sys::gerbil_scheme_rust_root_string_char_ref(
-                self.root,
+                self.owner.root_id(),
                 index,
                 &raw mut out,
             )
@@ -868,20 +950,16 @@ impl RootedSchemeString<'_> {
     }
 }
 
-impl Drop for RootedSchemeString<'_> {
-    fn drop(&mut self) {
-        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
-        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
-    }
-}
-
 impl RootedSchemeBytevector<'_> {
     /// Return this rooted bytevector's byte length.
     #[must_use]
     pub fn len(&self) -> NativeResult<usize> {
         let mut out = 0;
         let status = unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_length(self.root, &raw mut out)
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_length(
+                self.owner.root_id(),
+                &raw mut out,
+            )
         };
         if status == gerbil_scheme_sys::GerbilStatus::Ok {
             NativeResult::ok(out)
@@ -908,7 +986,7 @@ impl RootedSchemeBytevector<'_> {
         let mut out = 0;
         let status = unsafe {
             gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_u8_ref(
-                self.root,
+                self.owner.root_id(),
                 index,
                 &raw mut out,
             )
@@ -950,7 +1028,7 @@ impl RootedSchemeBytevector<'_> {
         let mut out = 0;
         let status = unsafe {
             gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_to_uint(
-                self.root,
+                self.owner.root_id(),
                 decoding.byte_order().abi_code(),
                 size,
                 &raw mut out,
@@ -969,7 +1047,7 @@ impl RootedSchemeBytevector<'_> {
         let mut out = 0;
         let status = unsafe {
             gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_to_sint(
-                self.root,
+                self.owner.root_id(),
                 decoding.byte_order().abi_code(),
                 size,
                 &raw mut out,
@@ -979,33 +1057,12 @@ impl RootedSchemeBytevector<'_> {
     }
 }
 
-impl Drop for RootedSchemeBytevector<'_> {
-    fn drop(&mut self) {
-        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
-        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
-    }
-}
-
 fn rooted_exact_integer<'runtime>(
     status: gerbil_scheme_sys::GerbilStatus,
     root: gerbil_scheme_sys::GerbilRootId,
     operation: &'static str,
 ) -> Result<RootedSchemeExactInteger<'runtime>, NativeError> {
-    if status == gerbil_scheme_sys::GerbilStatus::Ok && root.is_valid() {
-        Ok(RootedSchemeExactInteger {
-            root,
-            _runtime: PhantomData,
-        })
-    } else {
-        Err(NativeError::Status {
-            operation,
-            code: if status == gerbil_scheme_sys::GerbilStatus::Ok {
-                gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
-            } else {
-                status as i32
-            },
-        })
-    }
+    RootedSchemeOwner::new(status, root, operation).map(|owner| RootedSchemeExactInteger { owner })
 }
 
 fn checked_exact_integer_projection<T>(
@@ -1078,21 +1135,7 @@ fn rooted_integer_bytevector<'runtime>(
     root: gerbil_scheme_sys::GerbilRootId,
     operation: &'static str,
 ) -> Result<RootedSchemeBytevector<'runtime>, NativeError> {
-    if status == gerbil_scheme_sys::GerbilStatus::Ok && root.is_valid() {
-        Ok(RootedSchemeBytevector {
-            root,
-            _runtime: PhantomData,
-        })
-    } else {
-        Err(NativeError::Status {
-            operation,
-            code: if status == gerbil_scheme_sys::GerbilStatus::Ok {
-                gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
-            } else {
-                status as i32
-            },
-        })
-    }
+    RootedSchemeOwner::new(status, root, operation).map(|owner| RootedSchemeBytevector { owner })
 }
 
 fn resolved_unsigned_encoding_width(
@@ -2310,17 +2353,12 @@ impl GerbilRuntime {
                 &raw mut root,
             )
         };
-        if status == gerbil_scheme_sys::GerbilStatus::Ok {
-            Ok(RootedSchemeBytevector {
-                root,
-                _runtime: PhantomData,
-            })
-        } else {
-            Err(NativeError::Status {
-                operation: "gerbil_scheme_rust_bytestring_to_bytevector_root",
-                code: status as i32,
-            })
-        }
+        RootedSchemeOwner::new(
+            status,
+            root,
+            "gerbil_scheme_rust_bytestring_to_bytevector_root",
+        )
+        .map(|owner| RootedSchemeBytevector { owner })
     }
 
     fn checked_scheme_object_fixture(

@@ -598,8 +598,10 @@ native-surface projection, scenario benchmark, and Marlin-consumer reduction.
   typed rooted wrappers as enum variants; do not add a parallel C ABI.
 - [X] Cover all three variants with one live Scenario and nanosecond p50/p95
   receipts.
-- [ ] Converge the three wrapper internals onto one private root-owner field
-  after the public sum-type boundary is stable.
+- [X] Converge the three wrapper internals onto one private
+  =RootedSchemeOwner= field with one constructor and one Drop implementation.
+- [X] Prove =Ok + invalid root= rejection and native double-release
+  fail-closed behavior.
 
 - [X] Nil, void, =f64=, character, bytevector, rooted bytestring conversion, and
   machine integer/bytevector conversion slices now have real sys/safe backing.

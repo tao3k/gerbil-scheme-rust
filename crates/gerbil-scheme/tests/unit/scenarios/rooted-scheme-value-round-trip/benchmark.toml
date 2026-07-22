@@ -7,7 +7,7 @@ observed_total = "14.205708ms"
 regression_budget = "250ms"
 memory_budget_bytes = 16777216
 observed_memory_bytes = 0
-target_rationale = "Each sample allocates one Scheme value, transfers it into the generic typed root surface, projects through the existing C ABI, and releases the sole root owner."
+target_rationale = "Each sample allocates one Scheme value, transfers it into the generic typed root surface, projects through the existing C ABI, and releases the sole shared RootedSchemeOwner."
 
 [observed_timings]
 median_exact_integer_root = "473ns"

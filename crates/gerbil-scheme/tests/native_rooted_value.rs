@@ -67,4 +67,20 @@ fn rooted_scheme_value_preserves_typed_projections_and_single_owner_drop() {
         258,
     );
     assert!(values[2].as_exact_integer().is_none());
+
+    let mut raw_root = gerbil_scheme_sys::GerbilRootId(0);
+    let create_status = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_i64_to_exact_integer_root(7, &raw mut raw_root)
+    };
+    assert_eq!(create_status, gerbil_scheme_sys::GerbilStatus::Ok);
+    assert!(raw_root.is_valid());
+    assert_eq!(
+        unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(raw_root) },
+        gerbil_scheme_sys::GerbilStatus::Ok,
+    );
+    assert_eq!(
+        unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(raw_root) },
+        gerbil_scheme_sys::GerbilStatus::InvalidValue,
+        "the native root table must reject a second release",
+    );
 }

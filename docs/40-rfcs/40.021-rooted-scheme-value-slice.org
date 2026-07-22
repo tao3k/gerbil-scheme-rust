@@ -28,15 +28,21 @@ one existing typed wrapper, and that wrapper remains the sole owner of its
 1. conversion through =From= transfers ownership without =unsafe= or
    =ManuallyDrop=;
 2. =RootedSchemeValue= is neither =Clone= nor =Copy=;
-3. dropping the enum drops exactly one typed wrapper and releases exactly one
+3. every typed wrapper composes one private =RootedSchemeOwner=, so dropping the
+   enum reaches exactly one shared Drop implementation and releases exactly one
    Scheme root through =gerbil_scheme_rust_root_release=;
 4. the Gerbil root table and generated SCM remain the single native owner.
 
-The alternative of changing all three wrapper layouts and Drop implementations
-in the same slice was rejected.  That would combine a new public abstraction
-with an internal ownership migration and make a double-release regression harder
-to isolate.  A later private-owner refactor may change implementation layout
-without changing this public enum contract.
+The work landed in two independently verified steps.  The first established the
+public enum without changing typed-wrapper ownership.  The second replaced the
+three repeated =GerbilRootId + PhantomData + Drop= layouts with one private
+=RootedSchemeOwner=.  This sequencing kept double-release failures attributable
+while leaving the public enum contract unchanged.
+
+=RootedSchemeOwner::new= is also the single fail-closed constructor: a non-OK
+status or =Ok= paired with an invalid root never acquires an owner.  Unit tests
+cover both cases.  A live ABI receipt creates one exact-integer root, proves the
+first release returns =Ok=, and proves the second release returns =InvalidValue=.
 
 * Scenario receipt
 
@@ -64,14 +70,15 @@ into a Rust =String=; enum dispatch is not the dominant cost.
 - [X] Live multi-type functional test.
 - [X] Scenario benchmark with nanosecond and microsecond observations.
 - [X] Native feature gating for both new test targets.
-- [ ] Private =RootedSchemeOwner= composition inside the three typed wrappers.
+- [X] Private =RootedSchemeOwner= composition inside the three typed wrappers.
+- [X] One shared Drop implementation for all currently backed rooted values.
+- [X] Invalid-root constructor and native double-release fail-closed receipts.
 - [ ] Arbitrary precision integer digit import/export above the common owner.
 
 * Next owner
 
-The next ownership-only slice replaces the repeated private
-=GerbilRootId + PhantomData= fields with one private =RootedSchemeOwner=.
-The public =RootedSchemeValue= enum and all typed projection methods remain
-unchanged.  After that migration is proven against double-release and invalid
-root receipts, arbitrary-precision integer digit transfer can build on the
-common owner without widening the C ABI accidentally.
+The next bindings slice is arbitrary-precision integer digit import/export above
+the common owner.  It must define sign, magnitude limb width, endianness, zero,
+and allocation ownership explicitly.  The public =RootedSchemeValue= enum and
+all existing typed projection methods remain unchanged; no parser dependency is
+introduced.

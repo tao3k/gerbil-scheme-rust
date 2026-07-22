@@ -1,0 +1,80 @@
+;;; Gerbil Scheme Rust bridge exported symbol contract.
+;;;
+;;; This signature mirrors the stable bridge surface implemented by
+;;; `scheme/native.ss`.  `scheme/generated/native.scm` is the tracked
+;;; Gerbil/Gambit lowered generated-source artifact and is protected by the
+;;; generated-SCM drift check.
+
+(export
+  ;; Scalar control proofs.
+  gerbil-rs-abi-version
+  gerbil-rs-add-i64
+  gerbil-rs-is-even-i64
+  gerbil-rs-compare-i64
+
+  ;; Scheme object fixtures.
+  gerbil-rs-scheme-null-value-raw
+  gerbil-rs-fixture-void-raw
+  gerbil-rs-fixture-pair-raw
+  gerbil-rs-fixture-proper-list-raw
+  gerbil-rs-fixture-improper-list-raw
+  gerbil-rs-fixture-true-raw
+  gerbil-rs-fixture-false-raw
+  gerbil-rs-fixture-fixnum-raw
+  gerbil-rs-fixture-exact-integer-large-positive-raw
+  gerbil-rs-fixture-exact-integer-large-negative-raw
+  gerbil-rs-fixture-char-ascii-raw
+  gerbil-rs-fixture-char-bmp-raw
+  gerbil-rs-fixture-char-non-bmp-raw
+  gerbil-rs-fixture-flonum-finite-raw
+  gerbil-rs-fixture-flonum-nan-raw
+  gerbil-rs-fixture-flonum-pos-inf-raw
+  gerbil-rs-fixture-flonum-neg-inf-raw
+  gerbil-rs-fixture-flonum-neg-zero-raw
+  gerbil-rs-fixture-bytevector-raw
+
+  ;; Scheme object predicates.
+  gerbil-rs-scheme-object-null?-raw
+  gerbil-rs-scheme-object-void?-raw
+  gerbil-rs-scheme-object-bytevector?-raw
+  gerbil-rs-scheme-object-pair?-raw
+  gerbil-rs-scheme-object-list?-raw
+  gerbil-rs-scheme-object-boolean?-raw
+  gerbil-rs-scheme-object-fixnum?-raw
+  gerbil-rs-scheme-object-char?-raw
+  gerbil-rs-scheme-object-flonum?-raw
+
+  ;; Scheme object projections.
+  gerbil-rs-scheme-object-boolean-value-raw
+  gerbil-rs-scheme-object-fixnum-value-raw
+  gerbil-rs-scheme-object-exact-integer?-raw
+  gerbil-rs-scheme-object-exact-integer-fits-i64?-raw
+  gerbil-rs-scheme-object-exact-integer-fits-u64?-raw
+  gerbil-rs-scheme-object-exact-integer-i64-value-raw
+  gerbil-rs-scheme-object-exact-integer-u64-value-raw
+  gerbil-rs-scheme-object-char-value-raw
+  gerbil-rs-scheme-object-flonum-value-raw
+  gerbil-rs-scheme-object-bytevector-length-raw
+  gerbil-rs-scheme-object-bytevector-u8-ref-raw
+  gerbil-rs-bytevector->bytestring-root-raw
+  gerbil-rs-bytestring->bytevector-root-raw
+  gerbil-rs-bytevector->uint-raw
+  gerbil-rs-bytevector->sint-raw
+  gerbil-rs-root-bytevector->uint-raw
+  gerbil-rs-root-bytevector->sint-raw
+  gerbil-rs-uint->bytevector-root-raw
+  gerbil-rs-sint->bytevector-root-raw
+  gerbil-rs-i64->exact-integer-root-raw
+  gerbil-rs-u64->exact-integer-root-raw
+  gerbil-rs-root-exact-integer?-raw
+  gerbil-rs-root-exact-integer-fits-i64?-raw
+  gerbil-rs-root-exact-integer-fits-u64?-raw
+  gerbil-rs-root-exact-integer-i64-value-raw
+  gerbil-rs-root-exact-integer-u64-value-raw
+  gerbil-rs-root-string-length-raw
+  gerbil-rs-root-string-char-ref-raw
+  gerbil-rs-root-bytevector-length-raw
+  gerbil-rs-root-bytevector-u8-ref-raw
+  gerbil-rs-root-release-raw
+  gerbil-rs-scheme-object-pair-car-raw
+  gerbil-rs-scheme-object-pair-cdr-raw)

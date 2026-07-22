@@ -27,6 +27,7 @@ gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-schem
 gerbil-scheme-rust-project-harness = { path = "build-support/gerbil-scheme-rust-project-harness", version = "0.1.2" }
 gerbil-scheme = { path = "crates/gerbil-scheme", version = "0.1.0" }
 gerbil-scheme-sys = { path = "crates/gerbil-scheme-sys", version = "0.1.0" }
+sha2 = "0.10"
 
 [workspace.lints.rust]
 missing_debug_implementations = "warn"

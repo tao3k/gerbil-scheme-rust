@@ -1,0 +1,20 @@
+harness = "libtest"
+test = "rooted_bytestring_round_trip_stays_sub_millisecond"
+phase = "warm"
+target_total = "250ms"
+max_total = "500ms"
+observed_total = "34.212125ms"
+regression_budget = "250ms"
+memory_budget_bytes = 16777216
+observed_memory_bytes = 0
+target_rationale = "Each five-byte encode or decode includes Scheme allocation, explicit root-table ownership, projection into owned Rust memory, and RAII release; median and p95 must remain below one millisecond."
+
+[observed_timings]
+median_bytevector_to_bytestring = "4717ns"
+median_bytevector_to_bytestring_budget = "500us"
+p95_bytevector_to_bytestring = "13595ns"
+p95_bytevector_to_bytestring_budget = "900us"
+median_bytestring_to_bytevector = "2467ns"
+median_bytestring_to_bytevector_budget = "500us"
+p95_bytestring_to_bytevector = "5215ns"
+p95_bytestring_to_bytevector_budget = "900us"

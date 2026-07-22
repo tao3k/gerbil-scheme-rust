@@ -1,0 +1,277 @@
+#+title: RFC 40.014 - Gerbil Scheme Rust Bridge Engineering Standard
+#+startup: overview
+
+* Status
+
+Draft. This standard is normative for new Gerbil Scheme Rust bridge work after
+the boolean inspection gate.
+
+* Purpose
+
+The bridge must make Gerbil own Scheme semantics and make Rust consume a stable
+C ABI. Rust must not infer Gambit/Gerbil object layout from raw =SCM= bits.
+
+This keeps the bindings useful as a general library while preserving a
+fail-closed boundary for Marlin and other downstream consumers.
+
+* Layering
+
+** Gerbil implementation =.ss=
+
+Gerbil =.ss= modules own runtime semantics:
+
+- predicates such as =boolean?=, =fixnum?=, =pair?=, =list?=, and =null?=;
+- projections such as boolean value, fixnum value, =car=, and =cdr=;
+- defensive fallback behavior for non-matching Scheme values;
+- fixture exports used by runtime-backed tests.
+
+Scheme object projection must happen in Gerbil, not by Rust decoding raw
+handles.
+
+** Gerbil signature =.ssi=
+
+Gerbil =.ssi= files should become the bridge contract for exported Scheme
+symbols. New bridge slices should add or update signatures alongside =.ss=
+implementation when the exported surface is meant to be stable.
+
+=scheme/native.ssi= is the tracked source contract for the current native
+bridge. Generated =.scm= files may be tracked when they are treated as
+Gerbil/Gambit lowered generated-source artifacts, but only with a deterministic
+regeneration check that fails on drift.
+
+The signature layer should make these boundaries explicit:
+
+- exported bridge symbol names;
+- whether a function is a predicate, projection, or fixture;
+- which values are defensive fallbacks and which errors are enforced by Rust/sys
+  wrappers.
+
+** Rust sys crate
+
+The sys crate owns the C ABI boundary:
+
+- stable =repr(C)= carriers such as =GerbilBoolean= and =GerbilFixnum=;
+- =GerbilStatus= error projection;
+- null output checks;
+- checked wrappers around raw Scheme exports;
+- public ABI functions that remain fail-closed for untrusted handles.
+
+Sys wrappers may call Gerbil-exported raw functions only after validating the
+minimum safe preconditions for that wrapper.
+
+** Rust safe crate
+
+The safe crate owns Rust-facing provenance and lifetime policy:
+
+- =GerbilValueProvenance::SchemeObjectExport= may use runtime-backed
+  predicates/projections;
+- =GerbilValueProvenance::UntrustedRaw= and =RuntimeSentinel= must remain
+  fail-closed for Scheme object inspection and traversal;
+- returned handles from runtime-backed projections preserve
+  =SchemeObjectExport= provenance;
+- no safe method may rely on raw pointer layout.
+
+* SCM and handle policy
+
+=GerbilValueHandle= is opaque. Rust may store, compare for zero, pass back to
+Gerbil, and tag provenance. Rust must not dereference, mask, shift, or decode
+it as a Gambit/Gerbil object.
+
+Any API that wants to inspect Scheme values must route through Gerbil-owned
+predicates or projections.
+
+* Slice policy
+
+Each bridge slice should be intentionally narrow:
+
+- boolean projection is separate from fixnum projection;
+- fixnum projection is separate from full exact integer conversion;
+- char projection is separate from flonum projection;
+- recursive list traversal is blocked until lifetime and GC-root policy are
+  versioned.
+
+Each slice must update:
+
+- Gerbil implementation/signature contract when exported Scheme symbols change;
+- sys ABI wrappers;
+- safe Rust API;
+- runtime scenario tests;
+- ORG docs/checklist.
+
+* Current accepted slices
+
+Accepted slices are implementation receipts for this standard. A slice may move
+from the type checklist into this section only when it has:
+
+- Gerbil-owned projection logic in =scheme/native.ss=;
+- stable C ABI declarations in =include/gerbil_scheme_rust.h=;
+- sys crate checked wrappers that guard null pointers and invalid Scheme
+  values;
+- safe Rust methods that preserve =SchemeObjectExport= provenance and reject
+  =UntrustedRaw= / =RuntimeSentinel=;
+- scenario coverage for success, non-matching Scheme values, and raw provenance
+  fail-closed behavior;
+- local =cargo=, =clippy=, and Bazel receipts.
+
+** Runtime lifecycle receipt
+
+Status: accepted.
+
+The runtime lifecycle slice makes the native runtime boundary explicit before
+any Scheme object projection is exposed. =GerbilRuntime= remains a
+process-global, one-shot, thread-affine safe owner. Initialization loads the
+native Gerbil bridge module and checks the ABI version before returning the safe
+handle.
+
+The accepted lifecycle boundary is:
+
+- a second initialization while the runtime is live returns
+  =NativeError::AlreadyInitialized=;
+- after =GerbilRuntime= is dropped, the process is finalized for this bridge
+  and later initialization returns =NativeError::RuntimeFinalized=;
+- safe =GerbilRuntime= is intentionally =!Send=/=!Sync=, so wrong-thread access
+  is blocked by the Rust type system under safe code;
+- method-level =check_thread= remains a defensive fail-closed guard and returns
+  =NativeError::WrongThread= if an unsafe or future internal caller violates
+  thread affinity;
+- =GerbilRuntime::receipt= exposes the accepted ABI id, ABI version, public C
+  header path, and native Gerbil module path without exposing raw externs.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
+** Boolean Scheme-object projection
+
+Status: accepted.
+
+The boolean slice exports runtime-backed Scheme =#t= and =#f= fixtures, checks
+=boolean?= in Gerbil, and exposes =GerbilValue::is_boolean= /
+=GerbilValue::as_boolean= in Rust.
+
+The accepted failure boundary is:
+
+- non-boolean Scheme values return =InvalidValue= for =as_boolean=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for boolean inspection;
+- Rust never decodes the raw Scheme object handle.
+
+** Fixnum Scheme-object projection
+
+Status: accepted for fixnum only.
+
+The fixnum slice exports a runtime-backed Scheme fixnum fixture, checks
+=fixnum?= in Gerbil, and exposes =GerbilValue::is_fixnum=,
+=GerbilValue::as_fixnum=, and =GerbilValue::as_fixnum_i64= in Rust.
+
+The accepted failure boundary is:
+
+- non-fixnum Scheme values return =InvalidValue= for =as_fixnum=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for fixnum inspection;
+- bignum and full exact integer conversion remain outside this slice;
+- Rust consumes =GerbilFixnum= as a carrier and does not decode =SCM= layout.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
+** Character Scheme-object projection
+
+Status: accepted.
+
+The character slice exports runtime-backed ASCII, BMP, and non-BMP Scheme
+character fixtures, checks =char?= in Gerbil, and exposes
+=GerbilValue::is_char= and =GerbilValue::as_char= in Rust.
+
+The accepted failure boundary is:
+
+- non-character Scheme values return =InvalidValue= for =as_char=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for character inspection;
+- Rust validates the returned =GerbilChar= as a Unicode scalar before exposing
+  =char=;
+- flonum projection and numeric edge-case policy remain outside this slice.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
+** Flonum Scheme-object projection
+
+Status: accepted.
+
+The flonum slice exports runtime-backed finite, NaN, positive infinity,
+negative infinity, and negative-zero Scheme flonum fixtures, checks =flonum?=
+in Gerbil, and exposes =GerbilValue::is_flonum= and
+=GerbilValue::as_flonum= in Rust.
+
+The accepted failure and edge-value boundary is:
+
+- non-flonum Scheme values return =InvalidValue= for =as_flonum=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for flonum inspection;
+- NaN is preserved to the Rust =is_nan= observable boundary, without promising
+  payload preservation;
+- infinities preserve sign;
+- signed zero preserves sign;
+- exact integer, rational, and complex numeric conversion remain outside this
+  slice.
+
+Implementation receipt:
+
+- =direnv exec . env GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo test -p gerbil-scheme --test source_surface --locked -- --nocapture=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
+** Nil Scheme-object projection
+
+Status: accepted for nil / empty-list only.
+
+The nil slice reuses the runtime-backed Scheme null fixture and Gerbil-owned
+=null?= predicate path, and exposes =GerbilValue::as_nil= plus the borrowed
+=SchemeNil= marker in Rust.
+
+The accepted failure and ownership boundary is:
+
+- only =SchemeObjectExport= values may project as =SchemeNil=;
+- non-null Scheme objects return =InvalidValue= for =as_nil=;
+- =UntrustedRaw= and =RuntimeSentinel= fail closed for nil projection;
+- the marker wraps a non-zero =GerbilValueHandle= and is therefore distinct
+  from null pointers;
+- =SchemeNil= is borrowed and unrooted; it does not retain, free, root, or
+  decode the underlying =SCM= object;
+- void, EOF, unspecified, recursive list traversal, and GC-rooted sentinel
+  ownership remain outside this slice.
+
+Implementation receipt:
+
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture=
+- =direnv exec . cargo test -p gerbil-scheme --features native --test native_value_surface --locked -- --nocapture=
+- =direnv exec . cargo test -p gerbil-scheme --test source_surface --locked -- --nocapture=
+- =direnv exec . env GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo test -p gerbil-scheme-sys --locked=
+- =direnv exec . cargo clippy --workspace --all-targets --all-features --locked -- -D warnings=
+- =direnv exec . bazel test //:cargo_all=
+
+* Downstream policy
+
+Marlin consumes =gerbil-scheme-rust= as a dependency. It must not be the owner
+of Scheme runtime traversal or projection semantics.
+
+Marlin dependency-update PRs must remain open until explicitly approved by the
+maintainer. The same hold-to-merge rule applies to =gerbil-scheme-rust= PRs:
+CI green is required, but green CI alone is not approval to squash or merge.
+
+* Current non-goals
+
+- direct Rust decoding of =SCM= object layout;
+- recursive list traversal before GC/lifetime policy;
+- bignum or full exact integer conversion in the fixnum slice;
+- performance benchmark changes before correctness and failure semantics are
+  accepted.

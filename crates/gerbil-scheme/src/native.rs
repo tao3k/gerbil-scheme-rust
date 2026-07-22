@@ -1,16 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 use gerbil_scheme_sys::{
-    gerbil_scheme_rust_fixture_false, gerbil_scheme_rust_fixture_improper_list,
-    gerbil_scheme_rust_fixture_pair, gerbil_scheme_rust_fixture_proper_list,
-    gerbil_scheme_rust_fixture_true, gerbil_scheme_rust_scheme_object_as_boolean,
-    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_list,
-    gerbil_scheme_rust_scheme_object_is_pair,
+    gerbil_scheme_rust_fixture_char_ascii, gerbil_scheme_rust_fixture_char_bmp,
+    gerbil_scheme_rust_fixture_char_non_bmp, gerbil_scheme_rust_fixture_false,
+    gerbil_scheme_rust_fixture_fixnum, gerbil_scheme_rust_fixture_flonum_finite,
+    gerbil_scheme_rust_fixture_flonum_nan, gerbil_scheme_rust_fixture_flonum_neg_inf,
+    gerbil_scheme_rust_fixture_flonum_neg_zero, gerbil_scheme_rust_fixture_flonum_pos_inf,
+    gerbil_scheme_rust_fixture_improper_list, gerbil_scheme_rust_fixture_pair,
+    gerbil_scheme_rust_fixture_proper_list, gerbil_scheme_rust_fixture_true,
+    gerbil_scheme_rust_scheme_object_as_boolean, gerbil_scheme_rust_scheme_object_as_char,
+    gerbil_scheme_rust_scheme_object_as_fixnum, gerbil_scheme_rust_scheme_object_as_flonum,
+    gerbil_scheme_rust_scheme_object_is_boolean, gerbil_scheme_rust_scheme_object_is_char,
+    gerbil_scheme_rust_scheme_object_is_fixnum, gerbil_scheme_rust_scheme_object_is_flonum,
+    gerbil_scheme_rust_scheme_object_is_list, gerbil_scheme_rust_scheme_object_is_pair,
+};
+
+use gerbil_scheme_sys::{
+    gerbil_scheme_rust_fixture_exact_integer_large_negative,
+    gerbil_scheme_rust_fixture_exact_integer_large_positive,
+    gerbil_scheme_rust_scheme_object_exact_integer_to_i64,
+    gerbil_scheme_rust_scheme_object_exact_integer_to_u64,
+    gerbil_scheme_rust_scheme_object_is_exact_integer,
 };
 
 use std::fmt;
 use std::marker::PhantomData;
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU8, NonZeroUsize};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Mutex, PoisonError};
@@ -40,6 +55,24 @@ static RUNTIME_STATE: AtomicU8 = AtomicU8::new(RUNTIME_NEVER_INITIALIZED);
 pub struct GerbilRuntime {
     owner: ThreadId,
     _not_send_or_sync: PhantomData<Rc<()>>,
+}
+
+/// Public receipt describing the initialized native runtime binding surface.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GerbilRuntimeReceipt {
+    /// Stable ABI family identifier, including its terminating NUL byte.
+    pub abi_id: &'static [u8],
+    /// ABI major version accepted by this Rust binding.
+    pub abi_version: u32,
+    /// Repository-relative public C header path.
+    pub header_path: &'static str,
+    /// Gerbil module initialized for the native bridge.
+    pub native_module_path: &'static str,
+}
+
+impl GerbilRuntimeReceipt {
+    /// Runtime module loaded by the native bridge.
+    pub const NATIVE_MODULE_PATH: &'static str = "gerbil-scheme-rust/scheme/native";
 }
 
 /// Safe borrowed UTF-8 view for native Gerbil calls.
@@ -142,6 +175,1038 @@ pub struct SchemePairParts<'runtime> {
     pub cdr: GerbilValue<'runtime>,
 }
 
+/// Borrowed, runtime-backed Scheme nil / empty-list marker.
+///
+/// This proves only that a Gerbil-owned Scheme object export satisfied `null?`
+/// at projection time. It does not root, retain, or own the underlying object.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeNil<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+/// Borrowed, runtime-backed Scheme void marker.
+///
+/// This proves only that a Gerbil-owned Scheme object export satisfied `void?`
+/// at projection time. It does not root, retain, or own the underlying object.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeVoid<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl SchemeVoid<'_> {
+    fn from_raw(raw: usize) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    #[must_use]
+    pub fn as_raw(&self) -> usize {
+        self.raw.get()
+    }
+}
+
+/// Borrowed, runtime-backed Scheme bytevector marker.
+///
+/// This proves only that a Gerbil-owned Scheme object export satisfied
+/// `u8vector?` at projection time. It does not root, retain, or own the
+/// underlying object.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeBytevector<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+/// Borrowed, runtime-backed Scheme exact-integer marker.
+///
+/// This preserves the identity of fixnums and bignums without claiming that an
+/// arbitrary-size integer can cross the C ABI by value. Machine projections are
+/// checked explicitly through [`ExactIntegerTarget`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeExactInteger<'runtime> {
+    raw: NonZeroUsize,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+/// Delimiter policy for Gerbil hexadecimal bytestring conversions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BytestringDelimiter {
+    /// Emit two uppercase hexadecimal digits per byte with no separator.
+    Compact,
+    /// Place one Unicode scalar between adjacent encoded bytes.
+    Character(char),
+}
+
+impl BytestringDelimiter {
+    /// Gerbil's default bytestring representation: uppercase bytes separated by spaces.
+    pub const SPACE: Self = Self::Character(' ');
+
+    const fn abi_code(self) -> i32 {
+        match self {
+            Self::Compact => -1,
+            Self::Character(character) => character as i32,
+        }
+    }
+}
+
+impl Default for BytestringDelimiter {
+    fn default() -> Self {
+        Self::SPACE
+    }
+}
+
+/// Byte order used by Gerbil integer/bytevector conversions.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ByteOrder {
+    /// Most-significant byte first, matching Gerbil's default.
+    #[default]
+    Big,
+    /// Least-significant byte first.
+    Little,
+    /// Native byte order of the compiled Rust/Gerbil runtime.
+    Native,
+}
+
+impl ByteOrder {
+    const fn abi_code(self) -> i32 {
+        match self {
+            Self::Big => gerbil_scheme_sys::GerbilByteOrder::Big.code(),
+            Self::Little => gerbil_scheme_sys::GerbilByteOrder::Little.code(),
+            Self::Native => gerbil_scheme_sys::GerbilByteOrder::Native.code(),
+        }
+    }
+}
+
+/// Checked byte width for `u64` / `i64` bytevector conversion.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IntegerWidth(NonZeroU8);
+
+impl IntegerWidth {
+    /// Largest supported width for the machine-integer ABI.
+    pub const MAX: u8 = gerbil_scheme_sys::GERBIL_SCHEME_RUST_MAX_INTEGER_BYTES;
+
+    /// Construct a non-zero width no larger than eight bytes.
+    #[must_use]
+    pub const fn new(width: u8) -> Option<Self> {
+        match NonZeroU8::new(width) {
+            Some(width) if width.get() <= Self::MAX => Some(Self(width)),
+            Some(_) | None => None,
+        }
+    }
+
+    /// Return the width in bytes.
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0.get()
+    }
+}
+
+/// Width, byte-order, and overflow policy for integer-to-bytevector encoding.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IntegerEncoding {
+    byte_order: ByteOrder,
+    width: Option<IntegerWidth>,
+    truncating: bool,
+}
+
+impl IntegerEncoding {
+    /// Use Gerbil's minimal-width encoding for the selected byte order.
+    #[must_use]
+    pub const fn minimal(byte_order: ByteOrder) -> Self {
+        Self {
+            byte_order,
+            width: None,
+            truncating: false,
+        }
+    }
+
+    /// Use an explicit fixed width and reject values that do not fit.
+    #[must_use]
+    pub const fn fixed(byte_order: ByteOrder, width: IntegerWidth) -> Self {
+        Self {
+            byte_order,
+            width: Some(width),
+            truncating: false,
+        }
+    }
+
+    /// Explicitly opt into Gerbil's fixed-width high-bit truncation semantics.
+    #[must_use]
+    pub const fn truncating(mut self) -> Self {
+        self.truncating = true;
+        self
+    }
+
+    /// Selected byte order.
+    #[must_use]
+    pub const fn byte_order(self) -> ByteOrder {
+        self.byte_order
+    }
+
+    /// Explicit width, or `None` for Gerbil's minimal representation.
+    #[must_use]
+    pub const fn width(self) -> Option<IntegerWidth> {
+        self.width
+    }
+
+    /// Whether a too-small fixed width may truncate high bits.
+    #[must_use]
+    pub const fn allows_truncation(self) -> bool {
+        self.truncating
+    }
+}
+
+impl Default for IntegerEncoding {
+    fn default() -> Self {
+        Self::minimal(ByteOrder::Big)
+    }
+}
+
+/// Byte-order and optional prefix width for bytevector-to-integer decoding.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IntegerDecoding {
+    byte_order: ByteOrder,
+    width: Option<IntegerWidth>,
+}
+
+impl IntegerDecoding {
+    /// Decode the complete bytevector, matching Gerbil's default size.
+    #[must_use]
+    pub const fn entire(byte_order: ByteOrder) -> Self {
+        Self {
+            byte_order,
+            width: None,
+        }
+    }
+
+    /// Decode exactly the first `width` bytes of the bytevector.
+    #[must_use]
+    pub const fn prefix(byte_order: ByteOrder, width: IntegerWidth) -> Self {
+        Self {
+            byte_order,
+            width: Some(width),
+        }
+    }
+
+    /// Selected byte order.
+    #[must_use]
+    pub const fn byte_order(self) -> ByteOrder {
+        self.byte_order
+    }
+
+    /// Prefix width, or `None` to decode the complete bytevector.
+    #[must_use]
+    pub const fn width(self) -> Option<IntegerWidth> {
+        self.width
+    }
+}
+
+impl Default for IntegerDecoding {
+    fn default() -> Self {
+        Self::entire(ByteOrder::Big)
+    }
+}
+
+/// Owned root for a Scheme string created by a native conversion.
+///
+/// The root is released automatically on the Gerbil runtime owner thread. It
+/// is deliberately neither [`Clone`] nor [`Copy`] because release has exactly
+/// one owner.
+#[derive(Debug)]
+pub struct RootedSchemeString<'runtime> {
+    owner: RootedSchemeOwner<'runtime>,
+}
+
+/// Owned root for a Scheme bytevector created by a native conversion.
+///
+/// The root is released automatically on the Gerbil runtime owner thread. It
+/// is deliberately neither [`Clone`] nor [`Copy`] because release has exactly
+/// one owner.
+#[derive(Debug)]
+pub struct RootedSchemeBytevector<'runtime> {
+    owner: RootedSchemeOwner<'runtime>,
+}
+
+/// Single private owner for one live Scheme root.
+///
+/// Public typed wrappers compose this owner so root validation and release
+/// cannot drift across Scheme value families.
+#[derive(Debug)]
+struct RootedSchemeOwner<'runtime> {
+    root: gerbil_scheme_sys::GerbilRootId,
+    _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+impl RootedSchemeOwner<'_> {
+    fn new(
+        status: gerbil_scheme_sys::GerbilStatus,
+        root: gerbil_scheme_sys::GerbilRootId,
+        operation: &'static str,
+    ) -> Result<Self, NativeError> {
+        if status == gerbil_scheme_sys::GerbilStatus::Ok && root.is_valid() {
+            Ok(Self {
+                root,
+                _runtime: PhantomData,
+            })
+        } else {
+            Err(NativeError::Status {
+                operation,
+                code: if status == gerbil_scheme_sys::GerbilStatus::Ok {
+                    gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+                } else {
+                    status as i32
+                },
+            })
+        }
+    }
+
+    const fn root_id(&self) -> gerbil_scheme_sys::GerbilRootId {
+        self.root
+    }
+}
+
+impl Drop for RootedSchemeOwner<'_> {
+    fn drop(&mut self) {
+        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(self.root) };
+        debug_assert_eq!(status, gerbil_scheme_sys::GerbilStatus::Ok);
+    }
+}
+
+#[cfg(test)]
+mod rooted_scheme_owner_tests {
+    use super::{NativeError, RootedSchemeOwner};
+
+    #[test]
+    fn ok_status_with_an_invalid_root_fails_closed() {
+        let error = RootedSchemeOwner::new(
+            gerbil_scheme_sys::GerbilStatus::Ok,
+            gerbil_scheme_sys::GerbilRootId(0),
+            "rooted-owner-test",
+        )
+        .expect_err("an invalid root must not acquire a safe owner");
+
+        assert!(matches!(
+            error,
+            NativeError::Status {
+                operation: "rooted-owner-test",
+                code,
+            } if code == gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+        ));
+    }
+
+    #[test]
+    fn non_ok_status_never_acquires_a_root_owner() {
+        let error = RootedSchemeOwner::new(
+            gerbil_scheme_sys::GerbilStatus::InvalidValue,
+            gerbil_scheme_sys::GerbilRootId(1),
+            "rooted-owner-test",
+        )
+        .expect_err("a failed ABI status must not acquire a safe owner");
+
+        assert!(matches!(
+            error,
+            NativeError::Status {
+                operation: "rooted-owner-test",
+                code,
+            } if code == gerbil_scheme_sys::GerbilStatus::InvalidValue as i32
+        ));
+    }
+}
+
+/// Runtime-backed type carried by a [`RootedSchemeValue`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RootedSchemeValueKind {
+    /// A Scheme exact integer, including both fixnums and bignums.
+    ExactInteger,
+    /// A Scheme string.
+    String,
+    /// A Scheme bytevector.
+    Bytevector,
+}
+
+/// One owned Scheme root with a type-preserving safe Rust projection.
+///
+/// Each variant retains the existing typed wrapper as the sole owner of the
+/// native root. Dropping this value therefore releases exactly one Scheme
+/// root without introducing a parallel C ABI or a second ownership path.
+#[derive(Debug)]
+pub enum RootedSchemeValue<'runtime> {
+    /// A rooted Scheme exact integer.
+    ExactInteger(RootedSchemeExactInteger<'runtime>),
+    /// A rooted Scheme string.
+    String(RootedSchemeString<'runtime>),
+    /// A rooted Scheme bytevector.
+    Bytevector(RootedSchemeBytevector<'runtime>),
+}
+
+impl<'runtime> RootedSchemeValue<'runtime> {
+    /// Return the runtime-backed type carried by this root.
+    #[must_use]
+    pub const fn kind(&self) -> RootedSchemeValueKind {
+        match self {
+            Self::ExactInteger(_) => RootedSchemeValueKind::ExactInteger,
+            Self::String(_) => RootedSchemeValueKind::String,
+            Self::Bytevector(_) => RootedSchemeValueKind::Bytevector,
+        }
+    }
+
+    /// Borrow the typed exact-integer projection when this root carries one.
+    #[must_use]
+    pub const fn as_exact_integer(&self) -> Option<&RootedSchemeExactInteger<'runtime>> {
+        match self {
+            Self::ExactInteger(value) => Some(value),
+            Self::String(_) | Self::Bytevector(_) => None,
+        }
+    }
+
+    /// Borrow the typed string projection when this root carries one.
+    #[must_use]
+    pub const fn as_string(&self) -> Option<&RootedSchemeString<'runtime>> {
+        match self {
+            Self::String(value) => Some(value),
+            Self::ExactInteger(_) | Self::Bytevector(_) => None,
+        }
+    }
+
+    /// Borrow the typed bytevector projection when this root carries one.
+    #[must_use]
+    pub const fn as_bytevector(&self) -> Option<&RootedSchemeBytevector<'runtime>> {
+        match self {
+            Self::Bytevector(value) => Some(value),
+            Self::ExactInteger(_) | Self::String(_) => None,
+        }
+    }
+}
+
+impl<'runtime> From<RootedSchemeExactInteger<'runtime>> for RootedSchemeValue<'runtime> {
+    fn from(value: RootedSchemeExactInteger<'runtime>) -> Self {
+        Self::ExactInteger(value)
+    }
+}
+
+impl<'runtime> From<RootedSchemeString<'runtime>> for RootedSchemeValue<'runtime> {
+    fn from(value: RootedSchemeString<'runtime>) -> Self {
+        Self::String(value)
+    }
+}
+
+impl<'runtime> From<RootedSchemeBytevector<'runtime>> for RootedSchemeValue<'runtime> {
+    fn from(value: RootedSchemeBytevector<'runtime>) -> Self {
+        Self::Bytevector(value)
+    }
+}
+
+/// Owned root for a Scheme exact integer created from a Rust machine integer.
+///
+/// The Scheme object may be a fixnum or bignum depending on its magnitude. The
+/// root has one Rust owner and releases automatically on drop.
+#[derive(Debug)]
+pub struct RootedSchemeExactInteger<'runtime> {
+    owner: RootedSchemeOwner<'runtime>,
+}
+
+/// Rust machine target requested for a checked Scheme exact-integer projection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExactIntegerTarget {
+    /// Signed 64-bit integer.
+    I64,
+    /// Unsigned 64-bit integer.
+    U64,
+    /// Target-platform pointer-sized unsigned integer.
+    Usize,
+}
+
+impl<'runtime> SchemeBytevector<'runtime> {
+    fn from_raw(raw: usize) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    #[must_use]
+    pub fn as_raw(&self) -> usize {
+        self.raw.get()
+    }
+
+    /// Return this bytevector's byte length.
+    #[must_use]
+    pub fn len(&self) -> NativeResult<usize> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_bytevector_length(
+                self.raw.get(),
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_bytevector_length",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Return whether this bytevector has no bytes.
+    #[must_use]
+    pub fn is_empty(&self) -> NativeResult<bool> {
+        match self.len().into_result() {
+            Ok(len) => NativeResult::ok(len == 0),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Return the byte at `index`.
+    #[must_use]
+    pub fn u8_at(&self, index: usize) -> NativeResult<u8> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_bytevector_u8_ref(
+                self.raw.get(),
+                index,
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_bytevector_u8_ref",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Copy this runtime-backed bytevector into owned Rust memory.
+    #[must_use]
+    pub fn to_vec(&self) -> NativeResult<Vec<u8>> {
+        let len = match self.len().into_result() {
+            Ok(len) => len,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut bytes = Vec::with_capacity(len);
+        for index in 0..len {
+            match self.u8_at(index).into_result() {
+                Ok(byte) => bytes.push(byte),
+                Err(error) => return NativeResult::err(error),
+            }
+        }
+        NativeResult::ok(bytes)
+    }
+
+    /// Decode this Scheme bytevector as an unsigned integer.
+    #[must_use]
+    pub fn to_uint(&self, decoding: IntegerDecoding) -> NativeResult<u64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytevector_to_uint(
+                self.raw.get(),
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_bytevector_to_uint")
+    }
+
+    /// Decode this Scheme bytevector as a signed two's-complement integer.
+    #[must_use]
+    pub fn to_sint(&self, decoding: IntegerDecoding) -> NativeResult<i64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytevector_to_sint(
+                self.raw.get(),
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_bytevector_to_sint")
+    }
+
+    /// Convert this bytevector through Gerbil's AOT bytestring implementation.
+    ///
+    /// The returned Scheme string is held by a native root and releases that
+    /// root on drop. Gerbil emits uppercase hexadecimal digits and applies the
+    /// requested delimiter between adjacent bytes.
+    #[must_use]
+    pub fn to_bytestring(
+        &self,
+        delimiter: BytestringDelimiter,
+    ) -> NativeResult<RootedSchemeString<'runtime>> {
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytevector_to_bytestring_root(
+                self.raw.get(),
+                delimiter.abi_code(),
+                &raw mut root,
+            )
+        };
+        match RootedSchemeOwner::new(
+            status,
+            root,
+            "gerbil_scheme_rust_bytevector_to_bytestring_root",
+        ) {
+            Ok(owner) => NativeResult::ok(RootedSchemeString { owner }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+}
+
+impl SchemeExactInteger<'_> {
+    fn from_raw(raw: usize) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    /// Return the borrowed Scheme-object handle.
+    #[must_use]
+    pub const fn as_raw(self) -> usize {
+        self.raw.get()
+    }
+
+    /// Project this exact integer to `i64`, rejecting values outside the range.
+    #[must_use]
+    pub fn to_i64(self) -> NativeResult<i64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_rust_scheme_object_exact_integer_to_i64(self.raw.get(), &raw mut out)
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_scheme_object_exact_integer_to_i64",
+            ExactIntegerTarget::I64,
+        )
+    }
+
+    /// Project this exact integer to `u64`, rejecting negative or oversized values.
+    #[must_use]
+    pub fn to_u64(self) -> NativeResult<u64> {
+        self.to_unsigned_target(ExactIntegerTarget::U64)
+    }
+
+    /// Project this exact integer to `usize` for the current Rust target.
+    #[must_use]
+    pub fn to_usize(self) -> NativeResult<usize> {
+        checked_exact_integer_usize(self.to_unsigned_target(ExactIntegerTarget::Usize))
+    }
+
+    fn to_unsigned_target(self, target: ExactIntegerTarget) -> NativeResult<u64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_rust_scheme_object_exact_integer_to_u64(self.raw.get(), &raw mut out)
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_scheme_object_exact_integer_to_u64",
+            target,
+        )
+    }
+}
+
+impl RootedSchemeExactInteger<'_> {
+    /// Return the owned native root token without transferring ownership.
+    #[must_use]
+    pub const fn root_id(&self) -> gerbil_scheme_sys::GerbilRootId {
+        self.owner.root_id()
+    }
+
+    /// Project this rooted exact integer to `i64` with range checking.
+    #[must_use]
+    pub fn to_i64(&self) -> NativeResult<i64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_i64(
+                self.owner.root_id(),
+                &raw mut out,
+            )
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_root_exact_integer_to_i64",
+            ExactIntegerTarget::I64,
+        )
+    }
+
+    /// Project this rooted exact integer to `u64` with range checking.
+    #[must_use]
+    pub fn to_u64(&self) -> NativeResult<u64> {
+        self.to_unsigned_target(ExactIntegerTarget::U64)
+    }
+
+    /// Project this rooted exact integer to `usize` for the current Rust target.
+    #[must_use]
+    pub fn to_usize(&self) -> NativeResult<usize> {
+        checked_exact_integer_usize(self.to_unsigned_target(ExactIntegerTarget::Usize))
+    }
+
+    fn to_unsigned_target(&self, target: ExactIntegerTarget) -> NativeResult<u64> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_u64(
+                self.owner.root_id(),
+                &raw mut out,
+            )
+        };
+        checked_exact_integer_projection(
+            status,
+            out,
+            "gerbil_scheme_rust_root_exact_integer_to_u64",
+            target,
+        )
+    }
+}
+
+impl RootedSchemeString<'_> {
+    /// Return the number of Scheme characters in this rooted string.
+    #[must_use]
+    pub fn len(&self) -> NativeResult<usize> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_length(
+                self.owner.root_id(),
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_string_length",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Return whether this rooted string is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> NativeResult<bool> {
+        match self.len().into_result() {
+            Ok(length) => NativeResult::ok(length == 0),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Return the Scheme character at `index`.
+    #[must_use]
+    pub fn char_at(&self, index: usize) -> NativeResult<char> {
+        let mut out = gerbil_scheme_sys::GerbilChar::default();
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_char_ref(
+                self.owner.root_id(),
+                index,
+                &raw mut out,
+            )
+        };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_string_char_ref",
+                code: status as i32,
+            });
+        }
+        match char::try_from(out) {
+            Ok(character) => NativeResult::ok(character),
+            Err(()) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_string_char_ref",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+        }
+    }
+
+    /// Copy this rooted Scheme string into owned Rust UTF-8 storage.
+    #[must_use]
+    pub fn to_string(&self) -> NativeResult<String> {
+        let length = match self.len().into_result() {
+            Ok(length) => length,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut text = String::with_capacity(length);
+        for index in 0..length {
+            match self.char_at(index).into_result() {
+                Ok(character) => text.push(character),
+                Err(error) => return NativeResult::err(error),
+            }
+        }
+        NativeResult::ok(text)
+    }
+}
+
+impl RootedSchemeBytevector<'_> {
+    /// Return this rooted bytevector's byte length.
+    #[must_use]
+    pub fn len(&self) -> NativeResult<usize> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_length(
+                self.owner.root_id(),
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_bytevector_length",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Return whether this rooted bytevector is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> NativeResult<bool> {
+        match self.len().into_result() {
+            Ok(length) => NativeResult::ok(length == 0),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Return the byte at `index`.
+    #[must_use]
+    pub fn u8_at(&self, index: usize) -> NativeResult<u8> {
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_u8_ref(
+                self.owner.root_id(),
+                index,
+                &raw mut out,
+            )
+        };
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(out)
+        } else {
+            NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_bytevector_u8_ref",
+                code: status as i32,
+            })
+        }
+    }
+
+    /// Copy this rooted Scheme bytevector into owned Rust memory.
+    #[must_use]
+    pub fn to_vec(&self) -> NativeResult<Vec<u8>> {
+        let length = match self.len().into_result() {
+            Ok(length) => length,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut bytes = Vec::with_capacity(length);
+        for index in 0..length {
+            match self.u8_at(index).into_result() {
+                Ok(byte) => bytes.push(byte),
+                Err(error) => return NativeResult::err(error),
+            }
+        }
+        NativeResult::ok(bytes)
+    }
+
+    /// Decode this rooted Scheme bytevector as an unsigned integer.
+    #[must_use]
+    pub fn to_uint(&self, decoding: IntegerDecoding) -> NativeResult<u64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_to_uint(
+                self.owner.root_id(),
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_root_bytevector_to_uint")
+    }
+
+    /// Decode this rooted Scheme bytevector as a signed two's-complement integer.
+    #[must_use]
+    pub fn to_sint(&self, decoding: IntegerDecoding) -> NativeResult<i64> {
+        let size = match checked_integer_decoding_size(self.len(), decoding) {
+            Ok(size) => size,
+            Err(error) => return NativeResult::err(error),
+        };
+        let mut out = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_to_sint(
+                self.owner.root_id(),
+                decoding.byte_order().abi_code(),
+                size,
+                &raw mut out,
+            )
+        };
+        checked_integer_projection(status, out, "gerbil_scheme_rust_root_bytevector_to_sint")
+    }
+}
+
+fn rooted_exact_integer<'runtime>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    root: gerbil_scheme_sys::GerbilRootId,
+    operation: &'static str,
+) -> Result<RootedSchemeExactInteger<'runtime>, NativeError> {
+    RootedSchemeOwner::new(status, root, operation).map(|owner| RootedSchemeExactInteger { owner })
+}
+
+fn checked_exact_integer_projection<T>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    value: T,
+    operation: &'static str,
+    target: ExactIntegerTarget,
+) -> NativeResult<T> {
+    match status {
+        gerbil_scheme_sys::GerbilStatus::Ok => NativeResult::ok(value),
+        gerbil_scheme_sys::GerbilStatus::InvalidValue => {
+            NativeResult::err(NativeError::ExactIntegerOutOfRange { target })
+        }
+        status => NativeResult::err(NativeError::Status {
+            operation,
+            code: status as i32,
+        }),
+    }
+}
+
+fn checked_exact_integer_usize(value: NativeResult<u64>) -> NativeResult<usize> {
+    match value.into_result() {
+        Ok(value) => usize::try_from(value).map_or_else(
+            |_| {
+                NativeResult::err(NativeError::ExactIntegerOutOfRange {
+                    target: ExactIntegerTarget::Usize,
+                })
+            },
+            NativeResult::ok,
+        ),
+        Err(error) => NativeResult::err(error),
+    }
+}
+
+fn checked_integer_decoding_size(
+    length: NativeResult<usize>,
+    decoding: IntegerDecoding,
+) -> Result<usize, NativeError> {
+    let length = length.into_result()?;
+    let size = decoding
+        .width()
+        .map_or(length, |width| usize::from(width.get()));
+    if size > length || size > usize::from(gerbil_scheme_sys::GERBIL_SCHEME_RUST_MAX_INTEGER_BYTES)
+    {
+        return Err(NativeError::Status {
+            operation: "integer bytevector decoding width",
+            code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+        });
+    }
+    Ok(size)
+}
+
+fn checked_integer_projection<T>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    value: T,
+    operation: &'static str,
+) -> NativeResult<T> {
+    if status == gerbil_scheme_sys::GerbilStatus::Ok {
+        NativeResult::ok(value)
+    } else {
+        NativeResult::err(NativeError::Status {
+            operation,
+            code: status as i32,
+        })
+    }
+}
+
+fn rooted_integer_bytevector<'runtime>(
+    status: gerbil_scheme_sys::GerbilStatus,
+    root: gerbil_scheme_sys::GerbilRootId,
+    operation: &'static str,
+) -> Result<RootedSchemeBytevector<'runtime>, NativeError> {
+    RootedSchemeOwner::new(status, root, operation).map(|owner| RootedSchemeBytevector { owner })
+}
+
+fn resolved_unsigned_encoding_width(
+    value: u64,
+    encoding: IntegerEncoding,
+) -> Result<usize, NativeError> {
+    let width = encoding.width().map_or_else(
+        || {
+            let bits = u64::BITS - value.leading_zeros();
+            u8::try_from(bits.div_ceil(8).max(1)).expect("u64 requires at most eight bytes")
+        },
+        IntegerWidth::get,
+    );
+    if !encoding.allows_truncation() && !unsigned_integer_fits(value, width) {
+        return Err(NativeError::UnsignedIntegerWidth { value, width });
+    }
+    Ok(usize::from(width))
+}
+
+fn resolved_signed_encoding_width(
+    value: i64,
+    encoding: IntegerEncoding,
+) -> Result<usize, NativeError> {
+    let width = encoding.width().map_or_else(
+        || {
+            (1..=IntegerWidth::MAX)
+                .find(|width| signed_integer_fits(value, *width))
+                .expect("every i64 fits in eight bytes")
+        },
+        IntegerWidth::get,
+    );
+    if !encoding.allows_truncation() && !signed_integer_fits(value, width) {
+        return Err(NativeError::SignedIntegerWidth { value, width });
+    }
+    Ok(usize::from(width))
+}
+
+const fn unsigned_integer_fits(value: u64, width: u8) -> bool {
+    width == IntegerWidth::MAX || value < (1_u64 << ((width as u32) * 8))
+}
+
+const fn signed_integer_fits(value: i64, width: u8) -> bool {
+    if width == IntegerWidth::MAX {
+        return true;
+    }
+    let magnitude_bits = (width as u32) * 8 - 1;
+    let minimum = -(1_i64 << magnitude_bits);
+    let maximum = (1_i64 << magnitude_bits) - 1;
+    value >= minimum && value <= maximum
+}
+
+impl SchemeNil<'_> {
+    /// Wrap a non-zero runtime-owned nil handle.
+    ///
+    /// This constructor does not inspect the handle; callers must prove the
+    /// handle came from a runtime-backed `null?` projection before using it.
+    #[must_use]
+    pub fn from_raw(raw: gerbil_scheme_sys::GerbilValueHandle) -> Option<Self> {
+        NonZeroUsize::new(raw).map(|raw| Self {
+            raw,
+            _runtime: PhantomData,
+        })
+    }
+
+    /// Return the borrowed raw handle without dereferencing it.
+    #[must_use]
+    pub const fn as_raw(self) -> gerbil_scheme_sys::GerbilValueHandle {
+        self.raw.get()
+    }
+}
+
 impl<'runtime> GerbilValue<'runtime> {
     /// Return whether this value is known to be a pair.
     ///
@@ -213,6 +1278,142 @@ impl<'runtime> GerbilValue<'runtime> {
     ///
     /// This delegates to the sys ABI and only succeeds for Scheme-object
     /// exports.
+    /// Projects this value as Scheme nil / the empty list.
+    ///
+    /// This succeeds only for runtime-produced Scheme-object exports that
+    /// satisfy `null?`. It returns a borrowed marker around the same opaque
+    /// handle and does not claim ownership or GC rooting.
+    #[must_use]
+    pub fn as_nil(self) -> NativeResult<SchemeNil<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_nil",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_null().into_result() {
+            Ok(true) => SchemeNil::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_nil",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_nil",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Checks whether this value is Scheme void.
+    ///
+    /// This only succeeds for values exported by the initialized Gerbil runtime.
+    #[must_use]
+    pub fn is_void(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_void",
+                self.raw.get(),
+                gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_is_void,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_void",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as Scheme void.
+    ///
+    /// This succeeds only for runtime-produced Scheme-object exports that
+    /// satisfy `void?`. It returns a borrowed marker around the same opaque
+    /// handle and does not claim ownership or GC rooting.
+    #[must_use]
+    pub fn as_void(self) -> NativeResult<SchemeVoid<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_void",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_void().into_result() {
+            Ok(true) => SchemeVoid::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_void",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_void",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Checks whether this value is a Scheme bytevector.
+    ///
+    /// This only succeeds for values exported by the initialized Gerbil runtime.
+    #[must_use]
+    pub fn is_bytevector(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_bytevector",
+                self.raw.get(),
+                gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_is_bytevector,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_bytevector",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme bytevector.
+    ///
+    /// This succeeds only for runtime-produced Scheme-object exports that
+    /// satisfy `u8vector?`. It returns a borrowed marker around the same opaque
+    /// handle and does not claim ownership or GC rooting.
+    #[must_use]
+    pub fn as_bytevector(self) -> NativeResult<SchemeBytevector<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_bytevector",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_bytevector().into_result() {
+            Ok(true) => SchemeBytevector::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_bytevector",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_bytevector",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
     /// Checks whether this value is a Scheme boolean.
     ///
     /// This only succeeds for values exported by the initialized Gerbil runtime.
@@ -256,6 +1457,216 @@ impl<'runtime> GerbilValue<'runtime> {
             });
         }
         NativeResult::ok(out.as_bool())
+    }
+
+    /// Returns whether this value is a Scheme fixnum.
+    ///
+    /// This only succeeds for Scheme-object exports; untrusted raw handles and
+    /// runtime sentinels fail closed with `InvalidValue`.
+    #[must_use]
+    pub fn is_fixnum(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_fixnum",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_fixnum,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_fixnum",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme fixnum.
+    ///
+    /// This intentionally covers only Gerbil fixnums. Bignums and other exact
+    /// integer objects must use a later, explicitly versioned projection path.
+    #[must_use]
+    pub fn as_fixnum(self) -> NativeResult<isize> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_fixnum",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        let mut out = gerbil_scheme_sys::GerbilFixnum::default();
+        // SAFETY: `out` is a valid output slot for one GerbilFixnum.
+        let status =
+            unsafe { gerbil_scheme_rust_scheme_object_as_fixnum(self.raw.get(), &raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_fixnum",
+                code: status as i32,
+            });
+        }
+        NativeResult::ok(out.0)
+    }
+
+    /// Projects this value as a Scheme fixnum widened to `i64`.
+    #[must_use]
+    pub fn as_fixnum_i64(self) -> NativeResult<i64> {
+        match self.as_fixnum().as_result() {
+            Ok(value) => NativeResult::ok(*value as i64),
+            Err(error) => NativeResult::err(*error),
+        }
+    }
+
+    /// Return whether this runtime-backed Scheme object is an exact integer.
+    ///
+    /// Both fixnums and bignums satisfy this predicate. Untrusted raw handles and
+    /// runtime sentinels remain fail-closed.
+    #[must_use]
+    pub fn is_exact_integer(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_exact_integer",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_exact_integer,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_exact_integer",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Project this runtime-backed Scheme object as an exact integer handle.
+    ///
+    /// The returned marker is borrowed and unrooted. Use its checked machine
+    /// projections without retaining it beyond the runtime borrow.
+    #[must_use]
+    pub fn as_exact_integer(self) -> NativeResult<SchemeExactInteger<'runtime>> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        match self.is_exact_integer().into_result() {
+            Ok(true) => SchemeExactInteger::from_raw(self.raw.get()).map_or_else(
+                || {
+                    NativeResult::err(NativeError::Status {
+                        operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
+                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+                    })
+                },
+                NativeResult::ok,
+            ),
+            Ok(false) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+            Err(error) => NativeResult::err(error),
+        }
+    }
+
+    /// Returns whether this value is a Scheme character.
+    ///
+    /// This only succeeds for Scheme-object exports; untrusted raw handles and
+    /// runtime sentinels fail closed with `InvalidValue`.
+    #[must_use]
+    pub fn is_char(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_char",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_char,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_char",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme character.
+    ///
+    /// The sys layer returns a Unicode scalar value carrier and this method
+    /// performs Rust scalar validation before exposing `char`.
+    #[must_use]
+    pub fn as_char(self) -> NativeResult<char> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_char",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        let mut out = gerbil_scheme_sys::GerbilChar::default();
+        // SAFETY: `out` is a valid output slot for one GerbilChar.
+        let status =
+            unsafe { gerbil_scheme_rust_scheme_object_as_char(self.raw.get(), &raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_char",
+                code: status as i32,
+            });
+        }
+
+        match char::try_from(out) {
+            Ok(value) => NativeResult::ok(value),
+            Err(()) => NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_char",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            }),
+        }
+    }
+
+    /// Returns whether this value is a Scheme flonum.
+    ///
+    /// This only succeeds for Scheme-object exports; untrusted raw handles and
+    /// runtime sentinels fail closed with `InvalidValue`.
+    #[must_use]
+    pub fn is_flonum(self) -> NativeResult<bool> {
+        match self.provenance {
+            GerbilValueProvenance::SchemeObjectExport => checked_native_predicate(
+                "gerbil_scheme_rust_scheme_object_is_flonum",
+                self.raw.get(),
+                gerbil_scheme_rust_scheme_object_is_flonum,
+            ),
+            GerbilValueProvenance::UntrustedRaw | GerbilValueProvenance::RuntimeSentinel => {
+                NativeResult::err(NativeError::Status {
+                    operation: "gerbil_scheme_rust_scheme_object_is_flonum",
+                    code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+                })
+            }
+        }
+    }
+
+    /// Projects this value as a Scheme flonum.
+    ///
+    /// The Rust side preserves IEEE-754 `f64` semantics, including NaN,
+    /// infinities, and signed zero.
+    #[must_use]
+    pub fn as_flonum(self) -> NativeResult<f64> {
+        if self.provenance != GerbilValueProvenance::SchemeObjectExport {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_flonum",
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            });
+        }
+
+        let mut out = gerbil_scheme_sys::GerbilFlonum::default();
+        // SAFETY: `out` is a valid output slot for one GerbilFlonum.
+        let status =
+            unsafe { gerbil_scheme_rust_scheme_object_as_flonum(self.raw.get(), &raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_scheme_object_as_flonum",
+                code: status as i32,
+            });
+        }
+
+        NativeResult::ok(out.0)
     }
 
     /// Project this value's car if it is backed by a pair.
@@ -572,6 +1983,22 @@ impl GerbilRuntime {
         Ok(unsafe { gerbil_scheme_rust_abi_version() })
     }
 
+    /// Returns a stable receipt for the initialized runtime binding surface.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] if called outside the initializing
+    /// thread.
+    pub fn receipt(&self) -> Result<GerbilRuntimeReceipt, NativeError> {
+        self.check_thread()?;
+        Ok(GerbilRuntimeReceipt {
+            abi_id: gerbil_scheme_sys::GERBIL_SCHEME_RUST_ABI_ID,
+            abi_version: GERBIL_SCHEME_RUST_ABI_VERSION,
+            header_path: gerbil_scheme_sys::GERBIL_SCHEME_RUST_HEADER_PATH,
+            native_module_path: GerbilRuntimeReceipt::NATIVE_MODULE_PATH,
+        })
+    }
+
     /// Returns a signed 64-bit integer through the initialized Gerbil runtime.
     ///
     /// # Errors
@@ -634,6 +2061,32 @@ impl GerbilRuntime {
         value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
             .ok_or(NativeError::Status {
                 operation: "GerbilRuntime::fixture_null_value",
+                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+            })
+    }
+
+    /// Returns the Scheme void object through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_void_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.check_thread()?;
+        let mut out = 0;
+        // SAFETY: self proves runtime/module lifetime and `out` is a valid
+        // output slot for one borrowed Scheme object handle.
+        let status = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_fixture_void(&raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "GerbilRuntime::fixture_void_value",
+                code: status as i32,
+            });
+        }
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
+            .ok_or(NativeError::Status {
+                operation: "GerbilRuntime::fixture_void_value",
                 code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
             })
     }
@@ -704,6 +2157,210 @@ impl GerbilRuntime {
         )
     }
 
+    /// Exports a Scheme fixnum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_fixnum_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_fixnum",
+            gerbil_scheme_rust_fixture_fixnum,
+        )
+    }
+
+    /// Exports an ASCII Scheme character fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_char_ascii_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_char_ascii",
+            gerbil_scheme_rust_fixture_char_ascii,
+        )
+    }
+
+    /// Exports a BMP Scheme character fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_char_bmp_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_char_bmp",
+            gerbil_scheme_rust_fixture_char_bmp,
+        )
+    }
+
+    /// Exports a non-BMP Scheme character fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_char_non_bmp_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_char_non_bmp",
+            gerbil_scheme_rust_fixture_char_non_bmp,
+        )
+    }
+
+    /// Exports a finite Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_finite_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_finite",
+            gerbil_scheme_rust_fixture_flonum_finite,
+        )
+    }
+
+    /// Exports a NaN Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_nan_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_nan",
+            gerbil_scheme_rust_fixture_flonum_nan,
+        )
+    }
+
+    /// Exports a positive infinity Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_pos_inf_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_pos_inf",
+            gerbil_scheme_rust_fixture_flonum_pos_inf,
+        )
+    }
+
+    /// Exports a negative infinity Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_neg_inf_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_neg_inf",
+            gerbil_scheme_rust_fixture_flonum_neg_inf,
+        )
+    }
+
+    /// Exports a negative-zero Scheme flonum fixture through the initialized runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a native error if the fixture export fails.
+    pub fn fixture_flonum_neg_zero_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "gerbil_scheme_rust_fixture_flonum_neg_zero",
+            gerbil_scheme_rust_fixture_flonum_neg_zero,
+        )
+    }
+
+    /// Returns a Scheme bytevector fixture through the initialized Gerbil export path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] when called from a non-owner thread,
+    /// or [`NativeError::Status`] when the native export reports an error or
+    /// returns a zero handle.
+    pub fn fixture_bytevector_value(&self) -> Result<GerbilValue<'_>, NativeError> {
+        self.checked_scheme_object_fixture(
+            "GerbilRuntime::fixture_bytevector_value",
+            gerbil_scheme_sys::gerbil_scheme_rust_fixture_bytevector,
+        )
+    }
+
+    /// Encode an unsigned integer as a newly rooted Scheme bytevector.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error, or [`NativeError::UnsignedIntegerWidth`]
+    /// when a non-truncating fixed width cannot represent `value`.
+    pub fn uint_to_bytevector(
+        &self,
+        value: u64,
+        encoding: IntegerEncoding,
+    ) -> Result<RootedSchemeBytevector<'_>, NativeError> {
+        self.check_thread()?;
+        let size = resolved_unsigned_encoding_width(value, encoding)?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_uint_to_bytevector_root(
+                value,
+                encoding.byte_order().abi_code(),
+                size,
+                &raw mut root,
+            )
+        };
+        rooted_integer_bytevector(status, root, "gerbil_scheme_rust_uint_to_bytevector_root")
+    }
+
+    /// Encode a signed integer as a newly rooted two's-complement bytevector.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error, or [`NativeError::SignedIntegerWidth`]
+    /// when a non-truncating fixed width cannot represent `value`.
+    pub fn sint_to_bytevector(
+        &self,
+        value: i64,
+        encoding: IntegerEncoding,
+    ) -> Result<RootedSchemeBytevector<'_>, NativeError> {
+        self.check_thread()?;
+        let size = resolved_signed_encoding_width(value, encoding)?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_sint_to_bytevector_root(
+                value,
+                encoding.byte_order().abi_code(),
+                size,
+                &raw mut root,
+            )
+        };
+        rooted_integer_bytevector(status, root, "gerbil_scheme_rust_sint_to_bytevector_root")
+    }
+
+    /// Parse an ASCII hexadecimal bytestring through Gerbil's AOT converter.
+    ///
+    /// The returned bytevector is rooted in the Gerbil module and releases its
+    /// root automatically on drop.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::WrongThread`] outside the runtime owner thread,
+    /// or [`NativeError::Status`] when the bytestring or delimiter does not
+    /// satisfy Gerbil's conversion contract.
+    pub fn bytevector_from_bytestring(
+        &self,
+        bytestring: &str,
+        delimiter: BytestringDelimiter,
+    ) -> Result<RootedSchemeBytevector<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytestring_to_bytevector_root(
+                gerbil_scheme_sys::GerbilBorrowedUtf8::from(bytestring),
+                delimiter.abi_code(),
+                &raw mut root,
+            )
+        };
+        RootedSchemeOwner::new(
+            status,
+            root,
+            "gerbil_scheme_rust_bytestring_to_bytevector_root",
+        )
+        .map(|owner| RootedSchemeBytevector { owner })
+    }
+
     fn checked_scheme_object_fixture(
         &self,
         operation: &'static str,
@@ -766,6 +2423,97 @@ impl GerbilRuntime {
     /// Returns [`NativeError::WrongThread`] if called outside the initializing
     /// thread, or [`NativeError::InvalidComparisonResult`] if the native module
     /// violates the ABI's three-way comparison contract.
+    /// Export a positive exact-integer fixture larger than `u64::MAX`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error when the runtime cannot export the fixture.
+    pub fn fixture_exact_integer_large_positive_value(
+        &self,
+    ) -> Result<GerbilValue<'_>, NativeError> {
+        self.scheme_object_fixture(
+            "GerbilRuntime::fixture_exact_integer_large_positive_value",
+            gerbil_scheme_rust_fixture_exact_integer_large_positive,
+        )
+    }
+
+    /// Export a negative exact-integer fixture smaller than `i64::MIN`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error when the runtime cannot export the fixture.
+    pub fn fixture_exact_integer_large_negative_value(
+        &self,
+    ) -> Result<GerbilValue<'_>, NativeError> {
+        self.scheme_object_fixture(
+            "GerbilRuntime::fixture_exact_integer_large_negative_value",
+            gerbil_scheme_rust_fixture_exact_integer_large_negative,
+        )
+    }
+
+    /// Construct an owned, rooted Scheme exact integer from an `i64`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error if the native root cannot be created.
+    pub fn exact_integer_from_i64(
+        &self,
+        value: i64,
+    ) -> Result<RootedSchemeExactInteger<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_i64_to_exact_integer_root(value, &raw mut root)
+        };
+        rooted_exact_integer(status, root, "gerbil_scheme_rust_i64_to_exact_integer_root")
+    }
+
+    /// Construct an owned, rooted Scheme exact integer from a `u64`.
+    ///
+    /// Values larger than `i64::MAX` remain exact Scheme bignums.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread/status error if the native root cannot be created.
+    pub fn exact_integer_from_u64(
+        &self,
+        value: u64,
+    ) -> Result<RootedSchemeExactInteger<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_u64_to_exact_integer_root(value, &raw mut root)
+        };
+        rooted_exact_integer(status, root, "gerbil_scheme_rust_u64_to_exact_integer_root")
+    }
+
+    fn scheme_object_fixture(
+        &self,
+        operation: &'static str,
+        fixture: unsafe extern "C" fn(
+            *mut gerbil_scheme_sys::GerbilValueHandle,
+        ) -> gerbil_scheme_sys::GerbilStatus,
+    ) -> Result<GerbilValue<'_>, NativeError> {
+        self.check_thread()?;
+        let mut out = 0;
+        let status = unsafe { fixture(&raw mut out) };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation,
+                code: status as i32,
+            });
+        }
+        value_from_native_handle_with_provenance(out, GerbilValueProvenance::SchemeObjectExport)
+            .ok_or(NativeError::Status {
+                operation,
+                code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
+            })
+    }
+
+    /// # Errors
+    ///
+    /// Returns [`NativeError`] when the native runtime rejects the comparison
+    /// or returns an invalid ordering value.
     pub fn compare_i64(&self, left: i64, right: i64) -> Result<std::cmp::Ordering, NativeError> {
         self.check_thread()?;
         // SAFETY: self proves runtime/module lifetime; the scalar c-define ABI
@@ -845,6 +2593,25 @@ pub enum NativeError {
         left: i64,
         /// Right operand.
         right: i64,
+    },
+    /// An unsigned value does not fit a checked fixed-width encoding.
+    UnsignedIntegerWidth {
+        /// Value that would lose high bits.
+        value: u64,
+        /// Requested width in bytes.
+        width: u8,
+    },
+    /// A signed value does not fit a checked fixed-width encoding.
+    SignedIntegerWidth {
+        /// Value that cannot be represented at the requested width.
+        value: i64,
+        /// Requested width in bytes.
+        width: u8,
+    },
+    /// A Scheme exact integer cannot be represented by the requested Rust target.
+    ExactIntegerOutOfRange {
+        /// Checked Rust machine target.
+        target: ExactIntegerTarget,
     },
     /// A three-way comparison returned a value outside `-1`, `0`, and `1`.
     InvalidComparisonResult {
@@ -1162,9 +2929,11 @@ impl NativeError {
             Self::RuntimeFinalized => Some(GerbilStatus::RuntimeFinalized),
             Self::Status { code, .. } => GerbilStatus::from_code(*code),
             Self::AbiMismatch { .. } => Some(GerbilStatus::AbiMismatch),
-            Self::IntegerOverflow { .. } | Self::InvalidComparisonResult { .. } => {
-                Some(GerbilStatus::InvalidValue)
-            }
+            Self::IntegerOverflow { .. }
+            | Self::UnsignedIntegerWidth { .. }
+            | Self::SignedIntegerWidth { .. }
+            | Self::ExactIntegerOutOfRange { .. }
+            | Self::InvalidComparisonResult { .. } => Some(GerbilStatus::InvalidValue),
             Self::InvalidLifecycleState { .. } | Self::WrongThread { .. } => None,
         }
     }
@@ -1196,6 +2965,20 @@ impl fmt::Display for NativeError {
             ),
             Self::IntegerOverflow { left, right } => {
                 write!(formatter, "Gerbil i64 addition overflows: {left} + {right}")
+            }
+            Self::UnsignedIntegerWidth { value, width } => write!(
+                formatter,
+                "unsigned integer {value} does not fit a {width}-byte encoding"
+            ),
+            Self::SignedIntegerWidth { value, width } => write!(
+                formatter,
+                "signed integer {value} does not fit a {width}-byte encoding"
+            ),
+            Self::ExactIntegerOutOfRange { target } => {
+                write!(
+                    formatter,
+                    "Scheme exact integer does not fit Rust {target:?}"
+                )
             }
             Self::InvalidComparisonResult { code } => {
                 write!(formatter, "invalid Gerbil i64 comparison result {code}")

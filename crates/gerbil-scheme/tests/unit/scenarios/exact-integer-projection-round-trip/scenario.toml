@@ -1,0 +1,11 @@
+id = "exact-integer-projection-round-trip"
+title = "Gerbil exact integer checked projection round trip"
+policy_ids = ["RUST-AGENT-GERBIL-PERF-005", "RUST-AGENT-GERBIL-FFI-002"]
+agent_goal = "Prove fixnum/bignum identity, checked i64/u64/usize projection, rooted ownership, explicit out-of-range failure, and sub-millisecond warm AOT latency."
+reference_repositories = ["tao3k/gerbil", "tao3k/gerbil-scheme-rust"]
+reference_patterns = ["exact integer", "fixnum", "bignum", "GerbilRootId", "checked machine projection", "p95 nanosecond receipt"]
+inputs = "none"
+expected = "pass"
+benchmark = "benchmark.toml"
+harness = "libtest"
+test = "exact_integer_projection_round_trip_stays_sub_millisecond"

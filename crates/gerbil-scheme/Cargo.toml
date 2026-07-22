@@ -20,6 +20,22 @@ native = ["dep:gerbil-scheme-sys"]
 divan.workspace = true
 gerbil-scheme-rust-project-harness.workspace = true
 
+[[test]]
+name = "native_exact_integer"
+required-features = ["native"]
+
+[[test]]
+name = "native_exact_integer_benchmark"
+required-features = ["native"]
+
+[[test]]
+name = "native_rooted_value"
+required-features = ["native"]
+
+[[test]]
+name = "native_rooted_value_benchmark"
+required-features = ["native"]
+
 [[bench]]
 name = "native_ffi"
 harness = false

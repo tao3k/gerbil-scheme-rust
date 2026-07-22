@@ -24,14 +24,17 @@ mod native;
 
 #[cfg(feature = "native")]
 pub use native::{
-    SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword, SchemeList, SchemePair,
-    SchemePairParts, SchemeScalar, SchemeSymbol,
+    ByteOrder, BytestringDelimiter, ExactIntegerTarget, IntegerDecoding, IntegerEncoding,
+    IntegerWidth, RootedSchemeBytevector, RootedSchemeExactInteger, RootedSchemeString,
+    RootedSchemeValue, RootedSchemeValueKind, SchemeBorrowedBytevector, SchemeBorrowedVector,
+    SchemeBytevector, SchemeExactInteger, SchemeKeyword, SchemeList, SchemeNil, SchemePair,
+    SchemePairParts, SchemeScalar, SchemeSymbol, SchemeVoid,
 };
 
 #[cfg(feature = "native")]
 pub use native::{
-    GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilUtf8, GerbilValue,
-    GerbilValueProvenance, NativeError, NativeResult,
+    GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilRuntimeReceipt, GerbilUtf8,
+    GerbilValue, GerbilValueProvenance, NativeError, NativeResult,
 };
 
 /// Environment variable selecting the Gerbil interpreter.

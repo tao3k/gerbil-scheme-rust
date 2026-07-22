@@ -4,8 +4,13 @@
 
 use std::env;
 use std::ffi::OsStr;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
+
+use crate::generated_scm::{
+    stamp_generated_scm, validate_generated_scm, workspace_input_fingerprint,
+};
 
 /// Build the native Gerbil and Gambit archive for the consuming Cargo package.
 pub fn build_native_archive() {
@@ -16,9 +21,13 @@ fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_GSC");
     println!("cargo:rerun-if-env-changed=GERBIL_HOME");
     println!("cargo:rerun-if-env-changed=GERBIL_PATH");
+    println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM");
+    println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM");
     println!("cargo:rerun-if-changed=../../build.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/native.ss");
+    println!("cargo:rerun-if-changed=../../scheme/native.ssi");
+    println!("cargo:rerun-if-changed=../../scheme/generated/native.scm");
     println!("cargo:rerun-if-changed=../../native/runtime.c");
 
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
@@ -38,8 +47,10 @@ fn run_native_build() {
         .env("GERBIL_PATH", &gerbil_path);
     run(&mut canonical_build, "canonical Gerbil build");
 
-    let native_scm = gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__native.scm");
-    let native_c = native_scm.with_extension("c");
+    let generated_native_scm =
+        gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__native.scm");
+    let native_scm = sync_generated_scm(&workspace, &generated_native_scm);
+    let native_c = out_dir.join("native.c");
     let native_object = out_dir.join("native.o");
     let linker_c = out_dir.join("native_link.c");
     let linker_object = out_dir.join("native_link.o");
@@ -112,6 +123,54 @@ fn run_native_build() {
     println!("cargo:rustc-link-lib=dylib=m");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         println!("cargo:rustc-link-lib=dylib=dl");
+    }
+}
+
+fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
+    let tracked_scm = workspace.join("scheme/generated/native.scm");
+    let update = env::var("GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM").as_deref() == Ok("1");
+    let check = env::var("GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM").as_deref() == Ok("1");
+    let input_fingerprint = workspace_input_fingerprint(workspace);
+
+    if update {
+        let parent = tracked_scm
+            .parent()
+            .expect("tracked generated SCM path must have a parent");
+        fs::create_dir_all(parent).expect("create tracked generated SCM directory");
+        let generated = fs::read_to_string(native_scm).expect("read generated native SCM");
+        fs::write(
+            &tracked_scm,
+            stamp_generated_scm(&generated, &input_fingerprint),
+        )
+        .expect("update tracked generated SCM with provenance");
+    }
+
+    if check {
+        let tracked = fs::read_to_string(&tracked_scm).expect(
+            "read tracked generated SCM; run with GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1",
+        );
+        validate_generated_scm(&tracked, &input_fingerprint).unwrap_or_else(|error| {
+            panic!(
+                "tracked generated SCM provenance is invalid: {error}; run with \
+                 GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1"
+            )
+        });
+    }
+
+    if update || check {
+        tracked_scm
+    } else {
+        // Gerbil's canonical output filename encodes the complete module path.
+        // Gambit's `-link` derives its expected LNK symbol from that basename,
+        // while `compile-file-to-target` emits the stable short module symbol.
+        // Give both operations the same short basename so ordinary Cargo builds
+        // link the fresh artifact just like tracked-SCM check builds do.
+        let transient_scm = native_scm
+            .parent()
+            .expect("generated native SCM must have a parent")
+            .join("native.scm");
+        fs::copy(native_scm, &transient_scm).expect("stage fresh native SCM with stable basename");
+        transient_scm
     }
 }
 

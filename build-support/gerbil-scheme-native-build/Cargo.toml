@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 cbindgen.workspace = true
 cc.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 gerbil-scheme-rust-project-harness.workspace = true

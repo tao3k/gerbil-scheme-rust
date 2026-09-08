@@ -1,0 +1,24 @@
+harness = "libtest"
+test = "exact_integer_projection_round_trip_stays_sub_millisecond"
+phase = "warm"
+target_total = "250ms"
+max_total = "500ms"
+observed_total = "5.059375ms"
+regression_budget = "250ms"
+memory_budget_bytes = 16777216
+observed_memory_bytes = 0
+target_rationale = "Each round trip includes Scheme exact-integer allocation, root-table ownership, checked C ABI projection, and RAII release; out-of-range bignum rejection remains a separate hot path."
+
+[observed_timings]
+median_signed_round_trip = "512ns"
+median_signed_round_trip_budget = "500us"
+p95_signed_round_trip = "691ns"
+p95_signed_round_trip_budget = "900us"
+median_unsigned_round_trip = "515ns"
+median_unsigned_round_trip_budget = "500us"
+p95_unsigned_round_trip = "561ns"
+p95_unsigned_round_trip_budget = "900us"
+median_out_of_range = "175ns"
+median_out_of_range_budget = "500us"
+p95_out_of_range = "218ns"
+p95_out_of_range_budget = "900us"

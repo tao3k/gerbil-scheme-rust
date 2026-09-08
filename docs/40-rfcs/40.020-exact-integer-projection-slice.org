@@ -1,0 +1,106 @@
+#+TITLE: RFC 40.020 Exact Integer Checked Projection Slice
+#+DATE: 2026-07-21
+#+STATUS: Draft
+
+* Outcome
+
+This slice adds first-class Gerbil exact-integer handles without pretending that
+an arbitrary bignum crosses the C ABI by value.
+
+The public Rust surface distinguishes:
+
+- =SchemeExactInteger<'runtime>=: a runtime-borrowed, unrooted Scheme object
+  already classified as an exact integer;
+- =RootedSchemeExactInteger<'runtime>=: a single-owner Scheme root created from
+  an =i64= or =u64= and released by Rust =Drop=;
+- checked projection targets =i64=, =u64=, and =usize=;
+- =NativeError::ExactIntegerOutOfRange=: an explicit failure with no truncation.
+
+This remains a parser-free runtime binding.  Scheme evaluates the integer
+predicate/range contract, the C ABI carries only handles, roots, statuses, and
+checked machine values, and Rust owns the safe lifetime/error surface.
+
+* Official Scheme boundary
+
+Gerbil's integer/bytevector functions accept Scheme integer values and arbitrary
+byte widths, but the existing Rust C ABI intentionally carries only =i64=/=u64=
+machine results.  Therefore bytevector conversion is not proof of a general
+Rust bignum representation.
+
+The AOT bridge now defines its exact-integer contract directly:
+
+- a value must satisfy both =integer?= and =exact?=;
+- signed projection accepts the inclusive range =[-2^63, 2^63-1]=;
+- unsigned projection accepts the inclusive range =[0, 2^64-1]=;
+- =usize= projection first checks =u64= and then the current Rust target width;
+- =2^80= and =-2^80= fixtures prove bignum identity survives while machine
+  projections fail closed;
+- no projection truncates, wraps, or uses a sentinel result.
+
+* Ownership and rooting
+
+The existing Scheme root registry already stores arbitrary Scheme values, not
+only strings and bytevectors.  This slice reuses that owner instead of creating
+a second integer-specific registry.
+
+Rust construction follows one path:
+
+1. an =i64= or =u64= enters the Gerbil C FFI by value;
+2. Scheme stores the resulting exact integer in the module root table;
+3. the ABI returns a positive =GerbilRootId=;
+4. =RootedSchemeExactInteger= owns the token;
+5. =Drop= releases the token on the runtime owner thread.
+
+Borrowed exact integers remain tied to =GerbilRuntime= and cannot be retained as
+owned values.  A later general GC-root API may add explicit rooting of an
+arbitrary borrowed Scheme object; this slice does not claim that capability.
+
+* ABI surface
+
+The checked public C ABI adds:
+
+- positive and negative out-of-range bignum fixtures;
+- exact-integer predicate for exported Scheme objects;
+- checked exported-object projection to =int64_t= and =uint64_t=;
+- rooted constructors from =int64_t= and =uint64_t=;
+- checked rooted projection to =int64_t= and =uint64_t=.
+
+All public projections use status plus out-pointer.  =InvalidValue= represents a
+non-exact object or a machine-range failure at the sys boundary.  The safe Rust
+marker proves exact-integer classification first and maps range failure to
+=ExactIntegerOutOfRange { target }=.
+
+The ABI family/version remains =gerbil-scheme-rust.binding.v1= / =1= and crate
+versions remain =0.1.0=.
+
+* Scenario and performance receipt
+
+Scenario =exact-integer-projection-round-trip= runs 40 samples with 25
+iterations per sample against the live AOT runtime.
+
+| Path | Median | p95 |
+| signed =i64::MIN= root/project/release | 512ns | 691ns |
+| unsigned =u64::MAX= root/project/release | 515ns | 561ns |
+| oversized =2^80= rejection | 175ns | 218ns |
+
+The complete Scenario elapsed in =5.059375ms=.  Each hot-path budget remains
+below one millisecond; cold Cargo/Gerbil compilation is tracked separately.
+
+* Closure checklist
+
+- [X] Runtime-borrowed exact-integer marker covers fixnums and bignums.
+- [X] Rust-created machine integers receive single-owner Scheme roots.
+- [X] =i64=, =u64=, and =usize= projections are checked.
+- [X] Out-of-range positive and negative bignums fail without truncation.
+- [X] Untrusted raw handles and non-integer Scheme objects fail closed.
+- [X] Native surface shape and public backed type matrix are synchronized.
+- [X] Scenario records nanosecond median and p95 receipts.
+- [ ] Arbitrary-precision digits are not copied into a Rust bigint type.
+- [ ] Arbitrary borrowed Scheme objects cannot yet be promoted into general roots.
+
+* Next owner boundary
+
+The next prerequisite is a general =RootedSchemeValue= contract that can promote
+a runtime-exported Scheme object into an owned root.  Owned string/symbol/keyword
+and recursive list/vector APIs should depend on that contract instead of adding
+type-specific ad hoc root registries.

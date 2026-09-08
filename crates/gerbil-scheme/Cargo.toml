@@ -15,34 +15,70 @@ gerbil-scheme-sys = { workspace = true, optional = true }
 [features]
 default = []
 native = ["dep:gerbil-scheme-sys"]
+external-program = ["native", "gerbil-scheme-sys/external-program"]
 
 [dev-dependencies]
 divan.workspace = true
 gerbil-scheme-rust-project-harness.workspace = true
 
-[[bench]]
-name = "native_ffi"
-harness = false
+[build-dependencies]
+gerbil-scheme-rust-project-harness-policy.workspace = true
+
+# Each runtime qualification owns a separate process: the native runtime is
+# deliberately one-shot, so these cannot share unit_test's process.
+[[test]]
+name = "native_bytestring_benchmark"
+path = "tests/unit/targets/native_bytestring_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_error_contract"
+name = "native_exact_integer"
+path = "tests/unit/targets/native_exact_integer.rs"
+required-features = ["native"]
+
+[[test]]
+name = "native_exact_integer_benchmark"
+path = "tests/unit/targets/native_exact_integer_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
 name = "native_ffi_benchmark"
+path = "tests/unit/targets/native_ffi_benchmark.rs"
+required-features = ["native"]
+
+[[test]]
+name = "native_identity"
+path = "tests/unit/targets/native_identity.rs"
+required-features = ["native"]
+
+[[test]]
+name = "native_integer_bytes_benchmark"
+path = "tests/unit/targets/native_integer_bytes_benchmark.rs"
+required-features = ["native"]
+
+[[test]]
+name = "native_rooted_value"
+path = "tests/unit/targets/native_rooted_value.rs"
+required-features = ["native"]
+
+[[test]]
+name = "native_rooted_value_benchmark"
+path = "tests/unit/targets/native_rooted_value_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
 name = "native_runtime"
+path = "tests/unit/targets/native_runtime.rs"
 required-features = ["native"]
 
 [[test]]
 name = "native_runtime_round_trip"
+path = "tests/unit/targets/native_runtime_round_trip.rs"
 required-features = ["native"]
 
-[[test]]
-name = "status_contract"
+[[bench]]
+name = "native_ffi"
+harness = false
 required-features = ["native"]
 
 [lints]

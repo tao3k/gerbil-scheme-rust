@@ -10,6 +10,23 @@ members = [
 
 resolver = "3"
 
+[profile.dev]
+opt-level = 2
+debug = 2
+debug-assertions = true
+overflow-checks = true
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+overflow-checks = true
+
+[profile.dev.build-override]
+opt-level = 2
+
+[profile.release.build-override]
+opt-level = 3
+
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
@@ -27,6 +44,7 @@ gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-schem
 gerbil-scheme-rust-project-harness = { path = "build-support/gerbil-scheme-rust-project-harness", version = "0.1.2" }
 gerbil-scheme = { path = "crates/gerbil-scheme", version = "0.1.0" }
 gerbil-scheme-sys = { path = "crates/gerbil-scheme-sys", version = "0.1.0" }
+sha2 = "0.10"
 
 [workspace.lints.rust]
 missing_debug_implementations = "warn"

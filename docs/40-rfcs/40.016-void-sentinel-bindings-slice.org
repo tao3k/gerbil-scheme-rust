@@ -1,0 +1,82 @@
+#+TITLE: Void Sentinel Bindings Slice
+#+DATE: 2026-07-21
+#+OPTIONS: toc:nil
+
+* Scope
+
+This slice adds Scheme =void= as a first-class sentinel projection in the
+generic =gerbil-scheme-rust= bindings library.
+
+The slice is limited to upstream bindings.  It does not merge, squash, or
+change Marlin downstream integration.
+
+* Accepted surface
+
+- Scheme source exports =gerbil-rs-fixture-void-raw=.
+- Scheme source exports =gerbil-rs-scheme-object-void?-raw=.
+- The generated Gambit SCM artifact is tracked in =scheme/generated/native.scm=.
+- =gerbil-scheme-sys= exposes checked C ABI wrappers from a sentinel-focused
+  module instead of growing =abi.rs=.
+- =gerbil-scheme= exposes =SchemeVoid=, =GerbilValue::is_void=,
+  =GerbilValue::as_void=, and =GerbilRuntime::fixture_void_value=.
+- Runtime tests prove that nil and void do not alias.
+- Raw provenance and runtime sentinels fail closed for =as_void= / =is_void=.
+
+* Predicate decision
+
+Do not use =void?= inside =scheme/native.ss= for the C export.
+
+Runtime evidence showed that =void?= is unbound in the compiled bridge module,
+which caused Gambit to enter its interactive error path and then crash the Rust
+test process under the embedded runtime.  The accepted predicate is:
+
+#+begin_src scheme
+(eq? value #!void)
+#+end_src
+
+Local Gerbil evidence:
+
+- =(void? #!void)= evaluates to =#t= in =gxi=.
+- =(eq? #!void (void))= evaluates to =#t=.
+- =(eq? #!void '())= evaluates to =#f=.
+
+* Generated SCM rule
+
+Generated SCM is an in-repository artifact for this project.
+
+When =scheme/native.ss= or =scheme/native.ssi= changes, update
+=scheme/generated/native.scm= through the official native build path:
+
+#+begin_src sh
+direnv exec . env GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1 cargo check -p gerbil-scheme --features native --locked
+#+end_src
+
+Then verify drift:
+
+#+begin_src sh
+direnv exec . env GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo check -p gerbil-scheme --features native --locked
+#+end_src
+
+Raw =gxc -S= output is not sufficient by itself because the native build support
+normalizes the generated artifact.
+
+* Validation receipt
+
+- =cargo fmt --all=: pass.
+- =cargo check -p gerbil-scheme --features native --locked=: pass.
+- =GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo check -p gerbil-scheme --features native --locked=: pass.
+- =cargo test -p gerbil-scheme --features native --test native_runtime --locked -- --nocapture --test-threads=1=: 1 passed.
+- =cargo test -p gerbil-scheme --features native --test native_value_surface --locked -- --nocapture=: 11 passed.
+- =cargo test -p gerbil-scheme --test source_surface --locked -- --nocapture=: 3 passed.
+
+* Next checklist expansion
+
+- Add EOF sentinel projection only after identifying the canonical Gerbil/Gambit
+  EOF object and predicate that are safe in a compiled =c-define= module.
+- Add unspecified sentinel projection only after distinguishing it from =#!void=
+  in both Scheme source and generated SCM.
+- Continue moving new sys ABI families into focused modules instead of growing
+  =crates/gerbil-scheme-sys/src/abi.rs=.
+- Promote the scenario coverage from type-matrix/source-surface checks into
+  reusable harness scenarios once the upstream Rust harness exposes the
+  sub-millisecond and percentile benchmark keys.

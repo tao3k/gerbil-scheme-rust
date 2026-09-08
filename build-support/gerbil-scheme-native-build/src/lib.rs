@@ -3,9 +3,12 @@
 
 mod archive;
 mod discovery;
+mod generated_scm;
 mod header;
 mod native;
+mod program;
 mod toolchain;
+pub use program::{ProgramArchiveRequest, build_program_archive, source_workspace};
 
 pub use archive::{
     CargoDirective, CargoDirectiveKind, NativeArchiveLinkReceipt, NativeLinkLibrary,

@@ -10,6 +10,9 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+external-program = []
+
 [lints]
 workspace = true
 

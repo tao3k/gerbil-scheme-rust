@@ -1,0 +1,84 @@
+#+title: RFC 40.021 - Generic Rooted Scheme Value Slice
+#+startup: overview
+
+* Status
+
+Implemented on the bindings feature branch.  This slice does not change ABI v1
+and does not change crate version =0.1.0=.
+
+* Outcome
+
+=RootedSchemeValue<'runtime>= is the common safe Rust owner surface for the
+runtime-backed Scheme types that currently have complete projections:
+
+- =ExactInteger(RootedSchemeExactInteger)=
+- =String(RootedSchemeString)=
+- =Bytevector(RootedSchemeBytevector)=
+
+=RootedSchemeValueKind= provides stable type inspection.  The =as_*= methods
+return typed borrowed projections and return =None= for a mismatched type.
+There is no untyped pointer cast, parser dependency, or duplicated C entrypoint.
+
+* Ownership decision
+
+The public common surface is an enum sum type in this slice.  Each variant owns
+one existing typed wrapper, and that wrapper remains the sole owner of its
+=GerbilRootId=.  Consequently:
+
+1. conversion through =From= transfers ownership without =unsafe= or
+   =ManuallyDrop=;
+2. =RootedSchemeValue= is neither =Clone= nor =Copy=;
+3. every typed wrapper composes one private =RootedSchemeOwner=, so dropping the
+   enum reaches exactly one shared Drop implementation and releases exactly one
+   Scheme root through =gerbil_scheme_rust_root_release=;
+4. the Gerbil root table and generated SCM remain the single native owner.
+
+The work landed in two independently verified steps.  The first established the
+public enum without changing typed-wrapper ownership.  The second replaced the
+three repeated =GerbilRootId + PhantomData + Drop= layouts with one private
+=RootedSchemeOwner=.  This sequencing kept double-release failures attributable
+while leaving the public enum contract unchanged.
+
+=RootedSchemeOwner::new= is also the single fail-closed constructor: a non-OK
+status or =Ok= paired with an invalid root never acquires an owner.  Unit tests
+cover both cases.  A live ABI receipt creates one exact-integer root, proves the
+first release returns =Ok=, and proves the second release returns =InvalidValue=.
+
+* Scenario receipt
+
+The =rooted-scheme-value-round-trip= Scenario executes 40 samples with 25
+iterations for every backed variant.  Each measured operation allocates a Scheme
+value, moves its typed root into =RootedSchemeValue=, performs a typed projection,
+and releases the sole root owner.
+
+| Variant       | median | p95     |
+|---------------+--------+---------|
+| exact integer | 473 ns | 733 ns  |
+| bytevector    | 648 ns | 900 ns  |
+| string        | 1.938 us | 2.743 us |
+
+The complete 3000-operation live receipt was =14.205708 ms=.  Median and p95
+budgets remain =500 us= and =900 us= per operation; the Scenario hard maximum is
+=500 ms=.  String projection is the slowest path because it copies characters
+into a Rust =String=; enum dispatch is not the dominant cost.
+
+* Checklist
+
+- [X] Public heterogeneous root type and kind enum.
+- [X] Lossless =From= conversion for all currently backed rooted wrappers.
+- [X] Typed borrowed projections with mismatch returning =None=.
+- [X] Live multi-type functional test.
+- [X] Scenario benchmark with nanosecond and microsecond observations.
+- [X] Native feature gating for both new test targets.
+- [X] Private =RootedSchemeOwner= composition inside the three typed wrappers.
+- [X] One shared Drop implementation for all currently backed rooted values.
+- [X] Invalid-root constructor and native double-release fail-closed receipts.
+- [ ] Arbitrary precision integer digit import/export above the common owner.
+
+* Next owner
+
+The next bindings slice is arbitrary-precision integer digit import/export above
+the common owner.  It must define sign, magnitude limb width, endianness, zero,
+and allocation ownership explicitly.  The public =RootedSchemeValue= enum and
+all existing typed projection methods remain unchanged; no parser dependency is
+introduced.

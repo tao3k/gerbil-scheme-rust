@@ -40,6 +40,36 @@ fn run_native_build() {
     let gerbil_path = out_dir.join("gerbil-path");
     let gsc = env::var_os("GERBIL_GSC").unwrap_or_else(|| "gsc".into());
 
+    if env::var_os("CARGO_FEATURE_EXTERNAL_PROGRAM").is_some() {
+        let runtime_object = out_dir.join("runtime.o");
+        run(
+            gerbil_command(&gsc)
+                .args([
+                    "-obj",
+                    "-cc-options",
+                    "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM",
+                    "-o",
+                ])
+                .arg(&runtime_object)
+                .arg(workspace.join("native/runtime.c")),
+            "compile external program lifecycle owner",
+        );
+        cc::Build::new()
+            .cargo_metadata(false)
+            .out_dir(&out_dir)
+            .object(&runtime_object)
+            .try_compile("gerbil_scheme_rust_native")
+            .expect("archive external program lifecycle owner");
+        println!("cargo:rustc-link-search=native={}", out_dir.display());
+        println!(
+            "cargo:rustc-link-search=native={}",
+            gerbil_prefix(&gsc).join("lib").display()
+        );
+        println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
+        println!("cargo:rustc-link-lib=static=gambit");
+        return;
+    }
+
     let mut canonical_build = gerbil_command(workspace.join("build.ss"));
     canonical_build
         .arg("compile")
@@ -88,7 +118,7 @@ fn run_native_build() {
             .args([
                 OsStr::new("-obj"),
                 OsStr::new("-cc-options"),
-                OsStr::new("-Dmain=gerbil_scheme_rust_gambit_main"),
+                OsStr::new("-O2 -Dmain=gerbil_scheme_rust_gambit_main"),
                 OsStr::new("-o"),
             ])
             .arg(&linker_object)
@@ -177,7 +207,12 @@ fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
 fn compile_c(gsc: &OsStr, source: &Path, object: &Path, operation: &str) {
     run(
         gerbil_command(gsc)
-            .args([OsStr::new("-obj"), OsStr::new("-o")])
+            .args([
+                OsStr::new("-obj"),
+                OsStr::new("-cc-options"),
+                OsStr::new("-O2"),
+                OsStr::new("-o"),
+            ])
             .arg(object)
             .arg(source),
         operation,
@@ -221,7 +256,8 @@ fn scheme_string(path: &Path) -> String {
     format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
+/// Keep the selected Gerbil compiler isolated from unrelated Rust C flags.
+pub(crate) fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program);
     // Nix/direnv environments commonly inject compiler include and linker
     // paths for Rust. Gerbil's selected gsc is already configured with its own

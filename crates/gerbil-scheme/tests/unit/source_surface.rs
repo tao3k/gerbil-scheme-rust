@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-const ASP_NATIVE_SURFACE: &str = include_str!("../../../scheme/asp/native-surface.ss");
-const NATIVE_SIGNATURE: &str = include_str!("../../../scheme/native.ssi");
-const BUILD_SCRIPT: &str = include_str!("../../../build.ss");
+const ASP_NATIVE_SURFACE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../scheme/asp/native-surface.ss"
+));
+const NATIVE_SIGNATURE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../scheme/native.ssi"
+));
+const BUILD_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../build.ss"));
 
 #[test]
 fn asp_native_surface_exports_current_shape_selectors() {

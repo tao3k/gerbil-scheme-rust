@@ -6,6 +6,7 @@
 ;;; generated-SCM drift check.
 
 (export
+  gerbil-rs-root-string
   ;; Scalar control proofs.
   gerbil-rs-abi-version
   gerbil-rs-add-i64

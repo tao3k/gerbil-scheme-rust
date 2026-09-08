@@ -353,6 +353,7 @@ version = "0.1.0"
 dependencies = [
  "divan",
  "gerbil-scheme-rust-project-harness",
+ "gerbil-scheme-rust-project-harness-policy",
  "gerbil-scheme-sys",
 ]
 
@@ -372,6 +373,8 @@ dependencies = [
  "cc",
  "gerbil-scheme-rust-project-harness",
  "gerbil-scheme-rust-project-harness-policy",
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
 ]
 

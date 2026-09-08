@@ -2,6 +2,7 @@
 
 (import :std/foreign)
 (export
+  gerbil-rs-root-string
   gerbil-rs-abi-version
   gerbil-rs-add-i64
   gerbil-rs-is-even-i64
@@ -73,6 +74,10 @@
 ;; root-release export.  A token of zero is reserved for fail-closed errors.
 (def gerbil-rs-next-root-id 1)
 (def gerbil-rs-rooted-values [])
+
+;; Downstream AOT exports transfer this token, never a borrowed Scheme word.
+(def (gerbil-rs-root-string value)
+  (if (string? value) (gerbil-rs-rooted-value-store! value) 0))
 
 (def (gerbil-rs-rooted-value-store! value)
   (let (root-id gerbil-rs-next-root-id)

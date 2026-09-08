@@ -61,6 +61,10 @@ typedef struct GerbilBorrowedVector {
 
 uint32_t gerbil_scheme_rust_abi_version(void);
 int32_t gerbil_scheme_rust_runtime_init(void);
+struct ___global_state_struct;
+union ___mod_or_lnk_union;
+typedef union ___mod_or_lnk_union *(*GerbilProgramLinker)(struct ___global_state_struct *);
+int32_t gerbil_scheme_rust_runtime_init_program(GerbilProgramLinker linker);
 int32_t gerbil_scheme_rust_runtime_cleanup(void);
 int64_t gerbil_scheme_rust_identity_i64(int64_t value);
 int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);

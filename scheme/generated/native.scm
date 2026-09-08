@@ -1,10 +1,16 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=d6b52040ac4a678efbb50d66f9e91134ec3119040c8302459aa55802c649aa8a body-sha256=ab55887d7561b749db58bdffa677a7b8d7a1615ecae34bf8ee13a68c7699d973
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=68488e2be1f1d6d79996cceb929a3a38410735b6768283bb70a0813fd4a369c0 body-sha256=0002357e1e55d8b7cc9ed7f88d2da74d174fdeb0bdf636867cc2aef141628006
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/native::timestamp 1784678614)
+  (define gerbil-scheme-rust/scheme/native::timestamp 1788842852)
   (begin
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-next-root-id '1)
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values '())
+    (define gerbil-scheme-rust/scheme/native#gerbil-rs-root-string
+      (lambda (_%value298%_)
+        (if (string? _%value298%_)
+            (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-store!
+             _%value298%_)
+            '0)))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-store!
       (lambda (_%value294%_)
         (let ((_%root-id296%_
@@ -30,27 +36,27 @@
             (values _%rest275%_ '#f)
             (if (= (caar _%rest275%_) _%root-id276%_)
                 (values (cdr _%rest275%_) '#t)
-                (let ((__tmp3263
+                (let ((__tmp3356
                        (lambda ()
                          (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values-remove
                           (cdr _%rest275%_)
                           _%root-id276%_)))
-                      (__tmp3262
+                      (__tmp3355
                        (lambda (_%tail282%_ _%found?283%_)
                          (values (if _%found?283%_
                                      (cons (car _%rest275%_) _%tail282%_)
                                      _%rest275%_)
                                  _%found?283%_))))
                   (declare (not safe))
-                  (##call-with-values __tmp3263 __tmp3262))))))
+                  (##call-with-values __tmp3356 __tmp3355))))))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-release!
       (lambda (_%root-id269%_)
-        (let ((__tmp3265
+        (let ((__tmp3358
                (lambda ()
                  (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values-remove
                   gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values
                   _%root-id269%_)))
-              (__tmp3264
+              (__tmp3357
                (lambda (_%rooted-values272%_ _%found?273%_)
                  (if _%found?273%_
                      (set! gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values
@@ -58,7 +64,7 @@
                      '#!void)
                  _%found?273%_)))
           (declare (not safe))
-          (##call-with-values __tmp3265 __tmp3264))))
+          (##call-with-values __tmp3358 __tmp3357))))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-bytestring-delimiter
       (lambda (_%code264%_)
         (if (= _%code264%_ '-1)

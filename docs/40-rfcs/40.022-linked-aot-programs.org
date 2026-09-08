@@ -1,0 +1,60 @@
+#+title: Linked AOT programs and rooted projection calls
+
+* Ownership
+
+Downstream packages own their Scheme modules, POO objects and application
+semantics. Their =build.ss= compiles those modules. =gerbil-rs-stage-program=
+uses the Gerbil compiler's runtime dependency graph to emit a versioned native
+link manifest; Rust does not parse Scheme or reconstruct imports.
+
+=gerbil-scheme-native-build= compiles that manifest. An =external-program=
+consumer supplies the complete AOT graph, including exactly one bridge module.
+Its =ProgramArchiveRequest= names the manifest, compiler, archive, linker and
+output directory. Validation, staging, compilation and archive publication
+are distinct build steps; downstream callers do not repeat the graph logic.
+Each user SCM is compiled to C before the C-only program link step. The custom
+program linker name must never be passed while compiling SCM: Gambit applies
+that name to module entry points too, causing duplicate identities and invalid
+runtime initialization. Conformance checks the bridge/program identities
+before entering the runtime.
+The sys crate supplies only the shared lifecycle shim in this configuration.
+It must not also load the standalone fixture graph or create another runtime.
+
+* Runtime contract
+
+=LinkedGerbilProgram= is a build-owned, unsafe-to-register linker descriptor.
+=GerbilRuntime::initialize_program= preserves the same process-global,
+one-shot, thread-affine owner as =initialize=. Setup and ABI failures are
+terminal. Missing program setup has no process-backed fallback.
+
+=bind_string_export= is the narrow unsafe registration boundary. Its function
+must already belong to the initialized graph, contain Scheme exceptions, and
+transfer a fresh root from =gerbil-rs-root-string=. The returned export borrows
+the runtime. A call validates the rooted string; the unique returned owner
+releases the root on drop. Neither raw Scheme words nor caller-created root
+tokens are accepted by the normal safe call path.
+
+This string transport is for explicit native boundary projections, not a
+public JSON/S-expression language. Application object construction remains in
+Scheme; no Cedar, policy routing or runtime scheduling belongs in this repo.
+
+* Optimizer is the default
+
+Development and test Rust profiles use optimization level 2, full debug
+information, debug assertions and checked overflow. Release uses level 3 and
+thin LTO, retaining checked overflow. Downstream Cargo roots must preserve the
+same profile contract because dependency workspace profiles are not inherited.
+Build dependencies use level 2 in Dev and level 3 in Release as well.
+
+Canonical Gerbil compilation explicitly enables its optimizer. Generated C
+is compiled with =-O2= in both configurations. Optimization does not authorize
+unsafe Scheme declarations, removal of validation, or a longer runtime budget.
+
+* Qualification boundary
+
+A source/type check is not native acceptance. Qualification requires the
+generated graph to link, initialize, call an actual Scheme export, validate
+and release its root, and reject invalid lifecycle/call states. Downstream
+authorization additionally requires its own policy, signature, replay and
+effect-consumption checks. No proof theorem follows from these executable
+checks alone.

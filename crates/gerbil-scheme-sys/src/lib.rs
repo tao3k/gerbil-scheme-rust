@@ -3,12 +3,17 @@
 mod abi;
 mod abi_bytevector;
 mod abi_integer_bytes;
+mod abi_program;
 mod abi_rooted_bytes;
 mod abi_sentinel;
+mod abi_status;
 mod scheme_char;
 mod scheme_exact_integer;
 mod scheme_fixnum;
 mod scheme_flonum;
+
+pub use abi::{GerbilGlobalState, GerbilModuleOrLink};
+pub use abi_program::{GerbilProgramLinker, gerbil_scheme_rust_runtime_init_program};
 
 pub use abi::{
     GerbilBoolean, GerbilBorrowedBytevector, GerbilBorrowedVector, GerbilChar, GerbilFixnum,

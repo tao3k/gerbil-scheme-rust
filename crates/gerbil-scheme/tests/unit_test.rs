@@ -3,6 +3,7 @@
 mod native_error_contract;
 #[path = "unit/native_result_contract.rs"]
 mod native_result_contract;
+#[cfg(feature = "native")]
 #[path = "unit/native_safe_value_surface.rs"]
 mod native_safe_value_surface;
 #[path = "unit/native_value_surface.rs"]

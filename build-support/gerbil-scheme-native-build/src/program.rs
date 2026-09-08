@@ -11,6 +11,14 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Cargo-resolved source root containing `build.ss` and the Scheme modules.
+///
+/// Downstream build scripts use this instead of guessing a sibling checkout.
+#[must_use]
+pub fn source_workspace() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ProgramManifest {

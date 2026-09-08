@@ -1,8 +1,15 @@
 //! Reject malformed AOT plans before invoking a compiler or creating an archive.
 
-use gerbil_scheme_native_build::{ProgramArchiveRequest, build_program_archive};
+use gerbil_scheme_native_build::{ProgramArchiveRequest, build_program_archive, source_workspace};
 use serde_json::{Value, json};
 use std::{fs, path::Path};
+
+#[test]
+fn source_workspace_is_owned_by_the_resolved_crate() {
+    let workspace = source_workspace();
+    assert!(workspace.join("build.ss").is_file());
+    assert!(workspace.join("scheme/program-build.ss").is_file());
+}
 
 fn rejected_plan(plan: &Value) -> String {
     let root = super::support::unique_temp_dir("gerbil-program-rejection");

@@ -6,7 +6,7 @@ use gerbil_scheme_native_build::{
     build_program_archive_with_contract, source_workspace,
 };
 use serde_json::{Value, json};
-use std::cell::RefCell;
+use std::sync::Mutex;
 use std::{fs, path::Path};
 #[cfg(unix)]
 use std::{
@@ -83,11 +83,11 @@ fn program_rejects_linker_arguments_before_reading_input() {
     assert_eq!(error, "invalid native linker name");
 }
 
-struct Observations(RefCell<Vec<String>>);
+struct Observations(Mutex<Vec<String>>);
 
 impl ProgramArchiveObserver for Observations {
     fn observe(&self, observation: ProgramArchiveObservation<'_>) {
-        self.0.borrow_mut().push(observation.to_string());
+        self.0.lock().unwrap().push(observation.to_string());
     }
 }
 
@@ -108,7 +108,7 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
         .unwrap(),
     )
     .unwrap();
-    let observations = Observations(RefCell::new(Vec::new()));
+    let observations = Observations(Mutex::new(Vec::new()));
     let error = build_program_archive_observed(
         ProgramArchiveRequest {
             manifest: &manifest,
@@ -121,7 +121,7 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     )
     .unwrap_err();
     assert!(error.contains("generate program module C"));
-    let rows = observations.0.into_inner();
+    let rows = observations.0.into_inner().unwrap();
     assert_eq!(
         rows[0],
         "phase=program-plan state=complete operation=validate compiler-owned AOT manifest"
@@ -152,7 +152,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
         .unwrap(),
     )
     .unwrap();
-    let observations = Observations(RefCell::new(Vec::new()));
+    let observations = Observations(Mutex::new(Vec::new()));
     let error = build_program_archive_with_contract(
         ProgramArchiveRequest {
             manifest: &manifest,
@@ -171,7 +171,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
     .unwrap_err();
     assert!(error.contains("generate program module C"));
     assert!(
-        observations.0.into_inner()[1].contains("subject=example/application"),
+        observations.0.into_inner().unwrap()[1].contains("subject=example/application"),
         "the downstream module identity must survive into observation"
     );
     fs::remove_dir_all(root).unwrap();

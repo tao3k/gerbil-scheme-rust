@@ -11,6 +11,10 @@ use serde::Deserialize;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{
+    Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::{Duration, Instant};
 
 /// Cargo-resolved source root containing `build.ss` and the Scheme modules.
@@ -104,7 +108,7 @@ impl fmt::Display for ProgramArchiveObservation<'_> {
 /// Implementations decide how observations are presented. The builder never
 /// invents a timer heartbeat: the last emitted `start` is the exact native
 /// operation that still owns execution.
-pub trait ProgramArchiveObserver {
+pub trait ProgramArchiveObserver: Sync {
     /// Records one build transition.
     fn observe(&self, observation: ProgramArchiveObservation<'_>);
 }
@@ -349,18 +353,7 @@ fn compile_program(
         linker_c,
         linker_object,
     } = staged;
-    for (source, object, module) in compile_sources {
-        run(
-            gerbil_command(request.gsc)
-                .args(["-obj", "-cc-options", "-O2", "-o"])
-                .arg(&object)
-                .arg(source),
-            "native-object",
-            "compile program module",
-            Some(&module),
-            observer,
-        )?;
-    }
+    compile_program_modules(request.gsc, &compile_sources, observer)?;
     let stub_object = request.out_dir.join("program_stub.o");
     run(
         gerbil_command(request.gsc)
@@ -391,6 +384,77 @@ fn compile_program(
         link_search_dirs: search,
         link_libraries: libraries,
     })
+}
+
+fn compile_program_modules(
+    gsc: &Path,
+    sources: &[(PathBuf, PathBuf, String)],
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<(), String> {
+    let worker_count = native_build_parallelism(sources.len());
+    if worker_count <= 1 {
+        for (source, object, module) in sources {
+            compile_program_module(gsc, source, object, module, observer)?;
+        }
+        return Ok(());
+    }
+
+    let next = AtomicUsize::new(0);
+    let failure = Mutex::new(None);
+    std::thread::scope(|scope| {
+        for _ in 0..worker_count {
+            scope.spawn(|| {
+                loop {
+                    if failure.lock().expect("native build failure lock").is_some() {
+                        return;
+                    }
+                    let index = next.fetch_add(1, Ordering::Relaxed);
+                    let Some((source, object, module)) = sources.get(index) else {
+                        return;
+                    };
+                    if let Err(error) =
+                        compile_program_module(gsc, source, object, module, observer)
+                    {
+                        *failure.lock().expect("native build failure lock") = Some(error);
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    failure
+        .into_inner()
+        .expect("native build failure lock")
+        .map_or(Ok(()), Err)
+}
+
+fn compile_program_module(
+    gsc: &Path,
+    source: &Path,
+    object: &Path,
+    module: &str,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<(), String> {
+    run(
+        gerbil_command(gsc)
+            .args(["-obj", "-cc-options", "-O2", "-o"])
+            .arg(object)
+            .arg(source),
+        "native-object",
+        "compile program module",
+        Some(module),
+        observer,
+    )
+}
+
+fn native_build_parallelism(job_count: usize) -> usize {
+    let configured = std::env::var("GERBIL_BUILD_CORES")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|count| *count > 0)
+        .or_else(|| std::thread::available_parallelism().ok().map(usize::from))
+        .unwrap_or(1);
+    configured.min(job_count.max(1))
 }
 
 fn native_link_options(

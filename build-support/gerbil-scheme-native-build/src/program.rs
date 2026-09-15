@@ -261,44 +261,56 @@ fn stage_program(
         .arg(&linker_c);
     let mut objects = Vec::new();
     let mut compile_sources = Vec::new();
-    for (index, module) in plan.modules.iter().enumerate() {
-        if !module.scm.is_file() {
-            return Err(format!("missing SCM for {}", module.module));
-        }
-        // Gerbil compile-exe filters empty user SCM, but keeps every installed
-        // system object, including its interface/link metadata.
-        if !module.system
-            && std::fs::metadata(&module.scm)
-                .map_err(|e| e.to_string())?
-                .len()
-                == 0
-        {
-            continue;
-        }
-        if module.system {
-            let c = module.scm.with_extension("c");
-            let object = module.scm.with_extension("o");
-            if !c.is_file() || !object.is_file() {
-                return Err(format!(
-                    "missing installed AOT object for {}",
-                    module.module
-                ));
+    let module_count = plan.modules.len().to_string();
+    observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase: "module-c-batch",
+            operation: "stage program module C sources",
+            subject: Some(&module_count),
+        },
+        || {
+            for (index, module) in plan.modules.iter().enumerate() {
+                if !module.scm.is_file() {
+                    return Err(format!("missing SCM for {}", module.module));
+                }
+                // Gerbil compile-exe filters empty user SCM, but keeps every installed
+                // system object, including its interface/link metadata.
+                if !module.system
+                    && std::fs::metadata(&module.scm)
+                        .map_err(|e| e.to_string())?
+                        .len()
+                        == 0
+                {
+                    continue;
+                }
+                if module.system {
+                    let c = module.scm.with_extension("c");
+                    let object = module.scm.with_extension("o");
+                    if !c.is_file() || !object.is_file() {
+                        return Err(format!(
+                            "missing installed AOT object for {}",
+                            module.module
+                        ));
+                    }
+                    link.arg(c);
+                    objects.push(object);
+                } else {
+                    // Stage outside the source tree: gsc -link creates C next to SCM.
+                    // Preserve the compiler's basename because it determines LNK names.
+                    let file_name = module.scm.file_name().ok_or("SCM filename missing")?;
+                    let staged = request.out_dir.join(file_name);
+                    std::fs::copy(&module.scm, &staged).map_err(|e| e.to_string())?;
+                    let source = generate_module_c(request.gsc, &staged, &module.module, observer)?;
+                    link.arg(&source);
+                    let object = request.out_dir.join(format!("module_{index}.o"));
+                    compile_sources.push((source, object.clone(), module.module.clone()));
+                    objects.push(object);
+                }
             }
-            link.arg(c);
-            objects.push(object);
-        } else {
-            // Stage outside the source tree: gsc -link creates C next to SCM.
-            // Preserve the compiler's basename because it determines LNK names.
-            let file_name = module.scm.file_name().ok_or("SCM filename missing")?;
-            let staged = request.out_dir.join(file_name);
-            std::fs::copy(&module.scm, &staged).map_err(|e| e.to_string())?;
-            let source = generate_module_c(request.gsc, &staged, &module.module, observer)?;
-            link.arg(&source);
-            let object = request.out_dir.join(format!("module_{index}.o"));
-            compile_sources.push((source, object.clone(), module.module.clone()));
-            objects.push(object);
-        }
-    }
+            Ok(())
+        },
+    )?;
     link.arg(generate_module_c(
         request.gsc,
         &plan.stub,
@@ -392,6 +404,24 @@ fn compile_program_modules(
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
     let worker_count = native_build_parallelism(sources.len());
+    let batch = format!("jobs={} workers={worker_count}", sources.len());
+    observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase: "native-object-batch",
+            operation: "compile program module objects",
+            subject: Some(&batch),
+        },
+        || compile_program_modules_inner(gsc, sources, observer, worker_count),
+    )
+}
+
+fn compile_program_modules_inner(
+    gsc: &Path,
+    sources: &[(PathBuf, PathBuf, String)],
+    observer: &dyn ProgramArchiveObserver,
+    worker_count: usize,
+) -> Result<(), String> {
     if worker_count <= 1 {
         for (source, object, module) in sources {
             compile_program_module(gsc, source, object, module, observer)?;

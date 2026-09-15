@@ -128,10 +128,15 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     );
     assert_eq!(
         rows[1],
+        "phase=module-c-batch state=start operation=stage program module C sources subject=1"
+    );
+    assert_eq!(
+        rows[2],
         "phase=module-c state=start operation=generate program module C subject=gerbil-scheme-rust/scheme/native"
     );
-    assert!(rows[2].starts_with("phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="));
-    assert_eq!(rows.len(), 3, "no timer heartbeat may manufacture rows");
+    assert!(rows[3].starts_with("phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="));
+    assert!(rows[4].starts_with("phase=module-c-batch state=failed operation=stage program module C sources subject=1 elapsedMs="));
+    assert_eq!(rows.len(), 5, "no timer heartbeat may manufacture rows");
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -171,7 +176,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
     .unwrap_err();
     assert!(error.contains("generate program module C"));
     assert!(
-        observations.0.into_inner().unwrap()[1].contains("subject=example/application"),
+        observations.0.into_inner().unwrap()[2].contains("subject=example/application"),
         "the downstream module identity must survive into observation"
     );
     fs::remove_dir_all(root).unwrap();
@@ -230,6 +235,10 @@ fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats
     );
     assert_eq!(
         receiver.recv_timeout(Duration::from_millis(250)).unwrap(),
+        "phase=module-c-batch state=start operation=stage program module C sources subject=1"
+    );
+    assert_eq!(
+        receiver.recv_timeout(Duration::from_millis(250)).unwrap(),
         "phase=module-c state=start operation=generate program module C subject=gerbil-scheme-rust/scheme/native"
     );
     assert!(
@@ -243,6 +252,9 @@ fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats
     assert!(worker.join().unwrap().is_err());
     assert!(receiver.recv().unwrap().starts_with(
         "phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="
+    ));
+    assert!(receiver.recv().unwrap().starts_with(
+        "phase=module-c-batch state=failed operation=stage program module C sources subject=1 elapsedMs="
     ));
     assert!(receiver.try_recv().is_err());
     fs::remove_dir_all(root).unwrap();

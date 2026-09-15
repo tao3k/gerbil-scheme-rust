@@ -501,7 +501,46 @@ fn native_link_options(
             return Err(format!("unsupported compiler-owned link option {option:?}"));
         }
     }
+    if cfg!(target_os = "macos") {
+        let runtime = discover_darwin_compiler_runtime()?;
+        let directory = runtime.parent().ok_or_else(|| {
+            format!(
+                "Darwin compiler runtime has no parent: {}",
+                runtime.display()
+            )
+        })?;
+        search.push(directory.to_path_buf());
+        libraries.push(NativeLinkLibrary::new("static=clang_rt.osx"));
+    }
     Ok((search, libraries))
+}
+
+fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {
+    let compiler = cc::Build::new().cargo_metadata(false).get_compiler();
+    let output = compiler
+        .to_command()
+        .arg("-print-file-name=libclang_rt.osx.a")
+        .output()
+        .map_err(|error| format!("query Darwin compiler runtime: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "query Darwin compiler runtime: {}; {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let runtime = PathBuf::from(
+        std::str::from_utf8(&output.stdout)
+            .map_err(|error| format!("decode Darwin compiler runtime path: {error}"))?
+            .trim(),
+    );
+    if !runtime.is_file() {
+        return Err(format!(
+            "Darwin compiler runtime is missing: {}",
+            runtime.display()
+        ));
+    }
+    Ok(runtime)
 }
 
 fn run(

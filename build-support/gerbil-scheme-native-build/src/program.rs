@@ -111,6 +111,9 @@ impl fmt::Display for ProgramArchiveObservation<'_> {
 pub trait ProgramArchiveObserver: Sync {
     /// Records one build transition.
     fn observe(&self, observation: ProgramArchiveObservation<'_>);
+
+    /// Records one compiler-owned Scheme input consumed by the AOT graph.
+    fn observe_source_input(&self, _source: &Path) {}
 }
 
 /// Named description for one observed native operation.
@@ -182,6 +185,9 @@ pub fn build_program_archive_with_contract(
         subject: None,
         elapsed: None,
     });
+    for module in &plan.modules {
+        observer.observe_source_input(&module.scm);
+    }
     let staged = stage_program(&plan, request, observer)?;
     let mut link_plan = compile_program(
         &plan,

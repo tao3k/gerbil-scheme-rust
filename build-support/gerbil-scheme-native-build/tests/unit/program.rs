@@ -7,7 +7,10 @@ use gerbil_scheme_native_build::{
 };
 use serde_json::{Value, json};
 use std::sync::Mutex;
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 #[cfg(unix)]
 use std::{
     os::unix::fs::PermissionsExt,
@@ -83,11 +86,15 @@ fn program_rejects_linker_arguments_before_reading_input() {
     assert_eq!(error, "invalid native linker name");
 }
 
-struct Observations(Mutex<Vec<String>>);
+struct Observations(Mutex<Vec<String>>, Mutex<Vec<PathBuf>>);
 
 impl ProgramArchiveObserver for Observations {
     fn observe(&self, observation: ProgramArchiveObservation<'_>) {
         self.0.lock().unwrap().push(observation.to_string());
+    }
+
+    fn observe_source_input(&self, source: &Path) {
+        self.1.lock().unwrap().push(source.to_path_buf());
     }
 }
 
@@ -108,7 +115,7 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
         .unwrap(),
     )
     .unwrap();
-    let observations = Observations(Mutex::new(Vec::new()));
+    let observations = Observations(Mutex::new(Vec::new()), Mutex::new(Vec::new()));
     let error = build_program_archive_observed(
         ProgramArchiveRequest {
             manifest: &manifest,
@@ -121,6 +128,7 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     )
     .unwrap_err();
     assert!(error.contains("generate program module C"));
+    assert_eq!(*observations.1.lock().unwrap(), vec![bridge]);
     let rows = observations.0.into_inner().unwrap();
     assert_eq!(
         rows[0],
@@ -157,7 +165,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
         .unwrap(),
     )
     .unwrap();
-    let observations = Observations(Mutex::new(Vec::new()));
+    let observations = Observations(Mutex::new(Vec::new()), Mutex::new(Vec::new()));
     let error = build_program_archive_with_contract(
         ProgramArchiveRequest {
             manifest: &manifest,

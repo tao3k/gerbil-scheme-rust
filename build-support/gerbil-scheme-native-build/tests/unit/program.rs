@@ -1,8 +1,9 @@
 //! Reject malformed AOT plans before invoking a compiler or creating an archive.
 
 use gerbil_scheme_native_build::{
-    ProgramArchiveObservation, ProgramArchiveObserver, ProgramArchiveRequest,
-    build_program_archive, build_program_archive_observed, source_workspace,
+    ProgramArchiveContract, ProgramArchiveObservation, ProgramArchiveObserver,
+    ProgramArchiveRequest, build_program_archive, build_program_archive_observed,
+    build_program_archive_with_contract, source_workspace,
 };
 use serde_json::{Value, json};
 use std::cell::RefCell;
@@ -49,10 +50,8 @@ fn program_requires_exactly_one_bridge() {
     let bridge =
         json!({"module": "gerbil-scheme-rust/scheme/native", "scm": "unused.scm", "system": false});
     let other = json!({"module": "example/application", "scm": "unused.scm", "system": false});
-    assert!(rejected_plan(&plan(json!([other]))).contains("exactly one native bridge"));
-    assert!(
-        rejected_plan(&plan(json!([bridge.clone(), bridge]))).contains("exactly one native bridge")
-    );
+    assert!(rejected_plan(&plan(json!([other]))).contains("required module"));
+    assert!(rejected_plan(&plan(json!([bridge.clone(), bridge]))).contains("required module"));
 }
 
 #[test]
@@ -133,6 +132,48 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     );
     assert!(rows[2].starts_with("phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="));
     assert_eq!(rows.len(), 3, "no timer heartbeat may manufacture rows");
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn downstream_program_contract_selects_its_own_required_module_and_main_symbol() {
+    let root = super::support::unique_temp_dir("gerbil-downstream-program-contract");
+    fs::create_dir_all(&root).unwrap();
+    let application = root.join("application.scm");
+    fs::write(&application, "(display 'application)").unwrap();
+    let manifest = root.join("program.json");
+    fs::write(
+        &manifest,
+        serde_json::to_vec(&plan(json!([{
+            "module": "example/application",
+            "scm": application,
+            "system": false
+        }])))
+        .unwrap(),
+    )
+    .unwrap();
+    let observations = Observations(RefCell::new(Vec::new()));
+    let error = build_program_archive_with_contract(
+        ProgramArchiveRequest {
+            manifest: &manifest,
+            gsc: Path::new("/missing-compiler-must-not-run"),
+            archive_name: "test_program",
+            linker_name: "test_linker",
+            out_dir: &root.join("out"),
+        },
+        ProgramArchiveContract {
+            required_modules: &["example/application"],
+            linker_main_symbol: "example_program_main",
+            additional_objects: &[],
+        },
+        &observations,
+    )
+    .unwrap_err();
+    assert!(error.contains("generate program module C"));
+    assert!(
+        observations.0.into_inner()[1].contains("subject=example/application"),
+        "the downstream module identity must survive into observation"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 

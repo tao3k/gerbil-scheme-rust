@@ -9,8 +9,10 @@ mod native;
 mod program;
 mod toolchain;
 pub use program::{
-    ProgramArchiveObservation, ProgramArchiveObserver, ProgramArchiveRequest,
-    build_program_archive, build_program_archive_observed, source_workspace,
+    ProgramArchiveContract, ProgramArchiveObservation, ProgramArchiveObserver,
+    ProgramArchiveOperation, ProgramArchiveRequest, build_program_archive,
+    build_program_archive_observed, build_program_archive_with_contract,
+    observe_program_archive_operation, source_workspace,
 };
 
 pub use archive::{

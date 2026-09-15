@@ -54,6 +54,19 @@ pub struct ProgramArchiveRequest<'a> {
     pub out_dir: &'a Path,
 }
 
+/// Extension points for a downstream compiler-owned AOT program.
+#[derive(Clone, Copy, Debug)]
+pub struct ProgramArchiveContract<'a> {
+    /// Modules that must each occur exactly once in the compiler manifest.
+    pub required_modules: &'a [&'a str],
+    /// C symbol used in place of Gambit's generated `main`.
+    pub linker_main_symbol: &'a str,
+    /// Caller-owned native objects included in the same static archive.
+    pub additional_objects: &'a [PathBuf],
+}
+
+const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/native"];
+
 /// One compiler-owned transition in the linked AOT program build.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProgramArchiveObservation<'a> {
@@ -96,6 +109,17 @@ pub trait ProgramArchiveObserver {
     fn observe(&self, observation: ProgramArchiveObservation<'_>);
 }
 
+/// Named description for one observed native operation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramArchiveOperation<'a> {
+    /// Stable native phase name.
+    pub phase: &'static str,
+    /// Human-readable operation owned by the caller.
+    pub operation: &'a str,
+    /// Optional module or artifact owned by the operation.
+    pub subject: Option<&'a str>,
+}
+
 struct NoProgramArchiveObserver;
 
 impl ProgramArchiveObserver for NoProgramArchiveObserver {
@@ -123,8 +147,30 @@ pub fn build_program_archive_observed(
     request: ProgramArchiveRequest<'_>,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<NativeArchiveLinkReceipt, String> {
+    build_program_archive_with_contract(
+        request,
+        ProgramArchiveContract {
+            required_modules: DEFAULT_REQUIRED_MODULES,
+            linker_main_symbol: "gerbil_scheme_rust_program_main",
+            additional_objects: &[],
+        },
+        observer,
+    )
+}
+
+/// Builds a downstream AOT program through the canonical implementation.
+///
+/// # Errors
+/// Returns an error when the requested contract, compiler manifest, native
+/// command, or archive is invalid.
+pub fn build_program_archive_with_contract(
+    request: ProgramArchiveRequest<'_>,
+    contract: ProgramArchiveContract<'_>,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<NativeArchiveLinkReceipt, String> {
     validate_linker_name(request.linker_name)?;
-    let plan = read_manifest(request.manifest)?;
+    validate_linker_name(contract.linker_main_symbol)?;
+    let plan = read_manifest(request.manifest, contract.required_modules)?;
     observer.observe(ProgramArchiveObservation {
         phase: "program-plan",
         state: "complete",
@@ -133,12 +179,23 @@ pub fn build_program_archive_observed(
         elapsed: None,
     });
     let staged = stage_program(&plan, request, observer)?;
-    let link_plan = compile_program(&plan, staged, request, observer)?;
-    observed_operation(
+    let mut link_plan = compile_program(
+        &plan,
+        staged,
+        request,
+        contract.linker_main_symbol,
         observer,
-        "static-archive",
-        "package linked AOT archive",
-        None,
+    )?;
+    link_plan
+        .module_objects
+        .extend_from_slice(contract.additional_objects);
+    observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase: "static-archive",
+            operation: "package linked AOT archive",
+            subject: None,
+        },
         || build_static_archive_from_link_plan(request.archive_name, &link_plan, request.out_dir),
     )
 }
@@ -154,7 +211,7 @@ fn validate_linker_name(linker_name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn read_manifest(manifest: &Path) -> Result<ProgramManifest, String> {
+fn read_manifest(manifest: &Path, required_modules: &[&str]) -> Result<ProgramManifest, String> {
     let plan: ProgramManifest =
         serde_json::from_slice(&std::fs::read(manifest).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
@@ -164,14 +221,18 @@ fn read_manifest(manifest: &Path) -> Result<ProgramManifest, String> {
     {
         return Err("invalid AOT program manifest".into());
     }
-    if plan
-        .modules
-        .iter()
-        .filter(|m| m.module == "gerbil-scheme-rust/scheme/native")
-        .count()
-        != 1
-    {
-        return Err("AOT program must contain exactly one native bridge module".into());
+    for required in required_modules {
+        if plan
+            .modules
+            .iter()
+            .filter(|module| module.module == *required)
+            .count()
+            != 1
+        {
+            return Err(format!(
+                "AOT program must contain required module {required} exactly once"
+            ));
+        }
     }
     Ok(plan)
 }
@@ -279,6 +340,7 @@ fn compile_program(
     plan: &ProgramManifest,
     staged: StagedProgram,
     request: ProgramArchiveRequest<'_>,
+    linker_main_symbol: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<NativeStaticLinkPlan, String> {
     let StagedProgram {
@@ -311,14 +373,10 @@ fn compile_program(
         observer,
     )?;
     objects.push(stub_object);
+    let linker_options = format!("-O2 -Dmain={linker_main_symbol}");
     run(
         gerbil_command(request.gsc)
-            .args([
-                "-obj",
-                "-cc-options",
-                "-O2 -Dmain=gerbil_scheme_rust_program_main",
-                "-o",
-            ])
+            .args(["-obj", "-cc-options", &linker_options, "-o"])
             .arg(&linker_object)
             .arg(&linker_c),
         "native-object",
@@ -359,42 +417,52 @@ fn run(
     subject: Option<&str>,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
-    observed_operation(observer, phase, operation, subject, || {
-        let output = command.output().map_err(|e| format!("{operation}: {e}"))?;
-        if output.status.success() {
-            Ok(())
-        } else {
-            Err(format!(
-                "{operation}: {}; {}{}",
-                output.status,
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            ))
-        }
-    })
+    observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase,
+            operation,
+            subject,
+        },
+        || {
+            let output = command.output().map_err(|e| format!("{operation}: {e}"))?;
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(format!(
+                    "{operation}: {}; {}{}",
+                    output.status,
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                ))
+            }
+        },
+    )
 }
 
-fn observed_operation<T>(
+/// Runs one extension operation under the same phase observation contract.
+///
+/// # Errors
+/// Returns the action error after publishing a terminal `failed` transition.
+pub fn observe_program_archive_operation<T>(
     observer: &dyn ProgramArchiveObserver,
-    phase: &'static str,
-    operation: &str,
-    subject: Option<&str>,
+    operation: ProgramArchiveOperation<'_>,
     action: impl FnOnce() -> Result<T, String>,
 ) -> Result<T, String> {
     observer.observe(ProgramArchiveObservation {
-        phase,
+        phase: operation.phase,
         state: "start",
-        operation,
-        subject,
+        operation: operation.operation,
+        subject: operation.subject,
         elapsed: None,
     });
     let started = Instant::now();
     let result = action();
     observer.observe(ProgramArchiveObservation {
-        phase,
+        phase: operation.phase,
         state: if result.is_ok() { "complete" } else { "failed" },
-        operation,
-        subject,
+        operation: operation.operation,
+        subject: operation.subject,
         elapsed: Some(started.elapsed()),
     });
     result

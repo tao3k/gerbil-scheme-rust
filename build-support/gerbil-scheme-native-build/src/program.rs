@@ -9,6 +9,7 @@ use crate::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -65,6 +66,8 @@ pub struct ProgramArchiveRequest<'a> {
 pub struct ProgramArchiveContract<'a> {
     /// Modules that must each occur exactly once in the compiler manifest.
     pub required_modules: &'a [&'a str],
+    /// Modules that must not enter this downstream program's runtime closure.
+    pub forbidden_modules: &'a [&'a str],
     /// C symbol used in place of Gambit's generated `main`.
     pub linker_main_symbol: &'a str,
     /// Caller-owned native objects included in the same static archive.
@@ -160,6 +163,7 @@ pub fn build_program_archive_observed(
         request,
         ProgramArchiveContract {
             required_modules: DEFAULT_REQUIRED_MODULES,
+            forbidden_modules: &[],
             linker_main_symbol: "gerbil_scheme_rust_program_main",
             additional_objects: &[],
         },
@@ -179,7 +183,11 @@ pub fn build_program_archive_with_contract(
 ) -> Result<NativeArchiveLinkReceipt, String> {
     validate_linker_name(request.linker_name)?;
     validate_linker_name(contract.linker_main_symbol)?;
-    let plan = read_manifest(request.manifest, contract.required_modules)?;
+    let plan = read_manifest(
+        request.manifest,
+        contract.required_modules,
+        contract.forbidden_modules,
+    )?;
     observer.observe(ProgramArchiveObservation {
         phase: "program-plan",
         state: "complete",
@@ -223,7 +231,11 @@ fn validate_linker_name(linker_name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn read_manifest(manifest: &Path, required_modules: &[&str]) -> Result<ProgramManifest, String> {
+fn read_manifest(
+    manifest: &Path,
+    required_modules: &[&str],
+    forbidden_modules: &[&str],
+) -> Result<ProgramManifest, String> {
     let plan: ProgramManifest =
         serde_json::from_slice(&std::fs::read(manifest).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
@@ -233,16 +245,24 @@ fn read_manifest(manifest: &Path, required_modules: &[&str]) -> Result<ProgramMa
     {
         return Err("invalid AOT program manifest".into());
     }
+    let module_counts = plan
+        .modules
+        .iter()
+        .fold(HashMap::new(), |mut counts, module| {
+            *counts.entry(module.module.as_str()).or_insert(0_usize) += 1;
+            counts
+        });
     for required in required_modules {
-        if plan
-            .modules
-            .iter()
-            .filter(|module| module.module == *required)
-            .count()
-            != 1
-        {
+        if module_counts.get(required).copied() != Some(1) {
             return Err(format!(
                 "AOT program must contain required module {required} exactly once"
+            ));
+        }
+    }
+    for forbidden in forbidden_modules {
+        if module_counts.contains_key(forbidden) {
+            return Err(format!(
+                "AOT program must not contain forbidden module {forbidden}"
             ));
         }
     }

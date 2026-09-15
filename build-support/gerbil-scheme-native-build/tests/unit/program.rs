@@ -58,6 +58,47 @@ fn program_requires_exactly_one_bridge() {
 }
 
 #[test]
+fn program_rejects_a_forbidden_runtime_module_before_compilation() {
+    let root = super::support::unique_temp_dir("gerbil-program-forbidden-module");
+    fs::create_dir_all(&root).unwrap();
+    let manifest = root.join("program.json");
+    fs::write(
+        &manifest,
+        serde_json::to_vec(&plan(json!([
+            {"module": "example/application", "scm": "unused.scm", "system": false},
+            {"module": "example/build-control", "scm": "unused.scm", "system": false}
+        ])))
+        .unwrap(),
+    )
+    .unwrap();
+    let observations = Observations(Mutex::new(Vec::new()), Mutex::new(Vec::new()));
+    let error = build_program_archive_with_contract(
+        ProgramArchiveRequest {
+            manifest: &manifest,
+            gsc: Path::new("/missing-compiler-must-not-run"),
+            archive_name: "test_program",
+            linker_name: "test_linker",
+            out_dir: &root.join("out"),
+        },
+        ProgramArchiveContract {
+            required_modules: &["example/application"],
+            forbidden_modules: &["example/build-control"],
+            linker_main_symbol: "example_program_main",
+            additional_objects: &[],
+        },
+        &observations,
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        "AOT program must not contain forbidden module example/build-control"
+    );
+    assert!(observations.0.into_inner().unwrap().is_empty());
+    assert!(!root.join("out").exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn program_rejects_empty_unknown_and_unversioned_plans() {
     assert_eq!(
         rejected_plan(&plan(json!([]))),
@@ -176,6 +217,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
         },
         ProgramArchiveContract {
             required_modules: &["example/application"],
+            forbidden_modules: &[],
             linker_main_symbol: "example_program_main",
             additional_objects: &[],
         },

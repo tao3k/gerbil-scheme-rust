@@ -8,7 +8,9 @@ use crate::{
     build_static_archive_from_link_plan,
 };
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::fmt;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{
@@ -76,7 +78,7 @@ const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/native"];
 pub struct ProgramArchiveObservation<'a> {
     /// Stable native phase name.
     pub phase: &'static str,
-    /// `start`, `complete`, or `failed`.
+    /// `start`, `complete`, `cached`, or `failed`.
     pub state: &'static str,
     /// Human-readable operation owned by this crate.
     pub operation: &'a str,
@@ -267,6 +269,7 @@ fn stage_program(
         .arg(&linker_c);
     let mut objects = Vec::new();
     let mut compile_sources = Vec::new();
+    let mut linker_inputs = Vec::new();
     let module_count = plan.modules.len().to_string();
     observe_program_archive_operation(
         observer,
@@ -299,7 +302,8 @@ fn stage_program(
                             module.module
                         ));
                     }
-                    link.arg(c);
+                    link.arg(&c);
+                    linker_inputs.push(c);
                     objects.push(object);
                 } else {
                     // Stage outside the source tree: gsc -link creates C next to SCM.
@@ -309,6 +313,7 @@ fn stage_program(
                     std::fs::copy(&module.scm, &staged).map_err(|e| e.to_string())?;
                     let source = generate_module_c(request.gsc, &staged, &module.module, observer)?;
                     link.arg(&source);
+                    linker_inputs.push(source.clone());
                     let object = request.out_dir.join(format!("module_{index}.o"));
                     compile_sources.push((source, object.clone(), module.module.clone()));
                     objects.push(object);
@@ -317,19 +322,33 @@ fn stage_program(
             Ok(())
         },
     )?;
-    link.arg(generate_module_c(
+    let stub_source = generate_module_c(request.gsc, &plan.stub, "program-stub", observer)?;
+    link.arg(&stub_source);
+    linker_inputs.push(stub_source);
+    let linker_fingerprint = native_inputs_fingerprint(
         request.gsc,
-        &plan.stub,
-        "program-stub",
-        observer,
-    )?);
-    run(
-        &mut link,
-        "gsc-link",
-        "generate program linker",
-        None,
-        observer,
+        "program-linker-source-v1",
+        request.linker_name,
+        &linker_inputs,
     )?;
+    let linker_cached = match linker_fingerprint.as_deref() {
+        Some(fingerprint) => cached_native_output(&linker_c, fingerprint)?,
+        None => false,
+    };
+    if linker_cached {
+        observe_cached(observer, "gsc-link", "generate program linker", None);
+    } else {
+        run(
+            &mut link,
+            "gsc-link",
+            "generate program linker",
+            None,
+            observer,
+        )?;
+        if let Some(fingerprint) = linker_fingerprint {
+            publish_native_output_fingerprint(&linker_c, &fingerprint)?;
+        }
+    }
     Ok(StagedProgram {
         objects,
         compile_sources,
@@ -345,6 +364,18 @@ fn generate_module_c(
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<PathBuf, String> {
     let source = scm.with_extension("c");
+    let fingerprint = native_input_fingerprint(gsc, "module-c-v1", "-c -o", scm)?;
+    if let Some(fingerprint) = fingerprint.as_deref() {
+        if cached_native_output(&source, fingerprint)? {
+            observe_cached(
+                observer,
+                "module-c",
+                "generate program module C",
+                Some(module),
+            );
+            return Ok(source);
+        }
+    }
     // A linker-name passed while compiling SCM also names every module's
     // entry point. Compile separately so each module keeps its own identity;
     // only the final C-only link step receives the program linker name.
@@ -355,6 +386,9 @@ fn generate_module_c(
         Some(module),
         observer,
     )?;
+    if let Some(fingerprint) = fingerprint {
+        publish_native_output_fingerprint(&source, &fingerprint)?;
+    }
     Ok(source)
 }
 
@@ -373,26 +407,32 @@ fn compile_program(
     } = staged;
     compile_program_modules(request.gsc, &compile_sources, observer)?;
     let stub_object = request.out_dir.join("program_stub.o");
-    run(
-        gerbil_command(request.gsc)
-            .args(["-obj", "-cc-options", "-O2", "-o"])
-            .arg(&stub_object)
-            .arg(plan.stub.with_extension("c")),
-        "native-object",
-        "compile program startup",
-        Some("program-stub"),
+    compile_native_object(
+        request.gsc,
+        &plan.stub.with_extension("c"),
+        &stub_object,
+        "program-startup-object-v1",
+        "-O2",
+        ProgramArchiveOperation {
+            phase: "native-object",
+            operation: "compile program startup",
+            subject: Some("program-stub"),
+        },
         observer,
     )?;
     objects.push(stub_object);
     let linker_options = format!("-O2 -Dmain={linker_main_symbol}");
-    run(
-        gerbil_command(request.gsc)
-            .args(["-obj", "-cc-options", &linker_options, "-o"])
-            .arg(&linker_object)
-            .arg(&linker_c),
-        "native-object",
-        "compile program linker",
-        Some("program-linker"),
+    compile_native_object(
+        request.gsc,
+        &linker_c,
+        &linker_object,
+        "program-linker-object-v1",
+        &linker_options,
+        ProgramArchiveOperation {
+            phase: "native-object",
+            operation: "compile program linker",
+            subject: Some("program-linker"),
+        },
         observer,
     )?;
     let (search, libraries) = native_link_options(plan)?;
@@ -471,16 +511,167 @@ fn compile_program_module(
     module: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
-    run(
-        gerbil_command(gsc)
-            .args(["-obj", "-cc-options", "-O2", "-o"])
-            .arg(object)
-            .arg(source),
-        "native-object",
-        "compile program module",
-        Some(module),
+    compile_native_object(
+        gsc,
+        source,
+        object,
+        "program-module-object-v1",
+        "-O2",
+        ProgramArchiveOperation {
+            phase: "native-object",
+            operation: "compile program module",
+            subject: Some(module),
+        },
         observer,
     )
+}
+
+fn compile_native_object(
+    gsc: &Path,
+    source: &Path,
+    object: &Path,
+    domain: &str,
+    cc_options: &str,
+    operation: ProgramArchiveOperation<'_>,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<(), String> {
+    let fingerprint = native_input_fingerprint(gsc, domain, cc_options, source)?;
+    if let Some(fingerprint) = fingerprint.as_deref() {
+        if cached_native_output(object, fingerprint)? {
+            observe_cached(
+                observer,
+                operation.phase,
+                operation.operation,
+                operation.subject,
+            );
+            return Ok(());
+        }
+    }
+    run(
+        gerbil_command(gsc)
+            .args(["-obj", "-cc-options", cc_options, "-o"])
+            .arg(object)
+            .arg(source),
+        operation.phase,
+        operation.operation,
+        operation.subject,
+        observer,
+    )?;
+    match fingerprint {
+        Some(fingerprint) => publish_native_output_fingerprint(object, &fingerprint),
+        None => Ok(()),
+    }
+}
+
+fn native_input_fingerprint(
+    compiler: &Path,
+    domain: &str,
+    options: &str,
+    input: &Path,
+) -> Result<Option<String>, String> {
+    native_inputs_fingerprint(compiler, domain, options, &[input.to_path_buf()])
+}
+
+fn native_inputs_fingerprint(
+    compiler: &Path,
+    domain: &str,
+    options: &str,
+    inputs: &[PathBuf],
+) -> Result<Option<String>, String> {
+    let compiler = match fs::canonicalize(compiler) {
+        Ok(compiler) => compiler,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(format!(
+                "resolve native compiler {}: {error}",
+                compiler.display()
+            ));
+        }
+    };
+    let compiler_metadata = fs::metadata(&compiler)
+        .map_err(|error| format!("inspect native compiler {}: {error}", compiler.display()))?;
+    let compiler_modified = compiler_metadata
+        .modified()
+        .map_err(|error| {
+            format!(
+                "inspect native compiler mtime {}: {error}",
+                compiler.display()
+            )
+        })?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| {
+            format!(
+                "invalid native compiler mtime {}: {error}",
+                compiler.display()
+            )
+        })?;
+    let mut hasher = Sha256::new();
+    for value in [
+        domain.as_bytes(),
+        options.as_bytes(),
+        compiler.as_os_str().as_encoded_bytes(),
+        &compiler_metadata.len().to_le_bytes(),
+        &compiler_modified.as_nanos().to_le_bytes(),
+    ] {
+        hasher.update((value.len() as u64).to_le_bytes());
+        hasher.update(value);
+    }
+    for input in inputs {
+        let input_bytes = fs::read(input)
+            .map_err(|error| format!("read native input {}: {error}", input.display()))?;
+        let path = input.as_os_str().as_encoded_bytes();
+        hasher.update((path.len() as u64).to_le_bytes());
+        hasher.update(path);
+        hasher.update((input_bytes.len() as u64).to_le_bytes());
+        hasher.update(input_bytes);
+    }
+    Ok(Some(format!("{:x}", hasher.finalize())))
+}
+
+fn native_output_fingerprint_path(output: &Path) -> PathBuf {
+    let mut path = output.as_os_str().to_owned();
+    path.push(".sha256");
+    PathBuf::from(path)
+}
+
+fn cached_native_output(output: &Path, fingerprint: &str) -> Result<bool, String> {
+    if !output.is_file() {
+        return Ok(false);
+    }
+    let stamp = native_output_fingerprint_path(output);
+    match fs::read_to_string(&stamp) {
+        Ok(actual) => Ok(actual == fingerprint),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!(
+            "read native output fingerprint {}: {error}",
+            stamp.display()
+        )),
+    }
+}
+
+fn publish_native_output_fingerprint(output: &Path, fingerprint: &str) -> Result<(), String> {
+    let stamp = native_output_fingerprint_path(output);
+    fs::write(&stamp, fingerprint).map_err(|error| {
+        format!(
+            "write native output fingerprint {}: {error}",
+            stamp.display()
+        )
+    })
+}
+
+fn observe_cached(
+    observer: &dyn ProgramArchiveObserver,
+    phase: &'static str,
+    operation: &str,
+    subject: Option<&str>,
+) {
+    observer.observe(ProgramArchiveObservation {
+        phase,
+        state: "cached",
+        operation,
+        subject,
+        elapsed: None,
+    });
 }
 
 fn native_build_parallelism(job_count: usize) -> usize {
@@ -606,3 +797,7 @@ pub fn observe_program_archive_operation<T>(
     });
     result
 }
+
+#[cfg(all(test, unix))]
+#[path = "../tests/unit/program_cache_scenario.rs"]
+mod cache_scenario;

@@ -17,6 +17,18 @@ program linker name must never be passed while compiling SCM: Gambit applies
 that name to module entry points too, causing duplicate identities and invalid
 runtime initialization. Conformance checks the bridge/program identities
 before entering the runtime.
+
+Generated module C, module objects, startup objects and linker artifacts are
+content-addressed inside the caller's target-specific output directory. Each
+fingerprint frames the operation domain, compiler canonical path, compiler
+metadata, exact compiler options, ordered input paths and input bytes. An exact
+match publishes a =cached= observation and skips the native command; changed
+source, compiler or options fail closed to recompilation. This cache does not
+reuse unrelated =GERBIL_PATH= objects and does not weaken the compiler-owned
+closure. The executable Scenario runs an unchanged input twice and then changes
+it, proving one warm compiler invocation is skipped and the changed input is
+compiled again.
+
 The sys crate supplies only the shared lifecycle shim in this configuration.
 It must not also load the standalone fixture graph or create another runtime.
 

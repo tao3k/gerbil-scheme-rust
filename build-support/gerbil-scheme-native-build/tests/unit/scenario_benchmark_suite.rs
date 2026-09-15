@@ -15,7 +15,7 @@ fn all_required_native_build_scenarios_have_valid_contracts() {
         receipt.receipts,
         receipt.violations,
     );
-    assert_eq!(receipt.requirements.len(), 2);
-    assert_eq!(receipt.receipts.len(), 2);
+    assert_eq!(receipt.requirements.len(), 3);
+    assert_eq!(receipt.receipts.len(), 3);
     assert!(receipt.violations.is_empty(), "{:#?}", receipt.violations);
 }

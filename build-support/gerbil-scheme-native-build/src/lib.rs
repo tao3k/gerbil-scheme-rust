@@ -8,7 +8,10 @@ mod header;
 mod native;
 mod program;
 mod toolchain;
-pub use program::{ProgramArchiveRequest, build_program_archive, source_workspace};
+pub use program::{
+    ProgramArchiveObservation, ProgramArchiveObserver, ProgramArchiveRequest,
+    build_program_archive, build_program_archive_observed, source_workspace,
+};
 
 pub use archive::{
     CargoDirective, CargoDirectiveKind, NativeArchiveLinkReceipt, NativeLinkLibrary,

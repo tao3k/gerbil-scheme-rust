@@ -39,6 +39,12 @@ It must not also load the standalone fixture graph or create another runtime.
 one-shot, thread-affine owner as =initialize=. Setup and ABI failures are
 terminal. Missing program setup has no process-backed fallback.
 
+The external program initializes Gambit with one runtime processor. This does
+not serialize the Rust host, Cargo, or its test harness: callers remain
+concurrent and enqueue work onto the unique thread-affine runtime owner. It
+prevents Gambit's internal processor pool from racing a host that is already
+scheduling concurrent initialization callers.
+
 =bind_string_export= is the narrow unsafe registration boundary. Its function
 must already belong to the initialized graph, contain Scheme exceptions, and
 transfer a fresh root from =gerbil-rs-root-string=. The returned export borrows

@@ -9,6 +9,10 @@ const NATIVE_SIGNATURE: &str = include_str!(concat!(
     "/../../scheme/native.ssi"
 ));
 const BUILD_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../build.ss"));
+const NATIVE_RUNTIME: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../native/runtime.c"
+));
 
 #[test]
 fn asp_native_surface_exports_current_shape_selectors() {
@@ -114,6 +118,14 @@ fn native_signature_is_the_tracked_gerbil_contract() {
             "native signature must include stable bridge symbol {symbol}"
         );
     }
+}
+
+#[test]
+fn external_program_runtime_keeps_parallelism_in_the_rust_host() {
+    assert!(
+        NATIVE_RUNTIME.contains("params.parallelism_level = 1;"),
+        "the thread-affine external runtime must not start a competing Gambit processor pool"
+    );
 }
 
 fn export_form(source: &str) -> &str {

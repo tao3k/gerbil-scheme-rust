@@ -33,6 +33,14 @@ int32_t gerbil_scheme_rust_runtime_init_program(
   ___setup_params_reset(&params);
   params.version = ___VERSION;
   params.linker = linker;
+  /*
+   * Rust owns one thread-affine executor for this process-global runtime.
+   * Starting Gambit's processor pool while a concurrent Rust host is already
+   * scheduling callers can make setup fail before that owner is published.
+   * Keep host concurrency outside Gambit; every Scheme call still runs on the
+   * unique runtime owner thread.
+   */
+  params.parallelism_level = 1;
   /* Failed setup is terminal too: never retry partially initialized state. */
   if (___setup(&params) != ___FIX(___NO_ERR)) {
     gerbil_scheme_rust_state = 2;

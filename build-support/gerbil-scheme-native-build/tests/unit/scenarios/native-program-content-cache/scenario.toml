@@ -1,0 +1,8 @@
+id = "native-program-content-cache"
+title = "Content-addressed native program outputs"
+policy_ids = ["RUST-AGENT-GERBIL-BUILD-001"]
+agent_goal = "Prove that unchanged compiler-owned AOT inputs reuse exact native outputs while changed inputs fail closed to recompilation."
+reference_repositories = ["tao3k/gerbil-scheme-rust"]
+reference_patterns = ["framed content fingerprint", "cached observation", "input invalidation"]
+inputs = "inputs"
+expected = "expected"

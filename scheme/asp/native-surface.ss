@@ -10,14 +10,31 @@
          gerbil_scheme_rust_i64_shape
          gerbil_scheme_rust_bool_shape
          gerbil_scheme_rust_comparison_shape
+         gerbil_scheme_rust_fixnum_shape
+         gerbil_scheme_rust_exact_integer_shape
+         gerbil_scheme_rust_char_shape
+         gerbil_scheme_rust_flonum_shape
+         gerbil_scheme_rust_bytevector_shape
+         gerbil_scheme_rust_rooted_bytes_shape
+         gerbil_scheme_rust_integer_bytes_shape
+         gerbil_scheme_rust_utf8_shape
+         gerbil_scheme_rust_value_handle_shape
+         gerbil_scheme_rust_nil_shape
+         gerbil_scheme_rust_void_shape
+         gerbil_scheme_rust_i64_callback_shape
          gerbil_scheme_rust_native_value_shape
+         gerbil_scheme_rust_native_error_shape
          gerbil_scheme_rust_native_result_shape)
 
-;; ASP-only source surface for the native Gerbil/Rust ABI exports.
+;; ASP-only source-analysis projection for the native Gerbil/Rust ABI surface.
 ;;
 ;; Keep this file out of the runtime build.  The implementation owner remains
-;; scheme/native.ss; this file gives source-analysis tools ordinary Gerbil
-;; definitions for ABI names whose implementation uses native FFI forms.
+;; scheme/native.ss and the tracked Gerbil contract is scheme/native.ssi.  This
+;; file gives source-analysis tools ordinary Gerbil definitions for ABI names
+;; and value-family shapes whose implementation uses native FFI forms.
+;;
+;; Removal criterion: retire this projection when the Gerbil provider can
+;; directly project scheme/native.ss plus scheme/native.ssi FFI exports.
 
 (def gerbil_scheme_rust_abi_version
   'native-abi-export)
@@ -84,6 +101,61 @@
     (equal . 0)
     (greater . 1)))
 
+(def gerbil_scheme_rust_fixnum_shape
+  '(native-shape
+    (name . fixnum)
+    (transport . c-abi)
+    (repr . machine-word)
+    (ownership . by-value-or-scheme-object-export)
+    (predicate . gerbil-rs-scheme-object-fixnum?-raw)
+    (projection . gerbil-rs-scheme-object-fixnum-value-raw)
+    (safe-methods (is-fixnum as-fixnum as-fixnum-i64))
+    (failure-policy . fail-closed)))
+
+(def gerbil_scheme_rust_exact_integer_shape
+  '(native-shape
+    (name . exact-integer)
+    (transport . c-abi)
+    (repr . gerbil-value-handle)
+    (scheme-representations (fixnum bignum))
+    (ownership (runtime-borrowed single-owner-rooted))
+    (predicate . gerbil-rs-scheme-object-exact-integer?-raw)
+    (checked-projections (i64 u64 usize))
+    (constructors (i64->exact-integer-root u64->exact-integer-root))
+    (safe-types (SchemeExactInteger RootedSchemeExactInteger))
+    (range-policy . reject-out-of-range-without-truncation)
+    (rooting . scheme-module-root-table)
+    (release . rust-raii-drop)
+    (failure-policy . status-preserving-fail-closed)))
+
+(def gerbil_scheme_rust_char_shape
+  '(native-shape
+    (name . char)
+    (transport . c-abi)
+    (repr . unicode-scalar-u32)
+    (ownership . by-value-or-scheme-object-export)
+    (predicate . gerbil-rs-scheme-object-char?-raw)
+    (projection . gerbil-rs-scheme-object-char-value-raw)
+    (fixtures (ascii bmp non-bmp))
+    (safe-methods (is-char as-char))
+    (validation . rust-unicode-scalar)
+    (failure-policy . fail-closed)))
+
+(def gerbil_scheme_rust_flonum_shape
+  '(native-shape
+    (name . flonum)
+    (transport . c-abi)
+    (repr . ieee-754-f64)
+    (ownership . by-value-or-scheme-object-export)
+    (predicate . gerbil-rs-scheme-object-flonum?-raw)
+    (projection . gerbil-rs-scheme-object-flonum-value-raw)
+    (fixtures (finite nan positive-infinity negative-infinity negative-zero))
+    (safe-methods (is-flonum as-flonum))
+    (nan-policy . preserve-rust-is-nan)
+    (infinity-policy . preserve-sign)
+    (zero-policy . preserve-sign)
+    (failure-policy . fail-closed)))
+
 (def gerbil_scheme_rust_utf8_shape
   '(native-shape
     (name . utf8)
@@ -107,6 +179,78 @@
     (rooting . unrooted-borrow)
     (gc-policy . no-gc-root-guarantee)))
 
+(def gerbil_scheme_rust_nil_shape
+  '(native-shape
+    (name . nil)
+    (transport . c-abi)
+    (repr . gerbil-value-handle)
+    (ownership . gerbil-runtime-owned)
+    (nullability . non-zero-handle)
+    (sentinel . empty-list)
+    (predicate . null?)
+    (projection . SchemeNil)
+    (rooting . unrooted-borrow)
+    (gc-policy . no-gc-root-guarantee)))
+
+(def gerbil_scheme_rust_void_shape
+  '(native-shape
+    (name . void)
+    (transport . c-abi)
+    (repr . gerbil-value-handle)
+    (ownership . gerbil-runtime-owned)
+    (nullability . non-zero-handle)
+    (sentinel . void)
+    (predicate . eq?-#!void)
+    (projection . SchemeVoid)
+    (rooting . unrooted-borrow)
+    (gc-policy . no-gc-root-guarantee)))
+
+(def gerbil_scheme_rust_bytevector_shape
+  '(native-shape
+    (name . bytevector)
+    (transport . c-abi)
+    (repr . gerbil-value-handle)
+    (ownership . gerbil-runtime-owned)
+    (nullability . non-zero-handle)
+    (predicate . u8vector?)
+    (projection . SchemeBytevector)
+    (accessors (length u8-ref to-vec to-bytestring))
+    (rooting . unrooted-borrow)
+    (gc-policy . no-gc-root-guarantee)))
+
+(def gerbil_scheme_rust_rooted_bytes_shape
+  '(native-shape
+    (name . rooted-bytes)
+    (transport . c-abi)
+    (repr . positive-i64-root-token)
+    (conversions (u8vector->bytestring bytestring->u8vector))
+    (aliases (bytevector->bytestring bytestring->bytevector))
+    (safe-types (RootedSchemeString RootedSchemeBytevector))
+    (delimiter . compact-or-unicode-scalar)
+    (hex-case . uppercase)
+    (rooting . scheme-module-root-table)
+    (release . rust-raii-drop)
+    (thread-affinity . runtime-owner-thread)
+    (failure-policy . zero-root-to-invalid-value)))
+
+(def gerbil_scheme_rust_integer_bytes_shape
+  '(native-shape
+    (name . integer-bytevector-conversion)
+    (transport . c-abi)
+    (scheme-operations
+     (u8vector->uint uint->u8vector u8vector->sint sint->u8vector))
+    (bytevector-aliases
+     (bytevector->uint uint->bytevector bytevector->sint sint->bytevector))
+    (machine-results (u64 i64))
+    (byte-orders (big little native))
+    (width-range . zero-through-eight-at-raw-abi)
+    (safe-explicit-width-range . one-through-eight)
+    (default-width . minimal-on-encode-entire-vector-on-decode)
+    (signed-representation . twos-complement)
+    (overflow-policy . reject-unless-explicitly-truncating)
+    (ownership . rooted-output-bytevector)
+    (failure-policy . status-preserving-fail-closed)))
+
 (def gerbil_scheme_rust_i64_callback_shape
   '(native-shape
     (name . i64-callback)
@@ -122,9 +266,12 @@
   '(native-shape
     (name . native-value)
     (transport . c-abi)
-    (scalar-values (i64 bool comparison status))
-    (borrowed-values (utf8))
-    (handle-values (runtime-handle gerbil-value-handle))
+    (scalar-values (i64 bool comparison status fixnum char flonum))
+    (sentinel-values (nil void))
+    (borrowed-values (bytevector utf8))
+    (rooted-values (bytestring bytevector exact-integer))
+    (conversion-values (integer-bytevector))
+    (handle-values (runtime-handle gerbil-value-handle exact-integer))
     (callback-values (i64-callback))
     (nullability . explicit-per-shape)
     (rooting . explicit-per-shape)))
@@ -141,6 +288,7 @@
      (abi-mismatch . gerbil-status)
      (wrong-thread . gerbil-status)
      (integer-overflow . gerbil-status)
+     (exact-integer-out-of-range . gerbil-status)
      (invalid-comparison-result . gerbil-status))
     (unknown-status-policy . preserve-code)
     (projection . optional-gerbil-status)

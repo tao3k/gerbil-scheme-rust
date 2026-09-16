@@ -1,0 +1,146 @@
+#+TITLE: Integer and Bytevector Conversion Bindings Slice
+#+DATE: 2026-07-21
+#+STATUS: Draft
+#+OPTIONS: toc:nil
+
+* Outcome
+
+This slice binds the integer conversion family owned by Gerbil
+=:std/misc/bytes= through the standalone AOT bridge:
+
+- =u8vector->uint= / =bytevector->uint=;
+- =uint->u8vector= / =uint->bytevector=;
+- =u8vector->sint= / =bytevector->sint=;
+- =sint->u8vector= / =sint->bytevector=.
+
+The runtime dependency direction remains:
+
+#+begin_example
+safe gerbil-scheme API
+  -> checked gerbil-scheme-sys status/out-pointer ABI
+  -> Gerbil/Gambit c-define raw exports
+  -> Scheme AOT conversion and root table
+#+end_example
+
+No Scheme parser, Rowan tree, or language-project-harness is introduced into
+the bindings/runtime dependency graph.  This library binds the official
+runtime conversion semantics; it does not parse Gerbil source.
+
+* Official Gerbil semantics
+
+The tracked owner is =.data/gerbil/src/std/misc/bytes.ss=.  Its implementation
+establishes the following contract:
+
+- default byte order is =big=;
+- =little= reverses significance while preserving the first =size= input bytes;
+- =native= selects the platform byte order;
+- decode defaults =size= to the complete u8vector length;
+- unsigned decode folds bytes into a non-negative exact integer;
+- signed decode tests the most-significant bit and sign-extends two's
+  complement;
+- zero-byte decode returns zero;
+- unsigned encode defaults to =uint-length-in-u8=;
+- signed encode defaults to =sint-length-in-u8=, including a leading zero byte
+  when a positive value would otherwise appear negative;
+- fixed-width writes keep the low-order bytes and therefore truncate high bits;
+- all =bytevector= names are aliases of the =u8vector= implementation.
+
+The live runtime tests pin representative official examples:
+
+| operation | expected bytes/value |
+|-----------+----------------------|
+| =uint->u8vector 1 big 2= | =#u8(0 1)= |
+| =uint->u8vector 1 little 2= | =#u8(1 0)= |
+| =uint->u8vector 258= | =#u8(1 2)= |
+| =sint->u8vector -23= | =#u8(233)= |
+| =sint->u8vector 233= | =#u8(0 233)= |
+| =u8vector->sint #u8(255)= | =-1= |
+| empty bytevector decode | =0= |
+
+* C ABI and ownership
+
+The public ABI stays at version =1= and adds checked status/out-pointer entry
+points for borrowed and rooted bytevectors.  Unsigned results use a real
+=uint64_t *= output slot, so =u64::MAX= remains distinguishable from errors.
+Signed results use =int64_t *=.  Newly encoded bytevectors return a positive
+=GerbilRootId= and are released by Rust RAII.
+
+Raw Gerbil exports use Gambit's official =unsigned-int64= and =int64= C
+interface types.  The raw layer preserves Gerbil's zero-through-eight width and
+fixed-width truncation behavior.  =gerbil-scheme-sys= validates byte order,
+width, bytevector type, root identity, input length, and output pointers before
+calling those exports.
+
+=unsafe extern "C"= remains intentionally confined to =gerbil-scheme-sys=.
+This is Rust's native C ABI declaration mechanism; bindgen would generate the
+same unsafe boundary and would not improve runtime performance or ownership
+semantics for this small curated header.
+
+* Safe Rust surface
+
+The safe crate exposes configuration values instead of argument-heavy
+functions:
+
+- =ByteOrder::{Big, Little, Native}=;
+- =IntegerWidth=, restricted to =1..=8=;
+- =IntegerEncoding::{minimal,fixed}= plus explicit =truncating()=;
+- =IntegerDecoding::{entire,prefix}=;
+- =GerbilRuntime::{uint_to_bytevector,sint_to_bytevector}=;
+- =SchemeBytevector::{to_uint,to_sint}=;
+- =RootedSchemeBytevector::{to_uint,to_sint}=.
+
+Minimal encoding and entire-vector decoding match Gerbil defaults.  The safe
+fixed-width path rejects values that do not fit.  A caller must opt into
+=truncating()= to request the official low-byte truncation behavior.  This
+keeps the general-purpose API lossless by default while retaining full access
+to Gerbil semantics.
+
+* AOT build correction
+
+The slice exposed a pre-existing ordinary-Cargo linker-name drift.  Gerbil's
+canonical generated filename encodes the complete module path, so Gambit's
+=-link= derived a long =LNK= symbol while =compile-file-to-target= emitted the
+short =LNK_native= symbol.  Tracked-SCM check mode happened to use the short
+basename on both sides.
+
+Ordinary mode now stages the fresh compiler output as =native.scm= before both
+link and compile.  It still compiles the fresh artifact; it does not substitute
+the committed SCM.  Update/check modes continue to use the committed,
+SHA-256-stamped artifact.  Both ordinary Cargo and generated-SCM check paths
+therefore link the same stable module identity.
+
+* Scenario and performance contract
+
+=integer-bytevector-round-trip= measures an eight-byte unsigned encode/decode
+and an eight-byte signed encode/decode.  Each sample includes Scheme allocation,
+root-table insertion, checked C ABI calls, integer projection, and RAII release.
+The harness records nanoseconds and enforces median below =500us= and p95 below
+=900us= for both paths.  The complete test, including runtime initialization,
+must remain below =500ms=.
+
+The first local warm AOT receipt is:
+
+| operation | median | p95 |
+|-----------+--------+-----|
+| unsigned rooted round-trip | 627ns | 686ns |
+| signed rooted round-trip | 935ns | 14321ns |
+
+The complete measured scenario took =32251542ns=.  These figures establish an
+optimization baseline; a later change must update both observed values and the
+receipt rather than weakening the sub-millisecond budgets.
+
+* Acceptance checklist
+
+- [X] official default, endian, width, signed, alias, and truncation semantics
+  audited from =:std/misc/bytes=;
+- [X] Gambit =unsigned-int64= / =int64= raw exports compiled by the AOT path;
+- [X] checked C ABI supports full =u64= and =i64= results without sentinels;
+- [X] safe fixed-width encoding rejects overflow by default;
+- [X] explicit truncation path preserves official fixed-width behavior;
+- [X] borrowed and rooted bytevector decode paths covered;
+- [X] minimal unsigned/signed encodings and empty decode covered;
+- [X] big, little, and native byte order covered;
+- [X] Scenario median/p95 nanosecond receipt added;
+- [X] generated SCM updated and remains a committed build artifact;
+- [ ] exact integer/bignum ownership outside the machine =u64=/=i64= range;
+- [ ] bulk integer-list conversion and zero-copy buffer APIs.

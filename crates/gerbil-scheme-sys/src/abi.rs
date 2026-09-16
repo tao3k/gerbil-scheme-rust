@@ -23,6 +23,20 @@ pub const GERBIL_SCHEME_RUST_HEADER_PATH: &str = "include/gerbil_scheme_rust.h";
 pub const GERBIL_SCHEME_RUST_HEADER_SOURCE: &str =
     include_str!("../../../include/gerbil_scheme_rust.h");
 
+/// Opaque Gambit global state supplied by the native lifecycle owner.
+#[repr(C)]
+#[derive(Debug)]
+pub struct GerbilGlobalState {
+    _private: [u8; 0],
+}
+
+/// Opaque Gambit module/link descriptor returned by a generated linker.
+#[repr(C)]
+#[derive(Debug)]
+pub struct GerbilModuleOrLink {
+    _private: [u8; 0],
+}
+
 /// Status returned by native binding entry points.
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -45,34 +59,6 @@ pub enum GerbilStatus {
     NotInitialized = 7,
     /// The runtime was cleaned up and cannot be restarted in this process.
     RuntimeFinalized = 8,
-}
-
-impl GerbilStatus {
-    /// Returns the stable integer representation used by the C ABI.
-    #[must_use]
-    pub const fn code(self) -> i32 {
-        self as i32
-    }
-
-    /// Decodes a status returned by the C ABI.
-    ///
-    /// Unknown values are preserved by returning `None`, allowing newer Gerbil
-    /// runtimes to extend the status space without making this binding unsound.
-    #[must_use]
-    pub const fn from_code(code: i32) -> Option<Self> {
-        match code {
-            0 => Some(Self::Ok),
-            1 => Some(Self::NullPointer),
-            2 => Some(Self::AbiMismatch),
-            3 => Some(Self::InvalidValue),
-            4 => Some(Self::RuntimeUnavailable),
-            5 => Some(Self::Panic),
-            6 => Some(Self::AlreadyInitialized),
-            7 => Some(Self::NotInitialized),
-            8 => Some(Self::RuntimeFinalized),
-            _ => None,
-        }
-    }
 }
 
 /// Borrowed UTF-8 bytes crossing the native boundary.
@@ -169,6 +155,7 @@ pub struct GerbilRuntimeOpaque {
 /// Gambit represents the universal Scheme object (`scheme-object` in Gerbil
 /// FFI) as a machine word. Keep the Rust ABI aligned with the public C header's
 /// `uintptr_t` instead of modelling it as a dereferenceable pointer.
+/// Opaque Gambit/Gerbil Scheme object word.
 pub type GerbilValueHandle = usize;
 
 /// Callback for a native binding that consumes one signed integer.
@@ -582,7 +569,7 @@ pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_as_boolean(
     GerbilStatus::Ok
 }
 
-unsafe fn checked_scheme_object_predicate(
+pub(crate) unsafe fn checked_scheme_object_predicate(
     value: GerbilValueHandle,
     out: *mut GerbilBoolean,
     predicate: unsafe extern "C" fn(GerbilValueHandle) -> i32,
@@ -601,7 +588,7 @@ unsafe fn checked_scheme_object_predicate(
     GerbilStatus::Ok
 }
 
-unsafe fn checked_scheme_object_fixture(
+pub(crate) unsafe fn checked_scheme_object_fixture(
     out: *mut GerbilValueHandle,
     fixture: unsafe extern "C" fn() -> GerbilValueHandle,
 ) -> GerbilStatus {
@@ -913,6 +900,14 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_fixture_false_raw() -> GerbilValueHandle;
 
+    pub(crate) fn gerbil_scheme_rust_fixture_fixnum_raw() -> GerbilValueHandle;
+
+    pub(crate) fn gerbil_scheme_rust_fixture_char_ascii_raw() -> GerbilValueHandle;
+
+    pub(crate) fn gerbil_scheme_rust_fixture_char_bmp_raw() -> GerbilValueHandle;
+
+    pub(crate) fn gerbil_scheme_rust_fixture_char_non_bmp_raw() -> GerbilValueHandle;
+
     /// Raw Scheme-object pair predicate exported by `scheme/native.ss`.
     ///
     /// # Safety
@@ -952,6 +947,16 @@ unsafe extern "C" {
     /// The caller must ensure that the Gerbil runtime is initialized for the
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_boolean_value_raw(value: GerbilValueHandle) -> i32;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_is_fixnum_raw(value: GerbilValueHandle) -> i32;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_fixnum_value_raw(
+        value: GerbilValueHandle,
+    ) -> isize;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_is_char_raw(value: GerbilValueHandle) -> i32;
+
+    pub(crate) fn gerbil_scheme_rust_scheme_object_char_value_raw(value: GerbilValueHandle) -> i32;
 
     /// Raw Scheme-object pair car projection exported by `scheme/native.ss`.
     ///

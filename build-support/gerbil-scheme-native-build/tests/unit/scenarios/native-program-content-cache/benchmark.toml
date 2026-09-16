@@ -1,0 +1,14 @@
+harness = "libtest"
+test = "unchanged_native_input_reuses_content_addressed_output"
+phase = "warm"
+target_total = "250ms"
+max_total = "500ms"
+observed_total = "470ms"
+regression_budget = "500ms"
+memory_budget_bytes = 134217728
+observed_memory_bytes = 0
+target_rationale = "The gate invokes a deterministic compiler fixture twice, proves one exact warm cache hit, then changes the input and proves recompilation."
+
+[observed_timings]
+content_cache_contract = "470ms"
+content_cache_contract_budget = "500ms"

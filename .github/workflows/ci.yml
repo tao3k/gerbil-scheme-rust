@@ -16,7 +16,9 @@ jobs:
   bindings:
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
-    timeout-minutes: ${{ matrix.gerbil-install == 'homebrew' && 12 || 60 }}
+    # The bottle install retains its separate 120-second receipt budget below;
+    # this outer bound also covers the full Cargo and Bazel qualification run.
+    timeout-minutes: ${{ matrix.gerbil-install == 'homebrew' && 20 || 60 }}
     strategy:
       fail-fast: false
       matrix:

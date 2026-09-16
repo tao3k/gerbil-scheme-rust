@@ -2,8 +2,12 @@
 mod archive;
 #[path = "unit/discovery.rs"]
 mod discovery;
+#[path = "unit/generated_scm.rs"]
+mod generated_scm;
 #[path = "unit/header.rs"]
 mod header;
+#[path = "unit/program.rs"]
+mod program;
 #[path = "unit/scenario_benchmark_suite.rs"]
 mod scenario_benchmark_suite;
 #[path = "unit/support.rs"]

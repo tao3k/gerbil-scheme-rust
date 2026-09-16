@@ -1,0 +1,20 @@
+harness = "libtest"
+test = "integer_bytevector_round_trip_stays_sub_millisecond"
+phase = "warm"
+target_total = "250ms"
+max_total = "500ms"
+observed_total = "32.251542ms"
+regression_budget = "250ms"
+memory_budget_bytes = 16777216
+observed_memory_bytes = 0
+target_rationale = "Each eight-byte round trip includes Scheme AOT integer conversion, root-table ownership, checked C ABI projection, and RAII release; median and p95 remain hard sub-millisecond gates."
+
+[observed_timings]
+median_unsigned_round_trip = "627ns"
+median_unsigned_round_trip_budget = "500us"
+p95_unsigned_round_trip = "686ns"
+p95_unsigned_round_trip_budget = "900us"
+median_signed_round_trip = "935ns"
+median_signed_round_trip_budget = "500us"
+p95_signed_round_trip = "14321ns"
+p95_signed_round_trip_budget = "900us"

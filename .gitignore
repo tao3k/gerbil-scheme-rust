@@ -6,6 +6,9 @@
 *.scm
 *.c
 !native/runtime.c
+!scheme/native.ssi
+!scheme/generated/
+!scheme/generated/native.scm
 *.o
 *.so
 *.dylib

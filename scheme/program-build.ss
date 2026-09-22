@@ -44,9 +44,9 @@
       (call-with-output-file (path-expand "program.json" output-dir)
         (lambda (port)
           (write-json
+           port
            (hash ("schema" "gerbil-scheme-rust.aot-program.v1")
                  ("modules" (list->vector modules))
                  ("stub" (string-append output "__exe.scm"))
                  ("library_dir" (path-expand "lib" home))
-                 ("link_options" (list->vector link-options)))
-           port))))))
+                 ("link_options" (list->vector link-options)))))))))

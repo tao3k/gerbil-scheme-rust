@@ -29,7 +29,7 @@
 ;; ASP-only source-analysis projection for the native Gerbil/Rust ABI surface.
 ;;
 ;; Keep this file out of the runtime build.  The implementation owner remains
-;; scheme/native.ss and the tracked Gerbil contract is scheme/native.ssi.  This
+;; scheme/native.ss and its V19 compiler interface is scheme/native.ssi.  This
 ;; file gives source-analysis tools ordinary Gerbil definitions for ABI names
 ;; and value-family shapes whose implementation uses native FFI forms.
 ;;

@@ -30,14 +30,14 @@ Current Rust ABI evidence:
 - =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
   callback trampoline behavior.
 - =source_surface= integration tests cover the Scheme ASP source-surface export
-  set, the tracked =scheme/native.ssi= contract, and the rule that
+  set, the =scheme/native.ss= FFI contract, and the rule that
   =scheme/asp/native-surface.ss= stays out of the runtime build.
 
 Current Scheme source-surface evidence:
 
 - =scheme/native.ss= remains the runtime implementation owner.
-- =scheme/native.ssi= is the tracked Gerbil signature contract for exported
-  bridge symbols.
+- =scheme/native.ssi= is the tracked V19 compiler-generated interface for the
+  Scheme exports; =scheme/native.ss= owns the native FFI symbol contract.
 - =scheme/asp/native-surface.ss= is still the temporary ASP-projected
   workaround for the source-surface view; it must stay out of =build.ss= and can
   be retired once the provider projects =scheme/native.ss= plus

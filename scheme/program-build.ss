@@ -2,9 +2,8 @@
 ;;; Build-time only: preserve the compiler-owned runtime dependency graph.
 (import :gerbil/compiler
         :gerbil/expander
-        :std/srfi/1
-        :std/srfi/13
-        :std/text/json)
+        (only-in :std/list/list delete-duplicates/hash)
+        (only-in :std/encoding/json write-json))
 (export gerbil-rs-stage-program)
 
 ;; The versioned compiler adapter lives here, never in a downstream Rust
@@ -24,13 +23,13 @@
           (filter (lambda (ctx)
                     (not (string-prefix? "gerbil/core" (symbol->string (expander-context-id ctx)))))
                   (append dependencies (list context))))
-         (ids (delete-duplicates
+         (ids (delete-duplicates/hash
                (append gerbil-runtime-modules
                        ;; Preserve compile-exe's system-before-user link order.
                        (map (lambda (ctx) (symbol->string (expander-context-id ctx)))
                             (append (filter system-context? contexts)
-                                    (filter (lambda (ctx) (not (system-context? ctx))) contexts))))
-               string=?)))
+                                    (filter (lambda (ctx) (not (system-context? ctx)))
+                                            contexts)))))))
     ;; The entry module's main must return normally without entering an event
     ;; loop. Its ordinary exports become callable after shared runtime setup.
     (compile-exe source [invoke-gsc: #f keep-scm: #t optimize: #t output-file: output])

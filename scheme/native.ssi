@@ -1,81 +1,119 @@
-;;; Gerbil Scheme Rust bridge exported symbol contract.
-;;;
-;;; This signature mirrors the stable bridge surface implemented by
-;;; `scheme/native.ss`.  `scheme/generated/native.scm` is the tracked
-;;; Gerbil/Gambit lowered generated-source artifact and is protected by the
-;;; generated-SCM drift check.
+prelude: :gerbil/core
+package: gerbil-scheme-rust/scheme
+namespace: gerbil-scheme-rust/scheme/native
 
-(export
-  gerbil-rs-root-string
-  ;; Scalar control proofs.
-  gerbil-rs-abi-version
-  gerbil-rs-add-i64
-  gerbil-rs-is-even-i64
-  gerbil-rs-compare-i64
-
-  ;; Scheme object fixtures.
-  gerbil-rs-scheme-null-value-raw
-  gerbil-rs-fixture-void-raw
-  gerbil-rs-fixture-pair-raw
-  gerbil-rs-fixture-proper-list-raw
-  gerbil-rs-fixture-improper-list-raw
-  gerbil-rs-fixture-true-raw
-  gerbil-rs-fixture-false-raw
-  gerbil-rs-fixture-fixnum-raw
-  gerbil-rs-fixture-exact-integer-large-positive-raw
-  gerbil-rs-fixture-exact-integer-large-negative-raw
-  gerbil-rs-fixture-char-ascii-raw
-  gerbil-rs-fixture-char-bmp-raw
-  gerbil-rs-fixture-char-non-bmp-raw
-  gerbil-rs-fixture-flonum-finite-raw
-  gerbil-rs-fixture-flonum-nan-raw
-  gerbil-rs-fixture-flonum-pos-inf-raw
-  gerbil-rs-fixture-flonum-neg-inf-raw
-  gerbil-rs-fixture-flonum-neg-zero-raw
-  gerbil-rs-fixture-bytevector-raw
-
-  ;; Scheme object predicates.
-  gerbil-rs-scheme-object-null?-raw
-  gerbil-rs-scheme-object-void?-raw
-  gerbil-rs-scheme-object-bytevector?-raw
-  gerbil-rs-scheme-object-pair?-raw
-  gerbil-rs-scheme-object-list?-raw
-  gerbil-rs-scheme-object-boolean?-raw
-  gerbil-rs-scheme-object-fixnum?-raw
-  gerbil-rs-scheme-object-char?-raw
-  gerbil-rs-scheme-object-flonum?-raw
-
-  ;; Scheme object projections.
-  gerbil-rs-scheme-object-boolean-value-raw
-  gerbil-rs-scheme-object-fixnum-value-raw
-  gerbil-rs-scheme-object-exact-integer?-raw
-  gerbil-rs-scheme-object-exact-integer-fits-i64?-raw
-  gerbil-rs-scheme-object-exact-integer-fits-u64?-raw
-  gerbil-rs-scheme-object-exact-integer-i64-value-raw
-  gerbil-rs-scheme-object-exact-integer-u64-value-raw
-  gerbil-rs-scheme-object-char-value-raw
-  gerbil-rs-scheme-object-flonum-value-raw
-  gerbil-rs-scheme-object-bytevector-length-raw
-  gerbil-rs-scheme-object-bytevector-u8-ref-raw
-  gerbil-rs-bytevector->bytestring-root-raw
-  gerbil-rs-bytestring->bytevector-root-raw
-  gerbil-rs-bytevector->uint-raw
-  gerbil-rs-bytevector->sint-raw
-  gerbil-rs-root-bytevector->uint-raw
-  gerbil-rs-root-bytevector->sint-raw
-  gerbil-rs-uint->bytevector-root-raw
-  gerbil-rs-sint->bytevector-root-raw
-  gerbil-rs-i64->exact-integer-root-raw
-  gerbil-rs-u64->exact-integer-root-raw
-  gerbil-rs-root-exact-integer?-raw
-  gerbil-rs-root-exact-integer-fits-i64?-raw
-  gerbil-rs-root-exact-integer-fits-u64?-raw
-  gerbil-rs-root-exact-integer-i64-value-raw
-  gerbil-rs-root-exact-integer-u64-value-raw
-  gerbil-rs-root-string-length-raw
-  gerbil-rs-root-string-char-ref-raw
-  gerbil-rs-root-bytevector-length-raw
-  gerbil-rs-root-bytevector-u8-ref-raw
-  gerbil-rs-root-release-raw
-  gerbil-rs-scheme-object-pair-car-raw
-  gerbil-rs-scheme-object-pair-cdr-raw)
+(%#begin (%#export
+          (spec: 0 gerbil-rs-root-string gerbil-rs-root-string)
+          (spec: 0 gerbil-rs-abi-version gerbil-rs-abi-version)
+          (spec: 0 gerbil-rs-add-i64 gerbil-rs-add-i64)
+          (spec: 0 gerbil-rs-is-even-i64 gerbil-rs-is-even-i64)
+          (spec: 0 gerbil-rs-compare-i64 gerbil-rs-compare-i64))
+         (%#define-runtime
+          gerbil-rs-abi-version
+          gerbil-scheme-rust/scheme/native#gerbil-rs-abi-version)
+         (%#define-runtime
+          gerbil-rs-add-i64
+          gerbil-scheme-rust/scheme/native#gerbil-rs-add-i64)
+         (%#define-runtime
+          gerbil-rs-is-even-i64
+          gerbil-scheme-rust/scheme/native#gerbil-rs-is-even-i64)
+         (%#define-runtime
+          gerbil-rs-compare-i64
+          gerbil-scheme-rust/scheme/native#gerbil-rs-compare-i64)
+         (%#define-runtime
+          gerbil-rs-next-root-id
+          gerbil-scheme-rust/scheme/native#gerbil-rs-next-root-id)
+         (%#define-runtime
+          gerbil-rs-rooted-values
+          gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values)
+         (%#define-runtime
+          gerbil-rs-root-string
+          gerbil-scheme-rust/scheme/native#gerbil-rs-root-string)
+         (%#define-runtime
+          gerbil-rs-rooted-value-store!
+          gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-store!)
+         (%#define-runtime
+          gerbil-rs-rooted-value-ref
+          gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref)
+         (%#define-runtime
+          gerbil-rs-rooted-values-remove
+          gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values-remove)
+         (%#define-runtime
+          gerbil-rs-rooted-value-release!
+          gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-release!)
+         (%#define-runtime
+          gerbil-rs-bytestring-delimiter
+          gerbil-scheme-rust/scheme/native#gerbil-rs-bytestring-delimiter)
+         (%#define-runtime
+          gerbil-rs-upper-hex-digits
+          gerbil-scheme-rust/scheme/native#gerbil-rs-upper-hex-digits)
+         (%#define-runtime
+          gerbil-rs-upper-hex-digit
+          gerbil-scheme-rust/scheme/native#gerbil-rs-upper-hex-digit)
+         (%#define-runtime
+          gerbil-rs-hex-value
+          gerbil-scheme-rust/scheme/native#gerbil-rs-hex-value)
+         (%#define-runtime
+          gerbil-rs-u8vector->bytestring
+          gerbil-scheme-rust/scheme/native#gerbil-rs-u8vector->bytestring)
+         (%#define-runtime
+          gerbil-rs-hex-byte
+          gerbil-scheme-rust/scheme/native#gerbil-rs-hex-byte)
+         (%#define-runtime
+          gerbil-rs-bytestring->u8vector
+          gerbil-scheme-rust/scheme/native#gerbil-rs-bytestring->u8vector)
+         (%#define-runtime
+          gerbil-rs-bytevector->bytestring-root
+          gerbil-scheme-rust/scheme/native#gerbil-rs-bytevector->bytestring-root)
+         (%#define-runtime
+          gerbil-rs-bytestring->bytevector-root
+          gerbil-scheme-rust/scheme/native#gerbil-rs-bytestring->bytevector-root)
+         (%#define-runtime
+          gerbil-rs-u8vector->uint
+          gerbil-scheme-rust/scheme/native#gerbil-rs-u8vector->uint)
+         (%#define-runtime
+          gerbil-rs-u8vector->sint
+          gerbil-scheme-rust/scheme/native#gerbil-rs-u8vector->sint)
+         (%#define-runtime
+          gerbil-rs-uint->u8vector
+          gerbil-scheme-rust/scheme/native#gerbil-rs-uint->u8vector)
+         (%#define-runtime
+          gerbil-rs-sint->u8vector
+          gerbil-scheme-rust/scheme/native#gerbil-rs-sint->u8vector)
+         (%#define-runtime
+          gerbil-rs-root-bytevector->uint
+          gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector->uint)
+         (%#define-runtime
+          gerbil-rs-root-bytevector->sint
+          gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector->sint)
+         (%#define-runtime
+          gerbil-rs-uint->bytevector-root
+          gerbil-scheme-rust/scheme/native#gerbil-rs-uint->bytevector-root)
+         (%#define-runtime
+          gerbil-rs-sint->bytevector-root
+          gerbil-scheme-rust/scheme/native#gerbil-rs-sint->bytevector-root)
+         (%#define-runtime
+          gerbil-rs-i64-min
+          gerbil-scheme-rust/scheme/native#gerbil-rs-i64-min)
+         (%#define-runtime
+          gerbil-rs-i64-max
+          gerbil-scheme-rust/scheme/native#gerbil-rs-i64-max)
+         (%#define-runtime
+          gerbil-rs-u64-max
+          gerbil-scheme-rust/scheme/native#gerbil-rs-u64-max)
+         (%#define-runtime
+          gerbil-rs-exact-integer?
+          gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer?)
+         (%#define-runtime
+          gerbil-rs-exact-integer-fits-i64?
+          gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-i64?)
+         (%#define-runtime
+          gerbil-rs-exact-integer-fits-u64?
+          gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-u64?)
+         (%#define-runtime
+          gerbil-rs-i64->exact-integer-root
+          gerbil-scheme-rust/scheme/native#gerbil-rs-i64->exact-integer-root)
+         (%#define-runtime
+          gerbil-rs-u64->exact-integer-root
+          gerbil-scheme-rust/scheme/native#gerbil-rs-u64->exact-integer-root))
+(%#call (%#ref load-module) (%#quote "gerbil-scheme-rust/scheme/native~0"))

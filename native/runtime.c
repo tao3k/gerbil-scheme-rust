@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later */
-#define ___VERSION 409007
+#define ___VERSION 409008
 #include "gambit.h"
 
 #include <stdint.h>

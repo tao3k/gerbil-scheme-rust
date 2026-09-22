@@ -4,9 +4,9 @@ const ASP_NATIVE_SURFACE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../scheme/asp/native-surface.ss"
 ));
-const NATIVE_SIGNATURE: &str = include_str!(concat!(
+const NATIVE_SOURCE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../scheme/native.ssi"
+    "/../../scheme/native.ss"
 ));
 const BUILD_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../build.ss"));
 const NATIVE_RUNTIME: &str = include_str!(concat!(
@@ -77,7 +77,7 @@ fn asp_native_surface_stays_out_of_runtime_build() {
 }
 
 #[test]
-fn native_signature_is_the_tracked_gerbil_contract() {
+fn native_source_is_the_tracked_ffi_contract() {
     for symbol in [
         "gerbil-rs-fixture-fixnum-raw",
         "gerbil-rs-fixture-exact-integer-large-positive-raw",
@@ -114,8 +114,8 @@ fn native_signature_is_the_tracked_gerbil_contract() {
         "gerbil-rs-root-release-raw",
     ] {
         assert!(
-            NATIVE_SIGNATURE.contains(symbol),
-            "native signature must include stable bridge symbol {symbol}"
+            NATIVE_SOURCE.contains(symbol),
+            "native source must include stable bridge symbol {symbol}"
         );
     }
 }

@@ -28,18 +28,19 @@ Gerbil =.ss= modules own runtime semantics:
 Scheme object projection must happen in Gerbil, not by Rust decoding raw
 handles.
 
-** Gerbil signature =.ssi=
+** Gerbil compiler interface =.ssi=
 
-Gerbil =.ssi= files should become the bridge contract for exported Scheme
-symbols. New bridge slices should add or update signatures alongside =.ss=
-implementation when the exported surface is meant to be stable.
+Gerbil V19 generates =.ssi= compiler interfaces from the exported Scheme
+surface. New bridge slices update =.ss=; the V19 build then regenerates the
+matching interface alongside the lowered =.scm= artifact.
 
-=scheme/native.ssi= is the tracked source contract for the current native
-bridge. Generated =.scm= files may be tracked when they are treated as
-Gerbil/Gambit lowered generated-source artifacts, but only with a deterministic
-regeneration check that fails on drift.
+=scheme/native.ss= owns the current native FFI contract and
+=scheme/native.ssi= is its tracked V19 compiler interface. Generated =.scm=
+files may be tracked when they are treated as Gerbil/Gambit lowered
+generated-source artifacts, but only with a deterministic regeneration check
+that fails on drift.
 
-The signature layer should make these boundaries explicit:
+The source contract should make these boundaries explicit:
 
 - exported bridge symbol names;
 - whether a function is a predicate, projection, or fixture;

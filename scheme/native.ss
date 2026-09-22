@@ -1,73 +1,18 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(import :std/foreign)
-(export
-  gerbil-rs-root-string
-  gerbil-rs-abi-version
-  gerbil-rs-add-i64
-  gerbil-rs-is-even-i64
-  gerbil-rs-compare-i64
-  gerbil-rs-scheme-null-value-raw
-  gerbil-rs-fixture-void-raw
-  gerbil-rs-fixture-pair-raw
-  gerbil-rs-fixture-proper-list-raw
-  gerbil-rs-fixture-improper-list-raw
-  gerbil-rs-fixture-true-raw
-  gerbil-rs-fixture-false-raw
-  gerbil-rs-fixture-fixnum-raw
-  gerbil-rs-fixture-exact-integer-large-positive-raw
-  gerbil-rs-fixture-exact-integer-large-negative-raw
-  gerbil-rs-fixture-char-ascii-raw
-  gerbil-rs-fixture-char-bmp-raw
-  gerbil-rs-fixture-char-non-bmp-raw
-  gerbil-rs-fixture-flonum-finite-raw
-  gerbil-rs-fixture-flonum-nan-raw
-  gerbil-rs-fixture-flonum-pos-inf-raw
-  gerbil-rs-fixture-flonum-neg-inf-raw
-  gerbil-rs-fixture-flonum-neg-zero-raw
-  gerbil-rs-fixture-bytevector-raw
-  gerbil-rs-scheme-object-null?-raw
-  gerbil-rs-scheme-object-void?-raw
-  gerbil-rs-scheme-object-bytevector?-raw
-  gerbil-rs-scheme-object-pair?-raw
-  gerbil-rs-scheme-object-list?-raw
-  gerbil-rs-scheme-object-boolean?-raw
-  gerbil-rs-scheme-object-boolean-value-raw
-  gerbil-rs-scheme-object-fixnum?-raw
-  gerbil-rs-scheme-object-fixnum-value-raw
-  gerbil-rs-scheme-object-exact-integer?-raw
-  gerbil-rs-scheme-object-exact-integer-fits-i64?-raw
-  gerbil-rs-scheme-object-exact-integer-fits-u64?-raw
-  gerbil-rs-scheme-object-exact-integer-i64-value-raw
-  gerbil-rs-scheme-object-exact-integer-u64-value-raw
-  gerbil-rs-scheme-object-char?-raw
-  gerbil-rs-scheme-object-char-value-raw
-  gerbil-rs-scheme-object-flonum?-raw
-  gerbil-rs-scheme-object-flonum-value-raw
-  gerbil-rs-scheme-object-bytevector-length-raw
-  gerbil-rs-scheme-object-bytevector-u8-ref-raw
-  gerbil-rs-bytevector->bytestring-root-raw
-  gerbil-rs-bytestring->bytevector-root-raw
-  gerbil-rs-bytevector->uint-raw
-  gerbil-rs-bytevector->sint-raw
-  gerbil-rs-root-bytevector->uint-raw
-  gerbil-rs-root-bytevector->sint-raw
-  gerbil-rs-uint->bytevector-root-raw
-  gerbil-rs-sint->bytevector-root-raw
-  gerbil-rs-i64->exact-integer-root-raw
-  gerbil-rs-u64->exact-integer-root-raw
-  gerbil-rs-root-exact-integer?-raw
-  gerbil-rs-root-exact-integer-fits-i64?-raw
-  gerbil-rs-root-exact-integer-fits-u64?-raw
-  gerbil-rs-root-exact-integer-i64-value-raw
-  gerbil-rs-root-exact-integer-u64-value-raw
-  gerbil-rs-root-string-length-raw
-  gerbil-rs-root-string-char-ref-raw
-  gerbil-rs-root-bytevector-length-raw
-  gerbil-rs-root-bytevector-u8-ref-raw
-  gerbil-rs-root-release-raw
-  gerbil-rs-scheme-object-pair-car-raw
-  gerbil-rs-scheme-object-pair-cdr-raw)
+(export gerbil-rs-root-string
+        gerbil-rs-abi-version
+        gerbil-rs-add-i64
+        gerbil-rs-is-even-i64
+        gerbil-rs-compare-i64)
+
+(def (gerbil-rs-abi-version) 1)
+(def (gerbil-rs-add-i64 left right) (+ left right))
+(def (gerbil-rs-is-even-i64 value) (if (even? value) 1 0))
+(def (gerbil-rs-compare-i64 left right)
+  (cond ((< left right) -1)
+        ((> left right) 1)
+        (else 0)))
 
 ;; Values created by conversion APIs must remain reachable across the C ABI.
 ;; Rust owns the returned positive token and releases it through the matching
@@ -299,11 +244,13 @@
 
 ;; This is intentionally a scalar ABI proof. Rich values stay behind an opaque
 ;; runtime boundary until ownership, error, and thread contracts are versioned.
-(begin-ffi
-  (gerbil-rs-abi-version
-   gerbil-rs-add-i64
-   gerbil-rs-is-even-i64
-   gerbil-rs-compare-i64
+(begin-foreign
+  (namespace
+   ("gerbil-scheme-rust/scheme/native#"
+   gerbil-rs-abi-version-native
+   gerbil-rs-add-i64-native
+   gerbil-rs-is-even-i64-native
+   gerbil-rs-compare-i64-native
    gerbil-rs-scheme-null-value-raw
    gerbil-rs-fixture-void-raw
    gerbil-rs-fixture-pair-raw
@@ -364,33 +311,30 @@
    gerbil-rs-root-bytevector-u8-ref-raw
    gerbil-rs-root-release-raw
    gerbil-rs-scheme-object-pair-car-raw
-   gerbil-rs-scheme-object-pair-cdr-raw)
-  (c-define (gerbil-rs-abi-version)
+   gerbil-rs-scheme-object-pair-cdr-raw))
+  (c-define (gerbil-rs-abi-version-native)
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
     "extern"
-    1)
-  (c-define (gerbil-rs-add-i64 left right)
+    (gerbil-scheme-rust/scheme/native#gerbil-rs-abi-version))
+  (c-define (gerbil-rs-add-i64-native left right)
     (int64 int64) int64
     "gerbil_scheme_rust_add_i64"
     "extern"
-      (+ left right))
-  (c-define (gerbil-rs-is-even-i64 value)
+      (gerbil-scheme-rust/scheme/native#gerbil-rs-add-i64 left right))
+  (c-define (gerbil-rs-is-even-i64-native value)
       (int64)
       int32
       "gerbil_scheme_rust_is_even_i64"
       "extern"
-    (if (even? value) 1 0))
+    (gerbil-scheme-rust/scheme/native#gerbil-rs-is-even-i64 value))
 
-  (c-define (gerbil-rs-compare-i64 left right)
+  (c-define (gerbil-rs-compare-i64-native left right)
       (int64 int64)
       int32
       "gerbil_scheme_rust_compare_i64"
       "extern"
-    (cond
-     ((< left right) -1)
-     ((> left right) 1)
-     (else 0)))
+    (gerbil-scheme-rust/scheme/native#gerbil-rs-compare-i64 left right))
 
 (c-define (gerbil-rs-scheme-null-value-raw)
     ()

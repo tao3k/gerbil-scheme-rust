@@ -8,7 +8,7 @@ bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "gerbil_bazel", version = "0.1.0")
 git_override(
     module_name = "gerbil_bazel",
-    commit = "a1bc9ce7191c6fa2ea5550854398ca4f9c25c2e3",
+    commit = "e5296bf8c2c183c5e647d58fbb389570341a743d",
     remote = "https://github.com/tao3k/gerbil-bazel.git",
 )
 
@@ -16,8 +16,7 @@ gerbil = use_extension("@gerbil_bazel//gerbil:extensions.bzl", "gerbil")
 gerbil.host(
     name = "shared_gerbil",
     expected_version_prefixes = [
-        "Gerbil 07c8481",
-        "Gerbil v0.18.2",
+        "Gerbil d801e7a",
     ],
 )
 use_repo(gerbil, "shared_gerbil")

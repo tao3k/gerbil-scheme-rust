@@ -1,5 +1,9 @@
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
-load("@gerbil_bazel//gerbil:defs.bzl", "gerbil_project_test")
+load(
+    "@gerbil_bazel//gerbil:defs.bzl",
+    "gerbil_project_compile",
+    "gerbil_project_test",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -104,13 +108,18 @@ sh_test(
     timeout = "long",
 )
 
+gerbil_project_compile(
+    name = "gerbil_native_compile",
+    args = ["compile"],
+    build_script = "build.ss",
+    srcs = [":gerbil_sources"],
+)
+
 gerbil_project_test(
     name = "gerbil_native",
-    build_args = ["compile"],
-    build_script = "build.ss",
+    project = ":gerbil_native_compile",
     tests = ["scheme/test-native.ss"],
     timeout = "short",
-    srcs = [":gerbil_sources"],
 )
 
 test_suite(

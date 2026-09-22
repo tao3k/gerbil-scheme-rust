@@ -9,6 +9,7 @@
 !scheme/native.ssi
 !scheme/generated/
 !scheme/generated/native.scm
+!build-support/gerbil-scheme-native-build/tests/unit/scenarios/native-program-content-cache/inputs/module.scm
 *.o
 *.so
 *.dylib

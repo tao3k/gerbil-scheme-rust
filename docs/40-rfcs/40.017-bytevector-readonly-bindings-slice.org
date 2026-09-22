@@ -1,0 +1,70 @@
+#+TITLE: Bytevector Read-only Bindings Slice
+#+DATE: 2026-07-21
+#+OPTIONS: toc:nil
+
+* Scope
+
+This slice adds a read-only runtime-backed Scheme bytevector projection to the
+generic =gerbil-scheme-rust= bindings library.
+
+It is intentionally smaller than the complete byte/u8vector utility family.
+The following remain open until ownership, allocation, mutation, endian, and
+signedness policies are specified:
+
+- =u8vector-init!=
+- =u8vector-every=
+- =u8vector-reverse= and =u8vector-reverse!=
+- =u8vector->bytestring= and =bytestring->u8vector= (closed by 40.018)
+- =u8vector->uint= and =uint->u8vector=
+- =u8vector->sint= and =sint->u8vector=
+- =bytevector->bytestring= and =bytestring->bytevector= (closed by 40.018)
+- =bytevector->uint= and =uint->bytevector=
+
+* Accepted surface
+
+- Scheme source exports a =#u8(...)= fixture through
+  =gerbil-rs-fixture-bytevector-raw=.
+- Scheme source exports bytevector classification through
+  =gerbil-rs-scheme-object-bytevector?-raw=.
+- Scheme source exports read-only byte accessors:
+  - =gerbil-rs-scheme-object-bytevector-length-raw=
+  - =gerbil-rs-scheme-object-bytevector-u8-ref-raw=
+- =gerbil-scheme-sys= owns the bytevector ABI in a focused module instead of
+  growing =abi.rs=.
+- =gerbil-scheme= exposes =SchemeBytevector=,
+  =GerbilValue::is_bytevector=, =GerbilValue::as_bytevector=,
+  and =GerbilRuntime::fixture_bytevector_value=.
+- =SchemeBytevector= exposes =len=, =is_empty=, =u8_at=, and =to_vec=.
+
+* Boundary decisions
+
+The first accepted bytevector surface is read-only.
+
+Mutation and allocation are deferred because they need separate contracts for:
+
+- whether Rust or Gerbil owns allocated byte storage;
+- whether a returned bytevector is rooted or only borrowed;
+- whether mutation is in-place against a Gerbil-owned object;
+- how errors are represented for index, endian, signedness, and overflow;
+- whether conversions use strings, byte strings, or raw byte buffers.
+
+* Runtime fixture
+
+The accepted fixture bytes are:
+
+#+begin_src scheme
+#u8(255 127 11 1 0)
+#+end_src
+
+This fixture intentionally covers high byte, ASCII byte, small byte, one, and
+zero.
+
+* Next checklist expansion
+
+- [X] Add bytestring conversion in the Scheme AOT bridge with explicit rooted
+  result tokens and Rust RAII release; see =40.018=.
+- Add unsigned integer conversion after locking endian argument representation.
+- Add signed integer conversion after locking two's-complement width and
+  overflow policy.
+- Add mutation APIs only after adding scenario tests that prove object identity
+  and post-mutation byte contents.

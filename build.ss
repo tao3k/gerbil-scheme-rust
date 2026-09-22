@@ -6,5 +6,6 @@
 ;; Canonical Gerbil build truth. Cargo owns Rust dependency resolution and
 ;; Bazel invokes this script as an outer orchestration layer.
 (defbuild-script
-  '("scheme/native")
+  '("scheme/native" "scheme/program-build")
+  optimize: #t
   parallelize: 1)

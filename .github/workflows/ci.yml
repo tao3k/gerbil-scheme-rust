@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   bindings:
-    name: Gerbil V19 bindings (${{ matrix.os }})
+    name: Gerbil v0.19 bindings (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -25,7 +25,7 @@ jobs:
           - macos-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
-      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v19
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -47,7 +47,7 @@ jobs:
           brew list --formula ghostscript >/dev/null 2>&1 && brew unlink ghostscript || true
           brew install gcc jq
 
-      - name: Download immutable Gerbil V19 release artifact
+      - name: Download immutable Gerbil v0.19 release artifact
         shell: bash
         run: tools/ci/install-gerbil-release.sh "$GERBIL_RELEASE_ROOT"
 
@@ -67,7 +67,7 @@ jobs:
         with:
           bazelisk-cache: true
           cache-save: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
-          disk-cache: gerbil-v19-${{ runner.os }}-${{ runner.arch }}
+          disk-cache: gerbil-v0.19-${{ runner.os }}-${{ runner.arch }}
           repository-cache: true
 
       - name: Cargo format

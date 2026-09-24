@@ -354,11 +354,21 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             start,
             end,
         } => {
-            let token_start = compile_offset(start)?;
-            let token_end = compile_offset(end)?;
+            let token_start = if let EventOffsetIr::Boundary(EventBoundaryIr::Start) = start {
+                quote! { start, }
+            } else {
+                let value = compile_offset(start)?;
+                quote! { start: #value, }
+            };
+            let token_end = if let EventOffsetIr::Boundary(EventBoundaryIr::End) = end {
+                quote! { end, }
+            } else {
+                let value = compile_offset(end)?;
+                quote! { end: #value, }
+            };
             quote! {
                 events.push(TreeEvent::Token {
-                    kind: #syntax_kind, start: #token_start, end: #token_end
+                    kind: #syntax_kind, #token_start #token_end
                 });
             }
         }
@@ -442,7 +452,7 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
                 line.get(..#value.len())
                     .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
                     .and_then(|_| line.as_bytes()[#value.len()..]
-                        .iter().skip_while(|byte| matches!(byte, b' ' | b'\t')).next())
+                        .iter().find(|byte| !matches!(byte, b' ' | b'\t')))
                     .is_some_and(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
             }
         }

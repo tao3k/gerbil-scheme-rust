@@ -359,6 +359,36 @@ fn dynamic_key_line_offsets_preserve_value_and_trivia() {
 }
 
 #[test]
+fn nonspace_delimiter_scan_compiles_source_backed_offsets() {
+    let mut document = stateful_document();
+    let key_end = json!({
+        "kind": "line_scan_nonspace_until",
+        "from": "start",
+        "delimiter": 58
+    });
+    document["line"] = json!([
+        {"kind": "start_node", "syntax_kind": 1},
+        {"kind": "token", "syntax_kind": 3, "start": "start", "end": key_end},
+        {"kind": "token", "syntax_kind": 5, "start": key_end, "end": "end"},
+        {"kind": "finish_node"}
+    ]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string()).expect("byte scan IR compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("A+B: yes\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 3 },
+                Token { kind: 5, start: 3, end: 9 },
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
 fn bounded_line_byte_fold_emits_source_backed_segments() {
     let mut document = stateful_document();
     let index = json!({"kind": "line_index", "name": "cursor"});

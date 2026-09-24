@@ -160,6 +160,11 @@ pub enum EventComputedOffsetIr {
     LineScanWord { from: Box<EventOffsetIr> },
     /// Scan an ASCII identifier composed of letters, digits, underscore and hyphen.
     LineScanKey { from: Box<EventOffsetIr> },
+    /// Scan non-whitespace bytes up to a declared delimiter within one source line.
+    LineScanNonspaceUntil {
+        from: Box<EventOffsetIr>,
+        delimiter: u8,
+    },
     /// Move one byte forward without passing the current line boundary.
     LineStep { from: Box<EventOffsetIr> },
     /// Remove trailing ASCII whitespace from the current source line.
@@ -409,6 +414,7 @@ fn collect_offset_markers(offset: &EventOffsetIr, markers: &mut BTreeSet<(u8, u8
             EventComputedOffsetIr::LineSkipHorizontal { from }
             | EventComputedOffsetIr::LineScanWord { from }
             | EventComputedOffsetIr::LineScanKey { from }
+            | EventComputedOffsetIr::LineScanNonspaceUntil { from, .. }
             | EventComputedOffsetIr::LineStep { from }
             | EventComputedOffsetIr::LineTrimEndFrom { from },
         ) => collect_offset_markers(from, markers),
@@ -658,6 +664,20 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
                 let mut cursor = #from;
                 while cursor < end && (bytes[cursor].is_ascii_alphanumeric()
                     || matches!(bytes[cursor], b'_' | b'-')) {
+                    cursor += 1;
+                }
+                cursor
+            }}
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineScanNonspaceUntil {
+            from,
+            delimiter,
+        }) => {
+            let from = compile_offset(from)?;
+            quote! {{
+                let mut cursor = #from;
+                while cursor < end && bytes[cursor] != #delimiter
+                    && !matches!(bytes[cursor], b' ' | b'\t' | b'\r' | b'\n') {
                     cursor += 1;
                 }
                 cursor

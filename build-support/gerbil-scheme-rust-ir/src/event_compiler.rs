@@ -141,6 +141,11 @@ pub enum EventPredicateIr {
     State { name: String },
     /// Test whether an unsigned expression is positive.
     UsizePositive { value: EventUsizeIr },
+    /// Compare two typed unsigned parser values.
+    UsizeEqual {
+        left: EventUsizeIr,
+        right: EventUsizeIr,
+    },
     /// Compare the current source line's prefix.
     LineStartsWith { value: String },
     /// Compare a source-line prefix using ASCII-insensitive syntax matching.
@@ -302,6 +307,10 @@ fn collect_offset_markers(offset: &EventOffsetIr, markers: &mut BTreeSet<(u8, u8
 fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSet<(u8, u8)>) {
     match predicate {
         EventPredicateIr::UsizePositive { value } => collect_usize_markers(value, markers),
+        EventPredicateIr::UsizeEqual { left, right } => {
+            collect_usize_markers(left, markers);
+            collect_usize_markers(right, markers);
+        }
         EventPredicateIr::Not { value } => collect_predicate_markers(value, markers),
         EventPredicateIr::And { left, right } | EventPredicateIr::Or { left, right } => {
             collect_predicate_markers(left, markers);
@@ -492,6 +501,11 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
         EventPredicateIr::UsizePositive { value } => {
             let value = compile_usize(value)?;
             quote! { (#value) > 0 }
+        }
+        EventPredicateIr::UsizeEqual { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left) == (#right) }
         }
         EventPredicateIr::LineStartsWith { value } => {
             let value = syn::LitStr::new(value, proc_macro2::Span::call_site());

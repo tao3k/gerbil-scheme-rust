@@ -181,6 +181,27 @@ fn level_stack_event_ir_closes_siblings_and_nested_sections() {
 }
 
 #[test]
+fn typed_unsigned_state_selects_one_block_strategy() {
+    let mut document = stateful_document();
+    document["initial"].as_array_mut().unwrap().push(json!({
+        "kind": "let_usize", "name": "active_block", "value": 2
+    }));
+    document["line"][0]["condition"] = json!({
+        "kind": "usize_equal",
+        "left": {"kind": "state", "name": "active_block"},
+        "right": {"kind": "usize", "value": 2}
+    });
+    let source = compile_event_function_json(&document.to_string()).expect("typed state equality");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::StartNode;
+            assert!(matches!(parse_events("body\n").get(1), Some(StartNode(1))));
+        },
+    );
+}
+
+#[test]
 fn event_ir_rejects_unknown_forms_and_raw_rust() {
     let mut document = stateful_document();
     document["schema"] = json!("other.version");

@@ -290,6 +290,35 @@ fn dynamic_key_line_offsets_preserve_value_and_trivia() {
 }
 
 #[test]
+fn marker_end_offset_uses_one_cached_line_level() {
+    let mut document = stateful_document();
+    document["line"][0]["condition"] = json!({"kind": "line_starts_with", "value": "* "});
+    let marker_end = json!({"kind": "line_marker_end", "marker": 42, "separator": 32});
+    document["line"][0]["consequent"][2]["end"] = marker_end.clone();
+    document["line"][0]["consequent"]
+        .as_array_mut()
+        .unwrap()
+        .insert(
+            3,
+            json!({"kind": "token", "syntax_kind": 5, "start": marker_end, "end": "end"}),
+        );
+    let source = compile_event_function_json(&document.to_string()).expect("marker offset IR");
+    assert_eq!(source.matches("take_while").count(), 1);
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("* H\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 1 },
+                Token { kind: 5, start: 1, end: 4 },
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
 fn bounded_line_offsets_emit_source_backed_prefix_word_and_trivia() {
     let prefix = json!({"kind": "line_prefix_end", "value": "#+begin_src"});
     let word_start = json!({"kind": "line_skip_horizontal", "from": prefix});

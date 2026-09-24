@@ -115,6 +115,8 @@ pub enum EventComputedOffsetIr {
     LineStep { from: Box<EventOffsetIr> },
     /// Remove trailing ASCII whitespace from the current source line.
     LineTrimEnd,
+    /// End of a checked leading marker run; reuses the line's cached level.
+    LineMarkerEnd { marker: u8, separator: u8 },
 }
 
 /// Closed unsigned-value vocabulary for contextual line transitions.
@@ -260,6 +262,10 @@ fn collect_line_markers(statements: &[EventStatementIr], markers: &mut BTreeSet<
                 collect_usize_markers(value, markers);
             }
             EventStatementIr::SetBool { value, .. } => collect_predicate_markers(value, markers),
+            EventStatementIr::Token { start, end, .. } => {
+                collect_offset_markers(start, markers);
+                collect_offset_markers(end, markers);
+            }
             EventStatementIr::If {
                 condition,
                 consequent,
@@ -271,6 +277,21 @@ fn collect_line_markers(statements: &[EventStatementIr], markers: &mut BTreeSet<
             }
             _ => {}
         }
+    }
+}
+
+fn collect_offset_markers(offset: &EventOffsetIr, markers: &mut BTreeSet<(u8, u8)>) {
+    match offset {
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineMarkerEnd { marker, separator }) => {
+            markers.insert((*marker, *separator));
+        }
+        EventOffsetIr::Computed(
+            EventComputedOffsetIr::LineSkipHorizontal { from }
+            | EventComputedOffsetIr::LineScanWord { from }
+            | EventComputedOffsetIr::LineScanKey { from }
+            | EventComputedOffsetIr::LineStep { from },
+        ) => collect_offset_markers(from, markers),
+        _ => {}
     }
 }
 
@@ -449,6 +470,10 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
                 }
                 cursor
             }}
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineMarkerEnd { marker, separator }) => {
+            let name = marker_name(*marker, *separator)?;
+            quote! { start + #name }
         }
     })
 }

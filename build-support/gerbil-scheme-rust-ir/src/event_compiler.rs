@@ -7,6 +7,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde::Deserialize;
+use std::collections::BTreeSet;
 
 use crate::CompileError;
 
@@ -151,6 +152,7 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
     let initial = compile_statements(&function.initial)?;
     let line = compile_statements(&function.line)?;
     let finish = compile_statements(&function.finish)?;
+    let cached_markers = compile_marker_cache(&function.line)?;
     let tokens = quote! {
         pub const PARSER_DIGEST: &str = #digest;
 
@@ -173,6 +175,7 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
                     }
                 }
                 let line = &source[start..end];
+                #(#cached_markers)*
                 #line
                 start = end;
             }
@@ -183,6 +186,74 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
     };
     syn::parse2::<syn::File>(tokens.clone())?;
     Ok(tokens.to_string())
+}
+
+fn compile_marker_cache(statements: &[EventStatementIr]) -> Result<Vec<TokenStream>, CompileError> {
+    let mut markers = BTreeSet::new();
+    collect_line_markers(statements, &mut markers);
+    markers
+        .into_iter()
+        .map(|(marker, separator)| {
+            let name = marker_name(marker, separator)?;
+            Ok(quote! {
+                let #name = {
+                    let run = line.as_bytes().iter().take_while(|byte| **byte == #marker).count();
+                    if run > 0 && line.as_bytes().get(run) == Some(&#separator) {
+                        run
+                    } else {
+                        0
+                    }
+                };
+            })
+        })
+        .collect()
+}
+
+fn marker_name(marker: u8, separator: u8) -> Result<syn::Ident, CompileError> {
+    Ok(syn::parse_str(&format!(
+        "__event_marker_{marker}_{separator}"
+    ))?)
+}
+
+fn collect_line_markers(statements: &[EventStatementIr], markers: &mut BTreeSet<(u8, u8)>) {
+    for statement in statements {
+        match statement {
+            EventStatementIr::SetUsize { value, .. }
+            | EventStatementIr::CloseThroughLevel { level: value, .. }
+            | EventStatementIr::OpenLevel { level: value, .. } => {
+                collect_usize_markers(value, markers);
+            }
+            EventStatementIr::SetBool { value, .. } => collect_predicate_markers(value, markers),
+            EventStatementIr::If {
+                condition,
+                consequent,
+                alternate,
+            } => {
+                collect_predicate_markers(condition, markers);
+                collect_line_markers(consequent, markers);
+                collect_line_markers(alternate, markers);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSet<(u8, u8)>) {
+    match predicate {
+        EventPredicateIr::UsizePositive { value } => collect_usize_markers(value, markers),
+        EventPredicateIr::Not { value } => collect_predicate_markers(value, markers),
+        EventPredicateIr::And { left, right } | EventPredicateIr::Or { left, right } => {
+            collect_predicate_markers(left, markers);
+            collect_predicate_markers(right, markers);
+        }
+        _ => {}
+    }
+}
+
+fn collect_usize_markers(value: &EventUsizeIr, markers: &mut BTreeSet<(u8, u8)>) {
+    if let EventUsizeIr::LineMarkerLevel { marker, separator } = value {
+        markers.insert((*marker, *separator));
+    }
 }
 
 fn compile_statements(statements: &[EventStatementIr]) -> Result<TokenStream, CompileError> {
@@ -326,16 +397,8 @@ fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {
             quote! { #name }
         }
         EventUsizeIr::LineMarkerLevel { marker, separator } => {
-            let marker = *marker;
-            let separator = *separator;
-            quote! {{
-                let run = line.as_bytes().iter().take_while(|byte| **byte == #marker).count();
-                if run > 0 && line.as_bytes().get(run) == Some(&#separator) {
-                    run
-                } else {
-                    0
-                }
-            }}
+            let name = marker_name(*marker, *separator)?;
+            quote! { #name }
         }
     })
 }

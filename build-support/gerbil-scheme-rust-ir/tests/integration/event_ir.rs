@@ -141,7 +141,8 @@ fn level_stack_event_ir_closes_siblings_and_nested_sections() {
                  {"kind": "close_through_level", "stack": "levels",
                   "level": {"kind": "state", "name": "level"}},
                  {"kind": "open_level", "stack": "levels",
-                  "level": {"kind": "state", "name": "level"},
+                  "level": {"kind": "line_marker_level", "marker": 42,
+                            "separator": 32},
                   "syntax_kind": 1},
                  {"kind": "start_node", "syntax_kind": 2},
                  {"kind": "token", "syntax_kind": 4,
@@ -158,6 +159,7 @@ fn level_stack_event_ir_closes_siblings_and_nested_sections() {
         "finish": [{"kind": "close_all_levels", "stack": "levels"}]
     });
     let source = compile_event_function_json(&document.to_string()).expect("level IR compiles");
+    assert_eq!(source.matches("take_while").count(), 1);
     compile_and_run(
         &source,
         &quote! {

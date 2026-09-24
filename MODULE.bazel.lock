@@ -192,7 +192,7 @@
     "@@gerbil_bazel+//gerbil:extensions.bzl%gerbil": {
       "os:osx,arch:aarch64": {
         "bzlTransitiveDigest": "ftvcVApdsKajkZscTLJdqAalEp8gjyxQjrBxQOOSik4=",
-        "usagesDigest": "wk21QWPzm3Sx3AuynQH3MQ1t3o5bD+hT4WsO8Lhx1yk=",
+        "usagesDigest": "qEW90VDkg4Gnes0vSq6glSrKcpruoA5Hlck812ZvlsQ=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "shared_gerbil": {
@@ -206,7 +206,7 @@
               "dependency_roots": [],
               "environment": {},
               "expected_version_prefixes": [
-                "Gerbil d801e7a"
+                "Gerbil 2591dcd"
               ],
               "project_library_relative_path": ".gerbil/lib",
               "tool_paths": {}

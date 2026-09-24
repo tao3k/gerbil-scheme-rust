@@ -16,7 +16,7 @@ gerbil = use_extension("@gerbil_bazel//gerbil:extensions.bzl", "gerbil")
 gerbil.host(
     name = "shared_gerbil",
     expected_version_prefixes = [
-        "Gerbil d801e7a",
+        "Gerbil 2591dcd",
     ],
 )
 use_repo(gerbil, "shared_gerbil")

@@ -417,6 +417,66 @@ fn bounded_line_byte_fold_emits_source_backed_segments() {
 }
 
 #[test]
+fn declared_list_marker_and_bounded_frames_compile_to_events() {
+    let mut document = stateful_document();
+    document["initial"] = json!([
+        {"kind": "let_bool", "name": "present", "value": false},
+        {"kind": "let_bool", "name": "ordered", "value": false},
+        {"kind": "let_usize", "name": "column", "value": 0},
+        {"kind": "let_usize", "name": "bullet_start", "value": 0},
+        {"kind": "let_usize", "name": "bullet_end", "value": 0},
+        {"kind": "let_usize", "name": "content_start", "value": 0},
+        {"kind": "let_usize_stack", "name": "frames"}
+    ]);
+    document["line"] = json!([
+        {"kind": "scan_list_marker", "marker": {
+            "unordered": "-+*", "ordered": true, "tab_width": 8,
+            "present": "present", "column": "column", "ordered_slot": "ordered",
+            "bullet_start": "bullet_start", "bullet_end": "bullet_end",
+            "content_start": "content_start"
+        }},
+        {"kind": "if", "condition": {"kind": "state", "name": "present"},
+         "consequent": [
+            {"kind": "close_frames_while", "stack": "frames", "finish_count": 1,
+             "condition": {"kind": "usize_greater",
+                           "left": {"kind": "stack_top", "stack": "frames"},
+                           "right": {"kind": "state", "name": "column"}}},
+            {"kind": "start_node", "syntax_kind": 1},
+            {"kind": "push_frame", "stack": "frames",
+             "value": {"kind": "state", "name": "column"}},
+            {"kind": "token", "syntax_kind": 3,
+             "start": {"kind": "state_offset", "name": "bullet_start"},
+             "end": {"kind": "state_offset", "name": "bullet_end"}},
+            {"kind": "token", "syntax_kind": 4,
+             "start": {"kind": "state_offset", "name": "bullet_end"},
+             "end": "end"}
+         ], "alternate": []}
+    ]);
+    document["finish"] = json!([
+        {"kind": "close_all_frames", "stack": "frames", "finish_count": 1}
+    ]);
+    let source = compile_event_function_json(&document.to_string()).expect("list frame IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("- a\n  12) b\n- c\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 1 },
+                Token { kind: 4, start: 1, end: 4 },
+                StartNode(1),
+                Token { kind: 3, start: 6, end: 9 },
+                Token { kind: 4, start: 9, end: 12 },
+                FinishNode, StartNode(1),
+                Token { kind: 3, start: 12, end: 13 },
+                Token { kind: 4, start: 13, end: 16 },
+                FinishNode, FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
 fn marker_end_offset_uses_one_cached_line_level() {
     let mut document = stateful_document();
     document["line"][0]["condition"] = json!({"kind": "line_starts_with", "value": "* "});

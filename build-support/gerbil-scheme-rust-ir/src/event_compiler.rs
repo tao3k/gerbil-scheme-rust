@@ -11,6 +11,12 @@ use std::collections::BTreeSet;
 
 use crate::CompileError;
 
+#[path = "event_list_compiler.rs"]
+mod event_list_compiler;
+use event_list_compiler::{
+    compile_close_all_frames, compile_close_frames_while, compile_scan_list_marker,
+};
+
 /// Versioned wire contract for source-backed event functions.
 pub const EVENT_FUNCTION_IR_SCHEMA: &str = "gerbil-scheme-rust.event-function-ir.v1";
 
@@ -84,6 +90,42 @@ pub enum EventStatementIr {
         until: EventOffsetIr,
         body: Vec<Self>,
     },
+    /// Read a source-line list marker into typed state slots.
+    ScanListMarker { marker: EventListMarkerIr },
+    /// Push an unsigned frame owned by the Scheme transition.
+    PushFrame { stack: String, value: EventUsizeIr },
+    /// Pop frames while a Scheme predicate holds, emitting a fixed close arity.
+    CloseFramesWhile {
+        stack: String,
+        condition: EventPredicateIr,
+        finish_count: u8,
+    },
+    /// Close every frame, emitting a fixed number of node closes per frame.
+    CloseAllFrames { stack: String, finish_count: u8 },
+}
+
+/// Language-declared list marker shape and typed event-state destinations.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventListMarkerIr {
+    /// Unordered one-byte marker alternatives.
+    pub unordered: String,
+    /// Whether decimal and alphabetic ordered bullets are admitted.
+    pub ordered: bool,
+    /// Positive tab stop width used for indentation columns.
+    pub tab_width: usize,
+    /// Boolean slot for a successfully recognized marker.
+    pub present: String,
+    /// Unsigned indentation column slot.
+    pub column: String,
+    /// Boolean slot for ordered/unordered shape.
+    pub ordered_slot: String,
+    /// Source-backed bullet-start slot.
+    pub bullet_start: String,
+    /// Source-backed bullet-end slot.
+    pub bullet_end: String,
+    /// Source-backed content-start slot.
+    pub content_start: String,
 }
 
 /// Source byte offsets available in a line transition.
@@ -146,6 +188,16 @@ pub enum EventUsizeIr {
     LineMarkerLevel { marker: u8, separator: u8 },
     /// Promote a checked source-backed offset to an unsigned state value.
     Offset { value: EventOffsetIr },
+    /// Tab-aware leading indentation width of the current source line.
+    LineIndentColumn { tab_width: usize },
+    /// Top of a nonempty unsigned frame stack; zero when empty.
+    StackTop { stack: String },
+    /// Checked unsigned arithmetic for encoded frame values.
+    Add { left: Box<Self>, right: Box<Self> },
+    /// Checked multiplication for encoded frame values.
+    Multiply { left: Box<Self>, right: Box<Self> },
+    /// Bounded positive-divisor quotient for encoded frame values.
+    Divide { left: Box<Self>, right: Box<Self> },
 }
 
 /// Closed predicate vocabulary; it has no arbitrary Rust expression node.
@@ -163,6 +215,18 @@ pub enum EventPredicateIr {
         left: EventUsizeIr,
         right: EventUsizeIr,
     },
+    /// Compare two unsigned parser values.
+    UsizeGreater {
+        left: EventUsizeIr,
+        right: EventUsizeIr,
+    },
+    /// Compare two source-backed byte offsets.
+    OffsetLess {
+        left: EventOffsetIr,
+        right: EventOffsetIr,
+    },
+    /// Test whether a named unsigned frame stack contains a frame.
+    StackNonempty { stack: String },
     /// Compare the current source line's prefix.
     LineStartsWith { value: String },
     /// Compare a source-line prefix using ASCII-insensitive syntax matching.
@@ -298,7 +362,8 @@ fn collect_line_markers(statements: &[EventStatementIr], markers: &mut BTreeSet<
         match statement {
             EventStatementIr::SetUsize { value, .. }
             | EventStatementIr::CloseThroughLevel { level: value, .. }
-            | EventStatementIr::OpenLevel { level: value, .. } => {
+            | EventStatementIr::OpenLevel { level: value, .. }
+            | EventStatementIr::PushFrame { value, .. } => {
                 collect_usize_markers(value, markers);
             }
             EventStatementIr::SetBool { value, .. } => collect_predicate_markers(value, markers),
@@ -321,6 +386,9 @@ fn collect_line_markers(statements: &[EventStatementIr], markers: &mut BTreeSet<
                 collect_offset_markers(from, markers);
                 collect_offset_markers(until, markers);
                 collect_line_markers(body, markers);
+            }
+            EventStatementIr::CloseFramesWhile { condition, .. } => {
+                collect_predicate_markers(condition, markers);
             }
             _ => {}
         }
@@ -346,9 +414,14 @@ fn collect_offset_markers(offset: &EventOffsetIr, markers: &mut BTreeSet<(u8, u8
 fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSet<(u8, u8)>) {
     match predicate {
         EventPredicateIr::UsizePositive { value } => collect_usize_markers(value, markers),
-        EventPredicateIr::UsizeEqual { left, right } => {
+        EventPredicateIr::UsizeEqual { left, right }
+        | EventPredicateIr::UsizeGreater { left, right } => {
             collect_usize_markers(left, markers);
             collect_usize_markers(right, markers);
+        }
+        EventPredicateIr::OffsetLess { left, right } => {
+            collect_offset_markers(left, markers);
+            collect_offset_markers(right, markers);
         }
         EventPredicateIr::LineByteEqual { at, .. } => collect_offset_markers(at, markers),
         EventPredicateIr::LineBytesAllIn { from, until, .. }
@@ -371,6 +444,12 @@ fn collect_usize_markers(value: &EventUsizeIr, markers: &mut BTreeSet<(u8, u8)>)
             markers.insert((*marker, *separator));
         }
         EventUsizeIr::Offset { value } => collect_offset_markers(value, markers),
+        EventUsizeIr::Add { left, right }
+        | EventUsizeIr::Multiply { left, right }
+        | EventUsizeIr::Divide { left, right } => {
+            collect_usize_markers(left, markers);
+            collect_usize_markers(right, markers);
+        }
         _ => {}
     }
 }
@@ -461,21 +540,41 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             from,
             until,
             body,
-        } => {
-            let index = line_index_name(index)?;
-            let from = compile_offset(from)?;
-            let until = compile_offset(until)?;
-            let body = compile_statements(body)?;
-            quote! {
-                let iteration_from = #from;
-                let iteration_until = #until;
-                if iteration_from >= start && iteration_from <= iteration_until
-                    && iteration_until <= end {
-                    for #index in iteration_from..iteration_until {
-                        #body
-                    }
-                }
-            }
+        } => compile_line_byte_loop(index, from, until, body)?,
+        EventStatementIr::ScanListMarker { marker } => compile_scan_list_marker(marker)?,
+        EventStatementIr::PushFrame { stack, value } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            let value = compile_usize(value)?;
+            quote! { #stack.push(#value); }
+        }
+        EventStatementIr::CloseFramesWhile {
+            stack,
+            condition,
+            finish_count,
+        } => compile_close_frames_while(stack, condition, *finish_count)?,
+        EventStatementIr::CloseAllFrames {
+            stack,
+            finish_count,
+        } => compile_close_all_frames(stack, *finish_count)?,
+    })
+}
+
+fn compile_line_byte_loop(
+    index: &str,
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    body: &[EventStatementIr],
+) -> Result<TokenStream, CompileError> {
+    let index = line_index_name(index)?;
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let body = compile_statements(body)?;
+    Ok(quote! {
+        let iteration_from = #from;
+        let iteration_until = #until;
+        if iteration_from >= start && iteration_from <= iteration_until
+            && iteration_until <= end {
+            for #index in iteration_from..iteration_until { #body }
         }
     })
 }
@@ -622,6 +721,57 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             let right = compile_usize(right)?;
             quote! { (#left) == (#right) }
         }
+        EventPredicateIr::UsizeGreater { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left) > (#right) }
+        }
+        EventPredicateIr::OffsetLess { left, right } => {
+            let left = compile_offset(left)?;
+            let right = compile_offset(right)?;
+            quote! { (#left) < (#right) }
+        }
+        EventPredicateIr::StackNonempty { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            quote! { !#stack.is_empty() }
+        }
+        EventPredicateIr::LineStartsWith { .. }
+        | EventPredicateIr::LineStartsWithAsciiCaseInsensitive { .. }
+        | EventPredicateIr::LinePrefixBoundaryAsciiCaseInsensitive { .. }
+        | EventPredicateIr::LineMarkerAsciiCaseInsensitive { .. }
+        | EventPredicateIr::LineBlank
+        | EventPredicateIr::LineHasWordAfterPrefix { .. }
+        | EventPredicateIr::LineHasKeyAfterPrefix { .. } => compile_line_predicate(predicate),
+        EventPredicateIr::LineByteEqual { at, value } => compile_line_byte_equal(at, *value)?,
+        EventPredicateIr::LineBytesAllIn {
+            from,
+            until,
+            values,
+        } => compile_line_byte_set(from, until, values, true)?,
+        EventPredicateIr::LineBytesAnyIn {
+            from,
+            until,
+            values,
+        } => compile_line_byte_set(from, until, values, false)?,
+        EventPredicateIr::Not { value } => {
+            let value = compile_predicate(value)?;
+            quote! { !(#value) }
+        }
+        EventPredicateIr::And { left, right } => {
+            let left = compile_predicate(left)?;
+            let right = compile_predicate(right)?;
+            quote! { (#left) && (#right) }
+        }
+        EventPredicateIr::Or { left, right } => {
+            let left = compile_predicate(left)?;
+            let right = compile_predicate(right)?;
+            quote! { (#left) || (#right) }
+        }
+    })
+}
+
+fn compile_line_predicate(predicate: &EventPredicateIr) -> TokenStream {
+    match predicate {
         EventPredicateIr::LineStartsWith { value } => {
             let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
             quote! { line.starts_with(#value) }
@@ -679,32 +829,8 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
                     })
             }
         }
-        EventPredicateIr::LineByteEqual { at, value } => compile_line_byte_equal(at, *value)?,
-        EventPredicateIr::LineBytesAllIn {
-            from,
-            until,
-            values,
-        } => compile_line_byte_set(from, until, values, true)?,
-        EventPredicateIr::LineBytesAnyIn {
-            from,
-            until,
-            values,
-        } => compile_line_byte_set(from, until, values, false)?,
-        EventPredicateIr::Not { value } => {
-            let value = compile_predicate(value)?;
-            quote! { !(#value) }
-        }
-        EventPredicateIr::And { left, right } => {
-            let left = compile_predicate(left)?;
-            let right = compile_predicate(right)?;
-            quote! { (#left) && (#right) }
-        }
-        EventPredicateIr::Or { left, right } => {
-            let left = compile_predicate(left)?;
-            let right = compile_predicate(right)?;
-            quote! { (#left) || (#right) }
-        }
-    })
+        _ => unreachable!("compile_line_predicate only receives line predicates"),
+    }
 }
 
 fn compile_line_byte_equal(at: &EventOffsetIr, value: u8) -> Result<TokenStream, CompileError> {
@@ -748,5 +874,42 @@ fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {
             quote! { #name }
         }
         EventUsizeIr::Offset { value } => compile_offset(value)?,
+        EventUsizeIr::LineIndentColumn { tab_width } => {
+            if *tab_width == 0 {
+                return Err(CompileError::Schema("tab width must be positive".into()));
+            }
+            quote! {{
+                let mut cursor = start;
+                let mut column = 0usize;
+                while cursor < end && matches!(bytes[cursor], b' ' | b'\t') {
+                    if bytes[cursor] == b'\t' {
+                        column = (column / #tab_width + 1) * #tab_width;
+                    } else {
+                        column += 1;
+                    }
+                    cursor += 1;
+                }
+                column
+            }}
+        }
+        EventUsizeIr::StackTop { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            quote! { #stack.last().copied().unwrap_or(0) }
+        }
+        EventUsizeIr::Add { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left).saturating_add(#right) }
+        }
+        EventUsizeIr::Multiply { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left).saturating_mul(#right) }
+        }
+        EventUsizeIr::Divide { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left) / (#right).max(1) }
+        }
     })
 }

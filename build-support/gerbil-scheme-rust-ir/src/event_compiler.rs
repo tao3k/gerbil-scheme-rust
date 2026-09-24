@@ -145,6 +145,10 @@ pub enum EventPredicateIr {
     LineStartsWith { value: String },
     /// Compare a source-line prefix using ASCII-insensitive syntax matching.
     LineStartsWithAsciiCaseInsensitive { value: String },
+    /// Match an ASCII-insensitive prefix only at a horizontal or line boundary.
+    LinePrefixBoundaryAsciiCaseInsensitive { value: String },
+    /// Match a whole line marker with only trailing ASCII whitespace.
+    LineMarkerAsciiCaseInsensitive { value: String },
     /// Treat spaces, tabs, and line endings as a blank source line.
     LineBlank,
     /// A declared prefix is followed by one nonempty whitespace-delimited word.
@@ -498,6 +502,24 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             quote! {
                 line.get(..#value.len())
                     .is_some_and(|prefix| prefix.eq_ignore_ascii_case(#value))
+            }
+        }
+        EventPredicateIr::LinePrefixBoundaryAsciiCaseInsensitive { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .is_some_and(|_| line.as_bytes().get(#value.len())
+                        .is_none_or(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')))
+            }
+        }
+        EventPredicateIr::LineMarkerAsciiCaseInsensitive { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .is_some_and(|_| line.as_bytes()[#value.len()..]
+                        .iter().all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')))
             }
         }
         EventPredicateIr::LineBlank => {

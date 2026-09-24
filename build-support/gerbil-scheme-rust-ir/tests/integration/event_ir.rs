@@ -218,6 +218,38 @@ fn ascii_case_insensitive_line_prefix_is_source_backed() {
 }
 
 #[test]
+fn bounded_line_markers_reject_prefix_collisions() {
+    let mut document = stateful_document();
+    document["line"][0]["condition"] = json!({
+        "kind": "line_prefix_boundary_ascii_case_insensitive",
+        "value": "#+begin_src"
+    });
+    let source = compile_event_function_json(&document.to_string()).expect("bounded prefix IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::StartNode;
+            assert!(matches!(parse_events("#+BeGiN_SrC rust\n").get(1), Some(StartNode(1))));
+            assert!(matches!(parse_events("#+begin_srcx\n").get(1), Some(StartNode(2))));
+        },
+    );
+
+    document["line"][0]["condition"] = json!({
+        "kind": "line_marker_ascii_case_insensitive",
+        "value": ":END:"
+    });
+    let source = compile_event_function_json(&document.to_string()).expect("whole marker IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::StartNode;
+            assert!(matches!(parse_events(":eNd: \t\r\n").get(1), Some(StartNode(1))));
+            assert!(matches!(parse_events(":END: tail\n").get(1), Some(StartNode(2))));
+        },
+    );
+}
+
+#[test]
 fn blank_line_predicate_preserves_whitespace_bytes() {
     let mut document = stateful_document();
     document["line"][0]["condition"] = json!({"kind": "line_blank"});

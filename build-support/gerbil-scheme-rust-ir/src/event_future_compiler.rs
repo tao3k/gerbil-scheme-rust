@@ -139,11 +139,12 @@ fn compile_heading_boundary(marker: u8, separator: u8, enabled: bool) -> TokenSt
     }
 }
 
-fn compile_body_key_boundary(marker: u8) -> TokenStream {
+fn compile_body_key_boundary(marker: u8, target: &syn::LitStr) -> TokenStream {
     if marker == 0 {
         return quote! {};
     }
     quote! {
+      if !__event_is_boundary && !__event_future_matches(#target) {
         let __event_body = __event_future_line.as_bytes();
         let __event_key_start = __event_body.iter()
             .take_while(|byte| matches!(byte, b' ' | b'\t'))
@@ -162,6 +163,7 @@ fn compile_body_key_boundary(marker: u8) -> TokenStream {
         if !__event_valid_key {
             __event_is_boundary = true;
         }
+      }
     }
 }
 
@@ -203,7 +205,7 @@ pub(super) fn compile_future_line_marker(
     let candidate = compile_future_candidate(indent);
     let heading_check =
         compile_heading_boundary(heading_marker, heading_separator, stop_at_heading);
-    let body_check = compile_body_key_boundary(body_key_marker);
+    let body_check = compile_body_key_boundary(body_key_marker, &target);
     Ok(quote! {{
         let __event_future_index = #cache.get_or_init(|| {
             let mut __event_future_lines = Vec::new();
@@ -238,9 +240,7 @@ pub(super) fn compile_future_line_marker(
                 let mut __event_is_boundary = false;
                 #heading_check
                 #stop_check
-                if !__event_is_boundary && !__event_future_matches(#target) {
-                    #body_check
-                }
+                #body_check
                 __event_future_lines.push((
                     __event_future_cursor,
                     __event_future_matches(#target),

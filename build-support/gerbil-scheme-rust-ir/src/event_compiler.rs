@@ -476,8 +476,13 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             let until = compile_offset(until)?;
             let body = compile_statements(body)?;
             quote! {
-                for #index in (#from)..(#until) {
-                    #body
+                let iteration_from = #from;
+                let iteration_until = #until;
+                if iteration_from >= start && iteration_from <= iteration_until
+                    && iteration_until <= end {
+                    for #index in iteration_from..iteration_until {
+                        #body
+                    }
                 }
             }
         }
@@ -694,7 +699,7 @@ fn compile_line_byte_equal(at: &EventOffsetIr, value: u8) -> Result<TokenStream,
     let at = compile_offset(at)?;
     Ok(quote! {{
         let at = #at;
-        at < end && bytes.get(at) == Some(&#value)
+        at >= start && at < end && bytes.get(at) == Some(&#value)
     }})
 }
 
@@ -711,9 +716,12 @@ fn compile_line_byte_set(
     } else {
         quote! { slice.iter().any(|byte| [#(#values),*].contains(byte)) }
     };
-    Ok(quote! {
-        bytes.get((#from)..(#until)).is_some_and(|slice| #match_slice)
-    })
+    Ok(quote! {{
+        let from = #from;
+        let until = #until;
+        from >= start && from <= until && until <= end
+            && bytes.get(from..until).is_some_and(|slice| #match_slice)
+    }})
 }
 
 fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {

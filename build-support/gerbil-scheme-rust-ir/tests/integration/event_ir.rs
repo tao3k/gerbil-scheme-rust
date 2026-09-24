@@ -306,9 +306,9 @@ fn dynamic_key_line_offsets_preserve_value_and_trivia() {
             {"kind": "token", "syntax_kind": 4, "start": prefix_end, "end": key_end},
             {"kind": "token", "syntax_kind": 3, "start": key_end, "end": value_start},
             {"kind": "token", "syntax_kind": 5, "start": value_start,
-             "end": {"kind": "line_trim_end"}},
+             "end": {"kind": "line_trim_end_from", "from": value_start}},
             {"kind": "token", "syntax_kind": 3,
-             "start": {"kind": "line_trim_end"}, "end": "end"},
+             "start": {"kind": "line_trim_end_from", "from": value_start}, "end": "end"},
             {"kind": "finish_node"}
         ],
         "alternate": [
@@ -336,6 +336,15 @@ fn dynamic_key_line_offsets_preserve_value_and_trivia() {
             assert_eq!(parse_events("#+@bad: x\n"), vec![
                 StartNode(0), StartNode(2),
                 Token { kind: 5, start: 0, end: 10 },
+                FinishNode, FinishNode,
+            ]);
+            assert_eq!(parse_events("#+EMPTY:  \n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 2 },
+                Token { kind: 4, start: 2, end: 7 },
+                Token { kind: 3, start: 7, end: 10 },
+                Token { kind: 5, start: 10, end: 10 },
+                Token { kind: 3, start: 10, end: 11 },
                 FinishNode, FinishNode,
             ]);
         },

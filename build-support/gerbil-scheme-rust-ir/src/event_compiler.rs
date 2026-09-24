@@ -115,6 +115,8 @@ pub enum EventComputedOffsetIr {
     LineStep { from: Box<EventOffsetIr> },
     /// Remove trailing ASCII whitespace from the current source line.
     LineTrimEnd,
+    /// Trim trailing whitespace without crossing a source-backed value start.
+    LineTrimEndFrom { from: Box<EventOffsetIr> },
     /// End of a checked leading marker run; reuses the line's cached level.
     LineMarkerEnd { marker: u8, separator: u8 },
 }
@@ -479,6 +481,17 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
             quote! {{
                 let mut cursor = end;
                 while cursor > start && bytes[cursor - 1].is_ascii_whitespace() {
+                    cursor -= 1;
+                }
+                cursor
+            }}
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEndFrom { from }) => {
+            let from = compile_offset(from)?;
+            quote! {{
+                let floor = #from;
+                let mut cursor = end;
+                while cursor > floor && bytes[cursor - 1].is_ascii_whitespace() {
                     cursor -= 1;
                 }
                 cursor

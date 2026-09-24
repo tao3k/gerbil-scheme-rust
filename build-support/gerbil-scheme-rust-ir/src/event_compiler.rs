@@ -77,6 +77,13 @@ pub enum EventStatementIr {
         consequent: Vec<Self>,
         alternate: Vec<Self>,
     },
+    /// Iterate a bounded source-line byte range; the index is source-backed.
+    ForLineBytes {
+        index: String,
+        from: EventOffsetIr,
+        until: EventOffsetIr,
+        body: Vec<Self>,
+    },
 }
 
 /// Source byte offsets available in a line transition.
@@ -117,6 +124,12 @@ pub enum EventComputedOffsetIr {
     LineTrimEnd,
     /// Trim trailing whitespace without crossing a source-backed value start.
     LineTrimEndFrom { from: Box<EventOffsetIr> },
+    /// End before a final CR/LF, preserving horizontal source whitespace.
+    LineContentEnd,
+    /// A byte index bound by a surrounding source-line iteration.
+    LineIndex { name: String },
+    /// A named unsigned state containing a current source-line offset.
+    StateOffset { name: String },
     /// End of a checked leading marker run; reuses the line's cached level.
     LineMarkerEnd { marker: u8, separator: u8 },
 }
@@ -131,6 +144,8 @@ pub enum EventUsizeIr {
     State { name: String },
     /// Count repeated leading marker bytes only when followed by a separator.
     LineMarkerLevel { marker: u8, separator: u8 },
+    /// Promote a checked source-backed offset to an unsigned state value.
+    Offset { value: EventOffsetIr },
 }
 
 /// Closed predicate vocabulary; it has no arbitrary Rust expression node.
@@ -162,6 +177,20 @@ pub enum EventPredicateIr {
     LineHasWordAfterPrefix { value: String },
     /// A prefix is followed by a nonempty ASCII key and a colon.
     LineHasKeyAfterPrefix { value: String },
+    /// Compare one source-line byte at a bounded source-backed offset.
+    LineByteEqual { at: EventOffsetIr, value: u8 },
+    /// All bytes in one bounded slice belong to an explicit byte set.
+    LineBytesAllIn {
+        from: EventOffsetIr,
+        until: EventOffsetIr,
+        values: Vec<u8>,
+    },
+    /// At least one byte in one bounded slice belongs to an explicit byte set.
+    LineBytesAnyIn {
+        from: EventOffsetIr,
+        until: EventOffsetIr,
+        values: Vec<u8>,
+    },
     /// Boolean negation.
     Not { value: Box<Self> },
     /// Short-circuit conjunction.
@@ -286,6 +315,13 @@ fn collect_line_markers(statements: &[EventStatementIr], markers: &mut BTreeSet<
                 collect_line_markers(consequent, markers);
                 collect_line_markers(alternate, markers);
             }
+            EventStatementIr::ForLineBytes {
+                from, until, body, ..
+            } => {
+                collect_offset_markers(from, markers);
+                collect_offset_markers(until, markers);
+                collect_line_markers(body, markers);
+            }
             _ => {}
         }
     }
@@ -300,7 +336,8 @@ fn collect_offset_markers(offset: &EventOffsetIr, markers: &mut BTreeSet<(u8, u8
             EventComputedOffsetIr::LineSkipHorizontal { from }
             | EventComputedOffsetIr::LineScanWord { from }
             | EventComputedOffsetIr::LineScanKey { from }
-            | EventComputedOffsetIr::LineStep { from },
+            | EventComputedOffsetIr::LineStep { from }
+            | EventComputedOffsetIr::LineTrimEndFrom { from },
         ) => collect_offset_markers(from, markers),
         _ => {}
     }
@@ -313,6 +350,12 @@ fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSe
             collect_usize_markers(left, markers);
             collect_usize_markers(right, markers);
         }
+        EventPredicateIr::LineByteEqual { at, .. } => collect_offset_markers(at, markers),
+        EventPredicateIr::LineBytesAllIn { from, until, .. }
+        | EventPredicateIr::LineBytesAnyIn { from, until, .. } => {
+            collect_offset_markers(from, markers);
+            collect_offset_markers(until, markers);
+        }
         EventPredicateIr::Not { value } => collect_predicate_markers(value, markers),
         EventPredicateIr::And { left, right } | EventPredicateIr::Or { left, right } => {
             collect_predicate_markers(left, markers);
@@ -323,9 +366,18 @@ fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSe
 }
 
 fn collect_usize_markers(value: &EventUsizeIr, markers: &mut BTreeSet<(u8, u8)>) {
-    if let EventUsizeIr::LineMarkerLevel { marker, separator } = value {
-        markers.insert((*marker, *separator));
+    match value {
+        EventUsizeIr::LineMarkerLevel { marker, separator } => {
+            markers.insert((*marker, *separator));
+        }
+        EventUsizeIr::Offset { value } => collect_offset_markers(value, markers),
+        _ => {}
     }
+}
+
+fn line_index_name(name: &str) -> Result<syn::Ident, CompileError> {
+    let name = syn::parse_str::<syn::Ident>(name)?;
+    Ok(syn::parse_str(&format!("__event_index_{name}"))?)
 }
 
 fn compile_statements(statements: &[EventStatementIr]) -> Result<TokenStream, CompileError> {
@@ -397,29 +449,7 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             syntax_kind,
             start,
             end,
-        } => {
-            let token_start = if let EventOffsetIr::Boundary(EventBoundaryIr::Start) = start {
-                quote! { start }
-            } else {
-                let value = compile_offset(start)?;
-                quote! { #value }
-            };
-            let token_end = if let EventOffsetIr::Boundary(EventBoundaryIr::End) = end {
-                quote! { end }
-            } else {
-                let value = compile_offset(end)?;
-                quote! { #value }
-            };
-            quote! {
-                let token_start = #token_start;
-                let token_end = #token_end;
-                if token_start != token_end {
-                    events.push(TreeEvent::Token {
-                        kind: #syntax_kind, start: token_start, end: token_end,
-                    });
-                }
-            }
-        }
+        } => compile_token_statement(*syntax_kind, start, end)?,
         EventStatementIr::FinishNode => quote! { events.push(TreeEvent::FinishNode); },
         EventStatementIr::If {
             condition,
@@ -434,6 +464,40 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             } else {
                 quote! { if #condition { #consequent } else { #alternate } }
             }
+        }
+        EventStatementIr::ForLineBytes {
+            index,
+            from,
+            until,
+            body,
+        } => {
+            let index = line_index_name(index)?;
+            let from = compile_offset(from)?;
+            let until = compile_offset(until)?;
+            let body = compile_statements(body)?;
+            quote! {
+                for #index in (#from)..(#until) {
+                    #body
+                }
+            }
+        }
+    })
+}
+
+fn compile_token_statement(
+    syntax_kind: u16,
+    start: &EventOffsetIr,
+    end: &EventOffsetIr,
+) -> Result<TokenStream, CompileError> {
+    let token_start = compile_offset(start)?;
+    let token_end = compile_offset(end)?;
+    Ok(quote! {
+        let token_start = #token_start;
+        let token_end = #token_end;
+        if token_start != token_end {
+            events.push(TreeEvent::Token {
+                kind: #syntax_kind, start: token_start, end: token_end,
+            });
         }
     })
 }
@@ -500,6 +564,23 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
                 }
                 cursor
             }}
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineContentEnd) => {
+            quote! {{
+                let mut cursor = end;
+                while cursor > start && matches!(bytes[cursor - 1], b'\r' | b'\n') {
+                    cursor -= 1;
+                }
+                cursor
+            }}
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineIndex { name }) => {
+            let name = line_index_name(name)?;
+            quote! { #name }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::StateOffset { name }) => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            quote! { #name }
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineMarkerEnd { marker, separator }) => {
             let name = marker_name(*marker, *separator)?;
@@ -581,6 +662,17 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
                     })
             }
         }
+        EventPredicateIr::LineByteEqual { at, value } => compile_line_byte_equal(at, *value)?,
+        EventPredicateIr::LineBytesAllIn {
+            from,
+            until,
+            values,
+        } => compile_line_byte_set(from, until, values, true)?,
+        EventPredicateIr::LineBytesAnyIn {
+            from,
+            until,
+            values,
+        } => compile_line_byte_set(from, until, values, false)?,
         EventPredicateIr::Not { value } => {
             let value = compile_predicate(value)?;
             quote! { !(#value) }
@@ -598,6 +690,32 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
     })
 }
 
+fn compile_line_byte_equal(at: &EventOffsetIr, value: u8) -> Result<TokenStream, CompileError> {
+    let at = compile_offset(at)?;
+    Ok(quote! {{
+        let at = #at;
+        at < end && bytes.get(at) == Some(&#value)
+    }})
+}
+
+fn compile_line_byte_set(
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    values: &[u8],
+    all: bool,
+) -> Result<TokenStream, CompileError> {
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let match_slice = if all {
+        quote! { slice.iter().all(|byte| [#(#values),*].contains(byte)) }
+    } else {
+        quote! { slice.iter().any(|byte| [#(#values),*].contains(byte)) }
+    };
+    Ok(quote! {
+        bytes.get((#from)..(#until)).is_some_and(|slice| #match_slice)
+    })
+}
+
 fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {
     Ok(match value {
         EventUsizeIr::Usize { value } => quote! { #value },
@@ -609,5 +727,6 @@ fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {
             let name = marker_name(*marker, *separator)?;
             quote! { #name }
         }
+        EventUsizeIr::Offset { value } => compile_offset(value)?,
     })
 }

@@ -4,7 +4,14 @@ use gerbil_scheme_rust_ir::{
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde_json::json;
-use std::{fs, process::Command, time::SystemTime};
+use std::{
+    fs,
+    process::Command,
+    sync::atomic::{AtomicU64, Ordering},
+    time::SystemTime,
+};
+
+static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(0);
 
 fn stateful_document() -> serde_json::Value {
     json!({
@@ -86,8 +93,9 @@ fn compile_and_run(source: &str, assertions: &TokenStream) {
         .expect("clock follows epoch")
         .as_nanos();
     let root = std::env::temp_dir().join(format!(
-        "gerbil-scheme-rust-event-ir-{}-{nonce}",
-        std::process::id()
+        "gerbil-scheme-rust-event-ir-{}-{nonce}-{}",
+        std::process::id(),
+        NEXT_FIXTURE_ID.fetch_add(1, Ordering::Relaxed)
     ));
     fs::create_dir(&root).expect("isolated rustc fixture directory");
     let input = root.join("generated.rs");
@@ -345,6 +353,64 @@ fn dynamic_key_line_offsets_preserve_value_and_trivia() {
                 Token { kind: 3, start: 7, end: 10 },
                 Token { kind: 3, start: 10, end: 11 },
                 FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
+fn bounded_line_byte_fold_emits_source_backed_segments() {
+    let mut document = stateful_document();
+    let index = json!({"kind": "line_index", "name": "cursor"});
+    let content_end = json!({"kind": "line_content_end"});
+    let last = json!({"kind": "state_offset", "name": "last"});
+    let after_index = json!({"kind": "line_step", "from": index});
+    document["initial"] = json!([{"kind": "let_usize", "name": "last", "value": 0}]);
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {
+            "kind": "and",
+            "left": {"kind": "line_bytes_all_in", "from": "start",
+                     "until": content_end, "values": [124, 45]},
+            "right": {"kind": "line_bytes_any_in", "from": "start",
+                      "until": content_end, "values": [45]}
+        },
+        "consequent": [
+            {"kind": "token", "syntax_kind": 6, "start": "start", "end": "end"}
+        ],
+        "alternate": [
+            {"kind": "set_usize", "name": "last",
+             "value": {"kind": "offset", "value": "start"}},
+            {"kind": "for_line_bytes", "index": "cursor", "from": "start",
+             "until": content_end, "body": [{
+                "kind": "if",
+                "condition": {"kind": "line_byte_equal", "at": index, "value": 124},
+                "consequent": [
+                    {"kind": "token", "syntax_kind": 3, "start": last, "end": index},
+                    {"kind": "token", "syntax_kind": 4,
+                     "start": index, "end": after_index},
+                    {"kind": "set_usize", "name": "last",
+                     "value": {"kind": "offset", "value": after_index}}
+                ],
+                "alternate": []
+            }]},
+            {"kind": "token", "syntax_kind": 5, "start": last, "end": "end"}
+        ]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string()).expect("line byte fold IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("|x|\n|---|\n"), vec![
+                StartNode(0),
+                Token { kind: 4, start: 0, end: 1 },
+                Token { kind: 3, start: 1, end: 2 },
+                Token { kind: 4, start: 2, end: 3 },
+                Token { kind: 5, start: 3, end: 4 },
+                Token { kind: 6, start: 4, end: 10 },
+                FinishNode,
             ]);
         },
     );

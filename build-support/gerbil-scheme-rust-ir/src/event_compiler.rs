@@ -399,21 +399,25 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             end,
         } => {
             let token_start = if let EventOffsetIr::Boundary(EventBoundaryIr::Start) = start {
-                quote! { start, }
+                quote! { start }
             } else {
                 let value = compile_offset(start)?;
-                quote! { start: #value, }
+                quote! { #value }
             };
             let token_end = if let EventOffsetIr::Boundary(EventBoundaryIr::End) = end {
-                quote! { end, }
+                quote! { end }
             } else {
                 let value = compile_offset(end)?;
-                quote! { end: #value, }
+                quote! { #value }
             };
             quote! {
-                events.push(TreeEvent::Token {
-                    kind: #syntax_kind, #token_start #token_end
-                });
+                let token_start = #token_start;
+                let token_end = #token_end;
+                if token_start != token_end {
+                    events.push(TreeEvent::Token {
+                        kind: #syntax_kind, start: token_start, end: token_end,
+                    });
+                }
             }
         }
         EventStatementIr::FinishNode => quote! { events.push(TreeEvent::FinishNode); },

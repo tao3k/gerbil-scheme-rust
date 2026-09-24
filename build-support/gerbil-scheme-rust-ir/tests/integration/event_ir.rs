@@ -343,7 +343,6 @@ fn dynamic_key_line_offsets_preserve_value_and_trivia() {
                 Token { kind: 3, start: 0, end: 2 },
                 Token { kind: 4, start: 2, end: 7 },
                 Token { kind: 3, start: 7, end: 10 },
-                Token { kind: 5, start: 10, end: 10 },
                 Token { kind: 3, start: 10, end: 11 },
                 FinishNode, FinishNode,
             ]);

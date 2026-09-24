@@ -188,8 +188,8 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
             events
         }
     };
-    syn::parse2::<syn::File>(tokens.clone())?;
-    Ok(tokens.to_string())
+    let file = syn::parse2::<syn::File>(tokens)?;
+    Ok(prettyplease::unparse(&file))
 }
 
 fn compile_marker_cache(statements: &[EventStatementIr]) -> Result<Vec<TokenStream>, CompileError> {
@@ -353,9 +353,9 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             let consequent = compile_statements(consequent)?;
             let alternate = compile_statements(alternate)?;
             if alternate.is_empty() {
-                quote! { if #condition { #consequent }; }
+                quote! { if #condition { #consequent } }
             } else {
-                quote! { if #condition { #consequent } else { #alternate }; }
+                quote! { if #condition { #consequent } else { #alternate } }
             }
         }
     })

@@ -11,8 +11,11 @@ use std::collections::BTreeSet;
 
 use crate::CompileError;
 
+#[path = "event_future_compiler.rs"]
+mod event_future_compiler;
 #[path = "event_list_compiler.rs"]
 mod event_list_compiler;
+use event_future_compiler::{compile_future_cache_declarations, compile_future_line_marker};
 use event_list_compiler::{
     compile_close_all_frames, compile_close_frames_while, compile_scan_list_marker,
 };
@@ -245,6 +248,15 @@ pub enum EventPredicateIr {
     LinePrefixBoundaryAsciiCaseInsensitive { value: String },
     /// Match a whole line marker with only trailing ASCII whitespace.
     LineMarkerAsciiCaseInsensitive { value: String },
+    /// Search later source lines for a whole marker before a heading or parent marker.
+    FutureLineMarkerBeforeBoundary {
+        target: String,
+        stop: String,
+        heading_marker: u8,
+        heading_separator: u8,
+        indent: bool,
+        stop_at_heading: bool,
+    },
     /// Treat spaces, tabs, and line endings as a blank source line.
     LineBlank,
     /// A declared prefix is followed by one nonempty whitespace-delimited word.
@@ -305,6 +317,7 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
     let line = compile_statements(&function.line)?;
     let finish = compile_statements(&function.finish)?;
     let cached_markers = compile_marker_cache(&function.line)?;
+    let future_caches = compile_future_cache_declarations(&function.line)?;
     let tokens = quote! {
         pub const PARSER_DIGEST: &str = #digest;
 
@@ -313,6 +326,7 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
             let mut events = Vec::with_capacity(bytes.len() / 16 + 2);
             events.push(TreeEvent::StartNode(#root));
             #initial
+            #(#future_caches)*
             let mut start = 0usize;
             while start < bytes.len() {
                 let mut end = start;
@@ -773,6 +787,21 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
         | EventPredicateIr::LineBlank
         | EventPredicateIr::LineHasWordAfterPrefix { .. }
         | EventPredicateIr::LineHasKeyAfterPrefix { .. } => compile_line_predicate(predicate),
+        EventPredicateIr::FutureLineMarkerBeforeBoundary {
+            target,
+            stop,
+            heading_marker,
+            heading_separator,
+            indent,
+            stop_at_heading,
+        } => compile_future_line_marker(
+            target,
+            (!stop.is_empty()).then_some(stop.as_str()),
+            *heading_marker,
+            *heading_separator,
+            *indent,
+            *stop_at_heading,
+        )?,
         EventPredicateIr::LineByteEqual { at, value } => compile_line_byte_equal(at, *value)?,
         EventPredicateIr::LineBytesAllIn {
             from,

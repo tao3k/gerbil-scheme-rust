@@ -73,6 +73,48 @@ fn stateful_event_ir_typechecks_and_executes() {
     );
 }
 
+#[test]
+fn future_line_marker_stops_at_heading_and_parent_boundary() {
+    let mut document = stateful_document();
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {
+            "kind": "future_line_marker_before_boundary",
+            "target": "#+END_QUOTE",
+            "stop": "#+END_CENTER",
+            "heading_marker": 42,
+            "heading_separator": 32,
+            "indent": true,
+            "stop_at_heading": true
+        },
+        "consequent": [{"kind": "start_node", "syntax_kind": 1}, {"kind": "finish_node"}],
+        "alternate": [{"kind": "start_node", "syntax_kind": 2}, {"kind": "finish_node"}]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("future source-line marker is typed event IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode};
+            assert_eq!(parse_events("#+BEGIN_QUOTE\n  #+end_quote\n"), vec![
+                StartNode(0), StartNode(1), FinishNode,
+                StartNode(2), FinishNode, FinishNode,
+            ]);
+            assert_eq!(parse_events("#+BEGIN_QUOTE\n** Next\n#+END_QUOTE\n"), vec![
+                StartNode(0), StartNode(2), FinishNode,
+                StartNode(1), FinishNode,
+                StartNode(2), FinishNode, FinishNode,
+            ]);
+            assert_eq!(parse_events("#+BEGIN_QUOTE\n#+END_CENTER\n#+END_QUOTE\n"), vec![
+                StartNode(0), StartNode(2), FinishNode,
+                StartNode(1), FinishNode,
+                StartNode(2), FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
 fn compile_and_run(source: &str, assertions: &TokenStream) {
     let generated: TokenStream = source.parse().expect("Rust tokens parse");
     let fixture = quote! {

@@ -1,0 +1,21 @@
+[package]
+name = "gerbil-scheme-rust-ir"
+description = "Typed build-time Rust function IR for Scheme AOT compilers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+asp-rust = { git = "https://github.com/tao3k/asp-rust", rev = "2419414ee5379bad89506496e3eaab928df68daf", version = "0.1.2", default-features = false }
+
+[lints]
+workspace = true

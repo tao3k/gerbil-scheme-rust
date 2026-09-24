@@ -181,17 +181,20 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             syntax_kind,
             start,
             end,
-        } => {
-            let start = compile_offset(start);
-            let end = compile_offset(end);
-            quote! {
-                events.push(TreeEvent::Token {
-                    kind: #syntax_kind,
-                    start: #start,
-                    end: #end,
-                });
-            }
-        }
+        } => match (start, end) {
+            (EventOffsetIr::Start, EventOffsetIr::End) => quote! {
+                events.push(TreeEvent::Token { kind: #syntax_kind, start, end });
+            },
+            (EventOffsetIr::Start, EventOffsetIr::Start) => quote! {
+                events.push(TreeEvent::Token { kind: #syntax_kind, start, end: start });
+            },
+            (EventOffsetIr::End, EventOffsetIr::End) => quote! {
+                events.push(TreeEvent::Token { kind: #syntax_kind, start: end, end });
+            },
+            (EventOffsetIr::End, EventOffsetIr::Start) => quote! {
+                events.push(TreeEvent::Token { kind: #syntax_kind, start: end, end: start });
+            },
+        },
         EventStatementIr::FinishNode => quote! { events.push(TreeEvent::FinishNode); },
         EventStatementIr::If {
             condition,
@@ -201,16 +204,13 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             let condition = compile_predicate(condition)?;
             let consequent = compile_statements(consequent)?;
             let alternate = compile_statements(alternate)?;
-            quote! { if #condition { #consequent } else { #alternate } }
+            if alternate.is_empty() {
+                quote! { if #condition { #consequent } }
+            } else {
+                quote! { if #condition { #consequent } else { #alternate } }
+            }
         }
     })
-}
-
-fn compile_offset(offset: &EventOffsetIr) -> TokenStream {
-    match offset {
-        EventOffsetIr::Start => quote! { start },
-        EventOffsetIr::End => quote! { end },
-    }
 }
 
 fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, CompileError> {

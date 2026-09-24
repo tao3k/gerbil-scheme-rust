@@ -14,7 +14,29 @@ pub(super) fn compile_scan_list_marker(
         ));
     }
     let unordered = marker.unordered.as_bytes();
-    let ordered = marker.ordered;
+    let ordered_bullet = if marker.ordered {
+        quote! {
+            if first.is_ascii_digit() {
+                let mut cursor = __event_list_cursor + 1;
+                while cursor < __event_list_content_end && bytes[cursor].is_ascii_digit() {
+                    cursor += 1;
+                }
+                if cursor < __event_list_content_end && matches!(bytes[cursor], b'.' | b')') {
+                    Some((true, cursor + 1))
+                } else {
+                    None
+                }
+            } else if first.is_ascii_alphabetic()
+                && __event_list_cursor + 1 < __event_list_content_end
+                && matches!(bytes[__event_list_cursor + 1], b'.' | b')') {
+                Some((true, __event_list_cursor + 2))
+            } else {
+                None
+            }
+        }
+    } else {
+        quote! { None }
+    };
     let tab_width = marker.tab_width;
     let present = syn::parse_str::<syn::Ident>(&marker.present)?;
     let column = syn::parse_str::<syn::Ident>(&marker.column)?;
@@ -45,22 +67,8 @@ pub(super) fn compile_scan_list_marker(
             let first = bytes[__event_list_cursor];
             let bullet = if [#(#unordered),*].contains(&first) {
                 Some((false, __event_list_cursor + 1))
-            } else if #ordered && first.is_ascii_digit() {
-                let mut cursor = __event_list_cursor + 1;
-                while cursor < __event_list_content_end && bytes[cursor].is_ascii_digit() {
-                    cursor += 1;
-                }
-                if cursor < __event_list_content_end && matches!(bytes[cursor], b'.' | b')') {
-                    Some((true, cursor + 1))
-                } else {
-                    None
-                }
-            } else if #ordered && first.is_ascii_alphabetic()
-                && __event_list_cursor + 1 < __event_list_content_end
-                && matches!(bytes[__event_list_cursor + 1], b'.' | b')') {
-                Some((true, __event_list_cursor + 2))
             } else {
-                None
+                #ordered_bullet
             };
             bullet.and_then(|(is_ordered, bullet_limit)| {
                 if bullet_limit < __event_list_content_end

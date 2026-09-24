@@ -215,6 +215,11 @@ pub enum EventPredicateIr {
         left: EventUsizeIr,
         right: EventUsizeIr,
     },
+    /// Distinguish two typed unsigned parser values.
+    UsizeNotEqual {
+        left: EventUsizeIr,
+        right: EventUsizeIr,
+    },
     /// Compare two unsigned parser values.
     UsizeGreater {
         left: EventUsizeIr,
@@ -415,6 +420,7 @@ fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSe
     match predicate {
         EventPredicateIr::UsizePositive { value } => collect_usize_markers(value, markers),
         EventPredicateIr::UsizeEqual { left, right }
+        | EventPredicateIr::UsizeNotEqual { left, right }
         | EventPredicateIr::UsizeGreater { left, right } => {
             collect_usize_markers(left, markers);
             collect_usize_markers(right, markers);
@@ -721,6 +727,11 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             let right = compile_usize(right)?;
             quote! { (#left) == (#right) }
         }
+        EventPredicateIr::UsizeNotEqual { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left) != (#right) }
+        }
         EventPredicateIr::UsizeGreater { left, right } => {
             let left = compile_usize(left)?;
             let right = compile_usize(right)?;
@@ -908,8 +919,13 @@ fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {
         }
         EventUsizeIr::Divide { left, right } => {
             let left = compile_usize(left)?;
-            let right = compile_usize(right)?;
-            quote! { (#left) / (#right).max(1) }
+            match right.as_ref() {
+                EventUsizeIr::Usize { value } if *value > 0 => quote! { (#left) / #value },
+                _ => {
+                    let right = compile_usize(right)?;
+                    quote! { (#left) / (#right).max(1) }
+                }
+            }
         }
     })
 }

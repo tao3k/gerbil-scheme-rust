@@ -68,3 +68,35 @@ fn unknown_schema_and_raw_rust_snippets_fail_closed() {
     });
     assert!(compile_function_json(&document.to_string()).is_err());
 }
+
+#[test]
+fn nested_pure_bindings_compile_as_lexical_rust_blocks() {
+    let document = json!({
+        "schema": FUNCTION_IR_SCHEMA,
+        "name": "has_prefix",
+        "parameters": [{"name": "source", "ty": "&str"}],
+        "result": "bool",
+        "body": {
+            "bindings": [],
+            "result": {
+                "kind": "block",
+                "bindings": [{
+                    "name": "head",
+                    "value": {"kind": "first_word", "value": {"kind": "name", "value": "source"}}
+                }],
+                "result": {
+                    "kind": "binary",
+                    "operator": "equal",
+                    "left": {"kind": "name", "value": "head"},
+                    "right": {"kind": "string", "value": "TODO"}
+                }
+            }
+        }
+    });
+    let source = compile_function_json(&document.to_string()).expect("nested IR must compile");
+    let function: syn::ItemFn = syn::parse_str(&source).expect("Rust source must parse");
+    assert!(matches!(
+        function.block.stmts.first(),
+        Some(syn::Stmt::Expr(syn::Expr::Block(_), _))
+    ));
+}

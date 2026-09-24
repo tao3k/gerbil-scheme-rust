@@ -63,6 +63,11 @@ pub struct BindingIr {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ExprIr {
+    /// A lexically scoped sequence of pure bindings and a result expression.
+    Block {
+        bindings: Vec<BindingIr>,
+        result: Box<Self>,
+    },
     /// A Rust string literal.
     String { value: String },
     /// A bound name or admitted Rust path.
@@ -193,16 +198,7 @@ pub fn compile_function(function: &FunctionIr) -> Result<String, CompileError> {
         })
         .collect::<Result<Vec<_>, CompileError>>()?;
     let result = syn::parse_str::<syn::Type>(&function.result)?;
-    let bindings = function
-        .body
-        .bindings
-        .iter()
-        .map(|binding| {
-            let name = syn::parse_str::<syn::Ident>(&binding.name)?;
-            let value = compile_expression(&binding.value)?;
-            Ok(quote! { let #name = #value; })
-        })
-        .collect::<Result<Vec<_>, CompileError>>()?;
+    let bindings = compile_bindings(&function.body.bindings)?;
     let tail = compile_expression(&function.body.result)?;
     let tokens = quote! {
         pub fn #name(#(#parameters),*) -> #result {
@@ -216,6 +212,11 @@ pub fn compile_function(function: &FunctionIr) -> Result<String, CompileError> {
 
 fn compile_expression(expression: &ExprIr) -> Result<TokenStream, CompileError> {
     Ok(match expression {
+        ExprIr::Block { bindings, result } => {
+            let bindings = compile_bindings(bindings)?;
+            let result = compile_expression(result)?;
+            quote! { { #(#bindings)* #result } }
+        }
         ExprIr::String { value } => {
             let literal = syn::LitStr::new(value, proc_macro2::Span::call_site());
             quote! { #literal }
@@ -301,6 +302,17 @@ fn compile_expression(expression: &ExprIr) -> Result<TokenStream, CompileError> 
             }
         }
     })
+}
+
+fn compile_bindings(bindings: &[BindingIr]) -> Result<Vec<TokenStream>, CompileError> {
+    bindings
+        .iter()
+        .map(|binding| {
+            let name = syn::parse_str::<syn::Ident>(&binding.name)?;
+            let value = compile_expression(&binding.value)?;
+            Ok(quote! { let #name = #value; })
+        })
+        .collect()
 }
 
 fn compile_arguments(arguments: &[ExprIr]) -> Result<Vec<TokenStream>, CompileError> {

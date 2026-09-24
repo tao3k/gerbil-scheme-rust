@@ -353,9 +353,9 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             let consequent = compile_statements(consequent)?;
             let alternate = compile_statements(alternate)?;
             if alternate.is_empty() {
-                quote! { if #condition { #consequent } }
+                quote! { if #condition { #consequent }; }
             } else {
-                quote! { if #condition { #consequent } else { #alternate } }
+                quote! { if #condition { #consequent } else { #alternate }; }
             }
         }
     })

@@ -115,6 +115,8 @@ pub enum EventPredicateIr {
     LineStartsWith { value: String },
     /// Compare a source-line prefix using ASCII-insensitive syntax matching.
     LineStartsWithAsciiCaseInsensitive { value: String },
+    /// Treat spaces, tabs, and line endings as a blank source line.
+    LineBlank,
     /// Boolean negation.
     Not { value: Box<Self> },
     /// Short-circuit conjunction.
@@ -380,6 +382,9 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
                 line.get(..#value.len())
                     .is_some_and(|prefix| prefix.eq_ignore_ascii_case(#value))
             }
+        }
+        EventPredicateIr::LineBlank => {
+            quote! { line.as_bytes().iter().all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')) }
         }
         EventPredicateIr::Not { value } => {
             let value = compile_predicate(value)?;

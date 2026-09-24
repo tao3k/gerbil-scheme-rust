@@ -216,3 +216,23 @@ fn ascii_case_insensitive_line_prefix_is_source_backed() {
         },
     );
 }
+
+#[test]
+fn blank_line_predicate_preserves_whitespace_bytes() {
+    let mut document = stateful_document();
+    document["line"][0]["condition"] = json!({"kind": "line_blank"});
+    let source = compile_event_function_json(&document.to_string()).expect("blank-line IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events(" \t\r\nα\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 4 }, FinishNode,
+                StartNode(2), StartNode(4),
+                Token { kind: 5, start: 4, end: 7 },
+                FinishNode, FinishNode, FinishNode,
+            ]);
+        },
+    );
+}

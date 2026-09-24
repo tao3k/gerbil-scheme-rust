@@ -81,12 +81,34 @@ pub enum EventStatementIr {
 
 /// Source byte offsets available in a line transition.
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum EventOffsetIr {
+    /// An existing current-line boundary.
+    Boundary(EventBoundaryIr),
+    /// A statically bounded source-line byte calculation.
+    Computed(EventComputedOffsetIr),
+}
+
+/// Current source-line boundaries.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EventBoundaryIr {
     /// Inclusive current-line start.
     Start,
     /// Exclusive current-line end.
     End,
+}
+
+/// Bounded source-line byte offsets without arbitrary Rust expressions.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum EventComputedOffsetIr {
+    /// End of a declared literal prefix, clamped to the current line.
+    LinePrefixEnd { value: String },
+    /// Skip spaces and tabs from a source-backed offset.
+    LineSkipHorizontal { from: Box<EventOffsetIr> },
+    /// Scan the next whitespace-delimited word from a source-backed offset.
+    LineScanWord { from: Box<EventOffsetIr> },
 }
 
 /// Closed unsigned-value vocabulary for contextual line transitions.
@@ -117,6 +139,8 @@ pub enum EventPredicateIr {
     LineStartsWithAsciiCaseInsensitive { value: String },
     /// Treat spaces, tabs, and line endings as a blank source line.
     LineBlank,
+    /// A declared prefix is followed by one nonempty whitespace-delimited word.
+    LineHasWordAfterPrefix { value: String },
     /// Boolean negation.
     Not { value: Box<Self> },
     /// Short-circuit conjunction.
@@ -329,20 +353,15 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             syntax_kind,
             start,
             end,
-        } => match (start, end) {
-            (EventOffsetIr::Start, EventOffsetIr::End) => quote! {
-                events.push(TreeEvent::Token { kind: #syntax_kind, start, end });
-            },
-            (EventOffsetIr::Start, EventOffsetIr::Start) => quote! {
-                events.push(TreeEvent::Token { kind: #syntax_kind, start, end: start });
-            },
-            (EventOffsetIr::End, EventOffsetIr::End) => quote! {
-                events.push(TreeEvent::Token { kind: #syntax_kind, start: end, end });
-            },
-            (EventOffsetIr::End, EventOffsetIr::Start) => quote! {
-                events.push(TreeEvent::Token { kind: #syntax_kind, start: end, end: start });
-            },
-        },
+        } => {
+            let token_start = compile_offset(start)?;
+            let token_end = compile_offset(end)?;
+            quote! {
+                events.push(TreeEvent::Token {
+                    kind: #syntax_kind, start: #token_start, end: #token_end
+                });
+            }
+        }
         EventStatementIr::FinishNode => quote! { events.push(TreeEvent::FinishNode); },
         EventStatementIr::If {
             condition,
@@ -357,6 +376,37 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             } else {
                 quote! { if #condition { #consequent } else { #alternate } }
             }
+        }
+    })
+}
+
+fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
+    Ok(match offset {
+        EventOffsetIr::Boundary(EventBoundaryIr::Start) => quote! { start },
+        EventOffsetIr::Boundary(EventBoundaryIr::End) => quote! { end },
+        EventOffsetIr::Computed(EventComputedOffsetIr::LinePrefixEnd { value }) => {
+            let bytes = value.len();
+            quote! { start.saturating_add(#bytes).min(end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineSkipHorizontal { from }) => {
+            let from = compile_offset(from)?;
+            quote! {{
+                let mut cursor = #from;
+                while cursor < end && matches!(bytes[cursor], b' ' | b'\t') {
+                    cursor += 1;
+                }
+                cursor
+            }}
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineScanWord { from }) => {
+            let from = compile_offset(from)?;
+            quote! {{
+                let mut cursor = #from;
+                while cursor < end && !matches!(bytes[cursor], b' ' | b'\t' | b'\r' | b'\n') {
+                    cursor += 1;
+                }
+                cursor
+            }}
         }
     })
 }
@@ -385,6 +435,16 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
         }
         EventPredicateIr::LineBlank => {
             quote! { line.as_bytes().iter().all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')) }
+        }
+        EventPredicateIr::LineHasWordAfterPrefix { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .and_then(|_| line.as_bytes()[#value.len()..]
+                        .iter().skip_while(|byte| matches!(byte, b' ' | b'\t')).next())
+                    .is_some_and(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+            }
         }
         EventPredicateIr::Not { value } => {
             let value = compile_predicate(value)?;

@@ -236,3 +236,52 @@ fn blank_line_predicate_preserves_whitespace_bytes() {
         },
     );
 }
+
+#[test]
+fn bounded_line_offsets_emit_source_backed_prefix_word_and_trivia() {
+    let prefix = json!({"kind": "line_prefix_end", "value": "#+begin_src"});
+    let word_start = json!({"kind": "line_skip_horizontal", "from": prefix});
+    let word_end = json!({"kind": "line_scan_word", "from": word_start});
+    let document = json!({
+        "schema": EVENT_FUNCTION_IR_SCHEMA,
+        "name": "parse_events",
+        "root_kind": 0,
+        "parser_digest": format!("sha256:{}", "2".repeat(64)),
+        "initial": [],
+        "line": [{"kind": "if",
+          "condition": {"kind": "line_has_word_after_prefix", "value": "#+begin_src"},
+          "consequent": [
+            {"kind": "start_node", "syntax_kind": 1},
+            {"kind": "token", "syntax_kind": 2, "start": "start", "end": prefix},
+            {"kind": "token", "syntax_kind": 3, "start": prefix,
+             "end": word_start},
+            {"kind": "token", "syntax_kind": 4, "start": word_start,
+             "end": word_end},
+            {"kind": "token", "syntax_kind": 3, "start": word_end,
+             "end": "end"},
+            {"kind": "finish_node"}
+          ],
+          "alternate": [{"kind": "token", "syntax_kind": 5,
+                         "start": "start", "end": "end"}]
+        }],
+        "finish": []
+    });
+    let source = compile_event_function_json(&document.to_string()).expect("bounded offset IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("#+BeGiN_SrC rust :x\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 2, start: 0, end: 11 },
+                Token { kind: 3, start: 11, end: 12 },
+                Token { kind: 4, start: 12, end: 16 },
+                Token { kind: 3, start: 16, end: 20 },
+                FinishNode, FinishNode,
+            ]);
+            assert_eq!(parse_events("#+begin_src \n"), vec![
+                StartNode(0), Token { kind: 5, start: 0, end: 13 }, FinishNode,
+            ]);
+        },
+    );
+}

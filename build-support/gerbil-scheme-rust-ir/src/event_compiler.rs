@@ -256,6 +256,8 @@ pub enum EventPredicateIr {
         heading_separator: u8,
         indent: bool,
         stop_at_heading: bool,
+        #[serde(default)]
+        body_key_marker: u8,
     },
     /// Treat spaces, tabs, and line endings as a blank source line.
     LineBlank,
@@ -794,6 +796,7 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             heading_separator,
             indent,
             stop_at_heading,
+            body_key_marker,
         } => compile_future_line_marker(
             target,
             (!stop.is_empty()).then_some(stop.as_str()),
@@ -801,6 +804,7 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             *heading_separator,
             *indent,
             *stop_at_heading,
+            *body_key_marker,
         )?,
         EventPredicateIr::LineByteEqual { at, value } => compile_line_byte_equal(at, *value)?,
         EventPredicateIr::LineBytesAllIn {

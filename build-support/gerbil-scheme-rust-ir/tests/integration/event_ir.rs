@@ -115,6 +115,37 @@ fn future_line_marker_stops_at_heading_and_parent_boundary() {
     );
 }
 
+#[test]
+fn future_line_marker_requires_declared_key_value_body() {
+    let mut document = stateful_document();
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {
+            "kind": "future_line_marker_before_boundary",
+            "target": ":END:",
+            "stop": "",
+            "heading_marker": 42,
+            "heading_separator": 32,
+            "indent": true,
+            "stop_at_heading": true,
+            "body_key_marker": 58
+        },
+        "consequent": [{"kind": "start_node", "syntax_kind": 1}, {"kind": "finish_node"}],
+        "alternate": [{"kind": "start_node", "syntax_kind": 2}, {"kind": "finish_node"}]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("future key-value body is typed event IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode};
+            assert!(matches!(parse_events(":PROPERTIES:\n:ID: x\n:END:\n")[1], StartNode(1)));
+            assert!(matches!(parse_events(":PROPERTIES:\nmalformed\n:END:\n")[1], StartNode(2)));
+        },
+    );
+}
+
 fn compile_and_run(source: &str, assertions: &TokenStream) {
     let generated: TokenStream = source.parse().expect("Rust tokens parse");
     let fixture = quote! {

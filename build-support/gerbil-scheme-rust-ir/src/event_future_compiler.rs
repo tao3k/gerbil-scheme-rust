@@ -15,6 +15,7 @@ struct FutureSpec {
     heading_separator: u8,
     indent: bool,
     stop_at_heading: bool,
+    body_key_marker: u8,
 }
 
 fn cache_ident(spec: &FutureSpec) -> Result<syn::Ident, CompileError> {
@@ -27,6 +28,7 @@ fn cache_ident(spec: &FutureSpec) -> Result<syn::Ident, CompileError> {
             spec.heading_separator,
             spec.indent,
             spec.stop_at_heading,
+            spec.body_key_marker,
         )
     );
     let digits = b"0123456789abcdef";
@@ -47,6 +49,7 @@ fn collect_predicate(predicate: &EventPredicateIr, specs: &mut BTreeSet<FutureSp
             heading_separator,
             indent,
             stop_at_heading,
+            body_key_marker,
         } => {
             specs.insert(FutureSpec {
                 target: target.clone(),
@@ -55,6 +58,7 @@ fn collect_predicate(predicate: &EventPredicateIr, specs: &mut BTreeSet<FutureSp
                 heading_separator: *heading_separator,
                 indent: *indent,
                 stop_at_heading: *stop_at_heading,
+                body_key_marker: *body_key_marker,
             });
         }
         EventPredicateIr::Not { value } => collect_predicate(value, specs),
@@ -135,6 +139,32 @@ fn compile_heading_boundary(marker: u8, separator: u8, enabled: bool) -> TokenSt
     }
 }
 
+fn compile_body_key_boundary(marker: u8) -> TokenStream {
+    if marker == 0 {
+        return quote! {};
+    }
+    quote! {
+        let __event_body = __event_future_line.as_bytes();
+        let __event_key_start = __event_body.iter()
+            .take_while(|byte| matches!(byte, b' ' | b'\t'))
+            .count() + 1;
+        let __event_valid_key = __event_body.get(__event_key_start - 1)
+            == Some(&#marker)
+            && __event_body[__event_key_start..].iter()
+                .position(|byte| *byte == #marker)
+                .is_some_and(|key_len| {
+                    key_len > 0
+                        && !__event_body[__event_key_start..__event_key_start + key_len]
+                            .iter().any(u8::is_ascii_whitespace)
+                        && __event_body.get(__event_key_start + key_len + 1)
+                            .is_none_or(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                });
+        if !__event_valid_key {
+            __event_is_boundary = true;
+        }
+    }
+}
+
 pub(super) fn compile_future_line_marker(
     target: &str,
     stop: Option<&str>,
@@ -142,6 +172,7 @@ pub(super) fn compile_future_line_marker(
     heading_separator: u8,
     indent: bool,
     stop_at_heading: bool,
+    body_key_marker: u8,
 ) -> Result<TokenStream, CompileError> {
     if target.is_empty()
         || !target.is_ascii()
@@ -158,6 +189,7 @@ pub(super) fn compile_future_line_marker(
         heading_separator,
         indent,
         stop_at_heading,
+        body_key_marker,
     })?;
     let target = syn::LitStr::new(target, proc_macro2::Span::call_site());
     let stop = stop.map(|value| syn::LitStr::new(value, proc_macro2::Span::call_site()));
@@ -171,6 +203,7 @@ pub(super) fn compile_future_line_marker(
     let candidate = compile_future_candidate(indent);
     let heading_check =
         compile_heading_boundary(heading_marker, heading_separator, stop_at_heading);
+    let body_check = compile_body_key_boundary(body_key_marker);
     Ok(quote! {{
         let __event_future_index = #cache.get_or_init(|| {
             let mut __event_future_lines = Vec::new();
@@ -205,6 +238,9 @@ pub(super) fn compile_future_line_marker(
                 let mut __event_is_boundary = false;
                 #heading_check
                 #stop_check
+                if !__event_is_boundary && !__event_future_matches(#target) {
+                    #body_check
+                }
                 __event_future_lines.push((
                     __event_future_cursor,
                     __event_future_matches(#target),

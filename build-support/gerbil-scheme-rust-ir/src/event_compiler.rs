@@ -113,6 +113,8 @@ pub enum EventPredicateIr {
     UsizePositive { value: EventUsizeIr },
     /// Compare the current source line's prefix.
     LineStartsWith { value: String },
+    /// Compare a source-line prefix using ASCII-insensitive syntax matching.
+    LineStartsWithAsciiCaseInsensitive { value: String },
     /// Boolean negation.
     Not { value: Box<Self> },
     /// Short-circuit conjunction.
@@ -371,6 +373,13 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
         EventPredicateIr::LineStartsWith { value } => {
             let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
             quote! { line.starts_with(#value) }
+        }
+        EventPredicateIr::LineStartsWithAsciiCaseInsensitive { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(#value))
+            }
         }
         EventPredicateIr::Not { value } => {
             let value = compile_predicate(value)?;

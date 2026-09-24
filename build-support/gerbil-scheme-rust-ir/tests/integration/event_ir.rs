@@ -190,3 +190,29 @@ fn event_ir_rejects_unknown_forms_and_raw_rust() {
     document["line"] = json!([{"kind": "raw_rust", "source": "panic!()"}]);
     assert!(compile_event_function_json(&document.to_string()).is_err());
 }
+
+#[test]
+fn ascii_case_insensitive_line_prefix_is_source_backed() {
+    let mut document = stateful_document();
+    document["line"][0]["condition"] = json!({
+        "kind": "line_starts_with_ascii_case_insensitive",
+        "value": "#+begin_src"
+    });
+    let source = compile_event_function_json(&document.to_string()).expect("ASCII prefix IR");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("#+BeGiN_SrC rust\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 17 },
+                FinishNode, FinishNode,
+            ]);
+            assert_eq!(parse_events("α#+begin_src\n"), vec![
+                StartNode(0), StartNode(2), StartNode(4),
+                Token { kind: 5, start: 0, end: 14 },
+                FinishNode, FinishNode, FinishNode,
+            ]);
+        },
+    );
+}

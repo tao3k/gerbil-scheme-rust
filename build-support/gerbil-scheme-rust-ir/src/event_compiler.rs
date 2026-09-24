@@ -109,6 +109,12 @@ pub enum EventComputedOffsetIr {
     LineSkipHorizontal { from: Box<EventOffsetIr> },
     /// Scan the next whitespace-delimited word from a source-backed offset.
     LineScanWord { from: Box<EventOffsetIr> },
+    /// Scan an ASCII identifier composed of letters, digits, underscore and hyphen.
+    LineScanKey { from: Box<EventOffsetIr> },
+    /// Move one byte forward without passing the current line boundary.
+    LineStep { from: Box<EventOffsetIr> },
+    /// Remove trailing ASCII whitespace from the current source line.
+    LineTrimEnd,
 }
 
 /// Closed unsigned-value vocabulary for contextual line transitions.
@@ -141,6 +147,8 @@ pub enum EventPredicateIr {
     LineBlank,
     /// A declared prefix is followed by one nonempty whitespace-delimited word.
     LineHasWordAfterPrefix { value: String },
+    /// A prefix is followed by a nonempty ASCII key and a colon.
+    LineHasKeyAfterPrefix { value: String },
     /// Boolean negation.
     Not { value: Box<Self> },
     /// Short-circuit conjunction.
@@ -418,6 +426,30 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
                 cursor
             }}
         }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineScanKey { from }) => {
+            let from = compile_offset(from)?;
+            quote! {{
+                let mut cursor = #from;
+                while cursor < end && (bytes[cursor].is_ascii_alphanumeric()
+                    || matches!(bytes[cursor], b'_' | b'-')) {
+                    cursor += 1;
+                }
+                cursor
+            }}
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineStep { from }) => {
+            let from = compile_offset(from)?;
+            quote! { (#from).saturating_add(1).min(end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEnd) => {
+            quote! {{
+                let mut cursor = end;
+                while cursor > start && bytes[cursor - 1].is_ascii_whitespace() {
+                    cursor -= 1;
+                }
+                cursor
+            }}
+        }
     })
 }
 
@@ -454,6 +486,21 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
                     .and_then(|_| line.as_bytes()[#value.len()..]
                         .iter().find(|byte| !matches!(byte, b' ' | b'\t')))
                     .is_some_and(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+            }
+        }
+        EventPredicateIr::LineHasKeyAfterPrefix { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .is_some_and(|_| {
+                        let mut cursor = #value.len();
+                        while cursor < line.len() && (bytes[start + cursor].is_ascii_alphanumeric()
+                            || matches!(bytes[start + cursor], b'_' | b'-')) {
+                            cursor += 1;
+                        }
+                        cursor > #value.len() && bytes.get(start + cursor) == Some(&b':')
+                    })
             }
         }
         EventPredicateIr::Not { value } => {

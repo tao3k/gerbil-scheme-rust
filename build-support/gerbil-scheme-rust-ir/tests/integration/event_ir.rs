@@ -238,6 +238,58 @@ fn blank_line_predicate_preserves_whitespace_bytes() {
 }
 
 #[test]
+fn dynamic_key_line_offsets_preserve_value_and_trivia() {
+    let mut document = stateful_document();
+    let prefix_end = json!({"kind": "line_prefix_end", "value": "#+"});
+    let key_end = json!({"kind": "line_scan_key", "from": prefix_end});
+    let after_colon = json!({"kind": "line_step", "from": key_end});
+    let value_start = json!({"kind": "line_skip_horizontal", "from": after_colon});
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {"kind": "line_has_key_after_prefix", "value": "#+"},
+        "consequent": [
+            {"kind": "start_node", "syntax_kind": 1},
+            {"kind": "token", "syntax_kind": 3, "start": "start", "end": prefix_end},
+            {"kind": "token", "syntax_kind": 4, "start": prefix_end, "end": key_end},
+            {"kind": "token", "syntax_kind": 3, "start": key_end, "end": value_start},
+            {"kind": "token", "syntax_kind": 5, "start": value_start,
+             "end": {"kind": "line_trim_end"}},
+            {"kind": "token", "syntax_kind": 3,
+             "start": {"kind": "line_trim_end"}, "end": "end"},
+            {"kind": "finish_node"}
+        ],
+        "alternate": [
+            {"kind": "start_node", "syntax_kind": 2},
+            {"kind": "token", "syntax_kind": 5, "start": "start", "end": "end"},
+            {"kind": "finish_node"}
+        ]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string()).expect("key-line IR compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("#+SEQ_TODO: TODO | DONE \r\nplain\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 2 },
+                Token { kind: 4, start: 2, end: 10 },
+                Token { kind: 3, start: 10, end: 12 },
+                Token { kind: 5, start: 12, end: 23 },
+                Token { kind: 3, start: 23, end: 26 }, FinishNode,
+                StartNode(2), Token { kind: 5, start: 26, end: 32 },
+                FinishNode, FinishNode,
+            ]);
+            assert_eq!(parse_events("#+@bad: x\n"), vec![
+                StartNode(0), StartNode(2),
+                Token { kind: 5, start: 0, end: 10 },
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
 fn bounded_line_offsets_emit_source_backed_prefix_word_and_trivia() {
     let prefix = json!({"kind": "line_prefix_end", "value": "#+begin_src"});
     let word_start = json!({"kind": "line_skip_horizontal", "from": prefix});

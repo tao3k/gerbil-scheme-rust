@@ -455,16 +455,7 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             condition,
             consequent,
             alternate,
-        } => {
-            let condition = compile_predicate(condition)?;
-            let consequent = compile_statements(consequent)?;
-            let alternate = compile_statements(alternate)?;
-            if alternate.is_empty() {
-                quote! { if #condition { #consequent } }
-            } else {
-                quote! { if #condition { #consequent } else { #alternate } }
-            }
-        }
+        } => compile_if_statement(condition, consequent, alternate)?,
         EventStatementIr::ForLineBytes {
             index,
             from,
@@ -485,6 +476,27 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
                     }
                 }
             }
+        }
+    })
+}
+
+fn compile_if_statement(
+    condition: &EventPredicateIr,
+    consequent: &[EventStatementIr],
+    alternate: &[EventStatementIr],
+) -> Result<TokenStream, CompileError> {
+    let condition = compile_predicate(condition)?;
+    let consequent = compile_statements(consequent)?;
+    let alternate = compile_statements(alternate)?;
+    Ok(if alternate.is_empty() {
+        quote! {
+            let __event_condition = #condition;
+            if __event_condition { #consequent }
+        }
+    } else {
+        quote! {
+            let __event_condition = #condition;
+            if __event_condition { #consequent } else { #alternate }
         }
     })
 }

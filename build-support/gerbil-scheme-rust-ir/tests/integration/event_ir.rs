@@ -1,6 +1,7 @@
 use gerbil_scheme_rust_ir::{
     EVENT_FUNCTION_IR_SCHEMA, compile_event_function_json, compile_ir_json,
 };
+use proc_macro2::TokenStream;
 use quote::quote;
 use serde_json::json;
 use std::{fs, process::Command, time::SystemTime};
@@ -50,7 +51,23 @@ fn stateful_event_ir_typechecks_and_executes() {
         source,
         compile_ir_json(&stateful_document().to_string()).expect("schema dispatches to events")
     );
-    let generated: proc_macro2::TokenStream = source.parse().expect("Rust tokens parse");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("# A\r\nbody\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 5 }, FinishNode,
+                StartNode(2), StartNode(4),
+                Token { kind: 5, start: 5, end: 10 }, FinishNode,
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
+fn compile_and_run(source: &str, assertions: &TokenStream) {
+    let generated: TokenStream = source.parse().expect("Rust tokens parse");
     let fixture = quote! {
         #[derive(Debug, PartialEq)]
         enum TreeEvent {
@@ -61,14 +78,7 @@ fn stateful_event_ir_typechecks_and_executes() {
         #generated
         #[test]
         fn generated_semantics() {
-            use TreeEvent::{FinishNode, StartNode, Token};
-            assert_eq!(parse_events("# A\r\nbody\n"), vec![
-                StartNode(0), StartNode(1),
-                Token { kind: 3, start: 0, end: 5 }, FinishNode,
-                StartNode(2), StartNode(4),
-                Token { kind: 5, start: 5, end: 10 }, FinishNode,
-                FinishNode, FinishNode,
-            ]);
+            #assertions
         }
     };
     let nonce = SystemTime::now()
@@ -108,6 +118,64 @@ fn stateful_event_ir_typechecks_and_executes() {
     fs::remove_file(binary).expect("remove generated binary");
     fs::remove_file(input).expect("remove generated fixture");
     fs::remove_dir(root).expect("remove empty fixture directory");
+}
+
+#[test]
+fn level_stack_event_ir_closes_siblings_and_nested_sections() {
+    let document = json!({
+        "schema": EVENT_FUNCTION_IR_SCHEMA,
+        "name": "parse_events",
+        "root_kind": 0,
+        "parser_digest": format!("sha256:{}", "1".repeat(64)),
+        "initial": [
+            {"kind": "let_usize", "name": "level", "value": 0},
+            {"kind": "let_usize_stack", "name": "levels"}
+        ],
+        "line": [
+            {"kind": "set_usize", "name": "level",
+             "value": {"kind": "line_marker_level", "marker": 42, "separator": 32}},
+            {"kind": "if",
+             "condition": {"kind": "usize_positive",
+                           "value": {"kind": "state", "name": "level"}},
+             "consequent": [
+                 {"kind": "close_through_level", "stack": "levels",
+                  "level": {"kind": "state", "name": "level"}},
+                 {"kind": "open_level", "stack": "levels",
+                  "level": {"kind": "state", "name": "level"},
+                  "syntax_kind": 1},
+                 {"kind": "start_node", "syntax_kind": 2},
+                 {"kind": "token", "syntax_kind": 4,
+                  "start": "start", "end": "end"},
+                 {"kind": "finish_node"}
+             ],
+             "alternate": [
+                 {"kind": "start_node", "syntax_kind": 3},
+                 {"kind": "token", "syntax_kind": 4,
+                  "start": "start", "end": "end"},
+                 {"kind": "finish_node"}
+             ]}
+        ],
+        "finish": [{"kind": "close_all_levels", "stack": "levels"}]
+    });
+    let source = compile_event_function_json(&document.to_string()).expect("level IR compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("* Parent\n** Child\nbody\n* Peer\n"), vec![
+                StartNode(0),
+                StartNode(1), StartNode(2),
+                Token { kind: 4, start: 0, end: 9 }, FinishNode,
+                StartNode(1), StartNode(2),
+                Token { kind: 4, start: 9, end: 18 }, FinishNode,
+                StartNode(3), Token { kind: 4, start: 18, end: 23 }, FinishNode,
+                FinishNode, FinishNode,
+                StartNode(1), StartNode(2),
+                Token { kind: 4, start: 23, end: 30 }, FinishNode,
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
 }
 
 #[test]

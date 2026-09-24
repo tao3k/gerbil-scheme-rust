@@ -39,11 +39,27 @@ pub struct EventFunctionIr {
 pub enum EventStatementIr {
     /// Declare one bounded mutable boolean state slot.
     LetBool { name: String, value: bool },
+    /// Declare one unsigned parser state slot.
+    LetUsize { name: String, value: usize },
+    /// Declare a nesting stack of unsigned levels.
+    LetUsizeStack { name: String },
     /// Update a previously declared state slot.
     SetBool {
         name: String,
         value: EventPredicateIr,
     },
+    /// Update a previously declared unsigned state slot.
+    SetUsize { name: String, value: EventUsizeIr },
+    /// Close all nested nodes at or above a new level.
+    CloseThroughLevel { stack: String, level: EventUsizeIr },
+    /// Open one nested node at a declared level.
+    OpenLevel {
+        stack: String,
+        level: EventUsizeIr,
+        syntax_kind: u16,
+    },
+    /// Close every remaining node in a nesting stack.
+    CloseAllLevels { stack: String },
     /// Emit an opening Rowan node event.
     StartNode { syntax_kind: u16 },
     /// Emit a source-backed token for the current line.
@@ -72,6 +88,18 @@ pub enum EventOffsetIr {
     End,
 }
 
+/// Closed unsigned-value vocabulary for contextual line transitions.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum EventUsizeIr {
+    /// A literal nonnegative value.
+    Usize { value: usize },
+    /// A named unsigned parser state slot.
+    State { name: String },
+    /// Count repeated leading marker bytes only when followed by a separator.
+    LineMarkerLevel { marker: u8, separator: u8 },
+}
+
 /// Closed predicate vocabulary; it has no arbitrary Rust expression node.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -80,6 +108,8 @@ pub enum EventPredicateIr {
     Bool { value: bool },
     /// Read one named state slot.
     State { name: String },
+    /// Test whether an unsigned expression is positive.
+    UsizePositive { value: EventUsizeIr },
     /// Compare the current source line's prefix.
     LineStartsWith { value: String },
     /// Boolean negation.
@@ -169,10 +199,53 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             let name = syn::parse_str::<syn::Ident>(name)?;
             quote! { let mut #name = #value; }
         }
+        EventStatementIr::LetUsize { name, value } => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            quote! { let mut #name = #value; }
+        }
+        EventStatementIr::LetUsizeStack { name } => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            quote! { let mut #name: Vec<usize> = Vec::new(); }
+        }
         EventStatementIr::SetBool { name, value } => {
             let name = syn::parse_str::<syn::Ident>(name)?;
             let value = compile_predicate(value)?;
             quote! { #name = #value; }
+        }
+        EventStatementIr::SetUsize { name, value } => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            let value = compile_usize(value)?;
+            quote! { #name = #value; }
+        }
+        EventStatementIr::CloseThroughLevel { stack, level } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            let level = compile_usize(level)?;
+            quote! {
+                while #stack.last().is_some_and(|&open| open >= #level) {
+                    let _ = #stack.pop();
+                    events.push(TreeEvent::FinishNode);
+                }
+            }
+        }
+        EventStatementIr::OpenLevel {
+            stack,
+            level,
+            syntax_kind,
+        } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            let level = compile_usize(level)?;
+            quote! {
+                events.push(TreeEvent::StartNode(#syntax_kind));
+                #stack.push(#level);
+            }
+        }
+        EventStatementIr::CloseAllLevels { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            quote! {
+                while #stack.pop().is_some() {
+                    events.push(TreeEvent::FinishNode);
+                }
+            }
         }
         EventStatementIr::StartNode { syntax_kind } => {
             quote! { events.push(TreeEvent::StartNode(#syntax_kind)); }
@@ -220,6 +293,10 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             let name = syn::parse_str::<syn::Ident>(name)?;
             quote! { #name }
         }
+        EventPredicateIr::UsizePositive { value } => {
+            let value = compile_usize(value)?;
+            quote! { (#value) > 0 }
+        }
         EventPredicateIr::LineStartsWith { value } => {
             let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
             quote! { line.starts_with(#value) }
@@ -237,6 +314,28 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             let left = compile_predicate(left)?;
             let right = compile_predicate(right)?;
             quote! { (#left) || (#right) }
+        }
+    })
+}
+
+fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {
+    Ok(match value {
+        EventUsizeIr::Usize { value } => quote! { #value },
+        EventUsizeIr::State { name } => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            quote! { #name }
+        }
+        EventUsizeIr::LineMarkerLevel { marker, separator } => {
+            let marker = *marker;
+            let separator = *separator;
+            quote! {{
+                let run = line.as_bytes().iter().take_while(|byte| **byte == #marker).count();
+                if run > 0 && line.as_bytes().get(run) == Some(&#separator) {
+                    run
+                } else {
+                    0
+                }
+            }}
         }
     })
 }

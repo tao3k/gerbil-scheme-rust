@@ -462,6 +462,37 @@ fn nonspace_delimiter_scan_compiles_source_backed_offsets() {
 }
 
 #[test]
+fn delimiter_scan_preserves_whitespace_before_the_first_match() {
+    let mut document = stateful_document();
+    let tag_end = json!({
+        "kind": "line_scan_until",
+        "from": "start",
+        "delimiter": 58
+    });
+    document["line"] = json!([
+        {"kind": "start_node", "syntax_kind": 1},
+        {"kind": "token", "syntax_kind": 3, "start": "start", "end": tag_end},
+        {"kind": "token", "syntax_kind": 5, "start": tag_end, "end": "end"},
+        {"kind": "finish_node"}
+    ]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("bounded delimiter scan compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("term words :: body\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 11 },
+                Token { kind: 5, start: 11, end: 19 },
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
 fn bounded_line_byte_fold_emits_source_backed_segments() {
     let mut document = stateful_document();
     let index = json!({"kind": "line_index", "name": "cursor"});

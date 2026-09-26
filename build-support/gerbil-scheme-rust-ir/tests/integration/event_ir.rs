@@ -493,6 +493,46 @@ fn delimiter_scan_preserves_whitespace_before_the_first_match() {
 }
 
 #[test]
+fn bounded_static_name_set_uses_source_bytes_without_generated_name_branches() {
+    let mut document = stateful_document();
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {
+            "kind": "line_bytes_in_set", "from": "start",
+            "until": {"kind": "line_content_end"},
+            "values": ["alpha", "beta"]
+        },
+        "consequent": [{"kind": "token", "syntax_kind": 3,
+                        "start": "start", "end": "end"}],
+        "alternate": [{"kind": "token", "syntax_kind": 5,
+                       "start": "start", "end": "end"}]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("bounded static name-set lookup compiles");
+    assert!(
+        source.len() < 4_000,
+        "names must remain a compact static table"
+    );
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("alpha\nbeta\nother\n"), vec![
+                StartNode(0),
+                Token { kind: 3, start: 0, end: 6 },
+                Token { kind: 3, start: 6, end: 11 },
+                Token { kind: 5, start: 11, end: 17 },
+                FinishNode,
+            ]);
+        },
+    );
+
+    document["line"][0]["condition"]["values"] = json!(["beta", "alpha"]);
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+}
+
+#[test]
 fn bounded_line_byte_fold_emits_source_backed_segments() {
     let mut document = stateful_document();
     let index = json!({"kind": "line_index", "name": "cursor"});

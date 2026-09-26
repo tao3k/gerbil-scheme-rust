@@ -80,7 +80,8 @@ fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSe
         }
         EventPredicateIr::LineByteEqual { at, .. } => collect_offset_markers(at, markers),
         EventPredicateIr::LineBytesAllIn { from, until, .. }
-        | EventPredicateIr::LineBytesAnyIn { from, until, .. } => {
+        | EventPredicateIr::LineBytesAnyIn { from, until, .. }
+        | EventPredicateIr::LineBytesInSet { from, until, .. } => {
             collect_offset_markers(from, markers);
             collect_offset_markers(until, markers);
         }

@@ -287,6 +287,12 @@ pub enum EventPredicateIr {
         until: EventOffsetIr,
         values: Vec<u8>,
     },
+    /// Match a bounded source-line byte slice against a sorted static name set.
+    LineBytesInSet {
+        from: EventOffsetIr,
+        until: EventOffsetIr,
+        values: Vec<String>,
+    },
     /// Boolean negation.
     Not { value: Box<Self> },
     /// Short-circuit conjunction.
@@ -726,6 +732,11 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             until,
             values,
         } => compile_line_byte_set(from, until, values, false)?,
+        EventPredicateIr::LineBytesInSet {
+            from,
+            until,
+            values,
+        } => compile_line_bytes_in_set(from, until, values)?,
         EventPredicateIr::Not { value } => {
             let value = compile_predicate(value)?;
             quote! { !(#value) }
@@ -832,6 +843,35 @@ fn compile_line_byte_set(
         let until = #until;
         from >= start && from <= until && until <= end
             && bytes.get(from..until).is_some_and(|slice| #match_slice)
+    }})
+}
+
+fn compile_line_bytes_in_set(
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    values: &[String],
+) -> Result<TokenStream, CompileError> {
+    if values.is_empty()
+        || values
+            .iter()
+            .any(|value| value.is_empty() || !value.is_ascii())
+        || values.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(CompileError::Schema(
+            "line byte name set must be nonempty, ASCII, sorted, and unique".into(),
+        ));
+    }
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let names = values
+        .iter()
+        .map(|value| syn::LitByteStr::new(value.as_bytes(), proc_macro2::Span::call_site()));
+    Ok(quote! {{
+        let from = #from;
+        let until = #until;
+        const NAMES: &[&[u8]] = &[#(#names),*];
+        from >= start && from <= until && until <= end
+            && bytes.get(from..until).is_some_and(|slice| NAMES.binary_search(&slice).is_ok())
     }})
 }
 

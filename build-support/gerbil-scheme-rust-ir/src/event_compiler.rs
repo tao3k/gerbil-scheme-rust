@@ -17,7 +17,8 @@ mod event_list_compiler;
 #[path = "event_marker_collector.rs"]
 mod event_marker_collector;
 use event_future_compiler::{
-    compile_future_cache_declarations, compile_future_named_marker, compile_future_predicate,
+    compile_future_cache_declarations, compile_future_heading_title, compile_future_named_marker,
+    compile_future_predicate,
 };
 use event_list_compiler::{
     compile_close_all_frames, compile_close_frame, compile_close_frames_while,
@@ -671,6 +672,7 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
         EventPredicateIr::FutureLineMarkerBeforeBoundary { .. } => {
             compile_future_predicate(predicate)?
         }
+        EventPredicateIr::FutureHeadingTitle { .. } => compile_future_heading_title(predicate)?,
         EventPredicateIr::FutureNamedLineMarkerBeforeBoundary { .. } => {
             compile_future_named_marker(predicate)?
         }

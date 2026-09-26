@@ -276,6 +276,13 @@ pub enum EventPredicateIr {
         #[serde(default)]
         body_key_marker: u8,
     },
+    /// Find a later heading whose level and complete title match a declaration.
+    FutureHeadingTitle {
+        heading_marker: u8,
+        heading_separator: u8,
+        min_level: usize,
+        title: String,
+    },
     /// Find a later named closing marker matching a saved source slice.
     FutureNamedLineMarkerBeforeBoundary {
         name_from: EventOffsetIr,

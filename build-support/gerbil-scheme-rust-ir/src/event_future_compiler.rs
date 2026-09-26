@@ -30,6 +30,101 @@ struct NamedFutureSpec {
     ascii_case_insensitive: bool,
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct HeadingFutureSpec {
+    heading_marker: u8,
+    heading_separator: u8,
+    min_level: usize,
+    title: String,
+}
+
+fn compile_heading_future_index(spec: &HeadingFutureSpec) -> TokenStream {
+    let marker = spec.heading_marker;
+    let separator = spec.heading_separator;
+    let min_level = spec.min_level;
+    let title = syn::LitByteStr::new(spec.title.as_bytes(), proc_macro2::Span::call_site());
+    quote! {
+        let mut lines = Vec::new();
+        let mut cursor = 0usize;
+        while cursor < bytes.len() {
+            let mut end = cursor;
+            while end < bytes.len() && !matches!(bytes[end], b'\r' | b'\n') {
+                end += 1;
+            }
+            let mut next = end;
+            if next < bytes.len() {
+                next += if bytes[next] == b'\r' && bytes.get(next + 1) == Some(&b'\n') {
+                    2
+                } else {
+                    1
+                };
+            }
+            let line = &bytes[cursor..end];
+            let level = line.iter().take_while(|byte| **byte == #marker).count();
+            let matched = if level >= #min_level && line.get(level) == Some(&#separator) {
+                let mut title_start = level + 1;
+                while line.get(title_start).is_some_and(|byte| matches!(byte, b' ' | b'\t')) {
+                    title_start += 1;
+                }
+                let mut title_end = line.len();
+                while title_end > title_start
+                    && matches!(line[title_end - 1], b' ' | b'\t')
+                {
+                    title_end -= 1;
+                }
+                line[title_start..title_end] == *#title
+            } else {
+                false
+            };
+            lines.push((cursor, matched));
+            cursor = next;
+        }
+        let mut found = false;
+        for (_, match_here) in lines.iter_mut().rev() {
+            found |= *match_here;
+            *match_here = found;
+        }
+        lines
+    }
+}
+
+pub(super) fn compile_future_heading_title(
+    predicate: &EventPredicateIr,
+) -> Result<TokenStream, CompileError> {
+    let EventPredicateIr::FutureHeadingTitle {
+        heading_marker,
+        heading_separator,
+        min_level,
+        title,
+    } = predicate
+    else {
+        return Err(CompileError::Schema(
+            "expected future heading predicate".into(),
+        ));
+    };
+    if *min_level == 0
+        || *heading_marker == *heading_separator
+        || title.is_empty()
+        || title.bytes().any(|byte| matches!(byte, b'\r' | b'\n'))
+    {
+        return Err(CompileError::Schema(
+            "invalid future heading declaration".into(),
+        ));
+    }
+    let cache = heading_cache_ident(&HeadingFutureSpec {
+        heading_marker: *heading_marker,
+        heading_separator: *heading_separator,
+        min_level: *min_level,
+        title: title.clone(),
+    })?;
+    let builder = cache_builder_ident(&cache)?;
+    Ok(quote! {{
+        let index = #cache.get_or_init(|| #builder(bytes));
+        let position = index.partition_point(|(line_start, _)| *line_start < end);
+        index.get(position).is_some_and(|(_, found)| *found)
+    }})
+}
+
 fn cache_ident(spec: &FutureSpec) -> Result<syn::Ident, CompileError> {
     let key = format!(
         "{:?}",
@@ -63,6 +158,10 @@ fn named_cache_ident(spec: &NamedFutureSpec) -> Result<syn::Ident, CompileError>
     encoded_cache_ident("__event_named_future_", &key)
 }
 
+fn heading_cache_ident(spec: &HeadingFutureSpec) -> Result<syn::Ident, CompileError> {
+    encoded_cache_ident("__event_heading_future_", &format!("{spec:?}"))
+}
+
 fn encoded_cache_ident(prefix: &str, key: &str) -> Result<syn::Ident, CompileError> {
     let digits = b"0123456789abcdef";
     let mut encoded = String::with_capacity(key.len() * 2);
@@ -81,6 +180,7 @@ fn collect_predicate(
     predicate: &EventPredicateIr,
     specs: &mut BTreeSet<FutureSpec>,
     named_specs: &mut BTreeSet<NamedFutureSpec>,
+    heading_specs: &mut BTreeSet<HeadingFutureSpec>,
 ) {
     match predicate {
         EventPredicateIr::FutureLineMarkerBeforeBoundary {
@@ -141,10 +241,25 @@ fn collect_predicate(
                 });
             }
         }
-        EventPredicateIr::Not { value } => collect_predicate(value, specs, named_specs),
+        EventPredicateIr::FutureHeadingTitle {
+            heading_marker,
+            heading_separator,
+            min_level,
+            title,
+        } => {
+            heading_specs.insert(HeadingFutureSpec {
+                heading_marker: *heading_marker,
+                heading_separator: *heading_separator,
+                min_level: *min_level,
+                title: title.clone(),
+            });
+        }
+        EventPredicateIr::Not { value } => {
+            collect_predicate(value, specs, named_specs, heading_specs);
+        }
         EventPredicateIr::And { left, right } | EventPredicateIr::Or { left, right } => {
-            collect_predicate(left, specs, named_specs);
-            collect_predicate(right, specs, named_specs);
+            collect_predicate(left, specs, named_specs, heading_specs);
+            collect_predicate(right, specs, named_specs, heading_specs);
         }
         _ => {}
     }
@@ -154,25 +269,26 @@ fn collect_statements(
     statements: &[EventStatementIr],
     specs: &mut BTreeSet<FutureSpec>,
     named_specs: &mut BTreeSet<NamedFutureSpec>,
+    heading_specs: &mut BTreeSet<HeadingFutureSpec>,
 ) {
     for statement in statements {
         match statement {
             EventStatementIr::SetBool { value, .. }
             | EventStatementIr::CloseFramesWhile {
                 condition: value, ..
-            } => collect_predicate(value, specs, named_specs),
+            } => collect_predicate(value, specs, named_specs, heading_specs),
             EventStatementIr::If {
                 condition,
                 consequent,
                 alternate,
             } => {
-                collect_predicate(condition, specs, named_specs);
-                collect_statements(consequent, specs, named_specs);
-                collect_statements(alternate, specs, named_specs);
+                collect_predicate(condition, specs, named_specs, heading_specs);
+                collect_statements(consequent, specs, named_specs, heading_specs);
+                collect_statements(alternate, specs, named_specs, heading_specs);
             }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {
-                collect_statements(body, specs, named_specs);
+                collect_statements(body, specs, named_specs, heading_specs);
             }
             _ => {}
         }
@@ -184,8 +300,9 @@ pub(super) fn compile_future_cache_declarations(
 ) -> Result<Vec<TokenStream>, CompileError> {
     let mut specs = BTreeSet::new();
     let mut named_specs = BTreeSet::new();
+    let mut heading_specs = BTreeSet::new();
     for statements in phases {
-        collect_statements(statements, &mut specs, &mut named_specs);
+        collect_statements(statements, &mut specs, &mut named_specs, &mut heading_specs);
     }
     let mut declarations = specs
         .iter()
@@ -219,6 +336,17 @@ pub(super) fn compile_future_cache_declarations(
                 #index
             }
             let #name: std::cell::OnceCell<EventNamedFutureCache> = std::cell::OnceCell::new();
+        });
+    }
+    for spec in &heading_specs {
+        let name = heading_cache_ident(spec)?;
+        let builder = cache_builder_ident(&name)?;
+        let index = compile_heading_future_index(spec);
+        declarations.push(quote! {
+            fn #builder(bytes: &[u8]) -> Vec<(usize, bool)> {
+                #index
+            }
+            let #name: std::cell::OnceCell<Vec<(usize, bool)>> = std::cell::OnceCell::new();
         });
     }
     Ok(declarations)

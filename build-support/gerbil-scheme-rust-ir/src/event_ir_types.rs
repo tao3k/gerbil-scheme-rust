@@ -289,6 +289,16 @@ pub enum EventPredicateIr {
         stop_at_heading: bool,
         #[serde(default)]
         ascii_case_insensitive: bool,
+        #[serde(default)]
+        stop_name_from: Option<EventOffsetIr>,
+        #[serde(default)]
+        stop_name_until: Option<EventOffsetIr>,
+        #[serde(default)]
+        stop_prefix: String,
+        #[serde(default)]
+        stop_suffix: String,
+        #[serde(default)]
+        stop_ascii_case_insensitive: bool,
     },
     /// Treat spaces, tabs, and line endings as a blank source line.
     LineBlank,

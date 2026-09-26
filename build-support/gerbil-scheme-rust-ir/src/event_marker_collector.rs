@@ -105,10 +105,18 @@ fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSe
         EventPredicateIr::FutureNamedLineMarkerBeforeBoundary {
             name_from,
             name_until,
+            stop_name_from,
+            stop_name_until,
             ..
         } => {
             collect_offset_markers(name_from, markers);
             collect_offset_markers(name_until, markers);
+            if let Some(offset) = stop_name_from {
+                collect_offset_markers(offset, markers);
+            }
+            if let Some(offset) = stop_name_until {
+                collect_offset_markers(offset, markers);
+            }
         }
         EventPredicateIr::Not { value } => collect_predicate_markers(value, markers),
         EventPredicateIr::And { left, right } | EventPredicateIr::Or { left, right } => {

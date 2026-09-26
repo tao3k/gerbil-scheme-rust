@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
 
-use super::{EventPredicateIr, EventStatementIr, compile_offset};
+use super::{EventOffsetIr, EventPredicateIr, EventStatementIr, compile_offset};
 use crate::CompileError;
 
 #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
@@ -102,6 +102,11 @@ fn collect_predicate(
             target_prefix,
             target_suffix,
             stop,
+            stop_name_from,
+            stop_name_until,
+            stop_prefix,
+            stop_suffix,
+            stop_ascii_case_insensitive,
             heading_marker,
             heading_separator,
             indent,
@@ -119,6 +124,18 @@ fn collect_predicate(
                 stop_at_heading: *stop_at_heading,
                 ascii_case_insensitive: *ascii_case_insensitive,
             });
+            if stop_name_from.is_some() && stop_name_until.is_some() {
+                named_specs.insert(NamedFutureSpec {
+                    target_prefix: stop_prefix.clone(),
+                    target_suffix: stop_suffix.clone(),
+                    stop: String::new(),
+                    heading_marker: *heading_marker,
+                    heading_separator: *heading_separator,
+                    indent: *indent,
+                    stop_at_heading: *stop_at_heading,
+                    ascii_case_insensitive: *stop_ascii_case_insensitive,
+                });
+            }
         }
         EventPredicateIr::Not { value } => collect_predicate(value, specs, named_specs),
         EventPredicateIr::And { left, right } | EventPredicateIr::Or { left, right } => {
@@ -470,6 +487,42 @@ fn compile_named_future_index(spec: &NamedFutureSpec) -> TokenStream {
     }
 }
 
+fn compile_named_candidate_position(
+    name_from: &EventOffsetIr,
+    name_until: &EventOffsetIr,
+    spec: &NamedFutureSpec,
+) -> Result<TokenStream, CompileError> {
+    let cache = named_cache_ident(spec)?;
+    let index = compile_named_future_index(spec);
+    let name_from = compile_offset(name_from)?;
+    let name_until = compile_offset(name_until)?;
+    let ascii_case_insensitive = spec.ascii_case_insensitive;
+    Ok(quote! {{
+        let __event_name_from = #name_from;
+        let __event_name_until = #name_until;
+        bytes.get(__event_name_from..__event_name_until)
+            .filter(|name| !name.is_empty())
+            .and_then(|name| {
+                let (__event_lines, __event_closers) = #cache.get_or_init(|| { #index });
+                let __event_position = __event_lines
+                    .partition_point(|(line_start, _)| *line_start < end);
+                let __event_segment = __event_position.checked_sub(1)
+                    .and_then(|position| __event_lines.get(position))
+                    .map(|(_, segment)| *segment);
+                __event_segment.and_then(|segment| {
+                    let key = if #ascii_case_insensitive {
+                        name.iter().map(|byte| byte.to_ascii_lowercase())
+                            .collect::<Vec<_>>()
+                    } else { name.to_vec() };
+                    __event_closers.get(&(segment, key)).and_then(|positions| {
+                        positions.get(positions.partition_point(|position| *position < end))
+                            .copied()
+                    })
+                })
+            })
+    }})
+}
+
 pub(super) fn compile_future_named_marker(
     predicate: &EventPredicateIr,
 ) -> Result<TokenStream, CompileError> {
@@ -479,6 +532,11 @@ pub(super) fn compile_future_named_marker(
         target_prefix,
         target_suffix,
         stop,
+        stop_name_from,
+        stop_name_until,
+        stop_prefix,
+        stop_suffix,
+        stop_ascii_case_insensitive,
         heading_marker,
         heading_separator,
         indent,
@@ -492,12 +550,16 @@ pub(super) fn compile_future_named_marker(
         || !target_prefix.is_ascii()
         || !target_suffix.is_ascii()
         || !stop.is_ascii()
+        || !stop_prefix.is_ascii()
+        || !stop_suffix.is_ascii()
+        || stop_name_from.is_some() != stop_name_until.is_some()
+        || (stop_name_from.is_some() && (stop_prefix.is_empty() || !stop.is_empty()))
     {
         return Err(CompileError::Schema(
-            "future named line marker requires ASCII markers".into(),
+            "future named line marker requires valid ASCII markers and stop offsets".into(),
         ));
     }
-    let spec = NamedFutureSpec {
+    let target_spec = NamedFutureSpec {
         target_prefix: target_prefix.into(),
         target_suffix: target_suffix.into(),
         stop: stop.into(),
@@ -507,32 +569,29 @@ pub(super) fn compile_future_named_marker(
         stop_at_heading: *stop_at_heading,
         ascii_case_insensitive: *ascii_case_insensitive,
     };
-    let cache = named_cache_ident(&spec)?;
-    let index = compile_named_future_index(&spec);
-    let name_from = compile_offset(name_from)?;
-    let name_until = compile_offset(name_until)?;
+    let target_position = compile_named_candidate_position(name_from, name_until, &target_spec)?;
+    let (Some(stop_name_from), Some(stop_name_until)) =
+        (stop_name_from.as_ref(), stop_name_until.as_ref())
+    else {
+        return Ok(quote! { #target_position.is_some() });
+    };
+    let stop_spec = NamedFutureSpec {
+        target_prefix: stop_prefix.clone(),
+        target_suffix: stop_suffix.clone(),
+        stop: String::new(),
+        heading_marker: *heading_marker,
+        heading_separator: *heading_separator,
+        indent: *indent,
+        stop_at_heading: *stop_at_heading,
+        ascii_case_insensitive: *stop_ascii_case_insensitive,
+    };
+    let stop_position =
+        compile_named_candidate_position(stop_name_from, stop_name_until, &stop_spec)?;
     Ok(quote! {{
-        let __event_name_from = #name_from;
-        let __event_name_until = #name_until;
-        bytes.get(__event_name_from..__event_name_until)
-            .filter(|name| !name.is_empty())
-            .is_some_and(|name| {
-                let (__event_lines, __event_closers) = #cache.get_or_init(|| { #index });
-                let __event_position = __event_lines
-                    .partition_point(|(line_start, _)| *line_start < end);
-                let __event_segment = __event_position.checked_sub(1)
-                    .and_then(|position| __event_lines.get(position))
-                    .map(|(_, segment)| *segment);
-                __event_segment.is_some_and(|segment| {
-                    let key = if #ascii_case_insensitive {
-                        name.iter().map(|byte| byte.to_ascii_lowercase())
-                            .collect::<Vec<_>>()
-                    } else { name.to_vec() };
-                    __event_closers.get(&(segment, key)).is_some_and(|positions| {
-                        positions.partition_point(|position| *position < end)
-                            < positions.len()
-                    })
-                })
-            })
+        let __event_target_position = #target_position;
+        let __event_stop_position = #stop_position;
+        __event_target_position.is_some_and(|target| {
+            __event_stop_position.is_none_or(|stop| target < stop)
+        })
     }})
 }

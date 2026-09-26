@@ -11,8 +11,8 @@ pub use compiler::{
 pub use dispatch::compile_ir_json;
 pub use event_compiler::{
     EVENT_FUNCTION_IR_SCHEMA, EventBoundaryIr, EventComputedOffsetIr, EventFunctionIr,
-    EventOffsetIr, EventPredicateIr, EventStatementIr, compile_event_function,
-    compile_event_function_json,
+    EventOffsetIr, EventPredicateIr, EventStateSlot, EventStatementIr, EventUsizeParameterIr,
+    compile_event_function, compile_event_function_json,
 };
 
 #[cfg(test)]

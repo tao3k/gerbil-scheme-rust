@@ -19,6 +19,9 @@ pub struct EventFunctionIr {
     pub parser_digest: String,
     /// Initial state declarations, evaluated before the line fold.
     pub initial: Vec<EventStatementIr>,
+    /// Configurable unsigned states with source-owned defaults.
+    #[serde(default)]
+    pub parameters: Vec<EventUsizeParameterIr>,
     /// One transition for each source line.
     pub line: Vec<EventStatementIr>,
     /// Final transitions before the root closes.
@@ -26,6 +29,27 @@ pub struct EventFunctionIr {
     /// Bounded source-local event procedures owned by the Scheme parser.
     #[serde(default)]
     pub helpers: Vec<EventHelperIr>,
+}
+
+/// One typed runtime parameter overriding a declared unsigned state slot.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventUsizeParameterIr {
+    pub name: String,
+    pub state: EventStateSlot,
+    pub default: usize,
+}
+
+/// A declared parser-state slot targeted by a typed parameter.
+#[derive(Debug, Deserialize)]
+#[serde(transparent)]
+pub struct EventStateSlot(String);
+
+impl EventStateSlot {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// A fresh-state event procedure reused at multiple source spans.
@@ -280,7 +304,7 @@ pub enum EventPredicateIr {
     FutureHeadingTitle {
         heading_marker: u8,
         heading_separator: u8,
-        min_level: usize,
+        min_level: EventUsizeIr,
         title: String,
     },
     /// Find a later named closing marker matching a saved source slice.

@@ -16,6 +16,8 @@ mod event_future_compiler;
 mod event_list_compiler;
 #[path = "event_marker_collector.rs"]
 mod event_marker_collector;
+#[path = "event_parameter_compiler.rs"]
+mod event_parameter_compiler;
 use event_future_compiler::{
     compile_future_cache_declarations, compile_future_heading_title, compile_future_named_marker,
     compile_future_predicate,
@@ -25,13 +27,14 @@ use event_list_compiler::{
     compile_scan_list_marker,
 };
 use event_marker_collector::collect_line_markers;
+use event_parameter_compiler::{compile_event_initial, compile_event_parameters};
 
 #[path = "event_ir_types.rs"]
 mod event_ir_types;
 pub use event_ir_types::{
     EVENT_FUNCTION_IR_SCHEMA, EventBoundaryIr, EventComputedOffsetIr, EventFunctionIr,
-    EventHelperIr, EventListMarkerIr, EventOffsetIr, EventPredicateIr, EventStatementIr,
-    EventUsizeIr,
+    EventHelperIr, EventListMarkerIr, EventOffsetIr, EventPredicateIr, EventStateSlot,
+    EventStatementIr, EventUsizeIr, EventUsizeParameterIr,
 };
 /// Compile a versioned Scheme event IR document into a Rust event function.
 ///
@@ -48,19 +51,27 @@ pub fn compile_event_function_json(input: &str) -> Result<String, CompileError> 
 /// Rejects unknown schemas, malformed identifiers or digests, and invalid syntax.
 pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, CompileError> {
     validate_event_function(function)?;
+    let tokens = compile_event_tokens(function)?;
+    let file = syn::parse2::<syn::File>(tokens)?;
+    Ok(prettyplease::unparse(&file))
+}
+
+fn compile_event_tokens(function: &EventFunctionIr) -> Result<TokenStream, CompileError> {
     let name = syn::parse_str::<syn::Ident>(&function.name)?;
     let root = function.root_kind;
     let digest = syn::LitStr::new(&function.parser_digest, proc_macro2::Span::call_site());
-    let initial = compile_statements(&function.initial, false)?;
+    let (generated_name, parameters, wrapper) = compile_event_parameters(function, &name)?;
+    let initial = compile_event_initial(function)?;
     let line = compile_statements(&function.line, false)?;
     let finish = compile_statements(&function.finish, false)?;
     let helpers = compile_event_helpers(function)?;
     let cached_markers = compile_marker_cache(&function.line)?;
     let future_caches = compile_future_cache_declarations(&[&function.line, &function.finish])?;
-    let tokens = quote! {
+    Ok(quote! {
         pub const PARSER_DIGEST: &str = #digest;
 
-        pub fn #name(source: &str) -> Vec<TreeEvent> {
+        #wrapper
+        pub fn #generated_name(source: &str, #(#parameters),*) -> Vec<TreeEvent> {
             #(#helpers)*
             let bytes = source.as_bytes();
             let mut events = Vec::with_capacity(bytes.len() / 16 + 2);
@@ -89,9 +100,7 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
             events.push(TreeEvent::FinishNode);
             events
         }
-    };
-    let file = syn::parse2::<syn::File>(tokens)?;
-    Ok(prettyplease::unparse(&file))
+    })
 }
 
 fn validate_event_function(function: &EventFunctionIr) -> Result<(), CompileError> {

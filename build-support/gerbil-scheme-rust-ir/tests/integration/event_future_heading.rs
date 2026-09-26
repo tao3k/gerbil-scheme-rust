@@ -13,7 +13,7 @@ fn future_heading_title_matches_level_and_exact_title_once() {
         "kind": "future_heading_title",
         "heading_marker": 42,
         "heading_separator": 32,
-        "min_level": 4,
+        "min_level": {"kind": "usize", "value": 4},
         "title": "END"
     });
     document["line"] = json!([{
@@ -51,11 +51,48 @@ fn future_heading_title_rejects_non_heading_declarations() {
             "kind": "future_heading_title",
             "heading_marker": 42,
             "heading_separator": 32,
-            "min_level": 0,
+            "min_level": {"kind": "usize", "value": 0},
             "title": "END"
         },
         "consequent": [],
         "alternate": []
     }]);
     assert!(compile_event_function_json(&document.to_string()).is_err());
+}
+
+#[test]
+fn future_heading_title_uses_a_typed_runtime_threshold() {
+    let mut document = stateful_document();
+    document["initial"]
+        .as_array_mut()
+        .expect("initial state")
+        .push(json!({"kind": "let_usize", "name": "heading_limit", "value": 4}));
+    document["parameters"] = json!([{
+        "name": "configured_limit", "state": "heading_limit", "default": 4
+    }]);
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {
+            "kind": "future_heading_title", "heading_marker": 42,
+            "heading_separator": 32,
+            "min_level": {"kind": "state", "name": "heading_limit"},
+            "title": "END"
+        },
+        "consequent": [{"kind": "start_node", "syntax_kind": 1},
+                       {"kind": "finish_node"}],
+        "alternate": [{"kind": "start_node", "syntax_kind": 2},
+                      {"kind": "finish_node"}]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("runtime heading threshold compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::StartNode;
+            let input = "**** Task\n***** END\n";
+            assert!(matches!(parse_events(input)[1], StartNode(1)));
+            assert!(matches!(parse_events_with_parameters(input, 6)[1], StartNode(2)));
+        },
+    );
 }

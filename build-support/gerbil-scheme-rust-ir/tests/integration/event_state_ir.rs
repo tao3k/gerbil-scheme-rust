@@ -7,6 +7,51 @@ use serde_json::json;
 use super::event_ir::{compile_and_run, stateful_document};
 
 #[test]
+fn typed_unsigned_parameter_overrides_declared_state_without_a_second_parser() {
+    let mut document = stateful_document();
+    document["initial"]
+        .as_array_mut()
+        .expect("initial state declarations")
+        .push(json!({"kind": "let_usize", "name": "threshold", "value": 15}));
+    document["parameters"] = json!([{
+        "name": "configured_threshold", "state": "threshold", "default": 15
+    }]);
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {"kind": "usize_equal",
+                      "left": {"kind": "state", "name": "threshold"},
+                      "right": {"kind": "usize", "value": 7}},
+        "consequent": [{"kind": "token", "syntax_kind": 1,
+                        "start": "start", "end": "end"}],
+        "alternate": [{"kind": "token", "syntax_kind": 2,
+                      "start": "start", "end": "end"}]
+    }]);
+    let source =
+        compile_event_function_json(&document.to_string()).expect("typed event parameter compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            let first_kind = |events: Vec<TreeEvent>| {
+                events.into_iter().find_map(|event| match event {
+                    TreeEvent::Token { kind, .. } => Some(kind),
+                    _ => None,
+                })
+            };
+            assert_eq!(first_kind(parse_events("x\n")), Some(2));
+            assert_eq!(first_kind(parse_events_with_parameters("x\n", 7)), Some(1));
+        },
+    );
+    document["parameters"][0]["state"] = json!("missing_state");
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+    document["parameters"][0]["state"] = json!("threshold");
+    document["parameters"][0]["default"] = json!(16);
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+    document["parameters"][0]["default"] = json!(15);
+    document["parameters"][0]["name"] = json!("threshold");
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+}
+
+#[test]
 fn future_named_marker_matches_saved_name_before_heading_or_parent_boundary() {
     let mut document = stateful_document();
     let name_from = json!({"kind": "line_prefix_end", "value": "#+BEGIN_"});

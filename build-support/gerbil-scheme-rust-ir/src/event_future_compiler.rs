@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeSet;
 
-use super::{EventOffsetIr, EventPredicateIr, EventStatementIr, compile_offset};
+use super::{EventOffsetIr, EventPredicateIr, EventStatementIr, EventUsizeIr, compile_offset};
 use crate::CompileError;
 
 #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
@@ -34,14 +34,27 @@ struct NamedFutureSpec {
 struct HeadingFutureSpec {
     heading_marker: u8,
     heading_separator: u8,
-    min_level: usize,
+    min_level: HeadingMinLevelSpec,
     title: String,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum HeadingMinLevelSpec {
+    Literal(usize),
+    State(String),
+}
+
+fn heading_min_level(value: &EventUsizeIr) -> Option<HeadingMinLevelSpec> {
+    match value {
+        EventUsizeIr::Usize { value } if *value > 0 => Some(HeadingMinLevelSpec::Literal(*value)),
+        EventUsizeIr::State { name } => Some(HeadingMinLevelSpec::State(name.clone())),
+        _ => None,
+    }
 }
 
 fn compile_heading_future_index(spec: &HeadingFutureSpec) -> TokenStream {
     let marker = spec.heading_marker;
     let separator = spec.heading_separator;
-    let min_level = spec.min_level;
     let title = syn::LitByteStr::new(spec.title.as_bytes(), proc_macro2::Span::call_site());
     quote! {
         let mut lines = Vec::new();
@@ -61,7 +74,7 @@ fn compile_heading_future_index(spec: &HeadingFutureSpec) -> TokenStream {
             }
             let line = &bytes[cursor..end];
             let level = line.iter().take_while(|byte| **byte == #marker).count();
-            let matched = if level >= #min_level && line.get(level) == Some(&#separator) {
+            let matched = if level >= min_level && line.get(level) == Some(&#separator) {
                 let mut title_start = level + 1;
                 while line.get(title_start).is_some_and(|byte| matches!(byte, b' ' | b'\t')) {
                     title_start += 1;
@@ -102,7 +115,7 @@ pub(super) fn compile_future_heading_title(
             "expected future heading predicate".into(),
         ));
     };
-    if *min_level == 0
+    if heading_min_level(min_level).is_none()
         || *heading_marker == *heading_separator
         || title.is_empty()
         || title.bytes().any(|byte| matches!(byte, b'\r' | b'\n'))
@@ -111,15 +124,24 @@ pub(super) fn compile_future_heading_title(
             "invalid future heading declaration".into(),
         ));
     }
+    let level = heading_min_level(min_level)
+        .ok_or_else(|| CompileError::Schema("invalid future heading level".into()))?;
     let cache = heading_cache_ident(&HeadingFutureSpec {
         heading_marker: *heading_marker,
         heading_separator: *heading_separator,
-        min_level: *min_level,
+        min_level: level.clone(),
         title: title.clone(),
     })?;
     let builder = cache_builder_ident(&cache)?;
+    let min_level = match level {
+        HeadingMinLevelSpec::Literal(value) => quote! { #value },
+        HeadingMinLevelSpec::State(name) => {
+            let name = syn::parse_str::<syn::Ident>(&name)?;
+            quote! { #name.max(1) }
+        }
+    };
     Ok(quote! {{
-        let index = #cache.get_or_init(|| #builder(bytes));
+        let index = #cache.get_or_init(|| #builder(bytes, #min_level));
         let position = index.partition_point(|(line_start, _)| *line_start < end);
         index.get(position).is_some_and(|(_, found)| *found)
     }})
@@ -247,12 +269,14 @@ fn collect_predicate(
             min_level,
             title,
         } => {
-            heading_specs.insert(HeadingFutureSpec {
-                heading_marker: *heading_marker,
-                heading_separator: *heading_separator,
-                min_level: *min_level,
-                title: title.clone(),
-            });
+            if let Some(min_level) = heading_min_level(min_level) {
+                heading_specs.insert(HeadingFutureSpec {
+                    heading_marker: *heading_marker,
+                    heading_separator: *heading_separator,
+                    min_level,
+                    title: title.clone(),
+                });
+            }
         }
         EventPredicateIr::Not { value } => {
             collect_predicate(value, specs, named_specs, heading_specs);
@@ -343,7 +367,7 @@ pub(super) fn compile_future_cache_declarations(
         let builder = cache_builder_ident(&name)?;
         let index = compile_heading_future_index(spec);
         declarations.push(quote! {
-            fn #builder(bytes: &[u8]) -> Vec<(usize, bool)> {
+            fn #builder(bytes: &[u8], min_level: usize) -> Vec<(usize, bool)> {
                 #index
             }
             let #name: std::cell::OnceCell<Vec<(usize, bool)>> = std::cell::OnceCell::new();

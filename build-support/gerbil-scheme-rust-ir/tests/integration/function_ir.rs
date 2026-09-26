@@ -71,6 +71,31 @@ fn unknown_schema_and_raw_rust_snippets_fail_closed() {
 }
 
 #[test]
+fn bounded_string_predicates_compile_as_typed_functions() {
+    for (name, result) in [
+        (
+            "single_uppercase",
+            json!({"kind": "single_ascii_uppercase", "value": {"kind": "name", "value": "input"}}),
+        ),
+        (
+            "bounded_unsigned",
+            json!({"kind": "unsigned_at_most", "value": {"kind": "name", "value": "input"}, "maximum": 64}),
+        ),
+    ] {
+        let document = json!({
+            "schema": FUNCTION_IR_SCHEMA,
+            "name": name,
+            "parameters": [{"name": "input", "ty": "&str"}],
+            "result": "bool",
+            "body": {"bindings": [], "result": result},
+        });
+        let source = compile_function_json(&document.to_string()).expect("typed predicate IR");
+        let function: syn::ItemFn = syn::parse_str(&source).expect("generated Rust syntax");
+        assert_eq!(function.sig.ident, name);
+    }
+}
+
+#[test]
 fn nested_pure_bindings_compile_as_lexical_rust_blocks() {
     let document = json!({
         "schema": FUNCTION_IR_SCHEMA,

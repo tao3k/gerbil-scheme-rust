@@ -372,6 +372,7 @@ fn compile_event_helper(helper: &EventHelperIr) -> Result<TokenStream, CompileEr
                  bounds_from: usize, bounds_until: usize) {
             let bytes = source.as_bytes();
             if let Some(line) = source.get(bounds_from..bounds_until) {
+                let _ = line;
                 let start = bounds_from;
                 let end = bounds_until;
                 #initial

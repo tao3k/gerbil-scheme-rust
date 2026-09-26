@@ -336,15 +336,19 @@ fn compile_string_predicate(expression: &ExprIr) -> Result<TokenStream, CompileE
         }
         ExprIr::SingleAsciiUppercase { value } => {
             let value = compile_expression(value)?;
-            Ok(quote! { #value.len() == 1 && #value.as_bytes()[0].is_ascii_uppercase() })
+            Ok(quote! {{
+                let candidate = #value;
+                candidate.len() == 1 && candidate.as_bytes()[0].is_ascii_uppercase()
+            }})
         }
         ExprIr::UnsignedAtMost { value, maximum } => {
             let value = compile_expression(value)?;
-            Ok(quote! {
-                !#value.is_empty()
-                    && #value.bytes().all(|byte| byte.is_ascii_digit())
-                    && #value.parse::<u64>().is_ok_and(|number| number <= #maximum)
-            })
+            Ok(quote! {{
+                let candidate = #value;
+                !candidate.is_empty()
+                    && candidate.bytes().all(|byte| byte.is_ascii_digit())
+                    && candidate.parse::<u64>().is_ok_and(|number| number <= #maximum)
+            }})
         }
         _ => Err(CompileError::Schema("expected string predicate".into())),
     }

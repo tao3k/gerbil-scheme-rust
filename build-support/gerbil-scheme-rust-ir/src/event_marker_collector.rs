@@ -91,6 +91,17 @@ fn collect_predicate_markers(predicate: &EventPredicateIr, markers: &mut BTreeSe
             collect_offset_markers(from, markers);
             collect_offset_markers(until, markers);
         }
+        EventPredicateIr::SourceSlicesEqual {
+            left_from,
+            left_until,
+            right_from,
+            right_until,
+            ..
+        } => {
+            for offset in [left_from, left_until, right_from, right_until] {
+                collect_offset_markers(offset, markers);
+            }
+        }
         EventPredicateIr::Not { value } => collect_predicate_markers(value, markers),
         EventPredicateIr::And { left, right } | EventPredicateIr::Or { left, right } => {
             collect_predicate_markers(left, markers);

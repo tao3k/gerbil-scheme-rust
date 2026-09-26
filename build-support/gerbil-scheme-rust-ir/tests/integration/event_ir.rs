@@ -533,6 +533,85 @@ fn bounded_static_name_set_uses_source_bytes_without_generated_name_branches() {
 }
 
 #[test]
+fn checked_source_slices_compare_exact_and_ascii_case_insensitive_bytes() {
+    let mut document = stateful_document();
+    let name_end = json!({"kind": "line_prefix_end", "value": "Name"});
+    let other_start = json!({"kind": "line_skip_horizontal", "from": name_end});
+    let other_end = json!({"kind": "line_content_end"});
+    let comparison = |ascii_case_insensitive| {
+        json!({
+            "kind": "source_slices_equal",
+            "left_from": "start", "left_until": name_end,
+            "right_from": other_start, "right_until": other_end,
+            "ascii_case_insensitive": ascii_case_insensitive
+        })
+    };
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": comparison(true),
+        "consequent": [{
+            "kind": "if", "condition": comparison(false),
+            "consequent": [{"kind": "token", "syntax_kind": 3,
+                            "start": "start", "end": "end"}],
+            "alternate": [{"kind": "token", "syntax_kind": 5,
+                           "start": "start", "end": "end"}]
+        }],
+        "alternate": [{"kind": "token", "syntax_kind": 6,
+                       "start": "start", "end": "end"}]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("checked source slice equality compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("Name Name\nName name\nName other\n"), vec![
+                StartNode(0),
+                Token { kind: 3, start: 0, end: 10 },
+                Token { kind: 5, start: 10, end: 20 },
+                Token { kind: 6, start: 20, end: 31 },
+                FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
+fn checked_source_slices_reject_out_of_bounds_and_reversed_ranges() {
+    let mut document = stateful_document();
+    document["initial"] = json!([
+        {"kind": "let_usize", "name": "outside", "value": 100},
+        {"kind": "let_usize", "name": "zero", "value": 0}
+    ]);
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {
+            "kind": "source_slices_equal",
+            "left_from": {"kind": "state_offset", "name": "outside"},
+            "left_until": {"kind": "state_offset", "name": "zero"},
+            "right_from": "start", "right_until": "end"
+        },
+        "consequent": [{"kind": "token", "syntax_kind": 3,
+                        "start": "start", "end": "end"}],
+        "alternate": [{"kind": "token", "syntax_kind": 6,
+                       "start": "start", "end": "end"}]
+    }]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("checked source slice ranges compile");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("a\n"), vec![
+                StartNode(0), Token { kind: 6, start: 0, end: 2 }, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
 fn saved_source_bounds_rebind_line_primitives_across_physical_lines() {
     let mut document = stateful_document();
     document["initial"] = json!([

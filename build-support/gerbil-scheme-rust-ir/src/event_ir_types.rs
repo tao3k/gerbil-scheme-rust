@@ -298,6 +298,15 @@ pub enum EventPredicateIr {
         until: EventOffsetIr,
         values: Vec<String>,
     },
+    /// Compare two checked source byte slices, including spans on different lines.
+    SourceSlicesEqual {
+        left_from: EventOffsetIr,
+        left_until: EventOffsetIr,
+        right_from: EventOffsetIr,
+        right_until: EventOffsetIr,
+        #[serde(default)]
+        ascii_case_insensitive: bool,
+    },
     /// Boolean negation.
     Not { value: Box<Self> },
     /// Short-circuit conjunction.

@@ -16,7 +16,7 @@ mod event_future_compiler;
 mod event_list_compiler;
 #[path = "event_marker_collector.rs"]
 mod event_marker_collector;
-use event_future_compiler::{compile_future_cache_declarations, compile_future_line_marker};
+use event_future_compiler::{compile_future_cache_declarations, compile_future_predicate};
 use event_list_compiler::{
     compile_close_all_frames, compile_close_frames_while, compile_scan_list_marker,
 };
@@ -575,23 +575,9 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
         | EventPredicateIr::LineBlank
         | EventPredicateIr::LineHasWordAfterPrefix { .. }
         | EventPredicateIr::LineHasKeyAfterPrefix { .. } => compile_line_predicate(predicate),
-        EventPredicateIr::FutureLineMarkerBeforeBoundary {
-            target,
-            stop,
-            heading_marker,
-            heading_separator,
-            indent,
-            stop_at_heading,
-            body_key_marker,
-        } => compile_future_line_marker(
-            target,
-            (!stop.is_empty()).then_some(stop.as_str()),
-            *heading_marker,
-            *heading_separator,
-            *indent,
-            *stop_at_heading,
-            *body_key_marker,
-        )?,
+        EventPredicateIr::FutureLineMarkerBeforeBoundary { .. } => {
+            compile_future_predicate(predicate)?
+        }
         EventPredicateIr::LineByteEqual { at, value } => compile_line_byte_equal(at, *value)?,
         EventPredicateIr::LineBytesAllIn {
             from,
@@ -608,6 +594,19 @@ fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, Compil
             until,
             values,
         } => compile_line_bytes_in_set(from, until, values)?,
+        EventPredicateIr::SourceSlicesEqual {
+            left_from,
+            left_until,
+            right_from,
+            right_until,
+            ascii_case_insensitive,
+        } => compile_source_slices_equal(
+            left_from,
+            left_until,
+            right_from,
+            right_until,
+            *ascii_case_insensitive,
+        )?,
         EventPredicateIr::Not { value } => {
             let value = compile_predicate(value)?;
             quote! { !(#value) }
@@ -743,6 +742,33 @@ fn compile_line_bytes_in_set(
         const NAMES: &[&[u8]] = &[#(#names),*];
         from >= start && from <= until && until <= end
             && bytes.get(from..until).is_some_and(|slice| NAMES.binary_search(&slice).is_ok())
+    }})
+}
+
+fn compile_source_slices_equal(
+    left_from: &EventOffsetIr,
+    left_until: &EventOffsetIr,
+    right_from: &EventOffsetIr,
+    right_until: &EventOffsetIr,
+    ascii_case_insensitive: bool,
+) -> Result<TokenStream, CompileError> {
+    let left_from = compile_offset(left_from)?;
+    let left_until = compile_offset(left_until)?;
+    let right_from = compile_offset(right_from)?;
+    let right_until = compile_offset(right_until)?;
+    let compare = if ascii_case_insensitive {
+        quote! { left.eq_ignore_ascii_case(right) }
+    } else {
+        quote! { left == right }
+    };
+    Ok(quote! {{
+        let left_from = #left_from;
+        let left_until = #left_until;
+        let right_from = #right_from;
+        let right_until = #right_until;
+        left_from <= left_until && right_from <= right_until
+            && bytes.get(left_from..left_until).zip(bytes.get(right_from..right_until))
+                .is_some_and(|(left, right)| #compare)
     }})
 }
 

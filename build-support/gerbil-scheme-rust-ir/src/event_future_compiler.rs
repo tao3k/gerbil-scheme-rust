@@ -274,3 +274,31 @@ pub(super) fn compile_future_line_marker(
             .is_some_and(|(_, found)| *found)
     }})
 }
+
+pub(super) fn compile_future_predicate(
+    predicate: &EventPredicateIr,
+) -> Result<TokenStream, CompileError> {
+    let EventPredicateIr::FutureLineMarkerBeforeBoundary {
+        target,
+        stop,
+        heading_marker,
+        heading_separator,
+        indent,
+        stop_at_heading,
+        body_key_marker,
+    } = predicate
+    else {
+        return Err(CompileError::Schema(
+            "expected future marker predicate".into(),
+        ));
+    };
+    compile_future_line_marker(
+        target,
+        (!stop.is_empty()).then_some(stop.as_str()),
+        *heading_marker,
+        *heading_separator,
+        *indent,
+        *stop_at_heading,
+        *body_key_marker,
+    )
+}

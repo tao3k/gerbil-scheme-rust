@@ -20,7 +20,8 @@ use event_future_compiler::{
     compile_future_cache_declarations, compile_future_named_marker, compile_future_predicate,
 };
 use event_list_compiler::{
-    compile_close_all_frames, compile_close_frames_while, compile_scan_list_marker,
+    compile_close_all_frames, compile_close_frame, compile_close_frames_while,
+    compile_scan_list_marker,
 };
 use event_marker_collector::collect_line_markers;
 
@@ -255,6 +256,10 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
         EventStatementIr::PushFrame { .. } | EventStatementIr::PopFrame { .. } => {
             compile_stack_statement(statement)?
         }
+        EventStatementIr::CloseFrame {
+            stack,
+            finish_count,
+        } => compile_close_frame(stack, *finish_count)?,
         EventStatementIr::CloseFramesWhile {
             stack,
             condition,

@@ -105,6 +105,8 @@ pub enum EventStatementIr {
     PushFrame { stack: String, value: EventUsizeIr },
     /// Discard one state frame without emitting syntax-node closes.
     PopFrame { stack: String },
+    /// Close exactly one syntax frame, emitting a fixed number of node closes.
+    CloseFrame { stack: String, finish_count: u8 },
     /// Pop frames while a Scheme predicate holds, emitting a fixed close arity.
     CloseFramesWhile {
         stack: String,

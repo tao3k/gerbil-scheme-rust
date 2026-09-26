@@ -5,3 +5,6 @@ mod function_ir;
 
 #[path = "integration/event_ir.rs"]
 mod event_ir;
+
+#[path = "integration/event_state_ir.rs"]
+mod event_state_ir;

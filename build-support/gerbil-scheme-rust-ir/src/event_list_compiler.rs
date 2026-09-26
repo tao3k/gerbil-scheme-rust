@@ -141,3 +141,20 @@ pub(super) fn compile_close_all_frames(
         }
     })
 }
+
+pub(super) fn compile_close_frame(
+    stack: &str,
+    finish_count: u8,
+) -> Result<TokenStream, CompileError> {
+    if finish_count == 0 {
+        return Err(CompileError::Schema(
+            "frame close arity must be positive".into(),
+        ));
+    }
+    let stack = syn::parse_str::<syn::Ident>(stack)?;
+    Ok(quote! {
+        if #stack.pop().is_some() {
+            for _ in 0..#finish_count { events.push(TreeEvent::FinishNode); }
+        }
+    })
+}

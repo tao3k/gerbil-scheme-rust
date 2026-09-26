@@ -116,6 +116,35 @@ fn future_line_marker_stops_at_heading_and_parent_boundary() {
 }
 
 #[test]
+fn repeated_future_marker_uses_one_index_builder() {
+    let mut document = stateful_document();
+    let condition = json!({
+        "kind": "future_line_marker_before_boundary",
+        "target": "#+END_QUOTE",
+        "stop": "",
+        "heading_marker": 42,
+        "heading_separator": 32,
+        "indent": true,
+        "stop_at_heading": true
+    });
+    document["line"] = json!([
+        {"kind": "if", "condition": condition, "consequent": [], "alternate": []},
+        {"kind": "if", "condition": condition, "consequent": [], "alternate": []}
+    ]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("repeated future marker is typed event IR");
+    assert_eq!(source.matches("let mut __event_future_lines").count(), 1);
+    assert_eq!(source.matches("get_or_init").count(), 2);
+    compile_and_run(
+        &source,
+        &quote! {
+            assert!(!parse_events("#+BEGIN_QUOTE\n#+END_QUOTE\n").is_empty());
+        },
+    );
+}
+
+#[test]
 fn future_line_marker_requires_declared_key_value_body() {
     let mut document = stateful_document();
     document["line"] = json!([{

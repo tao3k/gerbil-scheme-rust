@@ -73,6 +73,10 @@ fn encoded_cache_ident(prefix: &str, key: &str) -> Result<syn::Ident, CompileErr
     syn::parse_str(&format!("{prefix}{encoded}")).map_err(Into::into)
 }
 
+fn cache_builder_ident(cache: &syn::Ident) -> Result<syn::Ident, CompileError> {
+    syn::parse_str(&format!("{cache}_build")).map_err(Into::into)
+}
+
 fn collect_predicate(
     predicate: &EventPredicateIr,
     specs: &mut BTreeSet<FutureSpec>,
@@ -187,7 +191,12 @@ pub(super) fn compile_future_cache_declarations(
         .iter()
         .map(|spec| {
             let name = cache_ident(spec)?;
+            let builder = cache_builder_ident(&name)?;
+            let index = compile_future_index(spec);
             Ok(quote! {
+                fn #builder(source: &str, bytes: &[u8]) -> Vec<(usize, bool)> {
+                    #index
+                }
                 let #name: std::cell::OnceCell<Vec<(usize, bool)>> =
                     std::cell::OnceCell::new();
             })
@@ -203,7 +212,12 @@ pub(super) fn compile_future_cache_declarations(
     }
     for spec in &named_specs {
         let name = named_cache_ident(spec)?;
+        let builder = cache_builder_ident(&name)?;
+        let index = compile_named_future_index(spec);
         declarations.push(quote! {
+            fn #builder(source: &str, bytes: &[u8]) -> EventNamedFutureCache {
+                #index
+            }
             let #name: std::cell::OnceCell<EventNamedFutureCache> = std::cell::OnceCell::new();
         });
     }
@@ -268,34 +282,10 @@ fn compile_body_key_boundary(marker: u8, target: &syn::LitStr) -> TokenStream {
     }
 }
 
-pub(super) fn compile_future_line_marker(
-    target: &str,
-    stop: Option<&str>,
-    heading_marker: u8,
-    heading_separator: u8,
-    indent: bool,
-    stop_at_heading: bool,
-    body_key_marker: u8,
-) -> Result<TokenStream, CompileError> {
-    if target.is_empty()
-        || !target.is_ascii()
-        || stop.is_some_and(|marker| marker.is_empty() || !marker.is_ascii())
-    {
-        return Err(CompileError::Schema(
-            "future line marker must be nonempty ASCII".into(),
-        ));
-    }
-    let cache = cache_ident(&FutureSpec {
-        target: target.into(),
-        stop: stop.unwrap_or_default().into(),
-        heading_marker,
-        heading_separator,
-        indent,
-        stop_at_heading,
-        body_key_marker,
-    })?;
-    let target = syn::LitStr::new(target, proc_macro2::Span::call_site());
-    let stop = stop.map(|value| syn::LitStr::new(value, proc_macro2::Span::call_site()));
+fn compile_future_index(spec: &FutureSpec) -> TokenStream {
+    let target = syn::LitStr::new(&spec.target, proc_macro2::Span::call_site());
+    let stop = (!spec.stop.is_empty())
+        .then(|| syn::LitStr::new(&spec.stop, proc_macro2::Span::call_site()));
     let stop_check = stop.map(|value| {
         quote! {
             if __event_future_matches(#value) {
@@ -303,12 +293,14 @@ pub(super) fn compile_future_line_marker(
             }
         }
     });
-    let candidate = compile_future_candidate(indent);
-    let heading_check =
-        compile_heading_boundary(heading_marker, heading_separator, stop_at_heading);
-    let body_check = compile_body_key_boundary(body_key_marker, &target);
-    Ok(quote! {{
-        let __event_future_index = #cache.get_or_init(|| {
+    let candidate = compile_future_candidate(spec.indent);
+    let heading_check = compile_heading_boundary(
+        spec.heading_marker,
+        spec.heading_separator,
+        spec.stop_at_heading,
+    );
+    let body_check = compile_body_key_boundary(spec.body_key_marker, &target);
+    quote! {
             let mut __event_future_lines = Vec::new();
             let mut __event_future_cursor = 0usize;
             while __event_future_cursor < bytes.len() {
@@ -362,7 +354,38 @@ pub(super) fn compile_future_line_marker(
                 .into_iter()
                 .map(|(start, found, _)| (start, found))
                 .collect()
-        });
+    }
+}
+
+pub(super) fn compile_future_line_marker(
+    target: &str,
+    stop: Option<&str>,
+    heading_marker: u8,
+    heading_separator: u8,
+    indent: bool,
+    stop_at_heading: bool,
+    body_key_marker: u8,
+) -> Result<TokenStream, CompileError> {
+    if target.is_empty()
+        || !target.is_ascii()
+        || stop.is_some_and(|marker| marker.is_empty() || !marker.is_ascii())
+    {
+        return Err(CompileError::Schema(
+            "future line marker must be nonempty ASCII".into(),
+        ));
+    }
+    let cache = cache_ident(&FutureSpec {
+        target: target.into(),
+        stop: stop.unwrap_or_default().into(),
+        heading_marker,
+        heading_separator,
+        indent,
+        stop_at_heading,
+        body_key_marker,
+    })?;
+    let builder = cache_builder_ident(&cache)?;
+    Ok(quote! {{
+        let __event_future_index = #cache.get_or_init(|| #builder(source, bytes));
         let __event_future_position = __event_future_index
             .partition_point(|(line_start, _)| *line_start < end);
         __event_future_index
@@ -493,7 +516,7 @@ fn compile_named_candidate_position(
     spec: &NamedFutureSpec,
 ) -> Result<TokenStream, CompileError> {
     let cache = named_cache_ident(spec)?;
-    let index = compile_named_future_index(spec);
+    let builder = cache_builder_ident(&cache)?;
     let name_from = compile_offset(name_from)?;
     let name_until = compile_offset(name_until)?;
     let ascii_case_insensitive = spec.ascii_case_insensitive;
@@ -503,7 +526,8 @@ fn compile_named_candidate_position(
         bytes.get(__event_name_from..__event_name_until)
             .filter(|name| !name.is_empty())
             .and_then(|name| {
-                let (__event_lines, __event_closers) = #cache.get_or_init(|| { #index });
+                let (__event_lines, __event_closers) =
+                    #cache.get_or_init(|| #builder(source, bytes));
                 let __event_position = __event_lines
                     .partition_point(|(line_start, _)| *line_start < end);
                 let __event_segment = __event_position.checked_sub(1)

@@ -1,6 +1,6 @@
 //! Build-time command for lowering a versioned Scheme function IR file.
 
-use gerbil_scheme_rust_ir::compile_function_json;
+use gerbil_scheme_rust_ir::compile_ir_json;
 use std::{env, fs, process::ExitCode};
 
 fn main() -> ExitCode {
@@ -12,8 +12,8 @@ fn main() -> ExitCode {
     };
     let result = (|| {
         let input = fs::read_to_string(input)?;
-        let source = compile_function_json(&input)
-            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        let source =
+            compile_ir_json(&input).map_err(|error| std::io::Error::other(error.to_string()))?;
         fs::write(output, source)?;
         Ok::<_, std::io::Error>(())
     })();

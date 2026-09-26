@@ -1,10 +1,18 @@
 //! Typed build-time IR for Scheme algorithms compiled into Rust functions.
 
 mod compiler;
+mod dispatch;
+mod event_compiler;
 
 pub use compiler::{
     BinaryOperator, BindingIr, BlockIr, CompileError, ExprIr, FUNCTION_IR_SCHEMA, FunctionIr,
     ParameterIr, compile_function, compile_function_json,
+};
+pub use dispatch::compile_ir_json;
+pub use event_compiler::{
+    EVENT_FUNCTION_IR_SCHEMA, EventBoundaryIr, EventComputedOffsetIr, EventFunctionIr,
+    EventOffsetIr, EventPredicateIr, EventStatementIr, compile_event_function,
+    compile_event_function_json,
 };
 
 #[cfg(test)]

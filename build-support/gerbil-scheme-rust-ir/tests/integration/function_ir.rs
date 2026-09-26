@@ -177,3 +177,63 @@ fn generated_function_typechecks_and_executes_with_rustc() {
     fs::remove_file(input).expect("remove generated Rust fixture");
     fs::remove_dir(root).expect("remove empty rustc fixture directory");
 }
+
+#[test]
+fn typed_fold_compiles_an_iterator_state_transition() {
+    let document = json!({
+        "schema": FUNCTION_IR_SCHEMA,
+        "name": "byte_count",
+        "parameters": [{"name": "source", "ty": "&str"}],
+        "result": "u64",
+        "body": {
+            "bindings": [],
+            "result": {
+                "kind": "fold",
+                "iterator": {
+                    "kind": "method",
+                    "receiver": {"kind": "name", "value": "source"},
+                    "method": "bytes",
+                    "arguments": []
+                },
+                "accumulator": "count",
+                "item": "byte",
+                "initial": {"kind": "number", "value": 0},
+                "step": {
+                    "kind": "binary",
+                    "operator": "add",
+                    "left": {"kind": "name", "value": "count"},
+                    "right": {"kind": "number", "value": 1}
+                }
+            }
+        }
+    });
+    let source = compile_function_json(&document.to_string()).expect("fold IR must compile");
+    let function: syn::ItemFn = syn::parse_str(&source).expect("fold must be valid Rust syntax");
+    assert_eq!(function.sig.ident, "byte_count");
+    assert!(source.contains(". fold"));
+    assert!(source.contains("| count , byte |"));
+}
+
+#[test]
+fn fold_rejects_duplicate_binders_and_raw_steps() {
+    let document = json!({
+        "schema": FUNCTION_IR_SCHEMA,
+        "name": "invalid_fold",
+        "parameters": [],
+        "result": "u64",
+        "body": {"bindings": [], "result": {
+            "kind": "fold",
+            "iterator": {"kind": "name", "value": "items"},
+            "accumulator": "item",
+        "item": "item",
+            "initial": {"kind": "number", "value": 0},
+            "step": {"kind": "number", "value": 1}
+        }}
+    });
+    assert!(compile_function_json(&document.to_string()).is_err());
+
+    let mut document = document;
+    document["body"]["result"]["item"] = json!("element");
+    document["body"]["result"]["step"] = json!({"kind": "raw_rust", "source": "unbounded_loop()"});
+    assert!(compile_function_json(&document.to_string()).is_err());
+}

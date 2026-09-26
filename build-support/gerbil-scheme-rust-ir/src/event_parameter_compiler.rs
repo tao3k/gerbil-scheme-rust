@@ -80,10 +80,36 @@ pub(super) fn compile_event_initial(
             EventStatementIr::LetUsize { name, .. } if arguments.contains_key(name.as_str()) => {
                 let state = syn::parse_str::<syn::Ident>(name)?;
                 let argument = syn::parse_str::<syn::Ident>(arguments[name.as_str()])?;
-                Ok(quote! { let mut #state = #argument; })
+                if parameter_is_mutated(&function.line, name)
+                    || parameter_is_mutated(&function.finish, name)
+                {
+                    Ok(quote! { let mut #state = #argument; })
+                } else {
+                    Ok(quote! { let #state = #argument; })
+                }
             }
             _ => compile_statement(statement, false),
         })
         .collect::<Result<Vec<_>, CompileError>>()?;
     Ok(quote! { #(#tokens)* })
+}
+
+fn parameter_is_mutated(statements: &[EventStatementIr], target: &str) -> bool {
+    statements.iter().any(|statement| match statement {
+        EventStatementIr::SetUsize { name, .. } => name == target,
+        EventStatementIr::ScanListMarker { marker } => {
+            marker.column == target
+                || marker.bullet_start == target
+                || marker.bullet_end == target
+                || marker.content_start == target
+        }
+        EventStatementIr::If {
+            consequent,
+            alternate,
+            ..
+        } => parameter_is_mutated(consequent, target) || parameter_is_mutated(alternate, target),
+        EventStatementIr::ForLineBytes { body, .. }
+        | EventStatementIr::WithSourceBounds { body, .. } => parameter_is_mutated(body, target),
+        _ => false,
+    })
 }

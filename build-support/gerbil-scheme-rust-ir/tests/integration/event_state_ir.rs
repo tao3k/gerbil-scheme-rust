@@ -49,6 +49,22 @@ fn typed_unsigned_parameter_overrides_declared_state_without_a_second_parser() {
     document["parameters"][0]["default"] = json!(15);
     document["parameters"][0]["name"] = json!("threshold");
     assert!(compile_event_function_json(&document.to_string()).is_err());
+    document["parameters"][0]["name"] = json!("configured_threshold");
+    document["line"]
+        .as_array_mut()
+        .expect("line transitions")
+        .push(json!({
+            "kind": "set_usize", "name": "threshold",
+            "value": {"kind": "usize", "value": 8}
+        }));
+    let mutable_source = compile_event_function_json(&document.to_string())
+        .expect("mutable configured state compiles");
+    compile_and_run(
+        &mutable_source,
+        &quote! {
+            assert!(!parse_events_with_parameters("x\n", 7).is_empty());
+        },
+    );
 }
 
 #[test]

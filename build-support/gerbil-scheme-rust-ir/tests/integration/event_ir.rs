@@ -116,6 +116,57 @@ fn future_line_marker_stops_at_heading_and_parent_boundary() {
 }
 
 #[test]
+fn future_named_marker_matches_saved_name_before_heading_or_parent_boundary() {
+    let mut document = stateful_document();
+    let name_from = json!({"kind": "line_prefix_end", "value": "#+BEGIN_"});
+    let name_until = json!({"kind": "line_scan_key", "from": name_from});
+    document["line"] = json!([{
+        "kind": "if",
+        "condition": {"kind": "line_starts_with_ascii_case_insensitive",
+                      "value": "#+BEGIN_"},
+        "consequent": [{
+            "kind": "if",
+            "condition": {
+                "kind": "future_named_line_marker_before_boundary",
+                "name_from": name_from, "name_until": name_until,
+                "target_prefix": "#+END_", "target_suffix": "",
+                "stop": "#+END_CENTER", "heading_marker": 42,
+                "heading_separator": 32, "indent": true,
+                "stop_at_heading": true, "ascii_case_insensitive": true
+            },
+            "consequent": [{"kind": "token", "syntax_kind": 1,
+                            "start": "start", "end": "end"}],
+            "alternate": [{"kind": "token", "syntax_kind": 2,
+                           "start": "start", "end": "end"}]
+        }],
+        "alternate": [{"kind": "token", "syntax_kind": 3,
+                       "start": "start", "end": "end"}]
+    }]);
+    document["finish"] = json!([]);
+    let source =
+        compile_event_function_json(&document.to_string()).expect("named future marker compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            let input = concat!(
+                "#+BEGIN_foo\n#+end_FOO\n",
+                "#+BEGIN_bar\n* Next\n#+END_bar\n",
+                "#+BEGIN_baz\n#+END_CENTER\n#+END_baz\n",
+                "#+BEGIN_qux\n#+END_other\n#+END_QUX\n"
+            );
+            let opener_kinds = parse_events(input).into_iter().filter_map(|event| {
+                match event {
+                    TreeEvent::Token { kind, .. } if matches!(kind, 1 | 2) =>
+                        Some(kind),
+                    _ => None,
+                }
+            }).collect::<Vec<_>>();
+            assert_eq!(opener_kinds, vec![1, 2, 2, 1]);
+        },
+    );
+}
+
+#[test]
 fn future_line_marker_requires_declared_key_value_body() {
     let mut document = stateful_document();
     document["line"] = json!([{

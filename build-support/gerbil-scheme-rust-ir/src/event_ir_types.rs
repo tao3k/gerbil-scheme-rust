@@ -272,6 +272,20 @@ pub enum EventPredicateIr {
         #[serde(default)]
         body_key_marker: u8,
     },
+    /// Find a later named closing marker matching a saved source slice.
+    FutureNamedLineMarkerBeforeBoundary {
+        name_from: EventOffsetIr,
+        name_until: EventOffsetIr,
+        target_prefix: String,
+        target_suffix: String,
+        stop: String,
+        heading_marker: u8,
+        heading_separator: u8,
+        indent: bool,
+        stop_at_heading: bool,
+        #[serde(default)]
+        ascii_case_insensitive: bool,
+    },
     /// Treat spaces, tabs, and line endings as a blank source line.
     LineBlank,
     /// A declared prefix is followed by one nonempty whitespace-delimited word.

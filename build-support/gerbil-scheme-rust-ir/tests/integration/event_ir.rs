@@ -167,6 +167,36 @@ fn future_named_marker_matches_saved_name_before_heading_or_parent_boundary() {
 }
 
 #[test]
+fn pop_frame_discards_parser_state_without_closing_syntax_nodes() {
+    let mut document = stateful_document();
+    document["initial"] = json!([
+        {"kind": "let_usize_stack", "name": "saved"}
+    ]);
+    document["line"] = json!([
+        {"kind": "push_frame", "stack": "saved",
+         "value": {"kind": "usize", "value": 7}},
+        {"kind": "pop_frame", "stack": "saved"},
+        {"kind": "if", "condition": {"kind": "stack_nonempty", "stack": "saved"},
+         "consequent": [{"kind": "start_node", "syntax_kind": 1},
+                        {"kind": "finish_node"}],
+         "alternate": [{"kind": "token", "syntax_kind": 3,
+                        "start": "start", "end": "end"}]}
+    ]);
+    document["finish"] = json!([]);
+    let source =
+        compile_event_function_json(&document.to_string()).expect("state-only frame pop compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("a\n"), vec![
+                StartNode(0), Token { kind: 3, start: 0, end: 2 }, FinishNode,
+            ]);
+        },
+    );
+}
+
+#[test]
 fn future_line_marker_requires_declared_key_value_body() {
     let mut document = stateful_document();
     document["line"] = json!([{

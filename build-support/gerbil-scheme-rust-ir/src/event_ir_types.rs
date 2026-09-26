@@ -103,6 +103,8 @@ pub enum EventStatementIr {
     ScanListMarker { marker: EventListMarkerIr },
     /// Push an unsigned frame owned by the Scheme transition.
     PushFrame { stack: String, value: EventUsizeIr },
+    /// Discard one state frame without emitting syntax-node closes.
+    PopFrame { stack: String },
     /// Pop frames while a Scheme predicate holds, emitting a fixed close arity.
     CloseFramesWhile {
         stack: String,

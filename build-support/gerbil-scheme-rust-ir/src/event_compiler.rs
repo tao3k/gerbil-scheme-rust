@@ -252,10 +252,8 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             quote! { #name(source, &mut events, #from, #until); }
         }
         EventStatementIr::ScanListMarker { marker } => compile_scan_list_marker(marker)?,
-        EventStatementIr::PushFrame { stack, value } => {
-            let stack = syn::parse_str::<syn::Ident>(stack)?;
-            let value = compile_usize(value)?;
-            quote! { #stack.push(#value); }
+        EventStatementIr::PushFrame { .. } | EventStatementIr::PopFrame { .. } => {
+            compile_stack_statement(statement)?
         }
         EventStatementIr::CloseFramesWhile {
             stack,
@@ -267,6 +265,21 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             finish_count,
         } => compile_close_all_frames(stack, *finish_count)?,
     })
+}
+
+fn compile_stack_statement(statement: &EventStatementIr) -> Result<TokenStream, CompileError> {
+    match statement {
+        EventStatementIr::PushFrame { stack, value } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            let value = compile_usize(value)?;
+            Ok(quote! { #stack.push(#value); })
+        }
+        EventStatementIr::PopFrame { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            Ok(quote! { let _ = #stack.pop(); })
+        }
+        _ => Err(CompileError::Schema("expected stack statement".into())),
+    }
 }
 
 fn compile_line_byte_loop(

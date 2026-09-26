@@ -176,13 +176,18 @@ pub(super) fn compile_future_cache_declarations(
             })
         })
         .collect::<Result<Vec<_>, CompileError>>()?;
+    if !named_specs.is_empty() {
+        declarations.push(quote! {
+            type EventNamedFutureCache = (
+                Vec<(usize, usize)>,
+                std::collections::HashMap<(usize, Vec<u8>), Vec<usize>>,
+            );
+        });
+    }
     for spec in &named_specs {
         let name = named_cache_ident(spec)?;
         declarations.push(quote! {
-            let #name: std::cell::OnceCell<(
-                Vec<(usize, usize)>,
-                std::collections::HashMap<(usize, Vec<u8>), Vec<usize>>
-            )> = std::cell::OnceCell::new();
+            let #name: std::cell::OnceCell<EventNamedFutureCache> = std::cell::OnceCell::new();
         });
     }
     Ok(declarations)

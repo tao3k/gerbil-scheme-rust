@@ -741,6 +741,53 @@ fn source_local_helper_compiles_once_and_runs_at_saved_bounds() {
 }
 
 #[test]
+fn nested_source_helpers_compile_once_and_reject_cycles() {
+    let mut document = stateful_document();
+    document["line"] = json!([{
+        "kind": "call_source_helper", "name": "outer",
+        "from": "start", "until": "end"
+    }]);
+    document["helpers"] = json!([
+        {
+            "name": "outer", "initial": [],
+            "body": [{"kind": "call_source_helper", "name": "inner",
+                      "from": "start", "until": "end"}]
+        },
+        {
+            "name": "inner", "initial": [],
+            "body": [
+                {"kind": "start_node", "syntax_kind": 1},
+                {"kind": "token", "syntax_kind": 3,
+                 "start": "start", "end": "end"},
+                {"kind": "finish_node"}
+            ]
+        }
+    ]);
+    let source =
+        compile_event_function_json(&document.to_string()).expect("acyclic nested helpers compile");
+    assert_eq!(source.matches("fn __event_helper_outer").count(), 1);
+    assert_eq!(source.matches("fn __event_helper_inner").count(), 1);
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("ab\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 3 },
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+    document["helpers"][1]["body"] = json!([{
+        "kind": "call_source_helper", "name": "outer",
+        "from": "start", "until": "end"
+    }]);
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+    document["helpers"][1]["body"][0]["name"] = json!("missing");
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+}
+
+#[test]
 fn bounded_line_byte_fold_emits_source_backed_segments() {
     let mut document = stateful_document();
     let index = json!({"kind": "line_index", "name": "cursor"});

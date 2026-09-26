@@ -6,7 +6,7 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::CompileError;
 
@@ -50,9 +50,9 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
     let name = syn::parse_str::<syn::Ident>(&function.name)?;
     let root = function.root_kind;
     let digest = syn::LitStr::new(&function.parser_digest, proc_macro2::Span::call_site());
-    let initial = compile_statements(&function.initial)?;
-    let line = compile_statements(&function.line)?;
-    let finish = compile_statements(&function.finish)?;
+    let initial = compile_statements(&function.initial, false)?;
+    let line = compile_statements(&function.line, false)?;
+    let finish = compile_statements(&function.finish, false)?;
     let helpers = compile_event_helpers(function)?;
     let cached_markers = compile_marker_cache(&function.line)?;
     let future_caches = compile_future_cache_declarations(&[&function.line, &function.finish])?;
@@ -117,15 +117,24 @@ fn compile_event_helpers(function: &EventFunctionIr) -> Result<Vec<TokenStream>,
     if helper_names.len() != function.helpers.len() {
         return Err(CompileError::Schema("duplicate event helper name".into()));
     }
-    validate_helper_calls(&function.line, &helper_names, true)?;
-    validate_helper_calls(&function.finish, &helper_names, true)?;
+    validate_helper_calls(&function.line, &helper_names)?;
+    validate_helper_calls(&function.finish, &helper_names)?;
+    let mut dependencies = BTreeMap::new();
+    for helper in &function.helpers {
+        validate_helper_calls(&helper.body, &helper_names)?;
+        let mut calls = BTreeSet::new();
+        collect_helper_calls(&helper.body, &mut calls);
+        dependencies.insert(helper.name.clone(), calls);
+    }
+    let mut active = BTreeSet::new();
+    let mut completed = BTreeSet::new();
+    for name in dependencies.keys() {
+        validate_helper_acyclic(name, &dependencies, &mut active, &mut completed)?;
+    }
     function
         .helpers
         .iter()
-        .map(|helper| {
-            validate_helper_calls(&helper.body, &helper_names, false)?;
-            compile_event_helper(helper)
-        })
+        .map(compile_event_helper)
         .collect::<Result<Vec<_>, _>>()
 }
 
@@ -161,15 +170,21 @@ fn line_index_name(name: &str) -> Result<syn::Ident, CompileError> {
     Ok(syn::parse_str(&format!("__event_index_{name}"))?)
 }
 
-fn compile_statements(statements: &[EventStatementIr]) -> Result<TokenStream, CompileError> {
+fn compile_statements(
+    statements: &[EventStatementIr],
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
     let tokens = statements
         .iter()
-        .map(compile_statement)
+        .map(|statement| compile_statement(statement, in_helper))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(quote! { #(#tokens)* })
 }
 
-fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, CompileError> {
+fn compile_statement(
+    statement: &EventStatementIr,
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
     Ok(match statement {
         EventStatementIr::LetBool { name, value } => {
             let name = syn::parse_str::<syn::Ident>(name)?;
@@ -236,21 +251,18 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             condition,
             consequent,
             alternate,
-        } => compile_if_statement(condition, consequent, alternate)?,
+        } => compile_if_statement(condition, consequent, alternate, in_helper)?,
         EventStatementIr::ForLineBytes {
             index,
             from,
             until,
             body,
-        } => compile_line_byte_loop(index, from, until, body)?,
+        } => compile_line_byte_loop(index, from, until, body, in_helper)?,
         EventStatementIr::WithSourceBounds { from, until, body } => {
-            compile_source_bounds(from, until, body)?
+            compile_source_bounds(from, until, body, in_helper)?
         }
         EventStatementIr::CallSourceHelper { name, from, until } => {
-            let name = helper_ident(name)?;
-            let from = compile_offset(from)?;
-            let until = compile_offset(until)?;
-            quote! { #name(source, &mut events, #from, #until); }
+            compile_source_helper_call(name, from, until, in_helper)?
         }
         EventStatementIr::ScanListMarker { marker } => compile_scan_list_marker(marker)?,
         EventStatementIr::PushFrame { .. } | EventStatementIr::PopFrame { .. } => {
@@ -269,6 +281,22 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             stack,
             finish_count,
         } => compile_close_all_frames(stack, *finish_count)?,
+    })
+}
+
+fn compile_source_helper_call(
+    name: &str,
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
+    let name = helper_ident(name)?;
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    Ok(if in_helper {
+        quote! { #name(source, &mut *events, #from, #until); }
+    } else {
+        quote! { #name(source, &mut events, #from, #until); }
     })
 }
 
@@ -292,11 +320,12 @@ fn compile_line_byte_loop(
     from: &EventOffsetIr,
     until: &EventOffsetIr,
     body: &[EventStatementIr],
+    in_helper: bool,
 ) -> Result<TokenStream, CompileError> {
     let index = line_index_name(index)?;
     let from = compile_offset(from)?;
     let until = compile_offset(until)?;
-    let body = compile_statements(body)?;
+    let body = compile_statements(body, in_helper)?;
     Ok(quote! {
         let iteration_from = #from;
         let iteration_until = #until;
@@ -311,11 +340,12 @@ fn compile_source_bounds(
     from: &EventOffsetIr,
     until: &EventOffsetIr,
     body: &[EventStatementIr],
+    in_helper: bool,
 ) -> Result<TokenStream, CompileError> {
     let from = compile_offset(from)?;
     let until = compile_offset(until)?;
     let cached_markers = compile_marker_cache(body)?;
-    let body = compile_statements(body)?;
+    let body = compile_statements(body, in_helper)?;
     Ok(quote! {
         let bounds_from = #from;
         let bounds_until = #until;
@@ -336,15 +366,12 @@ fn helper_ident(name: &str) -> Result<syn::Ident, CompileError> {
 fn validate_helper_calls(
     statements: &[EventStatementIr],
     names: &std::collections::BTreeSet<&str>,
-    allow_calls: bool,
 ) -> Result<(), CompileError> {
     for statement in statements {
         match statement {
-            EventStatementIr::CallSourceHelper { name, .. }
-                if !allow_calls || !names.contains(name.as_str()) =>
-            {
+            EventStatementIr::CallSourceHelper { name, .. } if !names.contains(name.as_str()) => {
                 return Err(CompileError::Schema(format!(
-                    "unknown or recursive event helper: {name}"
+                    "unknown event helper: {name}"
                 )));
             }
             EventStatementIr::If {
@@ -352,16 +379,61 @@ fn validate_helper_calls(
                 alternate,
                 ..
             } => {
-                validate_helper_calls(consequent, names, allow_calls)?;
-                validate_helper_calls(alternate, names, allow_calls)?;
+                validate_helper_calls(consequent, names)?;
+                validate_helper_calls(alternate, names)?;
             }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {
-                validate_helper_calls(body, names, allow_calls)?;
+                validate_helper_calls(body, names)?;
             }
             _ => {}
         }
     }
+    Ok(())
+}
+
+fn collect_helper_calls(statements: &[EventStatementIr], calls: &mut BTreeSet<String>) {
+    for statement in statements {
+        match statement {
+            EventStatementIr::CallSourceHelper { name, .. } => {
+                calls.insert(name.clone());
+            }
+            EventStatementIr::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                collect_helper_calls(consequent, calls);
+                collect_helper_calls(alternate, calls);
+            }
+            EventStatementIr::ForLineBytes { body, .. }
+            | EventStatementIr::WithSourceBounds { body, .. } => {
+                collect_helper_calls(body, calls);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn validate_helper_acyclic(
+    name: &str,
+    dependencies: &BTreeMap<String, BTreeSet<String>>,
+    active: &mut BTreeSet<String>,
+    completed: &mut BTreeSet<String>,
+) -> Result<(), CompileError> {
+    if completed.contains(name) {
+        return Ok(());
+    }
+    if !active.insert(name.to_owned()) {
+        return Err(CompileError::Schema(format!(
+            "recursive event helper: {name}"
+        )));
+    }
+    for dependency in &dependencies[name] {
+        validate_helper_acyclic(dependency, dependencies, active, completed)?;
+    }
+    active.remove(name);
+    completed.insert(name.to_owned());
     Ok(())
 }
 
@@ -384,9 +456,9 @@ fn compile_event_helper(helper: &EventHelperIr) -> Result<TokenStream, CompileEr
         ));
     }
     let name = helper_ident(&helper.name)?;
-    let initial = compile_statements(&helper.initial)?;
+    let initial = compile_statements(&helper.initial, true)?;
     let cached_markers = compile_marker_cache(&helper.body)?;
-    let body = compile_statements(&helper.body)?;
+    let body = compile_statements(&helper.body, true)?;
     Ok(quote! {
         fn #name(source: &str, events: &mut Vec<TreeEvent>,
                  bounds_from: usize, bounds_until: usize) {
@@ -407,10 +479,11 @@ fn compile_if_statement(
     condition: &EventPredicateIr,
     consequent: &[EventStatementIr],
     alternate: &[EventStatementIr],
+    in_helper: bool,
 ) -> Result<TokenStream, CompileError> {
     let condition = compile_predicate(condition)?;
-    let consequent = compile_statements(consequent)?;
-    let alternate = compile_statements(alternate)?;
+    let consequent = compile_statements(consequent, in_helper)?;
+    let alternate = compile_statements(alternate, in_helper)?;
     Ok(if alternate.is_empty() {
         quote! {
             let __event_condition = #condition;

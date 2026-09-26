@@ -6,7 +6,6 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use serde::Deserialize;
 use std::collections::BTreeSet;
 
 use crate::CompileError;
@@ -23,284 +22,13 @@ use event_list_compiler::{
 };
 use event_marker_collector::collect_line_markers;
 
-/// Versioned wire contract for source-backed event functions.
-pub const EVENT_FUNCTION_IR_SCHEMA: &str = "gerbil-scheme-rust.event-function-ir.v1";
-
-/// One Scheme-authored event procedure with line-local and final transitions.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EventFunctionIr {
-    /// Exact supported wire schema.
-    pub schema: String,
-    /// Public generated Rust function name.
-    pub name: String,
-    /// Declared root syntax-kind index.
-    pub root_kind: u16,
-    /// Digest of the source-owned parser algorithm.
-    pub parser_digest: String,
-    /// Initial state declarations, evaluated before the line fold.
-    pub initial: Vec<EventStatementIr>,
-    /// One transition for each source line.
-    pub line: Vec<EventStatementIr>,
-    /// Final transitions before the root closes.
-    pub finish: Vec<EventStatementIr>,
-}
-
-/// Closed, auditable side effects permitted in an event procedure.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum EventStatementIr {
-    /// Declare one bounded mutable boolean state slot.
-    LetBool { name: String, value: bool },
-    /// Declare one unsigned parser state slot.
-    LetUsize { name: String, value: usize },
-    /// Declare a nesting stack of unsigned levels.
-    LetUsizeStack { name: String },
-    /// Update a previously declared state slot.
-    SetBool {
-        name: String,
-        value: EventPredicateIr,
-    },
-    /// Update a previously declared unsigned state slot.
-    SetUsize { name: String, value: EventUsizeIr },
-    /// Close all nested nodes at or above a new level.
-    CloseThroughLevel { stack: String, level: EventUsizeIr },
-    /// Open one nested node at a declared level.
-    OpenLevel {
-        stack: String,
-        level: EventUsizeIr,
-        syntax_kind: u16,
-    },
-    /// Close every remaining node in a nesting stack.
-    CloseAllLevels { stack: String },
-    /// Emit an opening Rowan node event.
-    StartNode { syntax_kind: u16 },
-    /// Emit a source-backed token for the current line.
-    Token {
-        syntax_kind: u16,
-        start: EventOffsetIr,
-        end: EventOffsetIr,
-    },
-    /// Emit a closing Rowan node event.
-    FinishNode,
-    /// Choose one statically bounded transition branch.
-    If {
-        condition: EventPredicateIr,
-        consequent: Vec<Self>,
-        alternate: Vec<Self>,
-    },
-    /// Iterate a bounded source-line byte range; the index is source-backed.
-    ForLineBytes {
-        index: String,
-        from: EventOffsetIr,
-        until: EventOffsetIr,
-        body: Vec<Self>,
-    },
-    /// Read a source-line list marker into typed state slots.
-    ScanListMarker { marker: EventListMarkerIr },
-    /// Push an unsigned frame owned by the Scheme transition.
-    PushFrame { stack: String, value: EventUsizeIr },
-    /// Pop frames while a Scheme predicate holds, emitting a fixed close arity.
-    CloseFramesWhile {
-        stack: String,
-        condition: EventPredicateIr,
-        finish_count: u8,
-    },
-    /// Close every frame, emitting a fixed number of node closes per frame.
-    CloseAllFrames { stack: String, finish_count: u8 },
-}
-
-/// Language-declared list marker shape and typed event-state destinations.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EventListMarkerIr {
-    /// Unordered one-byte marker alternatives.
-    pub unordered: String,
-    /// Whether decimal and alphabetic ordered bullets are admitted.
-    pub ordered: bool,
-    /// Positive tab stop width used for indentation columns.
-    pub tab_width: usize,
-    /// Boolean slot for a successfully recognized marker.
-    pub present: String,
-    /// Unsigned indentation column slot.
-    pub column: String,
-    /// Boolean slot for ordered/unordered shape.
-    pub ordered_slot: String,
-    /// Source-backed bullet-start slot.
-    pub bullet_start: String,
-    /// Source-backed bullet-end slot.
-    pub bullet_end: String,
-    /// Source-backed content-start slot.
-    pub content_start: String,
-}
-
-/// Source byte offsets available in a line transition.
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum EventOffsetIr {
-    /// An existing current-line boundary.
-    Boundary(EventBoundaryIr),
-    /// A statically bounded source-line byte calculation.
-    Computed(EventComputedOffsetIr),
-}
-
-/// Current source-line boundaries.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EventBoundaryIr {
-    /// Inclusive current-line start.
-    Start,
-    /// Exclusive current-line end.
-    End,
-}
-
-/// Bounded source-line byte offsets without arbitrary Rust expressions.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum EventComputedOffsetIr {
-    /// End of a declared literal prefix, clamped to the current line.
-    LinePrefixEnd { value: String },
-    /// Skip spaces and tabs from a source-backed offset.
-    LineSkipHorizontal { from: Box<EventOffsetIr> },
-    /// Scan the next whitespace-delimited word from a source-backed offset.
-    LineScanWord { from: Box<EventOffsetIr> },
-    /// Scan an ASCII identifier composed of letters, digits, underscore and hyphen.
-    LineScanKey { from: Box<EventOffsetIr> },
-    /// Scan non-whitespace bytes up to a declared delimiter within one source line.
-    LineScanNonspaceUntil {
-        from: Box<EventOffsetIr>,
-        delimiter: u8,
-    },
-    /// Scan to a declared byte delimiter, including intervening whitespace.
-    LineScanUntil {
-        from: Box<EventOffsetIr>,
-        delimiter: u8,
-    },
-    /// Move one byte forward without passing the current line boundary.
-    LineStep { from: Box<EventOffsetIr> },
-    /// Remove trailing ASCII whitespace from the current source line.
-    LineTrimEnd,
-    /// Trim trailing whitespace without crossing a source-backed value start.
-    LineTrimEndFrom { from: Box<EventOffsetIr> },
-    /// End before a final CR/LF, preserving horizontal source whitespace.
-    LineContentEnd,
-    /// A byte index bound by a surrounding source-line iteration.
-    LineIndex { name: String },
-    /// A named unsigned state containing a current source-line offset.
-    StateOffset { name: String },
-    /// End of a checked leading marker run; reuses the line's cached level.
-    LineMarkerEnd { marker: u8, separator: u8 },
-}
-
-/// Closed unsigned-value vocabulary for contextual line transitions.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum EventUsizeIr {
-    /// A literal nonnegative value.
-    Usize { value: usize },
-    /// A named unsigned parser state slot.
-    State { name: String },
-    /// Count repeated leading marker bytes only when followed by a separator.
-    LineMarkerLevel { marker: u8, separator: u8 },
-    /// Promote a checked source-backed offset to an unsigned state value.
-    Offset { value: EventOffsetIr },
-    /// Tab-aware leading indentation width of the current source line.
-    LineIndentColumn { tab_width: usize },
-    /// Top of a nonempty unsigned frame stack; zero when empty.
-    StackTop { stack: String },
-    /// Checked unsigned arithmetic for encoded frame values.
-    Add { left: Box<Self>, right: Box<Self> },
-    /// Checked multiplication for encoded frame values.
-    Multiply { left: Box<Self>, right: Box<Self> },
-    /// Bounded positive-divisor quotient for encoded frame values.
-    Divide { left: Box<Self>, right: Box<Self> },
-}
-
-/// Closed predicate vocabulary; it has no arbitrary Rust expression node.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum EventPredicateIr {
-    /// A literal truth value.
-    Bool { value: bool },
-    /// Read one named state slot.
-    State { name: String },
-    /// Test whether an unsigned expression is positive.
-    UsizePositive { value: EventUsizeIr },
-    /// Compare two typed unsigned parser values.
-    UsizeEqual {
-        left: EventUsizeIr,
-        right: EventUsizeIr,
-    },
-    /// Distinguish two typed unsigned parser values.
-    UsizeNotEqual {
-        left: EventUsizeIr,
-        right: EventUsizeIr,
-    },
-    /// Compare two unsigned parser values.
-    UsizeGreater {
-        left: EventUsizeIr,
-        right: EventUsizeIr,
-    },
-    /// Compare two source-backed byte offsets.
-    OffsetLess {
-        left: EventOffsetIr,
-        right: EventOffsetIr,
-    },
-    /// Test whether a named unsigned frame stack contains a frame.
-    StackNonempty { stack: String },
-    /// Compare the current source line's prefix.
-    LineStartsWith { value: String },
-    /// Compare a source-line prefix using ASCII-insensitive syntax matching.
-    LineStartsWithAsciiCaseInsensitive { value: String },
-    /// Match an ASCII-insensitive prefix only at a horizontal or line boundary.
-    LinePrefixBoundaryAsciiCaseInsensitive { value: String },
-    /// Match a whole line marker with only trailing ASCII whitespace.
-    LineMarkerAsciiCaseInsensitive { value: String },
-    /// Search later source lines for a whole marker before a heading or parent marker.
-    FutureLineMarkerBeforeBoundary {
-        target: String,
-        stop: String,
-        heading_marker: u8,
-        heading_separator: u8,
-        indent: bool,
-        stop_at_heading: bool,
-        #[serde(default)]
-        body_key_marker: u8,
-    },
-    /// Treat spaces, tabs, and line endings as a blank source line.
-    LineBlank,
-    /// A declared prefix is followed by one nonempty whitespace-delimited word.
-    LineHasWordAfterPrefix { value: String },
-    /// A prefix is followed by a nonempty ASCII key and a colon.
-    LineHasKeyAfterPrefix { value: String },
-    /// Compare one source-line byte at a bounded source-backed offset.
-    LineByteEqual { at: EventOffsetIr, value: u8 },
-    /// All bytes in one bounded slice belong to an explicit byte set.
-    LineBytesAllIn {
-        from: EventOffsetIr,
-        until: EventOffsetIr,
-        values: Vec<u8>,
-    },
-    /// At least one byte in one bounded slice belongs to an explicit byte set.
-    LineBytesAnyIn {
-        from: EventOffsetIr,
-        until: EventOffsetIr,
-        values: Vec<u8>,
-    },
-    /// Match a bounded source-line byte slice against a sorted static name set.
-    LineBytesInSet {
-        from: EventOffsetIr,
-        until: EventOffsetIr,
-        values: Vec<String>,
-    },
-    /// Boolean negation.
-    Not { value: Box<Self> },
-    /// Short-circuit conjunction.
-    And { left: Box<Self>, right: Box<Self> },
-    /// Short-circuit disjunction.
-    Or { left: Box<Self>, right: Box<Self> },
-}
-
+#[path = "event_ir_types.rs"]
+mod event_ir_types;
+pub use event_ir_types::{
+    EVENT_FUNCTION_IR_SCHEMA, EventBoundaryIr, EventComputedOffsetIr, EventFunctionIr,
+    EventHelperIr, EventListMarkerIr, EventOffsetIr, EventPredicateIr, EventStatementIr,
+    EventUsizeIr,
+};
 /// Compile a versioned Scheme event IR document into a Rust event function.
 ///
 /// # Errors
@@ -315,29 +43,21 @@ pub fn compile_event_function_json(input: &str) -> Result<String, CompileError> 
 /// # Errors
 /// Rejects unknown schemas, malformed identifiers or digests, and invalid syntax.
 pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, CompileError> {
-    if function.schema != EVENT_FUNCTION_IR_SCHEMA {
-        return Err(CompileError::Schema(function.schema.clone()));
-    }
-    if !function.parser_digest.starts_with("sha256:")
-        || function.parser_digest.len() != 71
-        || !function.parser_digest[7..]
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Err(CompileError::Schema(function.parser_digest.clone()));
-    }
+    validate_event_function(function)?;
     let name = syn::parse_str::<syn::Ident>(&function.name)?;
     let root = function.root_kind;
     let digest = syn::LitStr::new(&function.parser_digest, proc_macro2::Span::call_site());
     let initial = compile_statements(&function.initial)?;
     let line = compile_statements(&function.line)?;
     let finish = compile_statements(&function.finish)?;
+    let helpers = compile_event_helpers(function)?;
     let cached_markers = compile_marker_cache(&function.line)?;
-    let future_caches = compile_future_cache_declarations(&function.line)?;
+    let future_caches = compile_future_cache_declarations(&[&function.line, &function.finish])?;
     let tokens = quote! {
         pub const PARSER_DIGEST: &str = #digest;
 
         pub fn #name(source: &str) -> Vec<TreeEvent> {
+            #(#helpers)*
             let bytes = source.as_bytes();
             let mut events = Vec::with_capacity(bytes.len() / 16 + 2);
             events.push(TreeEvent::StartNode(#root));
@@ -368,6 +88,42 @@ pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, Comp
     };
     let file = syn::parse2::<syn::File>(tokens)?;
     Ok(prettyplease::unparse(&file))
+}
+
+fn validate_event_function(function: &EventFunctionIr) -> Result<(), CompileError> {
+    if function.schema != EVENT_FUNCTION_IR_SCHEMA {
+        return Err(CompileError::Schema(function.schema.clone()));
+    }
+    if !function.parser_digest.starts_with("sha256:")
+        || function.parser_digest.len() != 71
+        || !function.parser_digest[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(CompileError::Schema(function.parser_digest.clone()));
+    }
+    Ok(())
+}
+
+fn compile_event_helpers(function: &EventFunctionIr) -> Result<Vec<TokenStream>, CompileError> {
+    let helper_names = function
+        .helpers
+        .iter()
+        .map(|helper| helper.name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    if helper_names.len() != function.helpers.len() {
+        return Err(CompileError::Schema("duplicate event helper name".into()));
+    }
+    validate_helper_calls(&function.line, &helper_names, true)?;
+    validate_helper_calls(&function.finish, &helper_names, true)?;
+    function
+        .helpers
+        .iter()
+        .map(|helper| {
+            validate_helper_calls(&helper.body, &helper_names, false)?;
+            compile_event_helper(helper)
+        })
+        .collect::<Result<Vec<_>, _>>()
 }
 
 fn compile_marker_cache(statements: &[EventStatementIr]) -> Result<Vec<TokenStream>, CompileError> {
@@ -484,6 +240,15 @@ fn compile_statement(statement: &EventStatementIr) -> Result<TokenStream, Compil
             until,
             body,
         } => compile_line_byte_loop(index, from, until, body)?,
+        EventStatementIr::WithSourceBounds { from, until, body } => {
+            compile_source_bounds(from, until, body)?
+        }
+        EventStatementIr::CallSourceHelper { name, from, until } => {
+            let name = helper_ident(name)?;
+            let from = compile_offset(from)?;
+            let until = compile_offset(until)?;
+            quote! { #name(source, &mut events, #from, #until); }
+        }
         EventStatementIr::ScanListMarker { marker } => compile_scan_list_marker(marker)?,
         EventStatementIr::PushFrame { stack, value } => {
             let stack = syn::parse_str::<syn::Ident>(stack)?;
@@ -518,6 +283,101 @@ fn compile_line_byte_loop(
         if iteration_from >= start && iteration_from <= iteration_until
             && iteration_until <= end {
             for #index in iteration_from..iteration_until { #body }
+        }
+    })
+}
+
+fn compile_source_bounds(
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    body: &[EventStatementIr],
+) -> Result<TokenStream, CompileError> {
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let cached_markers = compile_marker_cache(body)?;
+    let body = compile_statements(body)?;
+    Ok(quote! {
+        let bounds_from = #from;
+        let bounds_until = #until;
+        if let Some(line) = source.get(bounds_from..bounds_until) {
+            let start = bounds_from;
+            let end = bounds_until;
+            #(#cached_markers)*
+            #body
+        }
+    })
+}
+
+fn helper_ident(name: &str) -> Result<syn::Ident, CompileError> {
+    let name = syn::parse_str::<syn::Ident>(name)?;
+    Ok(syn::parse_str(&format!("__event_helper_{name}"))?)
+}
+
+fn validate_helper_calls(
+    statements: &[EventStatementIr],
+    names: &std::collections::BTreeSet<&str>,
+    allow_calls: bool,
+) -> Result<(), CompileError> {
+    for statement in statements {
+        match statement {
+            EventStatementIr::CallSourceHelper { name, .. }
+                if !allow_calls || !names.contains(name.as_str()) =>
+            {
+                return Err(CompileError::Schema(format!(
+                    "unknown or recursive event helper: {name}"
+                )));
+            }
+            EventStatementIr::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                validate_helper_calls(consequent, names, allow_calls)?;
+                validate_helper_calls(alternate, names, allow_calls)?;
+            }
+            EventStatementIr::ForLineBytes { body, .. }
+            | EventStatementIr::WithSourceBounds { body, .. } => {
+                validate_helper_calls(body, names, allow_calls)?;
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn compile_event_helper(helper: &EventHelperIr) -> Result<TokenStream, CompileError> {
+    if helper.initial.iter().any(|statement| {
+        !matches!(
+            statement,
+            EventStatementIr::LetBool { .. }
+                | EventStatementIr::LetUsize { .. }
+                | EventStatementIr::LetUsizeStack { .. }
+        )
+    }) {
+        return Err(CompileError::Schema(
+            "event helper initial state must be declarations".into(),
+        ));
+    }
+    if !compile_future_cache_declarations(&[&helper.body])?.is_empty() {
+        return Err(CompileError::Schema(
+            "event helpers do not admit future-line searches".into(),
+        ));
+    }
+    let name = helper_ident(&helper.name)?;
+    let initial = compile_statements(&helper.initial)?;
+    let cached_markers = compile_marker_cache(&helper.body)?;
+    let body = compile_statements(&helper.body)?;
+    Ok(quote! {
+        fn #name(source: &str, events: &mut Vec<TreeEvent>,
+                 bounds_from: usize, bounds_until: usize) {
+            let bytes = source.as_bytes();
+            if let Some(line) = source.get(bounds_from..bounds_until) {
+                let start = bounds_from;
+                let end = bounds_until;
+                #initial
+                #(#cached_markers)*
+                #body
+            }
         }
     })
 }
@@ -588,6 +448,16 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
         EventOffsetIr::Computed(EventComputedOffsetIr::LineStep { from }) => {
             let from = compile_offset(from)?;
             quote! { (#from).saturating_add(1).min(end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LinePhysicalEnd { from }) => {
+            let from = compile_offset(from)?;
+            quote! {{
+                let mut cursor = (#from).max(start).min(end);
+                while cursor < end && !matches!(bytes[cursor], b'\r' | b'\n') {
+                    cursor += 1;
+                }
+                cursor
+            }}
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEnd) => {
             quote! {{

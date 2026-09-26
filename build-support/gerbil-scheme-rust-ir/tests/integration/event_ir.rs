@@ -533,6 +533,106 @@ fn bounded_static_name_set_uses_source_bytes_without_generated_name_branches() {
 }
 
 #[test]
+fn saved_source_bounds_rebind_line_primitives_across_physical_lines() {
+    let mut document = stateful_document();
+    document["initial"] = json!([
+        {"kind": "let_usize", "name": "span_start", "value": 0},
+        {"kind": "let_usize", "name": "span_end", "value": 0}
+    ]);
+    document["line"] = json!([{
+        "kind": "set_usize", "name": "span_end",
+        "value": {"kind": "offset", "value": "end"}
+    }]);
+    document["finish"] = json!([{
+        "kind": "with_source_bounds",
+        "from": {"kind": "state_offset", "name": "span_start"},
+        "until": {"kind": "state_offset", "name": "span_end"},
+        "body": [{
+            "kind": "if",
+            "condition": {"kind": "line_byte_equal",
+                          "at": {"kind": "line_physical_end", "from": "start"},
+                          "value": 10},
+            "consequent": [
+                {"kind": "start_node", "syntax_kind": 1},
+                {"kind": "token", "syntax_kind": 3,
+                 "start": "start", "end": "end"},
+                {"kind": "finish_node"}
+            ],
+            "alternate": []
+        }]
+    }]);
+    let source =
+        compile_event_function_json(&document.to_string()).expect("checked source spans compile");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("ab\ncd\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 6 },
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+    document["initial"][0]["value"] = json!(1);
+    let invalid_boundary = compile_event_function_json(&document.to_string())
+        .expect("invalid UTF-8 boundaries are checked at runtime");
+    compile_and_run(
+        &invalid_boundary,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode};
+            assert_eq!(parse_events("α\n"), vec![StartNode(0), FinishNode]);
+        },
+    );
+}
+
+#[test]
+fn source_local_helper_compiles_once_and_runs_at_saved_bounds() {
+    let mut document = stateful_document();
+    document["initial"] = json!([
+        {"kind": "let_usize", "name": "span_start", "value": 0},
+        {"kind": "let_usize", "name": "span_end", "value": 0}
+    ]);
+    document["line"] = json!([{
+        "kind": "set_usize", "name": "span_end",
+        "value": {"kind": "offset", "value": "end"}
+    }]);
+    document["finish"] = json!([{
+        "kind": "call_source_helper", "name": "inline_span",
+        "from": {"kind": "state_offset", "name": "span_start"},
+        "until": {"kind": "state_offset", "name": "span_end"}
+    }]);
+    document["helpers"] = json!([{
+        "name": "inline_span",
+        "initial": [{"kind": "let_usize", "name": "cursor", "value": 0}],
+        "body": [
+            {"kind": "set_usize", "name": "cursor",
+             "value": {"kind": "offset", "value": "start"}},
+            {"kind": "start_node", "syntax_kind": 1},
+            {"kind": "token", "syntax_kind": 3,
+             "start": {"kind": "state_offset", "name": "cursor"}, "end": "end"},
+            {"kind": "finish_node"}
+        ]
+    }]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("closed source-local helper compiles");
+    assert_eq!(source.matches("fn __event_helper_inline_span").count(), 1);
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("ab\ncd\n"), vec![
+                StartNode(0), StartNode(1),
+                Token { kind: 3, start: 0, end: 6 },
+                FinishNode, FinishNode,
+            ]);
+        },
+    );
+    document["finish"][0]["name"] = json!("unknown");
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+}
+
+#[test]
 fn bounded_line_byte_fold_emits_source_backed_segments() {
     let mut document = stateful_document();
     let index = json!({"kind": "line_index", "name": "cursor"});

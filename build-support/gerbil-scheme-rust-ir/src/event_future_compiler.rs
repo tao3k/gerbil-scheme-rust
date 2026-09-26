@@ -86,17 +86,22 @@ fn collect_statements(statements: &[EventStatementIr], specs: &mut BTreeSet<Futu
                 collect_statements(consequent, specs);
                 collect_statements(alternate, specs);
             }
-            EventStatementIr::ForLineBytes { body, .. } => collect_statements(body, specs),
+            EventStatementIr::ForLineBytes { body, .. }
+            | EventStatementIr::WithSourceBounds { body, .. } => {
+                collect_statements(body, specs);
+            }
             _ => {}
         }
     }
 }
 
 pub(super) fn compile_future_cache_declarations(
-    statements: &[EventStatementIr],
+    phases: &[&[EventStatementIr]],
 ) -> Result<Vec<TokenStream>, CompileError> {
     let mut specs = BTreeSet::new();
-    collect_statements(statements, &mut specs);
+    for statements in phases {
+        collect_statements(statements, &mut specs);
+    }
     specs
         .iter()
         .map(|spec| {

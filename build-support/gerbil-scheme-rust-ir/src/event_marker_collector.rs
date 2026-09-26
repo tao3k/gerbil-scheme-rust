@@ -39,6 +39,11 @@ pub(super) fn collect_line_markers(
                 collect_offset_markers(until, markers);
                 collect_line_markers(body, markers);
             }
+            EventStatementIr::WithSourceBounds { from, until, .. }
+            | EventStatementIr::CallSourceHelper { from, until, .. } => {
+                collect_offset_markers(from, markers);
+                collect_offset_markers(until, markers);
+            }
             EventStatementIr::CloseFramesWhile { condition, .. } => {
                 collect_predicate_markers(condition, markers);
             }
@@ -58,6 +63,7 @@ fn collect_offset_markers(offset: &EventOffsetIr, markers: &mut BTreeSet<(u8, u8
             | EventComputedOffsetIr::LineScanKey { from }
             | EventComputedOffsetIr::LineScanNonspaceUntil { from, .. }
             | EventComputedOffsetIr::LineScanUntil { from, .. }
+            | EventComputedOffsetIr::LinePhysicalEnd { from }
             | EventComputedOffsetIr::LineStep { from }
             | EventComputedOffsetIr::LineTrimEndFrom { from },
         ) => collect_offset_markers(from, markers),

@@ -419,13 +419,16 @@ fn compile_body_key_boundary(marker: u8, target: &syn::LitStr) -> TokenStream {
         let __event_valid_key = __event_body.get(__event_key_start - 1)
             == Some(&#marker)
             && __event_body[__event_key_start..].iter()
-                .position(|byte| *byte == #marker)
-                .is_some_and(|key_len| {
+                .enumerate()
+                .find(|(index, byte)| {
+                    **byte == #marker
+                        && __event_body.get(__event_key_start + *index + 1)
+                            .is_none_or(|next| matches!(next, b' ' | b'\t' | b'\r' | b'\n'))
+                })
+                .is_some_and(|(key_len, _)| {
                     key_len > 0
                         && !__event_body[__event_key_start..__event_key_start + key_len]
                             .iter().any(u8::is_ascii_whitespace)
-                        && __event_body.get(__event_key_start + key_len + 1)
-                            .is_none_or(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
                 });
         if !__event_valid_key {
             __event_is_boundary = true;

@@ -170,7 +170,10 @@ fn future_line_marker_requires_declared_key_value_body() {
         &quote! {
             use TreeEvent::{FinishNode, StartNode};
             assert!(matches!(parse_events(":PROPERTIES:\n:ID: x\n:END:\n")[1], StartNode(1)));
+            assert!(matches!(parse_events(":PROPERTIES:\n:header-args:python: :session local\n:END:\n")[1], StartNode(1)));
+            assert!(matches!(parse_events(":PROPERTIES:\n:ID: value:more\n:END:\n")[1], StartNode(1)));
             assert!(matches!(parse_events(":PROPERTIES:\nmalformed\n:END:\n")[1], StartNode(2)));
+            assert!(matches!(parse_events(":PROPERTIES:\n:header args:python: x\n:END:\n")[1], StartNode(2)));
         },
     );
 }

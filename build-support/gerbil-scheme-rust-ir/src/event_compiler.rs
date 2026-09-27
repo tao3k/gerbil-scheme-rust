@@ -27,7 +27,9 @@ use event_list_compiler::{
     compile_scan_list_marker,
 };
 use event_marker_collector::collect_line_markers;
-use event_parameter_compiler::{compile_event_initial, compile_event_parameters};
+use event_parameter_compiler::{
+    compile_event_initial, compile_event_parameters, compile_helper_parameters,
+};
 
 #[path = "event_ir_types.rs"]
 mod event_ir_types;
@@ -119,19 +121,19 @@ fn validate_event_function(function: &EventFunctionIr) -> Result<(), CompileErro
 }
 
 fn compile_event_helpers(function: &EventFunctionIr) -> Result<Vec<TokenStream>, CompileError> {
-    let helper_names = function
+    let helper_arities = function
         .helpers
         .iter()
-        .map(|helper| helper.name.as_str())
-        .collect::<std::collections::BTreeSet<_>>();
-    if helper_names.len() != function.helpers.len() {
+        .map(|helper| (helper.name.as_str(), helper.parameters.len()))
+        .collect::<BTreeMap<_, _>>();
+    if helper_arities.len() != function.helpers.len() {
         return Err(CompileError::Schema("duplicate event helper name".into()));
     }
-    validate_helper_calls(&function.line, &helper_names)?;
-    validate_helper_calls(&function.finish, &helper_names)?;
+    validate_helper_calls(&function.line, &helper_arities)?;
+    validate_helper_calls(&function.finish, &helper_arities)?;
     let mut dependencies = BTreeMap::new();
     for helper in &function.helpers {
-        validate_helper_calls(&helper.body, &helper_names)?;
+        validate_helper_calls(&helper.body, &helper_arities)?;
         let mut calls = BTreeSet::new();
         collect_helper_calls(&helper.body, &mut calls);
         dependencies.insert(helper.name.clone(), calls);
@@ -271,9 +273,12 @@ fn compile_statement(
         EventStatementIr::WithSourceBounds { from, until, body } => {
             compile_source_bounds(from, until, body, in_helper)?
         }
-        EventStatementIr::CallSourceHelper { name, from, until } => {
-            compile_source_helper_call(name, from, until, in_helper)?
-        }
+        EventStatementIr::CallSourceHelper {
+            name,
+            from,
+            until,
+            arguments,
+        } => compile_source_helper_call(name, from, until, arguments, in_helper)?,
         EventStatementIr::ScanListMarker { marker } => compile_scan_list_marker(marker)?,
         EventStatementIr::PushFrame { .. } | EventStatementIr::PopFrame { .. } => {
             compile_stack_statement(statement)?
@@ -298,15 +303,20 @@ fn compile_source_helper_call(
     name: &str,
     from: &EventOffsetIr,
     until: &EventOffsetIr,
+    arguments: &[EventUsizeIr],
     in_helper: bool,
 ) -> Result<TokenStream, CompileError> {
     let name = helper_ident(name)?;
     let from = compile_offset(from)?;
     let until = compile_offset(until)?;
+    let arguments = arguments
+        .iter()
+        .map(compile_usize)
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(if in_helper {
-        quote! { #name(source, &mut *events, #from, #until); }
+        quote! { #name(source, &mut *events, #from, #until, #(#arguments),*); }
     } else {
-        quote! { #name(source, &mut events, #from, #until); }
+        quote! { #name(source, &mut events, #from, #until, #(#arguments),*); }
     })
 }
 
@@ -375,13 +385,15 @@ fn helper_ident(name: &str) -> Result<syn::Ident, CompileError> {
 
 fn validate_helper_calls(
     statements: &[EventStatementIr],
-    names: &std::collections::BTreeSet<&str>,
+    arities: &BTreeMap<&str, usize>,
 ) -> Result<(), CompileError> {
     for statement in statements {
         match statement {
-            EventStatementIr::CallSourceHelper { name, .. } if !names.contains(name.as_str()) => {
+            EventStatementIr::CallSourceHelper {
+                name, arguments, ..
+            } if arities.get(name.as_str()) != Some(&arguments.len()) => {
                 return Err(CompileError::Schema(format!(
-                    "unknown event helper: {name}"
+                    "unknown event helper or argument arity: {name}"
                 )));
             }
             EventStatementIr::If {
@@ -389,12 +401,12 @@ fn validate_helper_calls(
                 alternate,
                 ..
             } => {
-                validate_helper_calls(consequent, names)?;
-                validate_helper_calls(alternate, names)?;
+                validate_helper_calls(consequent, arities)?;
+                validate_helper_calls(alternate, arities)?;
             }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {
-                validate_helper_calls(body, names)?;
+                validate_helper_calls(body, arities)?;
             }
             _ => {}
         }
@@ -466,12 +478,13 @@ fn compile_event_helper(helper: &EventHelperIr) -> Result<TokenStream, CompileEr
         ));
     }
     let name = helper_ident(&helper.name)?;
-    let initial = compile_statements(&helper.initial, true)?;
+    let (parameters, initial) = compile_helper_parameters(helper)?;
     let cached_markers = compile_marker_cache(&helper.body)?;
     let body = compile_statements(&helper.body, true)?;
     Ok(quote! {
         fn #name(source: &str, events: &mut Vec<TreeEvent>,
-                 bounds_from: usize, bounds_until: usize) {
+                 bounds_from: usize, bounds_until: usize,
+                 #(#parameters),*) {
             let bytes = source.as_bytes();
             if let Some(line) = source.get(bounds_from..bounds_until) {
                 let _ = line;

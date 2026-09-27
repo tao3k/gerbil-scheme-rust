@@ -58,6 +58,8 @@ impl EventStateSlot {
 pub struct EventHelperIr {
     pub name: String,
     pub initial: Vec<EventStatementIr>,
+    #[serde(default)]
+    pub parameters: Vec<EventStateSlot>,
     pub body: Vec<EventStatementIr>,
 }
 
@@ -122,6 +124,8 @@ pub enum EventStatementIr {
         name: String,
         from: EventOffsetIr,
         until: EventOffsetIr,
+        #[serde(default)]
+        arguments: Vec<EventUsizeIr>,
     },
     /// Read a source-line list marker into typed state slots.
     ScanListMarker { marker: EventListMarkerIr },

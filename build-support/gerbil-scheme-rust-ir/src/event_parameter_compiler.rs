@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use super::{EventFunctionIr, EventStatementIr, compile_statement};
+use super::{EventFunctionIr, EventHelperIr, EventStatementIr, compile_statement};
 use crate::CompileError;
 
 pub(super) fn compile_event_parameters(
@@ -112,4 +112,54 @@ fn parameter_is_mutated(statements: &[EventStatementIr], target: &str) -> bool {
         | EventStatementIr::WithSourceBounds { body, .. } => parameter_is_mutated(body, target),
         _ => false,
     })
+}
+
+pub(super) fn compile_helper_parameters(
+    helper: &EventHelperIr,
+) -> Result<(Vec<TokenStream>, TokenStream), CompileError> {
+    let declared = helper
+        .initial
+        .iter()
+        .filter_map(|statement| match statement {
+            EventStatementIr::LetUsize { name, .. } => Some(name.as_str()),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::new();
+    let parameters = helper
+        .parameters
+        .iter()
+        .map(|state| {
+            let name = state.as_str();
+            if !declared.contains(name) || !seen.insert(name) {
+                return Err(CompileError::Schema(
+                    "invalid event helper parameter state".into(),
+                ));
+            }
+            let argument = helper_argument_ident(name)?;
+            Ok(quote! { #argument: usize })
+        })
+        .collect::<Result<Vec<_>, CompileError>>()?;
+    let initial = helper
+        .initial
+        .iter()
+        .map(|statement| match statement {
+            EventStatementIr::LetUsize { name, .. } if seen.contains(name.as_str()) => {
+                let state = syn::parse_str::<syn::Ident>(name)?;
+                let argument = helper_argument_ident(name)?;
+                if parameter_is_mutated(&helper.body, name) {
+                    Ok(quote! { let mut #state = #argument; })
+                } else {
+                    Ok(quote! { let #state = #argument; })
+                }
+            }
+            _ => compile_statement(statement, true),
+        })
+        .collect::<Result<Vec<_>, CompileError>>()?;
+    Ok((parameters, quote! { #(#initial)* }))
+}
+
+fn helper_argument_ident(name: &str) -> Result<syn::Ident, CompileError> {
+    let state = syn::parse_str::<syn::Ident>(name)?;
+    Ok(syn::parse_str(&format!("__event_arg_{state}"))?)
 }

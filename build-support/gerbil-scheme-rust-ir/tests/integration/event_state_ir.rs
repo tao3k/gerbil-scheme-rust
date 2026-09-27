@@ -7,6 +7,54 @@ use serde_json::json;
 use super::event_ir::{compile_and_run, stateful_document};
 
 #[test]
+fn typed_parameter_flows_into_source_local_helper() {
+    let mut document = stateful_document();
+    document["initial"] = json!([
+        {"kind": "let_bool", "name": "paragraph_open", "value": false},
+        {"kind": "let_usize", "name": "threshold", "value": 2}
+    ]);
+    document["parameters"] = json!([{
+        "name": "configured_threshold", "state": "threshold", "default": 2
+    }]);
+    document["line"] = json!([{
+        "kind": "call_source_helper", "name": "local_span",
+        "from": "start", "until": "end",
+        "arguments": [{"kind": "state", "name": "threshold"}]
+    }]);
+    document["helpers"] = json!([{
+        "name": "local_span",
+        "initial": [{"kind": "let_usize", "name": "threshold", "value": 2}],
+        "parameters": ["threshold"],
+        "body": [{
+            "kind": "if",
+            "condition": {"kind": "usize_equal",
+                          "left": {"kind": "state", "name": "threshold"},
+                          "right": {"kind": "usize", "value": 2}},
+            "consequent": [{"kind": "token", "syntax_kind": 1,
+                            "start": "start", "end": "end"}],
+            "alternate": [{"kind": "token", "syntax_kind": 2,
+                           "start": "start", "end": "end"}]
+        }]
+    }]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("typed helper parameter compiles");
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::Token;
+            assert!(parse_events("x\n").iter().any(|event| matches!(event, Token { kind: 1, .. })));
+            assert!(parse_events_with_parameters("x\n", 5)
+                .iter().any(|event| matches!(event, Token { kind: 2, .. })));
+        },
+    );
+    document["line"][0]["arguments"] = json!([]);
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+    document["line"][0]["arguments"] = json!([{"kind": "state", "name": "threshold"}]);
+    document["helpers"][0]["parameters"] = json!(["missing"]);
+    assert!(compile_event_function_json(&document.to_string()).is_err());
+}
+
+#[test]
 fn typed_unsigned_parameter_overrides_declared_state_without_a_second_parser() {
     let mut document = stateful_document();
     document["initial"]

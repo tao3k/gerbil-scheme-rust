@@ -69,6 +69,11 @@ pub fn compile_source_match(algorithm: &SourceMatchIr) -> Result<String, Compile
     let SourceWinnerIr::LongestThenFirst = algorithm.winner;
     let unicode_alphanumeric = algorithm.boundary.unicode_alphanumeric;
     let extra = syn::LitStr::new(&algorithm.boundary.extra_word_characters, Span::call_site());
+    let word_char = if unicode_alphanumeric {
+        quote! { ch.is_alphanumeric() || #extra.contains(ch) }
+    } else {
+        quote! { #extra.contains(ch) }
+    };
     let tokens = quote! {
         pub fn #name(source: &str, cursor: usize, targets: &[String])
             -> Option<(usize, usize, usize)>
@@ -77,19 +82,18 @@ pub fn compile_source_match(algorithm: &SourceMatchIr) -> Result<String, Compile
             for (relative, _) in remaining.char_indices() {
                 let start = cursor + relative;
                 let before = source.get(..start)?.chars().next_back();
-                if before.is_some_and(|ch| (#unicode_alphanumeric && ch.is_alphanumeric())
-                    || #extra.contains(ch)) {
+                if before.is_some_and(|ch| #word_char) {
                     continue;
                 }
                 let mut best: Option<(usize, usize)> = None;
+                let tail = source.get(start..)?;
                 for (index, target) in targets.iter().enumerate() {
-                    if target.is_empty() || !source.get(start..)?.starts_with(target) {
+                    if target.is_empty() || !tail.starts_with(target) {
                         continue;
                     }
                     let end = start + target.len();
                     let after = source.get(end..)?.chars().next();
-                    if after.is_some_and(|ch| (#unicode_alphanumeric && ch.is_alphanumeric())
-                        || #extra.contains(ch)) {
+                    if after.is_some_and(|ch| #word_char) {
                         continue;
                     }
                     if best.is_none_or(|(best_end, _)| end > best_end) {

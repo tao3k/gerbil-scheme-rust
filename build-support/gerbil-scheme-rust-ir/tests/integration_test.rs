@@ -11,3 +11,6 @@ mod event_future_heading;
 
 #[path = "integration/event_state_ir.rs"]
 mod event_state_ir;
+
+#[path = "integration/source_match_ir.rs"]
+mod source_match_ir;

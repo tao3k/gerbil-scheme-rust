@@ -3,6 +3,7 @@
 mod compiler;
 mod dispatch;
 mod event_compiler;
+mod source_match_compiler;
 
 pub use compiler::{
     BinaryOperator, BindingIr, BlockIr, CompileError, ExprIr, FUNCTION_IR_SCHEMA, FunctionIr,
@@ -13,6 +14,10 @@ pub use event_compiler::{
     EVENT_FUNCTION_IR_SCHEMA, EventBoundaryIr, EventComputedOffsetIr, EventFunctionIr,
     EventOffsetIr, EventPredicateIr, EventStateSlot, EventStatementIr, EventUsizeParameterIr,
     compile_event_function, compile_event_function_json,
+};
+pub use source_match_compiler::{
+    SOURCE_MATCH_IR_SCHEMA, SourceBoundaryIr, SourceCandidateIr, SourceMatchIr, SourceScanIr,
+    SourceWinnerIr, compile_source_match, compile_source_match_json,
 };
 
 #[cfg(test)]

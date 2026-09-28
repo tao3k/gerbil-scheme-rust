@@ -11,6 +11,8 @@ use syn::visit::Visit;
 
 use crate::CompileError;
 
+#[path = "event_byte_set_helpers.rs"]
+mod event_byte_set_helpers;
 #[path = "event_future_compiler.rs"]
 mod event_future_compiler;
 #[path = "event_list_compiler.rs"]
@@ -19,6 +21,7 @@ mod event_list_compiler;
 mod event_marker_collector;
 #[path = "event_parameter_compiler.rs"]
 mod event_parameter_compiler;
+use event_byte_set_helpers::compile_byte_set_helpers;
 use event_future_compiler::{
     compile_future_cache_declarations, compile_future_heading_title, compile_future_named_marker,
     compile_future_predicate,
@@ -70,11 +73,15 @@ fn compile_event_tokens(function: &EventFunctionIr) -> Result<TokenStream, Compi
     let helpers = compile_event_helpers(function)?;
     let cached_markers = compile_marker_cache(&function.line)?;
     let future_caches = compile_future_cache_declarations(&[&function.line, &function.finish])?;
+    let byte_set_helpers = compile_byte_set_helpers(&quote! {
+        #line #finish #(#helpers)*
+    })?;
     Ok(quote! {
         pub const PARSER_DIGEST: &str = #digest;
 
         #wrapper
         pub fn #generated_name(source: &str, #(#parameters),*) -> Vec<TreeEvent> {
+            #byte_set_helpers
             #(#helpers)*
             let bytes = source.as_bytes();
             let mut events = Vec::with_capacity(bytes.len() / 16 + 2);
@@ -524,18 +531,23 @@ fn compile_if_statement(
 ) -> Result<TokenStream, CompileError> {
     let condition = compile_predicate(condition)?;
     let consequent = compile_statements(consequent, in_helper)?;
+    if alternate.is_empty() {
+        return Ok(quote! { if #condition { #consequent } });
+    }
+    if let [
+        EventStatementIr::If {
+            condition: next_condition,
+            consequent: next_consequent,
+            alternate: next_alternate,
+        },
+    ] = alternate
+    {
+        let next =
+            compile_if_statement(next_condition, next_consequent, next_alternate, in_helper)?;
+        return Ok(quote! { if #condition { #consequent } else #next });
+    }
     let alternate = compile_statements(alternate, in_helper)?;
-    Ok(if alternate.is_empty() {
-        quote! {
-            let __event_condition = #condition;
-            if __event_condition { #consequent }
-        }
-    } else {
-        quote! {
-            let __event_condition = #condition;
-            if __event_condition { #consequent } else { #alternate }
-        }
-    })
+    Ok(quote! { if #condition { #consequent } else { #alternate } })
 }
 
 fn compile_token_statement(
@@ -841,17 +853,14 @@ fn compile_line_byte_set(
 ) -> Result<TokenStream, CompileError> {
     let from = compile_offset(from)?;
     let until = compile_offset(until)?;
-    let match_slice = if all {
-        quote! { slice.iter().all(|byte| [#(#values),*].contains(byte)) }
+    let helper = if all {
+        quote! { __event_all_bytes_in }
     } else {
-        quote! { slice.iter().any(|byte| [#(#values),*].contains(byte)) }
+        quote! { __event_any_byte_in }
     };
-    Ok(quote! {{
-        let from = #from;
-        let until = #until;
-        from >= start && from <= until && until <= end
-            && bytes.get(from..until).is_some_and(|slice| #match_slice)
-    }})
+    Ok(quote! {
+        #helper(bytes, start, end, #from, #until, &[#(#values),*])
+    })
 }
 
 fn compile_line_bytes_in_set(

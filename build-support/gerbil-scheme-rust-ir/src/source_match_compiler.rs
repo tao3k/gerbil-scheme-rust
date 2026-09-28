@@ -21,18 +21,21 @@ pub struct SourceMatchIr {
     pub winner: SourceWinnerIr,
 }
 
+/// Character-boundary traversal selected by the source matcher IR.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceScanIr {
     Utf8CharacterBoundaries,
 }
 
+/// Candidate comparison selected by the source matcher IR.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceCandidateIr {
     ExactTargetPrefix,
 }
 
+/// Word-boundary rules supplied by the Scheme strategy.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceBoundaryIr {
@@ -40,6 +43,7 @@ pub struct SourceBoundaryIr {
     pub extra_word_characters: String,
 }
 
+/// Tie-breaking rule for competing targets at one source offset.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceWinnerIr {

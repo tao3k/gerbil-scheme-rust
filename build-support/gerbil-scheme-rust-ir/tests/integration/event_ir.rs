@@ -743,6 +743,15 @@ fn source_local_helper_compiles_once_and_runs_at_saved_bounds() {
     );
     document["finish"][0]["name"] = json!("unknown");
     assert!(compile_event_function_json(&document.to_string()).is_err());
+    document["finish"][0]["name"] = json!("inline_span");
+    document["helpers"][0]["body"][0]["value"] = json!({
+        "kind": "add",
+        "left": {"kind": "state", "name": "cursor"},
+        "right": {"kind": "usize", "value": 1}
+    });
+    let self_referential = compile_event_function_json(&document.to_string())
+        .expect("helper may update a state from its previous value");
+    assert!(self_referential.contains("let mut cursor = 0usize;"));
 }
 
 #[test]

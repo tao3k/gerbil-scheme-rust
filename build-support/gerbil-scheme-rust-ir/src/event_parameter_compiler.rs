@@ -5,7 +5,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use super::{EventFunctionIr, EventHelperIr, EventStatementIr, compile_statement};
+use super::{
+    EventFunctionIr, EventHelperIr, EventOffsetIr, EventStatementIr, EventUsizeIr,
+    compile_statement,
+};
 use crate::CompileError;
 
 pub(super) fn compile_event_parameters(
@@ -156,7 +159,12 @@ pub(super) fn compile_helper_parameters(
             EventStatementIr::LetUsize { name, .. }
                 if !seen.contains(name.as_str())
                     && matches!(helper.body.first(),
-                        Some(EventStatementIr::SetUsize { name: target, .. }) if target == name) =>
+                        Some(EventStatementIr::SetUsize {
+                            name: target,
+                            value: EventUsizeIr::Offset {
+                                value: EventOffsetIr::Boundary(_),
+                            },
+                        }) if target == name) =>
             {
                 let state = syn::parse_str::<syn::Ident>(name)?;
                 Ok(quote! { let mut #state: usize; })

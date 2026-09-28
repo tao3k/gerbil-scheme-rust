@@ -728,6 +728,8 @@ fn source_local_helper_compiles_once_and_runs_at_saved_bounds() {
     let source = compile_event_function_json(&document.to_string())
         .expect("closed source-local helper compiles");
     assert_eq!(source.matches("fn __event_helper_inline_span").count(), 1);
+    assert!(source.contains("let mut cursor: usize;"));
+    assert_eq!(source.matches("let bytes = source.as_bytes();").count(), 1);
     compile_and_run(
         &source,
         &quote! {

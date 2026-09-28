@@ -7,6 +7,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::{BTreeMap, BTreeSet};
+use syn::visit::Visit;
 
 use crate::CompileError;
 
@@ -481,11 +482,17 @@ fn compile_event_helper(helper: &EventHelperIr) -> Result<TokenStream, CompileEr
     let (parameters, initial) = compile_helper_parameters(helper)?;
     let cached_markers = compile_marker_cache(&helper.body)?;
     let body = compile_statements(&helper.body, true)?;
+    let body_syntax = syn::parse2::<syn::Block>(quote! {{ #body }})?;
+    let mut source_bytes = SourceBytesUse::default();
+    source_bytes.visit_block(&body_syntax);
+    let bytes = source_bytes
+        .found
+        .then(|| quote! { let bytes = source.as_bytes(); });
     Ok(quote! {
         fn #name(source: &str, events: &mut Vec<TreeEvent>,
                  bounds_from: usize, bounds_until: usize,
                  #(#parameters),*) {
-            let bytes = source.as_bytes();
+            #bytes
             if let Some(line) = source.get(bounds_from..bounds_until) {
                 let _ = line;
                 let start = bounds_from;
@@ -496,6 +503,17 @@ fn compile_event_helper(helper: &EventHelperIr) -> Result<TokenStream, CompileEr
             }
         }
     })
+}
+
+#[derive(Default)]
+struct SourceBytesUse {
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for SourceBytesUse {
+    fn visit_expr_path(&mut self, path: &'ast syn::ExprPath) {
+        self.found |= path.path.is_ident("bytes");
+    }
 }
 
 fn compile_if_statement(

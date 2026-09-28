@@ -153,6 +153,14 @@ pub(super) fn compile_helper_parameters(
                     Ok(quote! { let #state = #argument; })
                 }
             }
+            EventStatementIr::LetUsize { name, .. }
+                if !seen.contains(name.as_str())
+                    && matches!(helper.body.first(),
+                        Some(EventStatementIr::SetUsize { name: target, .. }) if target == name) =>
+            {
+                let state = syn::parse_str::<syn::Ident>(name)?;
+                Ok(quote! { let mut #state: usize; })
+            }
             _ => compile_statement(statement, true),
         })
         .collect::<Result<Vec<_>, CompileError>>()?;

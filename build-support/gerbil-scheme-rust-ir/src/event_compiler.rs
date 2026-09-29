@@ -19,6 +19,8 @@ mod event_future_compiler;
 mod event_list_compiler;
 #[path = "event_marker_collector.rs"]
 mod event_marker_collector;
+#[path = "event_offset_helpers.rs"]
+mod event_offset_helpers;
 #[path = "event_parameter_compiler.rs"]
 mod event_parameter_compiler;
 use event_byte_set_helpers::compile_byte_set_helpers;
@@ -31,6 +33,7 @@ use event_list_compiler::{
     compile_scan_list_marker,
 };
 use event_marker_collector::collect_line_markers;
+use event_offset_helpers::compile_offset_helpers;
 use event_parameter_compiler::{
     compile_event_initial, compile_event_parameters, compile_helper_parameters,
 };
@@ -76,12 +79,16 @@ fn compile_event_tokens(function: &EventFunctionIr) -> Result<TokenStream, Compi
     let byte_set_helpers = compile_byte_set_helpers(&quote! {
         #line #finish #(#helpers)*
     })?;
+    let offset_helpers = compile_offset_helpers(&quote! {
+        #line #finish #(#helpers)*
+    })?;
     Ok(quote! {
         pub const PARSER_DIGEST: &str = #digest;
 
         #wrapper
         pub fn #generated_name(source: &str, #(#parameters),*) -> Vec<TreeEvent> {
             #byte_set_helpers
+            #offset_helpers
             #(#helpers)*
             let bytes = source.as_bytes();
             let mut events = Vec::with_capacity(bytes.len() / 16 + 2);
@@ -578,13 +585,7 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineSkipHorizontal { from }) => {
             let from = compile_offset(from)?;
-            quote! {{
-                let mut cursor = #from;
-                while cursor < end && matches!(bytes[cursor], b' ' | b'\t') {
-                    cursor += 1;
-                }
-                cursor
-            }}
+            quote! { __event_skip_horizontal(bytes, end, #from) }
         }
         EventOffsetIr::Computed(
             scan @ (EventComputedOffsetIr::LineScanWord { .. }

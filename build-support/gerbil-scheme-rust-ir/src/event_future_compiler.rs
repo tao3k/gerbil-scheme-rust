@@ -336,21 +336,18 @@ pub(super) fn compile_future_cache_declarations(
     for statements in phases {
         collect_statements(statements, &mut specs, &mut named_specs, &mut heading_specs);
     }
-    let mut declarations = specs
-        .iter()
-        .map(|spec| {
-            let name = cache_ident(spec)?;
-            let builder = cache_builder_ident(&name)?;
-            let index = compile_future_index(spec);
-            Ok(quote! {
-                fn #builder(source: &str, bytes: &[u8]) -> Vec<(usize, bool)> {
-                    #index
-                }
-                let #name: std::cell::OnceCell<Vec<(usize, bool)>> =
-                    std::cell::OnceCell::new();
-            })
-        })
-        .collect::<Result<Vec<_>, CompileError>>()?;
+    let mut declarations = Vec::new();
+    // Share source text, but expand at each call site so each typed rule stays static.
+    if !specs.is_empty() {
+        declarations.push(compile_future_index_builder());
+    }
+    for spec in &specs {
+        let name = cache_ident(spec)?;
+        declarations.push(quote! {
+            let #name: std::cell::OnceCell<Vec<(usize, bool)>> =
+                std::cell::OnceCell::new();
+        });
+    }
     if !named_specs.is_empty() {
         declarations.push(quote! {
             type EventNamedFutureCache = (
@@ -358,15 +355,11 @@ pub(super) fn compile_future_cache_declarations(
                 std::collections::HashMap<(usize, Vec<u8>), Vec<usize>>,
             );
         });
+        declarations.push(compile_named_future_index_builder());
     }
     for spec in &named_specs {
         let name = named_cache_ident(spec)?;
-        let builder = cache_builder_ident(&name)?;
-        let index = compile_named_future_index(spec);
         declarations.push(quote! {
-            fn #builder(source: &str, bytes: &[u8]) -> EventNamedFutureCache {
-                #index
-            }
             let #name: std::cell::OnceCell<EventNamedFutureCache> = std::cell::OnceCell::new();
         });
     }
@@ -384,86 +377,53 @@ pub(super) fn compile_future_cache_declarations(
     Ok(declarations)
 }
 
-fn compile_future_candidate(indent: bool) -> TokenStream {
-    if indent {
-        quote! {
-            let __event_indent = __event_future_line.as_bytes().iter()
-                .take_while(|byte| matches!(byte, b' ' | b'\t'))
-                .count();
-            let __event_candidate = &__event_future_line[__event_indent..];
-        }
-    } else {
-        quote! { let __event_candidate = __event_future_line; }
-    }
-}
-
-fn compile_heading_boundary(marker: u8, separator: u8, enabled: bool) -> TokenStream {
-    if !enabled {
-        return quote! {};
-    }
+fn compile_future_body_boundary() -> TokenStream {
     quote! {
-        let __event_heading_level = __event_future_line.as_bytes().iter()
-            .take_while(|byte| **byte == #marker)
-            .count();
-        if __event_heading_level > 0
-            && __event_future_line.as_bytes().get(__event_heading_level)
-                == Some(&#separator)
+        if body_key_marker != 0
+            && !__event_is_boundary
+            && !__event_future_matches(target)
         {
-            __event_is_boundary = true;
-        }
-    }
-}
-
-fn compile_body_key_boundary(marker: u8, target: &syn::LitStr) -> TokenStream {
-    if marker == 0 {
-        return quote! {};
-    }
-    quote! {
-      if !__event_is_boundary && !__event_future_matches(#target) {
-        let __event_body = __event_future_line.as_bytes();
-        let __event_key_start = __event_body.iter()
-            .take_while(|byte| matches!(byte, b' ' | b'\t'))
-            .count() + 1;
-        let __event_valid_key = __event_body.get(__event_key_start - 1)
-            == Some(&#marker)
-            && __event_body[__event_key_start..].iter()
-                .enumerate()
-                .find(|(index, byte)| {
-                    **byte == #marker
-                        && __event_body.get(__event_key_start + *index + 1)
-                            .is_none_or(|next| matches!(next, b' ' | b'\t' | b'\r' | b'\n'))
-                })
-                .is_some_and(|(key_len, _)| {
-                    key_len > 0
-                        && !__event_body[__event_key_start..__event_key_start + key_len]
-                            .iter().any(u8::is_ascii_whitespace)
-                });
-        if !__event_valid_key {
-            __event_is_boundary = true;
-        }
-      }
-    }
-}
-
-fn compile_future_index(spec: &FutureSpec) -> TokenStream {
-    let target = syn::LitStr::new(&spec.target, proc_macro2::Span::call_site());
-    let stop = (!spec.stop.is_empty())
-        .then(|| syn::LitStr::new(&spec.stop, proc_macro2::Span::call_site()));
-    let stop_check = stop.map(|value| {
-        quote! {
-            if __event_future_matches(#value) {
+            let __event_body = __event_future_line.as_bytes();
+            let __event_key_start = __event_body.iter()
+                .take_while(|byte| matches!(byte, b' ' | b'\t'))
+                .count() + 1;
+            let __event_valid_key = __event_body.get(__event_key_start - 1)
+                == Some(&body_key_marker)
+                && __event_body[__event_key_start..].iter()
+                    .enumerate()
+                    .find(|(index, byte)| {
+                        **byte == body_key_marker
+                            && __event_body.get(__event_key_start + *index + 1)
+                                .is_none_or(|next| matches!(next, b' ' | b'\t' | b'\r' | b'\n'))
+                    })
+                    .is_some_and(|(key_len, _)| {
+                        key_len > 0
+                            && !__event_body[__event_key_start..__event_key_start + key_len]
+                                .iter().any(u8::is_ascii_whitespace)
+                    });
+            if !__event_valid_key {
                 __event_is_boundary = true;
             }
         }
-    });
-    let candidate = compile_future_candidate(spec.indent);
-    let heading_check = compile_heading_boundary(
-        spec.heading_marker,
-        spec.heading_separator,
-        spec.stop_at_heading,
-    );
-    let body_check = compile_body_key_boundary(spec.body_key_marker, &target);
+    }
+}
+
+fn compile_future_index_builder() -> TokenStream {
+    let body_boundary = compile_future_body_boundary();
     quote! {
+        macro_rules! __event_future_build {
+          ($source:expr, $bytes:expr, $target:expr, $stop:expr,
+           $heading_marker:expr, $heading_separator:expr, $indent:expr,
+           $stop_at_heading:expr, $body_key_marker:expr $(,)?) => {{
+            let source = $source;
+            let bytes = $bytes;
+            let target = $target;
+            let stop = $stop;
+            let heading_marker = $heading_marker;
+            let heading_separator = $heading_separator;
+            let indent = $indent;
+            let stop_at_heading = $stop_at_heading;
+            let body_key_marker = $body_key_marker;
             let mut __event_future_lines = Vec::new();
             let mut __event_future_cursor = 0usize;
             while __event_future_cursor < bytes.len() {
@@ -484,7 +444,14 @@ fn compile_future_index(spec: &FutureSpec) -> TokenStream {
                     }
                 }
                 let __event_future_line = &source[__event_future_cursor..__event_future_end];
-                #candidate
+                let __event_candidate = if indent {
+                    let __event_indent = __event_future_line.as_bytes().iter()
+                        .take_while(|byte| matches!(byte, b' ' | b'\t'))
+                        .count();
+                    &__event_future_line[__event_indent..]
+                } else {
+                    __event_future_line
+                };
                 let __event_future_matches = |marker: &str| {
                     __event_candidate
                         .get(..marker.len())
@@ -494,12 +461,24 @@ fn compile_future_index(spec: &FutureSpec) -> TokenStream {
                             .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
                 };
                 let mut __event_is_boundary = false;
-                #heading_check
-                #stop_check
-                #body_check
+                if stop_at_heading {
+                    let __event_heading_level = __event_future_line.as_bytes().iter()
+                        .take_while(|byte| **byte == heading_marker)
+                        .count();
+                    if __event_heading_level > 0
+                        && __event_future_line.as_bytes().get(__event_heading_level)
+                            == Some(&heading_separator)
+                    {
+                        __event_is_boundary = true;
+                    }
+                }
+                if !stop.is_empty() && __event_future_matches(stop) {
+                    __event_is_boundary = true;
+                }
+                #body_boundary
                 __event_future_lines.push((
                     __event_future_cursor,
-                    __event_future_matches(#target),
+                    __event_future_matches(target),
                     __event_is_boundary,
                 ));
                 __event_future_cursor = __event_future_end;
@@ -516,7 +495,9 @@ fn compile_future_index(spec: &FutureSpec) -> TokenStream {
             __event_future_lines
                 .into_iter()
                 .map(|(start, found, _)| (start, found))
-                .collect()
+                .collect::<Vec<(usize, bool)>>()
+          }};
+        }
     }
 }
 
@@ -546,9 +527,13 @@ pub(super) fn compile_future_line_marker(
         stop_at_heading,
         body_key_marker,
     })?;
-    let builder = cache_builder_ident(&cache)?;
+    let target = syn::LitStr::new(target, proc_macro2::Span::call_site());
+    let stop = syn::LitStr::new(stop.unwrap_or_default(), proc_macro2::Span::call_site());
     Ok(quote! {{
-        let __event_future_index = #cache.get_or_init(|| #builder(source, bytes));
+        let __event_future_index = #cache.get_or_init(|| __event_future_build!(
+            source, bytes, #target, #stop, #heading_marker, #heading_separator,
+            #indent, #stop_at_heading, #body_key_marker,
+        ));
         let __event_future_position = __event_future_index
             .partition_point(|(line_start, _)| *line_start < end);
         __event_future_index
@@ -585,23 +570,29 @@ pub(super) fn compile_future_predicate(
     )
 }
 
-fn compile_named_future_index(spec: &NamedFutureSpec) -> TokenStream {
-    let prefix = syn::LitStr::new(&spec.target_prefix, proc_macro2::Span::call_site());
-    let suffix = syn::LitStr::new(&spec.target_suffix, proc_macro2::Span::call_site());
-    let stop = syn::LitStr::new(&spec.stop, proc_macro2::Span::call_site());
-    let ci = spec.ascii_case_insensitive;
-    let candidate = compile_future_candidate(spec.indent);
-    let heading = compile_heading_boundary(
-        spec.heading_marker,
-        spec.heading_separator,
-        spec.stop_at_heading,
-    );
-    let stop_check = if spec.stop.is_empty() {
-        quote! {}
-    } else {
-        quote! { if __event_future_matches(#stop) { __event_is_boundary = true; } }
-    };
+fn compile_named_future_macro_bindings() -> TokenStream {
     quote! {
+        let source = $source;
+        let bytes = $bytes;
+        let prefix = $prefix;
+        let suffix = $suffix;
+        let stop = $stop;
+        let heading_marker = $heading_marker;
+        let heading_separator = $heading_separator;
+        let indent = $indent;
+        let stop_at_heading = $stop_at_heading;
+        let ascii_case_insensitive = $ascii_case_insensitive;
+    }
+}
+
+fn compile_named_future_index_builder() -> TokenStream {
+    let bindings = compile_named_future_macro_bindings();
+    quote! {
+        macro_rules! __event_named_future_build {
+          ($source:expr, $bytes:expr, $prefix:expr, $suffix:expr,
+           $stop:expr, $heading_marker:expr, $heading_separator:expr,
+           $indent:expr, $stop_at_heading:expr, $ascii_case_insensitive:expr $(,)?) => {{
+        #bindings
         let mut __event_lines = Vec::new();
         let mut __event_closers = std::collections::HashMap::<
             (usize, Vec<u8>), Vec<usize>
@@ -623,7 +614,14 @@ fn compile_named_future_index(spec: &NamedFutureSpec) -> TokenStream {
                 }
             }
             let __event_future_line = &source[__event_cursor..__event_end];
-            #candidate
+            let __event_candidate = if indent {
+                let __event_indent = __event_future_line.as_bytes().iter()
+                    .take_while(|byte| matches!(byte, b' ' | b'\t'))
+                    .count();
+                &__event_future_line[__event_indent..]
+            } else {
+                __event_future_line
+            };
             let __event_future_matches = |marker: &str| {
                 __event_candidate.get(..marker.len())
                     .is_some_and(|value| value.eq_ignore_ascii_case(marker))
@@ -631,8 +629,20 @@ fn compile_named_future_index(spec: &NamedFutureSpec) -> TokenStream {
                         .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
             };
             let mut __event_is_boundary = false;
-            #heading
-            #stop_check
+            if stop_at_heading {
+                let __event_heading_level = __event_future_line.as_bytes().iter()
+                    .take_while(|byte| **byte == heading_marker)
+                    .count();
+                if __event_heading_level > 0
+                    && __event_future_line.as_bytes().get(__event_heading_level)
+                        == Some(&heading_separator)
+                {
+                    __event_is_boundary = true;
+                }
+            }
+            if !stop.is_empty() && __event_future_matches(stop) {
+                __event_is_boundary = true;
+            }
             if __event_is_boundary { __event_segment += 1; }
             __event_lines.push((__event_cursor, __event_segment));
             if !__event_is_boundary {
@@ -641,24 +651,24 @@ fn compile_named_future_index(spec: &NamedFutureSpec) -> TokenStream {
                     .rposition(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
                     .map_or(0, |index| index + 1);
                 let __event_trimmed = &__event_candidate_bytes[..__event_trimmed_end];
-                let __event_prefix = #prefix.as_bytes();
-                let __event_suffix = #suffix.as_bytes();
+                let __event_prefix = prefix.as_bytes();
+                let __event_suffix = suffix.as_bytes();
                 let __event_has_prefix = __event_trimmed.get(..__event_prefix.len())
-                    .is_some_and(|value| if #ci {
+                    .is_some_and(|value| if ascii_case_insensitive {
                         value.eq_ignore_ascii_case(__event_prefix)
                     } else { value == __event_prefix });
                 if __event_has_prefix {
                     let __event_rest = &__event_trimmed[__event_prefix.len()..];
                     let __event_has_suffix = __event_rest.get(
                         __event_rest.len().saturating_sub(__event_suffix.len())..
-                    ).is_some_and(|value| if #ci {
+                    ).is_some_and(|value| if ascii_case_insensitive {
                         value.eq_ignore_ascii_case(__event_suffix)
                     } else { value == __event_suffix });
                     if __event_has_suffix && __event_rest.len() > __event_suffix.len() {
                         let __event_name = &__event_rest[
                             ..__event_rest.len() - __event_suffix.len()
                         ];
-                        let __event_key = if #ci {
+                        let __event_key = if ascii_case_insensitive {
                             __event_name.iter().map(|byte| byte.to_ascii_lowercase())
                                 .collect::<Vec<_>>()
                         } else { __event_name.to_vec() };
@@ -670,6 +680,8 @@ fn compile_named_future_index(spec: &NamedFutureSpec) -> TokenStream {
             __event_cursor = __event_end;
         }
         (__event_lines, __event_closers)
+          }};
+        }
     }
 }
 
@@ -679,7 +691,13 @@ fn compile_named_candidate_position(
     spec: &NamedFutureSpec,
 ) -> Result<TokenStream, CompileError> {
     let cache = named_cache_ident(spec)?;
-    let builder = cache_builder_ident(&cache)?;
+    let prefix = syn::LitStr::new(&spec.target_prefix, proc_macro2::Span::call_site());
+    let suffix = syn::LitStr::new(&spec.target_suffix, proc_macro2::Span::call_site());
+    let stop = syn::LitStr::new(&spec.stop, proc_macro2::Span::call_site());
+    let heading_marker = spec.heading_marker;
+    let heading_separator = spec.heading_separator;
+    let indent = spec.indent;
+    let stop_at_heading = spec.stop_at_heading;
     let name_from = compile_offset(name_from)?;
     let name_until = compile_offset(name_until)?;
     let ascii_case_insensitive = spec.ascii_case_insensitive;
@@ -690,7 +708,11 @@ fn compile_named_candidate_position(
             .filter(|name| !name.is_empty())
             .and_then(|name| {
                 let (__event_lines, __event_closers) =
-                    #cache.get_or_init(|| #builder(source, bytes));
+                    #cache.get_or_init(|| __event_named_future_build!(
+                        source, bytes, #prefix, #suffix, #stop, #heading_marker,
+                        #heading_separator, #indent, #stop_at_heading,
+                        #ascii_case_insensitive,
+                    ));
                 let __event_position = __event_lines
                     .partition_point(|(line_start, _)| *line_start < end);
                 let __event_segment = __event_position.checked_sub(1)

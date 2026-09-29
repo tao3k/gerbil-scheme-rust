@@ -208,6 +208,7 @@ fn future_named_marker_stops_before_a_named_parent_close() {
     document["finish"] = json!([]);
     let source = compile_event_function_json(&document.to_string())
         .expect("dynamic named parent boundary compiles");
+    assert_eq!(source.matches("__event_named_future_build {").count(), 1);
     compile_and_run(
         &source,
         &quote! {

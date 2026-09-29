@@ -106,6 +106,12 @@ pub enum EventStatementIr {
         consequent: Vec<Self>,
         alternate: Vec<Self>,
     },
+    /// Execute a branch tree, then emit its shared fallback at most once.
+    JoinOnce {
+        handled: String,
+        branches: Vec<Self>,
+        fallback: Vec<Self>,
+    },
     /// Iterate a bounded source-line byte range; the index is source-backed.
     ForLineBytes {
         index: String,

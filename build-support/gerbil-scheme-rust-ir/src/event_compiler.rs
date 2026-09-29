@@ -15,6 +15,8 @@ use crate::CompileError;
 mod event_byte_set_helpers;
 #[path = "event_future_compiler.rs"]
 mod event_future_compiler;
+#[path = "event_join_compiler.rs"]
+mod event_join_compiler;
 #[path = "event_list_compiler.rs"]
 mod event_list_compiler;
 #[path = "event_marker_collector.rs"]
@@ -23,11 +25,16 @@ mod event_marker_collector;
 mod event_offset_helpers;
 #[path = "event_parameter_compiler.rs"]
 mod event_parameter_compiler;
+#[path = "event_state_compiler.rs"]
+mod event_state_compiler;
+#[path = "event_token_compiler.rs"]
+mod event_token_compiler;
 use event_byte_set_helpers::compile_byte_set_helpers;
 use event_future_compiler::{
     compile_future_cache_declarations, compile_future_heading_title, compile_future_named_marker,
     compile_future_predicate,
 };
+use event_join_compiler::compile_join_once;
 use event_list_compiler::{
     compile_close_all_frames, compile_close_frame, compile_close_frames_while,
     compile_scan_list_marker,
@@ -37,6 +44,8 @@ use event_offset_helpers::compile_offset_helpers;
 use event_parameter_compiler::{
     compile_event_initial, compile_event_parameters, compile_helper_parameters,
 };
+use event_state_compiler::compile_state_statement;
+use event_token_compiler::compile_token_statement;
 
 #[path = "event_ir_types.rs"]
 mod event_ir_types;
@@ -213,28 +222,11 @@ fn compile_statement(
     in_helper: bool,
 ) -> Result<TokenStream, CompileError> {
     Ok(match statement {
-        EventStatementIr::LetBool { name, value } => {
-            let name = syn::parse_str::<syn::Ident>(name)?;
-            quote! { let mut #name = #value; }
-        }
-        EventStatementIr::LetUsize { name, value } => {
-            let name = syn::parse_str::<syn::Ident>(name)?;
-            quote! { let mut #name = #value; }
-        }
-        EventStatementIr::LetUsizeStack { name } => {
-            let name = syn::parse_str::<syn::Ident>(name)?;
-            quote! { let mut #name: Vec<usize> = Vec::new(); }
-        }
-        EventStatementIr::SetBool { name, value } => {
-            let name = syn::parse_str::<syn::Ident>(name)?;
-            let value = compile_predicate(value)?;
-            quote! { #name = #value; }
-        }
-        EventStatementIr::SetUsize { name, value } => {
-            let name = syn::parse_str::<syn::Ident>(name)?;
-            let value = compile_usize(value)?;
-            quote! { #name = #value; }
-        }
+        EventStatementIr::LetBool { .. }
+        | EventStatementIr::LetUsize { .. }
+        | EventStatementIr::LetUsizeStack { .. }
+        | EventStatementIr::SetBool { .. }
+        | EventStatementIr::SetUsize { .. } => compile_state_statement(statement)?,
         EventStatementIr::CloseThroughLevel { stack, level } => {
             let stack = syn::parse_str::<syn::Ident>(stack)?;
             let level = compile_usize(level)?;
@@ -279,6 +271,11 @@ fn compile_statement(
             consequent,
             alternate,
         } => compile_if_statement(condition, consequent, alternate, in_helper)?,
+        EventStatementIr::JoinOnce {
+            handled,
+            branches,
+            fallback,
+        } => compile_join_once(handled, branches, fallback, in_helper)?,
         EventStatementIr::ForLineBytes {
             index,
             from,
@@ -419,6 +416,12 @@ fn validate_helper_calls(
                 validate_helper_calls(consequent, arities)?;
                 validate_helper_calls(alternate, arities)?;
             }
+            EventStatementIr::JoinOnce {
+                branches, fallback, ..
+            } => {
+                validate_helper_calls(branches, arities)?;
+                validate_helper_calls(fallback, arities)?;
+            }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {
                 validate_helper_calls(body, arities)?;
@@ -442,6 +445,12 @@ fn collect_helper_calls(statements: &[EventStatementIr], calls: &mut BTreeSet<St
             } => {
                 collect_helper_calls(consequent, calls);
                 collect_helper_calls(alternate, calls);
+            }
+            EventStatementIr::JoinOnce {
+                branches, fallback, ..
+            } => {
+                collect_helper_calls(branches, calls);
+                collect_helper_calls(fallback, calls);
             }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {
@@ -555,24 +564,6 @@ fn compile_if_statement(
     }
     let alternate = compile_statements(alternate, in_helper)?;
     Ok(quote! { if #condition { #consequent } else { #alternate } })
-}
-
-fn compile_token_statement(
-    syntax_kind: u16,
-    start: &EventOffsetIr,
-    end: &EventOffsetIr,
-) -> Result<TokenStream, CompileError> {
-    let token_start = compile_offset(start)?;
-    let token_end = compile_offset(end)?;
-    Ok(quote! {
-        let token_start = #token_start;
-        let token_end = #token_end;
-        if token_start != token_end {
-            events.push(TreeEvent::Token {
-                kind: #syntax_kind, start: token_start, end: token_end,
-            });
-        }
-    })
 }
 
 fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {

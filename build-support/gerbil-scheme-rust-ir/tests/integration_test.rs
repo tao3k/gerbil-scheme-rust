@@ -12,6 +12,9 @@ mod event_offset_optimization;
 #[path = "integration/event_choice_ir.rs"]
 mod event_choice_ir;
 
+#[path = "integration/event_join_ir.rs"]
+mod event_join_ir;
+
 #[path = "integration/event_future_heading.rs"]
 mod event_future_heading;
 

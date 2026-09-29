@@ -225,8 +225,9 @@ pub(super) fn compile_and_run(source: &str, assertions: &TokenStream) {
         .expect("execute generated fixture");
     assert!(
         execute.status.success(),
-        "generated Rust semantics failed:\n{}",
-        String::from_utf8_lossy(&execute.stdout)
+        "generated Rust semantics failed:\n{}{}",
+        String::from_utf8_lossy(&execute.stdout),
+        String::from_utf8_lossy(&execute.stderr)
     );
     fs::remove_file(binary).expect("remove generated binary");
     fs::remove_file(input).expect("remove generated fixture");

@@ -32,6 +32,12 @@ pub(super) fn collect_line_markers(
                 collect_line_markers(consequent, markers);
                 collect_line_markers(alternate, markers);
             }
+            EventStatementIr::JoinOnce {
+                branches, fallback, ..
+            } => {
+                collect_line_markers(branches, markers);
+                collect_line_markers(fallback, markers);
+            }
             EventStatementIr::ForLineBytes {
                 from, until, body, ..
             } => {

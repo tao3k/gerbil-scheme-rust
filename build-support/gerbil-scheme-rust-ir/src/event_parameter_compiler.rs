@@ -112,8 +112,10 @@ fn parameter_is_mutated(statements: &[EventStatementIr], target: &str) -> bool {
             ..
         } => parameter_is_mutated(consequent, target) || parameter_is_mutated(alternate, target),
         EventStatementIr::JoinOnce {
-            branches, fallback, ..
-        } => parameter_is_mutated(branches, target) || parameter_is_mutated(fallback, target),
+            branches,
+            continuation,
+            ..
+        } => parameter_is_mutated(branches, target) || parameter_is_mutated(continuation, target),
         EventStatementIr::ForLineBytes { body, .. }
         | EventStatementIr::WithSourceBounds { body, .. } => parameter_is_mutated(body, target),
         _ => false,

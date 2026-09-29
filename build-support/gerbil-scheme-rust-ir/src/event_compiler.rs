@@ -274,8 +274,8 @@ fn compile_statement(
         EventStatementIr::JoinOnce {
             handled,
             branches,
-            fallback,
-        } => compile_join_once(handled, branches, fallback, in_helper)?,
+            continuation,
+        } => compile_join_once(handled, branches, continuation, in_helper)?,
         EventStatementIr::ForLineBytes {
             index,
             from,
@@ -417,10 +417,12 @@ fn validate_helper_calls(
                 validate_helper_calls(alternate, arities)?;
             }
             EventStatementIr::JoinOnce {
-                branches, fallback, ..
+                branches,
+                continuation,
+                ..
             } => {
                 validate_helper_calls(branches, arities)?;
-                validate_helper_calls(fallback, arities)?;
+                validate_helper_calls(continuation, arities)?;
             }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {
@@ -447,10 +449,12 @@ fn collect_helper_calls(statements: &[EventStatementIr], calls: &mut BTreeSet<St
                 collect_helper_calls(alternate, calls);
             }
             EventStatementIr::JoinOnce {
-                branches, fallback, ..
+                branches,
+                continuation,
+                ..
             } => {
                 collect_helper_calls(branches, calls);
-                collect_helper_calls(fallback, calls);
+                collect_helper_calls(continuation, calls);
             }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {

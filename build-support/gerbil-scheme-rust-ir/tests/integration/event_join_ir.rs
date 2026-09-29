@@ -19,7 +19,7 @@ fn join_once_preserves_handled_and_fallthrough_paths() {
                  "value": {"kind": "bool", "value": true}}
             ], "alternate": []
         }],
-        "fallback": [{"kind": "token", "syntax_kind": 2,
+        "continuation": [{"kind": "token", "syntax_kind": 2,
                       "start": "start", "end": "end"}]
     }]);
     document["finish"] = json!([]);
@@ -36,4 +36,28 @@ fn join_once_preserves_handled_and_fallthrough_paths() {
             ]);
         },
     );
+}
+
+#[test]
+fn join_once_rejects_empty_continuation() {
+    let mut document = stateful_document();
+    document["line"] = json!([{
+        "kind": "join_once", "handled": "handled",
+        "branches": [{"kind": "finish_node"}],
+        "continuation": []
+    }]);
+    let error = compile_event_function_json(&document.to_string()).unwrap_err();
+    assert!(error.to_string().contains("normal continuation"));
+}
+
+#[test]
+fn join_once_rejects_unmarked_branches() {
+    let mut document = stateful_document();
+    document["line"] = json!([{
+        "kind": "join_once", "handled": "handled",
+        "branches": [{"kind": "finish_node"}],
+        "continuation": [{"kind": "finish_node"}]
+    }]);
+    let error = compile_event_function_json(&document.to_string()).unwrap_err();
+    assert!(error.to_string().contains("explicitly mark"));
 }

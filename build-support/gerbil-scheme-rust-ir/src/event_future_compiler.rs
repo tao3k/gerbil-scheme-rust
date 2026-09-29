@@ -311,10 +311,12 @@ fn collect_statements(
                 collect_statements(alternate, specs, named_specs, heading_specs);
             }
             EventStatementIr::JoinOnce {
-                branches, fallback, ..
+                branches,
+                continuation,
+                ..
             } => {
                 collect_statements(branches, specs, named_specs, heading_specs);
-                collect_statements(fallback, specs, named_specs, heading_specs);
+                collect_statements(continuation, specs, named_specs, heading_specs);
             }
             EventStatementIr::ForLineBytes { body, .. }
             | EventStatementIr::WithSourceBounds { body, .. } => {

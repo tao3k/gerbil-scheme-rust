@@ -6,6 +6,9 @@ mod function_ir;
 #[path = "integration/event_ir.rs"]
 mod event_ir;
 
+#[path = "integration/event_offset_optimization.rs"]
+mod event_offset_optimization;
+
 #[path = "integration/event_choice_ir.rs"]
 mod event_choice_ir;
 

@@ -593,8 +593,14 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
             | EventComputedOffsetIr::LineScanUntil { .. }),
         ) => compile_scan_offset(scan)?,
         EventOffsetIr::Computed(EventComputedOffsetIr::LineStep { from }) => {
-            let from = compile_offset(from)?;
-            quote! { (#from).saturating_add(1).min(end) }
+            let mut base = from.as_ref();
+            let mut steps = 1usize;
+            while let EventOffsetIr::Computed(EventComputedOffsetIr::LineStep { from }) = base {
+                base = from.as_ref();
+                steps += 1;
+            }
+            let base = compile_offset(base)?;
+            quote! { (#base).saturating_add(#steps).min(end) }
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LinePhysicalEnd { from }) => {
             let from = compile_offset(from)?;

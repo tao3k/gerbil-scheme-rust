@@ -615,33 +615,14 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
             }}
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEnd) => {
-            quote! {{
-                let mut cursor = end;
-                while cursor > start && bytes[cursor - 1].is_ascii_whitespace() {
-                    cursor -= 1;
-                }
-                cursor
-            }}
+            quote! { __event_trim_whitespace_end(bytes, start, end) }
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEndFrom { from }) => {
             let from = compile_offset(from)?;
-            quote! {{
-                let floor = #from;
-                let mut cursor = end;
-                while cursor > floor && bytes[cursor - 1].is_ascii_whitespace() {
-                    cursor -= 1;
-                }
-                cursor
-            }}
+            quote! { __event_trim_whitespace_end(bytes, #from, end) }
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineContentEnd) => {
-            quote! {{
-                let mut cursor = end;
-                while cursor > start && matches!(bytes[cursor - 1], b'\r' | b'\n') {
-                    cursor -= 1;
-                }
-                cursor
-            }}
+            quote! { __event_line_content_end(bytes, start, end) }
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineIndex { name }) => {
             let name = line_index_name(name)?;

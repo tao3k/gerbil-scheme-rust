@@ -67,3 +67,40 @@ fn horizontal_skip_is_shared_without_changing_offsets() {
         },
     );
 }
+
+#[test]
+fn line_end_offsets_share_helpers_without_changing_source_ranges() {
+    let mut document = stateful_document();
+    let content_end = json!({"kind": "line_content_end"});
+    let trimmed_end = json!({"kind": "line_trim_end"});
+    let trimmed_from = json!({"kind": "line_trim_end_from", "from": {
+        "kind": "line_step", "from": "start"
+    }});
+    document["line"] = json!([
+        {"kind": "token", "syntax_kind": 1, "start": "start", "end": content_end},
+        {"kind": "token", "syntax_kind": 2, "start": "start", "end": trimmed_end},
+        {"kind": "token", "syntax_kind": 3, "start": "start", "end": trimmed_from}
+    ]);
+    document["finish"] = json!([]);
+    let source = compile_event_function_json(&document.to_string())
+        .expect("source-backed line ends compile");
+    assert_eq!(source.matches("fn __event_line_content_end(").count(), 1);
+    assert_eq!(source.matches("fn __event_trim_whitespace_end(").count(), 1);
+    assert_eq!(source.matches("__event_trim_whitespace_end(").count(), 3);
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode, Token};
+            assert_eq!(parse_events("ab \r\n"), vec![
+                StartNode(0),
+                Token { kind: 1, start: 0, end: 3 },
+                Token { kind: 2, start: 0, end: 2 },
+                Token { kind: 3, start: 0, end: 2 },
+                FinishNode,
+            ]);
+            assert_eq!(parse_events("\r\n"), vec![
+                StartNode(0), Token { kind: 3, start: 0, end: 1 }, FinishNode,
+            ]);
+        },
+    );
+}

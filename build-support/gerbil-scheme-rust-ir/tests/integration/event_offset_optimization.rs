@@ -87,6 +87,8 @@ fn line_end_offsets_share_helpers_without_changing_source_ranges() {
     assert_eq!(source.matches("fn __event_line_content_end(").count(), 1);
     assert_eq!(source.matches("fn __event_trim_whitespace_end(").count(), 1);
     assert_eq!(source.matches("__event_trim_whitespace_end(").count(), 3);
+    assert!(source.contains("#[inline(always)]\n    fn __event_line_content_end("));
+    assert!(source.contains("#[inline(always)]\n    fn __event_trim_whitespace_end("));
     compile_and_run(
         &source,
         &quote! {

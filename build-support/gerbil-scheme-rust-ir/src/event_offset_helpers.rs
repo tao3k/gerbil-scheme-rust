@@ -23,7 +23,7 @@ pub(super) fn compile_offset_helpers(body: &TokenStream) -> Result<TokenStream, 
     }
     if calls.trim_whitespace_end {
         helpers.extend(quote! {
-            #[inline]
+            #[inline(always)]
             fn __event_trim_whitespace_end(bytes: &[u8], floor: usize, end: usize) -> usize {
                 let mut cursor = end;
                 while cursor > floor && bytes[cursor - 1].is_ascii_whitespace() {
@@ -35,7 +35,7 @@ pub(super) fn compile_offset_helpers(body: &TokenStream) -> Result<TokenStream, 
     }
     if calls.line_content_end {
         helpers.extend(quote! {
-            #[inline]
+            #[inline(always)]
             fn __event_line_content_end(bytes: &[u8], start: usize, end: usize) -> usize {
                 let mut cursor = end;
                 while cursor > start && matches!(bytes[cursor - 1], b'\r' | b'\n') {

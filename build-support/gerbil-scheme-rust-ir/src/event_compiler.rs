@@ -96,6 +96,12 @@ fn compile_event_tokens(function: &EventFunctionIr) -> Result<TokenStream, Compi
 
         #wrapper
         pub fn #generated_name(source: &str, #(#parameters),*) -> Vec<TreeEvent> {
+            #[inline(always)]
+            fn __event_push_token(events: &mut Vec<TreeEvent>, kind: u16, start: usize, end: usize) {
+                if start != end {
+                    events.push(TreeEvent::Token { kind, start, end });
+                }
+            }
             #byte_set_helpers
             #offset_helpers
             #(#helpers)*
@@ -264,7 +270,7 @@ fn compile_statement(
             syntax_kind,
             start,
             end,
-        } => compile_token_statement(*syntax_kind, start, end)?,
+        } => compile_token_statement(*syntax_kind, start, end, in_helper)?,
         EventStatementIr::FinishNode => quote! { events.push(TreeEvent::FinishNode); },
         EventStatementIr::If {
             condition,

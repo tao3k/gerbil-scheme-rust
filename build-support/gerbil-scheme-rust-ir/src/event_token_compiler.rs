@@ -9,16 +9,16 @@ pub(super) fn compile_token_statement(
     syntax_kind: u16,
     start: &EventOffsetIr,
     end: &EventOffsetIr,
+    in_helper: bool,
 ) -> Result<TokenStream, CompileError> {
     let token_start = compile_offset(start)?;
     let token_end = compile_offset(end)?;
+    let events = if in_helper {
+        quote! { &mut *events }
+    } else {
+        quote! { &mut events }
+    };
     Ok(quote! {
-        let token_start = #token_start;
-        let token_end = #token_end;
-        if token_start != token_end {
-            events.push(TreeEvent::Token {
-                kind: #syntax_kind, start: token_start, end: token_end,
-            });
-        }
+        __event_push_token(#events, #syntax_kind, #token_start, #token_end);
     })
 }

@@ -58,6 +58,8 @@ fn stateful_event_ir_typechecks_and_executes() {
         source,
         compile_ir_json(&stateful_document().to_string()).expect("schema dispatches to events")
     );
+    assert_eq!(source.matches("TreeEvent::Token {").count(), 1);
+    assert_eq!(source.matches("__event_push_token(").count(), 3);
     compile_and_run(
         &source,
         &quote! {

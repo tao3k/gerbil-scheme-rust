@@ -855,6 +855,20 @@ fn compile_line_byte_set(
 ) -> Result<TokenStream, CompileError> {
     let from = compile_offset(from)?;
     let until = compile_offset(until)?;
+    if values.len() >= 16 {
+        let mut mask = [0u64; 4];
+        for &value in values {
+            mask[usize::from(value / 64)] |= 1u64 << (value % 64);
+        }
+        let helper = if all {
+            quote! { __event_all_bytes_in_mask }
+        } else {
+            quote! { __event_any_byte_in_mask }
+        };
+        return Ok(quote! {
+            #helper(bytes, start, end, #from, #until, [#(#mask),*])
+        });
+    }
     let helper = if all {
         quote! { __event_all_bytes_in }
     } else {

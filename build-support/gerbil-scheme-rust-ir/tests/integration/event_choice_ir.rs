@@ -80,3 +80,44 @@ fn repeated_byte_set_checks_share_pure_generated_functions() {
         },
     );
 }
+
+#[test]
+fn large_byte_sets_use_bounded_masks_without_changing_range_semantics() {
+    let mut document = stateful_document();
+    document["initial"] = json!([]);
+    document["finish"] = json!([]);
+    document["line"] = json!([
+        {"kind": "if",
+         "condition": {"kind": "line_bytes_any_in", "from": "start",
+                       "until": {"kind": "line_content_end"},
+                       "values": [65, 66, 67, 68, 69, 70, 71, 72,
+                                  73, 74, 75, 76, 77, 78, 79, 80, 195, 255]},
+         "consequent": [{"kind": "start_node", "syntax_kind": 1},
+                        {"kind": "finish_node"}],
+         "alternate": []},
+        {"kind": "if",
+         "condition": {"kind": "line_bytes_all_in", "from": "start",
+                       "until": {"kind": "line_content_end"},
+                       "values": [65, 66, 67, 68, 69, 70, 71, 72,
+                                  73, 74, 75, 76, 77, 78, 79, 80, 195, 255]},
+         "consequent": [{"kind": "start_node", "syntax_kind": 2},
+                        {"kind": "finish_node"}],
+         "alternate": []}
+    ]);
+    let source = compile_event_function_json(&document.to_string()).expect("byte masks compile");
+    assert_eq!(source.matches("fn __event_any_byte_in_mask(").count(), 1);
+    assert_eq!(source.matches("fn __event_all_bytes_in_mask(").count(), 1);
+    compile_and_run(
+        &source,
+        &quote! {
+            use TreeEvent::{FinishNode, StartNode};
+            assert_eq!(parse_events("A\nQ\n\né\n"), vec![
+                StartNode(0), StartNode(1), FinishNode,
+                StartNode(2), FinishNode,
+                StartNode(2), FinishNode,
+                StartNode(1), FinishNode,
+                FinishNode,
+            ]);
+        },
+    );
+}

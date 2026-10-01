@@ -606,13 +606,7 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LinePhysicalEnd { from }) => {
             let from = compile_offset(from)?;
-            quote! {{
-                let mut cursor = (#from).max(start).min(end);
-                while cursor < end && !matches!(bytes[cursor], b'\r' | b'\n') {
-                    cursor += 1;
-                }
-                cursor
-            }}
+            quote! { __event_line_physical_end(bytes, start, end, #from) }
         }
         EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEnd) => {
             quote! { __event_trim_whitespace_end(bytes, start, end) }
@@ -640,32 +634,25 @@ fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
 }
 
 fn compile_scan_offset(scan: &EventComputedOffsetIr) -> Result<TokenStream, CompileError> {
-    let (from, condition) = match scan {
-        EventComputedOffsetIr::LineScanWord { from } => (
-            from,
-            quote! { !matches!(bytes[cursor], b' ' | b'\t' | b'\r' | b'\n') },
-        ),
-        EventComputedOffsetIr::LineScanKey { from } => (
-            from,
-            quote! { bytes[cursor].is_ascii_alphanumeric() || matches!(bytes[cursor], b'_' | b'-') },
-        ),
-        EventComputedOffsetIr::LineScanNonspaceUntil { from, delimiter } => (
-            from,
-            quote! { bytes[cursor] != #delimiter && !matches!(bytes[cursor], b' ' | b'\t' | b'\r' | b'\n') },
-        ),
+    Ok(match scan {
+        EventComputedOffsetIr::LineScanWord { from } => {
+            let from = compile_offset(from)?;
+            quote! { __event_scan_word(bytes, end, #from) }
+        }
+        EventComputedOffsetIr::LineScanKey { from } => {
+            let from = compile_offset(from)?;
+            quote! { __event_scan_key(bytes, end, #from) }
+        }
+        EventComputedOffsetIr::LineScanNonspaceUntil { from, delimiter } => {
+            let from = compile_offset(from)?;
+            quote! { __event_scan_nonspace_until(bytes, end, #from, #delimiter) }
+        }
         EventComputedOffsetIr::LineScanUntil { from, delimiter } => {
-            (from, quote! { bytes[cursor] != #delimiter })
+            let from = compile_offset(from)?;
+            quote! { __event_scan_until(bytes, end, #from, #delimiter) }
         }
         _ => unreachable!("compile_scan_offset is only called for scan offsets"),
-    };
-    let from = compile_offset(from)?;
-    Ok(quote! {{
-        let mut cursor = #from;
-        while cursor < end && (#condition) {
-            cursor += 1;
-        }
-        cursor
-    }})
+    })
 }
 
 fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, CompileError> {

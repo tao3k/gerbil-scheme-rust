@@ -1,6 +1,6 @@
 //! AOT lowering for a Scheme-owned source match traversal.
 
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use serde::Deserialize;
 
@@ -78,11 +78,26 @@ pub fn compile_source_match(algorithm: &SourceMatchIr) -> Result<String, Compile
     } else {
         quote! { #extra.contains(ch) }
     };
-    let tokens = quote! {
-        pub fn #name(source: &str, cursor: usize, targets: &[String])
-            -> Option<(usize, usize, usize)>
-        {
-            let remaining = source.get(cursor..)?;
+    let file = syn::parse2::<syn::File>(source_match_tokens(&name, &word_char))?;
+    Ok(prettyplease::unparse(&file))
+}
+
+fn source_match_tokens(name: &syn::Ident, word_char: &TokenStream) -> TokenStream {
+    let candidate_check = quote! {
+        if !tail.starts_with(target) {
+            continue;
+        }
+        let end = start + target.len();
+        let after = source.get(end..)?.chars().next();
+        if after.is_some_and(|ch| #word_char) {
+            continue;
+        }
+        if best.is_none_or(|(best_end, _)| end > best_end) {
+            best = Some((end, index));
+        }
+    };
+    let scan = |candidate_loop: TokenStream| {
+        quote! {
             for (relative, _) in remaining.char_indices() {
                 let start = cursor + relative;
                 let before = source.get(..start)?.chars().next_back();
@@ -91,19 +106,7 @@ pub fn compile_source_match(algorithm: &SourceMatchIr) -> Result<String, Compile
                 }
                 let mut best: Option<(usize, usize)> = None;
                 let tail = source.get(start..)?;
-                for (index, target) in targets.iter().enumerate() {
-                    if target.is_empty() || !tail.starts_with(target) {
-                        continue;
-                    }
-                    let end = start + target.len();
-                    let after = source.get(end..)?.chars().next();
-                    if after.is_some_and(|ch| #word_char) {
-                        continue;
-                    }
-                    if best.is_none_or(|(best_end, _)| end > best_end) {
-                        best = Some((end, index));
-                    }
-                }
+                #candidate_loop
                 if let Some((end, index)) = best {
                     return Some((start, end, index));
                 }
@@ -111,6 +114,38 @@ pub fn compile_source_match(algorithm: &SourceMatchIr) -> Result<String, Compile
             None
         }
     };
-    let file = syn::parse2::<syn::File>(tokens)?;
-    Ok(prettyplease::unparse(&file))
+    let linear_scan = scan(quote! {
+        for (index, target) in targets.iter().enumerate() {
+            if target.is_empty() {
+                continue;
+            }
+            #candidate_check
+        }
+    });
+    let indexed_scan = scan(quote! {
+        for &(index, target) in &candidates[tail.as_bytes()[0] as usize] {
+            #candidate_check
+        }
+    });
+    quote! {
+        pub fn #name(source: &str, cursor: usize, targets: &[String])
+            -> Option<(usize, usize, usize)>
+        {
+            let remaining = source.get(cursor..)?;
+            // Sparse target sets do not repay the per-call index construction.
+            if targets.len() <= 32 {
+                return { #linear_scan };
+            }
+            // Bucket exact-prefix candidates by their first UTF-8 byte. Keep
+            // declaration order within each bucket for longest-then-first.
+            let mut candidates: [Vec<(usize, &str)>; 256] =
+                std::array::from_fn(|_| Vec::new());
+            for (index, target) in targets.iter().enumerate() {
+                if let Some(&first) = target.as_bytes().first() {
+                    candidates[first as usize].push((index, target));
+                }
+            }
+            #indexed_scan
+        }
+    }
 }

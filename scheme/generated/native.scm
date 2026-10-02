@@ -1,7 +1,7 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=ecb53027b120e092b39fbecd147ac4d5dd1b32992c8f9f118cc9a76939479de6 body-sha256=95291d0c5d622b2f4f890c010849bc90636296b02e261cdd80a3e8284bcd5fa2
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=bab9ee3560d9a80900fc847dbc8977588f0ea8eb3e14aa3c514405136a431fcf body-sha256=687dcc303c0590cc4107709b33b0062d6d651e7e98d3e0a50828410c8f33a800
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/native::timestamp 1790933447)
+  (define gerbil-scheme-rust/scheme/native::timestamp 1790935940)
   (begin
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-abi-version
       (lambda () '1))
@@ -428,9 +428,18 @@
       gerbil-rs-root-string-char-ref-raw
       gerbil-rs-root-bytevector-length-raw
       gerbil-rs-root-bytevector-u8-ref-raw
+      gerbil-rs-copy-u8vector-c
+      gerbil-rs-root-bytevector-copy-raw
       gerbil-rs-root-release-raw
       gerbil-rs-scheme-object-pair-car-raw
       gerbil-rs-scheme-object-pair-cdr-raw))
+    (c-declare
+     "#ifndef ___HAVE_FFI_U8VECTOR\n#define ___HAVE_FFI_U8VECTOR\n#define U8_DATA(obj) ___CAST (___U8*, ___BODY_AS (obj, ___tSUBTYPED))\n#define U8_LEN(obj) ___HD_BYTES (___HEADER (obj))\n#endif")
+    (define gerbil-rs-copy-u8vector-c
+      (c-lambda
+       (scheme-object (pointer unsigned-int8) unsigned-int64)
+       int64
+       "if (___arg3 > U8_LEN(___arg1) || (___arg3 > 0 && ___arg2 == NULL)) {\n  ___return(-1);\n}\nconst ___U8 *source = U8_DATA(___arg1);\nfor (___U64 index = 0; index < ___arg3; ++index) {\n  ___arg2[index] = source[index];\n}\n___return((___S64)___arg3);"))
     (c-define
      (gerbil-rs-abi-version-native)
      ()
@@ -926,6 +935,20 @@
                 (>= index 0)
                 (< index (u8vector-length value)))
            (u8vector-ref value index)
+           -1)))
+    (c-define
+     (gerbil-rs-root-bytevector-copy-raw root-id destination length)
+     (int64 (pointer unsigned-int8) unsigned-int64)
+     int64
+     "gerbil_scheme_rust_root_bytevector_copy_raw"
+     "extern"
+     (let ((value (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref
+                   root-id)))
+       (if (and (u8vector? value) (= length (u8vector-length value)))
+           (gerbil-scheme-rust/scheme/native#gerbil-rs-copy-u8vector-c
+            value
+            destination
+            length)
            -1)))
     (c-define
      (gerbil-rs-root-release-raw root-id)

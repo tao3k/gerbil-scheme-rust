@@ -36,6 +36,7 @@ unsafe extern "C" {
     fn gerbil_scheme_rust_root_string_char_ref_raw(root: i64, index: i64) -> i32;
     pub(crate) fn gerbil_scheme_rust_root_bytevector_length_raw(root: i64) -> i64;
     fn gerbil_scheme_rust_root_bytevector_u8_ref_raw(root: i64, index: i64) -> i32;
+    fn gerbil_scheme_rust_root_bytevector_copy_raw(root: i64, out: *mut u8, len: u64) -> i64;
     fn gerbil_scheme_rust_root_release_raw(root: i64) -> i32;
 }
 
@@ -217,6 +218,38 @@ pub unsafe extern "C" fn gerbil_scheme_rust_root_bytevector_u8_ref(
         *out = byte;
     }
     GerbilStatus::Ok
+}
+
+/// Copy a rooted Scheme bytevector into an exactly sized caller-owned buffer.
+///
+/// Zero-length bytevectors accept a null output pointer. On an invalid root,
+/// wrong type, or length mismatch, the output remains untouched.
+///
+/// # Safety
+///
+/// The runtime must be initialized on its owner thread. `root` must identify
+/// a live Scheme value, and `out` must be valid for writing `len` bytes when
+/// `len` is nonzero.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_root_bytevector_copy(
+    root: GerbilRootId,
+    out: *mut u8,
+    len: usize,
+) -> GerbilStatus {
+    if !root.is_valid() {
+        return GerbilStatus::InvalidValue;
+    }
+    if len > 0 && out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    let (Ok(raw_len), Ok(expected)) = (u64::try_from(len), i64::try_from(len)) else {
+        return GerbilStatus::InvalidValue;
+    };
+    if unsafe { gerbil_scheme_rust_root_bytevector_copy_raw(root.0, out, raw_len) } == expected {
+        GerbilStatus::Ok
+    } else {
+        GerbilStatus::InvalidValue
+    }
 }
 
 /// Release one rooted Scheme value.

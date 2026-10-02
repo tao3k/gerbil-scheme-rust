@@ -61,7 +61,10 @@ call-scoped borrowed byte slice and a freshly rooted Scheme bytevector. A
 downstream export may inspect the pointer only until it returns, must return
 zero on failure, and must transfer exactly one root made with
 =gerbil-rs-root-bytevector= on success. The Rust owner validates the root type
-before exposing it and releases it on drop. This transport alone does not
+before exposing it and releases it on drop. A checked native bulk-copy call
+projects the rooted bytevector into exactly sized Rust storage in one FFI
+crossing; mismatched lengths and stale roots leave the destination untouched.
+This transport alone does not
 define an application wire format or choose a downstream parser algorithm.
 
 * Optimizer is the default

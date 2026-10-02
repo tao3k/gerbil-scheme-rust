@@ -168,6 +168,9 @@ GerbilStatus gerbil_scheme_rust_root_bytevector_length(GerbilRootId root,
 GerbilStatus gerbil_scheme_rust_root_bytevector_u8_ref(GerbilRootId root,
                                                        size_t index,
                                                        uint8_t *out);
+GerbilStatus gerbil_scheme_rust_root_bytevector_copy(GerbilRootId root,
+                                                     uint8_t *out,
+                                                     size_t len);
 GerbilStatus gerbil_scheme_rust_root_release(GerbilRootId root);
 GerbilStatus gerbil_scheme_rust_pair_car(GerbilValueHandle value,
                                          GerbilValueHandle *out);

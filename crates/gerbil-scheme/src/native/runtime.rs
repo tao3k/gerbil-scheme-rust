@@ -123,6 +123,11 @@ impl GerbilRuntime {
 
     /// Initialize one statically linked downstream program with the shared
     /// native lifecycle and GC owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lifecycle, ABI, or native setup error when initialization
+    /// cannot establish the unique runtime owner.
     pub fn initialize_program(program: LinkedGerbilProgram) -> Result<Self, NativeError> {
         Self::initialize_with_linker(Some(program.linker))
     }

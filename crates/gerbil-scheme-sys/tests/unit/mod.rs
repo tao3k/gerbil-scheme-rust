@@ -38,6 +38,7 @@ fn public_header_matches_the_live_scalar_abi() {
     assert!(header.contains("gerbil_scheme_rust_bytevector_to_sint("));
     assert!(header.contains("gerbil_scheme_rust_uint_to_bytevector_root("));
     assert!(header.contains("gerbil_scheme_rust_sint_to_bytevector_root("));
+    assert!(header.contains("gerbil_scheme_rust_root_bytevector_copy("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_is_exact_integer("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_i64("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_u64("));

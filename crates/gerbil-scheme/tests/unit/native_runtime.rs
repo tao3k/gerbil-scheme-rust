@@ -7,6 +7,73 @@ use gerbil_scheme::{
 };
 
 #[test]
+#[ignore = "local matched latency receipt; run separately from the one-shot runtime test"]
+fn rooted_bulk_copy_reduces_parser_sized_transfer_cost() {
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    let runtime = GerbilRuntime::initialize().expect("initialize native runtime");
+    let source = "A5".repeat(8 * 1024);
+    let rooted = runtime
+        .bytevector_from_bytestring(&source, BytestringDelimiter::Compact)
+        .expect("root parser-sized fixture");
+    assert_eq!(rooted.to_vec().into_result(), Ok(vec![0xA5; 8 * 1024]));
+    let mut bulk = Vec::new();
+    let mut scalar = Vec::new();
+    for pair in 0..8 {
+        let sample = |per_byte: bool| {
+            let started = Instant::now();
+            for _ in 0..4 {
+                let bytes = if per_byte {
+                    (0..8 * 1024)
+                        .map(|index| rooted.u8_at(index).into_result().expect("byte"))
+                        .collect::<Vec<_>>()
+                } else {
+                    rooted.to_vec().into_result().expect("bulk bytes")
+                };
+                assert_eq!(black_box(bytes.len()), 8 * 1024);
+                black_box(bytes);
+            }
+            started.elapsed().as_nanos() / 4
+        };
+        if pair % 2 == 0 {
+            bulk.push(sample(false));
+            scalar.push(sample(true));
+        } else {
+            scalar.push(sample(true));
+            bulk.push(sample(false));
+        }
+    }
+    bulk.sort_unstable();
+    scalar.sort_unstable();
+    eprintln!(
+        "native rooted 8KiB copy: bulk median={}ns scalar median={}ns",
+        bulk[4], scalar[4]
+    );
+    assert!(bulk[4] < scalar[4], "bulk copy must beat per-byte FFI");
+}
+
+unsafe extern "C" fn linked_hex_bytes_fixture(input: *const u8, len: usize) -> i64 {
+    let mut root = gerbil_scheme_sys::GerbilRootId(0);
+    // This test fixture delegates to the real native bytevector converter.
+    let status = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_bytestring_to_bytevector_root(
+            gerbil_scheme_sys::GerbilBorrowedUtf8 {
+                ptr: input.cast(),
+                len,
+            },
+            -1,
+            &raw mut root,
+        )
+    };
+    if status == gerbil_scheme_sys::GerbilStatus::Ok {
+        root.0
+    } else {
+        0
+    }
+}
+
+#[test]
 fn calls_scalar_export_in_process() {
     let runtime = GerbilRuntime::initialize().expect("initialize in-process Gerbil runtime");
     assert!(matches!(
@@ -28,7 +95,83 @@ fn calls_scalar_export_in_process() {
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
     exports_scheme_objects_and_traverses_pairs(&runtime);
     exercises_integer_bytevector_conversions(&runtime);
+    exercises_linked_bytes_export(&runtime);
+    exercises_rooted_bulk_copy_abi();
     reports_overflow_and_finalized_runtime_boundaries(runtime);
+}
+
+fn exercises_rooted_bulk_copy_abi() {
+    let mut root = gerbil_scheme_sys::GerbilRootId(0);
+    let status = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_bytestring_to_bytevector_root(
+            gerbil_scheme_sys::GerbilBorrowedUtf8::from_utf8_str("00FF7F"),
+            -1,
+            &raw mut root,
+        )
+    };
+    assert_eq!(status, GerbilStatus::Ok);
+    let mut output = [0u8; 3];
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                root,
+                output.as_mut_ptr(),
+                output.len(),
+            )
+        },
+        GerbilStatus::Ok
+    );
+    assert_eq!(output, [0, 255, 127]);
+    let mut short = [0xA5u8; 2];
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                root,
+                short.as_mut_ptr(),
+                short.len(),
+            )
+        },
+        GerbilStatus::InvalidValue
+    );
+    assert_eq!(short, [0xA5; 2]);
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                root,
+                std::ptr::null_mut(),
+                3,
+            )
+        },
+        GerbilStatus::NullPointer
+    );
+    assert_eq!(
+        unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(root) },
+        GerbilStatus::Ok
+    );
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                root,
+                output.as_mut_ptr(),
+                output.len(),
+            )
+        },
+        GerbilStatus::InvalidValue
+    );
+}
+
+fn exercises_linked_bytes_export(runtime: &GerbilRuntime) {
+    // SAFETY: the fixture is part of the initialized native graph, borrows its
+    // input only for the call, and transfers the converter's fresh root.
+    let export = unsafe { runtime.bind_bytes_export(linked_hex_bytes_fixture) }
+        .expect("bind byte-oriented export");
+    let bytes = export.call(b"00FF7f").into_result().expect("call export");
+    assert_eq!(bytes.to_vec().into_result(), Ok(vec![0, 255, 127]));
+    drop(bytes);
+    let empty = export.call(b"").into_result().expect("empty bytes");
+    assert_eq!(empty.to_vec().into_result(), Ok(Vec::<u8>::new()));
+    drop(empty);
+    assert!(export.call(b"not hex").into_result().is_err());
 }
 
 fn exercises_integer_bytevector_conversions(runtime: &GerbilRuntime) {

@@ -111,6 +111,7 @@ fn native_source_is_the_tracked_ffi_contract() {
         "gerbil-rs-root-exact-integer-u64-value-raw",
         "gerbil-rs-root-string-length-raw",
         "gerbil-rs-root-bytevector-length-raw",
+        "gerbil-rs-root-bytevector-copy-raw",
         "gerbil-rs-root-release-raw",
     ] {
         assert!(

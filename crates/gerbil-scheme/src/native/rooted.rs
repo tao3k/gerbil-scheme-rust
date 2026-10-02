@@ -403,12 +403,24 @@ impl RootedSchemeBytevector<'_> {
             Ok(length) => length,
             Err(error) => return NativeResult::err(error),
         };
-        let mut bytes = Vec::with_capacity(length);
-        for index in 0..length {
-            match self.u8_at(index).into_result() {
-                Ok(byte) => bytes.push(byte),
-                Err(error) => return NativeResult::err(error),
-            }
+        let mut bytes = vec![0; length];
+        let output = if bytes.is_empty() {
+            std::ptr::null_mut()
+        } else {
+            bytes.as_mut_ptr()
+        };
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                self.owner.root_id(),
+                output,
+                length,
+            )
+        };
+        if status != gerbil_scheme_sys::GerbilStatus::Ok {
+            return NativeResult::err(NativeError::Status {
+                operation: "gerbil_scheme_rust_root_bytevector_copy",
+                code: status as i32,
+            });
         }
         NativeResult::ok(bytes)
     }

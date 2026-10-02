@@ -107,6 +107,16 @@ pub enum ExprIr {
         body: Box<Self>,
         string_slice: bool,
     },
+    /// Left fold over an iterator, with accumulator and item scoped to the step.
+    Fold {
+        iterator: Box<Self>,
+        accumulator: String,
+        item: String,
+        initial: Box<Self>,
+        step: Box<Self>,
+    },
+    /// Nonnegative integer literal.
+    Number { value: u64 },
     /// Empty collection or string predicate.
     Empty { value: Box<Self> },
     /// String membership in a slice.
@@ -114,6 +124,10 @@ pub enum ExprIr {
         value: Box<Self>,
         collection: Box<Self>,
     },
+    /// Exactly one ASCII uppercase Latin letter.
+    SingleAsciiUppercase { value: Box<Self> },
+    /// A decimal unsigned integer within an inclusive upper bound.
+    UnsignedAtMost { value: Box<Self>, maximum: u64 },
     /// Pure conditional.
     If {
         condition: Box<Self>,
@@ -138,6 +152,8 @@ pub enum BinaryOperator {
     And,
     /// Value equality.
     Equal,
+    /// Integer addition.
+    Add,
 }
 
 /// A malformed wire value or invalid Rust syntax produced from it.
@@ -269,15 +285,21 @@ fn compile_expression(expression: &ExprIr) -> Result<TokenStream, CompileError> 
             body,
             string_slice,
         } => compile_any(collection, variable, body, *string_slice)?,
+        ExprIr::Fold {
+            iterator,
+            accumulator,
+            item,
+            initial,
+            step,
+        } => compile_fold(iterator, accumulator, item, initial, step)?,
+        ExprIr::Number { value } => quote! { #value },
         ExprIr::Empty { value } => {
             let value = compile_expression(value)?;
             quote! { #value.is_empty() }
         }
-        ExprIr::StringIn { value, collection } => {
-            let value = compile_expression(value)?;
-            let collection = compile_expression(collection)?;
-            quote! { #collection.contains(&#value) }
-        }
+        ExprIr::StringIn { .. }
+        | ExprIr::SingleAsciiUppercase { .. }
+        | ExprIr::UnsignedAtMost { .. } => compile_string_predicate(expression)?,
         ExprIr::If {
             condition,
             consequent,
@@ -299,9 +321,37 @@ fn compile_expression(expression: &ExprIr) -> Result<TokenStream, CompileError> 
                 BinaryOperator::Or => quote! { (#left) || (#right) },
                 BinaryOperator::And => quote! { (#left) && (#right) },
                 BinaryOperator::Equal => quote! { (#left) == (#right) },
+                BinaryOperator::Add => quote! { (#left) + (#right) },
             }
         }
     })
+}
+
+fn compile_string_predicate(expression: &ExprIr) -> Result<TokenStream, CompileError> {
+    match expression {
+        ExprIr::StringIn { value, collection } => {
+            let value = compile_expression(value)?;
+            let collection = compile_expression(collection)?;
+            Ok(quote! { #collection.contains(&#value) })
+        }
+        ExprIr::SingleAsciiUppercase { value } => {
+            let value = compile_expression(value)?;
+            Ok(quote! {{
+                let candidate = #value;
+                candidate.len() == 1 && candidate.as_bytes()[0].is_ascii_uppercase()
+            }})
+        }
+        ExprIr::UnsignedAtMost { value, maximum } => {
+            let value = compile_expression(value)?;
+            Ok(quote! {{
+                let candidate = #value;
+                !candidate.is_empty()
+                    && candidate.bytes().all(|byte| byte.is_ascii_digit())
+                    && candidate.parse::<u64>().is_ok_and(|number| number <= #maximum)
+            }})
+        }
+        _ => Err(CompileError::Schema("expected string predicate".into())),
+    }
 }
 
 fn compile_bindings(bindings: &[BindingIr]) -> Result<Vec<TokenStream>, CompileError> {
@@ -347,4 +397,26 @@ fn compile_any(
     } else {
         quote! { #collection.any(|#variable| #body) }
     })
+}
+
+fn compile_fold(
+    iterator: &ExprIr,
+    accumulator: &str,
+    item: &str,
+    initial: &ExprIr,
+    step: &ExprIr,
+) -> Result<TokenStream, CompileError> {
+    if accumulator == item {
+        return Err(syn::Error::new(
+            proc_macro2::Span::call_site(),
+            "fold accumulator and item must be distinct",
+        )
+        .into());
+    }
+    let iterator = compile_expression(iterator)?;
+    let accumulator = syn::parse_str::<syn::Ident>(accumulator)?;
+    let item = syn::parse_str::<syn::Ident>(item)?;
+    let initial = compile_expression(initial)?;
+    let step = compile_expression(step)?;
+    Ok(quote! { (#iterator).fold(#initial, |#accumulator, #item| #step) })
 }

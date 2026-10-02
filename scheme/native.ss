@@ -1,6 +1,6 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(export gerbil-rs-root-string
+(export gerbil-rs-root-string gerbil-rs-root-bytevector
         gerbil-rs-abi-version
         gerbil-rs-add-i64
         gerbil-rs-is-even-i64
@@ -23,6 +23,9 @@
 ;; Downstream AOT exports transfer this token, never a borrowed Scheme word.
 (def (gerbil-rs-root-string value)
   (if (string? value) (gerbil-rs-rooted-value-store! value) 0))
+
+(def (gerbil-rs-root-bytevector value)
+  (if (u8vector? value) (gerbil-rs-rooted-value-store! value) 0))
 
 (def (gerbil-rs-rooted-value-store! value)
   (let (root-id gerbil-rs-next-root-id)
@@ -309,9 +312,25 @@
    gerbil-rs-root-string-char-ref-raw
    gerbil-rs-root-bytevector-length-raw
    gerbil-rs-root-bytevector-u8-ref-raw
+   gerbil-rs-copy-u8vector-c
+   gerbil-rs-root-bytevector-copy-raw
    gerbil-rs-root-release-raw
    gerbil-rs-scheme-object-pair-car-raw
    gerbil-rs-scheme-object-pair-cdr-raw))
+  (c-declare "#ifndef ___HAVE_FFI_U8VECTOR\n#define ___HAVE_FFI_U8VECTOR\n#define U8_DATA(obj) ___CAST (___U8*, ___BODY_AS (obj, ___tSUBTYPED))\n#define U8_LEN(obj) ___HD_BYTES (___HEADER (obj))\n#endif")
+  (define gerbil-rs-copy-u8vector-c
+    (c-lambda (scheme-object (pointer unsigned-int8) unsigned-int64) int64
+      #<<END-C
+if (___arg3 > U8_LEN(___arg1) || (___arg3 > 0 && ___arg2 == NULL)) {
+  ___return(-1);
+}
+const ___U8 *source = U8_DATA(___arg1);
+for (___U64 index = 0; index < ___arg3; ++index) {
+  ___arg2[index] = source[index];
+}
+___return((___S64)___arg3);
+END-C
+      ))
   (c-define (gerbil-rs-abi-version-native)
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
@@ -788,6 +807,19 @@
              (>= index 0)
              (< index (u8vector-length value)))
       (u8vector-ref value index)
+      -1)))
+
+(c-define (gerbil-rs-root-bytevector-copy-raw root-id destination length)
+    (int64 (pointer unsigned-int8) unsigned-int64)
+    int64
+    "gerbil_scheme_rust_root_bytevector_copy_raw"
+    "extern"
+  (let ((value
+         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+    (if (and (u8vector? value)
+             (= length (u8vector-length value)))
+      (gerbil-scheme-rust/scheme/native#gerbil-rs-copy-u8vector-c
+       value destination length)
       -1)))
 
 (c-define (gerbil-rs-root-release-raw root-id)

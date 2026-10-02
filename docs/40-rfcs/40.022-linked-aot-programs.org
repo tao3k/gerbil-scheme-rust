@@ -56,6 +56,17 @@ This string transport is for explicit native boundary projections, not a
 public JSON/S-expression language. Application object construction remains in
 Scheme; no Cedar, policy routing or runtime scheduling belongs in this repo.
 
+=bind_bytes_export= extends the same build-owned registration boundary to a
+call-scoped borrowed byte slice and a freshly rooted Scheme bytevector. A
+downstream export may inspect the pointer only until it returns, must return
+zero on failure, and must transfer exactly one root made with
+=gerbil-rs-root-bytevector= on success. The Rust owner validates the root type
+before exposing it and releases it on drop. A checked native bulk-copy call
+projects the rooted bytevector into exactly sized Rust storage in one FFI
+crossing; mismatched lengths and stale roots leave the destination untouched.
+This transport alone does not
+define an application wire format or choose a downstream parser algorithm.
+
 * Optimizer is the default
 
 Development and test Rust profiles use optimization level 2, full debug

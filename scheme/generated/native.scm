@@ -1,24 +1,30 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=0c39c366a3a17141249becb779711695ec64cf62647af876e5adb0e189cb1f66 body-sha256=7ea0158966aa619e90cd23a37517c370b4aec2629e97a191f07aedcb92e7f47a
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=ecb53027b120e092b39fbecd147ac4d5dd1b32992c8f9f118cc9a76939479de6 body-sha256=95291d0c5d622b2f4f890c010849bc90636296b02e261cdd80a3e8284bcd5fa2
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/native::timestamp 1790086637)
+  (define gerbil-scheme-rust/scheme/native::timestamp 1790933447)
   (begin
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-abi-version
       (lambda () '1))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-add-i64
-      (lambda (_%left635%_ _%right636%_) (+ _%left635%_ _%right636%_)))
+      (lambda (_%left637%_ _%right638%_) (+ _%left637%_ _%right638%_)))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-is-even-i64
-      (lambda (_%value633%_) (if (even? _%value633%_) '1 '0)))
+      (lambda (_%value635%_) (if (even? _%value635%_) '1 '0)))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-compare-i64
-      (lambda (_%left627%_ _%right628%_)
-        (if (< _%left627%_ _%right628%_)
+      (lambda (_%left629%_ _%right630%_)
+        (if (< _%left629%_ _%right630%_)
             '-1
-            (if (> _%left627%_ _%right628%_) '1 '0))))
+            (if (> _%left629%_ _%right630%_) '1 '0))))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-next-root-id '1)
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values '())
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-root-string
+      (lambda (_%value627%_)
+        (if (string? _%value627%_)
+            (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-store!
+             _%value627%_)
+            '0)))
+    (define gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector
       (lambda (_%value625%_)
-        (if (string? _%value625%_)
+        (if (u8vector? _%value625%_)
             (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-store!
              _%value625%_)
             '0)))
@@ -47,27 +53,27 @@
             (values _%rest602%_ '#f)
             (if (= (caar _%rest602%_) _%root-id603%_)
                 (values (cdr _%rest602%_) '#t)
-                (let ((__tmp4935
+                (let ((__tmp4937
                        (lambda ()
                          (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values-remove
                           (cdr _%rest602%_)
                           _%root-id603%_)))
-                      (__tmp4934
+                      (__tmp4936
                        (lambda (_%tail609%_ _%found?610%_)
                          (values (if _%found?610%_
                                      (cons (car _%rest602%_) _%tail609%_)
                                      _%rest602%_)
                                  _%found?610%_))))
                   (declare (not safe))
-                  (##call-with-values __tmp4935 __tmp4934))))))
+                  (##call-with-values __tmp4937 __tmp4936))))))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-release!
       (lambda (_%root-id596%_)
-        (let ((__tmp4937
+        (let ((__tmp4939
                (lambda ()
                  (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values-remove
                   gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values
                   _%root-id596%_)))
-              (__tmp4936
+              (__tmp4938
                (lambda (_%rooted-values599%_ _%found?600%_)
                  (if _%found?600%_
                      (set! gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-values
@@ -75,7 +81,7 @@
                      '#!void)
                  _%found?600%_)))
           (declare (not safe))
-          (##call-with-values __tmp4937 __tmp4936))))
+          (##call-with-values __tmp4939 __tmp4938))))
     (define gerbil-scheme-rust/scheme/native#gerbil-rs-bytestring-delimiter
       (lambda (_%code591%_)
         (if (= _%code591%_ '-1)

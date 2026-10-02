@@ -6,6 +6,26 @@ use gerbil_scheme::{
     IntegerEncoding, IntegerWidth, NativeError,
 };
 
+unsafe extern "C" fn linked_hex_bytes_fixture(input: *const u8, len: usize) -> i64 {
+    let mut root = gerbil_scheme_sys::GerbilRootId(0);
+    // This test fixture delegates to the real native bytevector converter.
+    let status = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_bytestring_to_bytevector_root(
+            gerbil_scheme_sys::GerbilBorrowedUtf8 {
+                ptr: input.cast(),
+                len,
+            },
+            -1,
+            &raw mut root,
+        )
+    };
+    if status == gerbil_scheme_sys::GerbilStatus::Ok {
+        root.0
+    } else {
+        0
+    }
+}
+
 #[test]
 fn calls_scalar_export_in_process() {
     let runtime = GerbilRuntime::initialize().expect("initialize in-process Gerbil runtime");
@@ -28,7 +48,22 @@ fn calls_scalar_export_in_process() {
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
     exports_scheme_objects_and_traverses_pairs(&runtime);
     exercises_integer_bytevector_conversions(&runtime);
+    exercises_linked_bytes_export(&runtime);
     reports_overflow_and_finalized_runtime_boundaries(runtime);
+}
+
+fn exercises_linked_bytes_export(runtime: &GerbilRuntime) {
+    // SAFETY: the fixture is part of the initialized native graph, borrows its
+    // input only for the call, and transfers the converter's fresh root.
+    let export = unsafe { runtime.bind_bytes_export(linked_hex_bytes_fixture) }
+        .expect("bind byte-oriented export");
+    let bytes = export.call(b"00FF7f").into_result().expect("call export");
+    assert_eq!(bytes.to_vec().into_result(), Ok(vec![0, 255, 127]));
+    drop(bytes);
+    let empty = export.call(b"").into_result().expect("empty bytes");
+    assert_eq!(empty.to_vec().into_result(), Ok(Vec::<u8>::new()));
+    drop(empty);
+    assert!(export.call(b"not hex").into_result().is_err());
 }
 
 fn exercises_integer_bytevector_conversions(runtime: &GerbilRuntime) {

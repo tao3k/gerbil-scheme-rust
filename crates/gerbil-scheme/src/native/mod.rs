@@ -12,7 +12,7 @@ mod rooted;
 mod runtime;
 mod types;
 mod value;
-pub use program::{LinkedGerbilProgram, LinkedStringExport};
+pub use program::{LinkedBytesExport, LinkedGerbilProgram, LinkedStringExport};
 pub use runtime::{GerbilI64Callback, GerbilI64CallbackAbi};
 pub use types::{
     ByteOrder, BytestringDelimiter, ExactIntegerTarget, GerbilRuntime, GerbilRuntimeReceipt,

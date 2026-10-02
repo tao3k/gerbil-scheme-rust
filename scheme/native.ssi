@@ -4,6 +4,7 @@ namespace: gerbil-scheme-rust/scheme/native
 
 (%#begin (%#export
           (spec: 0 gerbil-rs-root-string gerbil-rs-root-string)
+          (spec: 0 gerbil-rs-root-bytevector gerbil-rs-root-bytevector)
           (spec: 0 gerbil-rs-abi-version gerbil-rs-abi-version)
           (spec: 0 gerbil-rs-add-i64 gerbil-rs-add-i64)
           (spec: 0 gerbil-rs-is-even-i64 gerbil-rs-is-even-i64)
@@ -29,6 +30,9 @@ namespace: gerbil-scheme-rust/scheme/native
          (%#define-runtime
           gerbil-rs-root-string
           gerbil-scheme-rust/scheme/native#gerbil-rs-root-string)
+         (%#define-runtime
+          gerbil-rs-root-bytevector
+          gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector)
          (%#define-runtime
           gerbil-rs-rooted-value-store!
           gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-store!)

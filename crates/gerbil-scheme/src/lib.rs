@@ -33,8 +33,8 @@ pub use native::{
 #[cfg(feature = "native")]
 pub use native::{
     GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilRuntimeReceipt, GerbilUtf8,
-    GerbilValue, GerbilValueProvenance, LinkedGerbilProgram, LinkedStringExport, NativeError,
-    NativeResult,
+    GerbilValue, GerbilValueProvenance, LinkedBytesExport, LinkedGerbilProgram, LinkedStringExport,
+    NativeError, NativeResult,
 };
 
 pub mod native_environment;

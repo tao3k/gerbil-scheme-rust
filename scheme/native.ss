@@ -1,6 +1,6 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(export gerbil-rs-root-string
+(export gerbil-rs-root-string gerbil-rs-root-bytevector
         gerbil-rs-abi-version
         gerbil-rs-add-i64
         gerbil-rs-is-even-i64
@@ -23,6 +23,9 @@
 ;; Downstream AOT exports transfer this token, never a borrowed Scheme word.
 (def (gerbil-rs-root-string value)
   (if (string? value) (gerbil-rs-rooted-value-store! value) 0))
+
+(def (gerbil-rs-root-bytevector value)
+  (if (u8vector? value) (gerbil-rs-rooted-value-store! value) 0))
 
 (def (gerbil-rs-rooted-value-store! value)
   (let (root-id gerbil-rs-next-root-id)

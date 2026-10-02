@@ -3,7 +3,7 @@
 //! Static program descriptors; runtime policy stays with the downstream owner.
 
 use super::types::RootedSchemeOwner;
-use super::{GerbilRuntime, NativeError, NativeResult, RootedSchemeString};
+use super::{GerbilRuntime, NativeError, NativeResult, RootedSchemeBytevector, RootedSchemeString};
 
 /// A build-owned AOT module graph containing the native bridge.
 #[derive(Clone, Copy, Debug)]
@@ -32,8 +32,20 @@ pub struct LinkedStringExport<'runtime> {
     export: unsafe extern "C" fn() -> i64,
 }
 
+/// Statically linked export accepting borrowed bytes and transferring a fresh
+/// root for one Scheme bytevector.
+#[derive(Clone, Copy, Debug)]
+pub struct LinkedBytesExport<'runtime> {
+    runtime: &'runtime GerbilRuntime,
+    export: unsafe extern "C" fn(*const u8, usize) -> i64,
+}
+
 impl GerbilRuntime {
     /// Register a build-owned Scheme export against this live runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread-affinity error when called outside the runtime owner.
     ///
     /// # Safety
     ///
@@ -51,10 +63,36 @@ impl GerbilRuntime {
             export,
         })
     }
+
+    /// Register a build-owned byte-oriented Scheme export against this runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns a thread-affinity error when called outside the runtime owner.
+    ///
+    /// # Safety
+    ///
+    /// The export must live for the process, call only this initialized AOT
+    /// graph, catch Scheme exceptions, and return zero on failure. A positive
+    /// return must transfer
+    /// exactly one unique live bytevector root. It may read the input only
+    /// during the call, may not retain its pointer, and may not reenter the
+    /// runtime owner or perform runtime cleanup.
+    pub unsafe fn bind_bytes_export(
+        &self,
+        export: unsafe extern "C" fn(*const u8, usize) -> i64,
+    ) -> Result<LinkedBytesExport<'_>, NativeError> {
+        self.check_thread()?;
+        Ok(LinkedBytesExport {
+            runtime: self,
+            export,
+        })
+    }
 }
 
 impl<'runtime> LinkedStringExport<'runtime> {
     /// Call a registered string projection, retaining its GC root until drop.
+    #[must_use]
     pub fn call(&self) -> NativeResult<RootedSchemeString<'runtime>> {
         let result = (|| {
             self.runtime.check_thread()?;
@@ -69,6 +107,35 @@ impl<'runtime> LinkedStringExport<'runtime> {
             let value = RootedSchemeString { owner };
             // Type-check the live root before it can escape. On error the owner
             // releases it; zero roots never become owners.
+            value.len().into_result()?;
+            Ok(value)
+        })();
+        result.into()
+    }
+}
+
+impl<'runtime> LinkedBytesExport<'runtime> {
+    /// Call a registered export with a borrow that cannot escape this call.
+    #[must_use]
+    pub fn call(&self, input: &[u8]) -> NativeResult<RootedSchemeBytevector<'runtime>> {
+        let result = (|| {
+            self.runtime.check_thread()?;
+            let input_ptr = if input.is_empty() {
+                std::ptr::null()
+            } else {
+                input.as_ptr()
+            };
+            // SAFETY: descriptor construction guarantees an initialized export,
+            // a call-scoped input borrow, and transfer of unique root ownership.
+            let root =
+                gerbil_scheme_sys::GerbilRootId(unsafe { (self.export)(input_ptr, input.len()) });
+            let owner = RootedSchemeOwner::new(
+                gerbil_scheme_sys::GerbilStatus::Ok,
+                root,
+                "linked bytes export",
+            )?;
+            let value = RootedSchemeBytevector { owner };
+            // Fail closed on a wrong-type root; drop releases a live one.
             value.len().into_result()?;
             Ok(value)
         })();

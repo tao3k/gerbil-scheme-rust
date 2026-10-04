@@ -256,8 +256,11 @@ fn scheme_string(path: &Path) -> String {
     format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-/// Keep the selected Gerbil compiler isolated from unrelated Rust C flags.
-pub(crate) fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
+/// Keep selected Gerbil build tools isolated from unrelated Rust SDK settings.
+///
+/// The selected GSC retains its configured C compiler. Ambient Apple developer
+/// directory overrides must not redirect that compiler's system tool shims.
+pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program);
     // Nix/direnv environments commonly inject compiler include and linker
     // paths for Rust. Gerbil's selected gsc is already configured with its own
@@ -275,6 +278,7 @@ pub(crate) fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
         "NIX_CFLAGS_COMPILE",
         "NIX_LDFLAGS",
         "SDKROOT",
+        "DEVELOPER_DIR",
     ] {
         command.env_remove(variable);
     }
@@ -287,6 +291,10 @@ pub(crate) fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
     }
     command
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/native_environment_scenario.rs"]
+mod environment_tests;
 
 fn run(command: &mut Command, operation: &str) -> ExitStatus {
     let status = command

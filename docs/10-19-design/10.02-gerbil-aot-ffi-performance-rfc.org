@@ -232,3 +232,27 @@ DataFusion 2/2 and GraphAr 4/4 source-handoff suites then passed idle5, in
 MRR =023a6db= composition; these do not qualify the latest published pins or
 claim an initialization speedup. The earlier failed cold attempts remain
 retained. CI's original-query entrypoint must enable these actual events.
+
+** Apple tool redirection and process exit qualification (2026-10-05)
+
+Cleaning =SDKROOT= and PATH alone did not isolate the selected compiler:
+=DEVELOPER_DIR= still pointed at the Nix Apple SDK. An owned PackageSpec
+process-tree capture showed nested Nix =xcrun ld= invocations while GCC itself
+was the configured Homebrew tool. The shared =gerbil_command= now removes the
+ambient developer-directory override alongside unrelated C/SDK settings and
+is public so downstream PackageSpec preparation can use the same boundary.
+It preserves the configured GSC compiler and its ABI flags.
+
+The actual Cargo helper build succeeded in 44.82s; eight default regressions
+passed in 0.48s, with four native fixtures still explicitly ignored. The Darwin
+regression resolves the actual system linker under an inherited Nix developer
+directory. A fresh-prefix Scheme package build with that override removed
+completed under idle30/wall1200; another fresh-prefix attempt still failed
+idle30. This is not a universal cold-build guarantee or a performance result.
+
+The successful sampled attempt also exposed its remaining quiet phase:
+=___cleanup_dyn_module -> dlclose -> dyld unload notifications=. At that
+point only GXI remained in the owned tree. Compilation completion and process
+exit/cleanup must remain separate observations; neither a final GC report nor
+completed object files alone admit the package build. Strict idle supervision
+is retained, and full downstream construction remains a separate gate.

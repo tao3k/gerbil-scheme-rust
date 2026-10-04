@@ -25,6 +25,5 @@ pub use header::{
     NativeCHeaderDriftReceipt, NativeCHeaderGenerationReceipt, validate_native_c_header,
     write_native_c_header,
 };
-pub use native::build_native_archive;
-pub(crate) use native::gerbil_command;
+pub use native::{build_native_archive, gerbil_command};
 pub use toolchain::{NativeCCompilerTool, discover_native_c_compiler};

@@ -40,6 +40,22 @@ shell; ambient include flags do not replace these declarations.
 The sys crate supplies only the shared lifecycle shim in this configuration.
 It must not also load the standalone fixture graph or create another runtime.
 
+* Native build progress
+
+With =GERBIL_BUILD_VERBOSE= greater than zero, compiler subprocess output is
+inherited and forwarded during execution instead of buffered until exit.
+Gambit receives =-:1n,2n,d5qQ -verbose=: line-buffered stdout/stderr, genuine
+compiler tracing and genuine garbage-collection reports. Runtime options
+precede compiler options. Errors and interrupts terminate with nonzero status;
+there is no interactive REPL fallback. Quiet builds retain captured failure
+diagnostics. Heap limits, allocation policy and compiler optimization remain
+unchanged.
+
+These events describe actual compiler work. There is no periodic timer output,
+and an idle watchdog can still reject a compiler that emits no actual events.
+Cold module builds must finish successfully; observing GC activity alone is
+not proof of archive completion or semantic conformance.
+
 * Runtime contract
 
 =LinkedGerbilProgram= is a build-owned, unsafe-to-register linker descriptor.

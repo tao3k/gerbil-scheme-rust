@@ -300,7 +300,7 @@ fn stage_program(
     std::fs::create_dir_all(request.out_dir).map_err(|e| e.to_string())?;
     let linker_c = request.out_dir.join("program_link.c");
     let linker_object = request.out_dir.join("program_link.o");
-    let mut link = gerbil_command(request.gsc);
+    let mut link = gambit_progress_command(request.gsc);
     link.args(["-link", "-linker-name", request.linker_name, "-o"])
         .arg(&linker_c);
     let mut objects = Vec::new();
@@ -416,7 +416,10 @@ fn generate_module_c(
     // entry point. Compile separately so each module keeps its own identity;
     // only the final C-only link step receives the program linker name.
     run(
-        gerbil_command(gsc).args(["-c", "-o"]).arg(&source).arg(scm),
+        gambit_progress_command(gsc)
+            .args(["-c", "-o"])
+            .arg(&source)
+            .arg(scm),
         "module-c",
         "generate program module C",
         Some(module),
@@ -588,7 +591,7 @@ fn compile_native_object(
         }
     }
     run(
-        gerbil_command(gsc)
+        gambit_progress_command(gsc)
             .args(["-obj", "-cc-options", cc_options, "-o"])
             .arg(object)
             .arg(source),
@@ -646,6 +649,12 @@ fn native_inputs_fingerprint(
             )
         })?;
     let mut hasher = Sha256::new();
+    if native_progress_enabled() {
+        for option in GSC_PROGRESS_OPTIONS {
+            hasher.update((option.len() as u64).to_le_bytes());
+            hasher.update(option.as_bytes());
+        }
+    }
     for value in [
         domain.as_bytes(),
         options.as_bytes(),
@@ -780,6 +789,60 @@ fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {
     Ok(runtime)
 }
 
+// Verbose native builds expose genuine compiler and collector events. The
+// collector policy and heap limits remain Gambit's defaults.
+const GSC_PROGRESS_OPTIONS: [&str; 2] = ["-:1n,2n,d5qQ", "-verbose"];
+
+fn native_progress_enabled() -> bool {
+    std::env::var("GERBIL_BUILD_VERBOSE")
+        .ok()
+        .and_then(|level| level.parse::<u8>().ok())
+        .is_some_and(|level| level > 0)
+}
+
+fn gambit_progress_command(program: &Path) -> Command {
+    gambit_progress_command_with_mode(program, native_progress_enabled())
+}
+
+fn gambit_progress_command_with_mode(program: &Path, live: bool) -> Command {
+    let mut command = gerbil_command(program);
+    if live {
+        // Runtime options must precede compiler options. Line buffering also
+        // applies when Cargo redirects stdout/stderr to pipes. q/Q retain
+        // nonzero termination rather than entering a REPL on failure.
+        command.args(GSC_PROGRESS_OPTIONS);
+    }
+    command
+}
+
+fn run_process(command: &mut Command, operation: &str, live: bool) -> Result<(), String> {
+    if live {
+        let status = command
+            .status()
+            .map_err(|error| format!("{operation}: {error}"))?;
+        return if status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "{operation}: {status}; diagnostics streamed to inherited stdout/stderr"
+            ))
+        };
+    }
+    let output = command
+        .output()
+        .map_err(|error| format!("{operation}: {error}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{operation}: {}; {}{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
 fn run(
     command: &mut Command,
     phase: &'static str,
@@ -794,19 +857,7 @@ fn run(
             operation,
             subject,
         },
-        || {
-            let output = command.output().map_err(|e| format!("{operation}: {e}"))?;
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(format!(
-                    "{operation}: {}; {}{}",
-                    output.status,
-                    String::from_utf8_lossy(&output.stdout),
-                    String::from_utf8_lossy(&output.stderr)
-                ))
-            }
-        },
+        || run_process(command, operation, native_progress_enabled()),
     )
 }
 
@@ -841,3 +892,7 @@ pub fn observe_program_archive_operation<T>(
 #[cfg(all(test, unix))]
 #[path = "../tests/unit/program_cache_scenario.rs"]
 mod cache_scenario;
+
+#[cfg(all(test, unix))]
+#[path = "../tests/unit/program_process.rs"]
+mod process_tests;

@@ -256,3 +256,11 @@ point only GXI remained in the owned tree. Compilation completion and process
 exit/cleanup must remain separate observations; neither a final GC report nor
 completed object files alone admit the package build. Strict idle supervision
 is retained, and full downstream construction remains a separate gate.
+
+The =9175ae2= Ubuntu job later rejected a newly written cache-test executable
+with =ETXTBSY= (=Text file busy=); its native Gerbil Bazel target passed, while
+the Cargo aggregate failed on that fixture. The fixture is now a checked-in
+immutable executable; output/log files remain per-run. This removes runtime
+executable writes without a production retry, a serialized test suite or a
+changed worker count. The revised Cargo test build succeeded in 1m11s;
+target-specific CI still needs qualification at the new commit.

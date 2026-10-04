@@ -2,7 +2,6 @@
 
 use super::{ProgramArchiveObservation, ProgramArchiveObserver, compile_program_module};
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::sync::Mutex;
 
 const INPUT: &str = include_str!("scenarios/native-program-content-cache/inputs/module.scm");
@@ -27,17 +26,10 @@ fn unchanged_native_input_reuses_content_addressed_output() {
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).expect("create cache scenario root");
     let log = root.join("compiler.log");
-    let compiler = root.join("fake-gsc");
-    fs::write(
-        &compiler,
-        format!(
-            "#!/bin/sh\nprintf 'invoke\\n' >> '{}'\noutput=''\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = '-o' ]; then shift; output=\"$1\"; fi\n  shift\ndone\n: > \"$output\"\n",
-            log.display()
-        ),
-    )
-    .expect("write fake compiler");
-    fs::set_permissions(&compiler, fs::Permissions::from_mode(0o755))
-        .expect("make fake compiler executable");
+    // Linux CI rejected the newly written executable with ETXTBSY. Keep this
+    // compiler fixture immutable during parallel test execution.
+    let compiler = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/unit/scenarios/native-program-content-cache/inputs/fake-gsc.sh");
     let input = root.join("module.scm");
     let output = root.join("module.o");
     fs::write(&input, INPUT).expect("write first input");

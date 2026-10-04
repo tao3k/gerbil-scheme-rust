@@ -336,3 +336,41 @@ The revised local Cargo test build passed in 41.48s and thirteen default
 regressions passed in 0.77s, with four native fixtures explicitly ignored.
 Ubuntu qualification of this replacement remains required; the failed Linux
 receipt is retained and is not counted as a pass.
+
+** Native stdio ownership and nonblocking backpressure (2026-10-05)
+
+Data's actual MRR =dd46dc4= / GSC =2d20e48= archive build retained a typed
+=write compiler artifact progress: Resource temporarily unavailable (os error
+35)= failure at the Cypher object. No supervision budget triggered and no
+Source artifact was admitted. A separate SDK GXI pipe experiment observed a
+blocking parent write description become nonblocking after the child exited:
+Gambit changes the inherited stderr open-file-description flags. This explains
+why parent Rust diagnostic writes can encounter EAGAIN under compiler output.
+
+Live =run_native_process= now gives native children private stdout/stderr pipes
+and immediately forwards their actual bytes through owned readers. Parent
+console flags are isolated from child mutation. Forwarding locks stdout/stderr
+only during each write, allowing concurrent compiler-artifact observations.
+Event formatting occurs once and the writer preserves the remaining byte
+offset across partial writes. Interrupted operations retry; WouldBlock waits
+for the consumer without producing output. Flush uses the same error policy.
+WriteZero, BrokenPipe and other genuine I/O failures remain typed refusals.
+No timer event, worker cap, optimizer/heap change or supervision relaxation is
+introduced. A permanently blocked consumer is still bounded by the enclosing
+process supervisor.
+
+The final helper test build passed in 32.11s; sixteen default regressions passed
+(1.52s), with four native fixtures explicitly ignored. New tests cover a real
+nonblocking full pipe followed by byte-exact drainage, partial/interrupted
+writes and flush, and native-child flag isolation. Strict direct production
+Clippy passed. The six-second real compiler-artifact growth regression was
+explicitly run under idle5/wall120 and passed (6.06s), confirming live artifact
+reports are not blocked by a stream reader's console lock. Current upstream
+CI and downstream native admission remain separate gates.
+
+The library-native build entry point and MRR package/program-stage commands
+also use this isolated streaming executor. Duplication alone would not isolate
+file-status flags; private pipe descriptions are required. The local SDK GXI
+probe exited zero and observed =before_nonblocking=false= followed by
+=after_nonblocking=true=. An initial probe without the selected SDK runtime
+configuration exited 70 and was not counted as evidence.

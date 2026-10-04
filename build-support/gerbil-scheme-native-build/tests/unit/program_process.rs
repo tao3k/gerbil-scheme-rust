@@ -196,3 +196,144 @@ fn actual_gcc_linker_emits_artifacts_and_completes() {
     assert!(!object.with_extension("s").exists());
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn progress_retains_partial_writes_and_retries_interrupted_write_and_flush() {
+    use std::io::{ErrorKind, Write};
+    #[derive(Default)]
+    struct Backpressure {
+        bytes: Vec<u8>,
+        writes: usize,
+        flushes: usize,
+    }
+    impl Write for Backpressure {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.writes += 1;
+            match self.writes {
+                2 => return Err(ErrorKind::Interrupted.into()),
+                3 => return Err(ErrorKind::WouldBlock.into()),
+                _ => {}
+            }
+            let count = bytes.len().min(3);
+            self.bytes.extend_from_slice(&bytes[..count]);
+            Ok(count)
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.flushes += 1;
+            match self.flushes {
+                1 => Err(ErrorKind::WouldBlock.into()),
+                2 => Err(ErrorKind::Interrupted.into()),
+                _ => Ok(()),
+            }
+        }
+    }
+    let mut output = Backpressure::default();
+    super::emit_compiler_artifact_event(&mut output, std::path::Path::new("module.i"), 262_144)
+        .unwrap();
+    assert_eq!(
+        output.bytes,
+        b"native compiler artifact=module.i bytes=262144\n"
+    );
+    assert_eq!(output.flushes, 3);
+}
+
+#[test]
+fn actual_nonblocking_full_pipe_delivers_event_without_loss_after_consumer_drains() {
+    use std::io::{ErrorKind, Write};
+    use std::os::fd::OwnedFd;
+    use std::process::Stdio;
+    let root = artifact_fixture("backpressure");
+    let ready = root.join("drain");
+    let receipt = root.join("received");
+    let mut child = Command::new("python3")
+        .args(["-c", "import pathlib,sys,time; flag=pathlib.Path(sys.argv[1]); receipt=pathlib.Path(sys.argv[2]);\nwhile not flag.exists(): time.sleep(.001)\nreceipt.write_bytes(sys.stdin.buffer.read())"])
+        .arg(&ready).arg(&receipt).stdin(Stdio::piped()).spawn().unwrap();
+    let mut pipe = std::fs::File::from(OwnedFd::from(child.stdin.take().unwrap()));
+    // fcntl changes the shared open-file description through a duplicate;
+    // neither the parent nor the reader process needs unsafe Rust code.
+    assert!(Command::new("python3")
+        .args(["-c", "import fcntl,os; fcntl.fcntl(0,fcntl.F_SETFL,fcntl.fcntl(0,fcntl.F_GETFL)|os.O_NONBLOCK)"])
+        .stdin(Stdio::from(pipe.try_clone().unwrap())).status().unwrap().success());
+    let filler = [b'x'; 4096];
+    let mut filled = 0;
+    loop {
+        match pipe.write(&filler) {
+            Ok(count) => {
+                filled += count;
+                assert!(filled < 16 * 1024 * 1024);
+            }
+            Err(error) if error.kind() == ErrorKind::WouldBlock => break,
+            other => panic!("fill nonblocking pipe: {other:?}"),
+        }
+    }
+    struct ReleaseConsumer {
+        pipe: std::fs::File,
+        ready: std::path::PathBuf,
+        blocked: bool,
+    }
+    impl Write for ReleaseConsumer {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            let result = self.pipe.write(bytes);
+            if result
+                .as_ref()
+                .is_err_and(|e| e.kind() == ErrorKind::WouldBlock)
+            {
+                self.blocked = true;
+                std::fs::write(&self.ready, b"drain")?;
+            }
+            result
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.pipe.flush()
+        }
+    }
+    let mut output = ReleaseConsumer {
+        pipe,
+        ready,
+        blocked: false,
+    };
+    super::emit_compiler_artifact_event(&mut output, std::path::Path::new("module.i"), 262_144)
+        .unwrap();
+    assert!(
+        output.blocked,
+        "the event must encounter real pipe backpressure"
+    );
+    drop(output);
+    assert!(child.wait().unwrap().success());
+    let received = std::fs::read(&receipt).unwrap();
+    assert_eq!(&received[..filled], vec![b'x'; filled]);
+    assert_eq!(
+        &received[filled..],
+        b"native compiler artifact=module.i bytes=262144\n"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn streaming_native_child_cannot_change_parent_stdio_file_status_flags() {
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+    use std::process::Stdio;
+    let (parent, _reader) = UnixStream::pair().unwrap();
+    let check = || {
+        Command::new("python3")
+            .args([
+                "-c",
+                "import os,sys; sys.exit(0 if os.get_blocking(0) else 1)",
+            ])
+            .stdin(Stdio::from(OwnedFd::from(parent.try_clone().unwrap())))
+            .status()
+            .unwrap()
+            .success()
+    };
+    assert!(check());
+    super::run_process(Command::new("python3")
+        .args(["-c", "import os; os.set_blocking(1,False); os.set_blocking(2,False); os.write(1,b'isolated-native-output\\n'); os.write(2,b'isolated-native-diagnostic\\n')"])
+        .stdout(Stdio::from(OwnedFd::from(parent.try_clone().unwrap())))
+        .stderr(Stdio::from(OwnedFd::from(parent.try_clone().unwrap()))),
+        "native file-status fixture", true).unwrap();
+    assert!(
+        check(),
+        "child flag mutation must not reach the parent's file description"
+    );
+}

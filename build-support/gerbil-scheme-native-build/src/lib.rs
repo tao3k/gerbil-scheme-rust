@@ -29,3 +29,5 @@ pub use header::{
 pub use native::{build_native_archive, gerbil_command};
 pub use package_launcher::prepare_gsc_progress_launcher;
 pub use toolchain::{NativeCCompilerTool, discover_native_c_compiler};
+
+pub use program::run_native_process;

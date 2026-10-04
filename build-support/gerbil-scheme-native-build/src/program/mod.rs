@@ -11,3 +11,5 @@ pub use archive::{
     build_program_archive_observed, build_program_archive_with_contract,
     observe_program_archive_operation, source_workspace,
 };
+
+pub use process::run_native_process;

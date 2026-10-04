@@ -6,7 +6,7 @@ use std::env;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 
 use crate::generated_scm::{
     stamp_generated_scm, validate_generated_scm, workspace_input_fingerprint,
@@ -296,10 +296,7 @@ pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
 #[path = "../tests/unit/native_environment_scenario.rs"]
 mod environment_tests;
 
-fn run(command: &mut Command, operation: &str) -> ExitStatus {
-    let status = command
-        .status()
-        .unwrap_or_else(|error| panic!("{operation} could not start: {error}"));
-    assert!(status.success(), "{operation} failed with {status}");
-    status
+fn run(command: &mut Command, operation: &str) {
+    crate::run_native_process(command, operation, true)
+        .unwrap_or_else(|error| panic!("{operation} failed: {error}"));
 }

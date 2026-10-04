@@ -70,6 +70,38 @@ fn artifact_fixture(name: &str) -> std::path::PathBuf {
 }
 
 #[test]
+fn compiler_artifact_diagnostic_write_failure_is_typed_without_panicking() {
+    struct ClosedDiagnosticPipe;
+    impl std::io::Write for ClosedDiagnosticPipe {
+        fn write(&mut self, _bytes: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let error = super::emit_compiler_artifact_event(
+        &mut ClosedDiagnosticPipe,
+        std::path::Path::new("module.i"),
+        262_144,
+    )
+    .unwrap_err();
+    assert!(error.contains("write compiler artifact progress"));
+    assert!(error.to_lowercase().contains("broken pipe"));
+}
+
+#[test]
+fn compiler_monitor_retains_actual_thread_panic_cause() {
+    let payload = std::thread::spawn(|| panic!("fixture monitor cause"))
+        .join()
+        .unwrap_err();
+    assert_eq!(
+        super::compiler_monitor_panic_message(payload),
+        "compiler artifact monitor panicked: fixture monitor cause"
+    );
+}
+
+#[test]
 fn artifact_events_require_new_bytes_and_do_not_repeat_for_stalled_files() {
     let root = artifact_fixture("growth");
     let path = root.join("program_link.i");

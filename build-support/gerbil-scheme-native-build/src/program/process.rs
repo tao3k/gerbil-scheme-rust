@@ -66,7 +66,7 @@ pub(super) fn run_process(
 }
 
 // Read the immutable SDK's declared compiler feature, not PATH or CC.
-pub(super) fn configured_gambit_gcc(gsc: &Path) -> bool {
+pub(crate) fn configured_gambit_gcc(gsc: &Path) -> bool {
     let Ok(gsc) = fs::canonicalize(gsc) else {
         return false;
     };
@@ -116,6 +116,29 @@ fn remove_compiler_artifacts(paths: &[PathBuf]) -> Result<(), String> {
     Ok(())
 }
 
+fn emit_compiler_artifact_event(
+    output: &mut impl std::io::Write,
+    path: &Path,
+    size: u64,
+) -> Result<(), String> {
+    writeln!(
+        output,
+        "native compiler artifact={} bytes={size}",
+        path.display()
+    )
+    .and_then(|()| output.flush())
+    .map_err(|error| format!("write compiler artifact progress: {error}"))
+}
+
+fn compiler_monitor_panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    let detail = payload
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| payload.downcast_ref::<&str>().copied())
+        .unwrap_or("non-string panic payload");
+    format!("compiler artifact monitor panicked: {detail}")
+}
+
 pub(super) fn run_with_compiler_artifacts(
     command: &mut Command,
     operation: &str,
@@ -131,7 +154,7 @@ pub(super) fn run_with_compiler_artifacts(
             while running.load(Ordering::Acquire) {
                 for (path, previous) in artifacts.iter().zip(previous.iter_mut()) {
                     if let Some(size) = compiler_artifact_growth(path, previous)? {
-                        eprintln!("native compiler artifact={} bytes={size}", path.display());
+                        emit_compiler_artifact_event(&mut std::io::stderr().lock(), path, size)?;
                     }
                 }
                 // Polling itself emits nothing. Only compiler-written growth
@@ -142,9 +165,7 @@ pub(super) fn run_with_compiler_artifacts(
         });
         let result = run_process(command, operation, true);
         running.store(false, Ordering::Release);
-        let observed = monitor
-            .join()
-            .map_err(|_| "compiler artifact monitor panicked".to_owned())?;
+        let observed = monitor.join().map_err(compiler_monitor_panic_message)?;
         result.and(observed)
     });
     let cleanup = remove_compiler_artifacts(&artifacts);

@@ -6,6 +6,7 @@ mod discovery;
 mod generated_scm;
 mod header;
 mod native;
+mod package_launcher;
 mod program;
 mod toolchain;
 pub use program::{
@@ -26,4 +27,5 @@ pub use header::{
     write_native_c_header,
 };
 pub use native::{build_native_archive, gerbil_command};
+pub use package_launcher::prepare_gsc_progress_launcher;
 pub use toolchain::{NativeCCompilerTool, discover_native_c_compiler};

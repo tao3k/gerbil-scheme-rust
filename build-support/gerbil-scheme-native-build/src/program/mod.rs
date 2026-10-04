@@ -3,6 +3,7 @@
 mod archive;
 mod headers;
 mod process;
+pub(crate) use process::configured_gambit_gcc;
 
 pub use archive::{
     NativeHeaderInput, ProgramArchiveContract, ProgramArchiveObservation, ProgramArchiveObserver,

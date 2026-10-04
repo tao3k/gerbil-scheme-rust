@@ -287,3 +287,37 @@ process descendants and a cleanup sample in the same refused run. Preserve
 normal Gambit cleanup and require successful child exit. Any static driver or
 module-lifetime change needs independent source/ABI qualification; object-file
 existence and a returned event cannot replace it.
+
+** Package compiler diagnostics and monitor failures (2026-10-05)
+
+The installed v0.19 compiler's =gsc-cc-options= discards user C options for
+macro (=phi?=) modules. PackageSpec options alone therefore do not cover the
+observed =native~1.c= quiet interval. The shared
+=prepare_gsc_progress_launcher= publishes a content-addressed, closed executable
+that execs the selected SDK GSC and forwards the original arguments. It adds
+=-Q -fopt-info-all= only for verbose builds whose SDK =gambuild-C= identifies
+GCC, preserving the SDK optimization level and ABI flags. Quiet and non-GCC
+calls retain the original compiler. These are actual function/optimization
+reports, as specified in [[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC developer options]], with no timer output.
+
+The final helper Cargo test build passed (39.52s); thirteen default regressions
+passed (0.55s), four native fixtures remained explicitly ignored, and the
+current production source passed direct strict Clippy against qualified Cargo
+dependency inputs. Launcher regressions cover quoted compiler paths, exact
+argument forwarding, nonzero exit and concurrent executable publication.
+
+An actual new isolated MRR package prefix completed under idle30/wall1200 in
+80.51s using this helper's generated launcher. The macro object was present
+after successful process exit. This is one host qualification, not a speedup
+or full downstream semantic qualification. A prior resumed incomplete prefix
+exited zero without invoking GCC because std/make trusted its SSI intermediates;
+that attempt did not qualify the diagnostic change. MRR must invalidate such
+partial managed output before retrying.
+
+Data =0912e5bc= Ubuntu reported =compiler artifact monitor panicked= at an
+archive object, independently of idle supervision. The previous join mapping
+discarded its panic payload. It now retains the actual cause; diagnostic writes
+and flushes return typed errors rather than panicking. The original CI panic
+cause remains unproven until the revised job supplies it. Broken-pipe and
+actual-thread-panic regressions validate failure propagation without relaxing
+the build gate.

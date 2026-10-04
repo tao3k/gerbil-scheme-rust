@@ -85,6 +85,7 @@ fn program_rejects_a_forbidden_runtime_module_before_compilation() {
             forbidden_modules: &["example/build-control"],
             linker_main_symbol: "example_program_main",
             additional_objects: &[],
+            native_headers: &[],
         },
         &observations,
     )
@@ -220,6 +221,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
             forbidden_modules: &[],
             linker_main_symbol: "example_program_main",
             additional_objects: &[],
+            native_headers: &[],
         },
         &observations,
     )

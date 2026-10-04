@@ -2,7 +2,7 @@
 
 //! Compile a compiler-owned AOT program manifest without inspecting Scheme text.
 
-use crate::native::gerbil_command;
+use crate::gerbil_command;
 use crate::{
     NativeArchiveLinkReceipt, NativeLinkLibrary, NativeStaticLinkPlan,
     build_static_archive_from_link_plan,
@@ -72,7 +72,20 @@ pub struct ProgramArchiveContract<'a> {
     pub linker_main_symbol: &'a str,
     /// Caller-owned native objects included in the same static archive.
     pub additional_objects: &'a [PathBuf],
+    /// Explicit package header roots and files used by module compilation.
+    pub native_headers: &'a [NativeHeaderInput<'a>],
 }
+
+/// One declared package include root, with its complete header inputs.
+#[derive(Clone, Copy, Debug)]
+pub struct NativeHeaderInput<'a> {
+    pub include_directory: &'a Path,
+    pub header_files: &'a [PathBuf],
+}
+
+#[path = "program_headers.rs"]
+mod headers;
+use headers::native_compile_options;
 
 const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/native"];
 
@@ -166,6 +179,7 @@ pub fn build_program_archive_observed(
             forbidden_modules: &[],
             linker_main_symbol: "gerbil_scheme_rust_program_main",
             additional_objects: &[],
+            native_headers: &[],
         },
         observer,
     )
@@ -198,12 +212,14 @@ pub fn build_program_archive_with_contract(
     for module in &plan.modules {
         observer.observe_source_input(&module.scm);
     }
+    let cc_options = native_compile_options(contract.native_headers, observer)?;
     let staged = stage_program(&plan, request, observer)?;
     let mut link_plan = compile_program(
         &plan,
         staged,
         request,
         contract.linker_main_symbol,
+        &cc_options,
         observer,
     )?;
     link_plan
@@ -417,6 +433,7 @@ fn compile_program(
     staged: StagedProgram,
     request: ProgramArchiveRequest<'_>,
     linker_main_symbol: &str,
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<NativeStaticLinkPlan, String> {
     let StagedProgram {
@@ -425,7 +442,7 @@ fn compile_program(
         linker_c,
         linker_object,
     } = staged;
-    compile_program_modules(request.gsc, &compile_sources, observer)?;
+    compile_program_modules(request.gsc, &compile_sources, cc_options, observer)?;
     let stub_object = request.out_dir.join("program_stub.o");
     compile_native_object(
         request.gsc,
@@ -467,6 +484,7 @@ fn compile_program(
 fn compile_program_modules(
     gsc: &Path,
     sources: &[(PathBuf, PathBuf, String)],
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
     let worker_count = native_build_parallelism(sources.len());
@@ -478,19 +496,20 @@ fn compile_program_modules(
             operation: "compile program module objects",
             subject: Some(&batch),
         },
-        || compile_program_modules_inner(gsc, sources, observer, worker_count),
+        || compile_program_modules_inner(gsc, sources, cc_options, observer, worker_count),
     )
 }
 
 fn compile_program_modules_inner(
     gsc: &Path,
     sources: &[(PathBuf, PathBuf, String)],
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
     worker_count: usize,
 ) -> Result<(), String> {
     if worker_count <= 1 {
         for (source, object, module) in sources {
-            compile_program_module(gsc, source, object, module, observer)?;
+            compile_program_module(gsc, source, object, module, cc_options, observer)?;
         }
         return Ok(());
     }
@@ -509,7 +528,7 @@ fn compile_program_modules_inner(
                         return;
                     };
                     if let Err(error) =
-                        compile_program_module(gsc, source, object, module, observer)
+                        compile_program_module(gsc, source, object, module, cc_options, observer)
                     {
                         *failure.lock().expect("native build failure lock") = Some(error);
                         return;
@@ -529,6 +548,7 @@ fn compile_program_module(
     source: &Path,
     object: &Path,
     module: &str,
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
     compile_native_object(
@@ -536,7 +556,7 @@ fn compile_program_module(
         source,
         object,
         "program-module-object-v1",
-        "-O2",
+        cc_options,
         ProgramArchiveOperation {
             phase: "native-object",
             operation: "compile program module",

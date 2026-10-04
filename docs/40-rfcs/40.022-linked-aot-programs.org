@@ -29,6 +29,14 @@ closure. The executable Scenario runs an unchanged input twice and then changes
 it, proving one warm compiler invocation is skipped and the changed input is
 compiled again.
 
+Package C headers are explicit =NativeHeaderInput= values in the program
+contract. Each input declares an include directory and its complete header
+files. The builder rejects missing files and files outside that directory,
+reports each file to the source observer, and incorporates header bytes into
+module compiler options and therefore object cache identity. A header-only
+change recompiles the module objects. Include paths are quoted for the compiler
+shell; ambient include flags do not replace these declarations.
+
 The sys crate supplies only the shared lifecycle shim in this configuration.
 It must not also load the standalone fixture graph or create another runtime.
 

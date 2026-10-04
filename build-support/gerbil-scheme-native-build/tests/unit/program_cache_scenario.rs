@@ -41,23 +41,80 @@ fn unchanged_native_input_reuses_content_addressed_output() {
     let input = root.join("module.scm");
     let output = root.join("module.o");
     fs::write(&input, INPUT).expect("write first input");
+    let header = root.join("bridge.h");
+    fs::write(&header, "#define BRIDGE_VERSION 1\n").expect("write header input");
+    let header_files = [header.clone()];
+    let header_input = [super::NativeHeaderInput {
+        include_directory: &root,
+        header_files: &header_files,
+    }];
     let observations = Observations(Mutex::new(Vec::new()));
+    let options = super::native_compile_options(&header_input, &observations)
+        .expect("validate header inputs");
 
-    compile_program_module(&compiler, &input, &output, "example/module", &observations)
-        .expect("initial native compilation");
-    compile_program_module(&compiler, &input, &output, "example/module", &observations)
-        .expect("cached native compilation");
+    compile_program_module(
+        &compiler,
+        &input,
+        &output,
+        "example/module",
+        &options,
+        &observations,
+    )
+    .expect("initial native compilation");
+    compile_program_module(
+        &compiler,
+        &input,
+        &output,
+        "example/module",
+        &options,
+        &observations,
+    )
+    .expect("cached native compilation");
     fs::write(&input, "changed input").expect("change native input");
-    compile_program_module(&compiler, &input, &output, "example/module", &observations)
-        .expect("invalidated native compilation");
+    compile_program_module(
+        &compiler,
+        &input,
+        &output,
+        "example/module",
+        &options,
+        &observations,
+    )
+    .expect("invalidated native compilation");
+
+    fs::write(&header, "#define BRIDGE_VERSION 2\n").expect("change only header bytes");
+    let changed = super::native_compile_options(&header_input, &observations)
+        .expect("validate changed header inputs");
+    compile_program_module(
+        &compiler,
+        &input,
+        &output,
+        "example/module",
+        &changed,
+        &observations,
+    )
+    .expect("header-only change invalidates native object");
+    let outside = root.join("nested");
+    fs::create_dir(&outside).expect("create separate include root");
+    assert!(
+        super::native_compile_options(
+            &[super::NativeHeaderInput {
+                include_directory: &outside,
+                header_files: &header_files,
+            }],
+            &observations
+        )
+        .is_err()
+    );
+    fs::remove_file(&header).expect("remove declared header");
+    assert!(super::native_compile_options(&header_input, &observations).is_err());
 
     assert_eq!(
         fs::read_to_string(&log)
             .expect("read compiler log")
             .lines()
             .count(),
-        2,
-        "the unchanged input must skip exactly one compiler invocation"
+        3,
+        "unchanged inputs cache; source-only and header-only changes recompile"
     );
     assert!(
         observations

@@ -2,7 +2,10 @@
 
 //! Compile a compiler-owned AOT program manifest without inspecting Scheme text.
 
-use crate::gerbil_command;
+use super::process::{
+    GSC_PROGRESS_OPTIONS, configured_gambit_gcc, gambit_progress_command, native_progress_enabled,
+    run_process, run_with_compiler_artifacts,
+};
 use crate::{
     NativeArchiveLinkReceipt, NativeLinkLibrary, NativeStaticLinkPlan,
     build_static_archive_from_link_plan,
@@ -83,9 +86,7 @@ pub struct NativeHeaderInput<'a> {
     pub header_files: &'a [PathBuf],
 }
 
-#[path = "program_headers.rs"]
-mod headers;
-use headers::native_compile_options;
+use super::headers::native_compile_options;
 
 const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/native"];
 
@@ -578,7 +579,17 @@ fn compile_native_object(
     operation: ProgramArchiveOperation<'_>,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
-    let fingerprint = native_input_fingerprint(gsc, domain, cc_options, source)?;
+    // Gambit's configured compiler owns its ABI flags. Only its declared GCC
+    // backend supports these diagnostic options; never substitute ambient CC.
+    let gcc_progress = native_progress_enabled()
+        && operation.subject == Some("program-linker")
+        && configured_gambit_gcc(gsc);
+    let cc_options = if gcc_progress {
+        format!("{cc_options} -save-temps=obj -Q")
+    } else {
+        cc_options.to_owned()
+    };
+    let fingerprint = native_input_fingerprint(gsc, domain, &cc_options, source)?;
     if let Some(fingerprint) = fingerprint.as_deref() {
         if cached_native_output(object, fingerprint)? {
             observe_cached(
@@ -590,16 +601,24 @@ fn compile_native_object(
             return Ok(());
         }
     }
-    run(
-        gambit_progress_command(gsc)
-            .args(["-obj", "-cc-options", cc_options, "-o"])
-            .arg(object)
-            .arg(source),
-        operation.phase,
-        operation.operation,
-        operation.subject,
-        observer,
-    )?;
+    let mut command = gambit_progress_command(gsc);
+    command
+        .args(["-obj", "-cc-options", &cc_options, "-o"])
+        .arg(object)
+        .arg(source);
+    if gcc_progress {
+        observe_program_archive_operation(observer, operation, || {
+            run_with_compiler_artifacts(&mut command, operation.operation, object)
+        })?;
+    } else {
+        run(
+            &mut command,
+            operation.phase,
+            operation.operation,
+            operation.subject,
+            observer,
+        )?;
+    }
     match fingerprint {
         Some(fingerprint) => publish_native_output_fingerprint(object, &fingerprint),
         None => Ok(()),
@@ -789,60 +808,6 @@ fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {
     Ok(runtime)
 }
 
-// Verbose native builds expose genuine compiler and collector events. The
-// collector policy and heap limits remain Gambit's defaults.
-const GSC_PROGRESS_OPTIONS: [&str; 2] = ["-:1n,2n,d5qQ", "-verbose"];
-
-fn native_progress_enabled() -> bool {
-    std::env::var("GERBIL_BUILD_VERBOSE")
-        .ok()
-        .and_then(|level| level.parse::<u8>().ok())
-        .is_some_and(|level| level > 0)
-}
-
-fn gambit_progress_command(program: &Path) -> Command {
-    gambit_progress_command_with_mode(program, native_progress_enabled())
-}
-
-fn gambit_progress_command_with_mode(program: &Path, live: bool) -> Command {
-    let mut command = gerbil_command(program);
-    if live {
-        // Runtime options must precede compiler options. Line buffering also
-        // applies when Cargo redirects stdout/stderr to pipes. q/Q retain
-        // nonzero termination rather than entering a REPL on failure.
-        command.args(GSC_PROGRESS_OPTIONS);
-    }
-    command
-}
-
-fn run_process(command: &mut Command, operation: &str, live: bool) -> Result<(), String> {
-    if live {
-        let status = command
-            .status()
-            .map_err(|error| format!("{operation}: {error}"))?;
-        return if status.success() {
-            Ok(())
-        } else {
-            Err(format!(
-                "{operation}: {status}; diagnostics streamed to inherited stdout/stderr"
-            ))
-        };
-    }
-    let output = command
-        .output()
-        .map_err(|error| format!("{operation}: {error}"))?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "{operation}: {}; {}{}",
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ))
-    }
-}
-
 fn run(
     command: &mut Command,
     phase: &'static str,
@@ -890,9 +855,5 @@ pub fn observe_program_archive_operation<T>(
 }
 
 #[cfg(all(test, unix))]
-#[path = "../tests/unit/program_cache_scenario.rs"]
+#[path = "../../tests/unit/program_cache_scenario.rs"]
 mod cache_scenario;
-
-#[cfg(all(test, unix))]
-#[path = "../tests/unit/program_process.rs"]
-mod process_tests;

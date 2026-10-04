@@ -111,3 +111,41 @@ and release its root, and reject invalid lifecycle/call states. Downstream
 authorization additionally requires its own policy, signature, replay and
 effect-consumption checks. No proof theorem follows from these executable
 checks alone.
+
+** Compiler-owned linker artifact progress
+
+Verbose linker compilation on a Gambit SDK declaring
+=BUILD_FEATURE_C_COMP="gcc"= adds =-save-temps=obj -Q= to its existing compiler
+options. The SDK's =gambuild-C= declaration is read beside the canonical GSC
+executable; ambient =CC= is not used to select this capability. Other declared
+compilers and quiet builds keep their existing options. The effective options
+participate in the object fingerprint.
+
+The helper observes only that linker's =.i= and =.s= files. A new event requires
+at least 256 KiB of compiler-written growth. Polling a missing or unchanged
+file emits nothing, so a stalled child still fails the caller's idle gate.
+Stale intermediates are removed before launch; both success and failure remove
+these extra intermediates after the child exits. The compiler exit status
+remains mandatory; artifact growth cannot turn a failed compilation into a
+successful archive. Additional intermediate disk use is limited to the linker
+operation, not all parallel module objects.
+
+The actual 8,582,602-byte generated MRR linker C reproduced the silent GCC phase.
+An owned-process sample identified initializer parsing with nested macro
+expansion. A diagnostic compile with the same SDK, ABI flags and =-O2= produced
+real =.i= growth and completed under the unchanged 30-second idle build gate.
+This is progress qualification, not a controlled speedup or full downstream
+runtime qualification. The mechanism follows GCC's documented intermediate
+output behavior:
+[[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC developer options, save-temps=obj and -Q]].
+
+The implemented Rust helper passed six default library regressions (including
+cache identity and failure/stale-artifact cleanup), the six-second artifact
+fixture under five-second idle supervision, and the actual generated-linker
+fixture under 30-second idle build supervision. The actual fixture completed
+in 21.00s on this host; this is not an A/B performance claim. A direct strict
+Clippy-driver check of the current helper test crate, using dependencies from
+the successful Cargo test compilation, passed. Full Cargo Clippy attempts
+still failed the 30-second idle gate while checking/compiling the separate
+Rust project harness dependency, including =--no-deps=; this remains distinct
+from the native compiler repair and is not reported as a passed full lint gate.

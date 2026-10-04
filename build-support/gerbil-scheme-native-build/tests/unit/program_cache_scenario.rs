@@ -127,3 +127,31 @@ fn unchanged_native_input_reuses_content_addressed_output() {
     );
     fs::remove_dir_all(root).expect("remove cache scenario root");
 }
+
+#[test]
+#[ignore = "requires owned generated module C and the configured GCC SDK"]
+fn actual_gcc_module_completes_with_bounded_load_motion_policy() {
+    let source = std::path::PathBuf::from(
+        std::env::var_os("GERBIL_MODULE_DIAGNOSTIC_SOURCE").expect("owned module source"),
+    );
+    let gsc = std::path::PathBuf::from(
+        std::env::var_os("GERBIL_GSC").expect("configured Gambit compiler"),
+    );
+    assert!(super::super::process::configured_gambit_gcc(&gsc));
+    let root = std::env::temp_dir().join(format!("native-actual-module-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    let object = root.join("module.o");
+    compile_program_module(
+        &gsc,
+        &source,
+        &object,
+        "owned/diagnostic-module",
+        "-O2 -Dmain=mrr_grammar_gambit_main",
+        &Observations(Mutex::new(Vec::new())),
+    )
+    .unwrap();
+    assert!(object.is_file());
+    assert!(!object.with_extension("i").exists());
+    assert!(!object.with_extension("s").exists());
+    std::fs::remove_dir_all(root).unwrap();
+}

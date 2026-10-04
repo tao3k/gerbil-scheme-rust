@@ -217,3 +217,18 @@ module-object phase; runtime restoration separately failed idle5 after setup
 started. Full Cargo Clippy also failed its idle gate in a Rust harness
 dependency. Direct helper lint success does not qualify full Cargo Clippy.
 These are open P0 gates, not completed production or performance claims.
+
+** P0 follow-up: actual compiler and restoration evidence
+
+The remaining cold object was identified as =clan/poo/trie= (58/59 completed).
+An owned GCC sample localized load-motion expression table work. The narrow
+GCC generated-module policy and expanded object diagnostics are specified in
+[[file:../40-rfcs/40.022-linked-aot-programs.org::*GCC module load-motion and full object progress][40.022 module qualification]].
+
+The parser's existing =GERBIL_PARSER_LR_TRACE= enabled real decode, verified
+and admitted events during cold setup. Independently supervised local-patch
+DataFusion 2/2 and GraphAr 4/4 source-handoff suites then passed idle5, in
+7.55s and 9.93s respectively. Their admitted build record still uses the older
+MRR =023a6db= composition; these do not qualify the latest published pins or
+claim an initialization speedup. The earlier failed cold attempts remain
+retained. CI's original-query entrypoint must enable these actual events.

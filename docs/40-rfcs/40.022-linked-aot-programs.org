@@ -149,3 +149,46 @@ the successful Cargo test compilation, passed. Full Cargo Clippy attempts
 still failed the 30-second idle gate while checking/compiling the separate
 Rust project harness dependency, including =--no-deps=; this remains distinct
 from the native compiler repair and is not reported as a passed full lint gate.
+
+** GCC module load-motion and full object progress
+
+The published-pin cold downstream build completed 58/59 module objects before
+idle30 refusal. The sole unfinished object was =clan/poo/trie=. An owned GCC
+16.2.0 process sample found =pass_rtl_pre=, =one_pre_gcse_pass= and
+=ldst_entry= expression hashing/comparison. Adding =-fopt-info-all= by itself
+still failed idle30. Compiler CPU activity is diagnostic evidence and is not
+an acceptance event.
+
+The generated-module policy for SDK-declared GCC now retains =-O2= and all
+SDK ABI flags, while disabling just load motion with =-fno-gcse-lm=. This
+policy is independent of verbosity and participates in the existing content
+fingerprint. Linker objects retain their optimization policy. Other SDK
+compiler backends are unchanged. The actual trie source completed with this
+narrow policy under idle30; full archive, semantics and target-specific
+performance qualification are separate gates.
+
+Verbose GCC compilation now exposes =-fopt-info-all= and observes =.i/.s=
+growth for module objects as well as the linker. Each object has distinct
+intermediates, stale files are removed before launch, and both success and
+failure clean them. Temporary disk use now includes concurrently compiled
+modules; no extra worker limit is introduced. Polling without newly written
+bytes remains silent. Optimization output cannot admit an unsuccessful object.
+
+GCC documents load motion as a subpass enabled with GCSE and explicitly notes
+that computed-goto programs can behave differently under GCSE:
+[[https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html][GCC optimization options]].
+The sampled mechanism also matches the load-motion expression-table code in
+[[https://github.com/gcc-mirror/gcc/blob/master/gcc/gcse.cc][GCC gcse.cc]];
+that moving upstream source is corroboration, not exact SDK-version proof.
+This workaround carries no steady-state speedup claim. Paired release-query
+and memory measurements remain required before final performance acceptance.
+
+The current candidate helper compiled successfully under idle30, passed six
+non-ignored library regressions, and passed the actual generated trie fixture
+in 51.43s under idle30. The fixture invokes the real archive module compiler
+and verifies object existence and removal of its =.i/.s= intermediates. Direct
+strict Clippy-driver qualification of current helper/test source also passed
+using dependencies from the previously qualified Cargo build. This remains
+separate from the open full Cargo Clippy gate. One first fixture invocation
+failed because SDK =~~bin= was not mapped; the corrected invocation used the
+same explicit versioned SDK mappings as the downstream build launcher.

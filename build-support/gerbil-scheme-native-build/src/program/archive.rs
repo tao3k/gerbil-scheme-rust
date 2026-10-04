@@ -581,13 +581,21 @@ fn compile_native_object(
 ) -> Result<(), String> {
     // Gambit's configured compiler owns its ABI flags. Only its declared GCC
     // backend supports these diagnostic options; never substitute ambient CC.
-    let gcc_progress = native_progress_enabled()
-        && operation.subject == Some("program-linker")
-        && configured_gambit_gcc(gsc);
-    let cc_options = if gcc_progress {
-        format!("{cc_options} -save-temps=obj -Q")
+    let gcc = configured_gambit_gcc(gsc);
+    // Gambit's large single-host module functions can spend minutes building
+    // GCC's load-motion expression table with no observable compiler output.
+    // Retain -O2 and the SDK ABI flags, but exclude that one GCC subpass for
+    // generated module objects. This policy is independent of verbosity.
+    let cc_options = if gcc && operation.phase == "native-object" {
+        format!("{cc_options} -fno-gcse-lm")
     } else {
         cc_options.to_owned()
+    };
+    let gcc_progress = native_progress_enabled() && gcc;
+    let cc_options = if gcc_progress {
+        format!("{cc_options} -save-temps=obj -Q -fopt-info-all")
+    } else {
+        cc_options
     };
     let fingerprint = native_input_fingerprint(gsc, domain, &cc_options, source)?;
     if let Some(fingerprint) = fingerprint.as_deref() {

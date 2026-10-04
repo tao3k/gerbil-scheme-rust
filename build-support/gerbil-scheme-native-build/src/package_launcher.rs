@@ -39,8 +39,9 @@ fn write_launcher(gsc: &Path, out_dir: &Path) -> Result<PathBuf, String> {
         }
         return Ok(launcher);
     }
-    // Publish only a closed, executable inode. Concurrent users never execute
-    // the staging file or observe a file still open for writing (ETXTBSY).
+    // Publish a closed inode without replacing an already published one.
+    // Rename-overwrite can race with a fork that inherited another staging
+    // writer's descriptor, making the replacement inode ETXTBSY on Linux.
     let staging = out_dir.join(format!(
         ".gsc-progress-{}-{}",
         std::process::id(),
@@ -49,10 +50,27 @@ fn write_launcher(gsc: &Path, out_dir: &Path) -> Result<PathBuf, String> {
     let result = (|| {
         fs::write(&staging, script.as_bytes())?;
         fs::set_permissions(&staging, fs::Permissions::from_mode(0o755))?;
-        fs::rename(&staging, &launcher)
+        match fs::hard_link(&staging, &launcher) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                if fs::read(&launcher)? == script.as_bytes() {
+                    Ok(())
+                } else {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "content-addressed package launcher drift",
+                    ))
+                }
+            }
+            Err(error) => Err(error),
+        }
     })();
-    if let Err(error) = result {
-        let _ = fs::remove_file(&staging);
+    let cleanup = match fs::remove_file(&staging) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    };
+    if let Err(error) = result.and(cleanup) {
         return Err(format!("publish package GSC launcher: {error}"));
     }
     Ok(launcher)

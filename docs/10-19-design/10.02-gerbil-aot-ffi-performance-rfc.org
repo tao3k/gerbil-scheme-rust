@@ -321,3 +321,18 @@ and flushes return typed errors rather than panicking. The original CI panic
 cause remains unproven until the revised job supplies it. Broken-pipe and
 actual-thread-panic regressions validate failure propagation without relaxing
 the build gate.
+
+** Immutable launcher publication after Linux regression (2026-10-05)
+
+Exact-head Ubuntu CI for =fc114cc= failed the parallel launcher regression
+with =ETXTBSY= (11 passed, one failed, four ignored). Closed staging files
+alone did not qualify rename-overwrite publication on Linux. Publication now
+uses a same-directory hard link with no replacement; concurrent losers verify
+the already published script bytes and remove their staging files. The
+content-addressed executable is reused rather than replaced during execution.
+An inherited staging descriptor is a possible mechanism, not a sampled cause.
+
+The revised local Cargo test build passed in 41.48s and thirteen default
+regressions passed in 0.77s, with four native fixtures explicitly ignored.
+Ubuntu qualification of this replacement remains required; the failed Linux
+receipt is retained and is not counted as a pass.

@@ -2,7 +2,10 @@
 
 //! Compile a compiler-owned AOT program manifest without inspecting Scheme text.
 
-use crate::native::gerbil_command;
+use super::process::{
+    GSC_PROGRESS_OPTIONS, configured_gambit_gcc, gambit_progress_command, native_progress_enabled,
+    run_process, run_with_compiler_artifacts,
+};
 use crate::{
     NativeArchiveLinkReceipt, NativeLinkLibrary, NativeStaticLinkPlan,
     build_static_archive_from_link_plan,
@@ -72,7 +75,18 @@ pub struct ProgramArchiveContract<'a> {
     pub linker_main_symbol: &'a str,
     /// Caller-owned native objects included in the same static archive.
     pub additional_objects: &'a [PathBuf],
+    /// Explicit package header roots and files used by module compilation.
+    pub native_headers: &'a [NativeHeaderInput<'a>],
 }
+
+/// One declared package include root, with its complete header inputs.
+#[derive(Clone, Copy, Debug)]
+pub struct NativeHeaderInput<'a> {
+    pub include_directory: &'a Path,
+    pub header_files: &'a [PathBuf],
+}
+
+use super::headers::native_compile_options;
 
 const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/native"];
 
@@ -166,6 +180,7 @@ pub fn build_program_archive_observed(
             forbidden_modules: &[],
             linker_main_symbol: "gerbil_scheme_rust_program_main",
             additional_objects: &[],
+            native_headers: &[],
         },
         observer,
     )
@@ -198,12 +213,14 @@ pub fn build_program_archive_with_contract(
     for module in &plan.modules {
         observer.observe_source_input(&module.scm);
     }
+    let cc_options = native_compile_options(contract.native_headers, observer)?;
     let staged = stage_program(&plan, request, observer)?;
     let mut link_plan = compile_program(
         &plan,
         staged,
         request,
         contract.linker_main_symbol,
+        &cc_options,
         observer,
     )?;
     link_plan
@@ -284,7 +301,7 @@ fn stage_program(
     std::fs::create_dir_all(request.out_dir).map_err(|e| e.to_string())?;
     let linker_c = request.out_dir.join("program_link.c");
     let linker_object = request.out_dir.join("program_link.o");
-    let mut link = gerbil_command(request.gsc);
+    let mut link = gambit_progress_command(request.gsc);
     link.args(["-link", "-linker-name", request.linker_name, "-o"])
         .arg(&linker_c);
     let mut objects = Vec::new();
@@ -400,7 +417,10 @@ fn generate_module_c(
     // entry point. Compile separately so each module keeps its own identity;
     // only the final C-only link step receives the program linker name.
     run(
-        gerbil_command(gsc).args(["-c", "-o"]).arg(&source).arg(scm),
+        gambit_progress_command(gsc)
+            .args(["-c", "-o"])
+            .arg(&source)
+            .arg(scm),
         "module-c",
         "generate program module C",
         Some(module),
@@ -417,6 +437,7 @@ fn compile_program(
     staged: StagedProgram,
     request: ProgramArchiveRequest<'_>,
     linker_main_symbol: &str,
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<NativeStaticLinkPlan, String> {
     let StagedProgram {
@@ -425,7 +446,7 @@ fn compile_program(
         linker_c,
         linker_object,
     } = staged;
-    compile_program_modules(request.gsc, &compile_sources, observer)?;
+    compile_program_modules(request.gsc, &compile_sources, cc_options, observer)?;
     let stub_object = request.out_dir.join("program_stub.o");
     compile_native_object(
         request.gsc,
@@ -467,6 +488,7 @@ fn compile_program(
 fn compile_program_modules(
     gsc: &Path,
     sources: &[(PathBuf, PathBuf, String)],
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
     let worker_count = native_build_parallelism(sources.len());
@@ -478,19 +500,20 @@ fn compile_program_modules(
             operation: "compile program module objects",
             subject: Some(&batch),
         },
-        || compile_program_modules_inner(gsc, sources, observer, worker_count),
+        || compile_program_modules_inner(gsc, sources, cc_options, observer, worker_count),
     )
 }
 
 fn compile_program_modules_inner(
     gsc: &Path,
     sources: &[(PathBuf, PathBuf, String)],
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
     worker_count: usize,
 ) -> Result<(), String> {
     if worker_count <= 1 {
         for (source, object, module) in sources {
-            compile_program_module(gsc, source, object, module, observer)?;
+            compile_program_module(gsc, source, object, module, cc_options, observer)?;
         }
         return Ok(());
     }
@@ -509,7 +532,7 @@ fn compile_program_modules_inner(
                         return;
                     };
                     if let Err(error) =
-                        compile_program_module(gsc, source, object, module, observer)
+                        compile_program_module(gsc, source, object, module, cc_options, observer)
                     {
                         *failure.lock().expect("native build failure lock") = Some(error);
                         return;
@@ -529,6 +552,7 @@ fn compile_program_module(
     source: &Path,
     object: &Path,
     module: &str,
+    cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
     compile_native_object(
@@ -536,7 +560,7 @@ fn compile_program_module(
         source,
         object,
         "program-module-object-v1",
-        "-O2",
+        cc_options,
         ProgramArchiveOperation {
             phase: "native-object",
             operation: "compile program module",
@@ -555,7 +579,17 @@ fn compile_native_object(
     operation: ProgramArchiveOperation<'_>,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
-    let fingerprint = native_input_fingerprint(gsc, domain, cc_options, source)?;
+    // Gambit's configured compiler owns its ABI flags. Only its declared GCC
+    // backend supports these diagnostic options; never substitute ambient CC.
+    let gcc_progress = native_progress_enabled()
+        && operation.subject == Some("program-linker")
+        && configured_gambit_gcc(gsc);
+    let cc_options = if gcc_progress {
+        format!("{cc_options} -save-temps=obj -Q")
+    } else {
+        cc_options.to_owned()
+    };
+    let fingerprint = native_input_fingerprint(gsc, domain, &cc_options, source)?;
     if let Some(fingerprint) = fingerprint.as_deref() {
         if cached_native_output(object, fingerprint)? {
             observe_cached(
@@ -567,16 +601,24 @@ fn compile_native_object(
             return Ok(());
         }
     }
-    run(
-        gerbil_command(gsc)
-            .args(["-obj", "-cc-options", cc_options, "-o"])
-            .arg(object)
-            .arg(source),
-        operation.phase,
-        operation.operation,
-        operation.subject,
-        observer,
-    )?;
+    let mut command = gambit_progress_command(gsc);
+    command
+        .args(["-obj", "-cc-options", &cc_options, "-o"])
+        .arg(object)
+        .arg(source);
+    if gcc_progress {
+        observe_program_archive_operation(observer, operation, || {
+            run_with_compiler_artifacts(&mut command, operation.operation, object)
+        })?;
+    } else {
+        run(
+            &mut command,
+            operation.phase,
+            operation.operation,
+            operation.subject,
+            observer,
+        )?;
+    }
     match fingerprint {
         Some(fingerprint) => publish_native_output_fingerprint(object, &fingerprint),
         None => Ok(()),
@@ -626,6 +668,12 @@ fn native_inputs_fingerprint(
             )
         })?;
     let mut hasher = Sha256::new();
+    if native_progress_enabled() {
+        for option in GSC_PROGRESS_OPTIONS {
+            hasher.update((option.len() as u64).to_le_bytes());
+            hasher.update(option.as_bytes());
+        }
+    }
     for value in [
         domain.as_bytes(),
         options.as_bytes(),
@@ -774,19 +822,7 @@ fn run(
             operation,
             subject,
         },
-        || {
-            let output = command.output().map_err(|e| format!("{operation}: {e}"))?;
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(format!(
-                    "{operation}: {}; {}{}",
-                    output.status,
-                    String::from_utf8_lossy(&output.stdout),
-                    String::from_utf8_lossy(&output.stderr)
-                ))
-            }
-        },
+        || run_process(command, operation, native_progress_enabled()),
     )
 }
 
@@ -819,5 +855,5 @@ pub fn observe_program_archive_operation<T>(
 }
 
 #[cfg(all(test, unix))]
-#[path = "../tests/unit/program_cache_scenario.rs"]
+#[path = "../../tests/unit/program_cache_scenario.rs"]
 mod cache_scenario;

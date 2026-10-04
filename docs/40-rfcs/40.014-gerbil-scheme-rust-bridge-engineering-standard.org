@@ -281,6 +281,6 @@ CI green is required, but green CI alone is not approval to squash or merge.
 
 The compiler, embedded setup, GC ownership, callback containment and staged
 P0/P1/P2 receipts are consolidated in
-[[file:../10-19-design/10.02-gerbil-aot-ffi-performance-rfc.org::*10.02.90 Source Audit and Delivery Plan (2026-10-04)][10.02.90 source audit and delivery plan]].
+[[file:../10-19-design/10.02-gerbil-aot-ffi-performance-rfc.org::*10.02.100 Source Audit and Delivery Plan (2026-10-04)][10.02.100 source audit and delivery plan]].
 AoT artifact construction, cold runtime restoration and steady-state FFI are
 separate acceptance gates. Passing one does not qualify the others.

@@ -276,3 +276,11 @@ CI green is required, but green CI alone is not approval to squash or merge.
 - bignum or full exact integer conversion in the fixnum slice;
 - performance benchmark changes before correctness and failure semantics are
   accepted.
+
+* Source-grounded native qualification
+
+The compiler, embedded setup, GC ownership, callback containment and staged
+P0/P1/P2 receipts are consolidated in
+[[file:../10-19-design/10.02-gerbil-aot-ffi-performance-rfc.org::*10.02.90 Source Audit and Delivery Plan (2026-10-04)][10.02.90 source audit and delivery plan]].
+AoT artifact construction, cold runtime restoration and steady-state FFI are
+separate acceptance gates. Passing one does not qualify the others.

@@ -115,3 +115,105 @@ valid evidence.
 
 Until the control and raw-sys layers exist, current results are baseline evidence
 only and MUST NOT be described as proof that Gerbil AOT is fully optimized.
+
+* 10.02.90 Source Audit and Delivery Plan (2026-10-04)
+
+This audit uses the installed Gerbil =0.19.2591dcd.patchf5cedd8168cb=
+compiler and =std/ffi.ss= sources, Gambit =v4.9.8= =lib/setup.c=,
+and the bridge tree at =f47b6a6ee3d323558acc0171440c13db1d552ac3=.
+The installed Gerbil includes downstream patches; it is not evidence that
+an unpatched upstream tag has identical build behavior.
+
+Primary references:
+
+- [[https://gerbil.scheme.org/guide/ffi.html][Gerbil FFI guide]] (general interface guidance).
+- [[https://gerbil.scheme.org/guide/intro.html][Gerbil compilation guide]].
+- [[https://raw.githubusercontent.com/gambit/gambit/v4.9.8/lib/setup.c][Gambit 4.9.8 setup implementation]].
+- [[https://doc.rust-lang.org/nomicon/ffi.html][Rust FFI and unwinding contract]].
+- [[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC compiler diagnostic artifacts]].
+
+** Source findings
+
+| Source seam | Observed behavior | Engineering consequence |
+|-
+| Gerbil =src/gerbil/compiler/driver.ss=, =compile-stub= | Resolves static runtime/dependency modules, generates a stub, invokes GSC =-link= then =-obj=, and links Gambit | Preserve dependency closure, module initialization order and the SDK-owned compiler; a static archive is not a runtime-independent payload |
+| Gerbil =src/std/ffi.ss=, =def-C-type/pointer= | Foreign type tags and optional release function are explicit; default =release: #f= supplies no release function | Document borrowed versus owned pointers and the matching allocator/releaser for every export; no inference from pointer shape |
+| Gambit =lib/setup.c= | Setup owns process/runtime state, processor initialization and interrupt machinery; debug settings have an explicit mask update API | Use version-matched setup parameters; an embedding policy must distinguish diagnostics, interrupt handling and process termination |
+| =native/runtime.c= | Setup version =409008=, one processor, one-shot lifecycle | Keep initialization/calls/cleanup on the owning thread; processor count is not permission for arbitrary Rust threads to call Scheme |
+| Safe Rust =native/runtime.rs= and =types.rs= | Lifecycle serialization, runtime ABI check after setup, =!Send/!Sync= owner, root lifetime and drop release | Audit raw-sys callers separately; safe wrapper guarantees do not protect arbitrary extern calls |
+| Rust callback trampoline | =catch_unwind= converts an unwinding panic to status | This cannot contain =panic=abort=, foreign exceptions, or prove that Scheme nonlocal exits across Rust frames are safe |
+
+A bridge ABI version check after setup cannot validate the Gambit ABI before
+setup. Header version, target, compiler configuration, runtime library and
+linked program must therefore be matched at build time. Exported status values,
+integer widths, =repr(C)= records, pointer/null rules and buffer lengths require
+separate ABI conformance receipts. Rust must not decode Gambit object bits.
+
+AoT does not imply zero cold initialization. The downstream generated GQL and
+Cypher static grammar modules call the parser's embedded language artifact
+loader. =src/runtime/language-artifact.ss= performs base64 decode, zlib
+uncompress, SHA256 identity admission and Scheme datum reading. An owned-process
+sample showed corresponding CPU frames during initialization. This identifies
+a concrete startup seam; it does not yet quantify each stage's cost.
+Digest, schema and complete-datum checks must survive any optimization.
+Existing =GERBIL_PARSER_LR_TRACE= emits real decode/verified/admitted events,
+but a long operation between those boundaries can still fail idle supervision.
+
+** P0: qualify build and cold startup
+
+1. Complete the source closure with immutable SDK identity, target, generated
+   source/header identity and effective flags in the cache key. Preserve
+   =.ss/.ssi= generation parity and Cargo/Bazel artifact parity.
+2. Supervise compiler-owned output for every expensive object stage, including
+   individual module objects. The current GCC intermediate observer covers the
+   program linker only. A cold published-pin Data build still failed 30-second
+   idle supervision after several large module objects completed; the remaining
+   silent child must be identified before extending observation to that stage.
+3. Measure cold setup separately with parser artifact trace and owned-thread
+   samples. Separate decode, decompression, digest and read/admission costs.
+   Avoid eagerly restoring languages a profile does not use only if module
+   semantics and explicit admission remain equivalent. Any lazy restoration
+   needs a single-owner state machine and cached failure semantics.
+4. Admit only actual child success and admitted artifacts. Keep build idle30 /
+   wall1200 and runtime idle5 / wall120. File polling without growth is silent;
+   synthetic heartbeat output and increased limits do not qualify work.
+
+** P1: qualify ABI, GC and lifecycle
+
+- Inventory each extern signature and owned/borrowed buffer or handle. Verify
+  lengths, nulls, integer ranges, allocation failure and paired release.
+- Exercise rooted values through forced collections, callback reentry and
+  error paths; confirm roots drop before runtime cleanup and on the owner
+  thread. A lifetime marker alone is not a GC root.
+- Verify Scheme exceptions become typed statuses before returning through
+  Rust frames; verify callback panic conversion and late callback rejection.
+  Keep C ABI non-unwinding; do not substitute =C-unwind= for a Scheme exception
+  containment design.
+- Test duplicate initialization, failed initialization, cleanup with live
+  roots, post-cleanup calls, and cross-thread misuse. Process-global restart
+  remains unsupported unless independently designed and qualified.
+- Review host interruption and fatal-error behavior against the pinned SDK.
+  Compiler =q/Q= diagnostics policy must not be copied into an embedded host
+  where it may terminate the host process.
+
+** P2: optimize with paired evidence
+
+Compare cold/warm build, artifact restoration, first query, steady FFI calls,
+and peak memory separately. Use release C-control/raw-sys/safe-wrapper/AoT
+comparisons, median and p95, plus semantic equivalence and negative cases.
+Evaluate batching before claiming a scalar micro-optimization benefits query
+execution. Compiler flag, LTO or full-program changes require target-specific
+A/B evidence, artifact parity, and preserved exception/GC contracts.
+
+** Current evidence boundary
+
+PR #19 was merged into the existing PR #18 development branch, producing
+=f47b6a6=; #18 remains the sole open delivery PR. This is not a main release.
+At observation, exact-head Ubuntu CI was running and macOS queued.
+
+The linker fixture, helper library tests, and a local-patch downstream archive
+build passed. The published-pin cold Data build still failed idle30 in the
+module-object phase; runtime restoration separately failed idle5 after setup
+started. Full Cargo Clippy also failed its idle gate in a Rust harness
+dependency. Direct helper lint success does not qualify full Cargo Clippy.
+These are open P0 gates, not completed production or performance claims.

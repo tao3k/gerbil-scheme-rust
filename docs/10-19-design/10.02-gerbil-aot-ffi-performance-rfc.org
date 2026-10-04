@@ -264,3 +264,26 @@ immutable executable; output/log files remain per-run. This removes runtime
 executable writes without a production retry, a serialized test suite or a
 changed worker count. The revised Cargo test build succeeded in 1m11s;
 target-specific CI still needs qualification at the new commit.
+
+** Source audit: package return and dynamic unload
+
+Gerbil v0.19's installed =src/std/make.ss= executes pending compiler jobs
+before =make= returns. The public =defbuild-script= macro delegates to that
+implementation; a wrapper can expose the actual return boundary while keeping
+the first-party command parser, build specification and worker policy.
+The MRR package script now distinguishes entering and returning from that
+delegate. A returned event is not process exit or package admission.
+
+The reference [[https://github.com/gambit/gambit/blob/d4d124d0555d03d46171c42522e3907a256e37cc/lib/os_dyn.c][Gambit os_dyn.c]]
+implements dynamic cleanup by walking loaded modules and calling =dlclose=.
+Apple's reference [[https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/dyld/ExternallyViewableState.cpp][dyld externally visible state]]
+updates the image list and may synchronously notify an active external monitor
+on removal. This agrees with the sampled cleanup stack, but these reference
+commits do not identify the installed Gerbil binary or macOS dyld build, nor
+identify the monitor or establish its contribution to a failed build.
+
+The next qualification must correlate a build-function return event, owned
+process descendants and a cleanup sample in the same refused run. Preserve
+normal Gambit cleanup and require successful child exit. Any static driver or
+module-lifetime change needs independent source/ABI qualification; object-file
+existence and a returned event cannot replace it.

@@ -609,6 +609,16 @@ fn compile_native_object(
             return Ok(());
         }
     }
+    // IRA diagnostics are not optimizer or ABI inputs. GCC documents level 15
+    // as the default dump verbosity (5), delivered to stderr during allocation.
+    // Keep existing content-verified object cache identities; a cache hit needs
+    // no diagnostic stream. The generated large single-host functions otherwise
+    // have a quiet register-allocation interval after tree optimization.
+    let cc_options = if gcc_progress {
+        format!("{cc_options} -fira-verbose=15")
+    } else {
+        cc_options
+    };
     let mut command = gambit_progress_command(gsc);
     command
         .args(["-obj", "-cc-options", &cc_options, "-o"])

@@ -192,3 +192,33 @@ using dependencies from the previously qualified Cargo build. This remains
 separate from the open full Cargo Clippy gate. One first fixture invocation
 failed because SDK =~~bin= was not mapped; the corrected invocation used the
 same explicit versioned SDK mappings as the downstream build launcher.
+
+** Register-allocation diagnostics: 2026-10-05
+
+A downstream cold build with GSC =3635dfa= and MRR =277b783= passed
+program staging (40.22 seconds), module C generation and GSC linking, then
+refused idle30 during large SDK GCC object compilation. This remains a failed
+full-build receipt. The independent OpenCypher grammar object completed under
+idle30 after enabling actual IRA diagnostics; a small paired =-O2= compilation
+produced byte-identical objects with and without that diagnostic option.
+
+Verbose SDK GCC objects now add =-fira-verbose=15=: the default allocator dump
+verbosity (5), sent to stderr. This does not alter allocation policy, optimizer
+limits, worker counts or ABI options. The diagnostic flag is appended after
+content-verified cache lookup and does not invalidate completed object caches.
+No output is emitted for a stalled allocator by a timer. Full linked Source
+qualification, result admission and current-head CI remain separate gates.
+See [[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC developer options]]
+for the documented stderr behavior.
+
+The current helper Cargo build completes with the Apple host linker; an earlier
+ambient Nix =cc= invocation failed to resolve macOS =-liconv=. This environment
+correction changes no compiler optimization or watchdog budget. All 16 ordinary
+library tests pass, including content-cache integrity and failure cleanup. The
+six-second real child stream passes idle5 supervision (6.06 seconds). The actual
+OpenCypher grammar module compiles through =compile_program_module= with the
+configured GCC SDK under idle30/wall1200 (90.13 seconds); its object exists and
+its preprocessor/assembly intermediates are removed. An initial invocation
+without the required =GERBIL_BUILD_VERBOSE= setting refused idle30 and remains
+a failed receipt. These local helper results do not qualify the downstream
+Source build or current-head CI.

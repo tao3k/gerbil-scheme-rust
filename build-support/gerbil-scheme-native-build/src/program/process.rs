@@ -211,18 +211,37 @@ fn compiler_monitor_panic_message(payload: Box<dyn std::any::Any + Send>) -> Str
     format!("compiler artifact monitor panicked: {detail}")
 }
 
+fn compiler_artifact_paths(object: &Path) -> [PathBuf; 4] {
+    ["i", "s", "ira", "reload"].map(|extension| object.with_extension(extension))
+}
+
+pub(super) fn gcc_allocation_diagnostics(object: &Path) -> Result<String, String> {
+    let mut options = Vec::new();
+    for extension in ["ira", "reload"] {
+        let path = object.with_extension(extension);
+        let name = path
+            .to_str()
+            .ok_or_else(|| format!("GCC diagnostic path is not UTF-8: {}", path.display()))?;
+        // Gambit's -cc-options is parsed by the SDK's shell command. Preserve
+        // spaces and apostrophes in the exact object-owned diagnostic path.
+        let quoted = name.replace('\'', "'\\''");
+        options.push(format!("-fdump-rtl-{extension}-details='{quoted}'"));
+    }
+    Ok(options.join(" "))
+}
+
 pub(super) fn run_with_compiler_artifacts(
     command: &mut Command,
     operation: &str,
     object: &Path,
 ) -> Result<(), String> {
-    let artifacts = [object.with_extension("i"), object.with_extension("s")];
+    let artifacts = compiler_artifact_paths(object);
     // A previous attempt must never qualify as progress for this process.
     remove_compiler_artifacts(&artifacts)?;
     let running = std::sync::atomic::AtomicBool::new(true);
     let result = std::thread::scope(|scope| {
         let monitor = scope.spawn(|| -> Result<(), String> {
-            let mut previous = [0_u64; 2];
+            let mut previous = [0_u64; 4];
             while running.load(Ordering::Acquire) {
                 for (path, previous) in artifacts.iter().zip(previous.iter_mut()) {
                     if let Some(size) = compiler_artifact_growth(path, previous)? {

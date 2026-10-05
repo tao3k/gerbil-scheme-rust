@@ -135,7 +135,9 @@ fn artifact_events_require_new_bytes_and_do_not_repeat_for_stalled_files() {
 fn failed_compiler_artifact_run_cleans_stale_and_new_intermediates() {
     let root = artifact_fixture("failure");
     let object = root.join("program_link.o");
-    std::fs::write(object.with_extension("i"), b"stale").unwrap();
+    for path in super::compiler_artifact_paths(&object) {
+        std::fs::write(path, b"stale").unwrap();
+    }
     let error = super::run_with_compiler_artifacts(
         Command::new("sh")
             .args([
@@ -143,7 +145,7 @@ fn failed_compiler_artifact_run_cleans_stale_and_new_intermediates() {
                 "test ! -e \"$1\" || exit 8; printf new > \"$1\"; exit 7",
                 "fixture",
             ])
-            .arg(object.with_extension("i")),
+            .arg(object.with_extension("reload")),
         "compile artifact fixture",
         &object,
     )
@@ -151,6 +153,8 @@ fn failed_compiler_artifact_run_cleans_stale_and_new_intermediates() {
     assert!(error.contains('7'));
     assert!(!object.with_extension("i").exists());
     assert!(!object.with_extension("s").exists());
+    assert!(!object.with_extension("ira").exists());
+    assert!(!object.with_extension("reload").exists());
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -160,11 +164,13 @@ fn compiler_artifact_events_forward_actual_growth_and_cleanup() {
     let root = artifact_fixture("live");
     let object = root.join("program_link.o");
     super::run_with_compiler_artifacts(
-        Command::new("sh").args(["-c", "dd if=/dev/zero of=\"$1\" bs=262144 count=1 2>/dev/null; sleep 3; dd if=/dev/zero of=\"$1\" bs=262144 count=2 2>/dev/null; sleep 3", "fixture"]).arg(object.with_extension("i")),
+        Command::new("sh").args(["-c", "dd if=/dev/zero of=\"$1\" bs=262144 count=1 2>/dev/null; sleep 3; dd if=/dev/zero of=\"$1\" bs=262144 count=2 2>/dev/null; sleep 3", "fixture"]).arg(object.with_extension("reload")),
         "compile artifact fixture",
         &object,
     ).unwrap();
-    assert!(!object.with_extension("i").exists());
+    for path in super::compiler_artifact_paths(&object) {
+        assert!(!path.exists());
+    }
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -194,6 +200,8 @@ fn actual_gcc_linker_emits_artifacts_and_completes() {
     assert!(object.is_file());
     assert!(!object.with_extension("i").exists());
     assert!(!object.with_extension("s").exists());
+    assert!(!object.with_extension("ira").exists());
+    assert!(!object.with_extension("reload").exists());
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -336,4 +344,56 @@ fn streaming_native_child_cannot_change_parent_stdio_file_status_flags() {
         check(),
         "child flag mutation must not reach the parent's file description"
     );
+}
+
+#[test]
+fn gcc_allocation_dump_options_preserve_exact_shell_paths() {
+    let object = std::path::Path::new("directory with spaces/owner's.o");
+    let options = super::gcc_allocation_diagnostics(object).unwrap();
+    let output = Command::new("sh")
+        .args(["-c", &format!("printf '%s\\n' {options}")])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "-fdump-rtl-ira-details=directory with spaces/owner's.ira\n-fdump-rtl-reload-details=directory with spaces/owner's.reload\n"
+    );
+}
+
+#[test]
+#[ignore = "requires an owned generated C input and explicit GCC; native build supervision"]
+fn actual_gcc_allocation_dump_progress_completes() {
+    let source =
+        std::env::var_os("GERBIL_ALLOCATION_DIAGNOSTIC_SOURCE").expect("owned generated C input");
+    let compiler =
+        std::env::var_os("GERBIL_ALLOCATION_DIAGNOSTIC_CC").expect("explicit diagnostic GCC");
+    let root = artifact_fixture("actual-allocation");
+    let object = root.join("module.o");
+    let mut command = Command::new(compiler);
+    command.args([
+        "-O2",
+        "-fno-gcse-lm",
+        "-save-temps=obj",
+        "-Q",
+        "-fopt-info-all",
+    ]);
+    for extension in ["ira", "reload"] {
+        command.arg(format!(
+            "-fdump-rtl-{extension}-details={}",
+            object.with_extension(extension).display()
+        ));
+    }
+    command.arg("-c").arg(source).arg("-o").arg(&object);
+    super::run_with_compiler_artifacts(
+        &mut command,
+        "compile actual allocation diagnostic",
+        &object,
+    )
+    .unwrap();
+    assert!(object.is_file());
+    for path in super::compiler_artifact_paths(&object) {
+        assert!(!path.exists());
+    }
+    std::fs::remove_dir_all(root).unwrap();
 }

@@ -3,8 +3,8 @@
 //! Compile a compiler-owned AOT program manifest without inspecting Scheme text.
 
 use super::process::{
-    GSC_PROGRESS_OPTIONS, configured_gambit_gcc, gambit_progress_command, native_progress_enabled,
-    run_process, run_with_compiler_artifacts,
+    GSC_PROGRESS_OPTIONS, configured_gambit_gcc, gambit_progress_command,
+    gcc_allocation_diagnostics, native_progress_enabled, run_process, run_with_compiler_artifacts,
 };
 use crate::{
     NativeArchiveLinkReceipt, NativeLinkLibrary, NativeStaticLinkPlan,
@@ -609,13 +609,11 @@ fn compile_native_object(
             return Ok(());
         }
     }
-    // IRA diagnostics are not optimizer or ABI inputs. GCC documents level 15
-    // as the default dump verbosity (5), delivered to stderr during allocation.
-    // Keep existing content-verified object cache identities; a cache hit needs
-    // no diagnostic stream. The generated large single-host functions otherwise
-    // have a quiet register-allocation interval after tree optimization.
+    // Diagnostic dumps do not change optimizer or ABI inputs. Keep existing
+    // verified object identities, and observe real file growth during register
+    // allocation without forwarding the full IRA/LRA trace through Cargo.
     let cc_options = if gcc_progress {
-        format!("{cc_options} -fira-verbose=15")
+        format!("{cc_options} {}", gcc_allocation_diagnostics(object)?)
     } else {
         cc_options
     };

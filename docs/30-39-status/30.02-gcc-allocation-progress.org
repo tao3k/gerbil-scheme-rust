@@ -1,0 +1,45 @@
+#+title: GCC allocation file progress qualification
+
+* Failure boundary
+
+Data commit =4557405a= fails its macOS Source Cargo no-run build at the unchanged
+1200-second wall deadline. Its retained CI log contains approximately 1.5 GiB
+of native diagnostics, including per-instruction IRA/LRA costs. Continued
+compiler output does not qualify a successful build. See the
+[[https://github.com/tao3k/mrr-data/actions/runs/37267812006][failed downstream run]].
+
+* Repair contract
+
+The immutable Gambit SDK still selects its declared compiler. GCC verbose
+builds write detailed IRA and reload diagnostics to the exact object-owned
+=.ira= and =.reload= paths using =-fdump-rtl-ira-details= and
+=-fdump-rtl-reload-details=. The existing monitor reports only new compiler
+bytes, with the existing 256 KiB threshold and 100 ms polling interval.
+Polling alone emits nothing. All four intermediates (=.i=, =.s=, =.ira= and
+=.reload=) are removed before invocation and after success or failure.
+Warnings, errors and exit status retain their ordinary diagnostic channels.
+
+Diagnostic selection follows content-verified cache lookup, preserving object
+cache identity. Optimizer policy, ABI flags, parallelism and watchdog limits
+are unchanged. See [[https://gcc.gnu.org/onlinedocs/gcc-15.2.0/gcc/Developer-Options.html][GCC developer diagnostic options]].
+
+* Local receipts: 2026-10-05
+
+- Rust library: 17 passed, 5 explicitly ignored native/live diagnostic tests.
+- Rust integration: 19 passed, no ignored tests.
+- Six-second reload-growth regression: 1 passed under idle5/wall120 test policy.
+- Generated GQL grammar input, explicit local GCC 16: 1 passed under
+  idle30/wall1200 build policy, 20.72 seconds. Actual allocation file growth
+  and intermediate cleanup were observed. This direct compiler diagnostic is
+  not an immutable-SDK Source build or an end-to-end runtime qualification.
+- All-target Clippy: passed with =-D warnings= and real Rust frontend progress.
+  An earlier unobserved invocation failed idle30; that failure is retained.
+- Matched generated trie input and GCC 16 optimizer/ABI options: stderr
+  allocation diagnostics produced 199711828 bytes; detailed file diagnostics
+  produced 3323381 console bytes. Both object files have SHA-256
+  =c7d665fdc90321ef219ae0fa03831ee489728d2de1d2b3d2387d9151e554b8ac=.
+  These one-shot diagnostics establish byte identity and logging reduction;
+  their elapsed times are not an application performance claim.
+
+Full downstream Source, native consumer recovery, resource qualification and
+all required CI checks must pass at the newly fixed dependency/source SHA.

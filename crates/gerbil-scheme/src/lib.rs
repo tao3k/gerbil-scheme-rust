@@ -10,7 +10,8 @@
 mod toolchain;
 pub use toolchain::{
     GERBIL_GSC_ENV, GERBIL_GXC_ENV, GERBIL_GXI_ENV, Gerbil, GerbilError, GerbilToolchain,
-    default_gambit_gsc_program_for_gxi, is_gambit_gsc_program, resolve_gerbil_executable,
+    default_gambit_gsc_program_for_gxi, discover_gambit_gsc_from_env, is_gambit_gsc_program,
+    resolve_gerbil_executable,
 };
 
 #[cfg(feature = "native")]

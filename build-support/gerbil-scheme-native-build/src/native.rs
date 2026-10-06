@@ -19,6 +19,8 @@ pub fn build_native_archive() {
 
 fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_GSC");
+    println!("cargo:rerun-if-env-changed=GERBIL_GXI");
+    println!("cargo:rerun-if-env-changed=PATH");
     println!("cargo:rerun-if-env-changed=GERBIL_HOME");
     println!("cargo:rerun-if-env-changed=GERBIL_PATH");
     println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM");
@@ -38,7 +40,9 @@ fn run_native_build() {
         .to_path_buf();
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let gerbil_path = out_dir.join("gerbil-path");
-    let gsc = env::var_os("GERBIL_GSC").unwrap_or_else(|| "gsc".into());
+    let gsc = crate::discover_gambit_gsc_from_env()
+        .expect("discover paired Gambit compiler")
+        .into_os_string();
 
     if env::var_os("CARGO_FEATURE_EXTERNAL_PROGRAM").is_some() {
         let runtime_object = out_dir.join("runtime.o");
@@ -261,7 +265,7 @@ fn scheme_string(path: &Path) -> String {
 /// The selected GSC retains its configured C compiler. Ambient Apple developer
 /// directory overrides must not redirect that compiler's system tool shims.
 pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
-    let mut command = Command::new(program);
+    let mut command = Command::new(program.as_ref());
     // Nix/direnv environments commonly inject compiler include and linker
     // paths for Rust. Gerbil's selected gsc is already configured with its own
     // C compiler and SDK, so inheriting those unrelated paths can mix libc/SDK
@@ -288,6 +292,9 @@ pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
         )
         .expect("rebuild Gerbil tool PATH");
         command.env("PATH", gerbil_path);
+    }
+    if let Some(selected) = crate::resolve_gerbil_executable(Path::new(program.as_ref())) {
+        crate::configure_gerbil_native_tool_command(&mut command, selected);
     }
     command
 }

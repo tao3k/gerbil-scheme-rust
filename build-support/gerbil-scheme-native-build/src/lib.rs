@@ -3,7 +3,12 @@
 
 mod archive;
 mod discovery;
+mod gambit_program;
 mod generated_scm;
+pub use gambit_program::{
+    default_gambit_gsc_program_for_gxi, discover_gambit_gsc_from_env, is_gambit_gsc_program,
+    resolve_gerbil_executable,
+};
 mod header;
 mod native;
 mod package_launcher;
@@ -31,3 +36,7 @@ pub use package_launcher::prepare_gsc_progress_launcher;
 pub use toolchain::{NativeCCompilerTool, discover_native_c_compiler};
 
 pub use program::run_native_process;
+
+#[path = "../../../crates/gerbil-scheme/src/native_environment.rs"]
+mod native_environment;
+pub use native_environment::{GerbilNativeToolEnvironment, configure_gerbil_native_tool_command};

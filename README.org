@@ -52,6 +52,13 @@ and development revision/timestamp version output are recognized. Explicit
 The selected installation supplies its own native runtime paths; downstream
 CI does not need to set a second compiler override.
 
+The native-build owner also completes link receipts for OpenSSL, zlib and
+SQLite archives. It uses declared SDK and explicit library paths before
+target-aware package discovery for implicit system paths. Library admission
+precedes C/object generation. Missing archives fail the producer build;
+downstream FFI bundle consumers only copy and validate the receipt's files,
+without repeating package or toolchain discovery.
+
 * Shared build environment
 
 The [[file:.github/actions/setup-gerbil/action.yml][setup-gerbil action]] installs the pinned Gerbil release and its host

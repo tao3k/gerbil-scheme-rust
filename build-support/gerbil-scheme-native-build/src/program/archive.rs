@@ -12,7 +12,7 @@ use crate::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -214,6 +214,16 @@ pub fn build_program_archive_with_contract(
         observer.observe_source_input(&module.scm);
     }
     let cc_options = native_compile_options(contract.native_headers, observer)?;
+    // Admit host libraries before any generated C or object compilation.
+    let link_inputs = observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase: "native-link-inputs",
+            operation: "admit SDK library dependencies",
+            subject: None,
+        },
+        || native_link_options(&plan),
+    )?;
     let staged = stage_program(&plan, request, observer)?;
     let mut link_plan = compile_program(
         &plan,
@@ -221,6 +231,7 @@ pub fn build_program_archive_with_contract(
         request,
         contract.linker_main_symbol,
         &cc_options,
+        link_inputs,
         observer,
     )?;
     link_plan
@@ -438,6 +449,7 @@ fn compile_program(
     request: ProgramArchiveRequest<'_>,
     linker_main_symbol: &str,
     cc_options: &str,
+    (search, libraries): (Vec<PathBuf>, Vec<NativeLinkLibrary>),
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<NativeStaticLinkPlan, String> {
     let StagedProgram {
@@ -476,7 +488,6 @@ fn compile_program(
         },
         observer,
     )?;
-    let (search, libraries) = native_link_options(plan)?;
     Ok(NativeStaticLinkPlan {
         module_objects: objects,
         link_object: linker_object,
@@ -782,6 +793,17 @@ fn native_link_options(
             return Err(format!("unsupported compiler-owned link option {option:?}"));
         }
     }
+    if let Some(paths) = std::env::var_os("LIBRARY_PATH") {
+        search.extend(std::env::split_paths(&paths).filter(|path| path.is_absolute()));
+    }
+    complete_sdk_dependency_search(&mut search, &libraries, |package| {
+        pkg_config::Config::new()
+            .cargo_metadata(false)
+            .statik(true)
+            .probe(package)
+            .map(|library| library.link_paths)
+            .map_err(|error| format!("resolve Gerbil static dependency {package}: {error}"))
+    })?;
     if cfg!(target_os = "macos") {
         let runtime = discover_darwin_compiler_runtime()?;
         let directory = runtime.parent().ok_or_else(|| {
@@ -794,6 +816,52 @@ fn native_link_options(
         libraries.push(NativeLinkLibrary::new("static=clang_rt.osx"));
     }
     Ok((search, libraries))
+}
+
+fn complete_sdk_dependency_search(
+    search: &mut Vec<PathBuf>,
+    libraries: &[NativeLinkLibrary],
+    mut resolve: impl FnMut(&str) -> Result<Vec<PathBuf>, String>,
+) -> Result<(), String> {
+    // The compiler receipt must locate non-platform SDK archives, including
+    // implicit Linux multiarch paths and a relocated Homebrew SDK. Consumers
+    // must not rediscover this toolchain or probe packages themselves.
+    let mut directories: HashSet<PathBuf> = search.iter().cloned().collect();
+    for library in libraries {
+        let name = library
+            .as_str()
+            .strip_prefix("static=")
+            .unwrap_or(library.as_str());
+        let package = match name {
+            "crypto" => "libcrypto",
+            "ssl" => "libssl",
+            "z" => "zlib",
+            "sqlite3" => "sqlite3",
+            _ => continue,
+        };
+        let file = format!("lib{name}.a");
+        if locate_static_archive(search, &file).is_some() {
+            continue;
+        }
+        for path in resolve(package)? {
+            if path.is_absolute() && directories.insert(path.clone()) {
+                search.push(path);
+            }
+        }
+        if locate_static_archive(search, &file).is_none() {
+            return Err(format!("Gerbil SDK static archive unavailable: {file}"));
+        }
+    }
+    Ok(())
+}
+
+fn locate_static_archive(search: &[PathBuf], file: &str) -> Option<PathBuf> {
+    // Ordered linker precedence is semantic. Probe one basename rather than
+    // enumerating every archive in each SDK/system library directory.
+    search
+        .iter()
+        .map(|path| path.join(file))
+        .find(|path| path.is_file())
 }
 
 fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {
@@ -873,3 +941,7 @@ pub fn observe_program_archive_operation<T>(
 #[cfg(all(test, unix))]
 #[path = "../../tests/unit/program_cache_scenario.rs"]
 mod cache_scenario;
+
+#[cfg(test)]
+#[path = "../../tests/unit/program_link_search.rs"]
+mod link_search_tests;

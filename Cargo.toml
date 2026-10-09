@@ -38,6 +38,7 @@ repository = "https://github.com/tao3k/gerbil-scheme-rust"
 
 [workspace.dependencies]
 cc = "1.2.64"
+pkg-config = "0.3"
 cbindgen = "0.29.4"
 divan = "0.1.21"
 gerbil-scheme-native-build = { path = "build-support/gerbil-scheme-native-build" }

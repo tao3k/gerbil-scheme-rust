@@ -14,7 +14,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential jq
+        sudo apt-get install -y build-essential jq pkg-config libssl-dev libsqlite3-dev zlib1g-dev
 
     - name: Install macOS Gerbil prerequisites
       if: runner.os == 'macOS'
@@ -24,7 +24,7 @@ runs:
         HOMEBREW_NO_INSTALL_CLEANUP: '1'
       run: |
         brew list --formula ghostscript >/dev/null 2>&1 && brew unlink ghostscript || true
-        brew install gcc jq
+        brew install gcc jq pkg-config openssl@3 sqlite zlib
 
     - name: Activate immutable Gerbil release
       shell: bash
@@ -42,5 +42,9 @@ runs:
         {
           echo "GERBIL_GSC=$GERBIL_PREFIX/bin/gsc"
           echo "GERBIL_BUILD_CORES=$cores"
+          if [[ "$(uname -s)" == Darwin ]]; then
+            # Stable formula roots, not the Cellar version embedded in an SDK.
+            echo "LIBRARY_PATH=$(brew --prefix openssl@3)/lib:$(brew --prefix sqlite)/lib:$(brew --prefix zlib)/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+          fi
         } >> "$GITHUB_ENV"
         "$GERBIL_PREFIX/bin/gsc" -v

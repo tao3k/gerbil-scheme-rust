@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 cbindgen.workspace = true
 cc.workspace = true
+pkg-config.workspace = true
 sha2.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

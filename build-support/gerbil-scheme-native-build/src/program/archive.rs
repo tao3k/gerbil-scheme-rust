@@ -449,9 +449,23 @@ fn compile_program(
     request: ProgramArchiveRequest<'_>,
     linker_main_symbol: &str,
     cc_options: &str,
-    (search, libraries): (Vec<PathBuf>, Vec<NativeLinkLibrary>),
+    (mut search, mut libraries): (Vec<PathBuf>, Vec<NativeLinkLibrary>),
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<NativeStaticLinkPlan, String> {
+    // Compiler runtime discovery belongs to the admitted compiler lane, not
+    // manifest/SDK admission. Rejection fixtures need not create a Cargo CC
+    // environment before their missing/failed Scheme compiler is observed.
+    if cfg!(target_os = "macos") {
+        let runtime = discover_darwin_compiler_runtime()?;
+        let directory = runtime.parent().ok_or_else(|| {
+            format!(
+                "Darwin compiler runtime has no parent: {}",
+                runtime.display()
+            )
+        })?;
+        search.push(directory.to_path_buf());
+        libraries.push(NativeLinkLibrary::new("static=clang_rt.osx"));
+    }
     let StagedProgram {
         mut objects,
         compile_sources,
@@ -804,17 +818,6 @@ fn native_link_options(
             .map(|library| library.link_paths)
             .map_err(|error| format!("resolve Gerbil static dependency {package}: {error}"))
     })?;
-    if cfg!(target_os = "macos") {
-        let runtime = discover_darwin_compiler_runtime()?;
-        let directory = runtime.parent().ok_or_else(|| {
-            format!(
-                "Darwin compiler runtime has no parent: {}",
-                runtime.display()
-            )
-        })?;
-        search.push(directory.to_path_buf());
-        libraries.push(NativeLinkLibrary::new("static=clang_rt.osx"));
-    }
     Ok((search, libraries))
 }
 
@@ -865,7 +868,10 @@ fn locate_static_archive(search: &[PathBuf], file: &str) -> Option<PathBuf> {
 }
 
 fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {
-    let compiler = cc::Build::new().cargo_metadata(false).get_compiler();
+    let compiler = cc::Build::new()
+        .cargo_metadata(false)
+        .try_get_compiler()
+        .map_err(|error| format!("resolve Darwin compiler runtime tool: {error}"))?;
     let output = compiler
         .to_command()
         .arg("-print-file-name=libclang_rt.osx.a")

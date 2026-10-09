@@ -178,15 +178,20 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     );
     assert_eq!(
         rows[1],
+        "phase=native-link-inputs state=start operation=admit SDK library dependencies"
+    );
+    assert!(rows[2].starts_with("phase=native-link-inputs state=complete operation=admit SDK library dependencies elapsedMs="));
+    assert_eq!(
+        rows[3],
         "phase=module-c-batch state=start operation=stage program module C sources subject=1"
     );
     assert_eq!(
-        rows[2],
+        rows[4],
         "phase=module-c state=start operation=generate program module C subject=gerbil-scheme-rust/scheme/native"
     );
-    assert!(rows[3].starts_with("phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="));
-    assert!(rows[4].starts_with("phase=module-c-batch state=failed operation=stage program module C sources subject=1 elapsedMs="));
-    assert_eq!(rows.len(), 5, "no timer heartbeat may manufacture rows");
+    assert!(rows[5].starts_with("phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="));
+    assert!(rows[6].starts_with("phase=module-c-batch state=failed operation=stage program module C sources subject=1 elapsedMs="));
+    assert_eq!(rows.len(), 7, "no timer heartbeat may manufacture rows");
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -228,7 +233,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
     .unwrap_err();
     assert!(error.contains("generate program module C"));
     assert!(
-        observations.0.into_inner().unwrap()[2].contains("subject=example/application"),
+        observations.0.into_inner().unwrap()[4].contains("subject=example/application"),
         "the downstream module identity must survive into observation"
     );
     fs::remove_dir_all(root).unwrap();
@@ -285,6 +290,13 @@ fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats
         receiver.recv_timeout(Duration::from_millis(250)).unwrap(),
         "phase=program-plan state=complete operation=validate compiler-owned AOT manifest"
     );
+    assert_eq!(
+        receiver.recv_timeout(Duration::from_millis(250)).unwrap(),
+        "phase=native-link-inputs state=start operation=admit SDK library dependencies"
+    );
+    assert!(receiver.recv_timeout(Duration::from_millis(250)).unwrap().starts_with(
+        "phase=native-link-inputs state=complete operation=admit SDK library dependencies elapsedMs="
+    ));
     assert_eq!(
         receiver.recv_timeout(Duration::from_millis(250)).unwrap(),
         "phase=module-c-batch state=start operation=stage program module C sources subject=1"

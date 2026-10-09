@@ -63,7 +63,7 @@ fn receipt_rejects_missing_static_archive_and_relative_package_paths() {
         ]))
         .is_err()
     );
-    assert_eq!(search, [root.0.clone()]);
+    assert_eq!(search.as_slice(), std::slice::from_ref(&root.0));
     assert!(
         complete_sdk_dependency_search(&mut Vec::new(), &libraries, |_| Err(
             "unavailable target package".into()

@@ -2,6 +2,7 @@
 use super::prepare_gsc_progress_launcher;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -9,11 +10,24 @@ fn fixture() -> PathBuf {
 }
 
 fn output() -> PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!("package-launcher-{}-{nonce}", std::process::id()))
+    for _ in 0..32 {
+        let sequence = NEXT.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "package-launcher-{}-{nonce}-{sequence}",
+            std::process::id()
+        ));
+        match std::fs::create_dir(&root) {
+            Ok(()) => return root,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("create launcher fixture directory: {error}"),
+        }
+    }
+    panic!("create unique launcher fixture directory");
 }
 
 #[test]
@@ -46,8 +60,7 @@ fn quiet_or_non_gcc_package_keeps_original_compiler() {
         prepare_gsc_progress_launcher(&fixture(), &root, false).unwrap(),
         fixture()
     );
-    assert!(!root.exists());
-    std::fs::create_dir_all(&root).unwrap();
+    assert!(root.is_dir());
     let compiler = root.join("gsc");
     std::fs::write(&compiler, "fixture").unwrap();
     std::fs::write(root.join("gambuild-C"), "BUILD_FEATURE_C_COMP=\"clang\"\n").unwrap();

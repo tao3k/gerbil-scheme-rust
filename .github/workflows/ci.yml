@@ -32,35 +32,10 @@ jobs:
         with:
           components: clippy,rustfmt
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential jq
-
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: 1
-          HOMEBREW_NO_INSTALL_CLEANUP: 1
-        run: |
-          brew list --formula ghostscript >/dev/null 2>&1 && brew unlink ghostscript || true
-          brew install gcc jq
-
-      - name: Download immutable Gerbil v0.19 release artifact
-        shell: bash
-        run: tools/ci/install-gerbil-release.sh "$GERBIL_RELEASE_ROOT"
-
-      - name: Activate Gerbil build controls
-        shell: bash
-        run: |
-          test -x "$GERBIL_PREFIX/bin/gsc"
-          cores="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)"
-          {
-            echo "GERBIL_GSC=$GERBIL_PREFIX/bin/gsc"
-            echo "GERBIL_BUILD_CORES=$cores"
-          } >> "$GITHUB_ENV"
-          "$GERBIL_PREFIX/bin/gsc" -v
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
 
       - name: Configure Bazel
         uses: bazel-contrib/setup-bazel@0.19.0
@@ -72,6 +47,15 @@ jobs:
 
       - name: Cargo format
         run: cargo fmt --all --check
+
+      - name: Check shell Gerbil environment boundary
+        shell: bash
+        run: |
+          env CC=foreign SDKROOT=/nix/store/foreign GAMBOPT=selected \
+            tools/gerbil-build-command.sh bash -c '
+              test -z "${CC+x}" && test -z "${SDKROOT+x}" &&
+              test "$GAMBOPT" = selected
+            '
 
       - name: Cargo gates
         run: |

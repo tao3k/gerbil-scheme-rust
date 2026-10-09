@@ -299,6 +299,26 @@ pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
     command
 }
 
+/// Add real Gambit runtime diagnostics to a Gerbil build command while
+/// retaining the selected SDK's existing runtime path options.
+pub fn configure_gerbil_runtime_diagnostics(command: &mut Command, enabled: bool) {
+    if !enabled {
+        return;
+    }
+    let configured = command
+        .get_envs()
+        .find(|(name, _)| *name == OsStr::new("GAMBOPT"))
+        .map(|(_, value)| value.map(OsStr::to_os_string));
+    let mut options = configured
+        .unwrap_or_else(|| env::var_os("GAMBOPT"))
+        .unwrap_or_default();
+    if !options.is_empty() {
+        options.push(",");
+    }
+    options.push("1n,2n,d5qQ");
+    command.env("GAMBOPT", options);
+}
+
 #[cfg(test)]
 #[path = "../tests/unit/native_environment_scenario.rs"]
 mod environment_tests;

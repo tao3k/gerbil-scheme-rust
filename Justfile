@@ -25,6 +25,9 @@ bridge-targets:
 bridge-path-check:
     ! rg --files --hidden -g '!.git/**' -g '!target/**' -g '!.gerbil/**' | rg -i '(^|/)[^/]*native[^/]*$'
 
+bridge-harness-test *args:
+    {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test unit_test --locked {{ args }}
+
 bridge-lint:
     {{ build_env }} cargo clippy -p gerbil-scheme -p gerbil-scheme-aot-build --features gerbil-scheme/native --all-targets --locked -- -D warnings
 

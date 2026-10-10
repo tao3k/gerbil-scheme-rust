@@ -27,10 +27,10 @@ fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM");
     println!("cargo:rerun-if-changed=../../build.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
-    println!("cargo:rerun-if-changed=../../scheme/native.ss");
-    println!("cargo:rerun-if-changed=../../scheme/native.ssi");
-    println!("cargo:rerun-if-changed=../../scheme/generated/native.scm");
-    println!("cargo:rerun-if-changed=../../native/runtime.c");
+    println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
+    println!("cargo:rerun-if-changed=../../scheme/runtime.ssi");
+    println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm");
+    println!("cargo:rerun-if-changed=../../ffi/runtime.c");
 
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let workspace = manifest_dir
@@ -55,7 +55,7 @@ fn run_native_build() {
                     "-o",
                 ])
                 .arg(&runtime_object)
-                .arg(workspace.join("native/runtime.c")),
+                .arg(workspace.join("ffi/runtime.c")),
             "compile external program lifecycle owner",
         );
         cc::Build::new()
@@ -82,13 +82,15 @@ fn run_native_build() {
     run(&mut canonical_build, "canonical Gerbil build");
 
     let generated_native_scm =
-        gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__native.scm");
+        gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__runtime.scm");
     let native_scm = sync_generated_scm(&workspace, &generated_native_scm);
-    let native_c = out_dir.join("native.c");
-    let native_object = out_dir.join("native.o");
-    let linker_c = out_dir.join("native_link.c");
-    let linker_object = out_dir.join("native_link.o");
-    let runtime_object = out_dir.join("runtime.o");
+    // Gambit derives the C linker identity from the target basename. Keep it
+    // aligned with runtime.scm, independently of the Scheme namespace name.
+    let native_c = out_dir.join("runtime.c");
+    let native_object = out_dir.join("runtime.o");
+    let linker_c = out_dir.join("linker.c");
+    let linker_object = out_dir.join("linker.o");
+    let runtime_object = out_dir.join("lifecycle.o");
 
     run(
         gerbil_command(&gsc)
@@ -103,7 +105,7 @@ fn run_native_build() {
         "generate Gambit linker",
     );
     let compile_expression = format!(
-        "(compile-file-to-target {} output: {} module-name: \"gerbil-scheme-rust/scheme/native\")",
+        "(compile-file-to-target {} output: {} module-name: \"gerbil-scheme-rust/scheme/runtime\")",
         scheme_string(&native_scm),
         scheme_string(&native_c),
     );
@@ -131,7 +133,7 @@ fn run_native_build() {
     );
     compile_c(
         &gsc,
-        &workspace.join("native/runtime.c"),
+        &workspace.join("ffi/runtime.c"),
         &runtime_object,
         "compile runtime lifecycle shim",
     );
@@ -161,7 +163,7 @@ fn run_native_build() {
 }
 
 fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
-    let tracked_scm = workspace.join("scheme/generated/native.scm");
+    let tracked_scm = workspace.join("scheme/generated/runtime.scm");
     let update = env::var("GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM").as_deref() == Ok("1");
     let check = env::var("GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM").as_deref() == Ok("1");
     let input_fingerprint = workspace_input_fingerprint(workspace);
@@ -202,7 +204,7 @@ fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
         let transient_scm = native_scm
             .parent()
             .expect("generated native SCM must have a parent")
-            .join("native.scm");
+            .join("runtime.scm");
         fs::copy(native_scm, &transient_scm).expect("stage fresh native SCM with stable basename");
         transient_scm
     }
@@ -320,7 +322,7 @@ pub fn configure_gerbil_runtime_diagnostics(command: &mut Command, enabled: bool
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/native_environment_scenario.rs"]
+#[path = "../tests/unit/environment_scenario.rs"]
 mod environment_tests;
 
 fn run(command: &mut Command, operation: &str) {

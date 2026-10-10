@@ -7,8 +7,8 @@ const PROVENANCE_SCHEMA: &str = "gerbil-scheme-rust.generated-scm-provenance.v1"
 const INPUT_PATHS: &[&str] = &[
     "build.ss",
     "gerbil.pkg",
-    "scheme/native.ss",
-    "scheme/native.ssi",
+    "scheme/runtime.ss",
+    "scheme/runtime.ssi",
 ];
 
 pub(crate) fn workspace_input_fingerprint(workspace: &Path) -> String {

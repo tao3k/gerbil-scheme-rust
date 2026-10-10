@@ -88,14 +88,12 @@ fn calls_scalar_export_in_process() {
     assert_eq!(receipt.abi_id, GERBIL_SCHEME_RUST_ABI_ID);
     assert_eq!(receipt.abi_version, GERBIL_SCHEME_RUST_ABI_VERSION);
     assert_eq!(receipt.header_path, "include/gerbil_scheme_rust.h");
-    assert_eq!(
-        receipt.native_module_path,
-        GerbilRuntimeReceipt::NATIVE_MODULE_PATH
-    );
+    assert_eq!(receipt.module_path, GerbilRuntimeReceipt::MODULE_PATH);
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
     exports_scheme_objects_and_traverses_pairs(&runtime);
     exercises_integer_bytevector_conversions(&runtime);
     exercises_linked_bytes_export(&runtime);
+    exercises_abandoned_receiver_root_release(&runtime);
     exercises_rooted_bulk_copy_abi();
     reports_overflow_and_finalized_runtime_boundaries(runtime);
 }
@@ -178,6 +176,35 @@ fn exercises_integer_bytevector_conversions(runtime: &GerbilRuntime) {
     exercises_integer_bytevector_decoding(runtime);
     exercises_integer_bytevector_minimal_encoding(runtime);
     exercises_integer_bytevector_width_policy(runtime);
+}
+
+// A dropped host receiver must not retain a Scheme root or poison later calls.
+// This is a real ABI regression control, not a test of Tokio's scheduler.
+fn exercises_abandoned_receiver_root_release(runtime: &GerbilRuntime) {
+    let (response, receiver) = std::sync::mpsc::sync_channel::<Vec<u8>>(1);
+    let root = runtime
+        .bytevector_from_bytestring("00FF7F", BytestringDelimiter::Compact)
+        .expect("root abandoned receiver fixture");
+    let token = root.root_id();
+    drop(receiver);
+    let bytes = root.to_vec().into_result().expect("copy owner result");
+    drop(root);
+    let error = response.send(bytes).expect_err("receiver is abandoned");
+    assert_eq!(error.0, [0, 255, 127]);
+    let mut output = [0u8; 3];
+    // SAFETY: same initialized owner; the ABI must reject the released token.
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                token,
+                output.as_mut_ptr(),
+                output.len(),
+            )
+        },
+        GerbilStatus::InvalidValue
+    );
+    assert_eq!(runtime.add_i64(40, 2).expect("owner remains usable"), 42);
+    eprintln!("BRIDGE-HANDOFF abandoned-receiver root-release=OK subsequent-call=OK");
 }
 
 fn exercises_integer_bytevector_decoding(runtime: &GerbilRuntime) {

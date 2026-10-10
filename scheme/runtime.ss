@@ -249,7 +249,7 @@
 ;; runtime boundary until ownership, error, and thread contracts are versioned.
 (begin-foreign
   (namespace
-   ("gerbil-scheme-rust/scheme/native#"
+   ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-abi-version-native
    gerbil-rs-add-i64-native
    gerbil-rs-is-even-i64-native
@@ -335,25 +335,25 @@ END-C
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
     "extern"
-    (gerbil-scheme-rust/scheme/native#gerbil-rs-abi-version))
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version))
   (c-define (gerbil-rs-add-i64-native left right)
     (int64 int64) int64
     "gerbil_scheme_rust_add_i64"
     "extern"
-      (gerbil-scheme-rust/scheme/native#gerbil-rs-add-i64 left right))
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-add-i64 left right))
   (c-define (gerbil-rs-is-even-i64-native value)
       (int64)
       int32
       "gerbil_scheme_rust_is_even_i64"
       "extern"
-    (gerbil-scheme-rust/scheme/native#gerbil-rs-is-even-i64 value))
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-is-even-i64 value))
 
   (c-define (gerbil-rs-compare-i64-native left right)
       (int64 int64)
       int32
       "gerbil_scheme_rust_compare_i64"
       "extern"
-    (gerbil-scheme-rust/scheme/native#gerbil-rs-compare-i64 left right))
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-compare-i64 left right))
 
 (c-define (gerbil-rs-scheme-null-value-raw)
     ()
@@ -556,21 +556,21 @@ END-C
       int32
       "gerbil_scheme_rust_scheme_object_is_exact_integer_raw"
       "extern"
-    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer? value) 1 0))
+    (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer? value) 1 0))
 
   (c-define (gerbil-rs-scheme-object-exact-integer-fits-i64?-raw value)
       (scheme-object)
       int32
       "gerbil_scheme_rust_scheme_object_exact_integer_fits_i64_raw"
       "extern"
-    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-i64? value) 1 0))
+    (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer-fits-i64? value) 1 0))
 
   (c-define (gerbil-rs-scheme-object-exact-integer-fits-u64?-raw value)
       (scheme-object)
       int32
       "gerbil_scheme_rust_scheme_object_exact_integer_fits_u64_raw"
       "extern"
-    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-u64? value) 1 0))
+    (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer-fits-u64? value) 1 0))
 
   (c-define (gerbil-rs-scheme-object-exact-integer-i64-value-raw value)
       (scheme-object)
@@ -637,7 +637,7 @@ END-C
     int64
     "gerbil_scheme_rust_bytevector_to_bytestring_root_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-bytevector->bytestring-root
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytevector->bytestring-root
    value
    delimiter-code))
 
@@ -646,7 +646,7 @@ END-C
     int64
     "gerbil_scheme_rust_bytestring_to_bytevector_root_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-bytestring->bytevector-root
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring->bytevector-root
    bytestring
    delimiter-code))
 
@@ -655,7 +655,7 @@ END-C
     unsigned-int64
     "gerbil_scheme_rust_bytevector_to_uint_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-u8vector->uint
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->uint
    value
    byte-order
    size))
@@ -665,7 +665,7 @@ END-C
     int64
     "gerbil_scheme_rust_bytevector_to_sint_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-u8vector->sint
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->sint
    value
    byte-order
    size))
@@ -675,7 +675,7 @@ END-C
     unsigned-int64
     "gerbil_scheme_rust_root_bytevector_to_uint_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector->uint
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector->uint
    root-id
    byte-order
    size))
@@ -685,7 +685,7 @@ END-C
     int64
     "gerbil_scheme_rust_root_bytevector_to_sint_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-root-bytevector->sint
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector->sint
    root-id
    byte-order
    size))
@@ -695,7 +695,7 @@ END-C
     int64
     "gerbil_scheme_rust_uint_to_bytevector_root_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-uint->bytevector-root
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-uint->bytevector-root
    uint
    byte-order
    size))
@@ -705,7 +705,7 @@ END-C
     int64
     "gerbil_scheme_rust_sint_to_bytevector_root_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-sint->bytevector-root
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-sint->bytevector-root
    sint
    byte-order
    size))
@@ -715,14 +715,14 @@ END-C
     int64
     "gerbil_scheme_rust_i64_to_exact_integer_root_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-i64->exact-integer-root value))
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-i64->exact-integer-root value))
 
 (c-define (gerbil-rs-u64->exact-integer-root-raw value)
     (unsigned-int64)
     int64
     "gerbil_scheme_rust_u64_to_exact_integer_root_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-u64->exact-integer-root value))
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-u64->exact-integer-root value))
 
 (c-define (gerbil-rs-root-exact-integer?-raw root-id)
     (int64)
@@ -730,8 +730,8 @@ END-C
     "gerbil_scheme_rust_root_is_exact_integer_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
-    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer? value) 1 0)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
+    (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer? value) 1 0)))
 
 (c-define (gerbil-rs-root-exact-integer-fits-i64?-raw root-id)
     (int64)
@@ -739,8 +739,8 @@ END-C
     "gerbil_scheme_rust_root_exact_integer_fits_i64_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
-    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-i64? value) 1 0)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
+    (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer-fits-i64? value) 1 0)))
 
 (c-define (gerbil-rs-root-exact-integer-fits-u64?-raw root-id)
     (int64)
@@ -748,22 +748,22 @@ END-C
     "gerbil_scheme_rust_root_exact_integer_fits_u64_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
-    (if (gerbil-scheme-rust/scheme/native#gerbil-rs-exact-integer-fits-u64? value) 1 0)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
+    (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer-fits-u64? value) 1 0)))
 
 (c-define (gerbil-rs-root-exact-integer-i64-value-raw root-id)
     (int64)
     int64
     "gerbil_scheme_rust_root_exact_integer_i64_value_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id))
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id))
 
 (c-define (gerbil-rs-root-exact-integer-u64-value-raw root-id)
     (int64)
     unsigned-int64
     "gerbil_scheme_rust_root_exact_integer_u64_value_raw"
     "extern"
-  (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id))
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id))
 
 (c-define (gerbil-rs-root-string-length-raw root-id)
     (int64)
@@ -771,7 +771,7 @@ END-C
     "gerbil_scheme_rust_root_string_length_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
     (if (string? value) (string-length value) -1)))
 
 (c-define (gerbil-rs-root-string-char-ref-raw root-id index)
@@ -780,7 +780,7 @@ END-C
     "gerbil_scheme_rust_root_string_char_ref_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
     (if (and (string? value)
              (>= index 0)
              (< index (string-length value)))
@@ -793,7 +793,7 @@ END-C
     "gerbil_scheme_rust_root_bytevector_length_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
     (if (u8vector? value) (u8vector-length value) -1)))
 
 (c-define (gerbil-rs-root-bytevector-u8-ref-raw root-id index)
@@ -802,7 +802,7 @@ END-C
     "gerbil_scheme_rust_root_bytevector_u8_ref_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
     (if (and (u8vector? value)
              (>= index 0)
              (< index (u8vector-length value)))
@@ -815,10 +815,10 @@ END-C
     "gerbil_scheme_rust_root_bytevector_copy_raw"
     "extern"
   (let ((value
-         (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-ref root-id)))
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
     (if (and (u8vector? value)
              (= length (u8vector-length value)))
-      (gerbil-scheme-rust/scheme/native#gerbil-rs-copy-u8vector-c
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-copy-u8vector-c
        value destination length)
       -1)))
 
@@ -827,7 +827,7 @@ END-C
     int32
     "gerbil_scheme_rust_root_release_raw"
     "extern"
-  (if (gerbil-scheme-rust/scheme/native#gerbil-rs-rooted-value-release! root-id)
+  (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release! root-id)
     1
     0))
 

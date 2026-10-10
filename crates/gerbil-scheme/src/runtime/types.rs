@@ -29,12 +29,12 @@ pub struct GerbilRuntimeReceipt {
     /// Repository-relative public C header path.
     pub header_path: &'static str,
     /// Gerbil module initialized for the native bridge.
-    pub native_module_path: &'static str,
+    pub module_path: &'static str,
 }
 
 impl GerbilRuntimeReceipt {
     /// Runtime module loaded by the native bridge.
-    pub const NATIVE_MODULE_PATH: &'static str = "gerbil-scheme-rust/scheme/native";
+    pub const MODULE_PATH: &'static str = "gerbil-scheme-rust/scheme/runtime";
 }
 
 /// Safe borrowed UTF-8 view for native Gerbil calls.

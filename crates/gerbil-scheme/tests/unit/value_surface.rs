@@ -526,7 +526,7 @@ fn read_native_surface_source() -> String {
         .ancestors()
         .nth(2)
         .expect("workspace root from gerbil-scheme crate")
-        .join("scheme/asp/native-surface.ss");
+        .join("scheme/asp/abi-surface.ss");
     std::fs::read_to_string(&native_surface)
         .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()))
 }

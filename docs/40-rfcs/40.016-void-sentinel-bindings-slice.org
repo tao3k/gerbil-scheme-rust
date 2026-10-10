@@ -14,7 +14,7 @@ change Marlin downstream integration.
 
 - Scheme source exports =gerbil-rs-fixture-void-raw=.
 - Scheme source exports =gerbil-rs-scheme-object-void?-raw=.
-- The generated Gambit SCM artifact is tracked in =scheme/generated/native.scm=.
+- The generated Gambit SCM artifact is tracked in =scheme/generated/runtime.scm=.
 - =gerbil-scheme-sys= exposes checked C ABI wrappers from a sentinel-focused
   module instead of growing =abi.rs=.
 - =gerbil-scheme= exposes =SchemeVoid=, =GerbilValue::is_void=,
@@ -24,7 +24,7 @@ change Marlin downstream integration.
 
 * Predicate decision
 
-Do not use =void?= inside =scheme/native.ss= for the C export.
+Do not use =void?= inside =scheme/runtime.ss= for the C export.
 
 Runtime evidence showed that =void?= is unbound in the compiled bridge module,
 which caused Gambit to enter its interactive error path and then crash the Rust
@@ -44,8 +44,8 @@ Local Gerbil evidence:
 
 Generated SCM is an in-repository artifact for this project.
 
-When =scheme/native.ss= or =scheme/native.ssi= changes, update
-=scheme/generated/native.scm= through the official native build path:
+When =scheme/runtime.ss= or =scheme/runtime.ssi= changes, update
+=scheme/generated/runtime.scm= through the official native build path:
 
 #+begin_src sh
 direnv exec . env GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1 cargo check -p gerbil-scheme --features native --locked

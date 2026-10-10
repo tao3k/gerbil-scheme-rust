@@ -31,7 +31,7 @@ future deletion of this receipt fails the suite.
 
 * Receipts
 
-- =crates/gerbil-scheme/src/native.rs= exports =NativeResult<T>= in the native
+- =crates/gerbil-scheme/src/runtime/mod.rs= exports =NativeResult<T>= in the native
   public surface.
 - =crates/gerbil-scheme/src/lib.rs= re-exports =NativeResult= when the =native=
   feature is enabled.

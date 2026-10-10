@@ -15,11 +15,11 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     fs::create_dir_all(workspace.join("scheme")).expect("create Scheme input root");
     fs::write(workspace.join("build.ss"), "build-v1\n").expect("write build.ss");
     fs::write(workspace.join("gerbil.pkg"), "package-v1\n").expect("write gerbil.pkg");
-    fs::write(workspace.join("scheme/native.ss"), "native-v1\n").expect("write native.ss");
-    fs::write(workspace.join("scheme/native.ssi"), "ffi-v1\n").expect("write native.ssi");
+    fs::write(workspace.join("scheme/runtime.ss"), "native-v1\n").expect("write native.ss");
+    fs::write(workspace.join("scheme/runtime.ssi"), "ffi-v1\n").expect("write native.ssi");
     let original = workspace_input_fingerprint(&workspace);
 
-    fs::write(workspace.join("scheme/native.ss"), "native-v2\n").expect("change native.ss");
+    fs::write(workspace.join("scheme/runtime.ss"), "native-v2\n").expect("change native.ss");
     let changed = workspace_input_fingerprint(&workspace);
 
     assert_ne!(original, changed);

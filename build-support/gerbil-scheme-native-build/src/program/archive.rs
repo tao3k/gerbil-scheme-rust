@@ -88,7 +88,7 @@ pub struct NativeHeaderInput<'a> {
 
 use super::headers::native_compile_options;
 
-const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/native"];
+const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/runtime"];
 
 /// One compiler-owned transition in the linked AOT program build.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

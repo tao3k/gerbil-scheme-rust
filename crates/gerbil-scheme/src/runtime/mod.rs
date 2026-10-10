@@ -3,17 +3,17 @@
 //! Safe native Gerbil/Gambit bindings organized by ownership boundary.
 //!
 //! `types` defines ABI-neutral value shapes, `rooted` owns GC-rooted Scheme
-//! values, `integer` implements exact-integer conversion, `runtime` owns
+//! values, `integer` implements exact-integer conversion, `lifecycle` owns
 //! Gerbil runtime entry points, and `value` owns safe value interpretation.
 
 mod integer;
+mod lifecycle;
 mod program;
 mod rooted;
-mod runtime;
 mod types;
 mod value;
+pub use lifecycle::{GerbilI64Callback, GerbilI64CallbackAbi};
 pub use program::{LinkedBytesExport, LinkedGerbilProgram, LinkedStringExport};
-pub use runtime::{GerbilI64Callback, GerbilI64CallbackAbi};
 pub use types::{
     ByteOrder, BytestringDelimiter, ExactIntegerTarget, GerbilRuntime, GerbilRuntimeReceipt,
     GerbilUtf8, GerbilValue, GerbilValueProvenance, IntegerDecoding, IntegerEncoding, IntegerWidth,

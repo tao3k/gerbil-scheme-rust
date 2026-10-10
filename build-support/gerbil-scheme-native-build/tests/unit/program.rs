@@ -50,8 +50,7 @@ fn plan(modules: Value) -> Value {
 
 #[test]
 fn program_requires_exactly_one_bridge() {
-    let bridge =
-        json!({"module": "gerbil-scheme-rust/scheme/native", "scm": "unused.scm", "system": false});
+    let bridge = json!({"module": "gerbil-scheme-rust/scheme/runtime", "scm": "unused.scm", "system": false});
     let other = json!({"module": "example/application", "scm": "unused.scm", "system": false});
     assert!(rejected_plan(&plan(json!([other]))).contains("required module"));
     assert!(rejected_plan(&plan(json!([bridge.clone(), bridge]))).contains("required module"));
@@ -109,7 +108,7 @@ fn program_rejects_empty_unknown_and_unversioned_plans() {
     unknown["caller_override"] = json!(true);
     assert!(rejected_plan(&unknown).contains("unknown field"));
     let mut unversioned = plan(
-        json!([{"module": "gerbil-scheme-rust/scheme/native", "scm": "unused.scm", "system": false}]),
+        json!([{"module": "gerbil-scheme-rust/scheme/runtime", "scm": "unused.scm", "system": false}]),
     );
     unversioned["schema"] = json!("other");
     assert_eq!(rejected_plan(&unversioned), "invalid AOT program manifest");
@@ -144,13 +143,13 @@ impl ProgramArchiveObserver for Observations {
 fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     let root = super::support::unique_temp_dir("gerbil-program-observation");
     fs::create_dir_all(&root).unwrap();
-    let bridge = root.join("native.scm");
+    let bridge = root.join("runtime.scm");
     fs::write(&bridge, "(display 'native)").unwrap();
     let manifest = root.join("program.json");
     fs::write(
         &manifest,
         serde_json::to_vec(&plan(json!([{
-            "module": "gerbil-scheme-rust/scheme/native",
+            "module": "gerbil-scheme-rust/scheme/runtime",
             "scm": bridge,
             "system": false
         }])))
@@ -187,9 +186,9 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     );
     assert_eq!(
         rows[4],
-        "phase=module-c state=start operation=generate program module C subject=gerbil-scheme-rust/scheme/native"
+        "phase=module-c state=start operation=generate program module C subject=gerbil-scheme-rust/scheme/runtime"
     );
-    assert!(rows[5].starts_with("phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="));
+    assert!(rows[5].starts_with("phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/runtime elapsedMs="));
     assert!(rows[6].starts_with("phase=module-c-batch state=failed operation=stage program module C sources subject=1 elapsedMs="));
     assert_eq!(rows.len(), 7, "no timer heartbeat may manufacture rows");
     fs::remove_dir_all(root).unwrap();
@@ -254,13 +253,13 @@ impl ProgramArchiveObserver for ChannelObservations {
 fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats() {
     let root = super::support::unique_temp_dir("gerbil-program-slow-child");
     fs::create_dir_all(&root).unwrap();
-    let bridge = root.join("native.scm");
+    let bridge = root.join("runtime.scm");
     fs::write(&bridge, "(display 'native)").unwrap();
     let manifest = root.join("program.json");
     fs::write(
         &manifest,
         serde_json::to_vec(&plan(json!([{
-            "module": "gerbil-scheme-rust/scheme/native",
+            "module": "gerbil-scheme-rust/scheme/runtime",
             "scm": bridge,
             "system": false
         }])))
@@ -303,7 +302,7 @@ fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats
     );
     assert_eq!(
         receiver.recv_timeout(Duration::from_millis(250)).unwrap(),
-        "phase=module-c state=start operation=generate program module C subject=gerbil-scheme-rust/scheme/native"
+        "phase=module-c state=start operation=generate program module C subject=gerbil-scheme-rust/scheme/runtime"
     );
     assert!(
         !worker.is_finished(),
@@ -315,7 +314,7 @@ fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats
     );
     assert!(worker.join().unwrap().is_err());
     assert!(receiver.recv().unwrap().starts_with(
-        "phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/native elapsedMs="
+        "phase=module-c state=failed operation=generate program module C subject=gerbil-scheme-rust/scheme/runtime elapsedMs="
     ));
     assert!(receiver.recv().unwrap().starts_with(
         "phase=module-c-batch state=failed operation=stage program module C sources subject=1 elapsedMs="

@@ -2,17 +2,15 @@
 
 const ASP_NATIVE_SURFACE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../scheme/asp/native-surface.ss"
+    "/../../scheme/asp/abi-surface.ss"
 ));
 const NATIVE_SOURCE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../scheme/native.ss"
+    "/../../scheme/runtime.ss"
 ));
 const BUILD_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../build.ss"));
-const NATIVE_RUNTIME: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../native/runtime.c"
-));
+const NATIVE_RUNTIME: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ffi/runtime.c"));
 
 #[test]
 fn asp_native_surface_exports_current_shape_selectors() {
@@ -67,11 +65,11 @@ fn asp_native_surface_exports_current_shape_selectors() {
 #[test]
 fn asp_native_surface_stays_out_of_runtime_build() {
     assert!(
-        BUILD_SCRIPT.contains("\"scheme/native\""),
+        BUILD_SCRIPT.contains("\"scheme/runtime\""),
         "runtime build must compile the real native implementation"
     );
     assert!(
-        !BUILD_SCRIPT.contains("scheme/asp/native-surface"),
+        !BUILD_SCRIPT.contains("scheme/asp/abi-surface"),
         "ASP projection must stay out of the runtime build"
     );
 }

@@ -212,7 +212,7 @@ impl GerbilRuntime {
             abi_id: gerbil_scheme_sys::GERBIL_SCHEME_RUST_ABI_ID,
             abi_version: GERBIL_SCHEME_RUST_ABI_VERSION,
             header_path: gerbil_scheme_sys::GERBIL_SCHEME_RUST_HEADER_PATH,
-            native_module_path: GerbilRuntimeReceipt::NATIVE_MODULE_PATH,
+            module_path: GerbilRuntimeReceipt::MODULE_PATH,
         })
     }
 

@@ -1,5 +1,5 @@
 harness = "libtest"
-test = "native_value_surface"
+test = "value_surface"
 phase = "warm"
 target_total = "10ms"
 max_total = "100ms"

@@ -30,18 +30,18 @@ Current Rust ABI evidence:
 - =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
   callback trampoline behavior.
 - =source_surface= integration tests cover the Scheme ASP source-surface export
-  set, the =scheme/native.ss= FFI contract, and the rule that
-  =scheme/asp/native-surface.ss= stays out of the runtime build.
+  set, the =scheme/runtime.ss= FFI contract, and the rule that
+  =scheme/asp/abi-surface.ss= stays out of the runtime build.
 
 Current Scheme source-surface evidence:
 
-- =scheme/native.ss= remains the runtime implementation owner.
-- =scheme/native.ssi= is the tracked V19 compiler-generated interface for the
-  Scheme exports; =scheme/native.ss= owns the native FFI symbol contract.
-- =scheme/asp/native-surface.ss= is still the temporary ASP-projected
+- =scheme/runtime.ss= remains the runtime implementation owner.
+- =scheme/runtime.ssi= is the tracked V19 compiler-generated interface for the
+  Scheme exports; =scheme/runtime.ss= owns the native FFI symbol contract.
+- =scheme/asp/abi-surface.ss= is still the temporary ASP-projected
   workaround for the source-surface view; it must stay out of =build.ss= and can
-  be retired once the provider projects =scheme/native.ss= plus
-  =scheme/native.ssi= directly.
+  be retired once the provider projects =scheme/runtime.ss= plus
+  =scheme/runtime.ssi= directly.
 - The current projected selector set is exactly 27 selectors:
   =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
   =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
@@ -66,7 +66,7 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_native_value_shape=,
   =gerbil_scheme_rust_native_error_shape=, and
   =gerbil_scheme_rust_native_result_shape=.
-- Direct provider projection of the real =scheme/native.ss= FFI/export owner is
+- Direct provider projection of the real =scheme/runtime.ss= FFI/export owner is
   not yet closed and remains a provider/source-surface TODO.
 - No current Scheme selector exists for symbol, keyword, general pair/list,
   vector, procedure, ports, continuations, or advanced Scheme objects.
@@ -366,13 +366,13 @@ keeps this table aligned with the Scheme source-surface projection.
 
 * ASP/source-surface checklist
 
-- [X] ASP workaround owner exists: =scheme/asp/native-surface.ss=.
+- [X] ASP workaround owner exists: =scheme/asp/abi-surface.ss=.
 - [X] Workaround projects current scalar and backed shape selectors:
   runtime/status/i64/bool/comparison/fixnum/char/flonum/bytevector/rooted-bytes
   /integer-bytes/exact-integer/UTF-8/value-handle/nil/void/i64-callback/native-value
   /native-error/native-result plus scalar exports.
-- [ ] Direct provider projection for real =scheme/native.ss= FFI/export owner.
-- [ ] Fix or document the current =scheme/native.ss= provider blocker:
+- [ ] Direct provider projection for real =scheme/runtime.ss= FFI/export owner.
+- [ ] Fix or document the current =scheme/runtime.ss= provider blocker:
   parser-owned search requires a provider query-pack descriptor and exact query
   currently returns no owner items.
 - [ ] Selector set for every public Scheme export.
@@ -405,9 +405,9 @@ keeps this table aligned with the Scheme source-surface projection.
 The immediate next implementation slice should close the mismatch between the
 Rust safe surface and the Scheme ASP surface:
 
-- [X] Add =gerbil_scheme_rust_utf8_shape= to =scheme/asp/native-surface.ss=.
+- [X] Add =gerbil_scheme_rust_utf8_shape= to =scheme/asp/abi-surface.ss=.
 - [X] Add =gerbil_scheme_rust_i64_callback_shape= to
-  =scheme/asp/native-surface.ss=.
+  =scheme/asp/abi-surface.ss=.
 - [X] Extend =gerbil_scheme_rust_native_value_shape= with explicit
   non-zero/runtime-borrowed/GC-not-rooted value semantics.
 - [ ] Extend =gerbil_scheme_rust_native_result_shape= or add a new result-family

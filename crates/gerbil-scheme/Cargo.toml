@@ -27,57 +27,57 @@ gerbil-scheme-rust-project-harness-policy.workspace = true
 # Each runtime qualification owns a separate process: the native runtime is
 # deliberately one-shot, so these cannot share unit_test's process.
 [[test]]
-name = "native_bytestring_benchmark"
-path = "tests/unit/targets/native_bytestring_benchmark.rs"
+name = "bytestring_benchmark"
+path = "tests/unit/targets/bytestring_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_exact_integer"
-path = "tests/unit/targets/native_exact_integer.rs"
+name = "exact_integer"
+path = "tests/unit/targets/exact_integer.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_exact_integer_benchmark"
-path = "tests/unit/targets/native_exact_integer_benchmark.rs"
+name = "exact_integer_benchmark"
+path = "tests/unit/targets/exact_integer_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_ffi_benchmark"
-path = "tests/unit/targets/native_ffi_benchmark.rs"
+name = "ffi_benchmark"
+path = "tests/unit/targets/ffi_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_identity"
-path = "tests/unit/targets/native_identity.rs"
+name = "identity"
+path = "tests/unit/targets/identity.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_integer_bytes_benchmark"
-path = "tests/unit/targets/native_integer_bytes_benchmark.rs"
+name = "integer_bytes_benchmark"
+path = "tests/unit/targets/integer_bytes_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_rooted_value"
-path = "tests/unit/targets/native_rooted_value.rs"
+name = "rooted_value"
+path = "tests/unit/targets/rooted_value.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_rooted_value_benchmark"
-path = "tests/unit/targets/native_rooted_value_benchmark.rs"
+name = "rooted_value_benchmark"
+path = "tests/unit/targets/rooted_value_benchmark.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_runtime"
-path = "tests/unit/targets/native_runtime.rs"
+name = "runtime_lifecycle"
+path = "tests/unit/targets/runtime_lifecycle.rs"
 required-features = ["native"]
 
 [[test]]
-name = "native_runtime_round_trip"
-path = "tests/unit/targets/native_runtime_round_trip.rs"
+name = "runtime_round_trip"
+path = "tests/unit/targets/runtime_round_trip.rs"
 required-features = ["native"]
 
 [[bench]]
-name = "native_ffi"
+name = "ffi"
 harness = false
 required-features = ["native"]
 

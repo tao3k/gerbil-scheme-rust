@@ -20,10 +20,10 @@ pub use gerbil_scheme_sys::{
 };
 
 #[cfg(feature = "native")]
-mod native;
+mod runtime;
 
 #[cfg(feature = "native")]
-pub use native::{
+pub use runtime::{
     ByteOrder, BytestringDelimiter, ExactIntegerTarget, IntegerDecoding, IntegerEncoding,
     IntegerWidth, RootedSchemeBytevector, RootedSchemeExactInteger, RootedSchemeString,
     RootedSchemeValue, RootedSchemeValueKind, SchemeBorrowedBytevector, SchemeBorrowedVector,
@@ -32,10 +32,10 @@ pub use native::{
 };
 
 #[cfg(feature = "native")]
-pub use native::{
+pub use runtime::{
     GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilRuntimeReceipt, GerbilUtf8,
     GerbilValue, GerbilValueProvenance, LinkedBytesExport, LinkedGerbilProgram, LinkedStringExport,
     NativeError, NativeResult,
 };
 
-pub mod native_environment;
+pub mod tool_environment;

@@ -346,6 +346,12 @@ impl RootedSchemeString<'_> {
 }
 
 impl RootedSchemeBytevector<'_> {
+    /// Return the owned root token without transferring ownership.
+    #[must_use]
+    pub const fn root_id(&self) -> gerbil_scheme_sys::GerbilRootId {
+        self.owner.root_id()
+    }
+
     /// Return this rooted bytevector's byte length.
     #[must_use]
     pub fn len(&self) -> NativeResult<usize> {

@@ -1,5 +1,5 @@
 use divan::{Bencher, black_box};
-use gerbil_scheme::GerbilRuntime;
+use gerbil_scheme::{BytestringDelimiter, GerbilRuntime};
 
 fn main() {
     divan::main();
@@ -12,7 +12,14 @@ std::thread_local! {
 fn with_runtime(run: impl FnOnce(&GerbilRuntime)) {
     RUNTIME.with(|runtime| {
         run(runtime.get_or_init(|| {
-            GerbilRuntime::initialize().expect("initialize the live Gerbil runtime")
+            let runtime = GerbilRuntime::initialize().expect("initialize the live Gerbil runtime");
+            assert_eq!(runtime.add_i64(41, 1).expect("addition preflight"), 42);
+            assert!(!runtime.is_even_i64(41).expect("predicate preflight"));
+            assert_eq!(
+                runtime.compare_i64(41, 42).expect("comparison preflight"),
+                std::cmp::Ordering::Less
+            );
+            runtime
         }));
     });
 }
@@ -133,5 +140,56 @@ fn compare(bencher: Bencher<'_, '_>) {
                     .expect("benchmark Gerbil comparison"),
             )
         });
+    });
+}
+
+// These are owner-local transport microbenchmarks, not concurrent parser
+// throughput. A non-Send runtime must never be shared across Divan workers.
+#[divan::bench(args = [0, 8192, 65536], sample_count = 40, sample_size = 25, threads = 1)]
+fn rooted_bulk_copy(bencher: Bencher<'_, '_>, size: usize) {
+    let source = "A5".repeat(size);
+    with_runtime(|runtime| {
+        let root = runtime
+            .bytevector_from_bytestring(&source, BytestringDelimiter::Compact)
+            .expect("create untimed bytevector fixture");
+        assert_eq!(
+            root.to_vec().into_result().expect("copy preflight"),
+            vec![0xA5; size]
+        );
+        bencher.bench_local(|| {
+            let bytes = root.to_vec().into_result().expect("copy rooted bytes");
+            black_box(&bytes);
+            // Dispose inside the timed closure, not in Divan's output drop.
+            drop(bytes);
+        });
+    });
+}
+
+#[divan::bench(args = [0, 8192, 65536], sample_count = 40, sample_size = 25, threads = 1)]
+fn rooted_round_trip(bencher: Bencher<'_, '_>, size: usize) {
+    let source = "A5".repeat(size);
+    with_runtime(|runtime| {
+        let fixture = runtime
+            .bytevector_from_bytestring(&source, BytestringDelimiter::Compact)
+            .expect("create round-trip preflight fixture");
+        assert_eq!(
+            fixture
+                .to_vec()
+                .into_result()
+                .expect("round-trip preflight"),
+            vec![0xA5; size]
+        );
+        drop(fixture);
+        bencher.bench_local(|| {
+            let root = runtime
+                .bytevector_from_bytestring(black_box(&source), BytestringDelimiter::Compact)
+                .expect("allocate and root bytevector");
+            let bytes = root.to_vec().into_result().expect("copy round-trip bytes");
+            black_box(&bytes);
+            // Include both Scheme root release and Rust result disposal.
+            drop(root);
+            drop(bytes);
+        });
+        assert_eq!(runtime.add_i64(40, 2).expect("owner remains usable"), 42);
     });
 }

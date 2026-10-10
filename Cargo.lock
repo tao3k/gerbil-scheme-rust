@@ -422,15 +422,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gerbil-scheme-build"
-version = "0.1.0"
-dependencies = [
- "gerbil-scheme",
- "gerbil-scheme-rust-project-harness",
-]
-
-[[package]]
-name = "gerbil-scheme-native-build"
+name = "gerbil-scheme-aot-build"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
@@ -441,6 +433,14 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "gerbil-scheme-build"
+version = "0.1.0"
+dependencies = [
+ "gerbil-scheme",
+ "gerbil-scheme-rust-project-harness",
 ]
 
 [[package]]
@@ -487,7 +487,7 @@ dependencies = [
 name = "gerbil-scheme-sys"
 version = "0.1.0"
 dependencies = [
- "gerbil-scheme-native-build",
+ "gerbil-scheme-aot-build",
  "gerbil-scheme-rust-project-harness",
  "gerbil-scheme-rust-project-harness-policy",
 ]

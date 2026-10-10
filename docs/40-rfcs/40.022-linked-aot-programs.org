@@ -7,7 +7,7 @@ semantics. Their =build.ss= compiles those modules. =gerbil-rs-stage-program=
 uses the Gerbil compiler's runtime dependency graph to emit a versioned native
 link manifest; Rust does not parse Scheme or reconstruct imports.
 
-=gerbil-scheme-native-build= compiles that manifest. An =external-program=
+=gerbil-scheme-aot-build= compiles that manifest. An =external-program=
 consumer supplies the complete AOT graph, including exactly one bridge module.
 Its =ProgramArchiveRequest= names the manifest, compiler, archive, linker and
 output directory. Validation, staging, compilation and archive publication

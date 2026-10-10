@@ -17,13 +17,25 @@ bridge-test:
 bridge-contracts:
     {{ build_env }} cargo test -p gerbil-scheme --features native --test unit_test
     {{ build_env }} cargo test -p gerbil-scheme --features native --test runtime_round_trip --test exact_integer --test rooted_value --test identity
-    {{ build_env }} cargo test -p gerbil-scheme-native-build --test unit_test
+    {{ build_env }} cargo test -p gerbil-scheme-aot-build --test unit_test
 
 bridge-targets:
     {{ build_env }} cargo check -p gerbil-scheme --features native --all-targets --locked
 
+bridge-path-check:
+    ! rg --files --hidden -g '!.git/**' -g '!target/**' -g '!.gerbil/**' | rg -i '(^|/)[^/]*native[^/]*$'
+
 bridge-lint:
-    {{ build_env }} cargo clippy -p gerbil-scheme -p gerbil-scheme-native-build --features gerbil-scheme/native --all-targets --locked -- -D warnings
+    {{ build_env }} cargo clippy -p gerbil-scheme -p gerbil-scheme-aot-build --features gerbil-scheme/native --all-targets --locked -- -D warnings
+
+bridge-bench-smoke:
+    {{ build_env }} cargo bench -p gerbil-scheme --features native --bench ffi --profile dev -- --test
+
+bridge-benchmark *args:
+    {{ build_env }} cargo bench -p gerbil-scheme --features native --bench ffi -- {{ args }}
+
+bridge-bench-controls:
+    {{ build_env }} cargo test -p gerbil-scheme --features native --test ffi_benchmark ratios_reject_unresolved_clock_samples_and_overflow
 
 bridge-regenerate:
     {{ build_env }} GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1 GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo check -p gerbil-scheme-sys --locked

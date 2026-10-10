@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "build-support/gerbil-scheme-native-build",
+  "build-support/gerbil-scheme-aot-build",
   "build-support/gerbil-scheme-rust-ir",
   "build-support/gerbil-scheme-rust-project-harness-policy",
   "build-support/gerbil-scheme-rust-project-harness",
@@ -41,7 +41,7 @@ cc = "1.2.64"
 pkg-config = "0.3"
 cbindgen = "0.29.4"
 divan = "0.1.21"
-gerbil-scheme-native-build = { path = "build-support/gerbil-scheme-native-build" }
+gerbil-scheme-aot-build = { path = "build-support/gerbil-scheme-aot-build" }
 gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-scheme-rust-project-harness-policy" }
 gerbil-scheme-rust-project-harness = { path = "build-support/gerbil-scheme-rust-project-harness", version = "0.1.2" }
 gerbil-scheme = { path = "crates/gerbil-scheme", version = "0.1.0" }

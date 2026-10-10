@@ -106,7 +106,7 @@ impl GerbilToolchain {
     }
 }
 
-#[path = "../../../build-support/gerbil-scheme-native-build/src/gambit_program.rs"]
+#[path = "../../../build-support/gerbil-scheme-aot-build/src/gambit_program.rs"]
 mod gambit_program;
 pub use gambit_program::{
     default_gambit_gsc_program_for_gxi, discover_gambit_gsc_from_env, is_gambit_gsc_program,

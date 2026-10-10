@@ -138,7 +138,7 @@ surface hardening step:
   runtime sentinel;
 - UTF-8 pointer and length are observable at the ABI boundary;
 - no new =bindgen=, =cc=, or release-version bump is introduced;
-- scenario coverage includes =native-value-surface= with a sub-millisecond
+- scenario coverage includes =value-surface= with a sub-millisecond
   target for the pure Rust validation path.
 
 The remaining provider debt is unchanged: the runtime implementation still owns

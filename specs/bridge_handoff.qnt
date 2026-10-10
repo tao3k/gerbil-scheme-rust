@@ -11,6 +11,7 @@ module bridge_handoff {
     phase: str,
     status: int -> str,
     owner: int -> int,
+    foreignHandoff: Set[int],
     roots: Set[int],
     cancelled: Set[int],
     completions: int -> int,
@@ -26,11 +27,15 @@ module bridge_handoff {
   val active = requests.filter(r => Set("running", "rooted").contains(s.status.get(r)))
   val terminal = requests.filter(r => Set("done", "cancelled").contains(s.status.get(r)))
   val idle = s.enabled.filter(w => not(active.exists(r => s.owner.get(r) == w)))
+  // Scheme CPU workers may overlap; this protocol's foreign copy/root handoff
+  // stays with one control owner. It does not limit Scheme processor count.
+  val publishable = requests.filter(r => s.status.get(r) == "running" and s.foreignHandoff.size() == 0)
 
   action init = s' = {
     phase: "running",
     status: requests.mapBy(_ => "new"),
     owner: requests.mapBy(_ => 0),
+    foreignHandoff: Set(),
     roots: Set(), cancelled: Set(),
     completions: requests.mapBy(_ => 0), receivers: Set(), settled: Set(),
     delivered: Set(), enabled: workers, queueLimit: capacity
@@ -46,15 +51,15 @@ module bridge_handoff {
     s' = { ...s, status: s.status.set(r, "running"), owner: s.owner.set(r, w) }
   }
   action publish(r: int): bool = all {
-    s.status.get(r) == "running",
-    s' = { ...s, status: s.status.set(r, "rooted"), roots: s.roots.union(Set(r)) }
+    publishable.contains(r),
+    s' = { ...s, status: s.status.set(r, "rooted"), roots: s.roots.union(Set(r)), foreignHandoff: Set(r) }
   }
   // Owner-side root release precedes terminal host completion, even on cancel.
   action finish(r: int): bool = all {
-    s.status.get(r) == "rooted", s.roots.contains(r),
+    s.status.get(r) == "rooted", s.roots.contains(r), s.foreignHandoff.contains(r),
     s' = { ...s,
       status: s.status.set(r, if (s.cancelled.contains(r)) "cancelled" else "done"),
-      owner: s.owner.set(r, 0), roots: s.roots.exclude(Set(r)),
+      owner: s.owner.set(r, 0), roots: s.roots.exclude(Set(r)), foreignHandoff: Set(),
       completions: s.completions.set(r, s.completions.get(r) + 1)
     }
   }
@@ -103,6 +108,7 @@ module bridge_handoff {
     active.forall(r => s.enabled.contains(s.owner.get(r))),
     workers.forall(w => active.filter(r => s.owner.get(r) == w).size() <= 1),
     requests.forall(r => s.roots.contains(r) == (s.status.get(r) == "rooted")),
+    s.roots == s.foreignHandoff, s.foreignHandoff.size() <= 1,
     terminal.forall(r => not(s.roots.contains(r))),
     s.settled.subseteq(terminal), s.delivered.subseteq(s.settled),
     s.delivered.intersect(s.cancelled).size() == 0,
@@ -121,6 +127,11 @@ module bridge_handoff {
   run parallelWorkersTest = init.then(admit(1)).then(admit(2))
     .then(dispatch(1, 1)).then(dispatch(2, 2))
     .then(all { assert(active.size() == 2), assert(safety), s' = s })
+  run parallelWorkersSerializeForeignHandoffTest = init.then(admit(1)).then(admit(2))
+    .then(dispatch(1, 1)).then(dispatch(2, 2)).then(publish(1))
+    .then(all { assert(active.size() == 2), assert(not(publishable.contains(2))), assert(safety), s' = s })
+    .then(finish(1)).then(publish(2)).then(finish(2))
+    .then(all { assert(s.foreignHandoff.size() == 0), assert(safety), s' = s })
   run cancellationRetainsRootTest = init.then(admit(1)).then(dispatch(1, 1))
     .then(publish(1)).then(cancel(1))
     .then(all { assert(s.roots.contains(1)), assert(safety), s' = s })
@@ -152,6 +163,13 @@ module bridge_handoff {
   }
   run notifyBeforeRootReleaseMutationTest = init.then(admit(1)).then(dispatch(1, 1))
     .then(publish(1)).then(unsafeNotify(1))
+    .then(all { assert(not(safety)), s' = s })
+  action unsafeForeignPublish(r: int): bool = all {
+    s.status.get(r) == "running",
+    s' = { ...s, status: s.status.set(r, "rooted"), roots: s.roots.union(Set(r)), foreignHandoff: Set(r) }
+  }
+  run overlappingForeignHandoffMutationTest = init.then(admit(1)).then(admit(2))
+    .then(dispatch(1, 1)).then(dispatch(2, 2)).then(publish(1)).then(unsafeForeignPublish(2))
     .then(all { assert(not(safety)), s' = s })
 }
 

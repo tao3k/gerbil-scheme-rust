@@ -551,5 +551,5 @@ pub(super) fn rooted_integer_bytevector<'runtime>(
     RootedSchemeOwner::new(status, root, operation).map(|owner| RootedSchemeBytevector { owner })
 }
 #[cfg(test)]
-#[path = "../../tests/unit/native/rooted_scheme_owner.rs"]
+#[path = "../../tests/unit/owner/rooted_scheme_owner.rs"]
 mod rooted_scheme_owner_tests;

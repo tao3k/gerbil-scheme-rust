@@ -10,7 +10,7 @@
 !scheme/runtime.ssi
 !scheme/generated/
 !scheme/generated/runtime.scm
-!build-support/gerbil-scheme-native-build/tests/unit/scenarios/native-program-content-cache/inputs/module.scm
+!build-support/gerbil-scheme-aot-build/tests/unit/scenarios/program-content-cache/inputs/module.scm
 *.o
 *.so
 *.dylib

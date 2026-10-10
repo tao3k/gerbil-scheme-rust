@@ -26,6 +26,18 @@ fn summarize(samples: &mut Samples) -> (u128, u128) {
     (u128::midpoint(samples[49], samples[50]), samples[94])
 }
 
+fn ratio_x100(numerator: u128, denominator: u128) -> Option<u128> {
+    numerator.checked_mul(100)?.checked_div(denominator)
+}
+
+#[test]
+fn ratios_reject_unresolved_clock_samples_and_overflow() {
+    assert_eq!(ratio_x100(15, 10), Some(150));
+    assert_eq!(ratio_x100(0, 10), Some(0));
+    assert_eq!(ratio_x100(15, 0), None);
+    assert_eq!(ratio_x100(u128::MAX, 1), None);
+}
+
 fn sample_raw_aot() -> (Samples, Samples, Samples) {
     let add = sample_operation(|| {
         black_box(unsafe {
@@ -46,7 +58,7 @@ fn sample_raw_aot() -> (Samples, Samples, Samples) {
 #[test]
 fn steady_state_native_ffi_reports_statistical_receipt() {
     let scenario = validate_rust_scenario_benchmark(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/unit/scenarios/native-ffi-steady-state"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/unit/scenarios/ffi-steady-state"),
     )
     .expect("validate the steady-state native FFI scenario benchmark contract");
     assert_eq!(scenario.status, RustScenarioBenchmarkStatus::Pass);
@@ -91,16 +103,22 @@ fn steady_state_native_ffi_reports_statistical_receipt() {
     let (add_median_ns, add_p95_ns) = summarize(&mut add_ns);
     let (even_median_ns, even_p95_ns) = summarize(&mut even_ns);
     let (compare_median_ns, compare_p95_ns) = summarize(&mut compare_ns);
-    let identity_vs_c_x100 = identity_median_ns * 100 / c_identity_median_ns;
-    let add_vs_c_x100 = add_median_ns * 100 / c_identity_median_ns;
-    let even_vs_c_x100 = even_median_ns * 100 / c_identity_median_ns;
-    let compare_vs_c_x100 = compare_median_ns * 100 / c_identity_median_ns;
-    let add_safe_vs_raw_x100 = add_median_ns * 100 / raw_add_median_ns;
-    let even_safe_vs_raw_x100 = even_median_ns * 100 / raw_even_median_ns;
-    let compare_safe_vs_raw_x100 = compare_median_ns * 100 / raw_compare_median_ns;
+    // A rounded-to-zero control is not evidence of zero-cost FFI. Keep the
+    // observation unmodified and fail closed instead of clamping it to 1ns.
+    let ratio = |numerator, denominator| {
+        ratio_x100(numerator, denominator)
+            .expect("FFI benchmark ratio is unresolved: zero control timing or arithmetic overflow")
+    };
+    let identity_vs_c_x100 = ratio(identity_median_ns, c_identity_median_ns);
+    let add_vs_c_x100 = ratio(add_median_ns, c_identity_median_ns);
+    let even_vs_c_x100 = ratio(even_median_ns, c_identity_median_ns);
+    let compare_vs_c_x100 = ratio(compare_median_ns, c_identity_median_ns);
+    let add_safe_vs_raw_x100 = ratio(add_median_ns, raw_add_median_ns);
+    let even_safe_vs_raw_x100 = ratio(even_median_ns, raw_even_median_ns);
+    let compare_safe_vs_raw_x100 = ratio(compare_median_ns, raw_compare_median_ns);
     let total = total_started.elapsed();
     eprintln!(
-        "scenario benchmark receipt: id=native-ffi-steady-state samples={SAMPLE_COUNT} iterations_per_sample={ITERATIONS_PER_SAMPLE} c_identity_median_ns={c_identity_median_ns} c_identity_p95_ns={c_identity_p95_ns} identity_median_ns={identity_median_ns} identity_p95_ns={identity_p95_ns} identity_vs_c_x100={identity_vs_c_x100} raw_add_median_ns={raw_add_median_ns} raw_add_p95_ns={raw_add_p95_ns} add_median_ns={add_median_ns} add_p95_ns={add_p95_ns} add_vs_c_x100={add_vs_c_x100} add_safe_vs_raw_x100={add_safe_vs_raw_x100} raw_even_median_ns={raw_even_median_ns} raw_even_p95_ns={raw_even_p95_ns} even_median_ns={even_median_ns} even_p95_ns={even_p95_ns} even_vs_c_x100={even_vs_c_x100} even_safe_vs_raw_x100={even_safe_vs_raw_x100} raw_compare_median_ns={raw_compare_median_ns} raw_compare_p95_ns={raw_compare_p95_ns} compare_median_ns={compare_median_ns} compare_p95_ns={compare_p95_ns} compare_vs_c_x100={compare_vs_c_x100} compare_safe_vs_raw_x100={compare_safe_vs_raw_x100} elapsed_ns={}",
+        "scenario benchmark receipt: id=ffi-steady-state samples={SAMPLE_COUNT} iterations_per_sample={ITERATIONS_PER_SAMPLE} c_identity_median_ns={c_identity_median_ns} c_identity_p95_ns={c_identity_p95_ns} identity_median_ns={identity_median_ns} identity_p95_ns={identity_p95_ns} identity_vs_c_x100={identity_vs_c_x100} raw_add_median_ns={raw_add_median_ns} raw_add_p95_ns={raw_add_p95_ns} add_median_ns={add_median_ns} add_p95_ns={add_p95_ns} add_vs_c_x100={add_vs_c_x100} add_safe_vs_raw_x100={add_safe_vs_raw_x100} raw_even_median_ns={raw_even_median_ns} raw_even_p95_ns={raw_even_p95_ns} even_median_ns={even_median_ns} even_p95_ns={even_p95_ns} even_vs_c_x100={even_vs_c_x100} even_safe_vs_raw_x100={even_safe_vs_raw_x100} raw_compare_median_ns={raw_compare_median_ns} raw_compare_p95_ns={raw_compare_p95_ns} compare_median_ns={compare_median_ns} compare_p95_ns={compare_p95_ns} compare_vs_c_x100={compare_vs_c_x100} compare_safe_vs_raw_x100={compare_safe_vs_raw_x100} elapsed_ns={}",
         total.as_nanos(),
     );
     assert_operation_budgets(

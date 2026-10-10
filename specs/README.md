@@ -63,8 +63,11 @@ targets no longer use a redundant native prefix. Cargo metadata resolves the
 new targets and filenames, with no compatibility forwarding files.
 The first real-ABI test compilation was interrupted before moving its target
 files; no passing receipt is claimed for that run. The expanded handoff model
-passes nine scenarios in each of two instances and both 1,000-trace samples,
+passes eleven scenarios in each of two instances and both 1,000-trace samples,
 including a receiver dropped after native completion but before notification.
+Parallel Scheme workers serialize the root publication/copy/release handoff;
+the mutation control rejects overlapping foreign handoffs. These bounded
+checks do not establish scheduler refinement, liveness or latency.
 The renamed `runtime_lifecycle` real-ABI regression passes, including its
 abandoned-receiver/root-release control. Gambit derives its linker identity
 from the generated C basename; `runtime.scm` and `runtime.c` must agree. The

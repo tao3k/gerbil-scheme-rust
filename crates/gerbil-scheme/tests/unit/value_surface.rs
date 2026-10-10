@@ -35,7 +35,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "copy scalar",
         nullability: "not pointer-backed",
         failure_policy: "overflow maps to IntegerOverflow",
-        scenario: "native-identity-round-trip",
+        scenario: "identity-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "bool",
@@ -45,7 +45,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "copy scalar or runtime-borrowed Scheme object",
         nullability: "not pointer-backed",
         failure_policy: "status fail-closed before bool projection; raw provenance rejected",
-        scenario: "native-runtime-round-trip",
+        scenario: "runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "comparison",
@@ -65,7 +65,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "runtime-borrowed Scheme object",
         nullability: "non-zero handle; distinct from null pointer",
         failure_policy: "non-null objects and raw provenance fail closed",
-        scenario: "native-runtime-round-trip",
+        scenario: "runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "void",
@@ -75,7 +75,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "runtime-borrowed Scheme object",
         nullability: "non-zero handle; distinct from null pointer and nil",
         failure_policy: "non-void objects and raw provenance fail closed",
-        scenario: "native-runtime-round-trip",
+        scenario: "runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "fixnum",
@@ -85,7 +85,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "runtime-borrowed Scheme object",
         nullability: "not pointer-backed",
         failure_policy: "non-fixnum and raw provenance fail closed",
-        scenario: "native-runtime-round-trip",
+        scenario: "runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "exact-integer",
@@ -105,7 +105,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "runtime-borrowed Scheme object",
         nullability: "not pointer-backed",
         failure_policy: "invalid Unicode scalar and raw provenance fail closed",
-        scenario: "native-runtime-round-trip",
+        scenario: "runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "flonum",
@@ -115,7 +115,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "runtime-borrowed Scheme object",
         nullability: "not pointer-backed",
         failure_policy: "non-flonum and raw provenance fail closed",
-        scenario: "native-runtime-round-trip",
+        scenario: "runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "bytevector",
@@ -125,7 +125,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "runtime-borrowed Scheme object",
         nullability: "non-zero handle; distinct from null pointer",
         failure_policy: "non-bytevector objects and raw provenance fail closed",
-        scenario: "native-runtime-round-trip",
+        scenario: "runtime-round-trip",
     },
     BackedTypeMatrixEntry {
         family: "rooted-bytes",
@@ -155,7 +155,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "borrowed Rust UTF-8 bytes",
         nullability: "empty string may use null pointer with zero length",
         failure_policy: "non-UTF-8 belongs to bytevector future surface",
-        scenario: "native-value-surface",
+        scenario: "value-surface",
     },
     BackedTypeMatrixEntry {
         family: "opaque-value-handle",
@@ -175,7 +175,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         ownership: "borrowed callback/context pair",
         nullability: "null context rejected before Rust call",
         failure_policy: "panic contained at native boundary",
-        scenario: "native-value-surface",
+        scenario: "value-surface",
     },
     BackedTypeMatrixEntry {
         family: "native-value",

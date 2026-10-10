@@ -8,8 +8,7 @@ use rust_lang_project_harness::{RustScenarioBenchmarkStatus, validate_rust_scena
 #[test]
 fn initialized_runtime_crosses_the_live_gerbil_abi() {
     let scenario = validate_rust_scenario_benchmark(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/unit/scenarios/native-runtime-round-trip"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/unit/scenarios/runtime-round-trip"),
     )
     .expect("validate the runtime scenario benchmark contract");
     assert_eq!(scenario.status, RustScenarioBenchmarkStatus::Pass);
@@ -55,7 +54,7 @@ fn initialized_runtime_crosses_the_live_gerbil_abi() {
     );
     let elapsed = started.elapsed();
     eprintln!(
-        "scenario benchmark receipt: id=native-runtime-round-trip scalar_calls=30000 elapsed_ns={}",
+        "scenario benchmark receipt: id=runtime-round-trip scalar_calls=30000 elapsed_ns={}",
         elapsed.as_nanos(),
     );
     assert!(

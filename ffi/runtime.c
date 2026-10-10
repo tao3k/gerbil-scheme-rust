@@ -34,11 +34,10 @@ int32_t gerbil_scheme_rust_runtime_init_program(
   params.version = ___VERSION;
   params.linker = linker;
   /*
-   * Rust owns one thread-affine executor for this process-global runtime.
-   * Starting Gambit's processor pool while a concurrent Rust host is already
-   * scheduling callers can make setup fail before that owner is published.
-   * Keep host concurrency outside Gambit; every Scheme call still runs on the
-   * unique runtime owner thread.
+   * The currently qualified bridge has one thread-affine foreign-entry owner.
+   * This startup policy is not an SDK SMP limitation or a requirement imposed
+   * by Tokio. Parallel Scheme workers require separately qualified publication,
+   * root ownership, processor waits, and draining before enabling that path.
    */
   params.parallelism_level = 1;
   /* Failed setup is terminal too: never retry partially initialized state. */

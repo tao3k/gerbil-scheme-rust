@@ -30,7 +30,7 @@ filegroup(
     srcs = glob(["scheme/**/*"]) + [
         "build.ss",
         "gerbil.pkg",
-        "native/runtime.c",
+        "ffi/runtime.c",
     ],
 )
 
@@ -118,7 +118,7 @@ gerbil_project_compile(
 gerbil_project_test(
     name = "gerbil_native",
     project = ":gerbil_native_compile",
-    tests = ["scheme/test-native.ss"],
+    tests = ["scheme/runtime-test.ss"],
     timeout = "short",
 )
 

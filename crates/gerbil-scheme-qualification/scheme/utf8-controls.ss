@@ -1,0 +1,237 @@
+;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+;;; Test-only historical control and allocation candidate, not runtime choices.
+package: gerbil-scheme-rust/qualification
+(import :gerbil-scheme-rust/scheme/runtime :gerbil-scheme-rust/scheme/utf8 "utf8-inline-control" "utf8-buffer-control" "utf8-baseline-control")
+(export utf8-conformance)
+(extern namespace: #f
+ gerbil-scheme-rust/qualification/utf8-inline-control#inline-control-encode-chunk-c
+ gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk
+ gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref)
+(extern historical-chunk wrong-tag-pointer tag-sentinel-intact)
+
+;; Same number of checked bounded leaves as current-text encoding, but each
+;; leaf has an empty span. This prices dispatch, not throughput admission.
+(def (leaf-dispatch text pointer capacity)
+ (let* ((length (string-length text)) (maximum (* 4 length)))
+  (unless (and (fixnum? maximum) (fixnum? capacity) (>= capacity maximum))
+   (error "dispatch capacity rejection"))
+  (let loop ((start 0))
+   (if (##fx< start length)
+    (let* ((end (if (##fx< (##fx- length start) 256) length (##fx+ start 256)))
+           (written (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk
+                     text pointer capacity end end 0)))
+     (unless (zero? written) (error "empty dispatch wrote bytes"))
+     (loop end))
+    0))))
+
+(begin-foreign
+ (namespace ("gerbil-scheme-rust/qualification/utf8-controls#" wrong-tag-pointer tag-sentinel-intact))
+ (c-declare "static int utf8_tag_sentinel[4];")
+ (define wrong-tag-pointer
+  (c-lambda () (pointer int)
+   "for (int i=0; i<4; ++i) utf8_tag_sentinel[i]=0x5a5a5a5a; ___return(utf8_tag_sentinel);"))
+ (define tag-sentinel-intact
+  (c-lambda () bool
+   "___return(utf8_tag_sentinel[0]==0x5a5a5a5a && utf8_tag_sentinel[1]==0x5a5a5a5a && utf8_tag_sentinel[2]==0x5a5a5a5a && utf8_tag_sentinel[3]==0x5a5a5a5a);"))
+ (c-define (pointer-contract) () int32 "gerbil_utf8_pointer_contract" "extern"
+  (let ((rejected
+         (with-exception-catcher (lambda (_) #t)
+          (lambda ()
+           (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-into
+            "abcd" (gerbil-scheme-rust/qualification/utf8-controls#wrong-tag-pointer) 16)
+           #f))))
+   (if (and rejected (gerbil-scheme-rust/qualification/utf8-controls#tag-sentinel-intact)) 1 0)))
+ (c-define (dispatch root pointer capacity) (int64 (pointer void) unsigned-int64) int64
+  "gerbil_utf8_leaf_dispatch" "extern"
+  (let ((text (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
+   (if (string? text)
+    (with-exception-catcher (lambda (_) -1)
+     (lambda () (gerbil-scheme-rust/qualification/utf8-controls#leaf-dispatch text pointer capacity)))
+    -1))))
+
+;; Frozen pre-inline/pre-no-fill encoder. Only the qualification graph links it.
+(def (historical-checked text bytes start end written)
+ (declare (not interrupts-enabled))
+ (let (next (historical-chunk text bytes start end written))
+  (if (##fx< next 0) (error "historical scalar rejection") next)))
+(def (historical text)
+ (let* ((length (string-length text)) (capacity (* 4 length)))
+  (unless (fixnum? capacity) (error "historical capacity overflow"))
+  (let (bytes (make-u8vector capacity))
+  (let loop ((start 0) (written 0))
+   (if (##fx< start length)
+    (let* ((end (if (##fx< (##fx- length start) 256) length (##fx+ start 256)))
+           (next (historical-checked text bytes start end written)))
+     (loop end next))
+    (begin (when (##fx< written capacity) (##u8vector-shrink! bytes written)) bytes))))))
+
+(def (count-chunk text start end)
+ (declare (not interrupts-enabled))
+ (##c-code "___RESULT = comparison_utf8_count(___ARG1, ___ARG2, ___ARG3);" text start end))
+
+;; Count every current character, not a stable snapshot. Reserve one bounded
+;; chunk's worst-case space so the unchanged encoding leaf's preflight remains
+;; valid even for the final partial chunk; shrink only after all writes finish.
+(def (sized text)
+ (let* ((length (string-length text)) (maximum (* 4 length)))
+  (unless (fixnum? maximum) (error "candidate capacity overflow"))
+  (let* ((size
+          (let count ((start 0) (total 0))
+           (if (##fx< start length)
+            (let* ((end (if (##fx< (##fx- length start) 256) length (##fx+ start 256))) (next (count-chunk text start end)))
+             (when (##fx< next 0) (error "candidate scalar rejection"))
+             (count end (##fx+ total next)))
+            total)))
+         (capacity (min maximum (+ size 1024)))
+         (bytes (##make-u8vector capacity)))
+   (let loop ((start 0) (written 0))
+    (if (##fx< start length)
+     (let* ((end (if (##fx< (##fx- length start) 256) length (##fx+ start 256)))
+            (next (gerbil-scheme-rust/qualification/utf8-inline-control#inline-control-encode-chunk-c
+                   text bytes start end written)))
+      (when (##fx< next 0) (error "candidate bounds or scalar rejection"))
+      (loop end next))
+     (begin (##u8vector-shrink! bytes written) bytes))))))
+
+(def (encode mode text)
+ (case mode ((0) (historical text)) ((1) (inline-control-encode text))
+       ((2) (sized text)) ((3) (baseline-encode text))
+       (else (error "unknown encoding control" mode))))
+
+(def (utf8-conformance)
+ (let loop ((start 0))
+  (when (< start #x110000)
+   (let* ((end (min (+ start 4096) #x110000))
+          (chars (let collect ((c start) (out '()))
+                   (cond ((= c end) (reverse out))
+                         ((<= #xd800 c #xdfff) (collect (+ c 1) out))
+                         (else (collect (+ c 1) (cons (integer->char c) out))))))
+          (text (list->string chars)) (expected (string->utf8 text)))
+    (for-each (lambda (mode) (unless (equal? (encode mode text) expected)
+                              (error "comparison Unicode mismatch" mode start))) '(0 1 2))
+    (loop end))))
+ (for-each
+  (lambda (mode)
+   (for-each (lambda (text)
+              (unless (equal? (encode mode text) (string->utf8 text))
+                (error "comparison short input mismatch" mode)))
+             (list "" "a" (make-string 8192 #\a) "\x00;汉😀"))
+   (let ((text (make-string 4096 #\a)))
+    (for-each (lambda (c) (string-set! text 2047 (integer->char c))
+                (unless (equal? (encode mode text) (string->utf8 text))
+                  (error "comparison mutable input mismatch" mode)))
+              '(0 127 128 2047 2048 55295 57344 65535 65536 1114111)))
+   (let reject ((c #xd800))
+    (when (<= c #xdfff)
+     (unless (with-exception-catcher (lambda (_) #t)
+               (lambda () (encode mode (string (##integer->char c))) #f))
+       (error "comparison accepted surrogate" mode c))
+     (reject (+ c 1))))) '(0 1 2))
+ (displayln "UTF8-MATCHED-CONFORMANCE modes=3 Unicode=1112064 surrogates=2048 mutation=OK"))
+
+(def snapshots (make-vector 2 #f))
+(begin-foreign
+(c-define (comparison-encode root mode) (int64 int32) int64
+ "gerbil_utf8_comparison_encode" "extern"
+ (let ((text (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
+  (if (string? text)
+   (with-exception-catcher (lambda (_) 0)
+    (lambda () (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector
+                (gerbil-scheme-rust/qualification/utf8-controls#encode mode text)))) 0)))
+(c-define (comparison-snapshot slot) (int32) void
+ "gerbil_utf8_comparison_snapshot" "extern"
+ (vector-set! gerbil-scheme-rust/qualification/utf8-controls#snapshots slot (##process-statistics)))
+(c-define (comparison-stat index) (int32) double
+ "gerbil_utf8_comparison_stat" "extern"
+ (- (f64vector-ref (vector-ref gerbil-scheme-rust/qualification/utf8-controls#snapshots 1) index)
+    (f64vector-ref (vector-ref gerbil-scheme-rust/qualification/utf8-controls#snapshots 0) index))))
+
+(begin-foreign
+ (c-define (snapshot-overhead) () double
+  "gerbil_utf8_snapshot_overhead" "extern"
+  (f64vector-ref (vector-ref gerbil-scheme-rust/qualification/utf8-controls#snapshots 1) 9))
+ (c-declare #<<C-END
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+#include <time.h>
+static struct rusage utf8_usage[2];
+static int utf8_usage_valid[2];
+static struct timespec utf8_thread_cpu[2];
+static int utf8_thread_cpu_valid[2];
+void gerbil_utf8_os_snapshot(int slot) {
+  if (slot >= 0 && slot < 2) {
+    utf8_usage_valid[slot] = getrusage(RUSAGE_SELF, &utf8_usage[slot]) == 0;
+#if defined(CLOCK_THREAD_CPUTIME_ID)
+    utf8_thread_cpu_valid[slot] = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &utf8_thread_cpu[slot]) == 0;
+#endif
+  }
+}
+double gerbil_utf8_os_stat(int field) {
+  if (!utf8_usage_valid[0] || !utf8_usage_valid[1]) return -1;
+  switch (field) {
+  case 0: return (double)(utf8_usage[1].ru_minflt - utf8_usage[0].ru_minflt);
+  case 1: return (double)(utf8_usage[1].ru_majflt - utf8_usage[0].ru_majflt);
+  case 2: return (double)(utf8_usage[1].ru_nvcsw - utf8_usage[0].ru_nvcsw);
+  case 3: return (double)(utf8_usage[1].ru_nivcsw - utf8_usage[0].ru_nivcsw);
+  case 4:
+    if (!utf8_thread_cpu_valid[0] || !utf8_thread_cpu_valid[1]) return -1;
+    return (double)(utf8_thread_cpu[1].tv_sec - utf8_thread_cpu[0].tv_sec)
+      + (double)(utf8_thread_cpu[1].tv_nsec - utf8_thread_cpu[0].tv_nsec) / 1e9;
+  default: return -1;
+  }
+}
+#else
+void gerbil_utf8_os_snapshot(int slot) { (void)slot; }
+double gerbil_utf8_os_stat(int field) { (void)field; return -1; }
+#endif
+C-END
+ ))
+
+(begin-foreign
+ (c-declare #<<C-END
+static ___SCMOBJ comparison_utf8_count(___SCMOBJ text, ___SCMOBJ first, ___SCMOBJ last) {
+ ___SCMOBJ ___temp;
+ if (!___STRINGP(text) || !___FIXNUMP(first) || !___FIXNUMP(last) ||
+     ___INT(first) < 0 || ___INT(last) < ___INT(first)) return ___FIX(-1);
+ const ___U64 start = ___INT(first), end = ___INT(last);
+ if (end > ___STRINGSIZE(text) || end - start > 256) return ___FIX(-1);
+ const ___C *source = ___CAST(const ___C*, ___BODY_AS(text, ___tSTRING));
+ ___U32 invalid = 0;
+ ___U64 bytes = 0;
+ for (___U64 i = start; i < end; ++i) {
+  const ___U32 c = source[i];
+  invalid |= (c > 0x10ffff) | ((c >> 11) == 0x1b);
+  bytes += 1 + (c > 0x7f) + (c > 0x7ff) + (c > 0xffff);
+ }
+ return invalid ? ___FIX(-1) : ___FIX(bytes);
+}
+C-END
+ )
+ (namespace ("gerbil-scheme-rust/qualification/utf8-controls#" historical-chunk))
+ (define historical-chunk
+  (c-lambda (scheme-object scheme-object unsigned-int64 unsigned-int64 unsigned-int64) int64
+   #<<C-END
+___SCMOBJ ___temp;
+if (!___STRINGP(___arg1) || !___U8VECTORP(___arg2)) ___return(-2);
+const ___U64 length = ___STRINGSIZE(___arg1), capacity = ___U8VECTORSIZE(___arg2);
+const ___U64 start = ___arg3, end = ___arg4, output_start = ___arg5;
+if (start > end || end > length || end - start > 256 || output_start > capacity ||
+    4 * (end - start) > capacity - output_start) ___return(-2);
+const ___C *source = ___CAST(const ___C*, ___BODY_AS(___arg1, ___tSTRING));
+___U8 *output = ___CAST(___U8*, ___BODY_AS(___arg2, ___tU8VECTOR));
+___U64 j = output_start;
+for (___U64 i = start; i < end; ++i) {
+ const ___U32 c = source[i];
+ if (c <= 0x7f) output[j++] = (___U8)c;
+ else if (c <= 0x7ff) { output[j++] = (___U8)(0xc0 | (c >> 6)); output[j++] = (___U8)(0x80 | (c & 0x3f)); }
+ else if (c <= 0xffff) {
+  if ((c >> 11) == 0x1b) ___return(-1);
+  output[j++] = (___U8)(0xe0 | (c >> 12)); output[j++] = (___U8)(0x80 | ((c >> 6) & 0x3f)); output[j++] = (___U8)(0x80 | (c & 0x3f));
+ } else if (c <= 0x10ffff) {
+  output[j++] = (___U8)(0xf0 | (c >> 18)); output[j++] = (___U8)(0x80 | ((c >> 12) & 0x3f));
+  output[j++] = (___U8)(0x80 | ((c >> 6) & 0x3f)); output[j++] = (___U8)(0x80 | (c & 0x3f));
+ } else ___return(-1);
+}
+___return((___S64)j);
+C-END
+  )))

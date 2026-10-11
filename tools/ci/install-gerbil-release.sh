@@ -5,20 +5,22 @@
 set -euo pipefail
 
 release_root="${1:?usage: install-gerbil-release.sh RELEASE_ROOT}"
-revision=2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
+    # Latest published Linux archive; no matching 1cfb032 release exists yet.
+    revision=2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb
     release_os=linux
     release_arch=x86_64
     tag=gerbil-v0.19-2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb-linux-x86_64-portable-full-single-host-unlimited-patchf5cedd8168cb
     sha256=9844ba362fdf6f1c5e8a4411e462a466d52dee0d541f8e84f61091cec0e5e740
     ;;
   Darwin-arm64)
+    revision=1cfb032c7a1612637da6205f5f8a15683eba3ba0
     release_os=darwin
     release_arch=aarch64
-    tag=gerbil-v0.19-2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb-darwin-aarch64-gcc16-arm64-aot-tools-single-host-unlimited-patchf5cedd8168cb
-    sha256=8d9c88434aed6301eaebb719bf52472f05c2368eafc630e8a9f1d67cc9895a21
+    tag=gerbil-v0.19-1cfb032c7a1612637da6205f5f8a15683eba3ba0-darwin-aarch64-gcc16-arm64-aot-tools-single-host-unlimited-multiple-vms-patch618d76f9eb72
+    sha256=0e18d063f888a73d9f9692d441fb3776898114e8440eada6876937d289578183
     ;;
   *)
     printf 'unsupported Gerbil release host: %s-%s\n' "$(uname -s)" "$(uname -m)" >&2

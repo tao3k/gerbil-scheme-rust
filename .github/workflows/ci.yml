@@ -32,35 +32,10 @@ jobs:
         with:
           components: clippy,rustfmt
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential jq
-
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: 1
-          HOMEBREW_NO_INSTALL_CLEANUP: 1
-        run: |
-          brew list --formula ghostscript >/dev/null 2>&1 && brew unlink ghostscript || true
-          brew install gcc jq
-
-      - name: Download immutable Gerbil v0.19 release artifact
-        shell: bash
-        run: tools/ci/install-gerbil-release.sh "$GERBIL_RELEASE_ROOT"
-
-      - name: Activate Gerbil build controls
-        shell: bash
-        run: |
-          test -x "$GERBIL_PREFIX/bin/gsc"
-          cores="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)"
-          {
-            echo "GERBIL_GSC=$GERBIL_PREFIX/bin/gsc"
-            echo "GERBIL_BUILD_CORES=$cores"
-          } >> "$GITHUB_ENV"
-          "$GERBIL_PREFIX/bin/gsc" -v
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
 
       - name: Configure Bazel
         uses: bazel-contrib/setup-bazel@0.19.0
@@ -73,14 +48,63 @@ jobs:
       - name: Cargo format
         run: cargo fmt --all --check
 
+      - name: Check shell Gerbil environment boundary
+        shell: bash
+        run: |
+          env CC=foreign SDKROOT=/nix/store/foreign GAMBOPT=selected \
+            tools/gerbil-build-command.sh bash -c '
+              test -z "${CC+x}" && test -z "${SDKROOT+x}" &&
+              test "$GAMBOPT" = selected
+            '
+
       - name: Cargo gates
         run: |
           cargo check --workspace --locked
-          cargo test --workspace --locked
+          cargo test --workspace --locked -- --nocapture
+          cargo bench -p gerbil-scheme --bench ffi --profile dev --locked -- --test
+          cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
           cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Record unsupported SMP qualification
+        run: |
+          echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned SDK does not support. This is not an SMP pass.'
+          echo '### Scheme SMP: SKIPPED (unsupported SDK capability; not passed)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The pinned SDK supports multiple VMs but not multiple-threaded VMs. Single-processor actor AOT and both Rust concurrency controls remain required. Restore the separate SMP job after the SDK capability is qualified.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Single-processor actor AOT and Rust concurrency qualification
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test one_processor_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_one_worker_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_machine_workers
+          cargo clippy -p gerbil-scheme-qualification --features actor-aot --all-targets --locked -- -D warnings
 
       - name: Bazel gates
         run: |
           bazel query //...
           bazel build //...
           bazel test //:ci
+
+  # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
+  # execution inside a VM. Restore this job only with a qualified SDK release.
+  scheme-smp:
+    name: Scheme SMP (SKIPPED - SDK lacks multiple-threaded-vms)
+    if: ${{ false }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Require exact processor activation
+        run: gxi scheme/runtime-smp-test.ss
+      - name: Multi-processor actor AOT qualification
+        run: cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test machine_processors

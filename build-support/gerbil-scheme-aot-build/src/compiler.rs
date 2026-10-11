@@ -1,0 +1,355 @@
+// SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+
+//! Owns Gerbil compilation, Gambit linking, C compilation, and archive assembly.
+
+use std::env;
+use std::ffi::OsStr;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use crate::generated_scm::{
+    stamp_generated_scm, validate_generated_scm, workspace_input_fingerprint,
+};
+
+/// Build the native Gerbil and Gambit archive for the consuming Cargo package.
+pub fn build_native_archive() {
+    run_native_build();
+}
+
+fn run_native_build() {
+    println!("cargo:rerun-if-env-changed=GERBIL_GSC");
+    println!("cargo:rerun-if-env-changed=GERBIL_GXI");
+    println!("cargo:rerun-if-env-changed=PATH");
+    println!("cargo:rerun-if-env-changed=GERBIL_HOME");
+    println!("cargo:rerun-if-env-changed=GERBIL_PATH");
+    println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM");
+    println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM");
+    println!("cargo:rerun-if-changed=../../build.ss");
+    println!("cargo:rerun-if-changed=../../gerbil.pkg");
+    println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
+    println!("cargo:rerun-if-changed=../../scheme/utf8.ss");
+    println!("cargo:rerun-if-changed=../../scheme/runtime.ssi");
+    println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm");
+    println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm");
+    println!("cargo:rerun-if-changed=../../ffi/runtime.c");
+
+    let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
+    let workspace = manifest_dir
+        .ancestors()
+        .nth(2)
+        .expect("sys crate must live under <workspace>/crates")
+        .to_path_buf();
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let gerbil_path = out_dir.join("gerbil-path");
+    let gsc = crate::discover_gambit_gsc_from_env()
+        .expect("discover paired Gambit compiler")
+        .into_os_string();
+    for input in crate::discovery::gambit_sdk_inputs(Path::new(&gsc)) {
+        println!("cargo:rerun-if-changed={}", input.display());
+    }
+
+    if env::var_os("CARGO_FEATURE_EXTERNAL_PROGRAM").is_some() {
+        let runtime_object = out_dir.join("runtime.o");
+        run(
+            gerbil_command(&gsc)
+                .args([
+                    "-obj",
+                    "-cc-options",
+                    "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM",
+                    "-o",
+                ])
+                .arg(&runtime_object)
+                .arg(workspace.join("ffi/runtime.c")),
+            "compile external program lifecycle owner",
+        );
+        cc::Build::new()
+            .cargo_metadata(false)
+            .out_dir(&out_dir)
+            .object(&runtime_object)
+            .try_compile("gerbil_scheme_rust_native")
+            .expect("archive external program lifecycle owner");
+        println!("cargo:rustc-link-search=native={}", out_dir.display());
+        println!(
+            "cargo:rustc-link-search=native={}",
+            gerbil_prefix(&gsc).join("lib").display()
+        );
+        println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
+        println!("cargo:rustc-link-lib=static=gambit");
+        return;
+    }
+
+    let mut canonical_build = gerbil_command(workspace.join("build.ss"));
+    canonical_build
+        .arg("compile")
+        .current_dir(&workspace)
+        .env("GERBIL_PATH", &gerbil_path);
+    run(&mut canonical_build, "canonical Gerbil build");
+
+    let generated_native_scm =
+        gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__runtime.scm");
+    let native_scm = sync_generated_scm(&workspace, &generated_native_scm, "runtime");
+    let utf8_scm = sync_generated_scm(
+        &workspace,
+        &gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__utf8.scm"),
+        "utf8",
+    );
+    let utf8_c = out_dir.join("utf8.c");
+    let utf8_object = out_dir.join("utf8.o");
+    // Gambit derives the C linker identity from the target basename. Keep it
+    // aligned with runtime.scm, independently of the Scheme namespace name.
+    let native_c = out_dir.join("runtime.c");
+    let native_object = out_dir.join("runtime.o");
+    let linker_c = out_dir.join("linker.c");
+    let linker_object = out_dir.join("linker.o");
+    let runtime_object = out_dir.join("lifecycle.o");
+
+    run(
+        gerbil_command(&gsc)
+            .args([
+                OsStr::new("-link"),
+                OsStr::new("-linker-name"),
+                OsStr::new("gerbil_scheme_rust_linker"),
+                OsStr::new("-o"),
+            ])
+            .arg(&linker_c)
+            .arg(&utf8_scm)
+            .arg(&native_scm),
+        "generate Gambit linker",
+    );
+    let compile_expression = format!(
+        "(compile-file-to-target {} output: {} module-name: \"gerbil-scheme-rust/scheme/runtime\")",
+        scheme_string(&native_scm),
+        scheme_string(&native_c),
+    );
+    run(
+        gerbil_command(&gsc).arg("-e").arg(compile_expression),
+        "generate named Gerbil module C",
+    );
+    compile_c(
+        &gsc,
+        &native_c,
+        &native_object,
+        "compile Gerbil module object",
+    );
+    let utf8_expression = format!(
+        "(compile-file-to-target {} output: {} module-name: \"gerbil-scheme-rust/scheme/utf8\")",
+        scheme_string(&utf8_scm),
+        scheme_string(&utf8_c),
+    );
+    run(
+        gerbil_command(&gsc).arg("-e").arg(utf8_expression),
+        "generate named UTF-8 module C",
+    );
+    compile_c(&gsc, &utf8_c, &utf8_object, "compile UTF-8 module object");
+    run(
+        gerbil_command(&gsc)
+            .args([
+                OsStr::new("-obj"),
+                OsStr::new("-cc-options"),
+                OsStr::new("-O2 -Dmain=gerbil_scheme_rust_gambit_main"),
+                OsStr::new("-o"),
+            ])
+            .arg(&linker_object)
+            .arg(&linker_c),
+        "compile Gambit linker",
+    );
+    compile_c(
+        &gsc,
+        &workspace.join("ffi/runtime.c"),
+        &runtime_object,
+        "compile runtime lifecycle shim",
+    );
+
+    let mut archive_build = cc::Build::new();
+    archive_build
+        .cargo_metadata(false)
+        .out_dir(&out_dir)
+        .object(&runtime_object)
+        .object(&linker_object)
+        .object(&native_object)
+        .object(&utf8_object)
+        .try_compile("gerbil_scheme_rust_native")
+        .expect("archive native binding objects");
+
+    let prefix = gerbil_prefix(&gsc);
+    println!("cargo:rustc-link-search=native={}", out_dir.display());
+    println!(
+        "cargo:rustc-link-search=native={}",
+        prefix.join("lib").display()
+    );
+    println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
+    println!("cargo:rustc-link-lib=static=gambit");
+    println!("cargo:rustc-link-lib=dylib=m");
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        println!("cargo:rustc-link-lib=dylib=dl");
+    }
+}
+
+fn sync_generated_scm(workspace: &Path, native_scm: &Path, module: &str) -> PathBuf {
+    let tracked_scm = workspace.join(format!("scheme/generated/{module}.scm"));
+    let update = env::var("GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM").as_deref() == Ok("1");
+    let check = env::var("GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM").as_deref() == Ok("1");
+    let input_fingerprint = workspace_input_fingerprint(workspace);
+
+    if update {
+        let parent = tracked_scm
+            .parent()
+            .expect("tracked generated SCM path must have a parent");
+        fs::create_dir_all(parent).expect("create tracked generated SCM directory");
+        let generated = fs::read_to_string(native_scm).expect("read generated native SCM");
+        fs::write(
+            &tracked_scm,
+            stamp_generated_scm(&generated, &input_fingerprint),
+        )
+        .expect("update tracked generated SCM with provenance");
+    }
+
+    if check {
+        let tracked = fs::read_to_string(&tracked_scm).expect(
+            "read tracked generated SCM; run with GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1",
+        );
+        validate_generated_scm(&tracked, &input_fingerprint).unwrap_or_else(|error| {
+            panic!(
+                "tracked generated SCM provenance is invalid: {error}; run with \
+                 GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1"
+            )
+        });
+    }
+
+    if update || check {
+        tracked_scm
+    } else {
+        // Gerbil's canonical output filename encodes the complete module path.
+        // Gambit's `-link` derives its expected LNK symbol from that basename,
+        // while `compile-file-to-target` emits the stable short module symbol.
+        // Give both operations the same short basename so ordinary Cargo builds
+        // link the fresh artifact just like tracked-SCM check builds do.
+        let transient_scm = native_scm
+            .parent()
+            .expect("generated native SCM must have a parent")
+            .join(format!("{module}.scm"));
+        fs::copy(native_scm, &transient_scm).expect("stage fresh native SCM with stable basename");
+        transient_scm
+    }
+}
+
+fn compile_c(gsc: &OsStr, source: &Path, object: &Path, operation: &str) {
+    run(
+        gerbil_command(gsc)
+            .args([
+                OsStr::new("-obj"),
+                OsStr::new("-cc-options"),
+                OsStr::new("-O2"),
+                OsStr::new("-o"),
+            ])
+            .arg(object)
+            .arg(source),
+        operation,
+    );
+}
+
+fn gerbil_prefix(gsc: &OsStr) -> PathBuf {
+    if let Some(home) = env::var_os("GERBIL_HOME") {
+        return PathBuf::from(home);
+    }
+
+    let output = Command::new(gsc).arg("-v").output().expect("run gsc -v");
+    assert!(output.status.success(), "gsc -v failed");
+
+    // gsc itself does not expose a machine-readable prefix flag. Its executable
+    // is installed at <prefix>/bin/gsc; canonicalize the selected executable so
+    // link discovery follows the same tool that compiled the objects.
+    let selected = if Path::new(gsc).components().count() > 1 {
+        PathBuf::from(gsc)
+    } else {
+        which(gsc).expect("locate selected gsc on PATH")
+    };
+    selected
+        .canonicalize()
+        .expect("canonicalize gsc")
+        .parent()
+        .and_then(Path::parent)
+        .expect("gsc must be installed under <prefix>/bin")
+        .to_path_buf()
+}
+
+fn which(program: &OsStr) -> Option<PathBuf> {
+    env::split_paths(&env::var_os("PATH")?).find_map(|dir| {
+        let candidate = dir.join(program);
+        candidate.is_file().then_some(candidate)
+    })
+}
+
+fn scheme_string(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// Keep selected Gerbil build tools isolated from unrelated Rust SDK settings.
+///
+/// The selected GSC retains its configured C compiler. Ambient Apple developer
+/// directory overrides must not redirect that compiler's system tool shims.
+pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program.as_ref());
+    // Nix/direnv environments commonly inject compiler include and linker
+    // paths for Rust. Gerbil's selected gsc is already configured with its own
+    // C compiler and SDK, so inheriting those unrelated paths can mix libc/SDK
+    // headers and make even FILE or wchar_t unavailable.
+    for variable in [
+        "CC",
+        "CFLAGS",
+        "CPPFLAGS",
+        "LDFLAGS",
+        "CPATH",
+        "C_INCLUDE_PATH",
+        "CPLUS_INCLUDE_PATH",
+        "LIBRARY_PATH",
+        "NIX_CFLAGS_COMPILE",
+        "NIX_LDFLAGS",
+        "SDKROOT",
+        "DEVELOPER_DIR",
+    ] {
+        command.env_remove(variable);
+    }
+    if let Some(path) = env::var_os("PATH") {
+        let gerbil_path = env::join_paths(
+            env::split_paths(&path).filter(|entry| !entry.starts_with("/nix/store")),
+        )
+        .expect("rebuild Gerbil tool PATH");
+        command.env("PATH", gerbil_path);
+    }
+    if let Some(selected) = crate::resolve_gerbil_executable(Path::new(program.as_ref())) {
+        crate::configure_gerbil_native_tool_command(&mut command, selected);
+    }
+    command
+}
+
+/// Add real Gambit runtime diagnostics to a Gerbil build command while
+/// retaining the selected SDK's existing runtime path options.
+pub fn configure_gerbil_runtime_diagnostics(command: &mut Command, enabled: bool) {
+    if !enabled {
+        return;
+    }
+    let configured = command
+        .get_envs()
+        .find(|(name, _)| *name == OsStr::new("GAMBOPT"))
+        .map(|(_, value)| value.map(OsStr::to_os_string));
+    let mut options = configured
+        .unwrap_or_else(|| env::var_os("GAMBOPT"))
+        .unwrap_or_default();
+    if !options.is_empty() {
+        options.push(",");
+    }
+    options.push("1n,2n,d5qQ");
+    command.env("GAMBOPT", options);
+}
+
+#[cfg(test)]
+#[path = "../tests/unit/environment_scenario.rs"]
+mod environment_tests;
+
+fn run(command: &mut Command, operation: &str) {
+    crate::run_native_process(command, operation, true)
+        .unwrap_or_else(|error| panic!("{operation} failed: {error}"));
+}

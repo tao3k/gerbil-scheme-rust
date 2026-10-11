@@ -40,3 +40,35 @@ the first implementation slice.
 - [[file:docs/00-index.org][Documentation index]]
 - [[file:docs/10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][RFC: Gerbil Scheme Rust bindings]]
 - [[file:docs/20-29-roadmap/20.01-bindings-bootstrap-plan.org][Bindings bootstrap and delivery plan]]
+
+* Paired Gambit discovery
+
+Runtime commands and native archive builds share Gambit compiler discovery.
+Default selection follows the selected Gerbil executable, including symlinked
+Homebrew wrappers with a literal `GERBIL_HOME`, before considering a validated
+PATH compiler. Ghostscript's unrelated `gsc` is rejected. Both release versions
+and development revision/timestamp version output are recognized. Explicit
+`GERBIL_GSC` overrides remain supported and validated by native archive builds.
+The selected installation supplies its own native runtime paths; downstream
+CI does not need to set a second compiler override.
+
+The native-build owner also completes link receipts for OpenSSL, zlib and
+SQLite archives. It uses declared SDK and explicit library paths before
+target-aware package discovery for implicit system paths. Library admission
+precedes C/object generation. Missing archives fail the producer build;
+downstream FFI bundle consumers only copy and validate the receipt's files,
+without repeating package or toolchain discovery.
+
+* Shared build environment
+
+The [[file:.github/actions/setup-gerbil/action.yml][setup-gerbil action]] installs the pinned Gerbil release and its host
+prerequisites on Linux and macOS, then exports the paired GSC and build-core
+settings. Consumers pin the action to a commit rather than copying the
+release installer and GCC setup into their own workflows.
+
+The native-build crate provides =gerbil_command= for compiler-environment
+isolation, =resolve_gerbil_executable= for tool lookup, and
+=configure_gerbil_runtime_diagnostics= for optional Gambit diagnostics. It
+preserves the selected SDK's =GAMBOPT= paths when diagnostics are enabled.
+For a shell command that runs before Cargo builds the Rust adapter,
+[[file:tools/gerbil-build-command.sh][gerbil-build-command.sh]] provides the same compiler-environment boundary.

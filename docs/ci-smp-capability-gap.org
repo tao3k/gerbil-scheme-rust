@@ -1,0 +1,48 @@
+#+TITLE: Temporary CI SMP capability gap
+
+* Status
+
+The pinned Gerbil SDK does not support multiple-threaded VMs. Multiple VMs are
+not evidence of multiple active processors inside one VM. PR #18 therefore
+keeps the =scheme-smp= job explicitly skipped with =if: ${{ false }}=, rather
+than converting its processor-activation assertions into passing controls.
+The bindings job records this gap in its notice and job summary. A green
+bindings job is not an SMP or Org parsing acceptance receipt.
+
+* Required gates retained
+
+Both Linux and macOS continue running the complete workspace Cargo checks,
+tests, FFI and Tokio transport smoke tests, and strict lint. The full-program
+actor AOT image remains tested using all nine single-processor load/fanout
+cases. Both Tokio controls remain tested, including machine-adaptive worker
+counts. Bazel query, build, and the complete =//:ci= test suite remain required.
+No failure is swallowed with =continue-on-error= or a successful fallback.
+
+The actor filters select =one_processor_control=, =tokio_one_worker_control=,
+and =tokio_machine_workers=. Only Scheme =machine_processors= and
+=scheme/runtime-smp-test.ss= are reserved for the skipped job. The underlying
+benchmark and processor-activation contract are unchanged.
+
+* Local validation
+
+YAML parsing, retained-gate/filter scope assertions, every workflow shell
+block's syntax, and diff whitespace checks passed. Using the installed SDK,
+=just bridge-actor-benchmark --test= passed all nine cases for each of the
+three retained filters (27 smoke cases, not twenty-sample performance runs).
+The machine-adaptive Tokio control observed 12 workers and up to 768 tasks.
+The Scheme control reported one active processor, recovered after injected
+worker failures, and emitted =ACTOR-AOT-CLEANUP finalized=OK=.
+The first local attempt lacked Cargo on PATH; a subsequent attempt could not
+write the sandboxed default harness cache. Selecting the existing Rust path
+and a checkout-local cache resolved these environment failures. The installed
+SDK was not downloaded, rebuilt, or changed. Complete remote gates still
+require the exact pushed head's GitHub run; these local checks are not CI green.
+
+* Restoration
+
+After both platform SDK releases qualify multiple-threaded VMs, update the
+immutable release identity/checksum and restore the =scheme-smp= job condition.
+Remove the temporary skip notice and rename the job to its ordinary SMP name.
+The restored job must run the original exact activation test and all nine
+machine-processor actor AOT cases. Do not count this temporary skip as prior
+SMP evidence or substitute Rust queue concurrency for processor activation.

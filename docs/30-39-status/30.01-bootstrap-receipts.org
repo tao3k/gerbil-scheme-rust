@@ -17,7 +17,7 @@ General Public License 2.1 or later, at the recipient's option.
   scalar projection.  It is not described as the native backend.
 - =GerbilRuntime=: safe, exclusive, thread-affine ownership of an initialized
   in-process Gerbil/Gambit runtime, with ABI validation and cleanup on drop.
-- =gerbil-scheme-native-build=: canonical Gerbil AOT, native compiler discovery,
+- =gerbil-scheme-aot-build=: canonical Gerbil AOT, native compiler discovery,
   archive/link projection, and checked native build orchestration.
 - =gerbil-scheme-build=: opaque source emission, artifact projection, and
   checked =gxc= invocation.

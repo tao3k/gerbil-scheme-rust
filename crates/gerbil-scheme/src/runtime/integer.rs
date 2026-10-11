@@ -429,15 +429,7 @@ impl<'runtime> GerbilValue<'runtime> {
         }
 
         match self.is_exact_integer().into_result() {
-            Ok(true) => SchemeExactInteger::from_raw(self.raw.get()).map_or_else(
-                || {
-                    NativeResult::err(NativeError::Status {
-                        operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
-                        code: gerbil_scheme_sys::GerbilStatus::NullPointer as i32,
-                    })
-                },
-                NativeResult::ok,
-            ),
+            Ok(true) => NativeResult::ok(SchemeExactInteger::from_raw(self.raw.get())),
             Ok(false) => NativeResult::err(NativeError::Status {
                 operation: "gerbil_scheme_rust_scheme_object_as_exact_integer",
                 code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
@@ -689,8 +681,11 @@ pub(super) fn value_from_native_handle_with_provenance<'runtime>(
     raw: gerbil_scheme_sys::GerbilValueHandle,
     provenance: GerbilValueProvenance,
 ) -> Option<GerbilValue<'runtime>> {
-    NonZeroUsize::new(raw).map(|raw| GerbilValue {
-        raw,
+    if raw == 0 && provenance != GerbilValueProvenance::SchemeObjectExport {
+        return None;
+    }
+    Some(GerbilValue {
+        raw: super::types::SchemeObjectWord(raw),
         provenance,
         _runtime: PhantomData,
     })
@@ -709,7 +704,7 @@ impl GerbilValue<'_> {
         })?;
 
         Ok(Self {
-            raw,
+            raw: super::types::SchemeObjectWord(raw.get()),
             provenance: GerbilValueProvenance::UntrustedRaw,
             _runtime: PhantomData,
         })

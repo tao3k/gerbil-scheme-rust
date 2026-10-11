@@ -3,6 +3,11 @@
 #include "gambit.h"
 
 #include <stdint.h>
+#include <string.h>
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+#endif
+#include "../include/gerbil_scheme_rust.h"
 
 ___BEGIN_C_LINKAGE
 #ifndef GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM
@@ -13,6 +18,82 @@ ___END_C_LINKAGE
 
 /* 0 = never initialized, 1 = running, 2 = finalized and not restartable. */
 static int gerbil_scheme_rust_state = 0;
+
+/* Owner-local qualification snapshot. Heap size is capacity, not live bytes;
+ * RSS is the process high-water mark and cannot be attributed to one variant. */
+int gerbil_scheme_rust_objects_usage(double *gc, uint64_t *os) {
+  if (gerbil_scheme_rust_state != 1 || gc == NULL || os == NULL) return -1;
+  ___virtual_machine_state vm = ___VMSTATE;
+  gc[0] = vm->mem.nb_gcs_;
+  gc[1] = vm->mem.gc_user_time_ + vm->mem.gc_sys_time_;
+  gc[2] = vm->mem.gc_real_time_;
+  gc[3] = (double)vm->mem.heap_size_ * ___WS;
+#if defined(__unix__) || defined(__APPLE__)
+  struct rusage usage;
+  if (getrusage(RUSAGE_SELF, &usage) != 0) return -1;
+  os[0] = ((uint64_t)usage.ru_utime.tv_sec + (uint64_t)usage.ru_stime.tv_sec) * 1000000000ULL
+        + ((uint64_t)usage.ru_utime.tv_usec + (uint64_t)usage.ru_stime.tv_usec) * 1000ULL;
+#if defined(__APPLE__)
+  os[1] = (uint64_t)usage.ru_maxrss;
+#else
+  os[1] = (uint64_t)usage.ru_maxrss * 1024ULL;
+#endif
+  os[2] = (uint64_t)usage.ru_nvcsw;
+  os[3] = (uint64_t)usage.ru_nivcsw;
+  return 0;
+#else
+  return -1;
+#endif
+}
+
+GerbilStatus gerbil_scheme_rust_fixnum_from_word(intptr_t number, uintptr_t *out) {
+  if (gerbil_scheme_rust_state != 1)
+    return gerbil_scheme_rust_state == 2 ? GERBIL_STATUS_RUNTIME_FINALIZED : GERBIL_STATUS_NOT_INITIALIZED;
+  if (out == NULL) return GERBIL_STATUS_NULL_POINTER;
+  ___SCMOBJ value = ___FIX(number);
+  if (___INT(value) != number) return GERBIL_STATUS_INVALID_VALUE;
+  *out = (uintptr_t)value;
+  return GERBIL_STATUS_OK;
+}
+
+/* Official Gambit representation operators; no Scheme allocation or retained
+ * body pointer. Validate the complete span before publishing any result. */
+static uint32_t scalar_tag(___SCMOBJ value) {
+  ___FLONUMP_DECL
+  if (value == ___FAL || value == ___TRU) return 1;
+  if (___FIXNUMP(value)) return 2;
+  if (___CHARP(value)) {
+    uint64_t code = (uint64_t)___ORD(value);
+    return code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? 3 : 0;
+  }
+  if (___FLONUMP(value)) return 4;
+  return 0;
+}
+GerbilStatus gerbil_scheme_rust_scalar_batch(const uintptr_t *values,
+                                            size_t length,
+                                            GerbilScalarProjection *output) {
+  if (gerbil_scheme_rust_state != 1)
+    return gerbil_scheme_rust_state == 2 ? GERBIL_STATUS_RUNTIME_FINALIZED
+                                        : GERBIL_STATUS_NOT_INITIALIZED;
+  if (length == 0) return GERBIL_STATUS_OK;
+  if (values == NULL || output == NULL) return GERBIL_STATUS_NULL_POINTER;
+  for (size_t i = 0; i < length; ++i)
+    if (scalar_tag((___SCMOBJ)values[i]) == 0)
+      return GERBIL_STATUS_INVALID_VALUE;
+  for (size_t i = 0; i < length; ++i) {
+    ___SCMOBJ value = (___SCMOBJ)values[i];
+    output[i].tag = scalar_tag(value);
+    output[i].reserved = 0;
+    if (output[i].tag == 1) output[i].bits = value == ___TRU;
+    else if (output[i].tag == 2) output[i].bits = (uint64_t)(int64_t)___INT(value);
+    else if (output[i].tag == 3) output[i].bits = (uint64_t)___ORD(value);
+    else {
+      double number = ___F64UNBOX(value);
+      memcpy(&output[i].bits, &number, sizeof(number));
+    }
+  }
+  return GERBIL_STATUS_OK;
+}
 
 /* Report the ABI used to compile this bridge, not flags requested by a host.
  * No runtime initialization, allocation, or processor-state access occurs.

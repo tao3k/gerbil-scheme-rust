@@ -16,6 +16,18 @@ pub const GERBIL_SCHEME_RUST_ABI_ID: &[u8] = b"gerbil-scheme-rust.binding.v1\0";
 /// ABI major version.  A mismatch must fail closed.
 pub const GERBIL_SCHEME_RUST_ABI_VERSION: u32 = 1;
 
+/// Representation-stable scalar projection; public header defines the tags.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GerbilScalarProjection {
+    /// Scalar kind, independent of Gambit's private tags.
+    pub tag: u32,
+    /// Reserved, zero on successful projection.
+    pub reserved: u32,
+    /// Signed integer, character, boolean, or IEEE-754 payload.
+    pub bits: u64,
+}
+
 /// Repository-relative path to the public C header for this ABI.
 pub const GERBIL_SCHEME_RUST_HEADER_PATH: &str = "include/gerbil_scheme_rust.h";
 
@@ -574,8 +586,15 @@ pub(crate) unsafe fn checked_scheme_object_predicate(
     out: *mut GerbilBoolean,
     predicate: unsafe extern "C" fn(GerbilValueHandle) -> i32,
 ) -> GerbilStatus {
-    if value == 0 || out.is_null() {
+    if out.is_null() {
         return GerbilStatus::NullPointer;
+    }
+    if value == 0 {
+        // Fixnum/exact-integer predicates handle zero in their typed wrappers.
+        unsafe {
+            *out = GerbilBoolean::FALSE;
+        }
+        return GerbilStatus::Ok;
     }
 
     // SAFETY: caller proves the Gerbil runtime/module is initialized and
@@ -599,9 +618,6 @@ pub(crate) unsafe fn checked_scheme_object_fixture(
     // SAFETY: caller proves the Gerbil runtime/module is initialized. The
     // raw Gerbil export returns Gambit's universal Scheme object word.
     let value = unsafe { fixture() };
-    if value == 0 {
-        return GerbilStatus::NullPointer;
-    }
 
     // SAFETY: caller provided a non-null output pointer for one handle.
     unsafe {
@@ -782,9 +798,6 @@ unsafe fn checked_scheme_object_projection(
     }
 
     let projected = unsafe { projection(value) };
-    if projected == 0 {
-        return GerbilStatus::NullPointer;
-    }
 
     // SAFETY: caller provided a non-null output pointer for one handle.
     unsafe {

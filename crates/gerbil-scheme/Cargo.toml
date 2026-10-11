@@ -79,5 +79,14 @@ harness = false
 name = "tokio_transport"
 harness = false
 
+[[bench]]
+name = "types"
+harness = false
+
+[[bench]]
+name = "objects"
+path = "benches/objects/main.rs"
+harness = false
+
 [lints]
 workspace = true

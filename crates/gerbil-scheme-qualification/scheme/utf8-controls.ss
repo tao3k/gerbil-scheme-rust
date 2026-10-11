@@ -162,10 +162,41 @@ package: gerbil-scheme-rust/qualification
 #if defined(__unix__) || defined(__APPLE__)
 #include <sys/resource.h>
 #include <time.h>
+int gerbil_utf8_process_usage(unsigned long long *cpu_ns,
+                              unsigned long long *rss_bytes,
+                              unsigned long long *voluntary,
+                              unsigned long long *involuntary) {
+  struct rusage usage;
+  if (getrusage(RUSAGE_SELF, &usage) != 0) return -1;
+  *cpu_ns = ((unsigned long long)usage.ru_utime.tv_sec
+             + (unsigned long long)usage.ru_stime.tv_sec) * 1000000000ULL
+          + ((unsigned long long)usage.ru_utime.tv_usec
+             + (unsigned long long)usage.ru_stime.tv_usec) * 1000ULL;
+#if defined(__APPLE__)
+  *rss_bytes = (unsigned long long)usage.ru_maxrss;
+#else
+  *rss_bytes = (unsigned long long)usage.ru_maxrss * 1024ULL;
+#endif
+  *voluntary = (unsigned long long)usage.ru_nvcsw;
+  *involuntary = (unsigned long long)usage.ru_nivcsw;
+  return 0;
+}
 static struct rusage utf8_usage[2];
 static int utf8_usage_valid[2];
 static struct timespec utf8_thread_cpu[2];
 static int utf8_thread_cpu_valid[2];
+static double utf8_request_gc[2][3];
+void gerbil_utf8_os_snapshot(int slot);
+void gerbil_utf8_request_snapshot(int slot) {
+  ___virtual_machine_state vm = ___VMSTATE;
+  utf8_request_gc[slot][0] = vm->mem.nb_gcs_;
+  utf8_request_gc[slot][1] = vm->mem.gc_user_time_ + vm->mem.gc_sys_time_;
+  utf8_request_gc[slot][2] = vm->mem.gc_real_time_;
+  gerbil_utf8_os_snapshot(slot);
+}
+double gerbil_utf8_request_gc_stat(int field) {
+  return utf8_request_gc[1][field] - utf8_request_gc[0][field];
+}
 void gerbil_utf8_os_snapshot(int slot) {
   if (slot >= 0 && slot < 2) {
     utf8_usage_valid[slot] = getrusage(RUSAGE_SELF, &utf8_usage[slot]) == 0;

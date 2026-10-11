@@ -44,7 +44,43 @@ typedef uint8_t GerbilBoolean;
 typedef intptr_t GerbilFixnum;
 typedef uint32_t GerbilChar;
 typedef double GerbilFlonum;
+GerbilStatus gerbil_scheme_rust_fixnum_from_word(intptr_t value, uintptr_t *out);
+/* Owner-local diagnostic: four GC doubles and four OS uint64 counters.
+ * Heap capacity and process RSS high-water are not live allocation counts. */
+int gerbil_scheme_rust_objects_usage(double *gc, uint64_t *os);
+/* Tags: 1 boolean, 2 signed fixnum bits, 3 Unicode scalar, 4 IEEE f64 bits.
+ * Input handles must be live owner-local objects; spans must not overlap.
+ * Empty spans permit null. Failure leaves every output slot unchanged.
+ * The Scheme word zero is fixnum zero, not a null object pointer. */
+typedef struct GerbilScalarProjection {
+  uint32_t tag;
+  uint32_t reserved;
+  uint64_t bits;
+} GerbilScalarProjection;
+GerbilStatus gerbil_scheme_rust_scalar_batch(const uintptr_t *values,
+                                            size_t length,
+                                            GerbilScalarProjection *output);
 typedef int64_t GerbilRootId;
+/* Owner-only raw entries. Zero object words are valid; root IDs are positive.
+ * Creation transfers a strong root. Collection copy publishes newly owned
+ * roots only on success. Release spans contain ascending unique live IDs. */
+GerbilRootId gerbil_scheme_rust_object_root_raw(GerbilValueHandle value);
+int64_t gerbil_scheme_rust_root_count_raw(void);
+int32_t gerbil_scheme_rust_force_gc_raw(void);
+int32_t gerbil_scheme_rust_object_scalar_raw(GerbilRootId root, GerbilScalarProjection *output);
+/* Index -1 projects the root; otherwise project a retained vector snapshot slot. */
+int32_t gerbil_scheme_rust_object_scalar_indexed(GerbilRootId root, int64_t index, GerbilScalarProjection *output);
+GerbilRootId gerbil_scheme_rust_collection_snapshot_raw(GerbilRootId root, int32_t kind, uint64_t len);
+int64_t gerbil_scheme_rust_bigint_size_indexed(GerbilRootId root, int64_t index);
+int32_t gerbil_scheme_rust_bigint_copy_indexed(GerbilRootId root, int64_t index, uint8_t *output, uint64_t len);
+GerbilValueHandle gerbil_scheme_rust_object_word_raw(GerbilRootId root);
+GerbilRootId gerbil_scheme_rust_collection_create_raw(const GerbilRootId *roots, uint64_t len, int32_t kind);
+int64_t gerbil_scheme_rust_collection_length_raw(GerbilRootId root, int32_t kind);
+GerbilRootId gerbil_scheme_rust_collection_element_raw(GerbilRootId root, int32_t kind, uint64_t index);
+int32_t gerbil_scheme_rust_roots_release_raw(const GerbilRootId *roots, uint64_t len);
+GerbilRootId gerbil_scheme_rust_bigint_create_raw(const uint8_t *bytes, uint64_t len, int32_t negative);
+int64_t gerbil_scheme_rust_bigint_size_raw(GerbilRootId root);
+int32_t gerbil_scheme_rust_bigint_copy_raw(GerbilRootId root, uint8_t *output, uint64_t len);
 typedef GerbilStatus (*GerbilI64Callback)(int64_t value, void *context);
 typedef GerbilStatus (*GerbilProcedureCallback)(GerbilValueHandle value,
                                                 void *context);

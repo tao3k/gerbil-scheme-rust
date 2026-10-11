@@ -9,9 +9,17 @@
 mod capabilities;
 mod integer;
 mod lifecycle;
+mod objects;
 mod program;
 mod rooted;
+mod scalar_batch;
+pub use objects::{
+    BigIntegerBuffer, BinaryInteger, CollectionKind, RootedObjectBatch, RootedSchemeCollection,
+    RootedSchemeObject, SchemeObjectRef,
+};
+pub use scalar_batch::ScalarBatch;
 mod types;
+use types::RootedSchemeOwner;
 mod utf8;
 mod value;
 mod value_buffers;

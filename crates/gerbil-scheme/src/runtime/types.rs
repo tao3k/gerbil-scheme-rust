@@ -117,15 +117,24 @@ pub enum GerbilValueProvenance {
 
 /// Runtime-borrowed opaque Gerbil value handle.
 ///
-/// This wrapper is intentionally non-owning. It proves only that the raw handle
-/// is non-zero. Runtime provenance is tracked explicitly by
+/// This wrapper is intentionally non-owning. A Scheme word can be zero
+/// (fixnum zero). Runtime provenance is tracked explicitly by
 /// [`GerbilValueProvenance`]; a caller-created raw handle is not enough to
 /// claim type, ownership, GC reachability, or validity as a Gambit object.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GerbilValue<'runtime> {
-    pub(super) raw: NonZeroUsize,
+    pub(super) raw: SchemeObjectWord,
     pub(super) provenance: GerbilValueProvenance,
     pub(super) _runtime: PhantomData<&'runtime GerbilRuntime>,
+}
+
+/// Scheme words are tagged values, not nullable object pointers or root IDs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct SchemeObjectWord(pub(super) usize);
+impl SchemeObjectWord {
+    pub(super) const fn get(self) -> usize {
+        self.0
+    }
 }
 
 /// Borrowed pair parts projected from a runtime-backed pair.
@@ -189,7 +198,7 @@ pub struct SchemeBytevector<'runtime> {
 /// checked explicitly through [`ExactIntegerTarget`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SchemeExactInteger<'runtime> {
-    pub(super) raw: NonZeroUsize,
+    pub(super) raw: SchemeObjectWord,
     pub(super) _runtime: PhantomData<&'runtime GerbilRuntime>,
 }
 

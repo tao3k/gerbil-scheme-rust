@@ -166,10 +166,20 @@ impl<'ast> Visit<'ast> for CopyShape {
             self.bulk_calls += usize::from(
                 name.ends_with("bytevector_copy")
                     || name.ends_with("root_string_to_utf8")
-                    || name.ends_with("root_string_encode_into"),
+                    || name.ends_with("root_string_encode_into")
+                    || name.ends_with("scalar_batch")
+                    || name.ends_with("collection_copy_raw")
+                    || name.ends_with("collection_snapshot_raw")
+                    || name.ends_with("bigint_copy_raw")
+                    || name.ends_with("bigint_copy_indexed"),
             );
             self.scalar_calls += usize::from(
-                name.ends_with("bytevector_u8_ref") || name.ends_with("string_char_ref"),
+                name.ends_with("bytevector_u8_ref")
+                    || name.ends_with("string_char_ref")
+                    || name.contains("scheme_object_as_")
+                    || name.ends_with("collection_element_raw")
+                    || name.ends_with("object_scalar_raw")
+                    || name.ends_with("object_scalar_indexed"),
             );
         }
         visit::visit_expr_call(self, expression);
@@ -177,8 +187,14 @@ impl<'ast> Visit<'ast> for CopyShape {
 
     fn visit_expr_method_call(&mut self, expression: &'ast syn::ExprMethodCall) {
         self.bulk_calls += usize::from(expression.method == "to_utf8_bytes");
-        self.scalar_calls +=
-            usize::from(expression.method == "u8_at" || expression.method == "char_at");
+        self.scalar_calls += usize::from(
+            expression.method == "u8_at"
+                || expression.method == "char_at"
+                || matches!(
+                    expression.method.to_string().as_str(),
+                    "as_boolean" | "as_fixnum" | "as_char" | "as_flonum"
+                ),
+        );
         visit::visit_expr_method_call(self, expression);
     }
 
@@ -231,6 +247,63 @@ fn bulk_conversions_are_bounded(source: &str) -> bool {
     checked == 7
 }
 
+fn rooted_copy_is_bounded(source: &str, method_name: &str) -> bool {
+    let file = syn::parse_file(source).expect("parse rooted copy source");
+    let mut checked = 0;
+    for item in file.items {
+        let syn::Item::Impl(implementation) = item else {
+            continue;
+        };
+        for item in implementation.items {
+            let syn::ImplItem::Fn(method) = item else {
+                continue;
+            };
+            if method.sig.ident != method_name {
+                continue;
+            }
+            checked += 1;
+            let mut shape = CopyShape::default();
+            shape.visit_block(&method.block);
+            if shape.bulk_calls != 1 || shape.scalar_calls != 0 || shape.loops != 0 {
+                return false;
+            }
+        }
+    }
+    checked == 1
+}
+
+#[test]
+fn rooted_collection_and_integer_copies_reject_scalar_ffi_loops() {
+    let sources = [
+        (
+            include_str!("../../src/runtime/objects/values.rs"),
+            "copy_into",
+        ),
+        (
+            include_str!("../../src/runtime/objects/integer.rs"),
+            "copy_big_integer",
+        ),
+    ];
+    for (source, method) in sources {
+        assert!(rooted_copy_is_bounded(source, method));
+        let scalar = source
+            .replace("collection_copy_raw", "collection_element_raw")
+            .replace("collection_snapshot_raw", "collection_element_raw")
+            .replace("bigint_copy_raw", "object_scalar_raw")
+            .replace("bigint_copy_indexed", "object_scalar_indexed");
+        assert!(!rooted_copy_is_bounded(&scalar, method));
+        let looped = source.replacen(
+            "let len = self.length;",
+            "let len = self.length; for _ in 0..2 {}",
+            1,
+        );
+        if method == "copy_into" {
+            assert_ne!(looped, source);
+            assert!(!rooted_copy_is_bounded(&looped, method));
+        }
+    }
+}
+
 #[test]
 fn bulk_conversion_rejects_per_element_ffi_regressions() {
     assert!(
@@ -269,4 +342,30 @@ fn bulk_conversion_rejects_per_element_ffi_regressions() {
     );
     assert_ne!(reuse_regression, SOURCE);
     assert!(!bulk_conversions_are_bounded(&reuse_regression));
+}
+
+#[test]
+fn scalar_batch_rejects_per_item_foreign_projections() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/runtime/scalar_batch.rs"
+    ));
+    let bounded = |source: &str| {
+        let mut shape = CopyShape::default();
+        shape.visit_file(&syn::parse_file(source).unwrap());
+        shape.bulk_calls == 1 && shape.scalar_calls == 0
+    };
+    assert!(bounded(source));
+    let negative = source.replace(
+        "self.handles.clear();",
+        "for v in values { let _ = v.as_flonum(); } self.handles.clear();",
+    );
+    assert_ne!(source, negative);
+    assert!(!bounded(&negative));
+    let negative = source.replace(
+        "gerbil_scheme_rust_scalar_batch(",
+        "gerbil_scheme_rust_scheme_object_as_flonum(",
+    );
+    assert_ne!(source, negative);
+    assert!(!bounded(&negative));
 }

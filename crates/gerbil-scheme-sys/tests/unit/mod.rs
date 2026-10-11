@@ -83,6 +83,16 @@ fn status_values_are_stable() {
 }
 
 #[test]
+fn scalar_projection_layout_is_stable() {
+    use crate::GerbilScalarProjection;
+    assert_eq!(core::mem::size_of::<GerbilScalarProjection>(), 16);
+    assert_eq!(core::mem::offset_of!(GerbilScalarProjection, tag), 0);
+    assert_eq!(core::mem::offset_of!(GerbilScalarProjection, reserved), 4);
+    assert_eq!(core::mem::offset_of!(GerbilScalarProjection, bits), 8);
+    assert!(crate::GERBIL_SCHEME_RUST_HEADER_SOURCE.contains("GerbilScalarProjection"));
+}
+
+#[test]
 fn borrowed_utf8_matches_pointer_and_length_layout() {
     assert_eq!(
         core::mem::size_of::<GerbilBorrowedUtf8>(),

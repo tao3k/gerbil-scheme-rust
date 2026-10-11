@@ -19,13 +19,17 @@ pub use gerbil_scheme_sys::{
 };
 
 mod runtime;
+pub use runtime::{
+    BigIntegerBuffer, BinaryInteger, CollectionKind, RootedObjectBatch, RootedSchemeCollection,
+    RootedSchemeObject, SchemeObjectRef,
+};
 
 pub use runtime::{
     ByteOrder, BytestringDelimiter, ExactIntegerTarget, IntegerDecoding, IntegerEncoding,
     IntegerWidth, RootedSchemeBytevector, RootedSchemeExactInteger, RootedSchemeString,
-    RootedSchemeValue, RootedSchemeValueKind, SchemeBorrowedBytevector, SchemeBorrowedVector,
-    SchemeBytevector, SchemeExactInteger, SchemeKeyword, SchemeList, SchemeNil, SchemePair,
-    SchemePairParts, SchemeScalar, SchemeSymbol, SchemeVoid,
+    RootedSchemeValue, RootedSchemeValueKind, ScalarBatch, SchemeBorrowedBytevector,
+    SchemeBorrowedVector, SchemeBytevector, SchemeExactInteger, SchemeKeyword, SchemeList,
+    SchemeNil, SchemePair, SchemePairParts, SchemeScalar, SchemeSymbol, SchemeVoid,
 };
 
 pub use runtime::{

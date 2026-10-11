@@ -53,7 +53,8 @@ Any value above one rejects the candidate.
 
 Both matrices reject, and all producer source changes are rolled back.
 At 100,000 mixed requests the complete selector's CPU is 705.248 versus
-524.735 ms (approximately 34% higher), with equal collection counts. GC CPU is
+524.735 ms (approximately 34% higher), with nearly equal collection counts
+(1,236 / 1,238). GC CPU is
 14.991 versus 13.917 ms. This is not merely a wall-clock scheduling effect;
 neither exact selection nor fewer dispatch alternatives automatically wins
 after scanning/copying costs. Individual scan/copy costs are not isolated here.

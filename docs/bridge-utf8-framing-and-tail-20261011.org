@@ -1,0 +1,122 @@
+#+TITLE: UTF-8 entry framing, backward emission and measurement boundaries
+
+* Measurement boundary and missing latency admission
+
+The existing UTF-8 matrix measures the total duration of a serial batch of
+1,000, 10,000 or 100,000 owner-local bridge conversions. It does not measure
+individual request latency, concurrent queue response latency or Org parsing.
+Twenty ABBA observations per variant/load qualify an algorithmic throughput
+comparison only. Batch medians are not request P50, P95 or P99. Request-level
+tail-latency qualification was not implemented at this framing audit's boundary.
+The subsequent =bridge-utf8-request-latency-20261011.org= receipt supplies
+owner-local service percentiles only; concurrent queue/response latency remains
+unqualified. A benchmark output banner explicitly records the batch boundary.
+
+A separate latency qualification must record actual requests, not percentiles
+of twenty batch totals. Report service time, admission/queue wait and response
+time separately, with P50/P95/P99/max, counts, errors, offered/completed rates,
+queue occupancy and concurrency. An open-loop workload must retain scheduled
+arrival times so delayed producers cannot omit waiting requests. A closed-loop
+workload must be labelled as such, not substituted for an arrival-rate SLO.
+The request-count matrix does not itself specify an arrival rate or concurrency.
+Timer/recording overhead must be measured separately; it must not be silently
+subtracted or introduced into the frozen throughput comparison.
+
+These principles are supported by the upstream
+[[https://github.com/HdrHistogram/HdrHistogram][HdrHistogram documentation]], including coordinated omission and per-thread
+recording. P95/P99 are useful statistics, not a universal performance standard
+or a replacement for declaring workload, time boundaries and acceptance limits.
+Only one Scheme owner is qualified here; Tokio admission is not Scheme parse
+parallelism. SMP remains explicitly skipped, not passed.
+
+* Same-codec framing isolation
+
+The new =--framing all= route compares mode 7 (production raw entry) with mode
+5 (checked Rust ABI). Both call the exact same production Scheme/C codec,
+use identical capacity and validate the entire output. This removes the
+separately linked frozen-control codec from the entry-framing comparison.
+All seven corpora, all three loads and twenty samples per variant completed:
+840 rows, 42 independent groups. The aggregate process exits 101; smaller
+load regressions remain failures. No acceptance threshold is changed.
+
+At 100,000 requests:
+
+| Corpus | Raw wall ms | Checked wall ms | Raw CPU ms | Checked CPU ms | Paired wall ratio |
+|--------+-------------+-----------------+------------+----------------+-------------------|
+| BMP | 662.268 | 620.409 | 505.685 | 508.585 | 0.992540 |
+| Wide with ASCII prefix | 645.039 | 629.507 | 597.268 | 596.741 | 0.987938 |
+
+The checked wrapper does not account for the entire earlier regression.
+Its guards/publication do not inspect character distribution. GC CPU is also
+close (BMP 15.004/15.206 ms, reverse-prefix 12.516/12.494 ms). Wall minus
+process CPU is a diagnostic residual, not an exact attribution to scheduling;
+the host was non-isolated (load average 31.71 at one observation). Different
+linked codec layout, branch behavior and host interference are not separated
+by this measurement. No specific one of those is declared the proven cause.
+
+Official =lib/c_intf.c:2825-2856= validates foreign pointer subtype/tags and
+extracts the address without allocating. The checked bounded leaf preserves
+that conversion. Official =lib/_thread.scm:4543-4556= implements exception
+catching with continuation capture/dynamic binding. Removing that machinery
+already failed a prior wall-time gate; this audit does not reintroduce it.
+
+* Official-source-inspired algorithm and rollback
+
+Official =lib/c_intf.c:1325-1370= selects a width, advances the output cursor,
+then emits continuation bytes backward with a fall-through switch. The
+candidate adopts this emission algorithm inside the existing checked private
+leaf, but retains Unicode scalar limits and surrogate rejection rather than
+the source's legacy five/six-byte encodings. It adds no allocation, pre-scan,
+snapshot or cached classification. Pointer/type/capacity guards, 256-scalar
+poll boundaries and full Rust UTF-8 validation remain intact.
+
+All seven corpora and three loads completed twenty samples per variant:
+840 rows, 42 groups. The aggregate exits 101.
+
+| Corpus | 1,000 ratio | 10,000 ratio | 100,000 ratio |
+|--------+-------------+--------------+---------------|
+| Mixed | 1.030166 | 1.074688 | 1.064372 |
+| ASCII | 0.950206 | 0.985519 | 0.984487 |
+| Two-byte | 1.009174 | 1.006323 | 1.018555 |
+| BMP | 1.192521 | 1.172148 | 1.184198 |
+| Supplementary | 1.049478 | 1.066309 | 1.120408 |
+| ASCII with wide prefix | 0.974219 | 0.938049 | 0.948443 |
+| Wide with ASCII prefix | 1.117609 | 1.087216 | 1.070568 |
+
+At 100,000 mixed requests CPU increases from 490.234 to 527.622 ms while GC
+CPU changes from 13.859 to 13.671 ms. Lower GC does not offset added codec
+work. The entire producer edit is rolled back; =scheme/utf8.ss= and all
+=scheme/generated= files match =fc4562c=. The running candidate image completed
+before the restored baseline was rebuilt. The source-only replay patch is
+=benchmarks/20261011-utf8-backward-tail.patch=.
+
+* Restored cost and memory boundary
+
+Cost fixtures no longer assume 3,415 characters: expected lengths derive from
+each current input outside timing, covering the 4,096-character prefix cases.
+BMP and reverse-prefix each complete seven phases, three loads and twenty
+samples (420 rows per corpus). Isolated phases are not additive.
+
+At 100,000 requests, CPU medians are:
+
+| Corpus | Owned | Encoding | Validation | Allocation/release | GC within owned |
+|--------+-------+----------+------------+--------------------+-----------------|
+| BMP | 446.344 | 347.666 | 103.283 | 2.560 | 10.384 |
+| Wide with ASCII prefix | 589.219 | 466.917 | 142.065 | 2.764 | 11.831 |
+
+Owned wall medians are 448.385 and 601.829 ms respectively. These are batch
+times, not request latency percentiles. Encoding and validation remain larger
+than measured allocation/release or GC. No buffer-reserve optimization is
+admitted merely because it reduces retained spare capacity.
+
+BMP reserves 13,660 bytes for 8,879 output bytes (35% spare); reverse-prefix
+reserves 16,384 for 12,256 (25.1953% spare). Capacity is not RSS. A smaller
+public buffer cannot bypass the current 4*N safety contract, and exact-size
+pre-counting would add another traversal. No shrink/cached text/extra retained
+allocation is installed. Memory/throughput policy still needs a qualified
+caller-lifetime-specific solution, rather than an arbitrary global threshold.
+
+Raw receipts are =benchmarks/20261011-utf8-framing-all.log=,
+=benchmarks/20261011-utf8-backward-tail-all.log= and
+=benchmarks/20261011-utf8-framing-costs-*.log= (2,520 complete measurements).
+They do not establish concurrent latency or downstream Org parsing admission.

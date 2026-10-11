@@ -80,6 +80,7 @@ fn measure(values: &[Root], texts: &[String], empty: &Root, jobs: usize, phase: 
     if phase == 6 {
         scratch.resize(capacity, 0xa5);
     }
+    let character_counts: Vec<_> = texts.iter().map(|text| text.chars().count()).collect();
     // SAFETY: all snapshots belong to this initialized runtime owner.
     unsafe {
         gerbil_utf8_comparison_snapshot(0);
@@ -94,6 +95,7 @@ fn measure(values: &[Root], texts: &[String], empty: &Root, jobs: usize, phase: 
                 &values[index % values.len()]
             },
             &texts[index % texts.len()],
+            character_counts[index % texts.len()],
             phase,
             &mut scratch,
         );
@@ -138,7 +140,13 @@ fn measure(values: &[Root], texts: &[String], empty: &Root, jobs: usize, phase: 
     row
 }
 
-fn operation(value: &Root, text: &str, phase: usize, scratch: &mut Vec<u8>) {
+fn operation(
+    value: &Root,
+    text: &str,
+    characters_expected: usize,
+    phase: usize,
+    scratch: &mut Vec<u8>,
+) {
     match phase {
         0 => assert_eq!(std::hint::black_box(convert(value, 5)), text),
         1 => {
@@ -153,7 +161,7 @@ fn operation(value: &Root, text: &str, phase: usize, scratch: &mut Vec<u8>) {
                 },
                 GerbilStatus::Ok
             );
-            assert_eq!(std::hint::black_box(characters), 3415);
+            assert_eq!(std::hint::black_box(characters), characters_expected);
         }
         2 => {
             let output = Vec::<u8>::with_capacity(scratch.capacity());

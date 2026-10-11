@@ -25,6 +25,7 @@
 ;; The foreign-entry owner remains the only mutator of this registry.
 (def gerbil-rs-rooted-values
   (make-table test: eqv? weak-keys: #f weak-values: #f))
+(def gerbil-rs-root-missing (gensym 'missing-root))
 
 ;; Downstream AOT exports transfer this token, never a borrowed Scheme word.
 (def (gerbil-rs-root-string value)
@@ -40,12 +41,14 @@
     root-id))
 
 (def (gerbil-rs-rooted-value-ref root-id)
-  (table-ref gerbil-rs-rooted-values root-id #f))
+  (table-ref gerbil-rs-rooted-values root-id gerbil-rs-root-missing))
 
 (def (gerbil-rs-rooted-value-release! root-id)
-  (if (gerbil-rs-rooted-value-ref root-id)
+  (if (not (eq? (gerbil-rs-rooted-value-ref root-id) gerbil-rs-root-missing))
     (begin (table-set! gerbil-rs-rooted-values root-id) #t)
     #f))
+
+(include "runtime-collections.ss")
 
 (def (gerbil-rs-bytestring-delimiter code)
   (cond

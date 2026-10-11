@@ -8,6 +8,12 @@ use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
 mod buffer;
 #[path = "utf8/costs.rs"]
 mod costs;
+#[path = "utf8/latency.rs"]
+mod latency;
+#[path = "utf8/queued.rs"]
+mod queued;
+#[path = "utf8/scheduling.rs"]
+mod scheduling;
 
 const SCENARIOS: [&str; 7] = [
     "mixed",
@@ -195,15 +201,36 @@ fn texts_for_scenario(scenario: &str) -> Vec<String> {
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--scheduling-audit") {
+        scheduling::run();
+        return;
+    }
+    if std::env::args().nth(1).as_deref() == Some("--queued") {
+        queued::run();
+        return;
+    }
+    if matches!(
+        std::env::args().nth(1).as_deref(),
+        Some("--latency" | "--spikes")
+    ) {
+        latency::run();
+        return;
+    }
+    println!(
+        "UTF8-MEASUREMENT scope=bridge unit=batch scheme_owners=1 request_latency_percentiles=unmeasured concurrent_latency_admission=false"
+    );
     let argument = std::env::args().nth(1);
     let direct = argument.as_deref() == Some("--buffer");
     let compact = argument.as_deref() == Some("--compact");
     let costs = argument.as_deref() == Some("--costs");
     let codec = argument.as_deref() == Some("--codec");
     let owned = argument.as_deref() == Some("--owned");
+    let framing = argument.as_deref() == Some("--framing");
     let contracts_only = argument.as_deref() == Some("--contracts");
     let requested = argument
-        .filter(|_| !direct && !compact && !costs && !codec && !owned && !contracts_only)
+        .filter(|_| {
+            !direct && !compact && !costs && !codec && !owned && !framing && !contracts_only
+        })
         .map(|value| {
             let jobs: usize = value.parse().expect("load must be a number");
             assert!([1_000, 10_000, 100_000].contains(&jobs), "unsupported load");
@@ -211,7 +238,7 @@ fn main() {
         });
     let program = gerbil_scheme_qualification::linked_program();
     let runtime = GerbilRuntime::initialize_program(program).expect("one owner-local AOT runtime");
-    if direct || compact || costs || codec || owned || contracts_only {
+    if direct || compact || costs || codec || owned || framing || contracts_only {
         buffer::contracts(&runtime);
         if contracts_only {
             return;
@@ -249,7 +276,11 @@ fn main() {
             if requested.is_some_and(|load| load != jobs) {
                 continue;
             }
-            if codec {
+            if framing {
+                // Both invoke the identical production raw entry and C leaf.
+                // Isolate the checked ABI rather than comparing linked codecs.
+                admitted &= compare(&values, &texts, jobs, 7, 5) <= 1.0;
+            } else if codec {
                 admitted &= compare(&values, &texts, jobs, 4, 7) <= 1.0;
             } else if owned {
                 // Current frozen caller-buffer control versus the checked public

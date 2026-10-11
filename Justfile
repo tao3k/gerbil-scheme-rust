@@ -78,8 +78,21 @@ bridge-actor-benchmark *args:
 
 # Same AOT image/owner/validation, ABBA, 20 complete samples per variant/load.
 # Optional corpus "all" collects every corpus/load before aggregate rejection.
+# --latency all records exact per-request service percentiles, not queue latency.
+# --queued all adds Tokio admission/queue/response percentiles; --spikes traces stalls.
 bridge-utf8-matched *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features actor-aot --bench utf8 --locked -- {{ args }}
+
+# Scalar projections only: not parser throughput or Tokio queue latency.
+bridge-types-matched:
+    {{ build_env }} cargo bench -p gerbil-scheme --bench types --locked
+
+bridge-objects-matched:
+    {{ build_env }} cargo bench -p gerbil-scheme --bench objects --locked
+
+bridge-types-contracts:
+    {{ build_env }} cargo test -p gerbil-scheme-sys --lib --locked
+    {{ build_env }} cargo test -p gerbil-scheme --test rooted_value --test exact_integer --test unit_test --locked
 
 scheme-utf8-matched-contracts:
     # Darwin bundles resolve host symbols; conformance executes the OS counters.

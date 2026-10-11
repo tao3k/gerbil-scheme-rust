@@ -190,11 +190,11 @@ impl<'runtime> SchemeBytevector<'runtime> {
 }
 
 impl SchemeExactInteger<'_> {
-    pub(super) fn from_raw(raw: usize) -> Option<Self> {
-        NonZeroUsize::new(raw).map(|raw| Self {
-            raw,
+    pub(super) fn from_raw(raw: usize) -> Self {
+        Self {
+            raw: super::types::SchemeObjectWord(raw),
             _runtime: PhantomData,
-        })
+        }
     }
 
     /// Return the borrowed Scheme-object handle.

@@ -1,6 +1,20 @@
 //! Raw C ABI bindings for the Gerbil Scheme runtime bridge.
 
 mod abi;
+mod abi_objects;
+mod abi_scalar_batch;
+pub use abi::GerbilScalarProjection;
+pub use abi_objects::{
+    gerbil_scheme_rust_bigint_copy_indexed, gerbil_scheme_rust_bigint_copy_raw,
+    gerbil_scheme_rust_bigint_create_raw, gerbil_scheme_rust_bigint_size_indexed,
+    gerbil_scheme_rust_bigint_size_raw, gerbil_scheme_rust_collection_create_raw,
+    gerbil_scheme_rust_collection_element_raw, gerbil_scheme_rust_collection_length_raw,
+    gerbil_scheme_rust_collection_snapshot_raw, gerbil_scheme_rust_force_gc_raw,
+    gerbil_scheme_rust_object_root_raw, gerbil_scheme_rust_object_scalar_indexed,
+    gerbil_scheme_rust_object_scalar_raw, gerbil_scheme_rust_object_word_raw,
+    gerbil_scheme_rust_root_count_raw, gerbil_scheme_rust_roots_release_raw,
+};
+pub use abi_scalar_batch::{gerbil_scheme_rust_fixnum_from_word, gerbil_scheme_rust_scalar_batch};
 mod abi_bytevector;
 mod abi_integer_bytes;
 mod abi_program;

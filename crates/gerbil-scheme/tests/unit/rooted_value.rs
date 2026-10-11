@@ -2,6 +2,8 @@ use gerbil_scheme::{
     ByteOrder, BytestringDelimiter, GerbilRuntime, IntegerDecoding, IntegerEncoding, IntegerWidth,
     RootedSchemeValue, RootedSchemeValueKind,
 };
+#[path = "object_contracts.rs"]
+mod object_contracts;
 
 #[test]
 fn rooted_scheme_value_preserves_typed_projections_and_single_owner_drop() {
@@ -85,6 +87,139 @@ fn rooted_scheme_value_preserves_typed_projections_and_single_owner_drop() {
     );
     population_survives_out_of_order_release();
     caller_owned_utf8_span_contracts(&runtime);
+    scalar_batch_contracts(&runtime);
+    object_contracts::run(&runtime);
+}
+
+fn scalar_batch_contracts(runtime: &GerbilRuntime) {
+    use gerbil_scheme::{GerbilValue, ScalarBatch, SchemeScalar};
+    let values = [
+        runtime.fixture_true_value().unwrap(),
+        runtime.fixture_false_value().unwrap(),
+        runtime.fixture_fixnum_value().unwrap(),
+        runtime.fixture_char_ascii_value().unwrap(),
+        runtime.fixture_char_bmp_value().unwrap(),
+        runtime.fixture_char_non_bmp_value().unwrap(),
+        runtime.fixture_flonum_finite_value().unwrap(),
+        runtime.fixture_flonum_nan_value().unwrap(),
+        runtime.fixture_flonum_pos_inf_value().unwrap(),
+        runtime.fixture_flonum_neg_inf_value().unwrap(),
+        runtime.fixture_flonum_neg_zero_value().unwrap(),
+    ];
+    let mut batch = ScalarBatch::default();
+    let mut output = vec![SchemeScalar::Boolean(false)];
+    batch.project(runtime, &values, &mut output).unwrap();
+    assert_eq!(output.len(), values.len());
+    for (input, actual) in values.iter().zip(&output) {
+        match actual {
+            SchemeScalar::Boolean(v) => assert_eq!(*v, input.as_boolean().into_result().unwrap()),
+            SchemeScalar::Fixnum(v) => assert_eq!(*v, input.as_fixnum().into_result().unwrap()),
+            SchemeScalar::Char(v) => assert_eq!(*v, input.as_char().into_result().unwrap()),
+            SchemeScalar::Flonum(v) => assert_eq!(
+                v.to_bits(),
+                input.as_flonum().into_result().unwrap().to_bits()
+            ),
+        }
+    }
+    let reserve = batch.reserved_bytes();
+    for _ in 0..100 {
+        batch.project(runtime, &values, &mut output).unwrap();
+        assert_eq!(batch.reserved_bytes(), reserve);
+    }
+    let unchanged = vec![SchemeScalar::Char('x')];
+    output.clone_from(&unchanged);
+    let wrong = [values[0], runtime.fixture_pair_value().unwrap()];
+    assert!(batch.project(runtime, &wrong, &mut output).is_err());
+    assert_eq!(output, unchanged);
+    for unsupported in [
+        runtime.fixture_null_value().unwrap(),
+        runtime.fixture_void_value().unwrap(),
+        runtime.fixture_bytevector_value().unwrap(),
+        runtime.fixture_proper_list_value().unwrap(),
+        runtime.fixture_improper_list_value().unwrap(),
+        runtime
+            .fixture_exact_integer_large_positive_value()
+            .unwrap(),
+        runtime
+            .fixture_exact_integer_large_negative_value()
+            .unwrap(),
+    ] {
+        assert!(
+            batch
+                .project(runtime, &[values[0], unsupported], &mut output)
+                .is_err()
+        );
+        assert_eq!(output, unchanged, "no partial publication or type coercion");
+    }
+    let untrusted = GerbilValue::from_raw(values[0].as_raw()).unwrap();
+    assert!(batch.project(runtime, &[untrusted], &mut output).is_err());
+    assert_eq!(output, unchanged);
+    batch.project(runtime, &[], &mut output).unwrap();
+    assert!(output.is_empty());
+    raw_scalar_batch_contracts(runtime);
+}
+
+fn raw_scalar_batch_contracts(runtime: &GerbilRuntime) {
+    use gerbil_scheme::GerbilValue;
+    use gerbil_scheme_sys::{GerbilScalarProjection, GerbilStatus};
+    let wrong = [
+        runtime.fixture_true_value().unwrap(),
+        runtime.fixture_pair_value().unwrap(),
+    ];
+    let sentinel = GerbilScalarProjection {
+        tag: 99,
+        reserved: 99,
+        bits: 99,
+    };
+    let mut raw_output = [sentinel; 2];
+    let raw_values = wrong.map(GerbilValue::as_raw);
+    // SAFETY: valid live exports, owner thread, disjoint writable output.
+    let status = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_scalar_batch(
+            raw_values.as_ptr(),
+            2,
+            raw_output.as_mut_ptr(),
+        )
+    };
+    assert_eq!(status, GerbilStatus::InvalidValue);
+    assert_eq!(raw_output, [sentinel; 2]);
+    // Official ___FIX(0) is zero: a Scheme word is not a nullable pointer.
+    let zero = 0_usize;
+    let status = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_scalar_batch(
+            &raw const zero,
+            1,
+            raw_output.as_mut_ptr(),
+        )
+    };
+    assert_eq!(status, GerbilStatus::Ok);
+    assert_eq!(
+        raw_output[0],
+        GerbilScalarProjection {
+            tag: 2,
+            reserved: 0,
+            bits: 0
+        }
+    );
+    // SAFETY: empty spans are explicitly allowed; null nonempty input rejected.
+    unsafe {
+        assert_eq!(
+            gerbil_scheme_sys::gerbil_scheme_rust_scalar_batch(
+                std::ptr::null(),
+                0,
+                std::ptr::null_mut()
+            ),
+            GerbilStatus::Ok
+        );
+        assert_eq!(
+            gerbil_scheme_sys::gerbil_scheme_rust_scalar_batch(
+                std::ptr::null(),
+                1,
+                raw_output.as_mut_ptr()
+            ),
+            GerbilStatus::NullPointer
+        );
+    }
 }
 
 fn caller_owned_utf8_span_contracts(runtime: &GerbilRuntime) {

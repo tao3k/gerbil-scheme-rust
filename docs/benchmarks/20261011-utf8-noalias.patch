@@ -1,0 +1,23 @@
+diff --git a/scheme/utf8.ss b/scheme/utf8.ss
+index d441c61..9abc4b0 100644
+--- a/scheme/utf8.ss
++++ b/scheme/utf8.ss
+@@ -70,7 +70,7 @@ C-END
+ (begin-foreign
+  (namespace ("gerbil-scheme-rust/scheme/utf8#" gerbil-rs-encode-utf8-chunk-c gerbil-rs-encode-utf8-buffer-chunk-c))
+  (c-declare #<<END-C
+-static ___SCMOBJ gerbil_utf8_encode_into(___SCMOBJ str, ___U8 *output,
++static ___SCMOBJ gerbil_utf8_encode_into(___SCMOBJ str, ___U8 *__restrict__ output,
+                                        ___SCMOBJ size, ___SCMOBJ first,
+                                        ___SCMOBJ last, ___SCMOBJ position) {
+ /* Checked private leaf: source and destination are distinct typed objects. */
+@@ -86,7 +86,8 @@ if (start > end || end > length || end - start > 256 ||
+     output_start > capacity || 4 * (end - start) > capacity - output_start ||
+     (end > start && !output))
+   return ___FIX(-2);
+-const ___C *source = ___CAST(const ___C*, ___BODY_AS(str, ___tSTRING));
++/* Rust output and the typed Scheme source cannot alias during this leaf. */
++const ___C *__restrict__ source = ___CAST(const ___C*, ___BODY_AS(str, ___tSTRING));
+ /* c_intf.c's output-cursor convention, within the checked local leaf only.
+    Handle an empty null destination before any pointer arithmetic. */
+ if (start == end) return ___FIX((___S64)output_start);

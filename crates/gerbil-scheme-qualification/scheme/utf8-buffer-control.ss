@@ -1,5 +1,5 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
-;;; Frozen checked-inline control from 345b172; qualification only.
+;;; Frozen checked-inline control from fc4562c; qualification only.
 package: gerbil-scheme-rust/qualification
 (import :gerbil-scheme-rust/scheme/runtime)
 
@@ -49,26 +49,29 @@ if (start > end || end > length || end - start > 256 ||
     (end > start && !output))
   return ___FIX(-2);
 const ___C *source = ___CAST(const ___C*, ___BODY_AS(str, ___tSTRING));
-___U64 j = output_start;
+/* c_intf.c's output-cursor convention, within the checked local leaf only.
+   Handle an empty null destination before any pointer arithmetic. */
+if (start == end) return ___FIX((___S64)output_start);
+___U8 *cursor = output + output_start;
 for (___U64 i = start; i < end; ++i) {
   const ___U32 c = source[i];
-  if (c <= 0x7f) output[j++] = (___U8)c;
+  if (c <= 0x7f) *cursor++ = (___U8)c;
   else if (c <= 0x7ff) {
-    output[j++] = (___U8)(0xc0 | (c >> 6));
-    output[j++] = (___U8)(0x80 | (c & 0x3f));
+    *cursor++ = (___U8)(0xc0 | (c >> 6));
+    *cursor++ = (___U8)(0x80 | (c & 0x3f));
   } else if (c <= 0xffff) {
     if ((c >> 11) == 0x1b) return ___FIX(-1);
-    output[j++] = (___U8)(0xe0 | (c >> 12));
-    output[j++] = (___U8)(0x80 | ((c >> 6) & 0x3f));
-    output[j++] = (___U8)(0x80 | (c & 0x3f));
+    *cursor++ = (___U8)(0xe0 | (c >> 12));
+    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
+    *cursor++ = (___U8)(0x80 | (c & 0x3f));
   } else if (c <= 0x10ffff) {
-    output[j++] = (___U8)(0xf0 | (c >> 18));
-    output[j++] = (___U8)(0x80 | ((c >> 12) & 0x3f));
-    output[j++] = (___U8)(0x80 | ((c >> 6) & 0x3f));
-    output[j++] = (___U8)(0x80 | (c & 0x3f));
+    *cursor++ = (___U8)(0xf0 | (c >> 18));
+    *cursor++ = (___U8)(0x80 | ((c >> 12) & 0x3f));
+    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
+    *cursor++ = (___U8)(0x80 | (c & 0x3f));
   } else return ___FIX(-1);
 }
-return ___FIX((___S64)j);
+return ___FIX((___S64)(cursor - output));
 }
 END-C
  ))

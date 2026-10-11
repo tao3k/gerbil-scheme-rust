@@ -42,7 +42,17 @@
 
 (def (gerbil-rs-encode-utf8-buffer-chunk str pointer capacity start end written)
   (declare (not interrupts-enabled))
-  (let (next (gerbil-rs-encode-utf8-buffer-chunk-c str pointer capacity start end written))
+  ;; c_intf.c's converter is allocation-free and retains the exact void* tag
+  ;; check. Keep foreign bodies local to this interrupt-disabled leaf.
+  (let (next (##c-code #<<C-END
+void *destination = 0;
+if (___EXT(___SCMOBJ_to_POINTER) (___PSP ___ARG2, &destination, ___ARG7, 2) != ___FIX(___NO_ERR))
+  ___RESULT = ___FIX(-2);
+else
+  ___RESULT = gerbil_utf8_encode_into(___ARG1, ___CAST(___U8*, destination),
+                                    ___ARG3, ___ARG4, ___ARG5, ___ARG6);
+C-END
+              str pointer capacity start end written '(void*)))
     (if (##fx< next 0) (error "Illegal Unicode scalar or caller bounds") next)))
 
 ;; One bulk call per bounded chunk, never one foreign call per character.

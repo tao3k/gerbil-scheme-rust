@@ -5,8 +5,49 @@ package: gerbil-scheme-rust/qualification
 (export utf8-conformance)
 (extern namespace: #f
  gerbil-scheme-rust/qualification/utf8-inline-control#inline-control-encode-chunk-c
+ gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk
  gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref)
-(extern historical-chunk)
+(extern historical-chunk wrong-tag-pointer tag-sentinel-intact)
+
+;; Same number of checked bounded leaves as current-text encoding, but each
+;; leaf has an empty span. This prices dispatch, not throughput admission.
+(def (leaf-dispatch text pointer capacity)
+ (let* ((length (string-length text)) (maximum (* 4 length)))
+  (unless (and (fixnum? maximum) (fixnum? capacity) (>= capacity maximum))
+   (error "dispatch capacity rejection"))
+  (let loop ((start 0))
+   (if (##fx< start length)
+    (let* ((end (if (##fx< (##fx- length start) 256) length (##fx+ start 256)))
+           (written (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk
+                     text pointer capacity end end 0)))
+     (unless (zero? written) (error "empty dispatch wrote bytes"))
+     (loop end))
+    0))))
+
+(begin-foreign
+ (namespace ("gerbil-scheme-rust/qualification/utf8-controls#" wrong-tag-pointer tag-sentinel-intact))
+ (c-declare "static int utf8_tag_sentinel[4];")
+ (define wrong-tag-pointer
+  (c-lambda () (pointer int)
+   "for (int i=0; i<4; ++i) utf8_tag_sentinel[i]=0x5a5a5a5a; ___return(utf8_tag_sentinel);"))
+ (define tag-sentinel-intact
+  (c-lambda () bool
+   "___return(utf8_tag_sentinel[0]==0x5a5a5a5a && utf8_tag_sentinel[1]==0x5a5a5a5a && utf8_tag_sentinel[2]==0x5a5a5a5a && utf8_tag_sentinel[3]==0x5a5a5a5a);"))
+ (c-define (pointer-contract) () int32 "gerbil_utf8_pointer_contract" "extern"
+  (let ((rejected
+         (with-exception-catcher (lambda (_) #t)
+          (lambda ()
+           (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-into
+            "abcd" (gerbil-scheme-rust/qualification/utf8-controls#wrong-tag-pointer) 16)
+           #f))))
+   (if (and rejected (gerbil-scheme-rust/qualification/utf8-controls#tag-sentinel-intact)) 1 0)))
+ (c-define (dispatch root pointer capacity) (int64 (pointer void) unsigned-int64) int64
+  "gerbil_utf8_leaf_dispatch" "extern"
+  (let ((text (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
+   (if (string? text)
+    (with-exception-catcher (lambda (_) -1)
+     (lambda () (gerbil-scheme-rust/qualification/utf8-controls#leaf-dispatch text pointer capacity)))
+    -1))))
 
 ;; Frozen pre-inline/pre-no-fill encoder. Only the qualification graph links it.
 (def (historical-checked text bytes start end written)
@@ -112,11 +153,18 @@ package: gerbil-scheme-rust/qualification
  (c-declare #<<C-END
 #if defined(__unix__) || defined(__APPLE__)
 #include <sys/resource.h>
+#include <time.h>
 static struct rusage utf8_usage[2];
 static int utf8_usage_valid[2];
+static struct timespec utf8_thread_cpu[2];
+static int utf8_thread_cpu_valid[2];
 void gerbil_utf8_os_snapshot(int slot) {
-  if (slot >= 0 && slot < 2)
+  if (slot >= 0 && slot < 2) {
     utf8_usage_valid[slot] = getrusage(RUSAGE_SELF, &utf8_usage[slot]) == 0;
+#if defined(CLOCK_THREAD_CPUTIME_ID)
+    utf8_thread_cpu_valid[slot] = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &utf8_thread_cpu[slot]) == 0;
+#endif
+  }
 }
 double gerbil_utf8_os_stat(int field) {
   if (!utf8_usage_valid[0] || !utf8_usage_valid[1]) return -1;
@@ -125,6 +173,10 @@ double gerbil_utf8_os_stat(int field) {
   case 1: return (double)(utf8_usage[1].ru_majflt - utf8_usage[0].ru_majflt);
   case 2: return (double)(utf8_usage[1].ru_nvcsw - utf8_usage[0].ru_nvcsw);
   case 3: return (double)(utf8_usage[1].ru_nivcsw - utf8_usage[0].ru_nivcsw);
+  case 4:
+    if (!utf8_thread_cpu_valid[0] || !utf8_thread_cpu_valid[1]) return -1;
+    return (double)(utf8_thread_cpu[1].tv_sec - utf8_thread_cpu[0].tv_sec)
+      + (double)(utf8_thread_cpu[1].tv_nsec - utf8_thread_cpu[0].tv_nsec) / 1e9;
   default: return -1;
   }
 }

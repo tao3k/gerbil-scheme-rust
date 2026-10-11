@@ -1,7 +1,7 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=0ef81f68e0424676190b034bd97ad7e9513a140a1c0e90e2786d7148c595c1e7 body-sha256=e2a64c4a010a0dbf88c8c5952f4899711be9377643b517a1314c909343eb99a0
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=6e941a1456c827a8d3132bfc20efffc9db655458ee5384f5a26ee63b23de5e15 body-sha256=d679de9f519b5243bc037db5a1daba15de99a719f85c81242aa73930d3d18ba1
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/utf8::timestamp 1791679530)
+  (define gerbil-scheme-rust/scheme/utf8::timestamp 1791689652)
   (begin
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8
       (lambda (_%str485%_)
@@ -90,13 +90,17 @@
                _%written461%_)
         (declare (not interrupts-enabled))
         (let ((_%next464%_
-               (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk-c
-                _%str456%_
-                _%pointer457%_
-                _%capacity458%_
-                _%start459%_
-                _%end460%_
-                _%written461%_)))
+               (let ()
+                 (declare (not safe))
+                 (##c-code
+                  '"void *destination = 0;\nif (___EXT(___SCMOBJ_to_POINTER) (___PSP ___ARG2, &destination, ___ARG7, 2) != ___FIX(___NO_ERR))\n  ___RESULT = ___FIX(-2);\nelse\n  ___RESULT = gerbil_utf8_encode_into(___ARG1, ___CAST(___U8*, destination),\n                                    ___ARG3, ___ARG4, ___ARG5, ___ARG6);"
+                  _%str456%_
+                  _%pointer457%_
+                  _%capacity458%_
+                  _%start459%_
+                  _%end460%_
+                  _%written461%_
+                  '(void*)))))
           (if (let () (declare (not safe)) (##fx< _%next464%_ '0))
               (let ()
                 (declare (not safe))

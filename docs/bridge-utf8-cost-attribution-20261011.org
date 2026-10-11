@@ -21,12 +21,16 @@ The official source inspected is the local matching checkout under
 
 * Reproducible attribution boundary
 
-=just bridge-utf8-matched --costs= measures six diagnostic phases with twenty
+=just bridge-utf8-matched --costs= measured six diagnostic phases in the run below, with twenty
 complete samples each at 1,000, 10,000 and 100,000 requests. Phase order rotates
 per round. Every encoding operates on the current one of four changing texts;
 no stable encoded snapshot replaces encoding. Raw samples retain GC CPU/wall,
 Scheme allocation accounting, minor faults and voluntary/involuntary switches.
 An unavailable OS counter or a major page fault rejects the diagnostic.
+
+The current diagnostic adds bounded empty-leaf dispatch and owner-thread CPU.
+Its complete seven-phase receipt and checked inline-leaf experiment are in
+[[file:bridge-utf8-leaf-and-wall-20261011.org][the leaf and non-CPU wall-time audit]].
 
 The owned phase includes actual checked ABI calls, allocation and full UTF-8
 validation. The encoding phase uses an exclusive preallocated destination and

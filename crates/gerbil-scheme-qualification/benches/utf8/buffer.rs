@@ -6,6 +6,7 @@ use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
 unsafe extern "C" {
     fn gerbil_utf8_buffer_encode(root: i64, output: *mut u8, capacity: u64) -> i64;
     fn gerbil_utf8_buffer_mutate(root: i64, index: u64, codepoint: u32);
+    fn gerbil_utf8_pointer_contract() -> i32;
     fn gerbil_scheme_rust_root_string_encode_into_raw(
         root: i64,
         output: *mut u8,
@@ -101,7 +102,18 @@ fn convert_owned(value: &Root, mode: i32) -> String {
     unsafe { String::from_utf8_unchecked(bytes) }
 }
 
+fn pointer_contract() {
+    // SAFETY: initialized owner-local Scheme; wrong-tag storage is a bounded
+    // static sentinel. Even accidental admission cannot escape its capacity.
+    assert_eq!(
+        unsafe { gerbil_utf8_pointer_contract() },
+        1,
+        "pointer tag rejection"
+    );
+}
+
 pub(super) fn contracts(runtime: &GerbilRuntime) {
+    pointer_contract();
     for start in (0..0x11_0000_u32).step_by(4096) {
         let text: String = (start..(start + 4096).min(0x11_0000))
             .filter_map(char::from_u32)

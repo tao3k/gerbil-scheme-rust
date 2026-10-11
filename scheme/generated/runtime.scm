@@ -1,7 +1,7 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=0ef81f68e0424676190b034bd97ad7e9513a140a1c0e90e2786d7148c595c1e7 body-sha256=ec6a0d25cf8368e0358b0c0210013d673fc1c4f1d19ef46e660f72917b3bfdc1
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=6e941a1456c827a8d3132bfc20efffc9db655458ee5384f5a26ee63b23de5e15 body-sha256=8891ed60706fbbdccaa423ca932d9dbcd3acf7fa1b18debf2deb3f6202af0e94
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1791679537)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1791689663)
   (begin
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))

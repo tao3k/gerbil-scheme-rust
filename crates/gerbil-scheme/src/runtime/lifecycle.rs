@@ -11,7 +11,7 @@ use super::types::RootedSchemeOwner;
 use super::{
     BytestringDelimiter, GerbilRuntime, GerbilRuntimeReceipt, GerbilValue, GerbilValueProvenance,
     IntegerEncoding, LinkedGerbilProgram, NativeError, RootedSchemeBytevector,
-    RootedSchemeExactInteger,
+    RootedSchemeExactInteger, RootedSchemeString,
 };
 use gerbil_scheme_sys::{
     GERBIL_SCHEME_RUST_ABI_VERSION, gerbil_scheme_rust_abi_version, gerbil_scheme_rust_add_i64,
@@ -544,6 +544,51 @@ impl GerbilRuntime {
             )
         };
         rooted_integer_bytevector(status, root, "gerbil_scheme_rust_sint_to_bytevector_root")
+    }
+
+    /// Copy binary input directly into a rooted Scheme bytevector.
+    ///
+    /// The input is borrowed only for this call. The result owns an independent
+    /// Scheme allocation, kept alive until its root is dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an owner-thread or checked ABI error if the call is rejected.
+    pub fn bytevector_from_bytes(
+        &self,
+        bytes: &[u8],
+    ) -> Result<RootedSchemeBytevector<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        // SAFETY: the initialized owner calls synchronously with a live slice
+        // and a disjoint root output slot. Scheme never retains the pointer.
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_bytes_to_bytevector_root(
+                super::SchemeBorrowedBytevector::new(bytes).as_abi(),
+                &raw mut root,
+            )
+        };
+        RootedSchemeOwner::new(status, root, "gerbil_scheme_rust_bytes_to_bytevector_root")
+            .map(|owner| RootedSchemeBytevector { owner })
+    }
+
+    /// Decode Rust UTF-8 with the official Scheme converter into a rooted string.
+    /// Embedded NUL is data, not a terminator. No Rust pointer survives the call.
+    ///
+    /// # Errors
+    /// Returns an owner-thread or checked conversion error.
+    pub fn string_from_utf8(&self, text: &str) -> Result<RootedSchemeString<'_>, NativeError> {
+        let bytes = self.bytevector_from_bytes(text.as_bytes())?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        // SAFETY: bytes owns a live root on this runtime's owner thread.
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_utf8_to_string(
+                bytes.root_id(),
+                &raw mut root,
+            )
+        };
+        RootedSchemeOwner::new(status, root, "gerbil_scheme_rust_root_utf8_to_string")
+            .map(|owner| RootedSchemeString { owner })
     }
 
     /// Parse an ASCII hexadecimal bytestring through Gerbil's AOT converter.

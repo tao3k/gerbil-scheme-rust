@@ -14,6 +14,24 @@ ___END_C_LINKAGE
 /* 0 = never initialized, 1 = running, 2 = finalized and not restartable. */
 static int gerbil_scheme_rust_state = 0;
 
+/* Report the ABI used to compile this bridge, not flags requested by a host.
+ * No runtime initialization, allocation, or processor-state access occurs.
+ * Multiple VM storage alone does not imply thread-local foreign entry. */
+uint32_t gerbil_scheme_rust_vm_capability_flags(void) {
+  uint32_t flags = 0;
+#ifndef ___SINGLE_VM
+  flags |= 1u;
+#endif
+#ifndef ___SINGLE_THREADED_VMS
+  flags |= 2u;
+#endif
+  return flags;
+}
+
+uint32_t gerbil_scheme_rust_vm_max_processors(void) {
+  return ___MAX_PROCESSORS;
+}
+
 int64_t gerbil_scheme_rust_identity_i64(int64_t value) { return value; }
 
 int32_t gerbil_scheme_rust_runtime_init_program(
@@ -34,12 +52,11 @@ int32_t gerbil_scheme_rust_runtime_init_program(
   params.version = ___VERSION;
   params.linker = linker;
   /*
-   * The currently qualified bridge has one thread-affine foreign-entry owner.
-   * This startup policy is not an SDK SMP limitation or a requirement imposed
-   * by Tokio. Parallel Scheme workers require separately qualified publication,
-   * root ownership, processor waits, and draining before enabling that path.
+   * Keep Gambit's setup-reset VM policy. Foreign-entry owner affinity does
+   * not imply a single Scheme processor: Scheme owns its actor scheduling,
+   * while Rust owns host admission and root publication at the ABI boundary.
+   * Do not override the selected SDK's VM defaults with a host worker count.
    */
-  params.parallelism_level = 1;
   /* Failed setup is terminal too: never retry partially initialized state. */
   if (___setup(&params) != ___FIX(___NO_ERR)) {
     gerbil_scheme_rust_state = 2;

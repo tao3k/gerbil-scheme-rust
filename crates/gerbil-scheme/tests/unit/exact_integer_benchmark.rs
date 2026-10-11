@@ -1,5 +1,3 @@
-#![cfg(feature = "native")]
-
 use std::hint::black_box;
 use std::path::Path;
 use std::time::Instant;

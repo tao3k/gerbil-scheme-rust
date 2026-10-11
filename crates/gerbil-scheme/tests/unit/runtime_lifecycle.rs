@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
+#[path = "conversion_contracts.rs"]
+mod conversion_contracts;
+use conversion_contracts::{checks_borrowed_bytevector_bulk_copy, exercises_utf8_bulk_conversion};
+
 use gerbil_scheme::{
     ByteOrder, BytestringDelimiter, GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION,
     GerbilRuntime, GerbilRuntimeReceipt, GerbilStatus, GerbilValueProvenance, IntegerDecoding,
@@ -95,7 +99,92 @@ fn calls_scalar_export_in_process() {
     exercises_linked_bytes_export(&runtime);
     exercises_abandoned_receiver_root_release(&runtime);
     exercises_rooted_bulk_copy_abi();
+    exercises_binary_input_and_reused_output(&runtime);
+    exercises_utf8_bulk_conversion(&runtime);
     reports_overflow_and_finalized_runtime_boundaries(runtime);
+}
+
+fn exercises_binary_input_and_reused_output(runtime: &GerbilRuntime) {
+    use gerbil_scheme_sys::{GerbilBorrowedBytevector, GerbilRootId};
+    for length in [
+        0, 1, 7, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257, 8191, 8192,
+        8193, 65537,
+    ] {
+        let expected: Vec<u8> = (0..=u8::MAX).cycle().take(length).collect();
+        // Neither direction may silently assume an aligned foreign buffer.
+        let mut input = vec![0xC3; length + 2];
+        input[1..=length].copy_from_slice(&expected);
+        let root = runtime
+            .bytevector_from_bytes(&input[1..=length])
+            .expect("root binary input");
+        input.fill(0xA5);
+        drop(input); // Scheme must own its bytes, not retain the borrowed pointer.
+        let mut output = vec![0x5A; length];
+        for _ in 0..3 {
+            root.copy_into(&mut output)
+                .into_result()
+                .expect("reused output");
+            assert_eq!(output, expected);
+            output.fill(0x5A);
+        }
+        let mut guarded_output = vec![0xC3; length + 2];
+        root.copy_into(&mut guarded_output[1..=length])
+            .into_result()
+            .expect("unaligned guarded output");
+        assert_eq!(&guarded_output[1..=length], expected.as_slice());
+        assert_eq!(guarded_output[0], 0xC3);
+        assert_eq!(guarded_output[length + 1], 0xC3);
+        let mut wrong = vec![0x5A; length + 1];
+        assert!(root.copy_into(&mut wrong).into_result().is_err());
+        assert_eq!(wrong, vec![0x5A; length + 1]);
+        assert_eq!(root.to_vec().into_result(), Ok(expected));
+    }
+    let mut unchanged = GerbilRootId(-7);
+    // SAFETY: the owner is initialized; invalid inputs are rejected before any
+    // pointer dereference or Scheme allocation, and output is a writable slot.
+    unsafe {
+        let mut empty = GerbilRootId(0);
+        assert_eq!(
+            gerbil_scheme_sys::gerbil_scheme_rust_bytes_to_bytevector_root(
+                GerbilBorrowedBytevector::EMPTY,
+                &raw mut empty,
+            ),
+            GerbilStatus::Ok
+        );
+        assert_eq!(
+            gerbil_scheme_sys::gerbil_scheme_rust_root_release(empty),
+            GerbilStatus::Ok
+        );
+        assert_eq!(
+            gerbil_scheme_sys::gerbil_scheme_rust_bytes_to_bytevector_root(
+                GerbilBorrowedBytevector {
+                    ptr: std::ptr::null(),
+                    len: 1
+                },
+                &raw mut unchanged,
+            ),
+            GerbilStatus::NullPointer
+        );
+        assert_eq!(unchanged, GerbilRootId(-7));
+        assert_eq!(
+            gerbil_scheme_sys::gerbil_scheme_rust_bytes_to_bytevector_root(
+                GerbilBorrowedBytevector::EMPTY,
+                std::ptr::null_mut(),
+            ),
+            GerbilStatus::NullPointer
+        );
+        assert_eq!(
+            gerbil_scheme_sys::gerbil_scheme_rust_bytes_to_bytevector_root(
+                GerbilBorrowedBytevector {
+                    ptr: std::ptr::NonNull::<u8>::dangling().as_ptr(),
+                    len: usize::MAX
+                },
+                &raw mut unchanged,
+            ),
+            GerbilStatus::InvalidValue
+        );
+        assert_eq!(unchanged, GerbilRootId(-7));
+    }
 }
 
 fn exercises_rooted_bulk_copy_abi() {
@@ -169,6 +258,26 @@ fn exercises_linked_bytes_export(runtime: &GerbilRuntime) {
     let empty = export.call(b"").into_result().expect("empty bytes");
     assert_eq!(empty.to_vec().into_result(), Ok(Vec::<u8>::new()));
     drop(empty);
+    // Distinct bytes and non-aligned lengths exercise complete initialization,
+    // including tails that a bulk implementation might otherwise skip.
+    for length in [1, 7, 31, 8193, 65537] {
+        let expected: Vec<u8> = (0..=u8::MAX).cycle().take(length).collect();
+        let hex: String = expected
+            .iter()
+            .flat_map(|byte| {
+                let digits = b"0123456789ABCDEF";
+                [
+                    char::from(digits[usize::from(byte >> 4)]),
+                    char::from(digits[usize::from(byte & 15)]),
+                ]
+            })
+            .collect();
+        let root = export
+            .call(hex.as_bytes())
+            .into_result()
+            .expect("root patterned bytes");
+        assert_eq!(root.to_vec().into_result(), Ok(expected));
+    }
     assert!(export.call(b"not hex").into_result().is_err());
 }
 
@@ -614,6 +723,7 @@ fn exports_bytevector_object(runtime: &GerbilRuntime) {
         projected.to_vec().into_result().expect("copy bytevector"),
         vec![255, 127, 11, 1, 0]
     );
+    checks_borrowed_bytevector_bulk_copy(runtime, scheme_bytevector.as_raw());
     let spaced = projected
         .to_bytestring(BytestringDelimiter::SPACE)
         .into_result()

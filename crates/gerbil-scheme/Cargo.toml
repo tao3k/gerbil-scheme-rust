@@ -10,15 +10,16 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-gerbil-scheme-sys = { workspace = true, optional = true }
+gerbil-scheme-sys.workspace = true
+simdutf8.workspace = true
 
 [features]
-default = []
-native = ["dep:gerbil-scheme-sys"]
-external-program = ["native", "gerbil-scheme-sys/external-program"]
+external-program = ["gerbil-scheme-sys/external-program"]
 
 [dev-dependencies]
 divan.workspace = true
+syn = { workspace = true, features = ["visit"] }
+tokio.workspace = true
 gerbil-scheme-rust-project-harness.workspace = true
 
 [build-dependencies]
@@ -29,57 +30,54 @@ gerbil-scheme-rust-project-harness-policy.workspace = true
 [[test]]
 name = "bytestring_benchmark"
 path = "tests/unit/targets/bytestring_benchmark.rs"
-required-features = ["native"]
 
 [[test]]
 name = "exact_integer"
 path = "tests/unit/targets/exact_integer.rs"
-required-features = ["native"]
 
 [[test]]
 name = "exact_integer_benchmark"
 path = "tests/unit/targets/exact_integer_benchmark.rs"
-required-features = ["native"]
 
 [[test]]
 name = "ffi_benchmark"
 path = "tests/unit/targets/ffi_benchmark.rs"
-required-features = ["native"]
 
 [[test]]
 name = "identity"
 path = "tests/unit/targets/identity.rs"
-required-features = ["native"]
 
 [[test]]
 name = "integer_bytes_benchmark"
 path = "tests/unit/targets/integer_bytes_benchmark.rs"
-required-features = ["native"]
 
 [[test]]
 name = "rooted_value"
 path = "tests/unit/targets/rooted_value.rs"
-required-features = ["native"]
 
 [[test]]
 name = "rooted_value_benchmark"
 path = "tests/unit/targets/rooted_value_benchmark.rs"
-required-features = ["native"]
+
+[[test]]
+name = "tokio_handoff"
+path = "tests/unit/targets/tokio_handoff.rs"
 
 [[test]]
 name = "runtime_lifecycle"
 path = "tests/unit/targets/runtime_lifecycle.rs"
-required-features = ["native"]
 
 [[test]]
 name = "runtime_round_trip"
 path = "tests/unit/targets/runtime_round_trip.rs"
-required-features = ["native"]
 
 [[bench]]
 name = "ffi"
 harness = false
-required-features = ["native"]
+
+[[bench]]
+name = "tokio_transport"
+harness = false
 
 [lints]
 workspace = true

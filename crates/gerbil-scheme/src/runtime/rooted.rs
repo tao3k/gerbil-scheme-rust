@@ -15,6 +15,8 @@ use gerbil_scheme_sys::{
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 
+use super::value_buffers::copy_reused_bytevector;
+
 impl<'runtime> SchemeBytevector<'runtime> {
     pub(super) fn from_raw(raw: usize) -> Option<Self> {
         NonZeroUsize::new(raw).map(|raw| Self {
@@ -81,18 +83,43 @@ impl<'runtime> SchemeBytevector<'runtime> {
     /// Copy this runtime-backed bytevector into owned Rust memory.
     #[must_use]
     pub fn to_vec(&self) -> NativeResult<Vec<u8>> {
-        let len = match self.len().into_result() {
-            Ok(len) => len,
-            Err(error) => return NativeResult::err(error),
-        };
-        let mut bytes = Vec::with_capacity(len);
-        for index in 0..len {
-            match self.u8_at(index).into_result() {
-                Ok(byte) => bytes.push(byte),
-                Err(error) => return NativeResult::err(error),
-            }
-        }
-        NativeResult::ok(bytes)
+        copy_owned_bytevector(
+            self.len(),
+            "gerbil_scheme_rust_scheme_object_bytevector_copy",
+            |output, length| {
+                // SAFETY: this view retains the runtime lifetime and the helper
+                // provides disjoint writable capacity for this synchronous call.
+                unsafe {
+                    gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_bytevector_copy(
+                        self.raw.get(),
+                        output,
+                        length,
+                    )
+                }
+            },
+        )
+    }
+
+    /// Replace an owned Rust buffer, reusing capacity across varying lengths.
+    ///
+    /// Length-query failure preserves the buffer. Once copying begins, failure
+    /// leaves it empty; partially initialized bytes are never exposed.
+    #[must_use]
+    pub fn copy_to_vec(&self, output: &mut Vec<u8>) -> NativeResult<()> {
+        copy_reused_bytevector(
+            self.len(),
+            output,
+            "gerbil_scheme_rust_scheme_object_bytevector_copy",
+            |destination, length| unsafe {
+                // SAFETY: this owner-affine view remains live, and the helper
+                // supplies exclusively borrowed capacity for the entire call.
+                gerbil_scheme_sys::gerbil_scheme_rust_scheme_object_bytevector_copy(
+                    self.raw.get(),
+                    destination,
+                    length,
+                )
+            },
+        )
     }
 
     /// Decode this Scheme bytevector as an unsigned integer.
@@ -271,7 +298,7 @@ impl RootedSchemeExactInteger<'_> {
     }
 }
 
-impl RootedSchemeString<'_> {
+impl<'runtime> RootedSchemeString<'runtime> {
     /// Return the number of Scheme characters in this rooted string.
     #[must_use]
     pub fn len(&self) -> NativeResult<usize> {
@@ -327,21 +354,35 @@ impl RootedSchemeString<'_> {
         }
     }
 
+    /// Encode an independent, owner-affine UTF-8 snapshot using Scheme's codec.
+    ///
+    /// The snapshot outlives this string root, but not its runtime. Callers may
+    /// reuse its bulk-copy APIs instead of re-encoding unchanged text. This is
+    /// explicit snapshot ownership, not a cache of a mutable Scheme string.
+    #[must_use]
+    pub fn to_utf8_bytes(&self) -> NativeResult<RootedSchemeBytevector<'runtime>> {
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        // SAFETY: this owner-affine root stays live throughout encoding. The
+        // Scheme encoder transfers an independent rooted bytevector.
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_to_utf8(
+                self.owner.root_id(),
+                &raw mut root,
+            )
+        };
+        RootedSchemeOwner::new(status, root, "gerbil_scheme_rust_root_string_to_utf8")
+            .map(|owner| RootedSchemeBytevector { owner })
+            .into()
+    }
+
     /// Copy this rooted Scheme string into owned Rust UTF-8 storage.
     #[must_use]
     pub fn to_string(&self) -> NativeResult<String> {
-        let length = match self.len().into_result() {
-            Ok(length) => length,
-            Err(error) => return NativeResult::err(error),
-        };
-        let mut text = String::with_capacity(length);
-        for index in 0..length {
-            match self.char_at(index).into_result() {
-                Ok(character) => text.push(character),
-                Err(error) => return NativeResult::err(error),
-            }
-        }
-        NativeResult::ok(text)
+        let result = (|| {
+            let bytes = self.to_utf8_bytes().into_result()?.to_vec().into_result()?;
+            super::utf8::validated_string(bytes)
+        })();
+        result.into()
     }
 }
 
@@ -405,30 +446,68 @@ impl RootedSchemeBytevector<'_> {
     /// Copy this rooted Scheme bytevector into owned Rust memory.
     #[must_use]
     pub fn to_vec(&self) -> NativeResult<Vec<u8>> {
-        let length = match self.len().into_result() {
-            Ok(length) => length,
-            Err(error) => return NativeResult::err(error),
-        };
-        let mut bytes = vec![0; length];
-        let output = if bytes.is_empty() {
-            std::ptr::null_mut()
-        } else {
-            bytes.as_mut_ptr()
-        };
+        copy_owned_bytevector(
+            self.len(),
+            "gerbil_scheme_rust_root_bytevector_copy",
+            |output, length| {
+                // SAFETY: the owner retains this root and the helper provides
+                // disjoint writable capacity for this synchronous call.
+                unsafe {
+                    gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                        self.owner.root_id(),
+                        output,
+                        length,
+                    )
+                }
+            },
+        )
+    }
+
+    /// Replace an owned Rust buffer, reusing capacity across varying lengths.
+    ///
+    /// Length-query failure preserves the buffer. Once copying begins, failure
+    /// leaves it empty; partially initialized bytes are never exposed.
+    #[must_use]
+    pub fn copy_to_vec(&self, output: &mut Vec<u8>) -> NativeResult<()> {
+        copy_reused_bytevector(
+            self.len(),
+            output,
+            "gerbil_scheme_rust_root_bytevector_copy",
+            |destination, length| unsafe {
+                // SAFETY: the root retains owner affinity, and the helper
+                // supplies exclusively borrowed capacity for the entire call.
+                gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
+                    self.owner.root_id(),
+                    destination,
+                    length,
+                )
+            },
+        )
+    }
+
+    /// Copy into an exactly sized reusable Rust buffer without allocating.
+    ///
+    /// A length mismatch or invalid root leaves the buffer unchanged. This
+    /// performs one copy; it does not borrow a pointer into the Scheme heap.
+    #[must_use]
+    pub fn copy_into(&self, output: &mut [u8]) -> NativeResult<()> {
+        // SAFETY: the root retains owner affinity and output is exclusively
+        // borrowed for this synchronous call; it cannot overlap Scheme storage.
         let status = unsafe {
             gerbil_scheme_sys::gerbil_scheme_rust_root_bytevector_copy(
                 self.owner.root_id(),
-                output,
-                length,
+                output.as_mut_ptr(),
+                output.len(),
             )
         };
-        if status != gerbil_scheme_sys::GerbilStatus::Ok {
-            return NativeResult::err(NativeError::Status {
+        if status == gerbil_scheme_sys::GerbilStatus::Ok {
+            NativeResult::ok(())
+        } else {
+            NativeResult::err(NativeError::Status {
                 operation: "gerbil_scheme_rust_root_bytevector_copy",
                 code: status as i32,
-            });
+            })
         }
-        NativeResult::ok(bytes)
     }
 
     /// Decode this rooted Scheme bytevector as an unsigned integer.
@@ -526,6 +605,20 @@ fn checked_integer_decoding_size(
         });
     }
     Ok(size)
+}
+
+// Both borrowed and rooted bytevectors use the same owned-buffer initialization
+// rule; only their checked Scheme source identity differs.
+fn copy_owned_bytevector(
+    length: NativeResult<usize>,
+    operation: &'static str,
+    copy: impl FnOnce(*mut u8, usize) -> gerbil_scheme_sys::GerbilStatus,
+) -> NativeResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    match copy_reused_bytevector(length, &mut bytes, operation, copy).into_result() {
+        Ok(()) => NativeResult::ok(bytes),
+        Err(error) => NativeResult::err(error),
+    }
 }
 
 fn checked_integer_projection<T>(

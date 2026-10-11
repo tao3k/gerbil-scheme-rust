@@ -5,6 +5,7 @@ members = [
   "build-support/gerbil-scheme-rust-project-harness-policy",
   "build-support/gerbil-scheme-rust-project-harness",
   "crates/gerbil-scheme",
+  "crates/gerbil-scheme-qualification",
     "crates/gerbil-scheme-build",
     "crates/gerbil-scheme-sys",
 ]
@@ -41,6 +42,8 @@ cc = "1.2.64"
 pkg-config = "0.3"
 cbindgen = "0.29.4"
 divan = "0.1.21"
+simdutf8 = "0.1.5"
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 gerbil-scheme-aot-build = { path = "build-support/gerbil-scheme-aot-build" }
 gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-scheme-rust-project-harness-policy" }
 gerbil-scheme-rust-project-harness = { path = "build-support/gerbil-scheme-rust-project-harness", version = "0.1.2" }

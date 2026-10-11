@@ -1,5 +1,3 @@
-#![cfg(feature = "native")]
-
 use gerbil_scheme::{GerbilStatus, NativeError, NativeResult};
 
 #[test]

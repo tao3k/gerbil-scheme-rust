@@ -28,8 +28,10 @@ fn run_native_build() {
     println!("cargo:rerun-if-changed=../../build.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
+    println!("cargo:rerun-if-changed=../../scheme/utf8.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ssi");
     println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm");
+    println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm");
     println!("cargo:rerun-if-changed=../../ffi/runtime.c");
 
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
@@ -43,6 +45,9 @@ fn run_native_build() {
     let gsc = crate::discover_gambit_gsc_from_env()
         .expect("discover paired Gambit compiler")
         .into_os_string();
+    for input in crate::discovery::gambit_sdk_inputs(Path::new(&gsc)) {
+        println!("cargo:rerun-if-changed={}", input.display());
+    }
 
     if env::var_os("CARGO_FEATURE_EXTERNAL_PROGRAM").is_some() {
         let runtime_object = out_dir.join("runtime.o");
@@ -83,7 +88,14 @@ fn run_native_build() {
 
     let generated_native_scm =
         gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__runtime.scm");
-    let native_scm = sync_generated_scm(&workspace, &generated_native_scm);
+    let native_scm = sync_generated_scm(&workspace, &generated_native_scm, "runtime");
+    let utf8_scm = sync_generated_scm(
+        &workspace,
+        &gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__utf8.scm"),
+        "utf8",
+    );
+    let utf8_c = out_dir.join("utf8.c");
+    let utf8_object = out_dir.join("utf8.o");
     // Gambit derives the C linker identity from the target basename. Keep it
     // aligned with runtime.scm, independently of the Scheme namespace name.
     let native_c = out_dir.join("runtime.c");
@@ -101,6 +113,7 @@ fn run_native_build() {
                 OsStr::new("-o"),
             ])
             .arg(&linker_c)
+            .arg(&utf8_scm)
             .arg(&native_scm),
         "generate Gambit linker",
     );
@@ -119,6 +132,16 @@ fn run_native_build() {
         &native_object,
         "compile Gerbil module object",
     );
+    let utf8_expression = format!(
+        "(compile-file-to-target {} output: {} module-name: \"gerbil-scheme-rust/scheme/utf8\")",
+        scheme_string(&utf8_scm),
+        scheme_string(&utf8_c),
+    );
+    run(
+        gerbil_command(&gsc).arg("-e").arg(utf8_expression),
+        "generate named UTF-8 module C",
+    );
+    compile_c(&gsc, &utf8_c, &utf8_object, "compile UTF-8 module object");
     run(
         gerbil_command(&gsc)
             .args([
@@ -145,6 +168,7 @@ fn run_native_build() {
         .object(&runtime_object)
         .object(&linker_object)
         .object(&native_object)
+        .object(&utf8_object)
         .try_compile("gerbil_scheme_rust_native")
         .expect("archive native binding objects");
 
@@ -162,8 +186,8 @@ fn run_native_build() {
     }
 }
 
-fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
-    let tracked_scm = workspace.join("scheme/generated/runtime.scm");
+fn sync_generated_scm(workspace: &Path, native_scm: &Path, module: &str) -> PathBuf {
+    let tracked_scm = workspace.join(format!("scheme/generated/{module}.scm"));
     let update = env::var("GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM").as_deref() == Ok("1");
     let check = env::var("GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM").as_deref() == Ok("1");
     let input_fingerprint = workspace_input_fingerprint(workspace);
@@ -204,7 +228,7 @@ fn sync_generated_scm(workspace: &Path, native_scm: &Path) -> PathBuf {
         let transient_scm = native_scm
             .parent()
             .expect("generated native SCM must have a parent")
-            .join("runtime.scm");
+            .join(format!("{module}.scm"));
         fs::copy(native_scm, &transient_scm).expect("stage fresh native SCM with stable basename");
         transient_scm
     }

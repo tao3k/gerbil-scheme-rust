@@ -39,6 +39,10 @@ fn public_header_matches_the_live_scalar_abi() {
     assert!(header.contains("gerbil_scheme_rust_uint_to_bytevector_root("));
     assert!(header.contains("gerbil_scheme_rust_sint_to_bytevector_root("));
     assert!(header.contains("gerbil_scheme_rust_root_bytevector_copy("));
+    assert!(header.contains("gerbil_scheme_rust_scheme_object_bytevector_copy("));
+    assert!(header.contains("gerbil_scheme_rust_bytes_to_bytevector_root("));
+    assert!(header.contains("gerbil_scheme_rust_root_string_to_utf8("));
+    assert!(header.contains("gerbil_scheme_rust_root_utf8_to_string("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_is_exact_integer("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_i64("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_u64("));
@@ -47,6 +51,26 @@ fn public_header_matches_the_live_scalar_abi() {
     assert!(header.contains("gerbil_scheme_rust_root_exact_integer_to_i64("));
     assert!(header.contains("gerbil_scheme_rust_root_exact_integer_to_u64("));
     assert!(!header.contains("int64_t *result"));
+}
+
+#[test]
+fn hex_input_rejects_unrepresentable_lengths_before_slice_or_ffi() {
+    for length in [isize::MAX as usize, usize::MAX] {
+        let input = GerbilBorrowedUtf8 {
+            ptr: std::ptr::NonNull::<u8>::dangling().as_ptr().cast(),
+            len: length,
+        };
+        let mut root = super::GerbilRootId(987_654);
+        // SAFETY: these impossible spans are rejected before pointer access.
+        // No runtime is initialized: a regression must not reach the raw FFI.
+        assert_eq!(
+            unsafe {
+                super::gerbil_scheme_rust_bytestring_to_bytevector_root(input, -1, &raw mut root)
+            },
+            GerbilStatus::InvalidValue
+        );
+        assert_eq!(root, super::GerbilRootId(987_654));
+    }
 }
 
 #[test]

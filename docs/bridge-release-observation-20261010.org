@@ -1,0 +1,782 @@
+#+TITLE: Local producer Release benchmark observation
+#+DATE: 2026-10-10
+
+* Identity and evidence boundary
+
+Checkout base: 2e465d95ee73dc6cb44dd637fd02faafe0c94a54, with uncommitted
+producer qualification and benchmark changes. This is not an exact-commit CI
+receipt or a stable regression baseline.
+Machine: Apple M2 Pro, 12 logical CPUs, 32 GiB RAM.
+SDK: Gerbil 1cfb032 / Gambit ea114fc, patch618d76f9eb72.
+Cargo/Rust compilation used the configured Nix 1.98.1 toolchain.
+Release profile: opt-level=3, thin LTO; no profile relaxation.
+Commands: just bridge-benchmark; just bridge-transport-benchmark.
+Other host workloads were active. Large slowest/median differences prevent
+admitting these observations as stable wins or declaring a scheduler winner.
+First Release compilation took 3m42s and is excluded from all timings below.
+
+* Processor admission correction
+
+The previously configured 12-processor actor observations are not SMP receipts.
+The configuration setter changes setup parameters, not an initialized VM's
+processor population. Qualification now uses Gambit's own ~##cvmr~ startup path
+and checks ~##current-vm-processor-count~ before admitting the batch.
+The published SDK still reports one active processor after requesting 12.
+The default Homebrew ~gxi~ reports one after requesting two as well. Both report
+Gerbil 1cfb032 / Gambit ea114fc; the default executable resolves to the
+patch618d76f9eb72 Homebrew release.
+
+The exact SDK build receipt includes ~--enable-smp~ and ~--enable-multiple-vms~,
+but omits ~--enable-multiple-threaded-vms~. The pinned official Gambit configure
+source defines these separately: the SMP scheduler flag does not enable multiple
+OS threads within a VM. This is a toolchain configuration/admission gap, not an
+established Gambit architectural performance ceiling. No kernel patch or unsafe
+Rust Send/Sync change was made. The corrected SMP smoke fails with active=1,
+requested=12 rather than admitting a falsely labelled parallel benchmark.
+
+Official source: https://git.cons.io/mighty-gerbils/gambit/src/commit/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/configure.ac
+
+The processor-admission Quint model distinguishes configuration, activation and
+admission, and detects the mutation that admits configuration alone. Its four
+tests and bounded 12-step verification passed. Existing actor lifecycle checking
+also passed a 12-step bounded verification. Neither result proves implementation
+refinement, scheduler optimality, or unbounded liveness.
+
+Corrected single-processor Release controls, 1024 synthetic jobs, 20 samples:
+
+| Rounds per job | Actors=1 | Actors=8 | Actors=64 |
+|----------------+----------+----------+-----------|
+| 1000 | 1.390 ms | 0.978 ms | 1.036 ms |
+| 10000 | 10.490 ms | 10.430 ms | 9.227 ms |
+
+These are complete batch medians, not Orgize document throughput. Other host
+workloads and large outliers remain; no stable optimization claim is admitted.
+
+* Scalar and bulk medians
+
+| Operation | Payload | Median |
+|-----------+---------+--------|
+| Safe Scheme add | scalar | 47.25 ns |
+| Raw Scheme add | scalar | 45.19 ns |
+| Rust allocate/copy/dispose | 8 KiB | 171.3 ns |
+| Safe rooted copy/dispose | 8 KiB | 2.947 us |
+| Scheme hex decode/create/root/release | 8 KiB | 325.4 us |
+| Complete rooted create/copy/release/dispose | 8 KiB | 278.7 us |
+| Safe rooted copy/dispose | 64 KiB | 22.82 us |
+| Complete rooted create/copy/release/dispose | 64 KiB | 2.391 ms |
+
+Phase results are not additive: separate cases have different GC/cache history.
+C identity and safe identity are ABI controls, not general Scheme evaluation.
+
+* Root population medians
+
+| Live roots | Oldest-token lookup | Newest-first population cycle | Oldest-first population cycle |
+|------------+---------------------+-------------------------------+-------------------------------|
+| 1 | 44.69 ns | 249.6 ns | 208.6 ns |
+| 32 | 74.69 ns | 6.187 us | 14.1 us |
+| 256 | 358 ns | 50.6 us | 1.672 ms |
+| 1024 | 1.299 us | 192.7 us | 18.53 ms |
+
+Cycles include creation and disposal, not isolated release.
+The pre-optimization Scheme registry was an alist; lookup scanned and removal reconstructed
+the prefix. This mechanism supports auditing order-sensitive scaling, but does
+not prove it caused any consumer parser regression.
+
+* Homebrew root-registry algorithm comparison
+
+Both runs used the globally installed Homebrew SDK via its bundled activation
+entry point, the same Release profile, and ~just bridge-benchmark lifecycle~.
+The replacement is Gambit's official strong-reference table, numeric equality,
+with no weak roots or token reuse. AOT source was regenerated through
+~just bridge-regenerate~. These local observations are not an exact-head CI
+receipt or an isolated-host performance guarantee. Compilation is excluded.
+
+| Live roots | Oldest lookup before | Oldest lookup after | Oldest-first cycle before | Oldest-first cycle after | Newest-first cycle before | Newest-first cycle after |
+|------------+----------------------+---------------------+---------------------------+--------------------------+---------------------------+--------------------------|
+| 1 | 46.37 ns | 61.22 ns | 249.6 ns | 291.5 ns | 291.6 ns | 812 ns |
+| 32 | 88.01 ns | 61.22 ns | 17.29 us | 10.74 us | 6.603 us | 25.85 us |
+| 256 | 369.6 ns | 306.2 ns | 678 us | 211.8 us | 53.93 us | 296.7 us |
+| 1024 | 1.353 us | 61.22 ns | 11.46 ms | 594.1 us | 192.2 us | 531.1 us |
+
+All entries are medians. Lookup uses 40 samples / 1000 total iterations; cycles
+use 20 samples / 20 iterations. The oldest-token and oldest-first scaling hotspot
+improves, while small populations and newest-first cycles regress. Active host
+workloads and large outliers preclude a stable whole-bridge speedup claim.
+The registry change does not resolve the independent SMP activation gate.
+Strong-reference and removal behavior follow the official Gambit table contract:
+https://www.gambitscheme.org/latest/gambit.pdf
+
+Two further post-change runs produced 1024-root oldest-token lookup medians of
+63.00 ns and 63.04 ns, and oldest-first cycle medians of 514.5 us and 977.7 us.
+Small-population and newest-first regressions remain; these repeats do not
+establish a stable end-to-end bridge or parser speedup.
+~just bridge-root-contracts~ passed the exact-integer, rooted-value and lifecycle
+targets (three tests passed, one pre-existing timing test explicitly ignored).
+The rooted-value target now verifies 1024 distinct bignum values, out-of-order
+release, retained-value parity, released-token rejection and double-release
+rejection under the same live foreign-entry owner.
+The updated handoff model passed 24 deterministic cases and two sets of 1000
+50-transition sampled traces. Its updated multi-root protocol has not yet been
+requalified by bounded symbolic checking; do not reuse the older model receipt.
+Workspace ~just bridge-lint~, Cargo formatting and Git diff whitespace checks
+passed. No Homebrew installation or toolchain repository was modified.
+
+* Standalone-library stress extension
+
+The rooted-value regression now retains 10,000 distinct bignum values and passes
+the same out-of-order release and token-invalidity checks. The focused runtime
+targets pass (three tests, one pre-existing ignored timing test). The official
+~gxi~ source-owned test explicitly collects twice and checks strong-root survival,
+released-token absence, duplicate-release rejection and unrelated-root isolation.
+~just scheme-contracts~ passed; it uses the official module build and one test
+process, without a custom process launcher or another SDK.
+
+The lifecycle benchmark now includes 1,000 and 10,000 live roots. A local Release
+run observed the following complete population-cycle medians:
+
+| Live roots | Oldest lookup | Oldest-first cycle | Newest-first cycle |
+|------------+---------------+--------------------+--------------------|
+| 1000 | 131.3 ns | 898.7 us | 1.084 ms |
+| 10000 | 66.35 ns | 7.958 ms | 8.330 ms |
+
+These units are roots, not Org documents or simultaneous actor execution.
+The host remained noisy: the 10,000-root oldest-first slowest cycle was 79.99 ms,
+and the newest-first slowest was 102 ms. These are not p95 values or stable
+whole-library performance guarantees.
+
+* Owned-buffer initialization experiment
+
+The safe bytevector result now writes into ~Vec::spare_capacity_mut~ and calls
+~set_len~ only after the checked ABI confirms complete initialization. Errors
+leave vector length zero. This follows Rust's documented spare-capacity pattern:
+https://doc.rust-lang.org/std/vec/struct.Vec.html#method.spare_capacity_mut
+It removes redundant zero filling, not the Scheme-to-Rust copy.
+
+Matched recipe: ~just bridge-benchmark rooted_ --sample-count 20 --sample-size 25~.
+These adjacent runs used the same installed toolchain, fixture and Release
+profile. Other compilation and symbolic verification were active on this host;
+the following medians are observations, not a stable performance admission.
+
+| Phase | Bytes | Zero-filled before | Spare-capacity after |
+|-------+-------+--------------------+----------------------|
+| Owned copy | 0 | 134.6 ns | 133 ns |
+| Owned copy | 8192 | 3.068 us | 2.892 us |
+| Owned copy | 65536 | 22.67 us | 21.72 us |
+| Reused buffer control | 8192 | 2.769 us | 2.914 us |
+| Reused buffer control | 65536 | 35.83 us | 27.11 us |
+| Complete round trip | 8192 | 183.1 us | 286 us |
+| Complete round trip | 65536 | 1.561 ms | 2.248 ms |
+
+The unchanged reused-buffer control and complete-path regressions prohibit an
+end-to-end speedup claim. Scheme hex decoding/creation remains much larger than
+the owned-copy phase. Hex is a benchmark fixture, not an admission that production
+binary data should travel through hex strings.
+
+An experimental C ~memcpy~ replacement failed official module linking with an
+unresolved ~_memcpy~ symbol on this installed Darwin toolchain. It was removed;
+the passing implementation retains the existing C copy loop. No kernel or
+linker workaround was added. Focused root contracts passed (three tests, one
+pre-existing ignored timing test), including zero lengths, patterned unaligned
+payloads through 65,537 bytes, length mismatch, null destination and released
+root rejection. True borrowed zero-copy still requires an explicit GC and
+foreign-entry lifetime contract; a root alone is not a public borrowed-slice API.
+Workspace Clippy with warnings denied, formatting and diff whitespace checks
+passed after the patterned-payload test update. The updated handoff model's
+12-transition symbolic run remained in progress; no completed proof is claimed.
+
+* Direct binary input and reusable output
+
+The ABI now connects the existing ~GerbilBorrowedBytevector~ pointer/length type
+to an independent rooted Scheme bytevector. Input is borrowed only during the
+call; arbitrary bytes, including NUL, do not pass through hex or ~CString~.
+The safe Rust ~bytevector_from_bytes~ constructor and ~copy_into~ output API
+retain owner affinity and the existing release protocol. This is a copied
+binary path, not a borrowed zero-copy Scheme heap view. Scheme allocation still
+initializes its bytevector before the C section fills it; no uninitialized
+Scheme object or kernel patch is introduced.
+
+Local Release ~just bridge-benchmark binary --sample-count 20 --sample-size 25~:
+
+| Result bytes | Input create/drop | Safe reused output | Complete binary round trip |
+|--------------+-------------------+--------------------+----------------------------|
+| 0 | 195.5 ns | 88.01 ns | 370.5 ns |
+| 8192 | 4.319 us | 2.783 us | 6.409 us |
+| 65536 | 26.25 us | 21.56 us | 50.38 us |
+
+These phases have payload preflight outside timing; the complete path includes
+input copy/allocation, rooting, output allocation/copy and both disposals. They
+do not represent parser work. Hex-conversion observations above are a different
+representation path, not evidence of a compiler or parser algorithm speedup.
+
+Local Release ~just bridge-transport-benchmark binary --sample-count 10~:
+12 Tokio workers, queue capacity 24, one Scheme owner, 8 KiB result per request.
+
+| Requests/batch | Callers | Batch median | Slowest sampled batch |
+|----------------+---------+--------------+-----------------------|
+| 1000 | 12 | 9.466 ms | 179.4 ms |
+| 10000 | 12 | 186.1 ms | 535.4 ms |
+| 1000 | 24 | 19.42 ms | 120.3 ms |
+| 10000 | 24 | 168.8 ms | 234.6 ms |
+
+All 220,004 accepted requests, including four preflights, drained before runtime
+cleanup. Increasing callers did not consistently improve latency. Symbolic
+verification and other build work remained active; these noisy ten-sample batch
+observations do not establish sustained QPS or sub-100-ms admission.
+
+The updated instrumented ~just bridge-handoff~ test checks full payload parity,
+queued/rooted/released cancellation and all 22,004 accepted root releases.
+Its single diagnostic run (dev profile, not a Release distribution) reported:
+
+| Requests | Bytes | Batch duration | Queue p95 | Service p95 | Request p95 |
+|----------+-------+----------------+-----------+-------------+-------------|
+| 1000 | 0 | 2.472 ms | 38.666 us | 1.709 us | 60.875 us |
+| 1000 | 8192 | 8.406 ms | 130.250 us | 9.375 us | 152.250 us |
+| 10000 | 0 | 29.488 ms | 41.750 us | 1.542 us | 63.417 us |
+| 10000 | 8192 | 182.175 ms | 204.916 us | 16.334 us | 275.625 us |
+
+Cancellation tests, focused root contracts, formatting, workspace Clippy and
+diff whitespace checks pass. ~just bridge-workspace~ also completed successfully
+after these changes, including the public-header and source-surface checks.
+Binary contracts cover input mutation/disposal
+after return, repeated output reuse, mismatch preserving sentinels, empty/null
+input, invalid oversized input, and non-aligned patterned lengths through
+65,537 bytes. No root or Scheme body pointer is sent across host threads.
+The updated 12-transition handoff proof remains pending; previous model passes
+are not a receipt for this changed state machine.
+
+* Tokio receive-many experiment
+
+The same direct-binary transport now uses official ~blocking_recv_many~ into
+reused request storage. Its upper bound is the channel capacity, derived from
+machine CPU count. It does not wait to fill that bound. Scheme calls remain
+owner-local; each result is released before notification. This changes the
+qualification integration pattern, not the public runtime scheduler.
+
+Matched Release recipe: ~just bridge-transport-benchmark binary --sample-count 10~.
+The Rust control copies the same 8 KiB input into owned output and retains the
+same queue/notification/disposal path without allocating or rooting Scheme data.
+These are observed medians, not a subtraction-based cost decomposition.
+
+| Requests | Callers | Per-message receive | Receive-many |
+|----------+---------+---------------------+--------------|
+| 1000 | 12 | 13.42 ms | 7.907 ms |
+| 10000 | 12 | 260.7 ms | 96.71 ms |
+| 1000 | 24 | 17.88 ms | 10.41 ms |
+| 10000 | 24 | 222 ms | 83.24 ms |
+| 1000, Rust control | 12 | 1.383 ms | 3.232 ms |
+| 10000, Rust control | 12 | 20.51 ms | 11.71 ms |
+
+The worsening 1,000-request Rust control and concurrent formal-checker work show
+why this is not a stable end-to-end speedup claim. Two subsequent 20-sample
+receive-many repeats retain the negative results:
+
+| Requests | Callers | Repeat 1 median | Repeat 2 median |
+|----------+---------+-----------------+-----------------|
+| 1000 | 12 | 8.237 ms | 7.666 ms |
+| 10000 | 12 | 98.14 ms | 154.7 ms |
+| 1000 | 24 | 8.405 ms | 11.92 ms |
+| 10000 | 24 | 100 ms | 147.4 ms |
+| 1000, Rust control | 12 | 1.808 ms | 1.570 ms |
+| 10000, Rust control | 12 | 13.26 ms | 16.34 ms |
+
+The repeat-1 10,000-request / 24-caller slowest batch was 1.027 s. Sub-100-ms
+admission remains open, even though some observed medians are below the gate.
+Both repeat processes drained 660,006 requests. These runs overlapped symbolic
+verification; quiet exact-profile runs are still required.
+
+Updated cancellation/drain qualification passed with 22,004 accepted requests,
+22,004 confirmed root releases, three intentional abandoned receivers, 2,104
+receive batches and maximum observed batch size 12 (channel capacity 24).
+Workspace Clippy and the 24 deterministic Quint tests plus both 1,000-trace
+samples passed. This is not a Scheme SMP or downstream parser qualification.
+
+The earlier per-transition symbolic checker was interrupted before completing
+the 12-transition bound. The official invariant ~after~ mode rerun retains the
+same model, all 17 generated verification conditions and the same bound, with
+no transition filters or simulation substituted for symbolic checking.
+
+* Installed-source alignment
+
+The optimization review read the installed `src/std/ffi.ss`, matching
+`include/gambit.h`, `src/std/io/bio/cache.ss`, `src/std/os/socket.ss` and
+`src/std/sync/threads.ss`. No SDK download, version query or installed-source
+mutation was performed. The bridge bytevector length accessor now uses the
+official subtype-aware `___U8VECTORSIZE` macro rather than its own header
+arithmetic. Generated SCM was regenerated; focused root contracts and the
+explicit-GC source test passed. This accessor alignment is not a measured
+performance win. Cache-backed result leases and cross-runtime thread lifecycle
+still require integration qualification before adopting further optimizations.
+
+* Whole-value conversion regression and matched controls
+
+Production bytevector-to-Vec and rooted-string-to-String conversion no longer
+use per-element Rust/FFI traversal. String encoding/decoding uses the installed
+official string->utf8/utf8->string primitives. Unicode, embedded NUL, invalid
+UTF-8, independent result roots, stale roots, wrong types, exact output lengths
+and untouched error outputs pass real ABI controls. Rust AST mutation controls
+reject restoration of the byte/character loops. Zero-length bytevectors skip
+the copy call after checked length projection. Conversion tests were split
+into their own owner module, not admitted through a file-size waiver.
+
+Release controls use the same rooted input, owned result allocation/disposal,
+and untimed full-payload parity. 20 samples, 5 iterations per sample. Byte
+fixture size is exact; strings contain the specified ASCII prefix plus the
+11-byte suffix containing two CJK characters, one emoji and NUL. Scalar loops
+exist only as benchmark controls. Initial observations overlapped symbolic
+verification; the repeat below began after the checker completed.
+
+| Conversion | Prefix/input size | Bulk median | Scalar median |
+|------------+-------------------+-------------+---------------|
+| Vec<u8> | 0 bytes | 66.29 ns | 66.29 ns |
+| Vec<u8> | 8192 bytes | 2.866 us | 664.8 us |
+| Vec<u8> | 65536 bytes | 21.98 us | 5.356 ms |
+| String | 0-byte ASCII prefix | 487.1 ns | 424.6 ns |
+| String | 8192-byte ASCII prefix | 19.74 us | 669.3 us |
+| String | 65536-byte ASCII prefix | 162.9 us | 6.871 ms |
+
+The short string control regresses: temporary encoding/root ownership has
+fixed cost. The 64KiB bulk-string slowest sample was 1.101 ms. These matched
+conversion results are not parser end-to-end or zero-copy results. Missing
+vector/list/numeric-vector conversions are enumerated in bridge-value-conversions.md;
+opaque handle shapes are not promoted to complete data conversions.
+
+* Binary concurrent transport repeat after symbolic checking
+
+The same 8192-byte request/result payload, 20 samples and one iteration per
+sample retain all input allocation, root creation/release, owned output,
+Tokio queue/notification and result disposal. No symbolic checker or compiler
+ran concurrently from this qualification task; other host work was uncontrolled.
+
+| Requests | Callers | Batch median | Slowest sampled batch |
+|----------+---------+--------------+-----------------------|
+| 1000 | 12 | 8.977 ms | 92.9 ms |
+| 10000 | 12 | 120.4 ms | 377.4 ms |
+| 1000 | 24 | 9.781 ms | 176 ms |
+| 10000 | 24 | 117.6 ms | 337.5 ms |
+| 1000, Rust-only control | 12 | 2.102 ms | 29.54 ms |
+| 10000, Rust-only control | 12 | 18.69 ms | 151.3 ms |
+
+All 660006 requests including preflights completed; 57715 receive batches,
+maximum batch 24, joined cleanup OK. 10000-request medians remain above 100ms;
+this is not threshold admission or a 10000-document Orgize benchmark.
+
+* Capability-aware copy implementation and three load scenarios
+
+The C copy helper now selects compiler capabilities rather than an OS or SDK
+version. With Clang's [[https://clang.llvm.org/docs/LanguageExtensions.html#guaranteed-inlined-copy][guaranteed-inline copy intrinsic]], constant-size blocks
+cannot introduce an external function call. GCC uses its constant-size builtin
+only with actual canonical module/link qualification. Other compilers retain
+the existing byte loop. No kernel, linker policy or optimization flags changed.
+
+Small spans and tails use the byte path; full 64-byte blocks use the builtin.
+The block width is a locally measured implementation choice, not a claim about
+every CPU's cache line or a workload-count dispatch threshold. Both input fill
+and output copy use the same allocation-free helper, with arbitrary byte
+alignment and the existing non-overlap contract. Independent owned results
+and explicitly caller-owned reused storage remain different safe APIs.
+
+Release phases used 40 samples, 25 iterations/sample. The expanded output
+matrix covers 0, 1, 8, 16, 17, 64, 65, 256, 8192 and 65536 bytes, both normal
+and one-byte-offset destinations, with patterned payloads and guard bytes.
+
+| Phase | Pre-change median | Candidate median | Candidate repeat |
+|-------+-------------------+------------------+------------------|
+| Copy, 8192 bytes | 4.973 us | 198.0 ns | 207.2 ns |
+| Copy, 65536 bytes | 22.46 us | 874.6 ns | 1.022 us |
+| Offset copy, 8192 bytes | 2.803 us | 228.0 ns | 240.5 ns |
+| Offset copy, 65536 bytes | 22.61 us | 1.250 us | 1.378 us |
+| Reused-output round trip, 8192 bytes | 6.073 us | 741.3 ns | 779.6 ns |
+| Reused-output round trip, 65536 bytes | 65.19 us | 4.584 us | 4.934 us |
+
+Owned round-trip candidate medians were 1.798/1.739 us at 8192 bytes and
+5.766/4.601 us at 65536 bytes. The slowest first 65536-byte owned sample was
+1.820 ms: faster copy does not establish tail admission. Tiny copies mostly
+remained around 85-95ns, but the repeated 64-byte normal-destination median
+was 189.6ns versus the pre-change 111.3ns. Keep this negative observation;
+there is no all-sizes speedup claim. The inspected Release module object had
+no unresolved ~memcpy~ or ~memmove~ symbol; this is local, not all-target proof.
+
+Concurrent diagnostic runs did not meet stable admission. With 12 Tokio
+workers, queue capacity 24, one Scheme foreign-entry owner and 8192-byte
+independently owned results, 20-sample 10000-request candidate medians were
+574.4/687.6ms, with Rust-only controls 514.1/145.7ms. Turning off the block
+path for a same-load reference gave 833.3ms Scheme and 135.0ms Rust-only.
+These sequential runs show large variability, not causal proof that unrelated
+host work is the only cause. Process/load inspection was sandbox-denied.
+
+The binary transport matrix now includes 1000, 10000 and 100000 requests for
+machine-sized callers, oversubscribed callers, pipelined admission and the
+matching Rust-only controls. An initial three-sample triage run observed:
+
+| Path | 1000 requests | 10000 requests | 100000 requests |
+|------+---------------+----------------+-----------------|
+| Scheme, 12 callers, window 1 | 174.8 ms | 683.9 ms | 3.563 s |
+| Scheme, 24 callers, window 1 | 3.529 ms | 333.6 ms | 1.354 s |
+| Scheme, 12 callers, window 2 | 3.205 ms | 90.00 ms | 2.500 s |
+| Rust-only, 12 callers, window 1 | 2.781 ms | 22.95 ms | 5.805 s |
+| Rust-only, 12 callers, window 2 | 11.12 ms | 113.0 ms | 4.025 s |
+
+All 1,665,015 requests including preflights drained, maximum receive batch 24,
+cleanup OK. Three samples are triage only; the declared default remains 20.
+The 90ms median is not stable admission, and these are bridge requests, not
+Org documents. No pipeline default or downstream dependency revision changes
+are justified. Request totals are load dimensions, not hard-coded scheduling
+rules: in-flight work, payload size, queue wait and result lifetime must drive
+subsequent optimization evidence.
+
+The lifetime fixture now covers 100000 ordinary and 100003 pipelined requests
+in addition to the smaller loads. It preserves cancellation, unused-permit
+abandonment, per-request released-token rejection, bounded admission and
+queue/service/request p95 telemetry. Symbolic model domains and bounds are
+unchanged; this stress extension is not a larger formal proof.
+
+The focused live fixture passed two tests in 16.56 seconds, with all 444,031
+accepted requests ABI-confirmed released, four intentional abandonments and
+maximum receive batch 24. Its instrumented dev-profile telemetry observed:
+
+| Requests / 8192-byte result | Queue p95 | Service p95 | Request p95 |
+|-----------------------------+-----------+-------------+-------------|
+| 1000, window 1 | 358.542 us | 3.250 us | 523.167 us |
+| 10000, window 1 | 894.292 us | 3.542 us | 1.092 ms |
+| 100000, window 1 | 2.686 ms | 4.416 us | 3.200 ms |
+| 100003, window 2 | 3.861 ms | 3.750 us | 4.749 ms |
+
+Queue time starts before permit acquisition, so it includes host admission
+wait, not merely residence in the channel. Service includes allocation,
+copying, release and stale-token verification. These percentiles are separate
+distributions and must not be added. They identify admission/handoff waiting
+as the next measured optimization target in this run; they do not prove a
+Tokio defect or a Gambit kernel limitation. Instrumentation, progress output
+and dev code generation prevent promoting them to Release admission.
+Workspace tests, all-target Clippy with warnings denied and formatting passed.
+
+* VM policy and scenario-matrix hardcoding audit
+
+The preceding timing receipts were collected before removing the production
+~params.parallelism_level = 1~ override in ~ffi/runtime.c~. They are historical
+copy/handoff observations, not measurements of the final VM initialization path.
+The bridge now retains ~___setup_params_reset~ defaults. Official Gambit
+[[https://raw.githubusercontent.com/gambit/gambit/master/lib/setup.c][setup implementation]] distinguishes single-threaded and other VM builds;
+the host bridge must not replace that SDK policy with a constant or CPU count.
+This does not establish actual SMP activation in the installed SDK. The
+foreign-entry owner and rooted-value affinity contract remain unchanged.
+
+The source regression now rejects overrides to both 1 and 12 processors.
+Binary transport controls cross 1000/10000/100000 requests with
+0/16/8192/65536-byte payloads instead of fixing all large batches to 8192 bytes.
+Actor controls cross those job totals with 1/8/64 tasks per processor rather
+than fixing jobs at 1024. Their rounds/job is now a constant fixture coordinate
+of 32, not the former variable-round work shape; older actor timings cannot
+be promoted to a speedup comparison. Machine budgets remain machine-derived.
+
+These are calibration matrices, not request-count dispatch rules. Payload type,
+ownership and retention semantics must remain explicit: copied independent
+results cannot silently become borrowed Scheme heap slices or reused storage.
+No production adaptive queue policy or optimal data-type selection is claimed.
+
+After the VM-policy change, ~just bridge-workspace~, ~just bridge-lint~,
+formatting and whitespace checks passed. The focused handoff fixture passed
+two tests in 9.83 seconds: 444031 accepted requests and ABI-confirmed releases,
+four intentional abandonments, maximum batch 24, cleanup OK. Instrumented dev
+timings are not Release performance admission.
+
+Release ~--test~ transport controls at 8192 bytes covered all three request
+totals and all five binary paths: 555015 completed, maximum batch 24, cleanup
+OK. These single-iteration smoke receipts establish drain/parity, not stable
+latency. They do not qualify every size/count combination in the expanded matrix.
+An additional 1000-request smoke crossed all four payload sizes and all five
+paths: 20020 completed, maximum batch 24, cleanup OK. The remaining large-count
+non-8192-byte cases still require execution before full matrix admission.
+
+Actual ~machine_processors~ AOT qualification still failed for 1000 jobs,
+32 rounds and one task/processor: requested processors 12, active processors 1.
+The failure was propagated with exit 101 and the guard remains intact. Removing
+the host's forced-single-processor setup did not close actual SMP activation.
+No SDK installation, kernel edits, foreign-entry safety relaxation, new model
+proof or downstream dependency admission is justified by this receipt.
+
+* Installed SDK flag separation and complete scenario smoke
+
+The installed Homebrew receipt, profile
+~gcc16-arm64-aot-tools-single-host-unlimited-multiple-vms~, contains
+~--enable-multiple-vms~ and ~--enable-smp~ but not
+~--enable-multiple-threaded-vms~. Its installed ~gambit.h~ defaults to
+~___SINGLE_THREADED_VMS~ and ~___MAX_PROCESSORS 1~, and its compiler-owned
+~gambuild-C~ does not supply an override. Local official-source inspection found:
+
+- Gambit ~configure~ distinguishes ~ENABLE_SMP~ from
+  ~ENABLE_MULTIPLE_THREADED_VMS~, defaulting the latter to ~no~.
+- ~CONF_MAX_PROCESSORS~ is 1 in that configuration.
+- ~lib/setup.c:___current_vm_resize~ clamps the request to ~___MAX_PROCESSORS~.
+- ~lib/_kernel.scm~ reads the VM's actual ~processor_count~, not its requested
+  configuration. ~lib/_thread.scm:##cvmr~ calls the official resize path.
+
+Source reference for the Gambit implementation is the existing local checkout
+~gerbil-bazel/.data/gxtest-next-ci-source/src/gambit~, read-only; the installed
+Gerbil runtime actor implementation was read under the Homebrew ~src~ path.
+That Gambit checkout HEAD is ~ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f~, matching
+the installed receipt's ~--with-gambit~ revision.
+No kernel, SDK, release configuration or system installation was changed.
+The user is building the additional capability in a separate session.
+
+~just smp-check~ now derives its request from ~##cpu-count~. Current SDK:
+requested 12, active 1, exit 70. The actor fixture restores the original active
+population instead of the configuration level and prints caught export errors.
+A source mutation regression rejects restoring a configuration level as though
+it were an active count. No activation assertion was relaxed.
+
+The producer-owned ~multiple_vm_globals.ss~ contract passed through the bridge
+Just entry point: 32768 globals retained across GC and green-thread global
+checks, exit 0. This is not an independent-VM isolation or SMP speed proof.
+
+All 60 binary transport smoke cases completed: three request totals
+(1000/10000/100000), four payload sizes (0/16/8192/65536), five Scheme/Rust
+controls. There were 2220060 completed requests including preflights, maximum
+batch 24, cleanup OK. Smoke is one iteration/case, not statistical admission.
+
+All nine single-processor actor compute controls also completed with 20 samples
+each, failure drain/recovery and finalized cleanup. Rounds/job is 32:
+
+| Jobs | 1 actor median | 8 actors median | 64 actors median |
+|------+----------------+-----------------+------------------|
+| 1000 | 47.74 us | 32.68 us | 54.85 us |
+| 10000 | 265.1 us | 269.7 us | 292.2 us |
+| 100000 | 2.645 ms | 4.451 ms | 2.926 ms |
+
+These are checksum controls, not Org documents or successful SMP runs. The
+processor-admission model now includes SDK capacity clamping: request 12,
+capacity 1 cannot be admitted. Type checking, 14 deterministic scenarios and
+three 1000-trace/50-step simulations passed. The changed model has no new
+symbolic verification receipt; older symbolic receipts do not cover it.
+Concurrent user toolchain construction and bridge checks prevent treating the
+current host timings as an uncontended or causal performance comparison.
+
+The first full 20-sample transport path (12 callers, window 1) completed all
+12 load coordinates. Its medians on the current SDK were:
+
+| Requests | 0 bytes | 16 bytes | 8192 bytes | 65536 bytes |
+|----------+---------+----------+------------+-------------|
+| 1000 | 92.45 ms | 40.65 ms | 22.73 ms | 114.9 ms |
+| 10000 | 353.9 ms | 228.0 ms | 571.9 ms | 1.174 s |
+| 100000 | 4.007 s | 6.107 s | 4.091 s | 8.936 s |
+
+None of the 10000-request medians admits the 100ms threshold. This is a
+busy-host transport diagnostic, not Org parsing, successful SMP qualification
+or a matched comparison against a newly compiled SDK. Other paths must be
+reported separately; completion of this path is not full statistical closure.
+
+The oversubscribed control (24 callers, window 1) also completed its twelve
+20-sample coordinates on the same SDK. It is not a parallel Scheme-owner path:
+
+| Requests | 0 bytes | 16 bytes | 8192 bytes | 65536 bytes |
+|----------+---------+----------+------------+-------------|
+| 1000 | 35.11 ms | 39.22 ms | 72.32 ms | 110.4 ms |
+| 10000 | 326.4 ms | 392.5 ms | 485.3 ms | 393.9 ms |
+| 100000 | 2.738 s | 3.305 s | 3.411 s | 4.365 s |
+
+The pipelined control (12 callers, window 2) completed the same 20-sample
+matrix. A small-payload median alone cannot admit the other load coordinates:
+
+| Requests | 0 bytes | 16 bytes | 8192 bytes | 65536 bytes |
+|----------+---------+----------+------------+-------------|
+| 1000 | 24.69 ms | 23.90 ms | 15.21 ms | 37.83 ms |
+| 10000 | 160.0 ms | 72.61 ms | 203.3 ms | 325.8 ms |
+| 100000 | 2.241 s | 1.318 s | 3.231 s | 6.255 s |
+
+An additional cache audit found that an unchanged compiler path/metadata did
+not cover an in-place SDK header or configured-driver change. Both scalar
+builds and observed AOT programs now track the selected SDK compiler, ABI
+header, compile driver and runtime library as Cargo inputs. Native object
+fingerprints additionally include header/driver contents; large runtime archives
+are tracked for relinking, not hashed for every module object. No ABI macro or
+SDK compile flag is overridden. A regression changes only the SDK header and
+then only its driver while keeping compiler/module identity unchanged; each
+must invalidate the fingerprint. Selected input ownership reuses existing
+library discovery rather than adding another shell discovery path.
+
+The Rust-only baseline (12 callers, window 1) completed all 20-sample
+coordinates with the same admission, result ownership and host disposal shape:
+
+| Requests | 0 bytes | 16 bytes | 8192 bytes | 65536 bytes |
+|----------+---------+----------+------------+-------------|
+| 1000 | 11.69 ms | 5.291 ms | 4.561 ms | 17.12 ms |
+| 10000 | 277.9 ms | 238.9 ms | 552.7 ms | 597.1 ms |
+| 100000 | 3.172 s | 2.267 s | 3.400 s | 6.453 s |
+
+High variance also exists without Scheme service. This does not prove that
+external load alone explains the complete path; it prevents attributing every
+slow transport sample to the Scheme engine or claiming kernel fixes are needed.
+
+The last Rust-only pipelined control (12 callers, window 2) completed:
+
+| Requests | 0 bytes | 16 bytes | 8192 bytes | 65536 bytes |
+|----------+---------+----------+------------+-------------|
+| 1000 | 9.735 ms | 3.628 ms | 7.216 ms | 15.50 ms |
+| 10000 | 81.09 ms | 80.05 ms | 138.4 ms | 409.9 ms |
+| 100000 | 1.699 s | 1.770 s | 2.395 s | 3.299 s |
+
+The entire statistical transport matrix completed with exit 0: all 60 cases,
+20 samples and one iteration per sample, 44400060 requests including preflights,
+2991122 receive batches, maximum batch 24, cleanup OK. The executing binary was
+linked against the current SDK before the build-input-tracking change; runtime
+copy/handoff code and SDK capabilities were unchanged. These observations are
+the current single-processor-VM diagnostic baseline, not a freshly enabled
+multiple-threaded-VM receipt or an uncontended performance comparison.
+No stable 10000-request/8192-byte sub-100ms admission was obtained in any path.
+
+After fixing SDK dependency tracking, workspace tests and all-target Clippy
+passed. The regular Just contracts now include build-library unit tests:
+21 passed, five pre-existing ignored controls, plus 20 integration tests passed.
+The unchanged-compiler/changed-SDK fingerprint regression and missing-compiler
+phase observation both passed. The latest handoff fixture confirmed all 444031
+roots released, four intentional abandonments, maximum batch 24, cleanup OK.
+Formatting, whitespace and filename gates passed. This does not close actual
+SMP activation, independent-VM isolation or consumer/remote-CI qualification.
+
+* Scoped-copy audit: reject unsupported allocator and aliasing wins
+
+The installed official ~std/ffi.ss~ supplies ~U8_DATA~ and ~U8_LEN~; official
+~std/db/sqlite-driver.ss~ uses a scoped bulk copy into a bytevector. The bridge
+already holds the Scheme value inside an allocation-free C section and does
+not publish its body pointer. A candidate added local ~__restrict__~ pointers
+under the existing non-overlap ABI contract, following the compiler's
+[[https://www.gnu.org/software/c-intro-and-ref/manual/html_node/restrict-Pointers.html][restricted-pointer guidance]]. No compiler flags, kernel or linking policy
+changed. Canonical regeneration and Release compilation succeeded.
+
+All direct phases below used 40 samples, 25 iterations/sample, one runtime
+owner and binary input/output. Measurements are sequential, not randomized;
+uncontrolled host activity and different GC histories prohibit causal tail
+attribution or a stable throughput claim.
+
+| Phase, 8192 bytes | Baseline median | Candidate median | Candidate repeat |
+|-------------------+-----------------+------------------+------------------|
+| Create input root and release | 4.103 us | 3.644 us | 2.915 us |
+| Copy into reused output | 2.835 us | 2.619 us | 2.609 us |
+| Complete owned round trip | 6.174 us | 7.262 us | 11.60 us |
+
+The complete-path gain was not demonstrated, so the candidate was removed and
+the generated Scheme source regenerated from the restored implementation.
+The original loops remain; no external ~memcpy~ dependency or handwritten SIMD
+was introduced.
+
+A new ~binary::round_trip_reused_output~ control uses the existing safe
+~copy_into~ API with caller-owned reusable storage. It still allocates/fills a
+new Scheme input, copies every output byte and releases the root on every call.
+Unlike the owned-result control, its output cannot be retained independently
+between iterations. It is not a substitute for concurrent retained responses.
+
+| Restored implementation | First median | Repeat median |
+|-------------------------+--------------+---------------|
+| Owned round trip, 8192 bytes | 12.76 us | 6.123 us |
+| Reused-output round trip, 8192 bytes | 7.543 us | 10.19 us |
+| Owned round trip, 65536 bytes | 47.41 us | 46.76 us |
+| Reused-output round trip, 65536 bytes | 47.19 us | 81.63 us |
+
+These paired observations do not establish that host output allocation is the
+dominant cost or that buffer pooling would fix the latency tail. Do not subtract
+independent phase medians, treat fastest samples as admission, or widen the
+queue on this evidence. Actual CPU/GC attribution remains a separate gate.
+
+Optimization policy must be scenario-specific, not a universal hard-coded
+copy strategy. Fixed small payloads, variable large payloads, caller-owned
+reusable output and independently retained results require separate matched
+controls. Ownership semantics belong in the API; implementation dispatch may
+choose among equivalent copy strategies only after crossover measurements.
+No measured size threshold, alignment fast path or scenario dispatcher is
+claimed by this audit. Non-aligned and zero-length paths remain mandatory.
+
+The existing owner lifecycle test now covers binary input and output at a
+one-byte offset, with guard bytes before and after the output. Patterned lengths
+0, 1, 7, 15, 16, 17, 31, 32, 33, 8191, 8192, 8193 and 65537 exercise alignment
+and tail boundaries. Input mutation/drop, independent owned results, repeated
+copies and wrong-length rejection remain checked. ~just bridge-root-contracts~
+passed all three active tests; one pre-existing timing test remains ignored.
+
+* Admission pipeline audit: retain the negative result
+
+The candidate uses official Tokio reserve_many and bounded reusable result
+storage. Window=queue_capacity/active_callers (minimum one), so this machine
+uses 12 workers, capacity 24, and window 2 for 12 callers. The baseline uses
+the same result-storage machinery but one request at a time. Payload, number
+of requests, Scheme allocations, copies, root release, notifications and owned
+result disposal remain identical. Divan has one driver, not one Tokio worker.
+No public runtime scheduler or default policy changed.
+
+Two sequential Release runs, 20 samples/case, one iteration/sample:
+
+| Path | Requests | First median | Repeat median |
+|------+----------+--------------+---------------|
+| Scheme, window 1, 12 callers | 1000 | 8.528 ms | 8.317 ms |
+| Scheme, window 1, 12 callers | 10000 | 80.28 ms | 86.09 ms |
+| Scheme, window 1, 24 callers | 1000 | 8.469 ms | 13.57 ms |
+| Scheme, window 1, 24 callers | 10000 | 101.4 ms | 127.1 ms |
+| Scheme, window 2, 12 callers | 1000 | 8.294 ms | 10.92 ms |
+| Scheme, window 2, 12 callers | 10000 | 125.0 ms | 113.3 ms |
+| Rust-only, window 1, 12 callers | 1000 | 1.506 ms | 1.537 ms |
+| Rust-only, window 1, 12 callers | 10000 | 14.67 ms | 18.05 ms |
+| Rust-only, window 2, 12 callers | 1000 | 0.9332 ms | 1.153 ms |
+| Rust-only, window 2, 12 callers | 10000 | 8.050 ms | 12.73 ms |
+
+Each run drained 1,100,010 requests including preflights, with maximum receive
+batch 24 and cleanup OK. Receive-batch counts were 82,715 and 81,210. Baseline
+10,000-request medians are under 100ms, but slowest batches were 852.4 and 456.2
+ms. Pipeline slowest batches were 393.6 and 326.8 ms. Host work is uncontrolled;
+no stable threshold admission or Orgize document performance is established.
+The pipeline is rejected as a default based on these observations. Its
+Rust-only queue improvement is not a full-bridge throughput improvement.
+
+Direct binary phases, 40 samples and 25 iterations/sample, observed:
+
+| Phase | 8192 bytes median | 65536 bytes median |
+|-------+-------------------+--------------------|
+| Create input root and release | 3.207 us | 24.89 us |
+| Copy into reusable host buffer | 2.763 us | 21.47 us |
+| Complete owned round trip | 6.082 us | 47.18 us |
+
+The 8192-byte round-trip slowest sample was 711.2 us. Multiplying its median
+by 10,000 gives 60.82ms as a diagnostic scale estimate only, not a measured
+concurrent batch or an additive decomposition of unrelated samples. Input
+allocation/fill and output copying remain material costs. Further optimization
+must preserve independent input/output ownership and retained-result lifetime;
+removing one of the copies from a control would change its contract.
+
+The live gate additionally checks uneven final windows, dropped unused
+reservations and an already-abandoned committed receiver. All 44,025 admitted
+requests were released; four intentional abandonments settled, maximum receive
+batch 24, and the owner joined cleanup. This qualifies the candidate boundary,
+not Scheme SMP or all formal model transitions.
+
+The audit also repaired the raw hex-input span guard: lengths at or above
+isize::MAX are rejected before slice construction/CString termination, leaving
+the output root unchanged. The negative sys test requires no runtime and no
+raw foreign call. Binary transport remains the production transfer route;
+the legacy hex converter stays a separately measured representation control.
+
+* Historical hex-conversion host transport
+
+Each iteration completes 1000 bridge requests, not documents. Tokio uses 12
+worker threads; caller counts are 1, CPU count (12), and twice CPU count (24).
+Queue capacity is 24, Scheme foreign-entry owners=1. Divan has one driver only.
+Initialization and full-payload preflight are excluded. Task creation, admission,
+Scheme hex decoding/allocation/rooting/copy/release, host notification, result
+disposal and caller joins are included. These are batch medians, not request p95.
+
+| Callers | Result bytes | Batch median | Requests/s from median | Slowest sampled batch |
+|---------+--------------+--------------+------------------------+-----------------------|
+| 1 | 0 | 72.69 ms | 13757 | 223.6 ms |
+| 12 | 0 | 3.173 ms | 315159 | 102.1 ms |
+| 24 | 0 | 4.260 ms | 234742 | 10.71 ms |
+| 1 | 8192 | 512.3 ms | 1952 | 1.448 s |
+| 12 | 8192 | 308.5 ms | 3241 | 1.305 s |
+| 24 | 8192 | 246.8 ms | 4052 | 1.120 s |
+
+20 samples per case. Throughput is 1000 divided by the rounded median duration,
+not independently measured sustained throughput. All 120006 requests (including
+six preflights) completed, admission closed, and owner cleanup joined.
+Full-payload parity is checked before each measured case; timing validates
+result length and consumes/disposes results. Cancellation and released-token
+rejection remain separate correctness tests.
+
+Actual parallel Scheme actor/SMP FFI execution, matched quiet repeated runs and
+consumer Orgize performance remain unqualified. This table must not be relabeled
+as multiple Scheme-owner throughput or a parser/file benchmark.

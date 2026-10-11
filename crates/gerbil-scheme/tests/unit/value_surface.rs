@@ -1,5 +1,3 @@
-#![cfg(feature = "native")]
-
 use gerbil_scheme::{
     GerbilI64Callback, GerbilStatus, GerbilUtf8, GerbilValue, NativeError, NativeResult,
 };
@@ -131,7 +129,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         family: "rooted-bytes",
         scheme_selector: "gerbil_scheme_rust_rooted_bytes_shape",
         raw_abi: "GerbilRootId",
-        safe_surface: "RootedSchemeString + RootedSchemeBytevector",
+        safe_surface: "RootedSchemeString + RootedSchemeBytevector::{to_vec,copy_into} + GerbilRuntime::bytevector_from_bytes",
         ownership: "single-owner Scheme root released by Rust Drop",
         nullability: "positive root token; zero is conversion failure",
         failure_policy: "invalid input and stale roots fail closed",
@@ -154,7 +152,7 @@ const BACKED_TYPE_MATRIX: &[BackedTypeMatrixEntry] = &[
         safe_surface: "GerbilUtf8",
         ownership: "borrowed Rust UTF-8 bytes",
         nullability: "empty string may use null pointer with zero length",
-        failure_policy: "non-UTF-8 belongs to bytevector future surface",
+        failure_policy: "non-UTF-8 uses the binary bytevector input surface",
         scenario: "value-surface",
     },
     BackedTypeMatrixEntry {

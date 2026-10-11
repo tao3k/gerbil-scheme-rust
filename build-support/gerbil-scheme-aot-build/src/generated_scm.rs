@@ -8,6 +8,7 @@ const INPUT_PATHS: &[&str] = &[
     "build.ss",
     "gerbil.pkg",
     "scheme/runtime.ss",
+    "scheme/utf8.ss",
     "scheme/runtime.ssi",
 ];
 

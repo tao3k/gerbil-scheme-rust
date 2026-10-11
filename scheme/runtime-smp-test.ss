@@ -9,13 +9,17 @@
         (loop (- remaining 1) (+ total remaining)))))
 
 (def (main)
-  (let (original (##get-parallelism-level))
+  (let ((original (##current-vm-processor-count))
+        (requested (##cpu-count)))
+    (unless (> requested 1)
+      (error "SMP qualification requires a multi-processor host" requested))
     (dynamic-wind
-      (lambda () (##set-parallelism-level! 2))
+      (lambda () (##cvmr requested))
       (lambda ()
-        (unless (= (##get-parallelism-level) 2)
-          (error "SDK did not admit two native processors"))
-        (displayln "SMP processors=2")
+        (let (active (##current-vm-processor-count))
+          (displayln "SMP requested=" requested " active=" active)
+          (unless (= active requested)
+            (error "SDK did not activate the requested VM processors" requested active)))
         (let (workers (map (lambda (name) (spawn/name name checksum))
                           '(smp-left smp-right)))
           ;; Join every actor before restoring the standalone runtime setting.
@@ -23,4 +27,4 @@
             (unless (equal? results '(5000050000 5000050000))
               (error "native SMP actor checksum mismatch" results))))
         (displayln "SMP actor-checksums=OK"))
-      (lambda () (##set-parallelism-level! original)))))
+      (lambda () (##cvmr original)))))

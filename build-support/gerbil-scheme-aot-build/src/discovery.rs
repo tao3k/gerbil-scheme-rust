@@ -27,6 +27,30 @@ pub fn discover_gambit_link_search_dir_from_gsc(gsc: &Path) -> Option<GambitLink
         })
 }
 
+/// Inputs of the selected SDK, using the same library owner as link discovery.
+/// Keep the selected paths (not only canonical ones) visible to Cargo so SDK
+/// replacement at an unchanged environment path can invalidate consumers.
+pub(crate) fn gambit_sdk_inputs(gsc: &Path) -> Vec<PathBuf> {
+    let mut inputs = Vec::new();
+    if gsc.is_file() {
+        inputs.push(gsc.to_path_buf());
+    }
+    if let Some(discovery) = discover_gambit_link_search_dir_from_gsc(gsc) {
+        if let Some(prefix) = discovery.search_dir.parent() {
+            for path in [
+                prefix.join("include/gambit.h"),
+                prefix.join("bin/gambuild-C"),
+                discovery.library_path,
+            ] {
+                if path.is_file() {
+                    push_unique_candidate(&mut inputs, path);
+                }
+            }
+        }
+    }
+    inputs
+}
+
 fn gambit_link_search_dir_candidates(gsc: &Path) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     push_gsc_prefix_lib_candidate(&mut candidates, gsc);

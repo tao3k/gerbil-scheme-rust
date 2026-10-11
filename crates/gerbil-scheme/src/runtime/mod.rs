@@ -6,12 +6,16 @@
 //! values, `integer` implements exact-integer conversion, `lifecycle` owns
 //! Gerbil runtime entry points, and `value` owns safe value interpretation.
 
+mod capabilities;
 mod integer;
 mod lifecycle;
 mod program;
 mod rooted;
 mod types;
+mod utf8;
 mod value;
+mod value_buffers;
+pub use capabilities::VmCapabilities;
 pub use lifecycle::{GerbilI64Callback, GerbilI64CallbackAbi};
 pub use program::{LinkedBytesExport, LinkedGerbilProgram, LinkedStringExport};
 pub use types::{

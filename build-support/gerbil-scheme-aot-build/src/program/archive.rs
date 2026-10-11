@@ -131,7 +131,7 @@ pub trait ProgramArchiveObserver: Sync {
     /// Records one build transition.
     fn observe(&self, observation: ProgramArchiveObservation<'_>);
 
-    /// Records one compiler-owned Scheme input consumed by the AOT graph.
+    /// Records a Scheme, SDK or header input consumed by the AOT graph.
     fn observe_source_input(&self, _source: &Path) {}
 }
 
@@ -212,6 +212,9 @@ pub fn build_program_archive_with_contract(
     });
     for module in &plan.modules {
         observer.observe_source_input(&module.scm);
+    }
+    for input in crate::discovery::gambit_sdk_inputs(request.gsc) {
+        observer.observe_source_input(&input);
     }
     let cc_options = native_compile_options(contract.native_headers, observer)?;
     // Admit host libraries before any generated C or object compilation.
@@ -733,6 +736,17 @@ fn native_inputs_fingerprint(
         hasher.update(path);
         hasher.update((input_bytes.len() as u64).to_le_bytes());
         hasher.update(input_bytes);
+    }
+    // Compiler metadata alone cannot detect an in-place SDK header/driver
+    // change. Hash the ABI and configured compile policy, not the large runtime
+    // archive: Cargo tracks that archive for relinking above.
+    for input in crate::discovery::gambit_sdk_inputs(&compiler) {
+        if input.ends_with("gambit.h") || input.ends_with("gambuild-C") {
+            let bytes = fs::read(&input)
+                .map_err(|error| format!("read SDK input {}: {error}", input.display()))?;
+            hasher.update((bytes.len() as u64).to_le_bytes());
+            hasher.update(bytes);
+        }
     }
     Ok(Some(format!("{:x}", hasher.finalize())))
 }

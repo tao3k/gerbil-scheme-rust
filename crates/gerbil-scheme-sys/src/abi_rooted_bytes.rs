@@ -3,7 +3,9 @@
 use core::ffi::c_char;
 use std::ffi::CString;
 
-use super::abi::{GerbilBorrowedUtf8, GerbilChar, GerbilStatus, GerbilValueHandle};
+use super::abi::{
+    GerbilBorrowedBytevector, GerbilBorrowedUtf8, GerbilChar, GerbilStatus, GerbilValueHandle,
+};
 use super::abi_bytevector::gerbil_scheme_rust_scheme_object_is_bytevector_raw;
 
 /// Positive Scheme root token owned by the native bridge.
@@ -24,6 +26,9 @@ impl GerbilRootId {
 }
 
 unsafe extern "C" {
+    fn gerbil_scheme_rust_root_string_to_utf8_raw(root: i64) -> i64;
+    fn gerbil_scheme_rust_root_utf8_to_string_raw(root: i64) -> i64;
+    fn gerbil_scheme_rust_bytes_to_bytevector_root_raw(value: *const u8, len: u64) -> i64;
     fn gerbil_scheme_rust_bytevector_to_bytestring_root_raw(
         value: GerbilValueHandle,
         delimiter: i32,
@@ -38,6 +43,85 @@ unsafe extern "C" {
     fn gerbil_scheme_rust_root_bytevector_u8_ref_raw(root: i64, index: i64) -> i32;
     fn gerbil_scheme_rust_root_bytevector_copy_raw(root: i64, out: *mut u8, len: u64) -> i64;
     fn gerbil_scheme_rust_root_release_raw(root: i64) -> i32;
+}
+
+/// Encode a rooted Scheme string with the checked Scheme-owned UTF-8 encoder.
+/// The returned root owns independent bytes and must be released.
+///
+/// # Safety
+/// The runtime must be initialized on its owner thread. `root` must identify
+/// a live root; `out` must be null or writable for one token.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_root_string_to_utf8(
+    root: GerbilRootId,
+    out: *mut GerbilRootId,
+) -> GerbilStatus {
+    unsafe { checked_root_conversion(root, out, gerbil_scheme_rust_root_string_to_utf8_raw) }
+}
+
+/// Decode a rooted bytevector with the official UTF-8 converter.
+/// Invalid UTF-8 or a wrong root type leaves output untouched.
+///
+/// # Safety
+/// The runtime must be initialized on its owner thread. `root` must identify
+/// a live root; `out` must be null or writable for one token.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_root_utf8_to_string(
+    root: GerbilRootId,
+    out: *mut GerbilRootId,
+) -> GerbilStatus {
+    unsafe { checked_root_conversion(root, out, gerbil_scheme_rust_root_utf8_to_string_raw) }
+}
+
+unsafe fn checked_root_conversion(
+    root: GerbilRootId,
+    out: *mut GerbilRootId,
+    convert: unsafe extern "C" fn(i64) -> i64,
+) -> GerbilStatus {
+    if out.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    if !root.is_valid() {
+        return GerbilStatus::InvalidValue;
+    }
+    let converted = GerbilRootId(unsafe { convert(root.0) });
+    if !converted.is_valid() {
+        return GerbilStatus::InvalidValue;
+    }
+    unsafe { *out = converted };
+    GerbilStatus::Ok
+}
+
+/// Copy borrowed binary input into a new rooted Scheme bytevector.
+///
+/// No text decoding or NUL termination is involved. On error `out` is untouched.
+///
+/// # Safety
+///
+/// The runtime must be initialized on its owner thread. Input must remain
+/// readable and stable for the complete call; null is allowed only at length
+/// zero. `out` must be null or writable for one root and must not overlap input.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_bytes_to_bytevector_root(
+    value: GerbilBorrowedBytevector,
+    out: *mut GerbilRootId,
+) -> GerbilStatus {
+    if out.is_null() || (value.len > 0 && value.ptr.is_null()) {
+        return GerbilStatus::NullPointer;
+    }
+    let Ok(length) = u64::try_from(value.len) else {
+        return GerbilStatus::InvalidValue;
+    };
+    if value.len > isize::MAX as usize {
+        return GerbilStatus::InvalidValue;
+    }
+    let root =
+        GerbilRootId(unsafe { gerbil_scheme_rust_bytes_to_bytevector_root_raw(value.ptr, length) });
+    if !root.is_valid() {
+        return GerbilStatus::InvalidValue;
+    }
+    unsafe { *out = root };
+    GerbilStatus::Ok
 }
 
 /// Convert a runtime-backed Scheme bytevector to a rooted uppercase hex string.
@@ -99,6 +183,11 @@ pub unsafe extern "C" fn gerbil_scheme_rust_bytestring_to_bytevector_root(
         return GerbilStatus::NullPointer;
     }
     if !valid_delimiter(delimiter) {
+        return GerbilStatus::InvalidValue;
+    }
+    // Rust slices are bounded by isize::MAX, and CString additionally needs
+    // one terminator byte. Reject impossible lengths before pointer access.
+    if value.len >= isize::MAX as usize {
         return GerbilStatus::InvalidValue;
     }
 
@@ -224,6 +313,8 @@ pub unsafe extern "C" fn gerbil_scheme_rust_root_bytevector_u8_ref(
 ///
 /// Zero-length bytevectors accept a null output pointer. On an invalid root,
 /// wrong type, or length mismatch, the output remains untouched.
+/// Success initializes all `len` bytes, including caller-owned uninitialized
+/// storage. The output must not overlap Scheme-managed storage.
 ///
 /// # Safety
 ///

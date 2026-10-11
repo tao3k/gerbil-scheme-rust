@@ -25,11 +25,14 @@ module bridge_handoff {
 
   val queued = requests.filter(r => s.status.get(r) == "queued")
   val active = requests.filter(r => Set("running", "rooted").contains(s.status.get(r)))
+  val computing = requests.filter(r => s.status.get(r) == "running")
   val terminal = requests.filter(r => Set("done", "cancelled").contains(s.status.get(r)))
-  val idle = s.enabled.filter(w => not(active.exists(r => s.owner.get(r) == w)))
+  val idle = s.enabled.filter(w => not(computing.exists(r => s.owner.get(r) == w)))
   // Scheme CPU workers may overlap; this protocol's foreign copy/root handoff
   // stays with one control owner. It does not limit Scheme processor count.
-  val publishable = requests.filter(r => s.status.get(r) == "running" and s.foreignHandoff.size() == 0)
+  // Root retention is not the copy/release critical section: multiple results
+  // may remain rooted while their owner serializes foreign handoff.
+  val publishable = requests.filter(r => s.status.get(r) == "running")
 
   action init = s' = {
     phase: "running",
@@ -52,7 +55,14 @@ module bridge_handoff {
   }
   action publish(r: int): bool = all {
     publishable.contains(r),
-    s' = { ...s, status: s.status.set(r, "rooted"), roots: s.roots.union(Set(r)), foreignHandoff: Set(r) }
+    // A retained result does not reserve a compute worker. The control owner
+    // retains its root independently until foreign copy/release completes.
+    s' = { ...s, status: s.status.set(r, "rooted"), owner: s.owner.set(r, 0), roots: s.roots.union(Set(r)),
+      foreignHandoff: if (s.foreignHandoff.size() == 0) Set(r) else s.foreignHandoff }
+  }
+  action beginHandoff(r: int): bool = all {
+    s.status.get(r) == "rooted", s.roots.contains(r), s.foreignHandoff.size() == 0,
+    s' = { ...s, foreignHandoff: Set(r) }
   }
   // Owner-side root release precedes terminal host completion, even on cancel.
   action finish(r: int): bool = all {
@@ -98,17 +108,17 @@ module bridge_handoff {
     nondet r = requests.oneOf()
     nondet w = workers.oneOf()
     nondet n = 1.to(capacity).oneOf()
-    any { admit(r), dispatch(r, w), publish(r), finish(r), cancel(r), notify(r),
+    any { admit(r), dispatch(r, w), publish(r), beginHandoff(r), finish(r), cancel(r), notify(r),
       park(w), enable(w), rebudget(n), close, cleanup, stutter }
   }
 
   val safety = and {
     s.queueLimit >= 1, s.queueLimit <= capacity, queued.size() <= s.queueLimit,
     s.enabled.subseteq(workers), s.enabled.size() >= 1,
-    active.forall(r => s.enabled.contains(s.owner.get(r))),
-    workers.forall(w => active.filter(r => s.owner.get(r) == w).size() <= 1),
+    computing.forall(r => s.enabled.contains(s.owner.get(r))),
+    workers.forall(w => computing.filter(r => s.owner.get(r) == w).size() <= 1),
     requests.forall(r => s.roots.contains(r) == (s.status.get(r) == "rooted")),
-    s.roots == s.foreignHandoff, s.foreignHandoff.size() <= 1,
+    s.foreignHandoff.subseteq(s.roots), s.foreignHandoff.size() <= 1,
     terminal.forall(r => not(s.roots.contains(r))),
     s.settled.subseteq(terminal), s.delivered.subseteq(s.settled),
     s.delivered.intersect(s.cancelled).size() == 0,
@@ -128,10 +138,14 @@ module bridge_handoff {
     .then(dispatch(1, 1)).then(dispatch(2, 2))
     .then(all { assert(active.size() == 2), assert(safety), s' = s })
   run parallelWorkersSerializeForeignHandoffTest = init.then(admit(1)).then(admit(2))
-    .then(dispatch(1, 1)).then(dispatch(2, 2)).then(publish(1))
-    .then(all { assert(active.size() == 2), assert(not(publishable.contains(2))), assert(safety), s' = s })
-    .then(finish(1)).then(publish(2)).then(finish(2))
+    .then(dispatch(1, 1)).then(dispatch(2, 2)).then(publish(1)).then(publish(2))
+    .then(all { assert(s.roots.size() == 2), assert(s.foreignHandoff == Set(1)), assert(safety), s' = s })
+    .then(finish(1)).then(beginHandoff(2)).then(finish(2))
     .then(all { assert(s.foreignHandoff.size() == 0), assert(safety), s' = s })
+  run retainedResultDoesNotReserveComputeWorkerTest = init.then(admit(1))
+    .then(dispatch(1, 1)).then(publish(1)).then(admit(2)).then(dispatch(2, 1)).then(publish(2))
+    .then(all { assert(s.roots.size() == 2), assert(idle.contains(1)), assert(safety), s' = s })
+    .then(finish(1)).then(beginHandoff(2)).then(finish(2))
   run cancellationRetainsRootTest = init.then(admit(1)).then(dispatch(1, 1))
     .then(publish(1)).then(cancel(1))
     .then(all { assert(s.roots.contains(1)), assert(safety), s' = s })
@@ -166,7 +180,8 @@ module bridge_handoff {
     .then(all { assert(not(safety)), s' = s })
   action unsafeForeignPublish(r: int): bool = all {
     s.status.get(r) == "running",
-    s' = { ...s, status: s.status.set(r, "rooted"), roots: s.roots.union(Set(r)), foreignHandoff: Set(r) }
+    s' = { ...s, status: s.status.set(r, "rooted"), roots: s.roots.union(Set(r)),
+      foreignHandoff: s.foreignHandoff.union(Set(r)) }
   }
   run overlappingForeignHandoffMutationTest = init.then(admit(1)).then(admit(2))
     .then(dispatch(1, 1)).then(dispatch(2, 2)).then(publish(1)).then(unsafeForeignPublish(2))

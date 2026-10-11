@@ -83,4 +83,55 @@ fn rooted_scheme_value_preserves_typed_projections_and_single_owner_drop() {
         gerbil_scheme_sys::GerbilStatus::InvalidValue,
         "the native root table must reject a second release",
     );
+    population_survives_out_of_order_release();
+}
+
+// Run under the existing live owner: the process-global runtime cannot be
+// independently initialized by another parallel test.
+fn population_survives_out_of_order_release() {
+    use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
+    let mut roots = Vec::new();
+    for index in 0..10_000_i64 {
+        let mut root = GerbilRootId(0);
+        let value = i64::MIN + index;
+        // SAFETY: the enclosing test retains the live owner on this thread.
+        assert_eq!(
+            unsafe {
+                gerbil_scheme_sys::gerbil_scheme_rust_i64_to_exact_integer_root(
+                    value,
+                    &raw mut root,
+                )
+            },
+            GerbilStatus::Ok
+        );
+        roots.push((root, value));
+    }
+    for (index, &(root, _)) in roots.iter().enumerate() {
+        if index % 2 == 1 {
+            assert_eq!(
+                unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(root) },
+                GerbilStatus::Ok
+            );
+        }
+    }
+    for (index, &(root, expected)) in roots.iter().enumerate().rev() {
+        let mut value = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_exact_integer_to_i64(root, &raw mut value)
+        };
+        if index % 2 == 0 {
+            assert_eq!(status, GerbilStatus::Ok);
+            assert_eq!(value, expected);
+            assert_eq!(
+                unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(root) },
+                GerbilStatus::Ok
+            );
+        } else {
+            assert_eq!(status, GerbilStatus::InvalidValue);
+        }
+        assert_eq!(
+            unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(root) },
+            GerbilStatus::InvalidValue
+        );
+    }
 }

@@ -6,6 +6,8 @@
         gerbil-rs-is-even-i64
         gerbil-rs-compare-i64)
 
+(import (only-in "utf8" gerbil-rs-encode-utf8))
+
 (def (gerbil-rs-abi-version) 1)
 (def (gerbil-rs-add-i64 left right) (+ left right))
 (def (gerbil-rs-is-even-i64 value) (if (even? value) 1 0))
@@ -18,7 +20,11 @@
 ;; Rust owns the returned positive token and releases it through the matching
 ;; root-release export.  A token of zero is reserved for fail-closed errors.
 (def gerbil-rs-next-root-id 1)
-(def gerbil-rs-rooted-values [])
+;; Official Gambit tables keep keys and values strongly reachable. Tokens are
+;; exact integers; eqv? preserves numeric identity without list-order scans.
+;; The foreign-entry owner remains the only mutator of this registry.
+(def gerbil-rs-rooted-values
+  (make-table test: eqv? weak-keys: #f weak-values: #f))
 
 ;; Downstream AOT exports transfer this token, never a borrowed Scheme word.
 (def (gerbil-rs-root-string value)
@@ -30,35 +36,16 @@
 (def (gerbil-rs-rooted-value-store! value)
   (let (root-id gerbil-rs-next-root-id)
     (set! gerbil-rs-next-root-id (1+ root-id))
-    (set! gerbil-rs-rooted-values
-      (cons (cons root-id value) gerbil-rs-rooted-values))
+    (table-set! gerbil-rs-rooted-values root-id value)
     root-id))
 
 (def (gerbil-rs-rooted-value-ref root-id)
-  (let lp ((rest gerbil-rs-rooted-values))
-    (cond
-     ((null? rest) #f)
-     ((= (caar rest) root-id) (cdar rest))
-     (else (lp (cdr rest))))))
-
-(def (gerbil-rs-rooted-values-remove rest root-id)
-  (cond
-   ((null? rest) (values rest #f))
-   ((= (caar rest) root-id) (values (cdr rest) #t))
-   (else
-    (call-with-values
-     (lambda () (gerbil-rs-rooted-values-remove (cdr rest) root-id))
-     (lambda (tail found?)
-       (values (if found? (cons (car rest) tail) rest) found?))))))
+  (table-ref gerbil-rs-rooted-values root-id #f))
 
 (def (gerbil-rs-rooted-value-release! root-id)
-  (call-with-values
-   (lambda ()
-     (gerbil-rs-rooted-values-remove gerbil-rs-rooted-values root-id))
-   (lambda (rooted-values found?)
-     (when found?
-       (set! gerbil-rs-rooted-values rooted-values))
-     found?)))
+  (if (gerbil-rs-rooted-value-ref root-id)
+    (begin (table-set! gerbil-rs-rooted-values root-id) #t)
+    #f))
 
 (def (gerbil-rs-bytestring-delimiter code)
   (cond
@@ -310,14 +297,54 @@
    gerbil-rs-root-exact-integer-u64-value-raw
    gerbil-rs-root-string-length-raw
    gerbil-rs-root-string-char-ref-raw
+   gerbil-rs-root-string->utf8-raw
+   gerbil-rs-root-utf8->string-raw
    gerbil-rs-root-bytevector-length-raw
    gerbil-rs-root-bytevector-u8-ref-raw
    gerbil-rs-copy-u8vector-c
+   gerbil-rs-fill-u8vector-c
+   gerbil-rs-bytes->bytevector-root-raw
    gerbil-rs-root-bytevector-copy-raw
+   gerbil-rs-scheme-object-bytevector-copy-raw
    gerbil-rs-root-release-raw
    gerbil-rs-scheme-object-pair-car-raw
    gerbil-rs-scheme-object-pair-cdr-raw))
-  (c-declare "#ifndef ___HAVE_FFI_U8VECTOR\n#define ___HAVE_FFI_U8VECTOR\n#define U8_DATA(obj) ___CAST (___U8*, ___BODY_AS (obj, ___tSUBTYPED))\n#define U8_LEN(obj) ___HD_BYTES (___HEADER (obj))\n#endif")
+  ;; Match the installed Gerbil std/ffi accessors, using Gambit's subtype-aware
+  ;; size macro rather than duplicating object-header arithmetic here.
+  (c-declare "#ifndef ___HAVE_FFI_U8VECTOR\n#define ___HAVE_FFI_U8VECTOR\n#define U8_DATA(obj) ___CAST (___U8*, ___BODY_AS (obj, ___tSUBTYPED))\n#define U8_LEN(obj) ___U8VECTORSIZE(obj)\n#endif")
+  ;; Capability selection belongs to the compiler, not an OS/version probe.
+  ;; This helper is synchronous and allocation-free; disjoint byte buffers may
+  ;; be unaligned. Small inputs and block tails never read outside their span.
+  (c-declare #<<END-C
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_memcpy_inline)
+#define GERBIL_RS_COPY_BLOCK(d, s) __builtin_memcpy_inline(d, s, 64)
+#endif
+#endif
+#if !defined(GERBIL_RS_COPY_BLOCK) && defined(__GNUC__)
+/* GCC's constant-size builtin is qualified by the canonical module link,
+   unlike the guaranteed-inline Clang intrinsic. Do not change linker policy
+   if a target emits an unresolved memcpy call. */
+#define GERBIL_RS_COPY_BLOCK(d, s) __builtin_memcpy(d, s, 64)
+#endif
+static void gerbil_rs_copy_bytes(___U8 *destination, const ___U8 *source,
+                                 ___U64 length) {
+#if defined(GERBIL_RS_COPY_BLOCK)
+  /* Local bulk-copy qualification does not imply concurrent admission.
+     Clang guarantees inlining; GCC must pass actual module qualification. */
+  while (length >= 64) {
+    GERBIL_RS_COPY_BLOCK(destination, source);
+    destination += 64;
+    source += 64;
+    length -= 64;
+  }
+#endif
+  for (___U64 index = 0; index < length; ++index) {
+    destination[index] = source[index];
+  }
+}
+END-C
+    )
   (define gerbil-rs-copy-u8vector-c
     (c-lambda (scheme-object (pointer unsigned-int8) unsigned-int64) int64
       #<<END-C
@@ -325,12 +352,32 @@ if (___arg3 > U8_LEN(___arg1) || (___arg3 > 0 && ___arg2 == NULL)) {
   ___return(-1);
 }
 const ___U8 *source = U8_DATA(___arg1);
-for (___U64 index = 0; index < ___arg3; ++index) {
-  ___arg2[index] = source[index];
-}
+gerbil_rs_copy_bytes(___arg2, source, ___arg3);
 ___return((___S64)___arg3);
 END-C
       ))
+  ;; The Rust input remains stable for this call. Scheme body pointers never
+  ;; escape this allocation-free C section or survive a return to Scheme.
+  (define gerbil-rs-fill-u8vector-c
+    (c-lambda (scheme-object (pointer unsigned-int8) unsigned-int64) int64
+      #<<END-C
+if (___arg3 != U8_LEN(___arg1) || (___arg3 > 0 && ___arg2 == NULL)) {
+  ___return(-1);
+}
+___U8 *destination = U8_DATA(___arg1);
+gerbil_rs_copy_bytes(destination, ___arg2, ___arg3);
+___return((___S64)___arg3);
+END-C
+      ))
+  (c-define (gerbil-rs-bytes->bytevector-root-raw source length)
+    ((pointer unsigned-int8) unsigned-int64) int64
+    "gerbil_scheme_rust_bytes_to_bytevector_root_raw"
+    "extern"
+    (let ((value (make-u8vector length)))
+      (if (= length (gerbil-scheme-rust/scheme/runtime#gerbil-rs-fill-u8vector-c
+                     value source length))
+        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector value)
+        0)))
   (c-define (gerbil-rs-abi-version-native)
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
@@ -765,6 +812,27 @@ END-C
     "extern"
   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id))
 
+(c-define (gerbil-rs-root-string->utf8-raw root-id)
+    (int64) int64
+    "gerbil_scheme_rust_root_string_to_utf8_raw" "extern"
+  (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
+    (if (string? value)
+      (with-exception-catcher (lambda (_) 0)
+        (lambda ()
+          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+           (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8 value))))
+      0)))
+
+(c-define (gerbil-rs-root-utf8->string-raw root-id)
+    (int64) int64
+    "gerbil_scheme_rust_root_utf8_to_string_raw" "extern"
+  (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
+    (if (u8vector? value)
+      (with-exception-catcher (lambda (_) 0)
+        (lambda ()
+          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! (utf8->string value))))
+      0)))
+
 (c-define (gerbil-rs-root-string-length-raw root-id)
     (int64)
     int64
@@ -821,6 +889,16 @@ END-C
       (gerbil-scheme-rust/scheme/runtime#gerbil-rs-copy-u8vector-c
        value destination length)
       -1)))
+
+(c-define (gerbil-rs-scheme-object-bytevector-copy-raw value destination length)
+    (scheme-object (pointer unsigned-int8) unsigned-int64)
+    int64
+    "gerbil_scheme_rust_scheme_object_bytevector_copy_raw"
+    "extern"
+  (if (and (u8vector? value) (= length (u8vector-length value)))
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-copy-u8vector-c
+     value destination length)
+    -1))
 
 (c-define (gerbil-rs-root-release-raw root-id)
     (int64)

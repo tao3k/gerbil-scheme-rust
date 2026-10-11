@@ -6,6 +6,48 @@ use std::sync::Mutex;
 
 const INPUT: &str = include_str!("scenarios/program-content-cache/inputs/module.scm");
 
+#[test]
+fn unchanged_compiler_path_does_not_cache_changed_sdk_abi_or_driver() {
+    let root = std::env::temp_dir().join(format!(
+        "gerbil-sdk-input-cache-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    for directory in ["bin", "include", "lib"] {
+        fs::create_dir_all(root.join(directory)).unwrap();
+    }
+    let compiler = root.join("bin/gsc");
+    let header = root.join("include/gambit.h");
+    let driver = root.join("bin/gambuild-C");
+    let library = root.join("lib/libgambit.a");
+    let source = root.join("module.c");
+    fs::write(&compiler, "unchanged compiler").unwrap();
+    fs::write(&header, "#define ___MAX_PROCESSORS 1").unwrap();
+    fs::write(&driver, "configured compiler policy").unwrap();
+    fs::write(&library, "runtime archive").unwrap();
+    fs::write(&source, "unchanged module").unwrap();
+    let fingerprint = || {
+        super::native_input_fingerprint(&compiler, "sdk-regression", "-O2", &source)
+            .unwrap()
+            .unwrap()
+    };
+    let original = fingerprint();
+    assert_eq!(original, fingerprint());
+    fs::write(&header, "#define ___MAX_PROCESSORS 64").unwrap();
+    let changed_abi = fingerprint();
+    assert_ne!(original, changed_abi);
+    fs::write(&driver, "different configured compiler policy").unwrap();
+    assert_ne!(changed_abi, fingerprint());
+    assert_eq!(
+        crate::discovery::gambit_sdk_inputs(&compiler),
+        vec![compiler, header, driver, library]
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
 struct Observations(Mutex<Vec<String>>);
 
 impl ProgramArchiveObserver for Observations {

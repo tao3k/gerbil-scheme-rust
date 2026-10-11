@@ -60,8 +60,18 @@ jobs:
       - name: Cargo gates
         run: |
           cargo check --workspace --locked
-          cargo test --workspace --locked
+          cargo test --workspace --locked -- --nocapture
+          cargo bench -p gerbil-scheme --bench ffi --profile dev --locked -- --test
+          cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
           cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Scheme actor capability
+        run: gxi scheme/runtime-smp-test.ss
+
+      - name: Full-program actor AOT qualification
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test
+          cargo clippy -p gerbil-scheme-qualification --features actor-aot --all-targets --locked -- -D warnings
 
       - name: Bazel gates
         run: |

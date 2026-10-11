@@ -66,6 +66,11 @@ union ___mod_or_lnk_union;
 typedef union ___mod_or_lnk_union *(*GerbilProgramLinker)(struct ___global_state_struct *);
 int32_t gerbil_scheme_rust_runtime_init_program(GerbilProgramLinker linker);
 int32_t gerbil_scheme_rust_runtime_cleanup(void);
+/* Linked ABI capabilities; these do not certify worker or scheduler safety. */
+#define GERBIL_VM_CAP_MULTIPLE_VMS 1u
+#define GERBIL_VM_CAP_THREAD_LOCAL_ENTRY 2u
+uint32_t gerbil_scheme_rust_vm_capability_flags(void);
+uint32_t gerbil_scheme_rust_vm_max_processors(void);
 int64_t gerbil_scheme_rust_identity_i64(int64_t value);
 int64_t gerbil_scheme_rust_add_i64(int64_t left, int64_t right);
 int32_t gerbil_scheme_rust_is_even_i64(int64_t value);
@@ -134,10 +139,16 @@ GerbilStatus gerbil_scheme_rust_scheme_object_bytevector_length(
     GerbilValueHandle value, size_t *out);
 GerbilStatus gerbil_scheme_rust_scheme_object_bytevector_u8_ref(
     GerbilValueHandle value, size_t index, uint8_t *out);
+GerbilStatus gerbil_scheme_rust_scheme_object_bytevector_copy(
+    GerbilValueHandle value, uint8_t *out, size_t len);
 GerbilStatus gerbil_scheme_rust_bytevector_to_bytestring_root(
     GerbilValueHandle value, int32_t delimiter, GerbilRootId *out);
 GerbilStatus gerbil_scheme_rust_bytestring_to_bytevector_root(
     GerbilBorrowedUtf8 value, int32_t delimiter, GerbilRootId *out);
+/* Input is borrowed only for the call; the returned root owns a Scheme copy.
+ * Null input is valid only at zero length. On error out remains untouched. */
+GerbilStatus gerbil_scheme_rust_bytes_to_bytevector_root(
+    GerbilBorrowedBytevector value, GerbilRootId *out);
 GerbilStatus gerbil_scheme_rust_bytevector_to_uint(
     GerbilValueHandle value, int32_t byte_order, size_t size, uint64_t *out);
 GerbilStatus gerbil_scheme_rust_bytevector_to_sint(
@@ -158,6 +169,8 @@ GerbilStatus gerbil_scheme_rust_root_exact_integer_to_i64(
     GerbilRootId root, int64_t *out);
 GerbilStatus gerbil_scheme_rust_root_exact_integer_to_u64(
     GerbilRootId root, uint64_t *out);
+GerbilStatus gerbil_scheme_rust_root_string_to_utf8(GerbilRootId root, GerbilRootId *out);
+GerbilStatus gerbil_scheme_rust_root_utf8_to_string(GerbilRootId root, GerbilRootId *out);
 GerbilStatus gerbil_scheme_rust_root_string_length(GerbilRootId root,
                                                    size_t *out);
 GerbilStatus gerbil_scheme_rust_root_string_char_ref(GerbilRootId root,

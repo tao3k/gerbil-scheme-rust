@@ -8,6 +8,9 @@
 
 * 20--29 Roadmaps and delivery evidence
 
+- [[file:bridge-qualification.md][Producer-first FFI/AOT qualification and remaining performance gates]]
+- [[file:bridge-value-conversions.md][Scheme/Rust conversion support and gap audit]]
+
 - [[file:20-29-roadmap/20.01-bindings-bootstrap-plan.org][20.01 Bindings Bootstrap And Delivery Plan]]
 - [[file:20-29-roadmap/20.02-marlin-consumer-migration-plan.org][20.02 Marlin Consumer Migration Plan]]
 

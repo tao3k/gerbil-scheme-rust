@@ -7,6 +7,7 @@ mod abi_program;
 mod abi_rooted_bytes;
 mod abi_sentinel;
 mod abi_status;
+mod abi_vm;
 mod scheme_char;
 mod scheme_exact_integer;
 mod scheme_fixnum;
@@ -14,6 +15,10 @@ mod scheme_flonum;
 
 pub use abi::{GerbilGlobalState, GerbilModuleOrLink};
 pub use abi_program::{GerbilProgramLinker, gerbil_scheme_rust_runtime_init_program};
+pub use abi_vm::{
+    GERBIL_VM_CAP_MULTIPLE_VMS, GERBIL_VM_CAP_THREAD_LOCAL_ENTRY,
+    gerbil_scheme_rust_vm_capability_flags, gerbil_scheme_rust_vm_max_processors,
+};
 
 pub use abi::{
     GerbilBoolean, GerbilBorrowedBytevector, GerbilBorrowedVector, GerbilChar, GerbilFixnum,
@@ -32,6 +37,7 @@ pub use abi::{
     gerbil_scheme_rust_scheme_object_pair_parts, gerbil_scheme_rust_value_is_list,
     gerbil_scheme_rust_value_is_null, gerbil_scheme_rust_value_is_pair,
 };
+pub use abi_bytevector::gerbil_scheme_rust_scheme_object_bytevector_copy;
 pub use abi_bytevector::{
     gerbil_scheme_rust_fixture_bytevector, gerbil_scheme_rust_scheme_object_bytevector_length,
     gerbil_scheme_rust_scheme_object_bytevector_u8_ref,
@@ -44,11 +50,13 @@ pub use abi_integer_bytes::{
     gerbil_scheme_rust_uint_to_bytevector_root,
 };
 pub use abi_rooted_bytes::{
-    GerbilRootId, gerbil_scheme_rust_bytestring_to_bytevector_root,
+    GerbilRootId, gerbil_scheme_rust_bytes_to_bytevector_root,
+    gerbil_scheme_rust_bytestring_to_bytevector_root,
     gerbil_scheme_rust_bytevector_to_bytestring_root, gerbil_scheme_rust_root_bytevector_copy,
     gerbil_scheme_rust_root_bytevector_length, gerbil_scheme_rust_root_bytevector_u8_ref,
     gerbil_scheme_rust_root_release, gerbil_scheme_rust_root_string_char_ref,
-    gerbil_scheme_rust_root_string_length,
+    gerbil_scheme_rust_root_string_length, gerbil_scheme_rust_root_string_to_utf8,
+    gerbil_scheme_rust_root_utf8_to_string,
 };
 pub use abi_sentinel::{gerbil_scheme_rust_fixture_void, gerbil_scheme_rust_scheme_object_is_void};
 

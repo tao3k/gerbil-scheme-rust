@@ -1,0 +1,38 @@
+[package]
+name = "gerbil-scheme-qualification"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tokio", "dep:simdutf8"]
+instance-probe = ["dep:divan", "dep:tokio"]
+
+[dependencies]
+gerbil-scheme = { workspace = true, optional = true, features = ["external-program"] }
+gerbil-scheme-sys = { workspace = true, optional = true, features = ["external-program"] }
+divan = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["time"] }
+simdutf8 = { workspace = true, optional = true }
+
+[build-dependencies]
+gerbil-scheme-aot-build.workspace = true
+
+[[bench]]
+name = "actors"
+harness = false
+required-features = ["actor-aot"]
+
+[[bench]]
+name = "utf8"
+harness = false
+required-features = ["actor-aot"]
+
+[[bench]]
+name = "instances"
+harness = false
+required-features = ["instance-probe"]
+
+[lints]
+workspace = true

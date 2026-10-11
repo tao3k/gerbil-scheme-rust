@@ -40,7 +40,10 @@ package: gerbil-scheme-rust/qualification
            (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-into
             "abcd" (gerbil-scheme-rust/qualification/utf8-controls#wrong-tag-pointer) 16)
            #f))))
-   (if (and rejected (gerbil-scheme-rust/qualification/utf8-controls#tag-sentinel-intact)) 1 0)))
+   (if (and rejected
+            (= (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk
+                "" #f 0 0 0 0) 0)
+            (gerbil-scheme-rust/qualification/utf8-controls#tag-sentinel-intact)) 1 0)))
  (c-define (dispatch root pointer capacity) (int64 (pointer void) unsigned-int64) int64
   "gerbil_utf8_leaf_dispatch" "extern"
   (let ((text (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
@@ -96,6 +99,7 @@ package: gerbil-scheme-rust/qualification
 (def (encode mode text)
  (case mode ((0) (historical text)) ((1) (inline-control-encode text))
        ((2) (sized text)) ((3) (baseline-encode text))
+       ((4) (gerbil-rs-encode-utf8 text))
        (else (error "unknown encoding control" mode))))
 
 (def (utf8-conformance)
@@ -108,7 +112,7 @@ package: gerbil-scheme-rust/qualification
                          (else (collect (+ c 1) (cons (integer->char c) out))))))
           (text (list->string chars)) (expected (string->utf8 text)))
     (for-each (lambda (mode) (unless (equal? (encode mode text) expected)
-                              (error "comparison Unicode mismatch" mode start))) '(0 1 2))
+                              (error "comparison Unicode mismatch" mode start))) '(0 1 2 4))
     (loop end))))
  (for-each
   (lambda (mode)
@@ -126,8 +130,12 @@ package: gerbil-scheme-rust/qualification
      (unless (with-exception-catcher (lambda (_) #t)
                (lambda () (encode mode (string (##integer->char c))) #f))
        (error "comparison accepted surrogate" mode c))
-     (reject (+ c 1))))) '(0 1 2))
- (displayln "UTF8-MATCHED-CONFORMANCE modes=3 Unicode=1112064 surrogates=2048 mutation=OK"))
+     (reject (+ c 1))))) '(0 1 2 4))
+ (displayln "UTF8-MATCHED-CONFORMANCE modes=4 Unicode=1112064 surrogates=2048 mutation=OK")
+ (case (os-counter-probe)
+   ((1) (displayln "UTF8-OS-COUNTERS dynamic-resolution=OK"))
+   ((0) (displayln "UTF8-OS-COUNTERS SKIPPED unsupported-platform"))
+   (else (error "OS counter resolution or sampling failed"))))
 
 (def snapshots (make-vector 2 #f))
 (begin-foreign
@@ -183,6 +191,23 @@ double gerbil_utf8_os_stat(int field) {
 #else
 void gerbil_utf8_os_snapshot(int slot) { (void)slot; }
 double gerbil_utf8_os_stat(int field) { (void)field; return -1; }
+#endif
+C-END
+ ))
+
+(def (os-counter-probe)
+ (##c-code #<<C-END
+#if defined(__unix__) || defined(__APPLE__)
+gerbil_utf8_os_snapshot(0);
+gerbil_utf8_os_snapshot(1);
+int valid = 1;
+for (int field = 0; field < 4; ++field) valid &= gerbil_utf8_os_stat(field) >= 0;
+#if defined(CLOCK_THREAD_CPUTIME_ID)
+valid &= gerbil_utf8_os_stat(4) >= 0;
+#endif
+___RESULT = ___FIX(valid ? 1 : -1);
+#else
+___RESULT = ___FIX(0);
 #endif
 C-END
  ))

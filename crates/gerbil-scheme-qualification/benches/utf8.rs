@@ -165,9 +165,10 @@ fn main() {
     let compact = argument.as_deref() == Some("--compact");
     let costs = argument.as_deref() == Some("--costs");
     let codec = argument.as_deref() == Some("--codec");
+    let owned = argument.as_deref() == Some("--owned");
     let contracts_only = argument.as_deref() == Some("--contracts");
     let requested = argument
-        .filter(|_| !direct && !compact && !costs && !codec && !contracts_only)
+        .filter(|_| !direct && !compact && !costs && !codec && !owned && !contracts_only)
         .map(|value| {
             let jobs: usize = value.parse().expect("load must be a number");
             assert!([1_000, 10_000, 100_000].contains(&jobs), "unsupported load");
@@ -175,7 +176,7 @@ fn main() {
         });
     let program = gerbil_scheme_qualification::linked_program();
     let runtime = GerbilRuntime::initialize_program(program).expect("one owner-local AOT runtime");
-    if direct || compact || costs || codec || contracts_only {
+    if direct || compact || costs || codec || owned || contracts_only {
         buffer::contracts(&runtime);
         if contracts_only {
             return;
@@ -206,6 +207,10 @@ fn main() {
         }
         if codec {
             admitted &= compare(&values, &texts, jobs, 4, 7) <= 1.0;
+        } else if owned {
+            // Current frozen caller-buffer control versus the checked public
+            // ABI, with the same allocation policy and complete validation.
+            admitted &= compare(&values, &texts, jobs, 4, 5) <= 1.0;
         } else if compact {
             admitted &= compare(&values, &texts, jobs, 5, 6) <= 1.0;
         } else if direct {

@@ -26,6 +26,11 @@ impl GerbilRootId {
 }
 
 unsafe extern "C" {
+    fn gerbil_scheme_rust_root_string_encode_into_raw(
+        root: i64,
+        out: *mut u8,
+        capacity: u64,
+    ) -> i64;
     fn gerbil_scheme_rust_root_string_to_utf8_raw(root: i64) -> i64;
     fn gerbil_scheme_rust_root_utf8_to_string_raw(root: i64) -> i64;
     fn gerbil_scheme_rust_bytes_to_bytevector_root_raw(value: *const u8, len: u64) -> i64;
@@ -57,6 +62,44 @@ pub unsafe extern "C" fn gerbil_scheme_rust_root_string_to_utf8(
     out: *mut GerbilRootId,
 ) -> GerbilStatus {
     unsafe { checked_root_conversion(root, out, gerbil_scheme_rust_root_string_to_utf8_raw) }
+}
+
+/// Encode into exclusively caller-owned storage without a temporary Scheme bytevector.
+/// On failure the prefix may be partially written, but `written` is untouched.
+///
+/// # Safety
+/// Call only on the initialized runtime owner. `out` must admit `capacity`
+/// writable bytes (null is allowed only for capacity zero), and `written`
+/// must be writable and non-overlapping. Keep the allocation stable throughout
+/// the synchronous call; no Scheme heap pointer is returned.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_root_string_encode_into(
+    root: GerbilRootId,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> GerbilStatus {
+    if written.is_null() || (capacity != 0 && out.is_null()) {
+        return GerbilStatus::NullPointer;
+    }
+    if !root.is_valid() || capacity > isize::MAX as usize {
+        return GerbilStatus::InvalidValue;
+    }
+    let Ok(span) = u64::try_from(capacity) else {
+        return GerbilStatus::InvalidValue;
+    };
+    // SAFETY: the caller owns a stable writable span; Scheme checks root type,
+    // fixnum capacity and all bounded leaves before publishing a result length.
+    let result = unsafe { gerbil_scheme_rust_root_string_encode_into_raw(root.0, out, span) };
+    let Ok(size) = usize::try_from(result) else {
+        return GerbilStatus::InvalidValue;
+    };
+    if size > capacity {
+        return GerbilStatus::InvalidValue;
+    }
+    // SAFETY: checked caller-owned output; only full success admits its length.
+    unsafe { written.write(size) };
+    GerbilStatus::Ok
 }
 
 /// Decode a rooted bytevector with the official UTF-8 converter.

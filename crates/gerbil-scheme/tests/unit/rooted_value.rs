@@ -84,6 +84,119 @@ fn rooted_scheme_value_preserves_typed_projections_and_single_owner_drop() {
         "the native root table must reject a second release",
     );
     population_survives_out_of_order_release();
+    caller_owned_utf8_span_contracts(&runtime);
+}
+
+fn caller_owned_utf8_span_contracts(runtime: &GerbilRuntime) {
+    use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
+    let text = runtime.string_from_utf8("a\0汉字😀").unwrap();
+    let string_root = acquire_string_root(runtime, "a\0汉字😀");
+    let wrong = runtime.bytevector_from_bytes(b"wrong").unwrap();
+    let mut output = [0xa5; 20];
+    let mut written = usize::MAX;
+    for (root, capacity, expected) in [
+        (string_root, 19, GerbilStatus::InvalidValue),
+        (string_root, usize::MAX, GerbilStatus::InvalidValue),
+        (wrong.root_id(), 20, GerbilStatus::InvalidValue),
+        (GerbilRootId(0), 20, GerbilStatus::InvalidValue),
+    ] {
+        // SAFETY: negative capacity/type controls must reject before writes.
+        assert_eq!(
+            unsafe {
+                gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                    root,
+                    output.as_mut_ptr(),
+                    capacity,
+                    &raw mut written,
+                )
+            },
+            expected
+        );
+        assert_eq!(written, usize::MAX);
+        assert_eq!(output, [0xa5; 20]);
+    }
+    // SAFETY: null control is rejected before any output access.
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                string_root,
+                std::ptr::null_mut(),
+                20,
+                &raw mut written,
+            )
+        },
+        GerbilStatus::NullPointer
+    );
+    // SAFETY: valid exclusive span and separate output count on the live owner.
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                string_root,
+                output.as_mut_ptr(),
+                output.len(),
+                &raw mut written,
+            )
+        },
+        GerbilStatus::Ok
+    );
+    assert_eq!(&output[..written], "a\0汉字😀".as_bytes());
+    assert!(output[written..].iter().all(|byte| *byte == 0xa5));
+    let owned = text.to_string().into_result().unwrap();
+    assert_eq!(owned, "a\0汉字😀");
+    assert!(owned.capacity() >= 20);
+    let empty_root = acquire_string_root(runtime, "");
+    // SAFETY: zero-length null span admits no write.
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                empty_root,
+                std::ptr::null_mut(),
+                0,
+                &raw mut written,
+            )
+        },
+        GerbilStatus::Ok
+    );
+    assert_eq!(written, 0);
+    for root in [string_root, empty_root] {
+        // SAFETY: release exactly these test-owned independent roots once.
+        assert_eq!(
+            unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(root) },
+            GerbilStatus::Ok
+        );
+        written = usize::MAX;
+        let before = output;
+        // SAFETY: released token is rejected without output access/publication.
+        assert_eq!(
+            unsafe {
+                gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                    root,
+                    output.as_mut_ptr(),
+                    output.len(),
+                    &raw mut written,
+                )
+            },
+            GerbilStatus::InvalidValue
+        );
+        assert_eq!(written, usize::MAX);
+        assert_eq!(output, before);
+    }
+}
+
+fn acquire_string_root(runtime: &GerbilRuntime, text: &str) -> gerbil_scheme_sys::GerbilRootId {
+    let input = runtime.bytevector_from_bytes(text.as_bytes()).unwrap();
+    let mut root = gerbil_scheme_sys::GerbilRootId(0);
+    // SAFETY: live owner/input and writable independent root; caller releases it.
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_utf8_to_string(
+                input.root_id(),
+                &raw mut root,
+            )
+        },
+        gerbil_scheme_sys::GerbilStatus::Ok
+    );
+    root
 }
 
 // Run under the existing live owner: the process-global runtime cannot be

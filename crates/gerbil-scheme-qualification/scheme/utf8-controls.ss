@@ -1,7 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Test-only historical control and allocation candidate, not runtime choices.
 package: gerbil-scheme-rust/qualification
-(import :gerbil-scheme-rust/scheme/runtime "utf8-inline-control")
+(import :gerbil-scheme-rust/scheme/runtime :gerbil-scheme-rust/scheme/utf8 "utf8-inline-control" "utf8-buffer-control" "utf8-baseline-control")
 (export utf8-conformance)
 (extern namespace: #f
  gerbil-scheme-rust/qualification/utf8-inline-control#inline-control-encode-chunk-c
@@ -54,7 +54,8 @@ package: gerbil-scheme-rust/qualification
 
 (def (encode mode text)
  (case mode ((0) (historical text)) ((1) (inline-control-encode text))
-       ((2) (sized text)) (else (error "unknown encoding control" mode))))
+       ((2) (sized text)) ((3) (baseline-encode text))
+       (else (error "unknown encoding control" mode))))
 
 (def (utf8-conformance)
  (let loop ((start 0))

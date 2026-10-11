@@ -37,6 +37,8 @@ fn main() {
     println!("cargo:rerun-if-changed=scheme/actors.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-controls.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-inline-control.ss");
+    println!("cargo:rerun-if-changed=scheme/utf8-buffer-control.ss");
+    println!("cargo:rerun-if-changed=scheme/utf8-baseline-control.ss");
     let actor_aot = env::var_os("CARGO_FEATURE_ACTOR_AOT").is_some();
     let instance_probe = env::var_os("CARGO_FEATURE_INSTANCE_PROBE").is_some();
     if !actor_aot && !instance_probe {
@@ -66,25 +68,23 @@ fn main() {
     let source = package.join("scheme/actors.ss");
     let controls = package.join("scheme/utf8-controls.ss");
     let inline_control = package.join("scheme/utf8-inline-control.ss");
+    let buffer_control = package.join("scheme/utf8-buffer-control.ss");
+    let baseline_control = package.join("scheme/utf8-baseline-control.ss");
     // Debug formatting admits ordinary Cargo paths as quoted Scheme strings.
     // The package compiler adapter, not Rust, discovers the complete module graph.
     let expression = format!(
-        "(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (compile-module {:?} [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t]) (compile-module {:?} [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t]) (compile-module {:?} [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t]) (gerbil-rs-stage-program {:?} {:?})",
+        "(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (for-each (lambda (module) (compile-module module [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t])) [{:?} {:?} {:?} {:?} {:?}]) (gerbil-rs-stage-program {:?} {:?})",
+        gerbil_path
+            .join("lib")
+            .to_str()
+            .expect("UTF-8 library path"),
         inline_control.to_str().expect("UTF-8 inline control path"),
-        gerbil_path
-            .join("lib")
+        buffer_control.to_str().expect("UTF-8 buffer control path"),
+        baseline_control
             .to_str()
-            .expect("UTF-8 library path"),
+            .expect("UTF-8 baseline control path"),
         controls.to_str().expect("UTF-8 controls path"),
-        gerbil_path
-            .join("lib")
-            .to_str()
-            .expect("UTF-8 library path"),
         source.to_str().expect("UTF-8 source path"),
-        gerbil_path
-            .join("lib")
-            .to_str()
-            .expect("UTF-8 library path"),
         source.to_str().expect("UTF-8 source path"),
         stage.to_str().expect("UTF-8 stage path")
     );

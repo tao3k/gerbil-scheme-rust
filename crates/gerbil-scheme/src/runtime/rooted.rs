@@ -375,11 +375,48 @@ impl<'runtime> RootedSchemeString<'runtime> {
             .into()
     }
 
-    /// Copy this rooted Scheme string into owned Rust UTF-8 storage.
+    /// Encode this rooted Scheme string directly into owned Rust UTF-8 storage.
+    ///
+    /// Capacity reserves at most four bytes per current Scheme character.
+    /// This avoids temporary Scheme bytes and a second copy; capacity is not
+    /// shrunk by a second allocation. No cached snapshot or heap view escapes.
     #[must_use]
     pub fn to_string(&self) -> NativeResult<String> {
         let result = (|| {
-            let bytes = self.to_utf8_bytes().into_result()?.to_vec().into_result()?;
+            let operation = "gerbil_scheme_rust_root_string_encode_into";
+            let failure = || NativeError::Status {
+                operation,
+                code: gerbil_scheme_sys::GerbilStatus::InvalidValue as i32,
+            };
+            let capacity = self
+                .len()
+                .into_result()?
+                .checked_mul(4)
+                .ok_or_else(failure)?;
+            let mut bytes = Vec::<u8>::new();
+            bytes.try_reserve_exact(capacity).map_err(|_| failure())?;
+            let mut written = 0;
+            // SAFETY: this string root stays owner-local and live. Exclusive
+            // Rust capacity remains stable across Scheme polls during the call.
+            let status = unsafe {
+                gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                    self.owner.root_id(),
+                    bytes.as_mut_ptr(),
+                    capacity,
+                    &raw mut written,
+                )
+            };
+            if status != gerbil_scheme_sys::GerbilStatus::Ok {
+                return Err(NativeError::Status {
+                    operation,
+                    code: status as i32,
+                });
+            }
+            if written > capacity {
+                return Err(failure());
+            }
+            // SAFETY: only complete success initializes and admits this prefix.
+            unsafe { bytes.set_len(written) };
             super::utf8::validated_string(bytes)
         })();
         result.into()

@@ -24,6 +24,16 @@ fn fresh_utf8_entry_reencodes_in_scheme_without_snapshot_shortcuts() {
     assert!(entry.contains("(string? value)"));
     assert!(entry.contains("gerbil-rs-encode-utf8 value"));
     assert!(entry.contains("gerbil-rs-rooted-value-store!"));
+    let direct = NATIVE_SOURCE
+        .split("(c-define (gerbil-rs-root-string-encode-into-raw")
+        .nth(1)
+        .unwrap()
+        .split("(c-define (gerbil-rs-root-utf8->string-raw")
+        .next()
+        .unwrap();
+    assert!(direct.contains("(string? value)"));
+    assert!(direct.contains("gerbil-rs-encode-utf8-into value pointer capacity"));
+    assert!(!direct.contains("gerbil-rs-rooted-value-store!"));
     assert!(!entry.contains("string->utf8 value"));
     let encoder = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../scheme/utf8.ss"));
     assert!(encoder.contains("(##u8vector-shrink! bytes j)"));

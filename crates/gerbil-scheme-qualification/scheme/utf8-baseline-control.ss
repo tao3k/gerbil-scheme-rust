@@ -1,6 +1,8 @@
+;;; Frozen baseline 6ad680c: test-only filled Scheme bytevector destination.
+package: gerbil-scheme-rust/qualification
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(export gerbil-rs-encode-utf8 gerbil-rs-encode-utf8-into)
+(export baseline-encode)
 
 ;; Bridge-local encoder: Gambit's gambit/string/string.scm codepoint rules,
 ;; with Gerbil std/encoding/utf16.ss's bounded allocation / single-pass shrink
@@ -8,7 +10,7 @@
 ;; Scheme owns capacity, chunk bounds, polling, shrink and errors. The private
 ;; no-allocation C leaf uses Gambit's official typed-body access and UTF-8
 ;; shifts (gambit.h and lib/c_intf.c), restricted to Unicode scalar values.
-(def (gerbil-rs-encode-utf8 str)
+(def (baseline-encode str)
   (let* ((length (string-length str))
          (capacity (* 4 length)))
     (unless (fixnum? capacity)
@@ -20,63 +22,44 @@
         (if (##fx< start length)
           (let* ((end (if (##fx< (##fx- length start) 256)
                         length (##fx+ start 256)))
-                 (next (gerbil-rs-encode-utf8-chunk str bytes start end j)))
+                 (next (baseline-encode-chunk str bytes start end j)))
             (loop end next))
           (begin
             (when (##fx< j capacity) (##u8vector-shrink! bytes j))
             bytes))))))
 
-;; Caller-owned storage follows c_intf.c's bounded buffer convention. Rust's
-;; allocation is stable across Scheme polls; no Scheme body pointer is retained.
-(def (gerbil-rs-encode-utf8-into str pointer capacity)
-  (let* ((length (string-length str)) (maximum (* 4 length)))
-    (unless (and (fixnum? maximum) (fixnum? capacity) (>= capacity maximum))
-      (error "UTF-8 caller capacity cannot admit encoding"))
-    (let loop ((start 0) (written 0))
-      (if (##fx< start length)
-        (let* ((end (if (##fx< (##fx- length start) 256)
-                       length (##fx+ start 256)))
-               (next (gerbil-rs-encode-utf8-buffer-chunk str pointer capacity start end written)))
-          (loop end next))
-        written))))
-
-(def (gerbil-rs-encode-utf8-buffer-chunk str pointer capacity start end written)
-  (declare (not interrupts-enabled))
-  (let (next (gerbil-rs-encode-utf8-buffer-chunk-c str pointer capacity start end written))
-    (if (##fx< next 0) (error "Illegal Unicode scalar or caller bounds") next)))
-
 ;; One bulk call per bounded chunk, never one foreign call per character.
 ;; Body pointers exist only inside this synchronous, allocation-free leaf;
 ;; no pointer survives a return to Scheme or a possible GC/poll boundary.
-(def (gerbil-rs-encode-utf8-chunk str bytes start end output-start)
+(def (baseline-encode-chunk str bytes start end output-start)
   (declare (not interrupts-enabled))
-  (let (next (gerbil-rs-encode-utf8-chunk-c str bytes start end output-start))
+  (let (next (baseline-encode-chunk-c str bytes start end output-start))
     (if (##fx< next 0)
       (error "Illegal Unicode scalar or UTF-8 chunk bounds" start end)
       next)))
 
-(extern gerbil-rs-encode-utf8-chunk-c gerbil-rs-encode-utf8-buffer-chunk-c)
+(extern baseline-encode-chunk-c)
 
 (begin-foreign
- (namespace ("gerbil-scheme-rust/scheme/utf8#" gerbil-rs-encode-utf8-chunk-c gerbil-rs-encode-utf8-buffer-chunk-c))
+ (namespace ("gerbil-scheme-rust/qualification/utf8-baseline-control#" baseline-encode-chunk-c))
  (c-declare #<<END-C
-static ___SCMOBJ gerbil_utf8_encode_into(___SCMOBJ str, ___U8 *output,
-                                       ___SCMOBJ size, ___SCMOBJ first,
-                                       ___SCMOBJ last, ___SCMOBJ position) {
+static ___SCMOBJ gerbil_utf8_encode_chunk(___SCMOBJ str, ___SCMOBJ bytes,
+                                        ___SCMOBJ first, ___SCMOBJ last,
+                                        ___SCMOBJ position) {
 /* Checked private leaf: source and destination are distinct typed objects. */
 ___SCMOBJ ___temp; /* Gambit's subtype predicates use this scratch word. */
-if (!___STRINGP(str) || !___FIXNUMP(size) || ___INT(size) < 0 ||
+if (!___STRINGP(str) || !___U8VECTORP(bytes) ||
     !___FIXNUMP(first) || !___FIXNUMP(last) || !___FIXNUMP(position) ||
     ___INT(first) < 0 || ___INT(last) < 0 || ___INT(position) < 0)
   return ___FIX(-2);
 const ___U64 length = ___STRINGSIZE(str);
-const ___U64 capacity = ___INT(size);
+const ___U64 capacity = ___U8VECTORSIZE(bytes);
 const ___U64 start = ___INT(first), end = ___INT(last), output_start = ___INT(position);
 if (start > end || end > length || end - start > 256 ||
-    output_start > capacity || 4 * (end - start) > capacity - output_start ||
-    (end > start && !output))
+    output_start > capacity || 4 * (end - start) > capacity - output_start)
   return ___FIX(-2);
 const ___C *source = ___CAST(const ___C*, ___BODY_AS(str, ___tSTRING));
+___U8 *output = ___CAST(___U8*, ___BODY_AS(bytes, ___tU8VECTOR));
 ___U64 j = output_start;
 for (___U64 i = start; i < end; ++i) {
   const ___U32 c = source[i];
@@ -98,20 +81,8 @@ for (___U64 i = start; i < end; ++i) {
 }
 return ___FIX((___S64)j);
 }
-static ___SCMOBJ gerbil_utf8_encode_chunk(___SCMOBJ str, ___SCMOBJ bytes,
-                                        ___SCMOBJ first, ___SCMOBJ last,
-                                        ___SCMOBJ position) {
-  ___SCMOBJ ___temp;
-  if (!___U8VECTORP(bytes)) return ___FIX(-2);
-  return gerbil_utf8_encode_into(str,
-    ___CAST(___U8*, ___BODY_AS(bytes, ___tU8VECTOR)),
-    ___FIX(___U8VECTORSIZE(bytes)), first, last, position);
-}
 END-C
  )
- (define gerbil-rs-encode-utf8-chunk-c
+ (define baseline-encode-chunk-c
   (c-lambda (scheme-object scheme-object scheme-object scheme-object scheme-object) scheme-object
-   "___return(gerbil_utf8_encode_chunk(___arg1, ___arg2, ___arg3, ___arg4, ___arg5));"))
- (define gerbil-rs-encode-utf8-buffer-chunk-c
-  (c-lambda (scheme-object (pointer void) scheme-object scheme-object scheme-object scheme-object) scheme-object
-   "___return(gerbil_utf8_encode_into(___arg1, ___CAST(___U8*, ___arg2), ___arg3, ___arg4, ___arg5, ___arg6));")))
+   "___return(gerbil_utf8_encode_chunk(___arg1, ___arg2, ___arg3, ___arg4, ___arg5));")))

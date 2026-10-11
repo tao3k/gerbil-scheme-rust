@@ -170,6 +170,8 @@ GerbilStatus gerbil_scheme_rust_root_exact_integer_to_i64(
 GerbilStatus gerbil_scheme_rust_root_exact_integer_to_u64(
     GerbilRootId root, uint64_t *out);
 GerbilStatus gerbil_scheme_rust_root_string_to_utf8(GerbilRootId root, GerbilRootId *out);
+/* Caller-owned writable span; failure may write a prefix but leaves written untouched. */
+GerbilStatus gerbil_scheme_rust_root_string_encode_into(GerbilRootId root, uint8_t *out, size_t capacity, size_t *written);
 GerbilStatus gerbil_scheme_rust_root_utf8_to_string(GerbilRootId root, GerbilRootId *out);
 GerbilStatus gerbil_scheme_rust_root_string_length(GerbilRootId root,
                                                    size_t *out);

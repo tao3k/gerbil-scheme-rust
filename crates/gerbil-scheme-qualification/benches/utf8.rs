@@ -4,6 +4,9 @@ use std::time::Instant;
 use gerbil_scheme::GerbilRuntime;
 use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
 
+#[path = "utf8/buffer.rs"]
+mod buffer;
+
 unsafe extern "C" {
     fn gerbil_utf8_comparison_encode(root: i64, mode: i32) -> i64;
     fn gerbil_utf8_comparison_snapshot(slot: i32);
@@ -22,6 +25,12 @@ impl Drop for Root {
 }
 
 fn convert(value: &Root, mode: i32) -> String {
+    if mode == 4 {
+        return buffer::convert(value);
+    }
+    if mode == 5 {
+        return buffer::production(value);
+    }
     // SAFETY: the preflighted mode and live string root belong to this owner.
     let raw = unsafe { gerbil_utf8_comparison_encode(value.0.0, mode) };
     assert!(
@@ -68,7 +77,7 @@ fn median(values: &[f64]) -> f64 {
     sorted[9].midpoint(sorted[10])
 }
 
-fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32) {
+fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32) -> f64 {
     let mut wall = [Vec::new(), Vec::new()];
     let mut cpu = [Vec::new(), Vec::new()];
     let mut gc_cpu = [Vec::new(), Vec::new()];
@@ -137,50 +146,57 @@ fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32
         median(&paired),
         median(&paired) > 1.0
     );
+    median(&paired)
 }
 
 fn main() {
-    let requested = std::env::args().nth(1).map(|value| {
-        let jobs: usize = value.parse().expect("load must be a number");
-        assert!([1_000, 10_000, 100_000].contains(&jobs), "unsupported load");
-        jobs
-    });
+    let argument = std::env::args().nth(1);
+    let direct = argument.as_deref() == Some("--buffer");
+    let contracts_only = argument.as_deref() == Some("--contracts");
+    let requested = argument
+        .filter(|_| !direct && !contracts_only)
+        .map(|value| {
+            let jobs: usize = value.parse().expect("load must be a number");
+            assert!([1_000, 10_000, 100_000].contains(&jobs), "unsupported load");
+            jobs
+        });
     let program = gerbil_scheme_qualification::linked_program();
     let runtime = GerbilRuntime::initialize_program(program).expect("one owner-local AOT runtime");
+    if direct || contracts_only {
+        buffer::contracts(&runtime);
+        if contracts_only {
+            return;
+        }
+    }
     let texts: Vec<_> = ["a\0汉字😀", "b\0漢語🚀", "c\0中文🌍", "d\0文字🎉"]
         .into_iter()
         .map(|text| text.repeat(683))
         .collect();
     let values: Vec<_> = texts
         .iter()
-        .map(|text| {
-            let bytes = runtime.bytevector_from_bytes(text.as_bytes()).unwrap();
-            let mut root = GerbilRootId(0);
-            // SAFETY: live owner-local input and writable output token; the
-            // independent string root survives release of the input bytes.
-            assert_eq!(
-                unsafe {
-                    gerbil_scheme_sys::gerbil_scheme_rust_root_utf8_to_string(
-                        bytes.root_id(),
-                        &raw mut root,
-                    )
-                },
-                GerbilStatus::Ok
-            );
-            Root(root)
-        })
+        .map(|text| buffer::root_text(&runtime, text))
         .collect();
     for mode in 0..3 {
         for (value, text) in values.iter().zip(&texts) {
             assert_eq!(convert(value, mode), *text);
         }
     }
+    let mut admitted = true;
     for jobs in [1_000, 10_000, 100_000] {
         if requested.is_some_and(|load| load != jobs) {
             continue;
         }
-        compare(&values, &texts, jobs, 0, 1);
-        compare(&values, &texts, jobs, 1, 2);
+        if direct {
+            admitted &= compare(&values, &texts, jobs, 3, 5) <= 1.0;
+        } else {
+            compare(&values, &texts, jobs, 0, 1);
+            compare(&values, &texts, jobs, 1, 2);
+        }
     }
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
+    // Collect every load before rejecting; never hide a slower negative sample.
+    assert!(
+        admitted,
+        "caller-buffer candidate is slower; retain the baseline"
+    );
 }

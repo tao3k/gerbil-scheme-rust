@@ -6,7 +6,7 @@
         gerbil-rs-is-even-i64
         gerbil-rs-compare-i64)
 
-(import (only-in "utf8" gerbil-rs-encode-utf8))
+(import (only-in "utf8" gerbil-rs-encode-utf8 gerbil-rs-encode-utf8-into))
 
 (def (gerbil-rs-abi-version) 1)
 (def (gerbil-rs-add-i64 left right) (+ left right))
@@ -822,6 +822,16 @@ END-C
           (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
            (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8 value))))
       0)))
+
+(c-define (gerbil-rs-root-string-encode-into-raw root-id pointer capacity)
+    (int64 (pointer void) unsigned-int64) int64
+    "gerbil_scheme_rust_root_string_encode_into_raw" "extern"
+  (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id)))
+    (if (string? value)
+      (with-exception-catcher (lambda (_) -1)
+        (lambda ()
+          (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-into value pointer capacity)))
+      -1)))
 
 (c-define (gerbil-rs-root-utf8->string-raw root-id)
     (int64) int64

@@ -164,7 +164,9 @@ impl<'ast> Visit<'ast> for CopyShape {
         if let syn::Expr::Path(path) = &*expression.func {
             let name = path.path.segments.last().unwrap().ident.to_string();
             self.bulk_calls += usize::from(
-                name.ends_with("bytevector_copy") || name.ends_with("root_string_to_utf8"),
+                name.ends_with("bytevector_copy")
+                    || name.ends_with("root_string_to_utf8")
+                    || name.ends_with("root_string_encode_into"),
             );
             self.scalar_calls += usize::from(
                 name.ends_with("bytevector_u8_ref") || name.ends_with("string_char_ref"),

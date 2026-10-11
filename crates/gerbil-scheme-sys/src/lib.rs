@@ -55,8 +55,8 @@ pub use abi_rooted_bytes::{
     gerbil_scheme_rust_bytevector_to_bytestring_root, gerbil_scheme_rust_root_bytevector_copy,
     gerbil_scheme_rust_root_bytevector_length, gerbil_scheme_rust_root_bytevector_u8_ref,
     gerbil_scheme_rust_root_release, gerbil_scheme_rust_root_string_char_ref,
-    gerbil_scheme_rust_root_string_length, gerbil_scheme_rust_root_string_to_utf8,
-    gerbil_scheme_rust_root_utf8_to_string,
+    gerbil_scheme_rust_root_string_encode_into, gerbil_scheme_rust_root_string_length,
+    gerbil_scheme_rust_root_string_to_utf8, gerbil_scheme_rust_root_utf8_to_string,
 };
 pub use abi_sentinel::{gerbil_scheme_rust_fixture_void, gerbil_scheme_rust_scheme_object_is_void};
 

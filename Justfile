@@ -81,7 +81,7 @@ bridge-utf8-matched *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features actor-aot --bench utf8 --locked -- {{ args }}
 
 scheme-utf8-matched-contracts:
-    GERBIL_PATH="{{ justfile_directory() }}/target/scheme-contracts" gxi -e '(import :gerbil/compiler) (for-each (lambda (source) (compile-module source [output-dir: "target/scheme-contracts/lib" optimize: #t invoke-gsc: #t])) ["crates/gerbil-scheme-qualification/scheme/utf8-inline-control.ss" "crates/gerbil-scheme-qualification/scheme/utf8-controls.ss"])'
+    GERBIL_PATH="{{ justfile_directory() }}/target/scheme-contracts" gxi -e '(import :gerbil/compiler) (for-each (lambda (source) (compile-module source [output-dir: "target/scheme-contracts/lib" optimize: #t invoke-gsc: #t])) ["crates/gerbil-scheme-qualification/scheme/utf8-inline-control.ss" "crates/gerbil-scheme-qualification/scheme/utf8-buffer-control.ss" "crates/gerbil-scheme-qualification/scheme/utf8-baseline-control.ss" "crates/gerbil-scheme-qualification/scheme/utf8-controls.ss"])'
     GERBIL_PATH="{{ justfile_directory() }}/target/scheme-contracts" gxi -e '(import :gerbil-scheme-rust/qualification/utf8-controls) (utf8-conformance)'
 
 bridge-actor-lint:

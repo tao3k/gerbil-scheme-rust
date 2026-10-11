@@ -1,0 +1,136 @@
+Command: just bridge-utf8-matched --buffer
+Baseline: 6ad680c6311957eadf2529765ab1efd751132554 (frozen mode 3)
+Candidate: actual production ABI, mode 5, caller-owned Rust storage
+Scope: bridge conversion, not Org parsing; 20 samples per variant per load
+   Compiling gerbil-scheme v0.1.0 (/private/tmp/orgize-native-recovery-20261009-f7ey6w/bridge/crates/gerbil-scheme)
+   Compiling gerbil-scheme-qualification v0.1.0 (/private/tmp/orgize-native-recovery-20261009-f7ey6w/bridge/crates/gerbil-scheme-qualification)
+   Compiling gerbil-scheme-sys v0.1.0 (/private/tmp/orgize-native-recovery-20261009-f7ey6w/bridge/crates/gerbil-scheme-sys)
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=0 mode=3 completed=1 elapsed_ms=13.213
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=1 mode=5 completed=1 elapsed_ms=7.401
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=2 mode=5 completed=2 elapsed_ms=24.239
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=3 mode=3 completed=2 elapsed_ms=20.489
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=0 mode=3 completed=3 elapsed_ms=14.772
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=1 mode=5 completed=3 elapsed_ms=12.122
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=2 mode=5 completed=4 elapsed_ms=41.331
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=3 mode=3 completed=4 elapsed_ms=15.760
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=0 mode=3 completed=5 elapsed_ms=26.949
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=1 mode=5 completed=5 elapsed_ms=7.643
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=2 mode=5 completed=6 elapsed_ms=22.663
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=3 mode=3 completed=6 elapsed_ms=70.944
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=0 mode=3 completed=7 elapsed_ms=32.279
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=1 mode=5 completed=7 elapsed_ms=12.397
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=2 mode=5 completed=8 elapsed_ms=12.324
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=3 mode=3 completed=8 elapsed_ms=20.765
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=0 mode=3 completed=9 elapsed_ms=66.885
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=1 mode=5 completed=9 elapsed_ms=17.578
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=2 mode=5 completed=10 elapsed_ms=68.989
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=3 mode=3 completed=10 elapsed_ms=69.173
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=0 mode=3 completed=11 elapsed_ms=18.044
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=1 mode=5 completed=11 elapsed_ms=9.651
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=2 mode=5 completed=12 elapsed_ms=13.908
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=3 mode=3 completed=12 elapsed_ms=18.774
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=0 mode=3 completed=13 elapsed_ms=91.756
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=1 mode=5 completed=13 elapsed_ms=14.241
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=2 mode=5 completed=14 elapsed_ms=52.559
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=3 mode=3 completed=14 elapsed_ms=22.368
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=0 mode=3 completed=15 elapsed_ms=26.837
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=1 mode=5 completed=15 elapsed_ms=8.659
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=2 mode=5 completed=16 elapsed_ms=74.831
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=3 mode=3 completed=16 elapsed_ms=14.297
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=0 mode=3 completed=17 elapsed_ms=7.288
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=1 mode=5 completed=17 elapsed_ms=5.928
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=2 mode=5 completed=18 elapsed_ms=6.945
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=3 mode=3 completed=18 elapsed_ms=8.141
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=0 mode=3 completed=19 elapsed_ms=23.431
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=1 mode=5 completed=19 elapsed_ms=27.277
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=2 mode=5 completed=20 elapsed_ms=24.596
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=3 mode=3 completed=20 elapsed_ms=34.252
+UTF8-MATCHED-SUMMARY jobs=1000 mode=3 samples=20 wall_median_ms=21.567 cpu_median_ms=9.666 gc_cpu_median_ms=1.480 gc_count_total=181
+UTF8-MATCHED-SUMMARY jobs=1000 mode=5 samples=20 wall_median_ms=14.074 cpu_median_ms=6.617 gc_cpu_median_ms=0.078 gc_count_total=10
+UTF8-MATCHED-DECISION jobs=1000 left=3 right=5 paired_ratio_median=0.729444 slower=false
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=0 mode=3 completed=1 elapsed_ms=791.863
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=1 mode=5 completed=1 elapsed_ms=646.297
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=2 mode=5 completed=2 elapsed_ms=574.139
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=3 mode=3 completed=2 elapsed_ms=251.119
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=0 mode=3 completed=3 elapsed_ms=689.427
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=1 mode=5 completed=3 elapsed_ms=319.648
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=2 mode=5 completed=4 elapsed_ms=386.170
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=3 mode=3 completed=4 elapsed_ms=123.238
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=0 mode=3 completed=5 elapsed_ms=155.574
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=1 mode=5 completed=5 elapsed_ms=228.971
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=2 mode=5 completed=6 elapsed_ms=125.777
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=3 mode=3 completed=6 elapsed_ms=483.884
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=0 mode=3 completed=7 elapsed_ms=1035.763
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=1 mode=5 completed=7 elapsed_ms=821.364
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=2 mode=5 completed=8 elapsed_ms=949.934
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=3 mode=3 completed=8 elapsed_ms=812.959
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=0 mode=3 completed=9 elapsed_ms=1108.044
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=1 mode=5 completed=9 elapsed_ms=1031.187
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=2 mode=5 completed=10 elapsed_ms=470.274
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=3 mode=3 completed=10 elapsed_ms=490.385
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=0 mode=3 completed=11 elapsed_ms=159.453
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=1 mode=5 completed=11 elapsed_ms=481.997
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=2 mode=5 completed=12 elapsed_ms=627.716
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=3 mode=3 completed=12 elapsed_ms=672.796
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=0 mode=3 completed=13 elapsed_ms=159.476
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=1 mode=5 completed=13 elapsed_ms=201.759
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=2 mode=5 completed=14 elapsed_ms=291.429
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=3 mode=3 completed=14 elapsed_ms=125.111
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=0 mode=3 completed=15 elapsed_ms=863.692
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=1 mode=5 completed=15 elapsed_ms=415.157
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=2 mode=5 completed=16 elapsed_ms=162.205
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=3 mode=3 completed=16 elapsed_ms=277.683
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=0 mode=3 completed=17 elapsed_ms=990.177
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=1 mode=5 completed=17 elapsed_ms=564.229
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=2 mode=5 completed=18 elapsed_ms=120.718
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=3 mode=3 completed=18 elapsed_ms=115.001
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=0 mode=3 completed=19 elapsed_ms=169.646
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=1 mode=5 completed=19 elapsed_ms=189.439
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=2 mode=5 completed=20 elapsed_ms=218.601
+UTF8-MATCHED-SUMMARY jobs=10000 mode=3 samples=20 wall_median_ms=407.671 cpu_median_ms=92.972 gc_cpu_median_ms=13.962 gc_count_total=1849
+UTF8-MATCHED-SUMMARY jobs=10000 mode=5 samples=20 wall_median_ms=400.664 cpu_median_ms=72.632 gc_cpu_median_ms=1.631 gc_count_total=121
+UTF8-MATCHED-DECISION jobs=10000 left=3 right=5 paired_ratio_median=0.945993 slower=false
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=3 mode=3 completed=20 elapsed_ms=331.459
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=0 mode=3 completed=1 elapsed_ms=5349.131
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=1 mode=5 completed=1 elapsed_ms=4061.015
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=2 mode=5 completed=2 elapsed_ms=2399.399
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=3 mode=3 completed=2 elapsed_ms=2507.192
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=0 mode=3 completed=3 elapsed_ms=3003.171
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=1 mode=5 completed=3 elapsed_ms=1742.613
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=2 mode=5 completed=4 elapsed_ms=2911.293
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=3 mode=3 completed=4 elapsed_ms=3281.858
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=0 mode=3 completed=5 elapsed_ms=3066.109
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=1 mode=5 completed=5 elapsed_ms=1414.946
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=2 mode=5 completed=6 elapsed_ms=1886.953
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=3 mode=3 completed=6 elapsed_ms=2673.822
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=0 mode=3 completed=7 elapsed_ms=2902.293
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=1 mode=5 completed=7 elapsed_ms=1674.383
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=2 mode=5 completed=8 elapsed_ms=1359.047
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=3 mode=3 completed=8 elapsed_ms=3846.339
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=0 mode=3 completed=9 elapsed_ms=2773.007
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=1 mode=5 completed=9 elapsed_ms=2020.730
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=2 mode=5 completed=10 elapsed_ms=1633.307
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=3 mode=3 completed=10 elapsed_ms=2464.913
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=0 mode=3 completed=11 elapsed_ms=3189.092
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=1 mode=5 completed=11 elapsed_ms=2890.255
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=2 mode=5 completed=12 elapsed_ms=1524.103
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=3 mode=3 completed=12 elapsed_ms=2505.272
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=0 mode=3 completed=13 elapsed_ms=1873.303
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=1 mode=5 completed=13 elapsed_ms=1948.312
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=2 mode=5 completed=14 elapsed_ms=2600.029
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=3 mode=3 completed=14 elapsed_ms=6063.959
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=0 mode=3 completed=15 elapsed_ms=6249.681
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=1 mode=5 completed=15 elapsed_ms=7785.982
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=2 mode=5 completed=16 elapsed_ms=3278.803
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=3 mode=3 completed=16 elapsed_ms=5409.446
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=0 mode=3 completed=17 elapsed_ms=4452.106
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=1 mode=5 completed=17 elapsed_ms=3297.846
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=2 mode=5 completed=18 elapsed_ms=2734.710
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=3 mode=3 completed=18 elapsed_ms=2851.601
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=0 mode=3 completed=19 elapsed_ms=2681.423
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=1 mode=5 completed=19 elapsed_ms=2630.112
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=2 mode=5 completed=20 elapsed_ms=3239.368
+UTF8-MATCHED-SUMMARY jobs=100000 mode=3 samples=20 wall_median_ms=3034.640 cpu_median_ms=936.606 gc_cpu_median_ms=135.531 gc_count_total=18518
+UTF8-MATCHED-SUMMARY jobs=100000 mode=5 samples=20 wall_median_ms=2499.714 cpu_median_ms=727.141 gc_cpu_median_ms=16.209 gc_count_total=1232
+UTF8-MATCHED-DECISION jobs=100000 left=3 right=5 paired_ratio_median=0.721383 slower=false
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=3 mode=3 completed=20 elapsed_ms=4536.602

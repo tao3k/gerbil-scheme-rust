@@ -2,6 +2,24 @@
 use crate::GerbilRootId;
 unsafe extern "C" {
     /// # Safety
+    /// Owner-local call; kind 0..4 names u16/u32/u64/f32/f64. Readable native
+    /// element bytes, disjoint from Scheme storage. Positive root transfers ownership.
+    pub fn gerbil_scheme_rust_numeric_create(kind: i32, bytes: *const u8, len: u64) -> i64;
+    /// # Safety
+    /// Live owner/root; index -1 selects root, otherwise its snapshot slot.
+    pub fn gerbil_scheme_rust_numeric_size(root: i64, index: i64, kind: i32) -> i64;
+    /// # Safety
+    /// Live owner/root; writable disjoint native element span. Range/type errors
+    /// publish nothing. Body pointers never escape the nonallocating leaf.
+    pub fn gerbil_scheme_rust_numeric_copy(
+        root: i64,
+        index: i64,
+        kind: i32,
+        bytes: *mut u8,
+        offset: u64,
+        len: u64,
+    ) -> i64;
+    /// # Safety
     /// Live owner and root; index -1 projects the root, otherwise a vector slot.
     /// Output must be valid and disjoint. Invalid indices publish nothing.
     pub fn gerbil_scheme_rust_object_scalar_indexed(

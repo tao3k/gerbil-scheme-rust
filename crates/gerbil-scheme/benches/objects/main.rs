@@ -3,6 +3,7 @@ use gerbil_scheme::{CollectionKind, GerbilRuntime, RootedObjectBatch};
 use std::{hint::black_box, time::Instant};
 #[path = "integer.rs"]
 mod integer;
+mod numeric;
 unsafe extern "C" {
     fn gerbil_scheme_rust_objects_usage(gc: *mut f64, os: *mut u64) -> i32;
 }
@@ -146,7 +147,11 @@ fn main() {
         "OBJECTS-METHOD owners=1 samples_per_variant=20 order=ABBA request_unit=ns wall_unit=ms memory_unit=bytes percentile=nearest_rank parser_parallelism=false workload=projection_roundtrip"
     );
     let before = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_count_raw() };
-    let admitted = collections(&runtime) & integer::run();
+    let admitted = if std::env::args().any(|arg| arg == "--numeric") {
+        numeric::run(&runtime)
+    } else {
+        collections(&runtime) & integer::run()
+    };
     assert_eq!(
         unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_count_raw() },
         before

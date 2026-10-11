@@ -1,7 +1,7 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=9621eaedb7c665c050ba7adc98cf040ca4c3179b77c858c14135380fd231f583 body-sha256=eedd4f8528914fb3494d56d27adbbf960f947a422ccd3c84e89b4fd143324dfd
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=c2be824130cae43e5f5f96044e7361d830f187691b113b0df9c00a9b52a6e4b1 body-sha256=e5234a3f05b6ad10f0ca968e9774cba157635893224f8714027acd6a1e48ace1
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1791726314)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1791728255)
   (begin
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))
@@ -125,6 +125,77 @@
       gerbil-rs-bigint-copy-raw
       gerbil-rs-bigint-create-byte-control
       gerbil-rs-bigint-copy-byte-control))
+    (namespace
+     ("gerbil-scheme-rust/scheme/runtime#"
+      gerbil-rs-numeric-span
+      gerbil-rs-numeric-create
+      gerbil-rs-numeric-size
+      gerbil-rs-numeric-copy))
+    (c-declare "#include <string.h>\n#include <stdint.h>")
+    (define gerbil-rs-numeric-span
+      (c-lambda
+       (scheme-object
+        int32
+        (pointer unsigned-int8)
+        unsigned-int64
+        unsigned-int64
+        int32)
+       int64
+       "___SCMOBJ ___temp;\nvoid *body = 0; ___U64 count = 0, width = 0;\n#define GRS_NUMERIC(K,T,W) case K: if (!___##T##VECTORP(___arg1)) ___return(-1); count=___##T##VECTORSIZE(___arg1); width=W; body=___BODY_AS(___arg1,___t##T##VECTOR); break\nswitch (___arg2) {\n  GRS_NUMERIC(0,U16,2); GRS_NUMERIC(1,U32,4); GRS_NUMERIC(2,U64,8);\n  GRS_NUMERIC(3,F32,4); GRS_NUMERIC(4,F64,8);\n  default: ___return(-1);\n}\n#undef GRS_NUMERIC\nif (___arg6 == 2) ___return(count);\nif (___arg4 > count || ___arg5 > count-___arg4 ||\n    ___arg5 > SIZE_MAX/width || (___arg5 && !___arg3)) ___return(-1);\nif (___arg5) {\n  unsigned char *start = (unsigned char*)body + ___arg4*width;\n  unsigned char *destination, *source;\n  if (___arg6 == 0) { destination=___arg3; source=start; }\n  else if (___arg6 == 1) { destination=start; source=___arg3; }\n  else ___return(-1);\n  /* Constant-size copies allow unaligned spans without aliasing casts. */\n  ___U64 bytes=___arg5*width, offset=0;\n  for (; bytes-offset >= 8; offset+=8) {\n    ___U64 word; memcpy(&word,source+offset,8); memcpy(destination+offset,&word,8);\n  }\n  for (; offset < bytes; offset++) destination[offset]=source[offset];\n}\n___return(0);"))
+    (c-define
+     (gerbil-rs-numeric-create kind bytes size)
+     (int32 (pointer unsigned-int8) unsigned-int64)
+     int64
+     "gerbil_scheme_rust_numeric_create"
+     "extern"
+     (with-exception-catcher
+      (lambda (_exception) 0)
+      (lambda ()
+        (let ((value (case kind
+                       ((0) (make-u16vector size))
+                       ((1) (make-u32vector size))
+                       ((2) (make-u64vector size))
+                       ((3) (make-f32vector size))
+                       ((4) (make-f64vector size))
+                       (else #f))))
+          (if (and value
+                   (= 0
+                      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+                       value
+                       kind
+                       bytes
+                       0
+                       size
+                       1)))
+              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+               value)
+              0)))))
+    (c-define
+     (gerbil-rs-numeric-size root index kind)
+     (int64 int64 int32)
+     int64
+     "gerbil_scheme_rust_numeric_size"
+     "extern"
+     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value root index)
+      kind
+      #f
+      0
+      0
+      2))
+    (c-define
+     (gerbil-rs-numeric-copy root index kind output offset size)
+     (int64 int64 int32 (pointer unsigned-int8) unsigned-int64 unsigned-int64)
+     int64
+     "gerbil_scheme_rust_numeric_copy"
+     "extern"
+     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value root index)
+      kind
+      output
+      offset
+      size
+      0))
     (define gerbil-rs-root-id-at
       (c-lambda
        ((pointer int64) unsigned-int64)

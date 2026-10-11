@@ -51,7 +51,8 @@ fail-closed untrusted raw constructors. Registry tokens remain positive.
 | symbol/keyword | Handle-backed borrowed views | Not an owned bulk string/interning transport; missing qualification |
 | pair/proper list | Strongly rooted creation and shallow snapshots | One complete snapshot root; nested/false/zero elements, parent release and GC covered; pair exposes car/cdr, not arbitrary improper-list sequence flattening |
 | generic vector | Strongly rooted creation and shallow snapshots | One native snapshot/root rather than per-element roots or Rust token buffers; element borrows cannot outlive the snapshot |
-| u16/u32/u64/f32/f64 homogeneous vectors | No complete safe bulk family found | Missing construction, copy, shape/alignment, range and owner/GC contracts |
+| u16/u32/u64/f32/f64 homogeneous vectors | Sealed native-element whole-span transport | Rooted construction, transactional reused copy, indexed snapshot lifetime, bit-pattern and GC contracts; see numeric-vector receipt |
+| signed homogeneous vectors | No qualified safe bulk family yet | Remain a separate representation/coverage gap; not inferred from unsigned vectors |
 | rational/complex/hash table | No complete safe owned bulk transport found | Missing representation and ownership semantics; not coerced to text or f64 |
 
 The audit does not claim every Gerbil data structure is already implemented.

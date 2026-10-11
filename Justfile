@@ -90,6 +90,10 @@ bridge-types-matched:
 bridge-objects-matched:
     {{ build_env }} cargo bench -p gerbil-scheme --bench objects --locked
 
+# Numeric whole-span FFI, changing inputs, exact request tails, 20 ABBA samples.
+bridge-numeric-matched:
+    {{ build_env }} cargo bench -p gerbil-scheme --bench objects --locked -- --numeric
+
 bridge-types-contracts:
     {{ build_env }} cargo test -p gerbil-scheme-sys --lib --locked
     {{ build_env }} cargo test -p gerbil-scheme --test rooted_value --test exact_integer --test unit_test --locked

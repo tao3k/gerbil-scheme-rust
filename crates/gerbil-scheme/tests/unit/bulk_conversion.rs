@@ -171,7 +171,8 @@ impl<'ast> Visit<'ast> for CopyShape {
                     || name.ends_with("collection_copy_raw")
                     || name.ends_with("collection_snapshot_raw")
                     || name.ends_with("bigint_copy_raw")
-                    || name.ends_with("bigint_copy_indexed"),
+                    || name.ends_with("bigint_copy_indexed")
+                    || name.ends_with("numeric_copy"),
             );
             self.scalar_calls += usize::from(
                 name.ends_with("bytevector_u8_ref")
@@ -365,6 +366,29 @@ fn scalar_batch_rejects_per_item_foreign_projections() {
     let negative = source.replace(
         "gerbil_scheme_rust_scalar_batch(",
         "gerbil_scheme_rust_scheme_object_as_flonum(",
+    );
+    assert_ne!(source, negative);
+    assert!(!bounded(&negative));
+}
+
+#[test]
+fn numeric_transport_rejects_element_foreign_loops() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/runtime/objects/numeric/transfer.rs"
+    ));
+    let bounded = |source: &str| {
+        let mut shape = CopyShape::default();
+        shape.visit_file(&syn::parse_file(source).unwrap());
+        shape.bulk_calls == 1 && shape.scalar_calls == 0 && shape.loops == 0
+    };
+    assert!(bounded(source));
+    let negative = source.replace("let status = unsafe {", "for _index in 0..len { let _ = sys::gerbil_scheme_rust_numeric_copy(self.root.0, self.index, T::KIND, output.staged.as_mut_ptr().cast(), 0, 1); } let status = unsafe {");
+    assert_ne!(source, negative);
+    assert!(!bounded(&negative));
+    let negative = source.replace(
+        "gerbil_scheme_rust_numeric_copy(",
+        "gerbil_scheme_rust_object_scalar_raw(",
     );
     assert_ne!(source, negative);
     assert!(!bounded(&negative));

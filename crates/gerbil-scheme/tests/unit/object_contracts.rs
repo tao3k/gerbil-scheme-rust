@@ -11,12 +11,152 @@ pub(super) fn run(runtime: &GerbilRuntime) {
     integers(runtime);
     eprintln!("OBJECT-CONTRACT phase=collections");
     collections(runtime);
+    numeric(runtime);
     rejected_spans();
     assert_eq!(
         count(),
         before,
         "no root leak after the complete ownership matrix"
     );
+}
+fn numeric_check<T: gerbil_scheme::NumericElement>(runtime: &GerbilRuntime, data: &[T]) {
+    fn bytes<T>(data: &[T]) -> &[u8] {
+        // SAFETY: callers use only sealed numeric primitives, with no padding.
+        unsafe { std::slice::from_raw_parts(data.as_ptr().cast(), std::mem::size_of_val(data)) }
+    }
+    let before = count();
+    let root = runtime.numeric_vector(data).unwrap();
+    let mut output = gerbil_scheme::NumericBuffer::<T>::default();
+    root.as_ref().copy_numeric(&mut output).unwrap();
+    assert_eq!(bytes(output.as_slice()), bytes(data));
+    let collection = runtime
+        .collection_from_objects(CollectionKind::Vector, &[&root])
+        .unwrap();
+    let mut snapshot = RootedObjectBatch::default();
+    collection.copy_into(&mut snapshot).unwrap();
+    drop(collection);
+    drop(root);
+    assert_eq!(
+        unsafe { gerbil_scheme_sys::gerbil_scheme_rust_force_gc_raw() },
+        0
+    );
+    snapshot.get(0).unwrap().copy_numeric(&mut output).unwrap();
+    assert_eq!(bytes(output.as_slice()), bytes(data));
+    let capacity = output.reserved_bytes();
+    snapshot.get(0).unwrap().copy_numeric(&mut output).unwrap();
+    assert_eq!(output.reserved_bytes(), capacity);
+    let wrong = runtime
+        .root_value(runtime.fixnum_value(0).unwrap())
+        .unwrap();
+    assert!(wrong.as_ref().copy_numeric(&mut output).is_err());
+    assert_eq!(bytes(output.as_slice()), bytes(data));
+    drop(wrong);
+    drop(snapshot);
+    assert_eq!(count(), before);
+}
+fn numeric(runtime: &GerbilRuntime) {
+    use numeric_check as check;
+    numeric_growth(runtime);
+    for len in [0, 1, 3, 1024] {
+        check(runtime, &vec![u16::MAX; len]);
+        check(runtime, &vec![u32::MAX; len]);
+        check(runtime, &vec![u64::MAX; len]);
+        check(runtime, &vec![f32::from_bits(0x7fc0_1234); len]);
+        check(runtime, &vec![f64::from_bits(0x7ff8_0000_1234_5678); len]);
+    }
+    check(
+        runtime,
+        &[
+            0.0_f32,
+            -0.0,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::MIN_POSITIVE,
+        ],
+    );
+    check(
+        runtime,
+        &[
+            0.0_f64,
+            -0.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::MIN_POSITIVE,
+        ],
+    );
+    // Raw ABI: wrong-family, out-of-range and null spans publish no bytes.
+    let raw = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_numeric_create(0, [1_u16, 65535].as_ptr().cast(), 2)
+    };
+    assert!(raw > 0);
+    let mut bytes = [0xa5_u8; 8];
+    for (kind, offset, len) in [(1, 0, 1), (0, 2, 1), (0, u64::MAX, 1)] {
+        assert_eq!(
+            unsafe {
+                gerbil_scheme_sys::gerbil_scheme_rust_numeric_copy(
+                    raw,
+                    -1,
+                    kind,
+                    bytes.as_mut_ptr(),
+                    offset,
+                    len,
+                )
+            },
+            -1
+        );
+        assert_eq!(bytes, [0xa5; 8]);
+    }
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_numeric_copy(
+                raw,
+                -1,
+                0,
+                std::ptr::null_mut(),
+                0,
+                1,
+            )
+        },
+        -1
+    );
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_numeric_copy(
+                raw,
+                -1,
+                0,
+                bytes[1..].as_mut_ptr(),
+                0,
+                2,
+            )
+        },
+        0
+    );
+    let expected: Vec<_> = [1_u16, u16::MAX]
+        .into_iter()
+        .flat_map(u16::to_ne_bytes)
+        .collect();
+    assert_eq!(&bytes[1..5], expected);
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_release(gerbil_scheme_sys::GerbilRootId(raw))
+        },
+        gerbil_scheme_sys::GerbilStatus::Ok
+    );
+}
+fn numeric_growth(runtime: &GerbilRuntime) {
+    let mut output = gerbil_scheme::NumericBuffer::<u64>::default();
+    for len in [0, 1, 3, 1024, 2, 0, 32] {
+        let input: Vec<_> = (0..len).map(|index| u64::MAX - index).collect();
+        let root = runtime.numeric_vector(&input).unwrap();
+        root.as_ref().copy_numeric(&mut output).unwrap();
+        assert_eq!(output.as_slice(), input);
+        let wrong = runtime.numeric_vector(&[1_u32, 2]).unwrap();
+        let before = output.reserved_bytes();
+        assert!(wrong.as_ref().copy_numeric(&mut output).is_err());
+        assert_eq!(output.as_slice(), input);
+        assert_eq!(output.reserved_bytes(), before);
+    }
 }
 fn rejected_spans() {
     use gerbil_scheme_sys::{self as sys, GerbilRootId};

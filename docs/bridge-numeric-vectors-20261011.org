@@ -1,0 +1,149 @@
+#+title: Homogeneous numeric spans and wake-path qualification
+
+* Scope and baseline
+
+This receipt extends the bridge, not Org parsing. The prior PR head is
+=9d18c4c6a963200dfaf555ed8215f4ac157d7e33=. The UTF-8 algorithm in
+=scheme/utf8.ss= is unchanged. The SDK and kernel are unchanged. Scheme SMP
+multi-processor admission remains explicitly skipped, not successful.
+
+* Library implementation and ownership
+
+=GerbilRuntime::numeric_vector= constructs u16/u32/u64/f32/f64 vectors.
+=SchemeObjectRef::copy_numeric= copies a complete native span to a reusable
+=NumericBuffer<T>=. The element trait is sealed: arbitrary Rust layouts,
+booleans and pointer-bearing structures cannot claim this protocol.
+
+The installed official Gambit header defines the vector predicates at
+4140-4159 and native sizes/body access at 5610 and the corresponding vector
+families. The C leaf uses these macros, not duplicated object tags or Rust
+casts to Scheme heap pointers. A single foreign entry processes the whole
+span with constant-size, unaligned-safe copies and a byte tail. This also
+avoids an unresolved dynamic memcpy import in the installed Darwin module
+linker. An attempted explicit system-library link did not fix that import
+and was reverted; no SDK or consumer linker workaround is retained.
+
+Construction publishes one strong root only after successful transfer.
+Borrowed indexed references retain their existing collection snapshot owner.
+The leaf does not allocate or retain Scheme body pointers. Rust staging
+is initialized before the call; a successful whole transfer swaps staging
+into the published output. Type/range failure publishes nothing. NaN payloads,
+infinities, negative zero and integer maximum bits survive unchanged.
+This is host-native element layout and byte order, not a cross-host wire format.
+
+Contract coverage includes empty/odd/large vectors, growth and shrink,
+wrong-family errors, null nonempty spans, range overflow, unaligned output,
+parent release followed by forced GC, stable reused capacity and root counts.
+Compile-fail coverage rejects unsupported element types. A dev-only syntax
+gate rejects per-element foreign-call loops and scalar ABI substitution.
+
+* Matched numeric qualification
+
+=just bridge-numeric-matched= runs five changing fixture rows per family,
+32 elements per request, three loads, ten ABBA groups and 20 batches per
+variant: 600 batches and 22,200,000 measured requests. Warmup is excluded.
+The control transfers one element per foreign entry; the selected variant
+uses the public checked whole-vector API, including its size query and
+transactional staging. Both perform identical bitwise result validation.
+This qualifies removal of repeated FFI entry, not an improvement over an
+already existing whole-span implementation or an Org parser benchmark.
+
+All 15 gates passed total timed wall, pooled exact nearest-rank request P95
+and P99. Timer overhead is included. Request tails are not batch percentiles.
+
+Example u32vector32 results:
+
+| Requests/batch | Mean batch wall control/bulk (ms) | Request P95 control/bulk (ns) | Request P99 control/bulk (ns) | Throughput control/bulk (requests/s) |
+|----------------+----------------------------------+-------------------------------+-------------------------------+-------------------------------------|
+| 1,000 | 4.390215 / 0.278202 | 6,500 / 292 | 6,959 / 500 | 227,779 / 3,594,510 |
+| 10,000 | 42.065060 / 2.746660 | 3,292 / 250 | 6,709 / 292 | 237,727 / 3,640,785 |
+| 100,000 | 448.859173 / 29.346994 | 3,333 / 250 | 6,750 / 333 | 222,787 / 3,407,504 |
+
+Rust retained payload capacity for 32 elements is 64/128/256 bytes in the
+control and 128/256/512 bytes for transactional bulk output, depending on
+element width. Vec headers are additional: 24 bytes control and 48 bytes
+bulk on this host. Double payload storage is an explicit ownership tradeoff,
+not zero-copy. Fixture roots/input arrays are common setup costs, not timed
+construction. Percentile observer capacity is 328,000 / 3,280,000 /
+32,800,000 bytes, identically for both modes. RSS is process high water,
+not independently attributable mode memory or live allocated bytes.
+
+In the first u32 100,000-request ABBA group, control GC counts were 160/160
+versus bulk 7/8. GC wall was 147.530/88.559 ms versus 3.996/4.344 ms.
+Total wall also improved; this is not a GC-only speed claim.
+
+Raw receipt: [[file:benchmarks/20261011-numeric-abba.log]].
+
+* Scheduler evidence boundaries
+
+The frozen request transport remains bounded mpsc plus per-request oneshot;
+rejected recv-many and reused-response-channel candidates remain reverted.
+Official Tokio 1.53.1 =worker.rs:1341-1368= routes an external Scheme owner's
+wake through remote injection; =worker.rs:1420-1427= contains the shared
+scheduler lock and injection. Official [[https://docs.rs/tokio/1.53.1/tokio/sync/oneshot/index.html][oneshot documentation]] permits synchronous
+senders outside async code, and [[https://docs.rs/tokio/1.53.1/tokio/runtime/index.html][runtime documentation]] separates multi-thread
+scheduling from local execution. Keeping Scheme objects on their owner is
+not a proof of multiple Scheme processors or parallel parsing.
+
+The diagnostic waker now observes synchronous forwarding duration and
+wake-start to ready-poll duration separately. Completed single-wake samples
+exclude cases where the task resumes before the wake call returns, multiple
+wakes, or no observed wake; exclusion counts are reported. It never delays
+task progress to complete an observation. The probe is deliberately
+perturbing and remains outside production acceptance. Synchronous wake wall
+includes notification, scheduler synchronization and possible OS suspension;
+it is not isolated injection-mutex time. Wake-to-ready time is not bare
+context-switch latency. Negative observer comparisons do not replace the
+baseline with a slower diagnostic wrapper.
+
+Raw full matrix: [[file:benchmarks/20261011-wake-phases-all.log]].
+All seven corpora completed 840 batches and 31,080,000 measured requests:
+three loads, 20 batches per variant, two variants, with 12 Tokio workers,
+24 closed-loop callers, queue capacity 12 and exactly one Scheme owner.
+This is not an open-loop arrival-rate or overload qualification. Each
+variant retains 16 u64 observations per request; at 100,000 requests per
+batch, its pooled 20-batch observer capacity is 256,000,000 bytes, or
+512,000,000 bytes for the two variants together, excluding scratch/results.
+That observer cost must not be attributed to production request buffering.
+
+The mixed-text ordinary path completed each load with 20 batches. At
+1,000 / 10,000 / 100,000 requests per batch, mean wall was 8.589 / 69.659 /
+818.953 ms; pooled response P95 was 389.833 / 245.666 / 288.041 us and P99
+842.542 / 356.000 / 548.958 us. Throughput was 116,426 / 143,557 / 122,107
+requests/s. These are closed-loop bridge response measurements, not parsing.
+
+The final mixed 100,000-request diagnostic batch had synchronous forwarding
+P95/P99 2.584/5.792 us versus wake-start-to-ready-poll 23.416/149.500 us,
+on 99,660 completed single-wake observations; 340 were excluded. These
+are one batch's conditional phase percentiles, not pooled matrix tails.
+The additional timer/atomic/owner-CPU observer regressed total mixed
+100,000-request wall from 16,379.062 to 19,417.552 ms across 20 batches;
+its response P99 also regressed from 548.958 to 809.709 us. It remains
+diagnostic-only. No scheduler speedup or isolated mutex duration is claimed.
+
+The reasonable next optimization boundary is aggregate work per owner
+entry, already available through the typed span APIs, not extra Scheme
+threads or unvalidated wake batching. Increasing callers around one owner
+can increase queueing without adding Scheme service capacity. A claim that
+changed Tokio admission or response scheduling improves tail latency still
+needs its own matched strict wall/P95/P99 gate; this receipt does not admit
+a scheduler replacement based on the conditional probe percentiles.
+
+Signed numeric vectors, symbol/keyword owned transport and rational/complex/
+map representation remain distinct gaps; this receipt does not pretend
+that a generic rooted handle is a serializer for those families.
+
+* Final local gates
+
+=just bridge-workspace=: 657 passed, zero failures, eight existing ignored
+tests, 37 target summaries. This includes the numeric anti-regression and
+unsupported-element compile-fail gates. =just bridge-lint= and
+=just bridge-actor-lint= passed with warnings denied. Full benchmark controls
+remain distinct from these correctness gates and from remote exact-head CI.
+No local Bazel execution is claimed; there is no local Bazel executable.
+
+[[file:benchmarks/20261011-numeric-workspace.log][Workspace receipt]],
+[[file:benchmarks/20261011-numeric-lint.log][workspace lint]],
+[[file:benchmarks/20261011-numeric-actor-lint.log][actor lint]],
+[[file:benchmarks/20261011-numeric-contracts.log][focused owner contracts]] and
+[[file:benchmarks/20261011-numeric-regenerate.log][canonical generated-source receipt]].

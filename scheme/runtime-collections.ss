@@ -30,6 +30,64 @@
    gerbil-rs-roots-release-raw gerbil-rs-bigint-create-raw
    gerbil-rs-bigint-size-raw gerbil-rs-bigint-copy-raw
    gerbil-rs-bigint-create-byte-control gerbil-rs-bigint-copy-byte-control))
+ (namespace ("gerbil-scheme-rust/scheme/runtime#"
+   gerbil-rs-numeric-span gerbil-rs-numeric-create gerbil-rs-numeric-size gerbil-rs-numeric-copy))
+ ;; Official storage macros remain inside a nonallocating foreign leaf. No
+ ;; Scheme body pointer is returned or retained; memcpy accepts unaligned spans.
+ (c-declare "#include <string.h>\n#include <stdint.h>")
+ (define gerbil-rs-numeric-span
+   (c-lambda (scheme-object int32 (pointer unsigned-int8) unsigned-int64 unsigned-int64 int32) int64
+     #<<END-C
+___SCMOBJ ___temp;
+void *body = 0; ___U64 count = 0, width = 0;
+#define GRS_NUMERIC(K,T,W) case K: if (!___##T##VECTORP(___arg1)) ___return(-1); count=___##T##VECTORSIZE(___arg1); width=W; body=___BODY_AS(___arg1,___t##T##VECTOR); break
+switch (___arg2) {
+  GRS_NUMERIC(0,U16,2); GRS_NUMERIC(1,U32,4); GRS_NUMERIC(2,U64,8);
+  GRS_NUMERIC(3,F32,4); GRS_NUMERIC(4,F64,8);
+  default: ___return(-1);
+}
+#undef GRS_NUMERIC
+if (___arg6 == 2) ___return(count);
+if (___arg4 > count || ___arg5 > count-___arg4 ||
+    ___arg5 > SIZE_MAX/width || (___arg5 && !___arg3)) ___return(-1);
+if (___arg5) {
+  unsigned char *start = (unsigned char*)body + ___arg4*width;
+  unsigned char *destination, *source;
+  if (___arg6 == 0) { destination=___arg3; source=start; }
+  else if (___arg6 == 1) { destination=start; source=___arg3; }
+  else ___return(-1);
+  /* Constant-size copies allow unaligned spans without aliasing casts. */
+  ___U64 bytes=___arg5*width, offset=0;
+  for (; bytes-offset >= 8; offset+=8) {
+    ___U64 word; memcpy(&word,source+offset,8); memcpy(destination+offset,&word,8);
+  }
+  for (; offset < bytes; offset++) destination[offset]=source[offset];
+}
+___return(0);
+END-C
+))
+ (c-define (gerbil-rs-numeric-create kind bytes size)
+   (int32 (pointer unsigned-int8) unsigned-int64) int64
+   "gerbil_scheme_rust_numeric_create" "extern"
+   (with-exception-catcher
+     (lambda (_exception) 0)
+     (lambda ()
+       (let ((value (case kind
+                      ((0) (make-u16vector size)) ((1) (make-u32vector size))
+                      ((2) (make-u64vector size)) ((3) (make-f32vector size))
+                      ((4) (make-f64vector size)) (else #f))))
+         (if (and value (= 0 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+                               value kind bytes 0 size 1)))
+           (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! value) 0)))))
+ (c-define (gerbil-rs-numeric-size root index kind) (int64 int64 int32) int64
+   "gerbil_scheme_rust_numeric_size" "extern"
+   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value root index) kind #f 0 0 2))
+ (c-define (gerbil-rs-numeric-copy root index kind output offset size)
+   (int64 int64 int32 (pointer unsigned-int8) unsigned-int64 unsigned-int64) int64
+   "gerbil_scheme_rust_numeric_copy" "extern"
+   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value root index) kind output offset size 0))
  (define gerbil-rs-root-id-at
    (c-lambda ((pointer int64) unsigned-int64) int64 "___return(___arg1[___arg2]);"))
  (define gerbil-rs-write-root-id

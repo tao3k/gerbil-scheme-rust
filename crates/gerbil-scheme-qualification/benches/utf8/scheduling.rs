@@ -1,22 +1,18 @@
 //! Same-owner ABBA admission controls; collect every regression before rejection.
 use super::{GerbilRuntime, SCENARIOS, buffer, convert, latency, texts_for_scenario};
 use std::{
-    future::{Future, poll_fn},
-    pin::pin,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering::Relaxed},
-        mpsc as std_mpsc,
-    },
-    task::{Context, Wake, Waker},
+    sync::{Arc, mpsc as std_mpsc},
     thread,
     time::Instant,
 };
+#[path = "wake_probe.rs"]
+mod wake_probe;
 use tokio::{
     runtime::Runtime,
     sync::{mpsc, oneshot},
     task::JoinSet,
 };
+use wake_probe::observe;
 
 pub(super) fn run() {
     latency::contracts();
@@ -58,7 +54,7 @@ pub(super) fn run() {
     );
 }
 
-fn quantiles(rows: &[[u64; 13]]) -> [u64; 8] {
+fn quantiles(rows: &[[u64; 16]]) -> [u64; 8] {
     let mut result = [0; 8];
     for field in 0..4 {
         let mut sorted: Vec<_> = rows.iter().map(|row| row[field]).collect();
@@ -81,7 +77,7 @@ fn compare(
     let name = SCENARIOS[corpus];
     let mut records: [Vec<[f64; 9]>; 2] = std::array::from_fn(|_| Vec::new());
     let mut paired: [Vec<f64>; 9] = std::array::from_fn(|_| Vec::new());
-    let mut all: [Vec<[u64; 13]>; 2] = std::array::from_fn(|_| Vec::with_capacity(jobs * 20));
+    let mut all: [Vec<[u64; 16]>; 2] = std::array::from_fn(|_| Vec::with_capacity(jobs * 20));
     for batched in [false, true] {
         assert_eq!(
             host.block_on(batch_requests(send, texts, corpus, 1_000, callers, batched))
@@ -144,7 +140,7 @@ fn compare(
             all[mode].len(),
             wall_total * 1000.0,
             f64::from(u32::try_from(all[mode].len()).unwrap()) / wall_total,
-            all[mode].capacity() * std::mem::size_of::<[u64; 13]>(),
+            all[mode].capacity() * std::mem::size_of::<[u64; 16]>(),
             q[0],
             q[1],
             q[2],
@@ -285,57 +281,6 @@ fn owner(mut incoming: mpsc::Receiver<Request>, ready: std_mpsc::Sender<()>) {
     drop(roots);
     drop(runtime);
 }
-struct Probe {
-    original: Waker,
-    wakes: AtomicU64,
-}
-impl Wake for Probe {
-    fn wake(self: Arc<Self>) {
-        self.wake_by_ref();
-    }
-    fn wake_by_ref(self: &Arc<Self>) {
-        self.wakes.fetch_add(1, Relaxed);
-        self.original.wake_by_ref();
-    }
-}
-async fn observe<F: Future<Output = Reply>>(
-    future: F,
-    probe: &mut Option<Arc<Probe>>,
-) -> (Reply, u64, u64, u64) {
-    let mut future = pin!(future);
-    let mut polls = 0;
-    let mut pending = 0;
-    let mut previous = 0;
-    let result = poll_fn(|cx| {
-        let probe = probe.get_or_insert_with(|| {
-            Arc::new(Probe {
-                original: cx.waker().clone(),
-                wakes: AtomicU64::new(0),
-            })
-        });
-        assert!(
-            probe.original.will_wake(cx.waker()),
-            "stable caller task identity"
-        );
-        if polls == 0 {
-            previous = probe.wakes.load(Relaxed);
-        }
-        let waker = Waker::from(Arc::clone(probe));
-        polls += 1;
-        let result = future.as_mut().poll(&mut Context::from_waker(&waker));
-        if result.is_pending() {
-            pending += 1;
-        }
-        result
-    })
-    .await;
-    (
-        result,
-        polls,
-        pending,
-        probe.as_ref().unwrap().wakes.load(Relaxed) - previous,
-    )
-}
 async fn batch_requests(
     send: &mpsc::Sender<Request>,
     texts: &Arc<Vec<String>>,
@@ -343,7 +288,7 @@ async fn batch_requests(
     jobs: usize,
     callers: usize,
     diagnostic: bool,
-) -> Vec<[u64; 13]> {
+) -> Vec<[u64; 16]> {
     let mut tasks = JoinSet::new();
     for caller in 0..callers.min(jobs) {
         let send = send.clone();
@@ -365,10 +310,10 @@ async fn batch_requests(
                     reply,
                     diagnostic,
                 });
-                let (result, polls, pending, wakes) = if diagnostic {
+                let (result, wake) = if diagnostic {
                     observe(async { wait.await.expect("live owner") }, &mut probe).await
                 } else {
-                    (wait.await.expect("live owner"), 0, 0, 0)
+                    (wait.await.expect("live owner"), [0; 6])
                 };
                 let response = nanos(issued);
                 let handoff = nanos(result.ready);
@@ -384,10 +329,13 @@ async fn batch_requests(
                     result.counters[1],
                     result.counters[2],
                     result.counters[3],
-                    polls,
-                    pending,
-                    wakes,
+                    wake[0],
+                    wake[1],
+                    wake[2],
                     result.counters[4],
+                    wake[3],
+                    wake[4],
+                    wake[5],
                 ]);
             }
             rows
@@ -404,10 +352,26 @@ fn audit_batch(
     name: &str,
     jobs: usize,
     mode: usize,
-    rows: &[[u64; 13]],
+    rows: &[[u64; 16]],
     before: [u64; 4],
     after: [u64; 4],
 ) {
+    let complete: Vec<_> = rows.iter().filter(|row| row[15] == 1).collect();
+    if !complete.is_empty() {
+        let mut sync: Vec<_> = complete.iter().map(|row| row[13]).collect();
+        let mut resume: Vec<_> = complete.iter().map(|row| row[14]).collect();
+        sync.sort_unstable();
+        resume.sort_unstable();
+        println!(
+            "UTF8-WAKE-PHASE corpus={name} jobs={jobs} mode={mode} complete={} excluded={} synchronous_wake_p95_ns={} synchronous_wake_p99_ns={} wake_to_ready_poll_p95_ns={} wake_to_ready_poll_p99_ns={} diagnostic_only=true mutex_isolation=false",
+            complete.len(),
+            rows.len() - complete.len(),
+            latency::percentile(&sync, 95),
+            latency::percentile(&sync, 99),
+            latency::percentile(&resume, 95),
+            latency::percentile(&resume, 99)
+        );
+    }
     for (index, row) in rows.iter().enumerate() {
         if mode == 1 && (row[2] >= 1_000_000 || row[4] >= 1_000_000) {
             println!(

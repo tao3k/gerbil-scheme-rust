@@ -20,6 +20,7 @@ fn write_launcher(gsc: &Path, out_dir: &Path) -> Result<PathBuf, String> {
     use sha2::{Digest, Sha256};
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::symlink;
     use std::sync::atomic::{AtomicUsize, Ordering};
     static NEXT: AtomicUsize = AtomicUsize::new(0);
 
@@ -31,17 +32,31 @@ fn write_launcher(gsc: &Path, out_dir: &Path) -> Result<PathBuf, String> {
     fs::create_dir_all(out_dir)
         .map_err(|error| format!("create package launcher directory: {error}"))?;
     let launcher = out_dir.join(format!("gsc-progress-{digest}"));
+    let command = launcher.with_file_name(format!("gsc-progress-{digest}.command"));
+    let shim = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/gsc-progress-launcher.sh"),
+    )
+    .map_err(|error| format!("resolve package launcher shim: {error}"))?;
+    if fs::metadata(&shim)
+        .map_err(|error| format!("inspect package launcher shim: {error}"))?
+        .permissions()
+        .mode()
+        & 0o111
+        == 0
+    {
+        return Err("package launcher shim is not executable".to_owned());
+    }
     if launcher.exists() {
-        let stored =
-            fs::read(&launcher).map_err(|error| format!("read package launcher: {error}"))?;
-        if stored != script.as_bytes() {
+        let stored = fs::read(&command)
+            .map_err(|error| format!("read package launcher command: {error}"))?;
+        if stored != script.as_bytes() || fs::read_link(&launcher).ok().as_ref() != Some(&shim) {
             return Err("content-addressed package launcher drift".to_owned());
         }
         return Ok(launcher);
     }
-    // Publish a closed inode without replacing an already published one.
-    // Rename-overwrite can race with a fork that inherited another staging
-    // writer's descriptor, making the replacement inode ETXTBSY on Linux.
+    // Closing our writer is insufficient: a concurrent fork can retain a
+    // duplicate until its exec. Never execute the generated writable inode.
+    // Publish it only as shell input, then symlink the source-owned executable.
     let staging = out_dir.join(format!(
         ".gsc-progress-{}-{}",
         std::process::id(),
@@ -49,11 +64,11 @@ fn write_launcher(gsc: &Path, out_dir: &Path) -> Result<PathBuf, String> {
     ));
     let result = (|| {
         fs::write(&staging, script.as_bytes())?;
-        fs::set_permissions(&staging, fs::Permissions::from_mode(0o755))?;
-        match fs::hard_link(&staging, &launcher) {
+        fs::set_permissions(&staging, fs::Permissions::from_mode(0o600))?;
+        match fs::hard_link(&staging, &command) {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                if fs::read(&launcher)? == script.as_bytes() {
+                if fs::read(&command)? == script.as_bytes() {
                     Ok(())
                 } else {
                     Err(std::io::Error::new(
@@ -72,6 +87,15 @@ fn write_launcher(gsc: &Path, out_dir: &Path) -> Result<PathBuf, String> {
     };
     if let Err(error) = result.and(cleanup) {
         return Err(format!("publish package GSC launcher: {error}"));
+    }
+    match symlink(&shim, &launcher) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            if fs::read_link(&launcher).ok().as_ref() != Some(&shim) {
+                return Err("content-addressed package launcher drift".to_owned());
+            }
+        }
+        Err(error) => return Err(format!("publish package launcher shim: {error}")),
     }
     Ok(launcher)
 }

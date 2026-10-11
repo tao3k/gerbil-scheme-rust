@@ -93,3 +93,41 @@ fn parallel_publication_executes_only_closed_launcher_inodes() {
     });
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn generated_command_writer_does_not_hold_the_executable_inode() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = output();
+    let launcher = prepare_gsc_progress_launcher(&fixture(), &root, true).unwrap();
+    let command = launcher.with_file_name(format!(
+        "{}.command",
+        launcher.file_name().unwrap().to_str().unwrap()
+    ));
+    assert_eq!(
+        std::fs::metadata(&command).unwrap().permissions().mode() & 0o111,
+        0
+    );
+    // Model a fork-retained writable descriptor without timing-dependent
+    // sleeps. The immutable executable must still run directly, not via a
+    // different test-only invocation or an ETXTBSY retry.
+    let writer = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&command)
+        .unwrap();
+    assert!(
+        Command::new(&launcher)
+            .arg("input.scm")
+            .env("GSC_ARGV_RECEIPT", root.join("held-writer-args"))
+            .status()
+            .unwrap()
+            .success()
+    );
+    drop(writer);
+    std::fs::write(&command, "drift").unwrap();
+    assert!(
+        prepare_gsc_progress_launcher(&fixture(), &root, true)
+            .unwrap_err()
+            .contains("drift")
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}

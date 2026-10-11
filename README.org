@@ -114,6 +114,26 @@ allocation count alone never admits a change:
 wall time and P95/P99 must also pass. Exact-head remote CI is independent
 from local bridge qualification and downstream Org acceptance.
 
+The source-guided admission fast path (same threads/channel, atomic permit
+attempt, async fallback and deferred reply allocation) also completed 840
+batches: 78 of 189 gates regressed, so it is reverted. For changing reverse
+prefixes, control / rejected candidate results are:
+
+| Requests/batch | Mean batch wall (ms) | Response P95 (µs) | Response P99 (µs) | Throughput (requests/s) |
+|----------------+----------------------+-------------------+-------------------+-------------------------|
+| 1,000 | 8.231850 / 8.424150 | 275.709 / 314.083 | 393.250 / 421.541 | 121,479 / 118,706 |
+| 10,000 | 122.795300 / 135.550300 | 479.000 / 546.875 | 1,965.209 / 2,504.833 | 81,436 / 73,773 |
+| 100,000 | 1,016.049150 / 976.082950 | 403.166 / 369.500 | 997.833 / 1,049.333 | 98,420 / 102,450 |
+
+Shared peak RSS: 634,241,024 bytes, including 512,000,000 bytes of retained
+large-load observations across both variants, plus scratch. This is not
+production memory/request or a per-variant RSS saving. One reply allocation
+still occurs per completed request; deferral only shortens its lifetime.
+[[file:docs/bridge-tokio-admission-20261011.org][Official source audit, complete matrix and rejected patch]] distinguish
+capacity-release wakes, external response injection and task wake
+coalescing. Injection-lock duration and owner receive off-CPU time remain
+unisolated; the failed candidate is not presented as their solution.
+
 #+begin_src text
 just bridge-composites-matched
 just bridge-signed-matched

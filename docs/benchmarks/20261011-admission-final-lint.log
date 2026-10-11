@@ -1,0 +1,2 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [optimized + debuginfo] target(s) in 0.20s

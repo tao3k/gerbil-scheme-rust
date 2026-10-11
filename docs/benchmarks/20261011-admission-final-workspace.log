@@ -1,0 +1,1708 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo test --workspace --locked -- --nocapture
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (target/debug/deps/gerbil_scheme-6a923705ed992eba)
+
+running 8 tests
+test runtime::rooted::rooted_scheme_owner_tests::failed_owned_copy_does_not_publish_uninitialized_storage ... ok
+test runtime::rooted::rooted_scheme_owner_tests::non_ok_status_never_acquires_a_root_owner ... ok
+test runtime::rooted::rooted_scheme_owner_tests::ok_status_with_an_invalid_root_fails_closed ... ok
+test runtime::value_buffers::tests::reuse_handles_growth_shrink_empty_and_failed_initialization ... ok
+test runtime::rooted::rooted_scheme_owner_tests::owned_bytevector_copy_invokes_bulk_operation_at_most_once_at_every_size ... ok
+test runtime::utf8::tests::validation_matches_std_for_all_one_and_two_byte_inputs ... ok
+test runtime::utf8::tests::validation_preserves_all_unicode_scalars_and_owned_allocation ... ok
+test runtime::utf8::tests::validation_matches_std_at_simd_boundaries_and_malformed_tails ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/bytestring_benchmark.rs (target/debug/deps/bytestring_benchmark-b712d48e06bffdea)
+
+running 1 test
+scenario benchmark receipt: id=bytevector-bytestring-round-trip samples=40 iterations_per_sample=25 encode_median_ns=1384 encode_p95_ns=1626 decode_median_ns=1085 decode_p95_ns=1715 elapsed_ns=12227333
+test bytestring_benchmark::rooted_bytestring_round_trip_stays_sub_millisecond ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/exact_integer.rs (target/debug/deps/exact_integer-fd3dab0c88b932f5)
+
+running 1 test
+test exact_integer::exact_integer_handles_preserve_bignums_and_check_machine_projections ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/exact_integer_benchmark.rs (target/debug/deps/exact_integer_benchmark-12354476451fe492)
+
+running 1 test
+scenario benchmark receipt: id=exact-integer-projection-round-trip samples=40 iterations_per_sample=25 signed_median_ns=565 signed_p95_ns=638 unsigned_median_ns=555 unsigned_p95_ns=608 rejection_median_ns=141 rejection_p95_ns=190 elapsed_ns=7270792
+test exact_integer_benchmark::exact_integer_projection_round_trip_stays_sub_millisecond ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/ffi_benchmark.rs (target/debug/deps/ffi_benchmark-57785af9f04de19a)
+
+running 2 tests
+test ffi_benchmark::ratios_reject_unresolved_clock_samples_and_overflow ... ok
+scenario benchmark receipt: id=ffi-steady-state samples=100 iterations_per_sample=250 c_identity_median_ns=1 c_identity_p95_ns=1 identity_median_ns=4 identity_p95_ns=4 identity_vs_c_x100=400 raw_add_median_ns=48 raw_add_p95_ns=61 add_median_ns=54 add_p95_ns=69 add_vs_c_x100=5400 add_safe_vs_raw_x100=112 raw_even_median_ns=46 raw_even_p95_ns=56 even_median_ns=51 even_p95_ns=52 even_vs_c_x100=5100 even_safe_vs_raw_x100=110 raw_compare_median_ns=45 raw_compare_p95_ns=46 compare_median_ns=54 compare_p95_ns=56 compare_vs_c_x100=5400 compare_safe_vs_raw_x100=120 elapsed_ns=9714166
+test ffi_benchmark::steady_state_native_ffi_reports_statistical_receipt ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/unit/targets/identity.rs (target/debug/deps/identity-439aa71b02437b7a)
+
+running 1 test
+test identity::identity_i64_crosses_the_live_gerbil_abi ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/integer_bytes_benchmark.rs (target/debug/deps/integer_bytes_benchmark-9f7606c4492e9ad6)
+
+running 1 test
+scenario benchmark receipt: id=integer-bytevector-round-trip samples=40 iterations_per_sample=25 unsigned_median_ns=616 unsigned_p95_ns=696 signed_median_ns=989 signed_p95_ns=1070 elapsed_ns=9465875
+test integer_bytes_benchmark::integer_bytevector_round_trip_stays_sub_millisecond ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/rooted_value.rs (target/debug/deps/rooted_value-b38f75e3ba03deee)
+
+running 1 test
+OBJECT-CONTRACT phase=count
+OBJECT-CONTRACT phase=zero
+OBJECT-CONTRACT phase=integers
+OBJECT-CONTRACT integer_bytes=0
+OBJECT-CONTRACT integer_bytes=1
+OBJECT-CONTRACT integer_bytes=7
+OBJECT-CONTRACT integer_bytes=8
+OBJECT-CONTRACT integer_bytes=9
+OBJECT-CONTRACT integer_bytes=16
+OBJECT-CONTRACT integer_bytes=17
+OBJECT-CONTRACT integer_bytes=32
+OBJECT-CONTRACT integer_bytes=64
+OBJECT-CONTRACT integer_bytes=257
+OBJECT-CONTRACT integer_bytes=1024
+OBJECT-CONTRACT phase=collections
+OBJECT-CONTRACT collection=Vector phase=input
+OBJECT-CONTRACT collection=Vector phase=zero-rooted
+OBJECT-CONTRACT collection=Vector phase=false-rooted
+OBJECT-CONTRACT collection=Vector phase=copy
+OBJECT-CONTRACT collection=List phase=input
+OBJECT-CONTRACT collection=List phase=zero-rooted
+OBJECT-CONTRACT collection=List phase=false-rooted
+OBJECT-CONTRACT collection=List phase=copy
+OBJECT-CONTRACT collection=Pair phase=input
+OBJECT-CONTRACT collection=Pair phase=zero-rooted
+OBJECT-CONTRACT collection=Pair phase=false-rooted
+OBJECT-CONTRACT collection=Pair phase=copy
+test rooted_value::rooted_scheme_value_preserves_typed_projections_and_single_owner_drop ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/unit/targets/rooted_value_benchmark.rs (target/debug/deps/rooted_value_benchmark-607780d14ce05a52)
+
+running 1 test
+scenario benchmark receipt: id=rooted-scheme-value-round-trip samples=40 iterations_per_sample=25 exact_integer_median_ns=526 exact_integer_p95_ns=581 bytevector_median_ns=596 bytevector_p95_ns=620 string_median_ns=603 string_p95_ns=696 elapsed_ns=9599958
+test rooted_value_benchmark::rooted_scheme_value_round_trip_stays_sub_millisecond ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/runtime_lifecycle.rs (target/debug/deps/runtime_lifecycle-0df224c9490e8944)
+
+running 2 tests
+test runtime_lifecycle::rooted_bulk_copy_reduces_parser_sized_transfer_cost ... ignored, local matched latency receipt; run separately from the one-shot runtime test
+BRIDGE-HANDOFF abandoned-receiver root-release=OK subsequent-call=OK
+test runtime_lifecycle::calls_scalar_export_in_process ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/runtime_round_trip.rs (target/debug/deps/runtime_round_trip-fa0fe3d3be719b64)
+
+running 1 test
+scenario benchmark receipt: id=runtime-round-trip scalar_calls=30000 elapsed_ns=10494709
+test runtime_round_trip::initialized_runtime_crosses_the_live_gerbil_abi ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/tokio_handoff.rs (target/debug/deps/tokio_handoff-a578ca2d12505c98)
+
+running 2 tests
+test tokio_handoff::percentile_uses_nearest_rank_without_rounding_to_zero ... ok
+BRIDGE-CANCEL stage=Rooted task-abort=OK
+BRIDGE-CANCEL stage=Released task-abort=OK
+BRIDGE-CANCEL stage=Queued task-abort=OK
+BRIDGE-PROGRESS completed=1000 released=1000
+BRIDGE-TRANSPORT completed=1000 bytes=0 callers=12 owners=1 window=1 pipelined=false instrumentation=true elapsed_ns=1806000 queue_p95_ns=26000 service_p95_ns=750 request_p95_ns=35416
+BRIDGE-PROGRESS completed=2000 released=2000
+BRIDGE-TRANSPORT completed=1000 bytes=8192 callers=12 owners=1 window=1 pipelined=false instrumentation=true elapsed_ns=2696333 queue_p95_ns=43959 service_p95_ns=2792 request_p95_ns=53458
+BRIDGE-PROGRESS completed=3000 released=3000
+BRIDGE-PROGRESS completed=4000 released=4000
+BRIDGE-PROGRESS completed=5000 released=5000
+BRIDGE-PROGRESS completed=6000 released=6000
+BRIDGE-PROGRESS completed=7000 released=7000
+BRIDGE-PROGRESS completed=8000 released=8000
+BRIDGE-PROGRESS completed=9000 released=9000
+BRIDGE-PROGRESS completed=10000 released=10000
+BRIDGE-PROGRESS completed=11000 released=11000
+BRIDGE-PROGRESS completed=12000 released=12000
+BRIDGE-TRANSPORT completed=10000 bytes=0 callers=12 owners=1 window=1 pipelined=false instrumentation=true elapsed_ns=22834958 queue_p95_ns=38209 service_p95_ns=1167 request_p95_ns=56125
+BRIDGE-PROGRESS completed=13000 released=13000
+BRIDGE-PROGRESS completed=14000 released=14000
+BRIDGE-PROGRESS completed=15000 released=15000
+BRIDGE-PROGRESS completed=16000 released=16000
+BRIDGE-PROGRESS completed=17000 released=17000
+BRIDGE-PROGRESS completed=18000 released=18000
+BRIDGE-PROGRESS completed=19000 released=19000
+BRIDGE-PROGRESS completed=20000 released=20000
+BRIDGE-PROGRESS completed=21000 released=21000
+BRIDGE-PROGRESS completed=22000 released=22000
+BRIDGE-TRANSPORT completed=10000 bytes=8192 callers=12 owners=1 window=1 pipelined=false instrumentation=true elapsed_ns=24889750 queue_p95_ns=50625 service_p95_ns=2209 request_p95_ns=70708
+BRIDGE-PROGRESS completed=23000 released=23000
+BRIDGE-PROGRESS completed=24000 released=24000
+BRIDGE-PROGRESS completed=25000 released=25000
+BRIDGE-PROGRESS completed=26000 released=26000
+BRIDGE-PROGRESS completed=27000 released=27000
+BRIDGE-PROGRESS completed=28000 released=28000
+BRIDGE-PROGRESS completed=29000 released=29000
+BRIDGE-PROGRESS completed=30000 released=30000
+BRIDGE-PROGRESS completed=31000 released=31000
+BRIDGE-PROGRESS completed=32000 released=32000
+BRIDGE-PROGRESS completed=33000 released=33000
+BRIDGE-PROGRESS completed=34000 released=34000
+BRIDGE-PROGRESS completed=35000 released=35000
+BRIDGE-PROGRESS completed=36000 released=36000
+BRIDGE-PROGRESS completed=37000 released=37000
+BRIDGE-PROGRESS completed=38000 released=38000
+BRIDGE-PROGRESS completed=39000 released=39000
+BRIDGE-PROGRESS completed=40000 released=40000
+BRIDGE-PROGRESS completed=41000 released=41000
+BRIDGE-PROGRESS completed=42000 released=42000
+BRIDGE-PROGRESS completed=43000 released=43000
+BRIDGE-PROGRESS completed=44000 released=44000
+BRIDGE-PROGRESS completed=45000 released=45000
+BRIDGE-PROGRESS completed=46000 released=46000
+BRIDGE-PROGRESS completed=47000 released=47000
+BRIDGE-PROGRESS completed=48000 released=48000
+BRIDGE-PROGRESS completed=49000 released=49000
+BRIDGE-PROGRESS completed=50000 released=50000
+BRIDGE-PROGRESS completed=51000 released=51000
+BRIDGE-PROGRESS completed=52000 released=52000
+BRIDGE-PROGRESS completed=53000 released=53000
+BRIDGE-PROGRESS completed=54000 released=54000
+BRIDGE-PROGRESS completed=55000 released=55000
+BRIDGE-PROGRESS completed=56000 released=56000
+BRIDGE-PROGRESS completed=57000 released=57000
+BRIDGE-PROGRESS completed=58000 released=58000
+BRIDGE-PROGRESS completed=59000 released=59000
+BRIDGE-PROGRESS completed=60000 released=60000
+BRIDGE-PROGRESS completed=61000 released=61000
+BRIDGE-PROGRESS completed=62000 released=62000
+BRIDGE-PROGRESS completed=63000 released=63000
+BRIDGE-PROGRESS completed=64000 released=64000
+BRIDGE-PROGRESS completed=65000 released=65000
+BRIDGE-PROGRESS completed=66000 released=66000
+BRIDGE-PROGRESS completed=67000 released=67000
+BRIDGE-PROGRESS completed=68000 released=68000
+BRIDGE-PROGRESS completed=69000 released=69000
+BRIDGE-PROGRESS completed=70000 released=70000
+BRIDGE-PROGRESS completed=71000 released=71000
+BRIDGE-PROGRESS completed=72000 released=72000
+BRIDGE-PROGRESS completed=73000 released=73000
+BRIDGE-PROGRESS completed=74000 released=74000
+BRIDGE-PROGRESS completed=75000 released=75000
+BRIDGE-PROGRESS completed=76000 released=76000
+BRIDGE-PROGRESS completed=77000 released=77000
+BRIDGE-PROGRESS completed=78000 released=78000
+BRIDGE-PROGRESS completed=79000 released=79000
+BRIDGE-PROGRESS completed=80000 released=80000
+BRIDGE-PROGRESS completed=81000 released=81000
+BRIDGE-PROGRESS completed=82000 released=82000
+BRIDGE-PROGRESS completed=83000 released=83000
+BRIDGE-PROGRESS completed=84000 released=84000
+BRIDGE-PROGRESS completed=85000 released=85000
+BRIDGE-PROGRESS completed=86000 released=86000
+BRIDGE-PROGRESS completed=87000 released=87000
+BRIDGE-PROGRESS completed=88000 released=88000
+BRIDGE-PROGRESS completed=89000 released=89000
+BRIDGE-PROGRESS completed=90000 released=90000
+BRIDGE-PROGRESS completed=91000 released=91000
+BRIDGE-PROGRESS completed=92000 released=92000
+BRIDGE-PROGRESS completed=93000 released=93000
+BRIDGE-PROGRESS completed=94000 released=94000
+BRIDGE-PROGRESS completed=95000 released=95000
+BRIDGE-PROGRESS completed=96000 released=96000
+BRIDGE-PROGRESS completed=97000 released=97000
+BRIDGE-PROGRESS completed=98000 released=98000
+BRIDGE-PROGRESS completed=99000 released=99000
+BRIDGE-PROGRESS completed=100000 released=100000
+BRIDGE-PROGRESS completed=101000 released=101000
+BRIDGE-PROGRESS completed=102000 released=102000
+BRIDGE-PROGRESS completed=103000 released=103000
+BRIDGE-PROGRESS completed=104000 released=104000
+BRIDGE-PROGRESS completed=105000 released=105000
+BRIDGE-PROGRESS completed=106000 released=106000
+BRIDGE-PROGRESS completed=107000 released=107000
+BRIDGE-PROGRESS completed=108000 released=108000
+BRIDGE-PROGRESS completed=109000 released=109000
+BRIDGE-PROGRESS completed=110000 released=110000
+BRIDGE-PROGRESS completed=111000 released=111000
+BRIDGE-PROGRESS completed=112000 released=112000
+BRIDGE-PROGRESS completed=113000 released=113000
+BRIDGE-PROGRESS completed=114000 released=114000
+BRIDGE-PROGRESS completed=115000 released=115000
+BRIDGE-PROGRESS completed=116000 released=116000
+BRIDGE-PROGRESS completed=117000 released=117000
+BRIDGE-PROGRESS completed=118000 released=118000
+BRIDGE-PROGRESS completed=119000 released=119000
+BRIDGE-PROGRESS completed=120000 released=120000
+BRIDGE-PROGRESS completed=121000 released=121000
+BRIDGE-PROGRESS completed=122000 released=122000
+BRIDGE-TRANSPORT completed=100000 bytes=0 callers=12 owners=1 window=1 pipelined=false instrumentation=true elapsed_ns=135053833 queue_p95_ns=20458 service_p95_ns=625 request_p95_ns=31084
+BRIDGE-PROGRESS completed=123000 released=123000
+BRIDGE-PROGRESS completed=124000 released=124000
+BRIDGE-PROGRESS completed=125000 released=125000
+BRIDGE-PROGRESS completed=126000 released=126000
+BRIDGE-PROGRESS completed=127000 released=127000
+BRIDGE-PROGRESS completed=128000 released=128000
+BRIDGE-PROGRESS completed=129000 released=129000
+BRIDGE-PROGRESS completed=130000 released=130000
+BRIDGE-PROGRESS completed=131000 released=131000
+BRIDGE-PROGRESS completed=132000 released=132000
+BRIDGE-PROGRESS completed=133000 released=133000
+BRIDGE-PROGRESS completed=134000 released=134000
+BRIDGE-PROGRESS completed=135000 released=135000
+BRIDGE-PROGRESS completed=136000 released=136000
+BRIDGE-PROGRESS completed=137000 released=137000
+BRIDGE-PROGRESS completed=138000 released=138000
+BRIDGE-PROGRESS completed=139000 released=139000
+BRIDGE-PROGRESS completed=140000 released=140000
+BRIDGE-PROGRESS completed=141000 released=141000
+BRIDGE-PROGRESS completed=142000 released=142000
+BRIDGE-PROGRESS completed=143000 released=143000
+BRIDGE-PROGRESS completed=144000 released=144000
+BRIDGE-PROGRESS completed=145000 released=145000
+BRIDGE-PROGRESS completed=146000 released=146000
+BRIDGE-PROGRESS completed=147000 released=147000
+BRIDGE-PROGRESS completed=148000 released=148000
+BRIDGE-PROGRESS completed=149000 released=149000
+BRIDGE-PROGRESS completed=150000 released=150000
+BRIDGE-PROGRESS completed=151000 released=151000
+BRIDGE-PROGRESS completed=152000 released=152000
+BRIDGE-PROGRESS completed=153000 released=153000
+BRIDGE-PROGRESS completed=154000 released=154000
+BRIDGE-PROGRESS completed=155000 released=155000
+BRIDGE-PROGRESS completed=156000 released=156000
+BRIDGE-PROGRESS completed=157000 released=157000
+BRIDGE-PROGRESS completed=158000 released=158000
+BRIDGE-PROGRESS completed=159000 released=159000
+BRIDGE-PROGRESS completed=160000 released=160000
+BRIDGE-PROGRESS completed=161000 released=161000
+BRIDGE-PROGRESS completed=162000 released=162000
+BRIDGE-PROGRESS completed=163000 released=163000
+BRIDGE-PROGRESS completed=164000 released=164000
+BRIDGE-PROGRESS completed=165000 released=165000
+BRIDGE-PROGRESS completed=166000 released=166000
+BRIDGE-PROGRESS completed=167000 released=167000
+BRIDGE-PROGRESS completed=168000 released=168000
+BRIDGE-PROGRESS completed=169000 released=169000
+BRIDGE-PROGRESS completed=170000 released=170000
+BRIDGE-PROGRESS completed=171000 released=171000
+BRIDGE-PROGRESS completed=172000 released=172000
+BRIDGE-PROGRESS completed=173000 released=173000
+BRIDGE-PROGRESS completed=174000 released=174000
+BRIDGE-PROGRESS completed=175000 released=175000
+BRIDGE-PROGRESS completed=176000 released=176000
+BRIDGE-PROGRESS completed=177000 released=177000
+BRIDGE-PROGRESS completed=178000 released=178000
+BRIDGE-PROGRESS completed=179000 released=179000
+BRIDGE-PROGRESS completed=180000 released=180000
+BRIDGE-PROGRESS completed=181000 released=181000
+BRIDGE-PROGRESS completed=182000 released=182000
+BRIDGE-PROGRESS completed=183000 released=183000
+BRIDGE-PROGRESS completed=184000 released=184000
+BRIDGE-PROGRESS completed=185000 released=185000
+BRIDGE-PROGRESS completed=186000 released=186000
+BRIDGE-PROGRESS completed=187000 released=187000
+BRIDGE-PROGRESS completed=188000 released=188000
+BRIDGE-PROGRESS completed=189000 released=189000
+BRIDGE-PROGRESS completed=190000 released=190000
+BRIDGE-PROGRESS completed=191000 released=191000
+BRIDGE-PROGRESS completed=192000 released=192000
+BRIDGE-PROGRESS completed=193000 released=193000
+BRIDGE-PROGRESS completed=194000 released=194000
+BRIDGE-PROGRESS completed=195000 released=195000
+BRIDGE-PROGRESS completed=196000 released=196000
+BRIDGE-PROGRESS completed=197000 released=197000
+BRIDGE-PROGRESS completed=198000 released=198000
+BRIDGE-PROGRESS completed=199000 released=199000
+BRIDGE-PROGRESS completed=200000 released=200000
+BRIDGE-PROGRESS completed=201000 released=201000
+BRIDGE-PROGRESS completed=202000 released=202000
+BRIDGE-PROGRESS completed=203000 released=203000
+BRIDGE-PROGRESS completed=204000 released=204000
+BRIDGE-PROGRESS completed=205000 released=205000
+BRIDGE-PROGRESS completed=206000 released=206000
+BRIDGE-PROGRESS completed=207000 released=207000
+BRIDGE-PROGRESS completed=208000 released=208000
+BRIDGE-PROGRESS completed=209000 released=209000
+BRIDGE-PROGRESS completed=210000 released=210000
+BRIDGE-PROGRESS completed=211000 released=211000
+BRIDGE-PROGRESS completed=212000 released=212000
+BRIDGE-PROGRESS completed=213000 released=213000
+BRIDGE-PROGRESS completed=214000 released=214000
+BRIDGE-PROGRESS completed=215000 released=215000
+BRIDGE-PROGRESS completed=216000 released=216000
+BRIDGE-PROGRESS completed=217000 released=217000
+BRIDGE-PROGRESS completed=218000 released=218000
+BRIDGE-PROGRESS completed=219000 released=219000
+BRIDGE-PROGRESS completed=220000 released=220000
+BRIDGE-PROGRESS completed=221000 released=221000
+BRIDGE-PROGRESS completed=222000 released=222000
+BRIDGE-TRANSPORT completed=100000 bytes=8192 callers=12 owners=1 window=1 pipelined=false instrumentation=true elapsed_ns=314703542 queue_p95_ns=67375 service_p95_ns=2917 request_p95_ns=90417
+BRIDGE-PROGRESS completed=223000 released=223000
+BRIDGE-TRANSPORT completed=1003 bytes=0 callers=12 owners=1 window=2 pipelined=true instrumentation=true elapsed_ns=801917 queue_p95_ns=20958 service_p95_ns=584 request_p95_ns=24875
+BRIDGE-PROGRESS completed=224000 released=224000
+BRIDGE-TRANSPORT completed=1003 bytes=8192 callers=12 owners=1 window=2 pipelined=true instrumentation=true elapsed_ns=1960792 queue_p95_ns=100042 service_p95_ns=1667 request_p95_ns=104875
+BRIDGE-PROGRESS completed=225000 released=225000
+BRIDGE-PROGRESS completed=226000 released=226000
+BRIDGE-PROGRESS completed=227000 released=227000
+BRIDGE-PROGRESS completed=228000 released=228000
+BRIDGE-PROGRESS completed=229000 released=229000
+BRIDGE-PROGRESS completed=230000 released=230000
+BRIDGE-PROGRESS completed=231000 released=231000
+BRIDGE-PROGRESS completed=232000 released=232000
+BRIDGE-PROGRESS completed=233000 released=233000
+BRIDGE-PROGRESS completed=234000 released=234000
+BRIDGE-TRANSPORT completed=10007 bytes=0 callers=12 owners=1 window=2 pipelined=true instrumentation=true elapsed_ns=8428167 queue_p95_ns=26583 service_p95_ns=583 request_p95_ns=32750
+BRIDGE-PROGRESS completed=235000 released=235000
+BRIDGE-PROGRESS completed=236000 released=236000
+BRIDGE-PROGRESS completed=237000 released=237000
+BRIDGE-PROGRESS completed=238000 released=238000
+BRIDGE-PROGRESS completed=239000 released=239000
+BRIDGE-PROGRESS completed=240000 released=240000
+BRIDGE-PROGRESS completed=241000 released=241000
+BRIDGE-PROGRESS completed=242000 released=242000
+BRIDGE-PROGRESS completed=243000 released=243000
+BRIDGE-PROGRESS completed=244000 released=244000
+BRIDGE-TRANSPORT completed=10007 bytes=8192 callers=12 owners=1 window=2 pipelined=true instrumentation=true elapsed_ns=20661459 queue_p95_ns=100625 service_p95_ns=1958 request_p95_ns=105666
+BRIDGE-PROGRESS completed=245000 released=245000
+BRIDGE-PROGRESS completed=246000 released=246000
+BRIDGE-PROGRESS completed=247000 released=247000
+BRIDGE-PROGRESS completed=248000 released=248000
+BRIDGE-PROGRESS completed=249000 released=249000
+BRIDGE-PROGRESS completed=250000 released=250000
+BRIDGE-PROGRESS completed=251000 released=251000
+BRIDGE-PROGRESS completed=252000 released=252000
+BRIDGE-PROGRESS completed=253000 released=253000
+BRIDGE-PROGRESS completed=254000 released=254000
+BRIDGE-PROGRESS completed=255000 released=255000
+BRIDGE-PROGRESS completed=256000 released=256000
+BRIDGE-PROGRESS completed=257000 released=257000
+BRIDGE-PROGRESS completed=258000 released=258000
+BRIDGE-PROGRESS completed=259000 released=259000
+BRIDGE-PROGRESS completed=260000 released=260000
+BRIDGE-PROGRESS completed=261000 released=261000
+BRIDGE-PROGRESS completed=262000 released=262000
+BRIDGE-PROGRESS completed=263000 released=263000
+BRIDGE-PROGRESS completed=264000 released=264000
+BRIDGE-PROGRESS completed=265000 released=265000
+BRIDGE-PROGRESS completed=266000 released=266000
+BRIDGE-PROGRESS completed=267000 released=267000
+BRIDGE-PROGRESS completed=268000 released=268000
+BRIDGE-PROGRESS completed=269000 released=269000
+BRIDGE-PROGRESS completed=270000 released=270000
+BRIDGE-PROGRESS completed=271000 released=271000
+BRIDGE-PROGRESS completed=272000 released=272000
+BRIDGE-PROGRESS completed=273000 released=273000
+BRIDGE-PROGRESS completed=274000 released=274000
+BRIDGE-PROGRESS completed=275000 released=275000
+BRIDGE-PROGRESS completed=276000 released=276000
+BRIDGE-PROGRESS completed=277000 released=277000
+BRIDGE-PROGRESS completed=278000 released=278000
+BRIDGE-PROGRESS completed=279000 released=279000
+BRIDGE-PROGRESS completed=280000 released=280000
+BRIDGE-PROGRESS completed=281000 released=281000
+BRIDGE-PROGRESS completed=282000 released=282000
+BRIDGE-PROGRESS completed=283000 released=283000
+BRIDGE-PROGRESS completed=284000 released=284000
+BRIDGE-PROGRESS completed=285000 released=285000
+BRIDGE-PROGRESS completed=286000 released=286000
+BRIDGE-PROGRESS completed=287000 released=287000
+BRIDGE-PROGRESS completed=288000 released=288000
+BRIDGE-PROGRESS completed=289000 released=289000
+BRIDGE-PROGRESS completed=290000 released=290000
+BRIDGE-PROGRESS completed=291000 released=291000
+BRIDGE-PROGRESS completed=292000 released=292000
+BRIDGE-PROGRESS completed=293000 released=293000
+BRIDGE-PROGRESS completed=294000 released=294000
+BRIDGE-PROGRESS completed=295000 released=295000
+BRIDGE-PROGRESS completed=296000 released=296000
+BRIDGE-PROGRESS completed=297000 released=297000
+BRIDGE-PROGRESS completed=298000 released=298000
+BRIDGE-PROGRESS completed=299000 released=299000
+BRIDGE-PROGRESS completed=300000 released=300000
+BRIDGE-PROGRESS completed=301000 released=301000
+BRIDGE-PROGRESS completed=302000 released=302000
+BRIDGE-PROGRESS completed=303000 released=303000
+BRIDGE-PROGRESS completed=304000 released=304000
+BRIDGE-PROGRESS completed=305000 released=305000
+BRIDGE-PROGRESS completed=306000 released=306000
+BRIDGE-PROGRESS completed=307000 released=307000
+BRIDGE-PROGRESS completed=308000 released=308000
+BRIDGE-PROGRESS completed=309000 released=309000
+BRIDGE-PROGRESS completed=310000 released=310000
+BRIDGE-PROGRESS completed=311000 released=311000
+BRIDGE-PROGRESS completed=312000 released=312000
+BRIDGE-PROGRESS completed=313000 released=313000
+BRIDGE-PROGRESS completed=314000 released=314000
+BRIDGE-PROGRESS completed=315000 released=315000
+BRIDGE-PROGRESS completed=316000 released=316000
+BRIDGE-PROGRESS completed=317000 released=317000
+BRIDGE-PROGRESS completed=318000 released=318000
+BRIDGE-PROGRESS completed=319000 released=319000
+BRIDGE-PROGRESS completed=320000 released=320000
+BRIDGE-PROGRESS completed=321000 released=321000
+BRIDGE-PROGRESS completed=322000 released=322000
+BRIDGE-PROGRESS completed=323000 released=323000
+BRIDGE-PROGRESS completed=324000 released=324000
+BRIDGE-PROGRESS completed=325000 released=325000
+BRIDGE-PROGRESS completed=326000 released=326000
+BRIDGE-PROGRESS completed=327000 released=327000
+BRIDGE-PROGRESS completed=328000 released=328000
+BRIDGE-PROGRESS completed=329000 released=329000
+BRIDGE-PROGRESS completed=330000 released=330000
+BRIDGE-PROGRESS completed=331000 released=331000
+BRIDGE-PROGRESS completed=332000 released=332000
+BRIDGE-PROGRESS completed=333000 released=333000
+BRIDGE-PROGRESS completed=334000 released=334000
+BRIDGE-PROGRESS completed=335000 released=335000
+BRIDGE-PROGRESS completed=336000 released=336000
+BRIDGE-PROGRESS completed=337000 released=337000
+BRIDGE-PROGRESS completed=338000 released=338000
+BRIDGE-PROGRESS completed=339000 released=339000
+BRIDGE-PROGRESS completed=340000 released=340000
+BRIDGE-PROGRESS completed=341000 released=341000
+BRIDGE-PROGRESS completed=342000 released=342000
+BRIDGE-PROGRESS completed=343000 released=343000
+BRIDGE-PROGRESS completed=344000 released=344000
+BRIDGE-TRANSPORT completed=100003 bytes=0 callers=12 owners=1 window=2 pipelined=true instrumentation=true elapsed_ns=89108333 queue_p95_ns=26667 service_p95_ns=583 request_p95_ns=34333
+BRIDGE-PROGRESS completed=345000 released=345000
+BRIDGE-PROGRESS completed=346000 released=346000
+BRIDGE-PROGRESS completed=347000 released=347000
+BRIDGE-PROGRESS completed=348000 released=348000
+BRIDGE-PROGRESS completed=349000 released=349000
+BRIDGE-PROGRESS completed=350000 released=350000
+BRIDGE-PROGRESS completed=351000 released=351000
+BRIDGE-PROGRESS completed=352000 released=352000
+BRIDGE-PROGRESS completed=353000 released=353000
+BRIDGE-PROGRESS completed=354000 released=354000
+BRIDGE-PROGRESS completed=355000 released=355000
+BRIDGE-PROGRESS completed=356000 released=356000
+BRIDGE-PROGRESS completed=357000 released=357000
+BRIDGE-PROGRESS completed=358000 released=358000
+BRIDGE-PROGRESS completed=359000 released=359000
+BRIDGE-PROGRESS completed=360000 released=360000
+BRIDGE-PROGRESS completed=361000 released=361000
+BRIDGE-PROGRESS completed=362000 released=362000
+BRIDGE-PROGRESS completed=363000 released=363000
+BRIDGE-PROGRESS completed=364000 released=364000
+BRIDGE-PROGRESS completed=365000 released=365000
+BRIDGE-PROGRESS completed=366000 released=366000
+BRIDGE-PROGRESS completed=367000 released=367000
+BRIDGE-PROGRESS completed=368000 released=368000
+BRIDGE-PROGRESS completed=369000 released=369000
+BRIDGE-PROGRESS completed=370000 released=370000
+BRIDGE-PROGRESS completed=371000 released=371000
+BRIDGE-PROGRESS completed=372000 released=372000
+BRIDGE-PROGRESS completed=373000 released=373000
+BRIDGE-PROGRESS completed=374000 released=374000
+BRIDGE-PROGRESS completed=375000 released=375000
+BRIDGE-PROGRESS completed=376000 released=376000
+BRIDGE-PROGRESS completed=377000 released=377000
+BRIDGE-PROGRESS completed=378000 released=378000
+BRIDGE-PROGRESS completed=379000 released=379000
+BRIDGE-PROGRESS completed=380000 released=380000
+BRIDGE-PROGRESS completed=381000 released=381000
+BRIDGE-PROGRESS completed=382000 released=382000
+BRIDGE-PROGRESS completed=383000 released=383000
+BRIDGE-PROGRESS completed=384000 released=384000
+BRIDGE-PROGRESS completed=385000 released=385000
+BRIDGE-PROGRESS completed=386000 released=386000
+BRIDGE-PROGRESS completed=387000 released=387000
+BRIDGE-PROGRESS completed=388000 released=388000
+BRIDGE-PROGRESS completed=389000 released=389000
+BRIDGE-PROGRESS completed=390000 released=390000
+BRIDGE-PROGRESS completed=391000 released=391000
+BRIDGE-PROGRESS completed=392000 released=392000
+BRIDGE-PROGRESS completed=393000 released=393000
+BRIDGE-PROGRESS completed=394000 released=394000
+BRIDGE-PROGRESS completed=395000 released=395000
+BRIDGE-PROGRESS completed=396000 released=396000
+BRIDGE-PROGRESS completed=397000 released=397000
+BRIDGE-PROGRESS completed=398000 released=398000
+BRIDGE-PROGRESS completed=399000 released=399000
+BRIDGE-PROGRESS completed=400000 released=400000
+BRIDGE-PROGRESS completed=401000 released=401000
+BRIDGE-PROGRESS completed=402000 released=402000
+BRIDGE-PROGRESS completed=403000 released=403000
+BRIDGE-PROGRESS completed=404000 released=404000
+BRIDGE-PROGRESS completed=405000 released=405000
+BRIDGE-PROGRESS completed=406000 released=406000
+BRIDGE-PROGRESS completed=407000 released=407000
+BRIDGE-PROGRESS completed=408000 released=408000
+BRIDGE-PROGRESS completed=409000 released=409000
+BRIDGE-PROGRESS completed=410000 released=410000
+BRIDGE-PROGRESS completed=411000 released=411000
+BRIDGE-PROGRESS completed=412000 released=412000
+BRIDGE-PROGRESS completed=413000 released=413000
+BRIDGE-PROGRESS completed=414000 released=414000
+BRIDGE-PROGRESS completed=415000 released=415000
+BRIDGE-PROGRESS completed=416000 released=416000
+BRIDGE-PROGRESS completed=417000 released=417000
+BRIDGE-PROGRESS completed=418000 released=418000
+BRIDGE-PROGRESS completed=419000 released=419000
+BRIDGE-PROGRESS completed=420000 released=420000
+BRIDGE-PROGRESS completed=421000 released=421000
+BRIDGE-PROGRESS completed=422000 released=422000
+BRIDGE-PROGRESS completed=423000 released=423000
+BRIDGE-PROGRESS completed=424000 released=424000
+BRIDGE-PROGRESS completed=425000 released=425000
+BRIDGE-PROGRESS completed=426000 released=426000
+BRIDGE-PROGRESS completed=427000 released=427000
+BRIDGE-PROGRESS completed=428000 released=428000
+BRIDGE-PROGRESS completed=429000 released=429000
+BRIDGE-PROGRESS completed=430000 released=430000
+BRIDGE-PROGRESS completed=431000 released=431000
+BRIDGE-PROGRESS completed=432000 released=432000
+BRIDGE-PROGRESS completed=433000 released=433000
+BRIDGE-PROGRESS completed=434000 released=434000
+BRIDGE-PROGRESS completed=435000 released=435000
+BRIDGE-PROGRESS completed=436000 released=436000
+BRIDGE-PROGRESS completed=437000 released=437000
+BRIDGE-PROGRESS completed=438000 released=438000
+BRIDGE-PROGRESS completed=439000 released=439000
+BRIDGE-PROGRESS completed=440000 released=440000
+BRIDGE-PROGRESS completed=441000 released=441000
+BRIDGE-PROGRESS completed=442000 released=442000
+BRIDGE-PROGRESS completed=443000 released=443000
+BRIDGE-PROGRESS completed=444000 released=444000
+BRIDGE-TRANSPORT completed=100003 bytes=8192 callers=12 owners=1 window=2 pipelined=true instrumentation=true elapsed_ns=193841875 queue_p95_ns=97166 service_p95_ns=1875 request_p95_ns=103042
+BRIDGE-DRAIN completed=444031 released=444031 abandoned=4 receive_batches=38033 max_batch=24 cleanup=OK
+test tokio_handoff::tokio_abort_and_concurrent_batches_drain_before_runtime_cleanup ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+     Running tests/unit_test.rs (target/debug/deps/unit_test-fb371cef58d07832)
+
+running 45 tests
+test result_contract::native_result_projects_success_and_error_statuses ... ok
+test safe_value_surface::scheme_borrowed_bytevector_preserves_slice_and_abi_projection ... ok
+test safe_value_surface::scheme_borrowed_vector_preserves_handle_slice_and_abi_projection ... ok
+test safe_value_surface::scheme_handle_backed_views_preserve_identity_and_reject_null ... ok
+test safe_value_surface::scheme_pair_list_status_wrappers_fail_closed_for_unbacked_handles ... ok
+test safe_value_surface::scheme_scalar_projects_to_public_sys_abi_shapes ... ok
+scenario benchmark receipt: id=invalid-comparison-fail-closed projections=10000 elapsed_ns=2129792
+test bulk_conversion::owned_string_never_bypasses_the_required_utf8_validation ... ok
+test scenario_benchmark_suite::all_required_safe_value_scenarios_have_valid_contracts ... ok
+test bulk_conversion::utf8_benchmarks_do_not_log_inside_transfer_loops ... ok
+test error_contract::invalid_comparison_result_fails_closed_as_an_invalid_value ... ok
+test bulk_conversion::numeric_transport_rejects_element_foreign_loops ... ok
+test source_surface::actor_qualification_restores_the_active_vm_not_its_startup_policy ... ok
+test bulk_conversion::scalar_batch_rejects_per_item_foreign_projections ... ok
+test source_surface::ffi_runtime_is_the_default_api_without_an_opt_in_alias ... ok
+test source_surface::external_program_runtime_preserves_the_sdk_vm_policy ... ok
+test source_surface::asp_native_surface_stays_out_of_runtime_build ... ok
+test status_contract::native_errors_expose_known_statuses_and_preserve_unknown_codes ... ok
+test source_surface::fresh_utf8_entry_reencodes_in_scheme_without_snapshot_shortcuts ... ok
+test source_surface::asp_native_surface_exports_current_shape_selectors ... ok
+test source_surface::native_source_is_the_tracked_ffi_contract ... ok
+scenario benchmark receipt: id=status-contract projections=90000 elapsed_ns=124083
+test status_contract::stable_status_codes_round_trip_without_transmute ... ok
+test bulk_conversion::composite_transport_rejects_per_component_foreign_loops ... ok
+test toolchain::explicit_toolchain_preserves_paths ... ok
+scenario benchmark receipt: id=source-surface-sync checked_tokens=8 elapsed_ns=test toolchain_program::leaves_paths_and_unknown_program_names_unchanged ... ok
+
+thread 'value_surface::i64_callback_contains_panic_at_native_boundary' (4148084) panicked at crates/gerbil-scheme/tests/unit/value_surface.rs:393:9:
+contained panic
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test toolchain_program::maps_conventional_program_names_through_the_toolchain ... ok
+test value_surface::borrowed_utf8_surface_preserves_text_and_abi_bytes ... ok
+21375
+test value_surface::empty_borrowed_utf8_keeps_zero_length_contract ... ok
+test status_contract::scheme_native_surface_projects_result_and_error_shapes ... ok
+test toolchain::missing_interpreter_is_reported_at_spawn_boundary ... ok
+test value_surface::i64_callback_rejects_null_context_before_rust_call ... ok
+test value_surface::i64_callback_projects_rust_function_to_native_pair ... ok
+test value_surface::native_result_projects_status_and_preserves_unknown_codes ... ok
+VM-ABI multiple-vms=true thread-local-entry=false max-processors=1 independent-worker-admission=unqualified
+test value_surface::public_backed_type_matrix_covers_current_native_surface ... ok
+test value_surface::scheme_native_surface_projects_all_backed_value_family_shapes ... ok
+test value_surface::value_handle_preserves_non_null_raw_identity_without_deref ... ok
+test value_surface::scheme_native_surface_projects_value_utf8_and_callback_shapes ... ok
+test value_surface::value_handle_rejects_null_without_crossing_ffi ... ok
+test vm_capabilities::linked_vm_capabilities_are_initialization_free ... ok
+test vm_capabilities::vm_capability_probe_cannot_override_sdk_or_initialize_runtime ... ok
+test value_surface::i64_callback_contains_panic_at_native_boundary ... ok
+test bulk_conversion::identifier_transport_rejects_per_name_foreign_loops ... ok
+test bulk_conversion::rooted_collection_and_integer_copies_reject_scalar_ffi_loops ... ok
+test bulk_conversion::bulk_conversion_rejects_per_element_ffi_regressions ... ok
+test real_gerbil::reports_real_runtime_version ... ok
+test real_gerbil::projects_real_scalar_value ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running unittests src/lib.rs (target/debug/deps/gerbil_scheme_aot_build-47393c6d3d36171d)
+
+running 26 tests
+test program::archive::cache_scenario::actual_gcc_module_completes_with_bounded_load_motion_policy ... ignored, requires owned generated module C and the configured GCC SDK
+test program::process::process_tests::actual_gcc_allocation_dump_progress_completes ... ignored, requires an owned generated C input and explicit GCC; native build supervision
+test program::process::process_tests::actual_gcc_linker_emits_artifacts_and_completes ... ignored, requires the exact owned generated linker C; supervise as a native build
+test program::archive::link_search_tests::receipt_locates_implicit_archives_once_without_changing_link_order ... ok
+test compiler::environment_tests::runtime_diagnostics_keep_selected_sdk_mappings ... ok
+test program::archive::link_search_tests::receipt_rejects_missing_static_archive_and_relative_package_paths ... ok
+test compiler::environment_tests::selected_sdk_command_removes_ambient_apple_tool_redirects ... ok
+test program::process::process_tests::compiler_artifact_events_forward_actual_growth_and_cleanup ... ignored, six-second compiler-written artifact regression under five-second idle supervision
+test program::process::process_tests::artifact_events_require_new_bytes_and_do_not_repeat_for_stalled_files ... ok
+test program::process::process_tests::compiler_artifact_diagnostic_write_failure_is_typed_without_panicking ... ok
+test program::process::process_tests::live_child_forwards_real_events_before_exit ... ignored, six-second real child-output regression; run under five-second idle supervision
+
+thread '<unnamed>' (4148171) panicked at build-support/gerbil-scheme-aot-build/src/program/../../tests/unit/program_process.rs:95:41:
+fixture monitor cause
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test package_launcher::tests::quiet_or_non_gcc_package_keeps_original_compiler ... ok
+test program::process::process_tests::compiler_monitor_retains_actual_thread_panic_cause ... ok
+test program::archive::cache_scenario::unchanged_compiler_path_does_not_cache_changed_sdk_abi_or_driver ... ok
+test program::process::process_tests::progress_retains_partial_writes_and_retries_interrupted_write_and_flush ... ok
+test program::process::process_tests::verbose_gambit_runtime_options_precede_compiler_options_and_preserve_heap_defaults ... ok
+test compiler::environment_tests::darwin_system_linker_resolves_through_clean_selected_sdk_command ... ok
+diagnostic
+test program::process::process_tests::quiet_failure_retains_both_diagnostic_streams ... ok
+test program::process::process_tests::live_failure_preserves_nonzero_status ... ok
+test program::process::process_tests::gcc_allocation_dump_options_preserve_exact_shell_paths ... ok
+test program::archive::cache_scenario::unchanged_native_input_reuses_content_addressed_output ... ok
+test program::process::process_tests::failed_compiler_artifact_run_cleans_stale_and_new_intermediates ... ok
+test program::process::process_tests::actual_nonblocking_full_pipe_delivers_event_without_loss_after_consumer_drains ... ok
+isolated-native-output
+isolated-native-diagnostic
+test program::process::process_tests::streaming_native_child_cannot_change_parent_stdio_file_status_flags ... ok
+test package_launcher::tests::parallel_publication_executes_only_closed_launcher_inodes ... ok
+test package_launcher::tests::launcher_preserves_arguments_and_nonzero_exit_with_quoted_compiler_path ... ok
+
+test result: ok. 21 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.67s
+
+     Running tests/unit_test.rs (target/debug/deps/unit_test-de9e2061d43c2d85)
+
+running 20 tests
+test archive::static_archive_filename_matches_target_family ... ok
+test generated_scm::generated_scm_provenance_rejects_changed_inputs ... ok
+test generated_scm::generated_scm_provenance_rejects_changed_body ... ok
+test generated_scm::generated_scm_provenance_accepts_untouched_body_and_inputs ... ok
+test archive::static_archive_projection_is_parameterized_and_ordered ... ok
+test archive::static_archive_packaging_consumes_real_object_files ... ok
+test program::source_workspace_is_owned_by_the_resolved_crate ... ok
+test program::program_rejects_linker_arguments_before_reading_input ... ok
+test toolchain::native_compiler_discovery_uses_the_cc_contract ... ok
+test program::program_rejects_a_forbidden_runtime_module_before_compilation ... ok
+test header::header_drift_receipt_fails_closed_without_selecting_a_generator ... ok
+test program::observed_build_identifies_the_last_owned_phase_without_a_heartbeat ... ok
+test program::downstream_program_contract_selects_its_own_required_module_and_main_symbol ... ok
+test program::program_requires_exactly_one_bridge ... ok
+test program::program_rejects_empty_unknown_and_unversioned_plans ... ok
+test scenario_benchmark_suite::all_required_native_build_scenarios_have_valid_contracts ... ok
+test discovery::discovers_gambit_library_from_a_gerbil_wrapper ... ok
+test generated_scm::generated_scm_input_fingerprint_tracks_all_build_inputs ... ok
+test toolchain::paired_wrapper_compiler_rejects_ghostscript_and_follows_symlinked_home ... ok
+test program::slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s
+
+     Running unittests src/lib.rs (target/debug/deps/gerbil_scheme_build-3ecadf2c8b7b88b2)
+
+running 2 tests
+test tests::rejects_non_portable_module_names ... ok
+test tests::emits_opaque_source ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/real_gerbil_compiler.rs (target/debug/deps/real_gerbil_compiler-7948b78e95f1da2c)
+
+running 2 tests
+test compiler_source_emission_stays_within_scenario_budget ... ok
+test downstream_consumer_compiles_gerbil_source_to_gambit ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/scenario_benchmark_suite.rs (target/debug/deps/scenario_benchmark_suite-a29d4dc231d3b06c)
+
+running 1 test
+test all_required_compiler_scenarios_have_valid_benchmark_contracts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/gerbil_scheme_qualification-4974c1220450519f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/build_inputs.rs (target/debug/deps/build_inputs-88fdc4d7953ee601)
+
+running 1 test
+test original_sdk_and_producer_inputs_are_not_self_invalidating_outputs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/gerbil_scheme_rust_ir-d8a9da7ac6c17589)
+
+running 1 test
+test enforce_asp_rust_gate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/bin/gerbil-scheme-rust-ir.rs (target/debug/deps/gerbil_scheme_rust_ir-bbec08d9a89e74b4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/integration_test.rs (target/debug/deps/integration_test-1670c740ce1bcad8)
+
+running 53 tests
+test event_future_heading::future_heading_title_rejects_non_heading_declarations ... ok
+test event_choice_ir::exclusive_event_choices_lower_to_flat_else_if ... ok
+test event_future_heading::future_heading_title_uses_a_typed_runtime_threshold ... ok
+test event_ir::bounded_line_byte_fold_emits_source_backed_segments ... ok
+test event_ir::blank_line_predicate_preserves_whitespace_bytes ... ok
+test event_future_heading::future_heading_title_matches_level_and_exact_title_once ... ok
+test event_choice_ir::repeated_byte_set_checks_share_pure_generated_functions ... ok
+test event_future_ir::future_line_marker_stops_at_heading_and_parent_boundary ... ok
+test event_ir::ascii_case_insensitive_line_prefix_is_source_backed ... ok
+test event_ir::event_ir_rejects_unknown_forms_and_raw_rust ... ok
+test event_future_ir::future_line_marker_requires_declared_key_value_body ... ok
+test event_choice_ir::large_byte_sets_use_bounded_masks_without_changing_range_semantics ... ok
+test event_future_ir::distinct_future_markers_share_one_index_builder ... ok
+test event_ir::bounded_line_markers_reject_prefix_collisions ... ok
+test event_ir::bounded_line_offsets_emit_source_backed_prefix_word_and_trivia ... ok
+test event_ir::bounded_static_name_set_uses_source_bytes_without_generated_name_branches ... ok
+test event_ir::checked_source_slices_compare_exact_and_ascii_case_insensitive_bytes ... ok
+test event_ir::checked_source_slices_reject_out_of_bounds_and_reversed_ranges ... ok
+test event_ir::declared_list_marker_and_bounded_frames_compile_to_events ... ok
+test event_join_ir::join_once_rejects_empty_continuation ... ok
+test event_join_ir::join_once_rejects_unmarked_branches ... ok
+test event_ir::delimiter_scan_preserves_whitespace_before_the_first_match ... ok
+test event_ir::dynamic_key_line_offsets_preserve_value_and_trivia ... ok
+test event_ir::level_stack_event_ir_closes_siblings_and_nested_sections ... ok
+test event_ir::marker_end_offset_uses_one_cached_line_level ... ok
+test event_ir::nested_source_helpers_compile_once_and_reject_cycles ... ok
+test event_ir::nonspace_delimiter_scan_compiles_source_backed_offsets ... ok
+test event_ir::source_local_helper_compiles_once_and_runs_at_saved_bounds ... ok
+test event_ir::stateful_event_ir_typechecks_and_executes ... ok
+test event_ir::typed_unsigned_state_selects_one_block_strategy ... ok
+test event_join_ir::join_once_preserves_handled_and_fallthrough_paths ... ok
+test event_offset_optimization::bounded_scans_share_helpers_without_changing_offsets ... ok
+test function_ir::bounded_string_predicates_compile_as_typed_functions ... ok
+test function_ir::fold_rejects_duplicate_binders_and_raw_steps ... ok
+test event_offset_optimization::consecutive_line_steps_lower_to_one_bounded_offset ... ok
+test function_ir::nested_pure_bindings_compile_as_lexical_rust_blocks ... ok
+test function_ir::typed_fold_compiles_an_iterator_state_transition ... ok
+test function_ir::typed_ir_compiles_to_a_rust_function ... ok
+test function_ir::unknown_schema_and_raw_rust_snippets_fail_closed ... ok
+test event_offset_optimization::horizontal_skip_is_shared_without_changing_offsets ... ok
+test event_offset_optimization::line_end_offsets_share_helpers_without_changing_source_ranges ... ok
+test source_match_ir::source_match_ir_rejects_unknown_algorithm_fields ... ok
+test event_offset_optimization::physical_line_end_shares_a_forced_inline_helper ... ok
+test event_state_ir::close_frame_emits_one_node_close_even_for_equal_nested_frames ... ok
+test event_state_ir::future_named_marker_matches_saved_name_before_heading_or_parent_boundary ... ok
+test event_ir::saved_source_bounds_rebind_line_primitives_across_physical_lines ... ok
+test event_state_ir::future_named_marker_stops_before_a_named_parent_close ... ok
+test event_state_ir::pop_frame_discards_parser_state_without_closing_syntax_nodes ... ok
+test event_state_ir::typed_parameter_flows_into_source_local_helper ... ok
+test function_ir::generated_function_typechecks_and_executes_with_rustc ... ok
+test source_match_ir::indexed_source_match_preserves_order_boundaries_and_cursor_behavior ... ok
+test source_match_ir::scheme_source_match_ir_typechecks_and_matches_longest_at_unicode_boundaries ... ok
+test event_state_ir::typed_unsigned_parameter_overrides_declared_state_without_a_second_parser ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.66s
+
+     Running unittests src/lib.rs (target/debug/deps/rust_lang_project_harness-a38909dd7cf28c8d)
+
+running 47 tests
+test discovery_tests::hidden_directories_are_ignored_by_default ... ok
+test discovery_tests::asp_toml_can_include_a_hidden_directory ... ok
+test discovery_tests::workspace_member_glob_matches_forward_slash_relative_paths ... ok
+test discovery_tests::workspace_member_glob_matches_windows_relative_paths ... ok
+test discovery_tests::symlinked_rust_file_is_not_discovered ... ok
+test build_gate::cache::tests::symlinked_file_is_not_a_snapshot_input ... ok
+test build_gate::cache::tests::corrupt_cache_is_a_cold_miss_and_atomic_record_round_trips ... ok
+test build_gate::cache::tests::same_key_concurrent_publish_is_valid_and_leaves_no_temporary_files ... ok
+test discovery_tests::symlinked_directory_is_not_discovered ... ok
+test build_gate::cache::tests::symlinked_directory_is_not_a_snapshot_input ... ok
+test build_gate::cache::tests::snapshot_hashes_complete_content_before_parse ... ok
+test parser_reasoning_tree_tests::cargo_manifest_parser_records_cfg_facts ... ok
+test parser_source_path_tests::source_path_facts_identify_special_rust_entrypoints ... ok
+test parser_source_path_tests::source_path_facts_include_file_stem_namespaces ... ok
+test parser_reasoning_tree_tests::cargo_manifest_parser_records_dependency_facts ... ok
+test discovery_tests::workspace_path_dependencies_are_discovered_as_package_roots ... ok
+test parser_reasoning_tree_tests::reasoning_tree_marks_test_root_modules_as_test_sources ... ok
+test parser_reasoning_tree_tests::cargo_manifest_parser_records_workspace_inherited_dependency_facts ... ok
+test parser_reasoning_tree_tests::reasoning_tree_deduplicates_owner_dependencies_by_context_and_keeps_earliest_line ... ok
+test discovery_tests::project_scope_is_anchored_to_cargo_manifest_targets ... ok
+test parser_reasoning_tree_tests::reasoning_tree_interprets_modules_owners_and_child_edges ... ok
+test parser_syntax_api_shape_tests::syntax_facts_record_public_tuple_api_surfaces ... ok
+test parser_syntax_control_flow_tests::syntax_facts_ignore_complex_collection_builders ... ok
+test parser_syntax_control_flow_tests::syntax_facts_record_loop_local_linear_membership_scans ... ok
+test parser_syntax_control_flow_tests::syntax_facts_record_literal_dispatch_chains ... ok
+test parser_syntax_control_flow_tests::syntax_facts_record_manual_iterator_loop_shapes ... ok
+test parser_reasoning_tree_tests::reasoning_tree_derives_crate_repairs_for_deep_relative_imports ... ok
+test parser_syntax_control_flow_tests::syntax_facts_record_private_function_and_impl_method_control_flow ... ok
+test parser_syntax_data_shape_tests::syntax_facts_record_public_type_alias_carriers ... ok
+test parser_syntax_signature_tests::syntax_facts_record_public_enum_variant_fields ... ok
+test parser_reasoning_tree_tests::cargo_manifest_parser_uses_completed_manifest_targets_and_workspace_paths ... ok
+test parser_syntax_control_flow_tests::syntax_facts_record_repeated_iterator_method_sources ... ok
+test parser_syntax_signature_tests::syntax_facts_record_public_function_returns ... ok
+test parser_syntax_control_flow_tests::syntax_facts_record_public_function_control_flow ... ok
+test parser_syntax_tests::syntax_facts_record_deep_relative_scope_imports ... ok
+test parser_syntax_signature_tests::syntax_facts_record_public_struct_fields ... ok
+test parser_syntax_data_shape_tests::syntax_facts_record_public_enum_tuple_variant_fields ... ok
+test parser_syntax_signature_tests::syntax_facts_record_public_function_params ... ok
+test parser_syntax_signature_tests::syntax_facts_record_public_type_generic_bounds ... ok
+test parser_syntax_tests::syntax_facts_record_cfg_and_module_declaring_macros ... ok
+test parser_syntax_tests::syntax_facts_record_reexports_and_path_references ... ok
+test parser_syntax_tests::syntax_facts_record_glob_scope_kinds ... ok
+test runner_tests::report_and_verification_share_one_parse_pass ... ok
+test runner_tests::package_scope_does_not_expand_local_path_dependencies ... ok
+test build_gate::cache::tests::cache_key_invalidates_config_policy_scope_contract_and_baseline ... ok
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/lib.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/obsolete.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/value.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/lib.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/obsolete.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/value.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/lib.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/obsolete.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/renamed_value.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/lib.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/rust-project-harness-build-gate-cache-downstream-hit-88194-3/project/src/renamed_value.rs
+test build_gate::cache::tests::downstream_cold_publish_then_warm_hit_parses_once ... ok
+test self_policy::enforce_rust_project_harness_gate ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.08s
+
+     Running tests/unit_test.rs (target/debug/deps/unit_test-6c0a74845e68a46d)
+
+running 426 tests
+test agent_policy_snapshot::agent_policy_mod_exports_have_explicit_test_coverage ... ok
+test agent_policy_snapshot::agent_r005_facade_reexports_snapshot ... ok
+test agent_policy_snapshot::agent_r002_public_item_doc_snapshot ... ok
+test agent_policy_snapshot::agent_r004_public_name_conflict_snapshot ... ok
+test agent_policy_snapshot::agent_r007_generic_module_path_snapshot ... ok
+test agent_policy_snapshot::agent_r008_branch_intent_snapshot ... ok
+test agent_policy_snapshot::agent_r001_public_module_intent_snapshot ... ok
+test agent_policy_snapshot::agent_r006_generic_public_module_snapshot ... ok
+test agent_policy_snapshot::algorithm_shape::agent_r015_literal_dispatch_chain_snapshot ... ok
+test agent_policy_snapshot::path_policy_agent_has_process_command_lane ... ok
+test agent_policy_snapshot::agent_r003_repeated_namespace_snapshot ... ok
+test agent_policy_snapshot::agent_r009_owner_dependency_cycle_snapshot ... ok
+test agent_policy_snapshot::agent_r010_cross_owner_leaf_snapshot ... ok
+test agent_policy_snapshot::agent_r011_owner_fan_out_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r012_public_primitive_identifier_snapshot ... ok
+test agent_policy_snapshot::algorithm_shape::agent_r026_internal_iterator_idiom_snapshot ... ok
+test agent_policy_snapshot::error_boundary::agent_r013_public_error_boundary_snapshot ... ok
+test agent_policy_snapshot::algorithm_shape::agent_r016_broad_linear_algorithm_snapshot ... ok
+test agent_policy_snapshot::algorithm_shape::agent_r017_iterator_idiom_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r018_public_flag_params_snapshot ... ok
+test agent_policy_snapshot::algorithm_shape::agent_r025_internal_traversal_snapshot ... ok
+test agent_policy_snapshot::algorithm_shape::agent_r015_nested_algorithm_shape_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r022_public_generic_data_bounds_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r020_public_data_shape_snapshot ... ok
+test agent_policy_snapshot::primitive_api::rust_agent_api_shape_023_public_tuple_api_surface_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r021_public_enum_payload_shape_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r019_public_positional_surface_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r027_public_primitive_type_alias_snapshot ... ok
+test agent_policy_snapshot::primitive_api::agent_r028_public_stringly_state_field_snapshot ... ok
+test agent_policy_snapshot::rust_agent_tokio_runtime_boundary_snapshot ... ok
+test harness_rules::generated_harness_rules_matches_unit_fixture ... ok
+test harness_rules::harness_rules_ids_match_rule_catalog ... ok
+test harness_rules::harness_rules_markdown_is_plain_rule_id_list ... ok
+test harness_rules::build_dependency_helper_writes_to_requested_unit_dir ... ok
+test agent_policy_snapshot::primitive_api::agent_r024_public_enum_tuple_payload_snapshot ... ok
+test agent_policy_snapshot::test_support_reexport::agent_r014_test_support_reexport_snapshot ... ok
+test agent_policy_snapshot::rust_agent_abi_contract_snapshot ... ok
+test agent_reasoning_snapshot::agent_reasoning_tree_snapshot_groups_owner_branches ... ok
+test mod_policy_snapshot::mod_r001_interface_mod_snapshot ... ok
+test mod_policy_snapshot::mod_r003_deep_relative_import_snapshot ... ok
+test invariant_catalog::p0_agent_policy_findings_emit_invariant_candidates ... ok
+test agent_reasoning_snapshot::agent_reasoning_tree_snapshot_omits_empty_child_edge_placeholder ... ok
+test mod_policy_snapshot::mod_r004_lib_facade_snapshot ... ok
+test agent_reasoning_snapshot::agent_reasoning_tree_snapshot_ignores_test_context_owner_dependencies ... ok
+test mod_policy_snapshot::mod_r006_build_script_snapshot ... ok
+test mod_policy_snapshot::mod_r010_absolute_owner_glob_import_snapshot ... ok
+test mod_policy_snapshot::mod_r007_module_source_shadow_snapshot ... ok
+test mod_policy_snapshot::mod_r008_inline_source_module_snapshot ... ok
+test mod_policy_snapshot::mod_r009_orphan_source_snapshot ... ok
+test agent_reasoning_snapshot::agent_reasoning_tree_snapshot_compacts_workspace_packages ... ok
+test mod_policy_snapshot::mod_r005_binary_entrypoint_snapshot ... ok
+test path_policy::agent::algorithm_shape::async_blocking_call_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::bounded_async_queue_clears_backpressure_advice ... ok
+test path_policy::agent::algorithm_shape::dropped_sync_lock_guard_clears_across_await_advice ... ok
+test mod_policy_snapshot::mod_r010_glob_import_snapshot ... ok
+test path_policy::agent::algorithm_shape::deeply_nested_algorithm_does_not_duplicate_native_iterator_advice ... ok
+test path_policy::agent::algorithm_shape::indexed_membership_lookup_clears_linear_scan_advice ... ok
+test mod_policy_snapshot::mod_r002_source_bloat_snapshot ... ok
+test path_policy::agent::algorithm_shape::public_manual_iterator_boilerplate_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::loop_local_linear_membership_scan_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::public_broad_linear_algorithm_surface_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::public_literal_dispatch_chain_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::public_match_dispatch_is_not_nested_algorithm_advice ... ok
+test path_policy::agent::algorithm_shape::public_nested_algorithm_shape_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::spawn_blocking_boundary_clears_async_blocking_advice ... ok
+test path_policy::agent::algorithm_shape::read_exact_outside_timeout_clears_cancellation_safety_advice ... ok
+test path_policy::agent::algorithm_shape::read_exact_outside_select_clears_cancellation_safety_advice ... ok
+test path_policy::agent::algorithm_shape::sync_lock_guard_across_await_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::tokio_select_read_clears_cancellation_safety_advice ... ok
+test path_policy::agent::algorithm_shape::tokio_rwlock_read_guard_clears_sync_lock_advice ... ok
+test path_policy::agent::algorithm_shape::tokio_timeout_read_exact_is_cancellation_safety_advice ... ok
+test path_policy::agent::algorithm_shape::std_rwlock_read_guard_across_await_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::unbounded_async_queue_without_backpressure_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape::tokio_timeout_read_clears_cancellation_safety_advice ... ok
+test path_policy::agent::algorithm_shape::tokio_select_read_exact_is_cancellation_safety_advice ... ok
+test path_policy::agent::algorithm_shape_internal_traversal::named_receipt_traversal_helper_clears_private_nesting_advice ... ok
+test path_policy::agent::algorithm_shape::try_send_boundary_clears_unbounded_queue_advice ... ok
+test path_policy::agent::algorithm_shape_internal_traversal::private_nested_receipt_traversal_is_agent_advice ... ok
+test path_policy::agent::algorithm_shape_internal_traversal::named_private_iterator_helper_clears_boilerplate_advice ... ok
+test agent_reasoning_snapshot::agent_reasoning_tree_snapshot_caps_large_sections ... ok
+test path_policy::agent::api_shape::named_api_surface_clears_tuple_api_advice ... ok
+test path_policy::agent::algorithm_shape_internal_traversal::private_manual_iterator_boilerplate_is_agent_advice ... ok
+test path_policy::agent::api_shape::public_tuple_api_surface_is_agent_advice ... ok
+test path_policy::agent::data_shape::generic_method_bounds_clear_public_data_type_bound_advice ... ok
+test path_policy::agent::api_shape::documented_public_tuple_api_surface_clears_agent_advice ... ok
+test path_policy::agent::data_shape::public_enum_variant_primitive_payload_fields_are_agent_advice ... ok
+test path_policy::agent::data_shape::public_struct_primitive_semantic_fields_are_agent_advice ... ok
+test path_policy::agent::data_shape::public_struct_typed_fields_clear_primitive_data_advice ... ok
+test path_policy::agent::data_shape::public_generic_data_type_bounds_are_agent_advice ... ok
+test path_policy::agent::data_shape::public_enum_named_or_typed_tuple_payload_clears_agent_advice ... ok
+test path_policy::agent::data_shape::public_enum_tuple_variant_primitive_payload_is_agent_advice ... ok
+test path_policy::agent::data_shape_boundaries::documented_public_enum_tuple_variant_primitive_payload_clears_agent_advice ... ok
+test path_policy::agent::data_shape_boundaries::documented_public_enum_variant_primitive_payload_fields_clear_agent_advice ... ok
+test path_policy::agent::data_shape::public_enum_variant_typed_payload_clears_agent_advice ... ok
+test path_policy::agent::data_shape_boundaries::documented_public_struct_primitive_semantic_fields_clear_agent_advice ... ok
+test path_policy::agent::data_shape_boundaries::documented_public_generic_data_type_bounds_clear_agent_advice ... ok
+test path_policy::agent::data_shape_stringly_state::documented_public_stringly_state_fields_clear_agent_advice ... ok
+test path_policy::agent::data_shape_type_alias::documented_public_semantic_primitive_type_alias_clears_agent_advice ... ok
+test path_policy::agent::data_shape_stringly_state::public_stringly_state_fields_are_agent_advice ... ok
+test path_policy::agent::data_shape_type_alias::public_semantic_primitive_type_alias_is_agent_advice ... ok
+test path_policy::agent::error_boundary::typed_and_test_error_boundaries_are_not_agent_advice ... ok
+test path_policy::agent::data_shape_type_alias::public_newtype_and_domain_alias_clear_primitive_type_alias_advice ... ok
+test path_policy::agent::flag_surface::public_config_object_clears_many_param_advice ... ok
+test path_policy::agent::data_shape_stringly_state::typed_and_static_state_fields_clear_stringly_state_advice ... ok
+test path_policy::agent::flag_surface::documented_public_multiple_flag_params_clear_agent_advice ... ok
+test path_policy::agent::flag_surface::documented_public_many_constructor_params_clear_agent_advice ... ok
+test path_policy::agent::dependency_graph::cross_owner_leaf_import_is_agent_advice ... ok
+test path_policy::agent::dependency_graph::owner_dependency_cycle_is_agent_advice ... ok
+test path_policy::agent::error_boundary::public_application_error_boundary_is_agent_advice ... ok
+test path_policy::agent::flag_surface::single_public_flag_param_is_not_agent_advice ... ok
+test path_policy::agent::flag_surface::public_many_constructor_params_are_agent_advice ... ok
+test path_policy::agent::dependency_graph::cfg_test_owner_dependencies_do_not_trigger_structural_agent_policies ... ok
+test path_policy::agent::flag_surface::public_multiple_flag_params_are_agent_advice ... ok
+test path_policy::agent::dependency_graph::owner_fan_out_without_intent_doc_is_agent_advice ... ok
+test path_policy::agent::source_surface::branch_module_with_intent_doc_is_not_agent_advice ... ok
+test path_policy::agent::source_surface::generic_public_module_names_are_agent_advice ... ok
+test path_policy::agent::source_surface::generic_source_module_paths_with_boundary_doc_are_not_agent_advice ... ok
+test path_policy::agent::source_surface::branch_module_without_intent_doc_is_agent_advice ... ok
+test path_policy::agent::process_command::raw_skill_file_source_dump_process_command_is_agent_advice ... ok
+test path_policy::agent::source_surface::module_intent_policy_uses_native_inner_doc_attributes ... ok
+test path_policy::agent::source_surface::branch_intent_counts_resolved_reasoning_tree_edges ... ok
+test path_policy::agent::source_surface::duplicated_public_names_with_boundary_doc_are_not_agent_advice ... ok
+test path_policy::agent::source_surface::generic_source_module_paths_are_agent_advice ... ok
+test path_policy::agent::source_surface::public_doc_policy_ignores_comment_text_that_mentions_docs ... ok
+test path_policy::agent::source_surface::public_doc_policy_with_real_doc_suppresses_finding ... ok
+test path_policy::agent::source_surface::duplicated_public_names_are_reported_as_agent_advice ... ok
+test path_policy::agent::source_surface::public_typed_identifier_params_are_not_agent_advice ... ok
+test path_policy::agent::source_surface::public_primitive_identifier_params_are_agent_advice ... ok
+test path_policy::agent::source_surface_boundaries::documented_generic_source_module_paths_clear_agent_advice ... ok
+test path_policy::agent::source_surface::repeated_namespace_policy_covers_default_test_roots ... ok
+test path_policy::agent::source_surface_boundaries::documented_public_name_conflicts_clear_agent_advice ... ok
+test path_policy::agent::tokio_runtime::tokio_runtime_boundary_with_owner_doc_is_not_agent_advice ... ok
+test path_policy::modularity::deep_relative::deep_relative_import_policy_uses_native_use_trees ... ok
+test path_policy::agent::source_surface::repeated_namespace_policy_includes_file_stems ... ok
+test path_policy::modularity::deep_relative::deep_relative_import_policy_reports_pub_super_prefix_group_without_crate_suggestion ... ok
+test path_policy::agent::tokio_runtime::tokio_runtime_boundary_without_owner_doc_is_agent_advice ... ok
+test path_policy::modularity::deep_relative::deep_relative_import_policy_ignores_comments_and_strings ... ok
+test path_policy::agent::test_support_reexport::unused_test_support_reexports_are_agent_advice ... ok
+test path_policy::modularity::glob_imports::glob_import_policy_flags_absolute_crate_owner_glob ... ok
+test path_policy::agent::source_surface_boundaries::documented_public_primitive_identifier_params_clear_agent_advice ... ok
+test path_policy::modularity::glob_imports::glob_import_policy_ignores_comments_and_strings ... ok
+test path_policy::modularity::source_layout::interface_mod_policy_rejects_inline_module_implementation ... ok
+test path_policy::agent::test_support_reexport::consumed_test_support_reexports_are_not_agent_advice ... ok
+test path_policy::modularity::source_layout::inline_source_module_policy_rejects_reasoning_tree_collapse ... ok
+test path_policy::modularity::glob_imports::glob_import_policy_flags_native_use_tree_globs ... ok
+test path_policy::agent::test_support_reexport::consumed_name_in_one_support_scope_does_not_clear_sibling_support_scope ... ok
+test path_policy::modularity::glob_imports::glob_import_policy_reports_cfg_test_context_from_parser_stack ... ok
+test path_policy::modularity::source_layout::orphan_source_file_policy_rejects_unreachable_module_file ... ok
+test path_policy::modularity::source_layout::source_bloat_policy_reports_absolute_line_pressure_without_item_pressure ... ok
+test path_policy::modularity::glob_imports::glob_import_policy_scans_tests_root_with_test_context ... ok
+test path_policy::modularity::source_layout::source_bloat_policy_reports_invalid_source_absolute_line_pressure ... ok
+test path_policy::modularity::source_layout::module_source_layout_policy_rejects_file_and_mod_rs_pair ... ok
+test path_policy::modularity::source_layout::source_bloat_policy_allows_999_source_lines_below_1000_gate ... ok
+test path_policy::modularity::source_layout::orphan_policy_does_not_treat_latest_feature_as_cfg_test ... ok
+test path_policy::modularity_owner_shape::sibling_file_dir_owner_policy_rejects_split_owner_entrypoint ... ok
+test path_policy::project::build_gate::build_gate_default_config_requires_explicit_verification_config ... ok
+test path_policy::project::build_gate::build_gate_call_requires_build_dependency ... ok
+test path_policy::project::build_gate::downstream_policy_build_gate_clears_build_gate_requirement ... ok
+test path_policy::project::build_gate::harness_build_dependency_requires_root_build_script ... ok
+test path_policy::project::build_gate::non_harness_build_script_does_not_require_build_gate ... ok
+test path_policy::project::build_gate::harness_dependency_requires_cargo_check_build_gate_without_build_script ... ok
+test path_policy::project::build_gate::ordinary_workspace_alias_does_not_clear_build_gate_requirement ... ok
+test path_policy::project::build_gate::complete_build_gate_clears_root_test_target_gate_requirement ... ok
+test path_policy::project::build_gate::harness_enabled_build_script_requires_build_gate_snapshot ... ok
+test path_policy::project::build_gate::complete_build_gate_clears_source_cargo_test_gate_requirement ... ok
+test path_policy::project::all_standard_rust_files_enter_agent_policy_analysis ... ok
+test path_policy::project::build_gate::workspace_wrapper_build_gate_clears_direct_harness_dependency_requirement ... ok
+test path_policy::project::manifest::stale_rust_edition_is_project_policy_advice ... ok
+test path_policy::project::harness_dev_dependency_requires_cargo_check_build_gate ... ok
+test path_policy::project::manifest::rust_2024_edition_clears_project_policy_advice ... ok
+test path_policy::project::manifest_package_field_uses_the_canonical_harness_identity ... ok
+test path_policy::project::manifest_comment_does_not_enable_library_harness_policy ... ok
+test path_policy::project::library_target_ignores_comment_mentions_of_embedded_cargo_test_gate ... ok
+test path_policy::modularity::source_layout::source_bloat_policy_reports_private_implementation_pile ... ok
+test path_policy::project::quality::redundant_workspace_member_build_gate_alias_is_flagged ... ok
+test path_policy::project::quality::fake_cargo_package_identity_fallback_is_flagged ... ok
+test path_policy::project::retired_gate::retired_root_cargo_test_gate_reports_migration_warning ... ok
+test path_policy::project::quality::weak_advice_allow_explanation_is_flagged ... ok
+test path_policy::project::quality::silent_evidence_default_is_flagged_in_search_graph_code ... ok
+test path_policy::project::quality::candidate_loop_without_rejection_telemetry_is_flagged ... ok
+test path_policy::project::quality::candidate_loop_with_rejection_telemetry_is_allowed ... ok
+test path_policy::project::retired_gate::retired_source_cargo_test_gate_reports_migration_warning ... ok
+test path_policy::project::root_test_target_accepts_embedded_cargo_test_gate_macro ... ok
+test path_policy::project::root_test_target_comment_mentions_do_not_count_as_structure ... ok
+test path_policy::project::quality::source_location_sentinel_is_flagged_in_candidate_code ... ok
+test path_policy::project::quality::structured_advice_allow_explanation_is_allowed ... ok
+test path_policy::project::target_dependency_table_uses_canonical_harness_identity ... ok
+test path_policy::project::verification_integration::config_gate::advice_allow_with_config_still_requires_allow_explanation ... ok
+test path_policy::project::verification_integration::config_gate::configured_cargo_test_gate_clears_verification_config_warning ... ok
+test path_policy::project::source_test_policy_does_not_treat_latest_feature_as_cfg_test ... ok
+test path_policy::project::verification_integration::config_gate::advice_allow_gate_still_requires_explicit_verification_config ... ok
+test path_policy::project::root_test_target_accepts_library_cargo_test_gate_macro ... ok
+test path_policy::project::verification_integration::config_gate::advice_allow_with_explanation_clears_allow_warning ... ok
+test path_policy::project::verification_integration::config_gate::positional_config_gate_still_requires_named_verification_config ... ok
+test path_policy::project::verification_integration::config_gate::cargo_test_gate_requires_explicit_verification_config ... ok
+test path_policy::modularity::source_layout::source_bloat_policy_reports_test_support_pile ... ok
+test path_policy::project::verification_integration::performance::performance_verification_binding_accepts_manual_criterion_main_bench_target ... ok
+test path_policy::project::verification_integration::performance::performance_verification_binding_requires_cargo_bench_target ... ok
+test path_policy::project::verification_integration::performance::performance_verification_binding_rejects_raw_harness_false_bench ... ok
+test path_policy::project::verification_integration::performance::performance_verification_binding_accepts_cargo_bench_target ... ok
+test path_policy::project::large_unit_test_leaf_is_reported_from_parser_source_metrics ... ok
+test policy_config::harness_scope_policy_requires_explanations_for_custom_test_paths ... ok
+test path_policy::project::large_test_support_module_is_reported_from_parser_source_metrics ... ok
+test policy_contract::crate_facade_keeps_macro_implementation_out_of_lib_rs ... ok
+test policy_contract::agent_policy_rules_are_non_blocking_advice ... ok
+test policy_contract::default_policy_blocks_only_warning_and_error ... ok
+test policy_contract::library_target_mounts_source_backed_self_apply_gate ... ok
+test policy_config::harness_scope_policy_requires_explanations_for_custom_source_paths ... ok
+test policy_contract::parser::cargo_test_target_parsing_lives_under_parser_module ... ok
+test policy_config::harness_scope_policy_requires_explanations_for_default_source_reduction ... ok
+test policy_contract::parser::parsed_module_does_not_expose_syn_file_to_policy_rules ... ok
+test path_policy::project::verification_integration::performance::performance_verification_binding_accepts_workspace_inherited_cargo_bench_target ... ok
+test policy_contract::parser::native_use_scope_facts_stay_in_parser_layer ... ok
+test policy_contract::parser::verification_profile_index_does_not_hardcode_project_semantics ... ok
+test policy_config::layout_policy_requires_explanations_for_directory_exceptions ... ok
+test policy_contract::parser::module_tree_reachability_lives_under_parser_module ... ok
+test policy_contract::parser::rust_path_attribute_resolution_lives_under_parser_module ... ok
+test policy_contract::parser::rust_source_path_facts_live_under_parser_module ... ok
+test policy_config::harness_scope_policy_requires_explanations_for_manifest_test_targets ... ok
+test policy_contract::parser::policy_rules_consume_parser_facts_not_syn_directly ... ok
+test policy_contract::root_test_target_relies_on_source_backed_project_gate ... ok
+test policy_config::harness_scope_policy_requires_explanations_for_test_scope_reduction ... ok
+test policy_contract::reasoning_tree::rust_reasoning_tree_facts_are_the_policy_facing_parser_layer ... ok
+test public_api::core::explicit_path_runner_is_syntax_only_without_project_scope ... ok
+test public_api::core::advice_renderer_selects_info_findings ... ok
+
+thread 'public_api::core::cargo_test_assertion_promotes_agent_advice_to_repair_feedback' (4153773) panicked at build-support/gerbil-scheme-rust-project-harness/tests/unit/public_api/core.rs:169:9:
+[RUST-AGENT-DOCS-MODULE-001] Info: Public module lacks an intent doc
+@ /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpIcjX7Y/src/owned.rs:1:1
+fix: add a module intent doc using doc_markdown style
+line: 1 | pub fn public_api() {}
+Help: /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpIcjX7Y/src/owned.rs has public Rust surface without a module intent doc.
+Contract: Add a concise `//!` module-level intent doc using `clippy::doc_markdown` style, with technical identifiers in backticks.
+
+[RUST-AGENT-DOCS-PUBLIC-002] Info: Public item lacks a doc comment
+@ /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpIcjX7Y/src/owned.rs:1:1
+fix: add a doc comment using clippy::doc_markdown style
+line: 1 | pub fn public_api() {}
+Help: /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpIcjX7Y/src/owned.rs exposes public item `public_api` without a doc comment.
+Contract: Document public Rust boundaries using `clippy::doc_markdown` style so agents can reason from native syntax without guessing intent.
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test policy_config::layout_policy_requires_explanations_for_root_file_exceptions ... ok
+test public_api::core::cargo_test_assertion_respects_configured_agent_pack_suppression ... ok
+test public_api::core::explicit_path_runner_reports_unreadable_source_as_syntax_error ... ok
+test public_api::core::cargo_test_assertion_promotes_agent_advice_to_repair_feedback ... ok
+test public_api::core::explicit_path_runner_returns_compact_report ... ok
+test public_api::core::default_renderer_keeps_info_advice_visible_without_blocking ... ok
+test public_api::core::agent_snapshot_renderer_exposes_reasoning_tree_shape ... ok
+test public_api::policy_config::agent_snapshot_uses_policy_configured_findings ... ok
+test public_api::policy_config::policy_config_can_disable_a_rule_pack ... ok
+test public_api::policy_config::policy_config_can_override_rule_severity ... ok
+test query_workspace_contract::query_code_rejects_trailing_root_and_catalog_accepts_positional_workspace ... ok
+test query_workspace_contract::query_exact_owner_names_only_does_not_scan_workspace_context ... ok
+test query_workspace_contract::query_names_only_rejects_workspace_term_discovery ... ok
+test render_snapshot::compact_text_render_matches_snapshot ... ok
+test public_api::policy_config::policy_config_single_rule_override_wins_after_rule_pack_expansion ... ok
+test policy_contract::parser::cargo_manifest_parser_lives_under_parser_module ... ok
+test public_api::core::json_renderer_preserves_structured_report_fields ... ok
+test rs_harness_attribute::rs_harness_test_attribute_forwards_ignore_to_libtest ... ignored, compile-only libtest attribute forwarding smoke
+test render_snapshot::failure_frontier_render_points_to_deduplicated_hot_blocks ... ok
+test render_snapshot::json_render_matches_snapshot ... ok
+test policy_contract::parser::syn_parse_file_entrypoint_stays_inside_parser_module ... ok
+test public_api::policy_config::policy_config_can_override_a_rule_pack_severity ... ok
+test rule_catalog::rule_pack_descriptors_expose_default_execution_order ... ok
+test rule_catalog::rule_catalogs_expose_stable_rule_ids ... ok
+test rule_catalog::rule_catalogs_keep_default_severities_aligned ... ok
+test public_api::policy_config::policy_config_can_disable_rule_findings ... ok
+test runner_config::entrypoint_facade_macros::crate_facade_policy_accepts_cfg_contract_macros ... ok
+test runner_config::entrypoints::binary_entrypoint_policy_accepts_thin_entrypoint ... ok
+test runner_config::entrypoint_facade_macros::crate_facade_policy_still_rejects_macro_rules_implementation ... ok
+test runner_config::entrypoints::build_script_policy_rejects_top_level_implementation ... ok
+test runner_config::entrypoint_facade_macros::crate_facade_policy_rejects_macro_wrapped_implementation ... ok
+test runner_config::entrypoints::binary_entrypoint_policy_rejects_top_level_implementation ... ok
+test runner_config::entrypoints::crate_facade_policy_accepts_proc_macro_exports ... ok
+test runner_config::entrypoints::crate_facade_policy_rejects_implementation_in_lib_rs ... ok
+test runner_config::entrypoints::custom_source_roots_are_policy_source_roots ... ok
+test public_api::report_projection::report_projection_public_api_surface_smoke ... ok
+test runner_config::entrypoints::include_tests_false_skips_test_root_parsing_not_test_layout_policy ... ok
+test runner_config::entrypoints::default_project_runner_covers_cargo_package_rust_targets ... ok
+test runner_config::entrypoints::root_test_target_policy_accepts_thin_aggregate ... ok
+test runner_config::entrypoints::root_test_target_policy_rejects_implicit_module_mounts ... ok
+test runner_config::entrypoints::root_test_target_policy_accepts_documented_suite_mounts ... ok
+test runner_config::entrypoints::root_test_target_policy_rejects_top_level_test_implementation ... ok
+test runner_config::workspace::include_literal_source_shards_are_reachable_from_the_module_tree ... ok
+test sample_project::project_runner_reports_blocking_policy_and_agent_advice ... ok
+test scenario_benchmark::contract::scenario_benchmark_contract_accepts_libtest_insta_snapshot_entry ... ok
+test runner_config::workspace::workspace_manifest_member_globs_are_scanned_as_member_crates ... ok
+test scenario_benchmark::contract::scenario_benchmark_contract_accepts_sub_millisecond_durations_and_generic_timing_keys ... ok
+test scenario_benchmark::contract::scenario_benchmark_contract_rejects_second_scale_hard_gate ... ok
+test scenario_benchmark::public_dynamic_json_api_boundary::scenario_benchmark_public_dynamic_json_api_boundary_v1_snapshot ... ok
+test scenario_benchmark::contract::scenario_benchmark_contract_rejects_self_referential_gate_command ... ok
+test scenario_benchmark::scenario_benchmark_async_backpressure_boundary_v1_snapshot ... ok
+test scenario_benchmark::contract::scenario_benchmark_contract_requires_agent_visible_metadata ... ok
+test scenario_benchmark::scenario_benchmark_async_blocking_boundary_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_async_select_cancellation_safety_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_async_task_lifecycle_boundary_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_async_sync_lock_boundary_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_async_timeout_cancellation_safety_v1_snapshot ... ok
+test runner_config::workspace::workspace_member_test_target_policy_accepts_crate_local_suite_mounts ... ok
+test scenario_benchmark::scenario_benchmark_control_flow_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_comparison_allows_expected_to_be_slower_than_input ... ok
+test scenario_benchmark::scenario_benchmark_data_structure_linear_membership_scan_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_comparison_requires_annotation_when_expected_is_not_faster ... ok
+test scenario_benchmark::scenario_benchmark_phase_is_typed ... ok
+
+thread 'scenario_benchmark::scenario_benchmark_hard_gate_panics_with_repair_template' (4153842) panicked at build-support/gerbil-scheme-rust-project-harness/src/verification/scenario_benchmark/core.rs:107:9:
+scenario benchmark hard gate failed
+preferred fix: add benchmark.toml next to the scenario fixture
+do not add advisory mode, fixture-local opt-out, or expires
+status: invalid
+- contract:tests/unit/scenarios/missing_benchmark/benchmark.toml: required benchmark.toml is missing
+create: tests/unit/scenarios/missing_benchmark/benchmark.toml
+template:
+harness = "libtest"
+test = "<focused-libtest-case>"
+snapshot = "<insta-snapshot-name>"
+# For Criterion, Divan, or iai-callgrind use:
+# harness = "criterion"
+# bench = "<cargo-bench-target>"
+# case = "<benchmark-group-or-function>"
+target_total = "25ms"
+max_total = "100ms"
+observed_total = "25ms"
+regression_budget = "20ms"
+memory_budget_bytes = 8388608
+observed_memory_bytes = 4194304
+target_rationale = "Small rule fixture should stay bounded."
+
+[input_expected_comparison]
+input_total = "30ms"
+expected_total = "25ms"
+input_memory_bytes = 6291456
+expected_memory_bytes = 4194304
+interpretation = "Record both fixture timings; expected should normally be faster or more memory efficient than input."
+# expected_not_faster_annotation = "Required when expected_total >= input_total or expected_memory_bytes >= input_memory_bytes."
+
+[observed_timings]
+contract_deserialize = "8ms"
+receipt_render = "5ms"
+snapshot_assertion = "2ms"
+test scenario_benchmark::scenario_benchmark_process_command_probe_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_rust_package_edition_2024_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_numeric_gate_reports_speed_and_memory_failures ... ok
+test scenario_benchmark::scenario_benchmark_source_index_fallback_control_v1_snapshot ... ok
+test scenario_benchmark::scenario_benchmark_hard_gate_panics_with_repair_template ... ok
+test runner_config::workspace::project_runner_discovers_member_crates_under_package_collection_root ... ok
+test scenario_benchmark::scenario_benchmark_hard_gate_accepts_current_required_suite ... ok
+
+thread 'scenario_benchmark::scenario_benchmark_suite_reports_missing_required_benchmark' (4153850) panicked at build-support/gerbil-scheme-rust-project-harness/src/verification/scenario_benchmark/core.rs:107:9:
+scenario benchmark hard gate failed
+preferred fix: add benchmark.toml next to the scenario fixture
+do not add advisory mode, fixture-local opt-out, or expires
+status: invalid
+- contract:tests/unit/scenarios/missing_benchmark/benchmark.toml: required benchmark.toml is missing
+create: tests/unit/scenarios/missing_benchmark/benchmark.toml
+template:
+harness = "libtest"
+test = "<focused-libtest-case>"
+snapshot = "<insta-snapshot-name>"
+# For Criterion, Divan, or iai-callgrind use:
+# harness = "criterion"
+# bench = "<cargo-bench-target>"
+# case = "<benchmark-group-or-function>"
+target_total = "25ms"
+max_total = "100ms"
+observed_total = "25ms"
+regression_budget = "20ms"
+memory_budget_bytes = 8388608
+observed_memory_bytes = 4194304
+target_rationale = "Small rule fixture should stay bounded."
+
+[input_expected_comparison]
+input_total = "30ms"
+expected_total = "25ms"
+input_memory_bytes = 6291456
+expected_memory_bytes = 4194304
+interpretation = "Record both fixture timings; expected should normally be faster or more memory efficient than input."
+# expected_not_faster_annotation = "Required when expected_total >= input_total or expected_memory_bytes >= input_memory_bytes."
+
+[observed_timings]
+contract_deserialize = "8ms"
+receipt_render = "5ms"
+snapshot_assertion = "2ms"
+test scenario_benchmark::scenario_benchmark_suite_reports_ast_patch_speed_failure ... ok
+test scenario_benchmark::scenario_benchmark_suite_reports_missing_required_benchmark ... ok
+test scenario_benchmark::scenario_benchmark_suite_covers_all_required_current_scenarios ... ok
+test software_criterion_snapshot::agent_r015_control_flow_v1_snapshot ... ok
+test software_criterion_snapshot::agent_r016_control_flow_v1_snapshot ... ok
+test software_criterion_snapshot::agent_r017_control_flow_v1_snapshot ... ok
+test software_criterion_snapshot::agent_r026_control_flow_v1_snapshot ... ok
+test verification::analysis::verification_analysis_profile_reports_project_scale_and_json ... ok
+test verification::behavior_snapshot::p2_behavior_snapshot_serializes_shared_schema_surface ... ok
+test verification::assurance_case::p6_2_assurance_case_summarizes_claim_support_and_gaps ... ok
+test software_criterion_snapshot::agent_r029_data_structure_linear_membership_scan_v1_snapshot ... ok
+test software_criterion_snapshot::agent_r025_control_flow_v1_snapshot ... ok
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpDBeoNC/Cargo.lock
+test verification::build_gate::build_gate_verification_requires_reports_for_configured_task_kinds ... ok
+
+thread 'verification::build_gate::dependency_baseline_reports_duplicate_or_stale_entries_with_agent_guidance' (4153862) panicked at build-support/gerbil-scheme-rust-project-harness/src/build_gate/dependency_baseline.rs:126:9:
+api crate dependency baseline: rust-lang-project-harness requires exactly one Cargo.lock entry in /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpDBeoNC/Cargo.lock; found 2
+expected: rust-lang-project-harness 0.1.2 source contains rev=new
+actual:
+- rust-lang-project-harness 0.1.1 source git+https://github.com/tao3k/agent-semantic-protocols?rev=old#old
+- rust-lang-project-harness 0.1.2 source git+https://github.com/tao3k/agent-semantic-protocols?rev=new#new
+[rust-harness-dependency-guidance]
+gate: api crate
+trigger: Cargo.lock dependency baseline drift.
+repair:
+- update the workspace dependency declaration that still pins the old version or git rev.
+- if a transitive crate pins the old rev, upgrade that crate first instead of overriding the lockfile by hand.
+- keep the baseline in shared workspace policy and derive member gates from RustProjectHarnessWorkspacePolicy.
+- rerun cargo update for the affected package, then cargo tree -i <package> --workspace.
+- rerun cargo test so build.rs verifies the repaired lockfile.
+
+test verification::build_gate::dependency_baseline_reports_duplicate_or_stale_entries_with_agent_guidance ... ok
+test verification::analysis::verification_analysis_profile_reports_workspace_member_scale ... ok
+test verification::build_gate::downstream_policy_receipt_projects_verification_and_dependency_contract ... ok
+test scenario_benchmark::agent_policy_schema_ids_do_not_expose_legacy_aliases ... ok
+test verification::build_gate::downstream_verification_gate_guide_classifies_api_and_cli_surfaces ... ok
+test verification::build_gate::workspace_evidence_graph_receipt_connects_multi_crate_trust_loop ... ok
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmp4MV5gf/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmp4MV5gf/benches
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmp4MV5gf/benches/api_hot_path.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmp4MV5gf/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpOiA1NX/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpOiA1NX/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpHtKlJV/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpHtKlJV/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpaBNSjC/Cargo.lock
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpaBNSjC/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpaBNSjC/src
+
+thread 'verification::build_gate::downstream_policy_requires_criterion_bench_manifest_when_performance_adapter_is_enabled' (4153868) panicked at build-support/gerbil-scheme-rust-project-harness/src/build_gate/downstream.rs:188:9:
+[RUST-AGENT-PROJECT-010] Warning: Performance verification skill lacks Cargo bench target
+@ /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpOiA1NX/Cargo.toml:1:1
+fix: add a Criterion, Divan, or iai-callgrind [[bench]] target, declare the matching benchmark framework dependency, and keep the verification contract command pointed at it
+Help: Cargo.toml configures a Rust-native performance verification skill, but Cargo.toml does not expose a runnable Criterion, Divan, or iai-callgrind harness=false [[bench]] target.
+Contract: When a Rust-native performance skill is configured, expose a runnable harness=false [[bench]] target and benchmark framework dev-dependency; keep build.rs as a structural gate and record benchmark runs through performance receipts.
+
+[RUST-AGENT-DOCS-PUBLIC-002] Info: Public item lacks a doc comment
+@ /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpOiA1NX/src/api.rs:2:1
+fix: add a doc comment using clippy::doc_markdown style
+line: 2 | pub fn handle_request() {}
+Help: /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpOiA1NX/src/api.rs exposes public item `handle_request` without a doc comment.
+Contract: Document public Rust boundaries using `clippy::doc_markdown` style so agents can reason from native syntax without guessing intent.
+
+[rust-harness-agent-guidance]
+gate: api crate
+trigger: cargo test runs the member build.rs before tests; keep rust-lang-project-harness under [build-dependencies].
+repair:
+- keep build.rs thin and call assert_rust_project_harness_downstream_policy_from_env.
+- in a workspace, put common policy in the root harness/ module tree.
+- construct RustProjectHarnessWorkspacePolicy once, then derive members with member_crate or member_crate_with_config.
+- add crate-local owners, receipts, waivers, or report obligations in the member override only.
+- rerun cargo test after updating policy or evidence.
+
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpJVDz2H/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpJVDz2H/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpqHvSB2/benchmarked-member/Cargo.toml
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpqHvSB2/benchmarked-member/benches
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpqHvSB2/benchmarked-member/benches/api_hot_path.rs
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpqHvSB2/benchmarked-member/src
+cargo:rerun-if-changed=/var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/.tmpaBNSjC/Cargo.lock
+test verification::build_gate::downstream_policy_requires_criterion_bench_manifest_when_performance_adapter_is_enabled ... ok
+test verification::build_gate::workspace_policy_shares_dependency_baseline_with_member_crates ... ok
+test verification::build_gate::workspace_policy_reuses_common_config_for_member_crates ... ok
+test verification::build_gate::downstream_policy_accepts_criterion_bench_manifest_contract ... ok
+test verification::build_gate::downstream_policy_asserts_dependency_baseline_from_cargo_lock ... ok
+test verification::build_gate::downstream_policy_object_keeps_build_script_thin ... ok
+test verification::build_gate::downstream_member_policy_does_not_apply_performance_contract_to_siblings ... ok
+test verification::config::api_baseline::verification_api_path_baseline_override_without_rationale_requests_review ... ok
+test verification::config::api_baseline::verification_api_path_baseline_can_be_suppressed_with_rationale ... ok
+test verification::config::api_baseline::verification_api_path_baseline_receipt_clears_only_matching_path ... ok
+test verification::config::api_baseline::verification_api_path_baseline_requests_path_scoped_tasks ... ok
+test verification::config::api_baseline::verification_api_path_baseline_unmatched_owner_requests_review ... ok
+test verification::config::api_baseline::verification_api_path_baseline_with_skill_binding_stays_compact ... ok
+test verification::config::mapping::verification_latency_sensitive_profile_requests_performance_task ... ok
+test verification::config::contract::verification_task_contract_is_configurable ... ok
+test verification::config::mapping::verification_responsibility_mapping_can_suppress_default_task ... ok
+test verification::config::mapping::verification_availability_critical_profile_requests_stability_task ... ok
+test verification::config::contract::verification_profile_task_contract_beats_global_contract ... ok
+test verification::config::mapping::verification_responsibility_mapping_is_configurable ... ok
+test verification::config::profile_review::verification_profile_empty_responsibilities_request_review ... ok
+test verification::config::profile_override::verification_profile_can_request_owner_local_task_kinds ... ok
+test verification::config::profile_review::verification_profile_disabled_owner_task_requests_review ... ok
+test verification::config::profile_override::verification_profile_can_suppress_only_that_owner ... ok
+test verification::config::scenario::verification_skill_contract_scenario_ids_are_unique ... ok
+test verification::config::profile_review::verification_profile_override_without_rationale_requests_review ... ok
+test verification::config::profile_review::verification_profile_suppression_without_rationale_requests_review ... ok
+test verification::config::skill::rust_performance_skill_descriptors_snapshot ... ok
+test verification::config::profile_review::verification_profile_unused_owner_contract_requests_review ... ok
+test verification::config::skill::verification_performance_convenience_config_uses_library_api ... ok
+test verification::config::skill::verification_skill_binding_renders_quiet_dispatch_snapshot ... ok
+test verification::config::skill::verification_performance_skill_binding_uses_rust_descriptor_snapshot ... ok
+test verification::evidence_graph::p6_evidence_analysis_request_projects_graph_turbo_shape ... ok
+test verification::execution_receipt::p1_execution_receipt_serializes_shared_schema_surface ... ok
+test verification::execution_receipt::p1_tool_adapters_expose_default_commands ... ok
+test verification::evidence_graph::p6_evidence_graph_links_review_packet_evidence ... ok
+test verification::config::skill::verification_skill_binding_trigger_audit_snapshot ... ok
+test verification::config::skill::verification_skill_contracts_clear_with_receipt ... ok
+test verification::execution_receipt::p1_tool_adapters_parse_protocol_names ... ok
+test verification::determinism_readiness::p3_determinism_readiness_detects_direct_sources ... ok
+test verification::lifecycle::policy::verification_policy_can_disable_task_kind ... ok
+test verification::lifecycle::policy::verification_json_preserves_structured_plan_fields ... ok
+test verification::lifecycle::profiles::parser_facts_can_reject_wrong_responsibility_profile ... ok
+test verification::lifecycle::profiles::verification_profile_tasks_render_compact_snapshot ... ok
+test verification::lifecycle::receipts::complete_verification_waiver_clears_matching_task ... ok
+test verification::lifecycle::profiles::parser_facts_generate_regression_task_for_large_owner_branch ... ok
+test verification::lifecycle::receipts::incomplete_verification_waiver_keeps_task_active_with_resolution_note ... ok
+test verification::lifecycle::receipts::failed_verification_receipt_remains_active ... ok
+test verification::lifecycle::receipts::verification_receipt_clears_matching_task ... ok
+test verification::performance_index::performance_index_keeps_satisfied_receipt_searchable_snapshot ... ok
+test verification::lifecycle::receipts::performance_receipt_keeps_structured_state_searchable_after_compact_clears ... ok
+test verification::performance_index::performance_index_omits_non_performance_tasks ... ok
+test verification::performance_index::performance_index_marks_partial_failed_receipt_missing_keys_snapshot ... ok
+test verification::performance_index::performance_index_renders_pending_task_without_skill_manual_snapshot ... ok
+test verification::performance_index::performance_policy_requires_plan_and_performance_report_obligations ... ok
+test verification::performance_index::performance_index_workspace_package_queries_snapshot ... ok
+test verification::formal_proof_pilot::p4_dependency_graph_proof_pilot_checks_exhaustive_small_models ... ok
+test verification::profile_index::candidates::verification_profile_index_json_preserves_structured_candidates ... ok
+test verification::profile_index::candidates::nested_branch_profile_uses_nearest_owner_without_parent_duplication ... ok
+test verification::profile_index::candidates::branch_profile_candidate_aggregates_child_owner_signals ... ok
+test verification::profile_index::cargo_dependencies::cargo_dependency_signal_matches_renamed_package ... ok
+test verification::profile_index::candidates::verification_profile_index_reports_parser_suggested_responsibilities ... ok
+test verification::profile_index::candidates::crate_root_facade_exports_do_not_shadow_owner_profiles ... ok
+test verification::profile_index::hints::partial_profile_hint_renders_profile_drift ... ok
+test verification::profile_index::hints::workspace_profile_hint_paths_are_project_relative ... ok
+test verification::profile_index::cargo_dependencies::third_party_dependency_signals_are_cargo_configured ... ok
+test verification::profile_index::hints::configured_profile_hint_clears_profile_index_reminder ... ok
+test verification::report::verification_report_bundle_allows_agent_trace_overrides ... ok
+test verification::report::verification_report_bundle_is_empty_without_active_tasks ... ok
+test verification::report::verification_report_bundle_materializes_required_artifacts ... ok
+test verification::report::verification_report_bundle_can_include_analysis_profile_artifact_explicitly ... ok
+test verification::report::verification_report_bundle_materializes_stability_picture_artifact ... ok
+test verification::report::verification_report_bundle_exposes_selection_advice_sidecar_contract ... ok
+test verification::report_manifest::manifest_schema_compatibility_accepts_current_schema ... ok
+test verification::report_entry::report_entry_reports_empty_supported_bundles_without_payload_action ... ok
+test verification::report_manifest::manifest_schema_compatibility_json_is_agent_stable ... ok
+test verification::report_manifest::manifest_schema_compatibility_rejects_unknown_schema_id ... ok
+test verification::report_entry::report_entry_stops_before_selection_when_schema_is_unsupported ... ok
+test verification::report_manifest::manifest_schema_compatibility_rejects_unknown_schema_version ... ok
+test verification::report_select::report_selection_advice_json_preserves_structured_order ... ok
+test verification::report_select::report_selection_advice_reports_empty_bundles_structurally ... ok
+test verification::report_select::report_selection_loads_baseline_first_for_known_small_projects ... ok
+test verification::report_select::report_selection_prefers_analysis_profile_when_scale_is_unknown ... ok
+test verification::report_entry::report_entry_prefers_persisted_selection_sidecar_when_receipt_is_available ... ok
+test verification::config::scenario::verification_skill_contract_scenarios_snapshot ... ok
+test verification::report_writer::verification_report_writer_advises_when_source_baseline_dir_is_temp_outside_repo ... ok
+test verification::report_select::report_selection_uses_analysis_profile_first_for_workspace_scale ... ok
+test verification::report_projection_contract::verification_report_agent_projection_contract_snapshot ... ok
+test verification::report_writer::verification_report_writer_advises_when_source_baseline_dir_is_runtime_cache ... ok
+test verification::review_packet::p5_review_packet_summarizes_invariants_receipts_and_stale_waivers ... ok
+test verification::report_writer::verification_report_write_receipt_renders_agent_paths ... ok
+test verification::report_writer::verification_report_writer_can_persist_explicit_analysis_profile_runtime_artifact ... ok
+test verification::stability_index::stability_index_keeps_receipt_evidence_searchable ... ok
+test verification::stability_index::stability_index_renders_pending_availability_task ... ok
+test verification::report_writer::verification_report_writer_splits_source_baseline_from_runtime_cache ... ok
+test verification::stability_index::stability_report_artifact_is_source_baseline ... ok
+test verification::stability_picture::stability_picture_renders_configured_agent_actions ... ok
+test verification::report_writer::verification_report_writer_compacts_windows_json_escaped_project_root ... ok
+test verification::stability_picture::stability_run_receipt_compares_against_baseline ... ok
+test verification::stability_picture::stability_picture_json_is_deterministic_for_same_plan ... ok
+test verification::stability_picture::stability_picture_uses_owner_and_api_path_local_overrides ... ok
+test verification::stability_picture::stability_picture_surfaces_configuration_warnings ... ok
+test verification::stability_picture::stability_picture_respects_downstream_axis_configuration ... ok
+test verification::report_writer::verification_report_writer_can_persist_selection_advice_runtime_sidecar ... ok
+test verification::workspace::unmatched_workspace_profile_hint_renders_once ... ok
+test verification::workspace::workspace_package_relative_profile_hint_keeps_distinct_fingerprints ... ok
+test verification::workspace::workspace_root_relative_profile_hint_targets_one_member_snapshot ... ok
+test rs_harness_attribute::rs_harness_test_attribute_runs_user_body_after_harness_gate ... ok
+
+thread 'rs_harness_attribute::rs_harness_test_attribute_forwards_should_panic_to_libtest' (4153798) panicked at build-support/gerbil-scheme-rust-project-harness/tests/unit/rs_harness_attribute.rs:33:5:
+expected panic after harness gate
+test rs_harness_attribute::rs_harness_test_attribute_forwards_should_panic_to_libtest - should panic ... ok
+test rs_harness_attribute::rs_harness_test_attribute_accepts_explicit_project_root ... ok
+test policy_contract::crate_is_clean_under_its_own_project_harness ... ok
+test public_api::core::embedded_cargo_test_gate_macro_smoke::enforce_rust_project_harness_gate ... ok
+test public_api::core::embedded_cargo_test_gate_macro_smoke::advice_allow::enforce_rust_project_harness_gate ... ok
+
+test result: ok. 425 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.23s
+
+     Running unittests src/lib.rs (target/debug/deps/gerbil_scheme_rust_project_harness_policy-fd5da836f4c036cb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/gerbil_scheme_sys-0a149f3e2c839e81)
+
+running 17 tests
+test tests::abi_identity_is_nul_terminated ... ok
+test tests::abi_integer_bytes::byte_order_codes_are_stable ... ok
+test tests::abi_integer_bytes::checked_surface_rejects_invalid_inputs_before_raw_ffi ... ok
+test tests::borrowed_collection_surfaces_preserve_pointer_and_length_contracts ... ok
+test tests::borrowed_utf8_as_str_rejects_invalid_utf8 ... ok
+test tests::borrowed_utf8_constructors_preserve_rust_string_bytes ... ok
+test tests::borrowed_utf8_matches_pointer_and_length_layout ... ok
+test tests::hex_input_rejects_unrepresentable_lengths_before_slice_or_ffi ... ok
+test tests::pair_and_list_status_abi_fails_closed_until_runtime_backed ... ok
+test tests::pair_and_list_status_abi_rejects_null_inputs ... ok
+test tests::procedure_callback_type_projects_value_handle_status_boundary ... ok
+test tests::scalar_projection_layout_is_stable ... ok
+test tests::public_header_matches_the_live_scalar_abi ... ok
+test tests::scalar_scheme_value_wrappers_have_stable_c_abi_shapes ... ok
+test tests::scheme_exact_integer::exact_integer_checked_abi_rejects_null_boundaries_before_raw_ffi ... ok
+test tests::status_values_are_stable ... ok
+test tests::scenario_benchmark_suite::all_required_sys_scenarios_have_valid_contracts ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/rs_harness-3d37ece3a2c85ba1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gerbil_scheme
+
+running 3 tests
+error[E0277]: `Rc<()>` cannot be shared between threads safely
+   --> crates/gerbil-scheme/src/runtime/objects/values.rs:167:8
+    |
+167 | send::<RootedObjectBatch<'static>>();
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ `Rc<()>` cannot be shared between threads safely
+    |
+    = help: within `GerbilRuntime`, the trait `Sync` is not implemented for `Rc<()>`
+note: required because it appears within the type `PhantomData<Rc<()>>`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/marker.rs:811:11
+note: required because it appears within the type `GerbilRuntime`
+   --> crates/gerbil-scheme/src/runtime/types.rs:17:12
+    |
+ 17 | pub struct GerbilRuntime {
+    |            ^^^^^^^^^^^^^
+    = note: required for `&'static GerbilRuntime` to implement `Send`
+note: required because it appears within the type `PhantomData<&'static GerbilRuntime>`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/marker.rs:811:11
+note: required because it appears within the type `gerbil_scheme::runtime::types::RootedSchemeOwner<'static>`
+   --> crates/gerbil-scheme/src/runtime/types.rs:410:19
+    |
+410 | pub(super) struct RootedSchemeOwner<'runtime> {
+    |                   ^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `Option<gerbil_scheme::runtime::types::RootedSchemeOwner<'static>>`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:598:9
+note: required because it appears within the type `RootedObjectBatch<'static>`
+   --> crates/gerbil-scheme/src/runtime/objects/values.rs:169:12
+    |
+169 | pub struct RootedObjectBatch<'runtime> {
+    |            ^^^^^^^^^^^^^^^^^
+note: required by a bound in `send`
+   --> crates/gerbil-scheme/src/runtime/objects/values.rs:166:12
+    |
+166 | fn send<T: Send>() {}
+    |            ^^^^ required by this bound in `send`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0277`.
+error[E0597]: `runtime` does not live long enough
+   --> crates/gerbil-scheme/src/runtime/objects/values.rs:158:22
+    |
+157 |     let runtime = GerbilRuntime::initialize().unwrap();
+    |         ------- binding `runtime` declared here
+158 |     let collection = runtime.collection_from_objects(CollectionKind::Vector, &[]).unwrap();
+    |                      ^^^^^^^ borrowed value does not live long enough
+159 |     collection.copy_into(&mut batch).unwrap();
+160 | }
+    | - `runtime` dropped here while still borrowed
+161 | drop(batch);
+    |      ----- borrow later used here
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0597`.
+test crates/gerbil-scheme/src/runtime/objects/values.rs - runtime::objects::values::RootedObjectBatch (line 163) - compile fail ... ok
+test crates/gerbil-scheme/src/runtime/objects/values.rs - runtime::objects::values::RootedObjectBatch (line 152) - compile fail ... ok
+error[E0277]: the trait bound `bool: NumericElement` is not satisfied
+  --> crates/gerbil-scheme/src/runtime/objects/numeric/transfer.rs:14:36
+   |
+14 |     let _ = runtime.numeric_vector(&[true, false]);
+   |                     -------------- ^^^^^^^^^^^^^^ the trait `NumericElement` is not implemented for `bool`
+   |                     |
+   |                     required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `NumericElement`:
+             f32
+             f64
+             i16
+             i32
+             i64
+             i8
+             u16
+             u32
+             u64
+note: required by a bound in `gerbil_scheme::runtime::objects::numeric::transfer::<impl GerbilRuntime>::numeric_vector`
+  --> crates/gerbil-scheme/src/runtime/objects/numeric/transfer.rs:51:30
+   |
+51 |     pub fn numeric_vector<T: NumericElement>(
+   |                              ^^^^^^^^^^^^^^ required by this bound in `gerbil_scheme::runtime::objects::numeric::transfer::<impl GerbilRuntime>::numeric_vector`
+
+error[E0277]: the trait bound `bool: NumericElement` is not satisfied
+  --> crates/gerbil-scheme/src/runtime/objects/numeric/transfer.rs:15:13
+   |
+15 |     let _ = NumericBuffer::<bool>::default();
+   |             ^^^^^^^^^^^^^^^^^^^^^ the trait `NumericElement` is not implemented for `bool`
+   |
+   = help: the following other types implement trait `NumericElement`:
+             f32
+             f64
+             i16
+             i32
+             i64
+             i8
+             u16
+             u32
+             u64
+note: required by a bound in `NumericBuffer`
+  --> crates/gerbil-scheme/src/runtime/objects/numeric/transfer.rs:32:29
+   |
+32 | pub struct NumericBuffer<T: NumericElement> {
+   |                             ^^^^^^^^^^^^^^ required by this bound in `NumericBuffer`
+
+error[E0599]: the associated function or constant `default` exists for struct `NumericBuffer<bool>`, but its trait bounds were not satisfied
+  --> crates/gerbil-scheme/src/runtime/objects/numeric/transfer.rs:15:36
+   |
+15 |     let _ = NumericBuffer::<bool>::default();
+   |                                    ^^^^^^^ associated function or constant cannot be called on `NumericBuffer<bool>` due to unsatisfied trait bounds
+   |
+  ::: crates/gerbil-scheme/src/runtime/objects/numeric/transfer.rs:32:1
+   |
+32 | pub struct NumericBuffer<T: NumericElement> {
+   | ------------------------------------------- doesn't satisfy `NumericBuffer<bool>: Default`
+   |
+   = note: the following trait bounds were not satisfied:
+           `bool: NumericElement`
+           which is required by `NumericBuffer<bool>: Default`
+
+error: aborting due to 3 previous errors
+
+Some errors have detailed explanations: E0277, E0599.
+For more information about an error, try `rustc --explain E0277`.
+test crates/gerbil-scheme/src/runtime/objects/numeric/transfer.rs - runtime::objects::numeric::transfer::NumericElement (line 10) - compile fail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+   Doc-tests gerbil_scheme_aot_build
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gerbil_scheme_build
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gerbil_scheme_qualification
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gerbil_scheme_rust_ir
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rust_lang_project_harness
+
+running 1 test
+test build-support/gerbil-scheme-rust-project-harness/src/macros.rs - macros::rust_project_harness_cargo_test_gate (line 34) ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.80s; merged doctests compilation took 0.31s
+   Doc-tests gerbil_scheme_rust_project_harness_policy
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gerbil_scheme_sys
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rs_harness
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

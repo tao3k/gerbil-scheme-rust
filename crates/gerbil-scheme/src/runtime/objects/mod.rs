@@ -1,5 +1,7 @@
 //! Strong-root collections and binary arbitrary-precision integer transport.
+mod identifiers;
 mod integer;
+pub use identifiers::{IdentifierBuffer, IdentifierKind};
 mod numeric;
 pub use numeric::{NumericBuffer, NumericElement};
 mod values;

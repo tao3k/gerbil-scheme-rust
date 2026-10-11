@@ -94,6 +94,12 @@ bridge-objects-matched:
 bridge-numeric-matched:
     {{ build_env }} cargo bench -p gerbil-scheme --bench objects --locked -- --numeric
 
+bridge-signed-matched:
+    {{ build_env }} cargo bench -p gerbil-scheme --bench objects --locked -- --numeric --signed
+
+bridge-identifiers-matched:
+    {{ build_env }} cargo bench -p gerbil-scheme --bench objects --locked -- --identifiers
+
 bridge-types-contracts:
     {{ build_env }} cargo test -p gerbil-scheme-sys --lib --locked
     {{ build_env }} cargo test -p gerbil-scheme --test rooted_value --test exact_integer --test unit_test --locked

@@ -64,6 +64,24 @@ fn family<T: NumericElement>(runtime: &GerbilRuntime, name: &str, rows: &[Vec<T>
     pass
 }
 pub(super) fn run(runtime: &GerbilRuntime) -> bool {
+    if std::env::args().any(|arg| arg == "--signed") {
+        let i8s: Vec<_> = (0..5_i8)
+            .map(|n| (0..32_i8).map(|i| i8::MIN + i + n).collect())
+            .collect();
+        let i16s: Vec<_> = (0..5_i16)
+            .map(|n| (0..32_i16).map(|i| i16::MIN + i + n).collect())
+            .collect();
+        let i32s: Vec<_> = (0..5_i32)
+            .map(|n| (0..32_i32).map(|i| i32::MIN + i + n).collect())
+            .collect();
+        let i64s: Vec<_> = (0..5_i64)
+            .map(|n| (0..32_i64).map(|i| i64::MIN + i + n).collect())
+            .collect();
+        return family(runtime, "s8vector32", &i8s)
+            & family(runtime, "s16vector32", &i16s)
+            & family(runtime, "s32vector32", &i32s)
+            & family(runtime, "s64vector32", &i64s);
+    }
     let u16s: Vec<_> = (0..5_u16)
         .map(|n| (0..32_u16).map(|i| u16::MAX - i - n).collect())
         .collect();

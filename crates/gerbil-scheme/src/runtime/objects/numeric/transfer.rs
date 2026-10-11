@@ -24,7 +24,8 @@ macro_rules! elements {
         impl NumericElement for $ty { const KIND: i32 = $kind; }
     )*};
 }
-elements!(u16 => 0, u32 => 1, u64 => 2, f32 => 3, f64 => 4);
+elements!(u16 => 0, u32 => 1, u64 => 2, f32 => 3, f64 => 4,
+    i16 => 5, i32 => 6, i64 => 7, i8 => 8);
 
 /// Reusable owned projection; staging preserves published output on failure.
 #[derive(Debug, Default)]

@@ -2,6 +2,8 @@
 use gerbil_scheme::{
     BigIntegerBuffer, BinaryInteger, CollectionKind, GerbilRuntime, RootedObjectBatch, SchemeScalar,
 };
+#[path = "identifier_contracts.rs"]
+mod identifier_contracts;
 pub(super) fn run(runtime: &GerbilRuntime) {
     eprintln!("OBJECT-CONTRACT phase=count");
     let before = count();
@@ -12,6 +14,7 @@ pub(super) fn run(runtime: &GerbilRuntime) {
     eprintln!("OBJECT-CONTRACT phase=collections");
     collections(runtime);
     numeric(runtime);
+    identifier_contracts::run(runtime);
     rejected_spans();
     assert_eq!(
         count(),
@@ -58,12 +61,20 @@ fn numeric(runtime: &GerbilRuntime) {
     use numeric_check as check;
     numeric_growth(runtime);
     for len in [0, 1, 3, 1024] {
+        check(runtime, &vec![i8::MIN; len]);
+        check(runtime, &vec![i16::MIN; len]);
+        check(runtime, &vec![i32::MIN; len]);
+        check(runtime, &vec![i64::MIN; len]);
         check(runtime, &vec![u16::MAX; len]);
         check(runtime, &vec![u32::MAX; len]);
         check(runtime, &vec![u64::MAX; len]);
         check(runtime, &vec![f32::from_bits(0x7fc0_1234); len]);
         check(runtime, &vec![f64::from_bits(0x7ff8_0000_1234_5678); len]);
     }
+    check(runtime, &[i8::MIN, -1, 0, 1, i8::MAX]);
+    check(runtime, &[i16::MIN, -1, 0, 1, i16::MAX]);
+    check(runtime, &[i32::MIN, -1, 0, 1, i32::MAX]);
+    check(runtime, &[i64::MIN, -1, 0, 1, i64::MAX]);
     check(
         runtime,
         &[

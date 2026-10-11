@@ -1,0 +1,53 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo test -p gerbil-scheme --test rooted_value --test runtime_lifecycle --test exact_integer --locked -- --nocapture
+   Compiling gerbil-scheme v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/crates/gerbil-scheme)
+    Finished `test` profile [optimized + debuginfo] target(s) in 3.27s
+     Running tests/unit/targets/exact_integer.rs (target/debug/deps/exact_integer-57fd6cd410f36dd8)
+
+running 1 test
+test exact_integer::exact_integer_handles_preserve_bignums_and_check_machine_projections ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/unit/targets/rooted_value.rs (target/debug/deps/rooted_value-8fc3501a64461894)
+
+running 1 test
+OBJECT-CONTRACT phase=count
+OBJECT-CONTRACT phase=zero
+OBJECT-CONTRACT phase=integers
+OBJECT-CONTRACT integer_bytes=0
+OBJECT-CONTRACT integer_bytes=1
+OBJECT-CONTRACT integer_bytes=7
+OBJECT-CONTRACT integer_bytes=8
+OBJECT-CONTRACT integer_bytes=9
+OBJECT-CONTRACT integer_bytes=16
+OBJECT-CONTRACT integer_bytes=17
+OBJECT-CONTRACT integer_bytes=32
+OBJECT-CONTRACT integer_bytes=64
+OBJECT-CONTRACT integer_bytes=257
+OBJECT-CONTRACT integer_bytes=1024
+OBJECT-CONTRACT phase=collections
+OBJECT-CONTRACT collection=Vector phase=input
+OBJECT-CONTRACT collection=Vector phase=zero-rooted
+OBJECT-CONTRACT collection=Vector phase=false-rooted
+OBJECT-CONTRACT collection=Vector phase=copy
+OBJECT-CONTRACT collection=List phase=input
+OBJECT-CONTRACT collection=List phase=zero-rooted
+OBJECT-CONTRACT collection=List phase=false-rooted
+OBJECT-CONTRACT collection=List phase=copy
+OBJECT-CONTRACT collection=Pair phase=input
+OBJECT-CONTRACT collection=Pair phase=zero-rooted
+OBJECT-CONTRACT collection=Pair phase=false-rooted
+OBJECT-CONTRACT collection=Pair phase=copy
+test rooted_value::rooted_scheme_value_preserves_typed_projections_and_single_owner_drop ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/unit/targets/runtime_lifecycle.rs (target/debug/deps/runtime_lifecycle-5faf625470fc8afe)
+
+running 2 tests
+test runtime_lifecycle::rooted_bulk_copy_reduces_parser_sized_transfer_cost ... ignored, local matched latency receipt; run separately from the one-shot runtime test
+BRIDGE-HANDOFF abandoned-receiver root-release=OK subsequent-call=OK
+test runtime_lifecycle::calls_scalar_export_in_process ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

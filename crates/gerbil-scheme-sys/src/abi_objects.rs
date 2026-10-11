@@ -2,7 +2,31 @@
 use crate::GerbilRootId;
 unsafe extern "C" {
     /// # Safety
-    /// Owner-local call; kind 0..4 names u16/u32/u64/f32/f64. Readable native
+    /// Live owner and string root; kind 0 interned symbol/1 keyword/2 uninterned
+    /// symbol. Transfers one root; spelling alone is never an identity token.
+    pub fn gerbil_scheme_rust_identifier_create(string_root: i64, kind: i32) -> i64;
+    /// # Safety
+    /// Two live roots on the same owner; -1 selects root, otherwise vector slot.
+    pub fn gerbil_scheme_rust_object_identical(left: i64, li: i64, right: i64, ri: i64) -> i32;
+    /// # Safety
+    /// Live owner/root. Index -1 selects root or vector snapshot; otherwise
+    /// one slot. Writable two-u64 metadata span. Positive result owns a packet.
+    pub fn gerbil_scheme_rust_identifiers_prepare(root: i64, index: i64, metadata: *mut u64)
+    -> i64;
+    /// # Safety
+    /// Owner-local prepared packet only; disjoint writable byte capacity,
+    /// count+1 u64 offsets, count u8 tags matching the prepared metadata.
+    /// The packet root stays live throughout encoding. Negative result is failure.
+    pub fn gerbil_scheme_rust_identifiers_copy(
+        root: i64,
+        bytes: *mut u8,
+        capacity: u64,
+        offsets: *mut u64,
+        kinds: *mut u8,
+        count: u64,
+    ) -> i64;
+    /// # Safety
+    /// Owner-local call; kind 0..8 names u16/u32/u64/f32/f64/i16/i32/i64/i8. Readable native
     /// element bytes, disjoint from Scheme storage. Positive root transfers ownership.
     pub fn gerbil_scheme_rust_numeric_create(kind: i32, bytes: *const u8, len: u64) -> i64;
     /// # Safety

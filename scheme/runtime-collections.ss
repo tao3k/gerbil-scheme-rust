@@ -16,6 +16,25 @@
        (vector-ref value index))
       (else gerbil-rs-root-missing))))
 
+;; Names are descriptive UTF-8 data, not a serialization of symbol identity.
+;; Official name conversion returns a private string snapshot for this packet.
+(def (gerbil-rs-identifier-packet value)
+  (let (values (if (vector? value) value (vector value)))
+    (let* ((count (vector-length values)) (names (make-vector count))
+           (kinds (make-u8vector count)))
+      (let prepare ((index 0) (capacity 0))
+        (if (= index count) (vector names kinds capacity)
+          (let* ((item (vector-ref values index))
+                 (kind (cond ((symbol? item) 0) ((keyword? item) 1) (else -1)))
+                 (name (case kind ((0) (symbol->string item))
+                                 ((1) (keyword->string item)) (else #f))))
+            (and name
+              (let (next (+ capacity (* 4 (string-length name))))
+                (and (fixnum? next)
+                  (begin (vector-set! names index name)
+                         (u8vector-set! kinds index kind)
+                         (prepare (+ index 1) next)))))))))))
+
 (begin-foreign
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-root-id-at gerbil-rs-write-root-id gerbil-rs-scalar-copy-c gerbil-rs-object-scalar-raw
@@ -32,6 +51,68 @@
    gerbil-rs-bigint-create-byte-control gerbil-rs-bigint-copy-byte-control))
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-numeric-span gerbil-rs-numeric-create gerbil-rs-numeric-size gerbil-rs-numeric-copy))
+ (namespace ("gerbil-scheme-rust/scheme/runtime#"
+   gerbil-rs-identifier-create gerbil-rs-identifiers-prepare gerbil-rs-identifiers-copy
+   gerbil-rs-object-identical
+   gerbil-rs-identifier-metadata gerbil-rs-identifier-slot gerbil-rs-identifier-end
+   gerbil-rs-pointer-offset))
+ (define gerbil-rs-identifier-metadata
+   (c-lambda ((pointer unsigned-int64) unsigned-int64 unsigned-int64) void
+     "___arg1[0]=___arg2; ___arg1[1]=___arg3;"))
+ (define gerbil-rs-identifier-slot
+   (c-lambda ((pointer unsigned-int64) (pointer unsigned-int8) unsigned-int64 unsigned-int64 int32) void
+     "___arg1[___arg3]=___arg4; ___arg2[___arg3]=___arg5;"))
+ (define gerbil-rs-identifier-end
+   (c-lambda ((pointer unsigned-int64) unsigned-int64 unsigned-int64) void
+     "___arg1[___arg2]=___arg3;"))
+ (define gerbil-rs-pointer-offset
+   (c-lambda ((pointer void) unsigned-int64) (pointer void)
+     "___return(___arg2 == 0 ? ___arg1 : (unsigned char*)___arg1 + ___arg2);"))
+ (c-define (gerbil-rs-identifier-create string-root kind) (int64 int32) int64
+   "gerbil_scheme_rust_identifier_create" "extern"
+   (with-exception-catcher (lambda (_exception) 0)
+     (lambda ()
+       (let ((name (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref string-root)))
+         (if (not (string? name)) 0
+           (let ((value (case kind ((0) (string->symbol name))
+                                  ((1) (string->keyword name))
+                                  ((2) (string->uninterned-symbol name)) (else #f))))
+             (if value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! value) 0)))))))
+ (c-define (gerbil-rs-object-identical left li right ri) (int64 int64 int64 int64) int32
+   "gerbil_scheme_rust_object_identical" "extern"
+   (if (eq? (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value left li)
+            (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value right ri)) 1 0))
+ (c-define (gerbil-rs-identifiers-prepare root index metadata)
+   (int64 int64 (pointer unsigned-int64)) int64
+   "gerbil_scheme_rust_identifiers_prepare" "extern"
+   (with-exception-catcher (lambda (_exception) 0)
+     (lambda ()
+       (let* ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value root index))
+              (packet (and (not (eq? value gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing))
+                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-identifier-packet value))))
+         (if (not packet) 0
+           (begin
+             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-identifier-metadata metadata
+               (vector-length (vector-ref packet 0)) (vector-ref packet 2))
+             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! packet)))))))
+ (c-define (gerbil-rs-identifiers-copy root bytes capacity offsets kinds count)
+   (int64 (pointer void) unsigned-int64 (pointer unsigned-int64) (pointer unsigned-int8) unsigned-int64) int64
+   "gerbil_scheme_rust_identifiers_copy" "extern"
+   (with-exception-catcher (lambda (_exception) -1)
+     (lambda ()
+       (let* ((packet (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root))
+              (names (vector-ref packet 0)) (tags (vector-ref packet 1)))
+         (if (not (and (= count (vector-length names)) (>= capacity (vector-ref packet 2)))) -1
+           (let encode ((index 0) (written 0))
+             (if (= index count)
+               (begin (gerbil-scheme-rust/scheme/runtime#gerbil-rs-identifier-end offsets count written) written)
+               (let ((size (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-into
+                             (vector-ref names index)
+                             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-pointer-offset bytes written)
+                             (- capacity written))))
+                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-identifier-slot
+                   offsets kinds index written (u8vector-ref tags index))
+                 (encode (+ index 1) (+ written size))))))))))
  ;; Official storage macros remain inside a nonallocating foreign leaf. No
  ;; Scheme body pointer is returned or retained; memcpy accepts unaligned spans.
  (c-declare "#include <string.h>\n#include <stdint.h>")
@@ -44,6 +125,8 @@ void *body = 0; ___U64 count = 0, width = 0;
 switch (___arg2) {
   GRS_NUMERIC(0,U16,2); GRS_NUMERIC(1,U32,4); GRS_NUMERIC(2,U64,8);
   GRS_NUMERIC(3,F32,4); GRS_NUMERIC(4,F64,8);
+  GRS_NUMERIC(5,S16,2); GRS_NUMERIC(6,S32,4); GRS_NUMERIC(7,S64,8);
+  GRS_NUMERIC(8,S8,1);
   default: ___return(-1);
 }
 #undef GRS_NUMERIC
@@ -75,7 +158,9 @@ END-C
        (let ((value (case kind
                       ((0) (make-u16vector size)) ((1) (make-u32vector size))
                       ((2) (make-u64vector size)) ((3) (make-f32vector size))
-                      ((4) (make-f64vector size)) (else #f))))
+                      ((4) (make-f64vector size)) ((5) (make-s16vector size))
+                      ((6) (make-s32vector size)) ((7) (make-s64vector size))
+                      ((8) (make-s8vector size)) (else #f))))
          (if (and value (= 0 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
                                value kind bytes 0 size 1)))
            (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! value) 0)))))

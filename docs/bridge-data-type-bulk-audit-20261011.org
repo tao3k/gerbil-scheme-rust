@@ -48,11 +48,11 @@ fail-closed untrusted raw constructors. Registry tokens remain positive.
 | String/UTF-8 | Rooted strings, owned validated Rust bytes/strings | Existing whole-value path; encoder baseline untouched |
 | bytevector/Vec<u8> | Root ID lifetime, whole-copy into slice or reused Vec | Existing bulk path, no borrowed heap pointer escapes; growth/shrink/empty/error/unaligned tests exist |
 | exact integer | Rooted IDs, indexed snapshot references and checked machine projections | Canonical signed binary magnitude construction/copy, short fixnum and limb paths, GC and error-preserving output tests; no decimal coercion or truncation |
-| symbol/keyword | Handle-backed borrowed views | Not an owned bulk string/interning transport; missing qualification |
+| symbol/keyword | Strong roots and owned UTF-8 name packets | Qualified bulk names, explicit interned/uninterned identity, transactional reuse and GC; see signed/identifier receipt |
 | pair/proper list | Strongly rooted creation and shallow snapshots | One complete snapshot root; nested/false/zero elements, parent release and GC covered; pair exposes car/cdr, not arbitrary improper-list sequence flattening |
 | generic vector | Strongly rooted creation and shallow snapshots | One native snapshot/root rather than per-element roots or Rust token buffers; element borrows cannot outlive the snapshot |
 | u16/u32/u64/f32/f64 homogeneous vectors | Sealed native-element whole-span transport | Rooted construction, transactional reused copy, indexed snapshot lifetime, bit-pattern and GC contracts; see numeric-vector receipt |
-| signed homogeneous vectors | No qualified safe bulk family yet | Remain a separate representation/coverage gap; not inferred from unsigned vectors |
+| s8/s16/s32/s64 homogeneous vectors | Sealed native-element whole spans | Qualified signed min/max, empty/growth/reuse/GC and full matched matrix; see signed/identifier receipt |
 | rational/complex/hash table | No complete safe owned bulk transport found | Missing representation and ownership semantics; not coerced to text or f64 |
 
 The audit does not claim every Gerbil data structure is already implemented.

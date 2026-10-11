@@ -157,12 +157,31 @@ struct CopyShape {
     bulk_calls: usize,
     scalar_calls: usize,
     loops: usize,
+    loop_depth: usize,
+    ffi_calls_in_loops: usize,
 }
 
 impl<'ast> Visit<'ast> for CopyShape {
+    fn visit_expr_for_loop(&mut self, expression: &'ast syn::ExprForLoop) {
+        self.loop_depth += 1;
+        visit::visit_expr_for_loop(self, expression);
+        self.loop_depth -= 1;
+    }
+    fn visit_expr_while(&mut self, expression: &'ast syn::ExprWhile) {
+        self.loop_depth += 1;
+        visit::visit_expr_while(self, expression);
+        self.loop_depth -= 1;
+    }
+    fn visit_expr_loop(&mut self, expression: &'ast syn::ExprLoop) {
+        self.loop_depth += 1;
+        visit::visit_expr_loop(self, expression);
+        self.loop_depth -= 1;
+    }
     fn visit_expr_call(&mut self, expression: &'ast syn::ExprCall) {
         if let syn::Expr::Path(path) = &*expression.func {
             let name = path.path.segments.last().unwrap().ident.to_string();
+            self.ffi_calls_in_loops +=
+                usize::from(self.loop_depth > 0 && name.starts_with("gerbil_scheme_rust_"));
             self.bulk_calls += usize::from(
                 name.ends_with("bytevector_copy")
                     || name.ends_with("root_string_to_utf8")
@@ -172,7 +191,8 @@ impl<'ast> Visit<'ast> for CopyShape {
                     || name.ends_with("collection_snapshot_raw")
                     || name.ends_with("bigint_copy_raw")
                     || name.ends_with("bigint_copy_indexed")
-                    || name.ends_with("numeric_copy"),
+                    || name.ends_with("numeric_copy")
+                    || name.ends_with("identifiers_copy"),
             );
             self.scalar_calls += usize::from(
                 name.ends_with("bytevector_u8_ref")
@@ -196,7 +216,23 @@ impl<'ast> Visit<'ast> for CopyShape {
                     "as_boolean" | "as_fixnum" | "as_char" | "as_flonum"
                 ),
         );
+        let repeats = matches!(
+            expression.method.to_string().as_str(),
+            "map"
+                | "flat_map"
+                | "filter_map"
+                | "for_each"
+                | "try_for_each"
+                | "fold"
+                | "try_fold"
+                | "any"
+                | "all"
+                | "find"
+                | "find_map"
+        );
+        self.loop_depth += usize::from(repeats);
         visit::visit_expr_method_call(self, expression);
+        self.loop_depth -= usize::from(repeats);
     }
 
     fn visit_expr(&mut self, expression: &'ast syn::Expr) {
@@ -388,6 +424,32 @@ fn numeric_transport_rejects_element_foreign_loops() {
     assert!(!bounded(&negative));
     let negative = source.replace(
         "gerbil_scheme_rust_numeric_copy(",
+        "gerbil_scheme_rust_object_scalar_raw(",
+    );
+    assert_ne!(source, negative);
+    assert!(!bounded(&negative));
+}
+
+#[test]
+fn identifier_transport_rejects_per_name_foreign_loops() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/runtime/objects/identifiers.rs"
+    ));
+    let bounded = |source: &str| {
+        let mut shape = CopyShape::default();
+        shape.visit_file(&syn::parse_file(source).unwrap());
+        shape.bulk_calls == 1 && shape.scalar_calls == 0 && shape.ffi_calls_in_loops == 0
+    };
+    assert!(bounded(source));
+    let negative=source.replace("let packet = own(","for _ in 0..8 { let _ = sys::gerbil_scheme_rust_identifiers_prepare(root,index,metadata.as_mut_ptr()); } let packet = own(");
+    assert_ne!(source, negative);
+    assert!(!bounded(&negative));
+    let negative = source.replace("let packet = own(", "(0..8).for_each(|_| { let _ = sys::gerbil_scheme_rust_identifiers_prepare(root,index,metadata.as_mut_ptr()); }); let packet = own(");
+    assert_ne!(source, negative);
+    assert!(!bounded(&negative));
+    let negative = source.replace(
+        "gerbil_scheme_rust_identifiers_copy(",
         "gerbil_scheme_rust_object_scalar_raw(",
     );
     assert_ne!(source, negative);

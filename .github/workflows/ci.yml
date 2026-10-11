@@ -65,12 +65,17 @@ jobs:
           cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
           cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: Scheme actor capability
-        run: gxi scheme/runtime-smp-test.ss
-
-      - name: Full-program actor AOT qualification
+      - name: Record unsupported SMP qualification
         run: |
-          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test
+          echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned SDK does not support. This is not an SMP pass.'
+          echo '### Scheme SMP: SKIPPED (unsupported SDK capability; not passed)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The pinned SDK supports multiple VMs but not multiple-threaded VMs. Single-processor actor AOT and both Rust concurrency controls remain required. Restore the separate SMP job after the SDK capability is qualified.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Single-processor actor AOT and Rust concurrency qualification
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test one_processor_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_one_worker_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_machine_workers
           cargo clippy -p gerbil-scheme-qualification --features actor-aot --all-targets --locked -- -D warnings
 
       - name: Bazel gates
@@ -78,3 +83,28 @@ jobs:
           bazel query //...
           bazel build //...
           bazel test //:ci
+
+  # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
+  # execution inside a VM. Restore this job only with a qualified SDK release.
+  scheme-smp:
+    name: Scheme SMP (SKIPPED - SDK lacks multiple-threaded-vms)
+    if: ${{ false }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Require exact processor activation
+        run: gxi scheme/runtime-smp-test.ss
+      - name: Multi-processor actor AOT qualification
+        run: cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test machine_processors

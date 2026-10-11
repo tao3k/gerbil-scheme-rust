@@ -1,0 +1,87 @@
+diff --git a/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs b/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs
+index 19509c2..bddb50f 100644
+--- a/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs
++++ b/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs
+@@ -18,16 +18,20 @@ pub(super) fn run() {
+     latency::contracts();
+     let workers = thread::available_parallelism().unwrap().get();
+     let callers = workers.checked_mul(2).unwrap();
+-    let host = tokio::runtime::Builder::new_multi_thread()
+-        .worker_threads(workers)
+-        .build()
+-        .unwrap();
++    // Keep one CPU budget for the synchronous Scheme owner; test, do not assume.
++    let candidate_workers = workers.saturating_sub(1).max(1);
++    let host = [workers, candidate_workers].map(|count| {
++        tokio::runtime::Builder::new_multi_thread()
++            .worker_threads(count)
++            .build()
++            .unwrap()
++    });
+     let (send, receive) = mpsc::channel(workers);
+     let (ready, wait) = std_mpsc::channel();
+     let owner = thread::spawn(move || owner(receive, ready));
+     wait.recv().unwrap();
+     println!(
+-        "UTF8-SCHED-AUDIT-METHOD workers={workers} callers={callers} capacity={workers} scheme_owners=1 workload=closed_loop parser_parallelism=false samples_per_variant=20 comparator=ordinary_observation candidate=perturbed_wake_cpu_observation optimization_admission=false"
++        "UTF8-SCHED-AUDIT-METHOD workers={workers} callers={callers} capacity={workers} scheme_owners=1 workload=closed_loop parser_parallelism=false samples_per_variant=20 comparator=tokio_cpu_default candidate=owner_cpu_budget candidate_workers={candidate_workers} wake_observer=false optimization_admission=strict"
+     );
+     let requested = std::env::args().nth(2).filter(|arg| arg != "--bench");
+     let mut admitted = true;
+@@ -45,11 +49,9 @@ pub(super) fn run() {
+     }
+     drop(send);
+     owner.join().unwrap();
++    println!("UTF8-SCHED-AUDIT-COMPLETE candidate_all_gates_pass={admitted}");
+     println!(
+-        "UTF8-SCHED-AUDIT-COMPLETE optimization_admission=false observer_not_slower={admitted}"
+-    );
+-    println!(
+-        "UTF8-SCHED-AUDIT-BOUNDARY optimized=false instrumentation_slower={}",
++        "UTF8-SCHED-AUDIT-BOUNDARY production_unchanged=true candidate_rejected={}",
+         !admitted
+     );
+ }
+@@ -67,7 +69,7 @@ fn quantiles(rows: &[[u64; 16]]) -> [u64; 8] {
+ }
+ 
+ fn compare(
+-    host: &Runtime,
++    host: &[Runtime; 2],
+     send: &mpsc::Sender<Request>,
+     texts: &Arc<Vec<String>>,
+     corpus: usize,
+@@ -78,9 +80,10 @@ fn compare(
+     let mut records: [Vec<[f64; 9]>; 2] = std::array::from_fn(|_| Vec::new());
+     let mut paired: [Vec<f64>; 9] = std::array::from_fn(|_| Vec::new());
+     let mut all: [Vec<[u64; 16]>; 2] = std::array::from_fn(|_| Vec::with_capacity(jobs * 20));
+-    for batched in [false, true] {
++    for runtime in host {
+         assert_eq!(
+-            host.block_on(batch_requests(send, texts, corpus, 1_000, callers, batched))
++            runtime
++                .block_on(batch_requests(send, texts, corpus, 1_000, callers, false))
+                 .len(),
+             1_000
+         );
+@@ -90,17 +93,11 @@ fn compare(
+         for (position, mode) in [0, 1, 1, 0].into_iter().enumerate() {
+             let os_start = process_usage();
+             let start = Instant::now();
+-            let rows = host.block_on(batch_requests(
+-                send,
+-                texts,
+-                corpus,
+-                jobs,
+-                callers,
+-                mode == 1,
+-            ));
++            let rows =
++                host[mode].block_on(batch_requests(send, texts, corpus, jobs, callers, false));
+             let wall = start.elapsed().as_secs_f64();
+             let os_end = process_usage();
+-            audit_batch(host, name, jobs, mode, &rows, os_start, os_end);
++            audit_batch(&host[mode], name, jobs, mode, &rows, os_start, os_end);
+             assert_eq!(rows.len(), jobs);
+             let q = quantiles(&rows);
+             let mut record = [0.0; 9];

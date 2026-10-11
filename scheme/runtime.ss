@@ -49,6 +49,7 @@
     #f))
 
 (include "runtime-collections.ss")
+(include "runtime-composites.ss")
 
 (def (gerbil-rs-bytestring-delimiter code)
   (cond

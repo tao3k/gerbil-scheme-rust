@@ -2,6 +2,33 @@
 
 use syn::visit::{self, Visit};
 
+#[test]
+fn composite_transport_rejects_per_component_foreign_loops() {
+    let source = include_str!("../../src/runtime/objects/composites.rs");
+    let bounded = |source: &str| {
+        let mut shape = CopyShape::default();
+        shape.visit_file(&syn::parse_file(source).unwrap());
+        shape.bulk_calls == 1 && shape.scalar_calls == 0 && shape.ffi_calls_in_loops == 0
+    };
+    assert!(bounded(source));
+    for injection in [
+        "for _ in 0..8 { let _ = sys::gerbil_scheme_rust_composite_snapshot(0,-1,kind,&raw mut length); }",
+        "(0..8).for_each(|_| { let _ = sys::gerbil_scheme_rust_composite_snapshot(0,-1,kind,&raw mut length); });",
+    ] {
+        let negative = source.replace(
+            "let mut length = 0_u64;",
+            &format!("let mut length = 0_u64; {injection}"),
+        );
+        assert_ne!(source, negative);
+        assert!(!bounded(&negative));
+    }
+    let negative = source.replace(
+        "gerbil_scheme_rust_composite_snapshot(",
+        "gerbil_scheme_rust_collection_element_raw(",
+    );
+    assert!(!bounded(&negative));
+}
+
 const SOURCE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/runtime/rooted.rs"
@@ -192,7 +219,8 @@ impl<'ast> Visit<'ast> for CopyShape {
                     || name.ends_with("bigint_copy_raw")
                     || name.ends_with("bigint_copy_indexed")
                     || name.ends_with("numeric_copy")
-                    || name.ends_with("identifiers_copy"),
+                    || name.ends_with("identifiers_copy")
+                    || name.ends_with("composite_snapshot"),
             );
             self.scalar_calls += usize::from(
                 name.ends_with("bytevector_u8_ref")

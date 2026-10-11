@@ -170,7 +170,11 @@ pub struct RootedObjectBatch<'runtime> {
     owner: Option<RootedSchemeOwner<'runtime>>,
     length: usize,
 }
-impl RootedObjectBatch<'_> {
+impl<'r> RootedObjectBatch<'r> {
+    pub(super) fn replace_snapshot(&mut self, owner: RootedSchemeOwner<'r>, length: usize) {
+        self.owner = Some(owner);
+        self.length = length;
+    }
     /// Release the single snapshot root and all its retained element references.
     pub fn clear(&mut self) {
         self.owner = None;
@@ -187,6 +191,18 @@ impl RootedObjectBatch<'_> {
             index: i64::try_from(index).ok()?,
             _runtime: PhantomData,
         })
+    }
+    /// Root one snapshot element independently. Prefer borrowing the complete
+    /// snapshot when all elements are needed: this entry allocates another root.
+    /// # Errors
+    /// Rejects an out-of-bounds element or failed strong-root registration.
+    pub fn root_element(&self, index: usize) -> Result<RootedSchemeObject<'r>, NativeError> {
+        let reference = self.get(index).ok_or_else(|| invalid("snapshot index"))?;
+        // SAFETY: live snapshot vector root and checked element index.
+        let root = unsafe {
+            sys::gerbil_scheme_rust_collection_element_raw(reference.root.0, 0, index as u64)
+        };
+        own(root).map(|owner| RootedSchemeObject { owner })
     }
     #[must_use]
     pub fn len(&self) -> usize {

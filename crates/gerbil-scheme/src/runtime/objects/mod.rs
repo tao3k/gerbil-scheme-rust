@@ -1,5 +1,7 @@
 //! Strong-root collections and binary arbitrary-precision integer transport.
+mod composites;
 mod identifiers;
+pub use composites::{NumberKind, TableEquality};
 mod integer;
 pub use identifiers::{IdentifierBuffer, IdentifierKind};
 mod numeric;

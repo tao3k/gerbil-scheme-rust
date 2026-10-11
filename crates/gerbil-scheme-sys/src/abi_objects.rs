@@ -2,6 +2,24 @@
 use crate::GerbilRootId;
 unsafe extern "C" {
     /// # Safety
+    /// Owner-local, readable 2*count root IDs. Kind 0 rational or 1 complex.
+    /// Positive output transfers a whole number-vector root.
+    pub fn gerbil_scheme_rust_composite_create(roots: *const i64, count: u64, kind: i32) -> i64;
+    /// # Safety
+    /// Owner-local readable key/value root pairs; equality 0 eq?, 1 eqv?, 2 equal?.
+    /// Positive result owns one strong table; duplicate keys use last value.
+    pub fn gerbil_scheme_rust_table_create(roots: *const i64, count: u64, equality: i32) -> i64;
+    /// # Safety
+    /// Live owner/root, valid index (-1 selects root), writable u64 length.
+    /// Kind 0 exact rational, 1 numeric components, 2 table entries.
+    /// Positive result owns one shallow snapshot of alternating components.
+    pub fn gerbil_scheme_rust_composite_snapshot(
+        root: i64,
+        index: i64,
+        kind: i32,
+        length: *mut u64,
+    ) -> i64;
+    /// # Safety
     /// Live owner and string root; kind 0 interned symbol/1 keyword/2 uninterned
     /// symbol. Transfers one root; spelling alone is never an identity token.
     pub fn gerbil_scheme_rust_identifier_create(string_root: i64, kind: i32) -> i64;

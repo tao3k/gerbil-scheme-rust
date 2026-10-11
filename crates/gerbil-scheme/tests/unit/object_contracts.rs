@@ -2,6 +2,8 @@
 use gerbil_scheme::{
     BigIntegerBuffer, BinaryInteger, CollectionKind, GerbilRuntime, RootedObjectBatch, SchemeScalar,
 };
+#[path = "composite_contracts.rs"]
+mod composite_contracts;
 #[path = "identifier_contracts.rs"]
 mod identifier_contracts;
 pub(super) fn run(runtime: &GerbilRuntime) {
@@ -15,6 +17,7 @@ pub(super) fn run(runtime: &GerbilRuntime) {
     collections(runtime);
     numeric(runtime);
     identifier_contracts::run(runtime);
+    composite_contracts::run(runtime);
     rejected_spans();
     assert_eq!(
         count(),

@@ -9,14 +9,15 @@ pub use abi_objects::{
     gerbil_scheme_rust_bigint_create_raw, gerbil_scheme_rust_bigint_size_indexed,
     gerbil_scheme_rust_bigint_size_raw, gerbil_scheme_rust_collection_create_raw,
     gerbil_scheme_rust_collection_element_raw, gerbil_scheme_rust_collection_length_raw,
-    gerbil_scheme_rust_collection_snapshot_raw, gerbil_scheme_rust_force_gc_raw,
+    gerbil_scheme_rust_collection_snapshot_raw, gerbil_scheme_rust_composite_create,
+    gerbil_scheme_rust_composite_snapshot, gerbil_scheme_rust_force_gc_raw,
     gerbil_scheme_rust_identifier_create, gerbil_scheme_rust_identifiers_copy,
     gerbil_scheme_rust_identifiers_prepare, gerbil_scheme_rust_numeric_copy,
     gerbil_scheme_rust_numeric_create, gerbil_scheme_rust_numeric_size,
     gerbil_scheme_rust_object_identical, gerbil_scheme_rust_object_root_raw,
     gerbil_scheme_rust_object_scalar_indexed, gerbil_scheme_rust_object_scalar_raw,
     gerbil_scheme_rust_object_word_raw, gerbil_scheme_rust_root_count_raw,
-    gerbil_scheme_rust_roots_release_raw,
+    gerbil_scheme_rust_roots_release_raw, gerbil_scheme_rust_table_create,
 };
 pub use abi_scalar_batch::{gerbil_scheme_rust_fixnum_from_word, gerbil_scheme_rust_scalar_batch};
 mod abi_bytevector;

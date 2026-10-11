@@ -20,9 +20,9 @@ pub use gerbil_scheme_sys::{
 
 mod runtime;
 pub use runtime::{
-    BigIntegerBuffer, BinaryInteger, CollectionKind, IdentifierBuffer, IdentifierKind,
+    BigIntegerBuffer, BinaryInteger, CollectionKind, IdentifierBuffer, IdentifierKind, NumberKind,
     NumericBuffer, NumericElement, RootedObjectBatch, RootedSchemeCollection, RootedSchemeObject,
-    SchemeObjectRef,
+    SchemeObjectRef, TableEquality,
 };
 
 pub use runtime::{

@@ -1,6 +1,7 @@
 //! Strong-root collection and binary integer ABBA qualification, not Org parsing.
 use gerbil_scheme::{CollectionKind, GerbilRuntime, RootedObjectBatch};
 use std::{hint::black_box, time::Instant};
+mod composites;
 mod identifiers;
 #[path = "integer.rs"]
 mod integer;
@@ -148,7 +149,9 @@ fn main() {
         "OBJECTS-METHOD owners=1 samples_per_variant=20 order=ABBA request_unit=ns wall_unit=ms memory_unit=bytes percentile=nearest_rank parser_parallelism=false workload=projection_roundtrip"
     );
     let before = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_count_raw() };
-    let admitted = if std::env::args().any(|arg| arg == "--identifiers") {
+    let admitted = if std::env::args().any(|arg| arg == "--composites") {
+        composites::run(&runtime)
+    } else if std::env::args().any(|arg| arg == "--identifiers") {
         identifiers::run(&runtime)
     } else if std::env::args().any(|arg| arg == "--numeric") {
         numeric::run(&runtime)

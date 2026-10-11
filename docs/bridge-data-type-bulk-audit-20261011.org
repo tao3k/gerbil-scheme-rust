@@ -53,7 +53,8 @@ fail-closed untrusted raw constructors. Registry tokens remain positive.
 | generic vector | Strongly rooted creation and shallow snapshots | One native snapshot/root rather than per-element roots or Rust token buffers; element borrows cannot outlive the snapshot |
 | u16/u32/u64/f32/f64 homogeneous vectors | Sealed native-element whole-span transport | Rooted construction, transactional reused copy, indexed snapshot lifetime, bit-pattern and GC contracts; see numeric-vector receipt |
 | s8/s16/s32/s64 homogeneous vectors | Sealed native-element whole spans | Qualified signed min/max, empty/growth/reuse/GC and full matched matrix; see signed/identifier receipt |
-| rational/complex/hash table | No complete safe owned bulk transport found | Missing representation and ownership semantics; not coerced to text or f64 |
+| rational/complex | Whole rooted construction and component snapshots | Exact numeric tower preserved, one strong result root; no detached recursive Rust serialization; see composite receipt |
+| Gambit hash table | Whole key/value construction and shallow strong snapshots | Explicit eq?/eqv?/equal?, no weak keys/values, unspecified ordering and identity preserved; see composite receipt |
 
 The audit does not claim every Gerbil data structure is already implemented.
 Collection elements can contain GC-managed objects; a scalar bit-copy API

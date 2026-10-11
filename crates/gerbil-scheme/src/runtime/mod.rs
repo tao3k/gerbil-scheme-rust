@@ -14,9 +14,9 @@ mod program;
 mod rooted;
 mod scalar_batch;
 pub use objects::{
-    BigIntegerBuffer, BinaryInteger, CollectionKind, IdentifierBuffer, IdentifierKind,
+    BigIntegerBuffer, BinaryInteger, CollectionKind, IdentifierBuffer, IdentifierKind, NumberKind,
     NumericBuffer, NumericElement, RootedObjectBatch, RootedSchemeCollection, RootedSchemeObject,
-    SchemeObjectRef,
+    SchemeObjectRef, TableEquality,
 };
 pub use scalar_batch::ScalarBatch;
 mod types;

@@ -15,6 +15,11 @@ must use same-condition controls and reject slower candidates, not redefine
 the benchmark or substitute cached snapshots. Delivery uses the existing
 gerbil-scheme-rust PR #18, without a new PR or release tag.
 
+The inventory below reflects the later rooted bulk closures; the historical
+encoder receipts in the sections below retain their original sampling and
+performance boundaries. See [numeric/table qualification](bridge-composites-20261011.org)
+and [signed/name qualification](bridge-signed-identifiers-20261011.org).
+
 This inventory distinguishes working conversions from opaque handle shapes.
 A nonzero handle is not evidence of runtime classification, rooting, traversal,
 or a bulk conversion. Scalar element access is legitimate; whole-value APIs
@@ -23,17 +28,18 @@ must not implement traversal by repeated Rust-to-Scheme calls.
 | Scheme family | Rust representation | Current implementation | Boundary / gap |
 | --- | --- | --- | --- |
 | boolean, fixnum, character, flonum | `bool`, `isize`, `char`, `f64` | Checked scalar projection | Constant-size values; not bulk traversal |
-| exact integer | rooted integer; checked `i64`/`u64` | Range-checked projection and byte encoding | Arbitrary-precision Rust result is not implemented |
+| exact integer | rooted integer and canonical binary magnitude | Checked machine projection and arbitrary-precision binary transport | No truncation or decimal coercion |
 | u8vector | borrowed input `&[u8]`, owned/reused `Vec<u8>`, reused output `&mut [u8]` | Binary construction and bulk copying | Copies ownership; no exported Scheme heap slice |
 | string | borrowed Rust `&str`, owned `String`, explicit rooted UTF-8 snapshot | Scheme UTF-8 encoding and bulk bytevector copy | Snapshot owns an independent root; not zero-copy or an implicit mutable-string cache |
-| pair | `SchemePair`, checked car/cdr projections | Runtime-classified borrowed access | Recursive owned Rust conversion is not implemented |
-| proper list | `SchemeList` | Classified borrowed identity | No bulk list-to-`Vec<T>` conversion |
-| vector | `SchemeBorrowedVector` | Rust handle slice with pointer/length ABI | No Scheme-vector classification, rooting, or bulk output conversion |
-| symbol, keyword | `SchemeSymbol`, `SchemeKeyword` | Opaque handle shapes | No runtime-backed name/interning conversion |
+| pair | strongly rooted car/cdr snapshots | Whole shallow projection | Not recursive detached Rust serialization |
+| proper list | `RootedObjectBatch` | Whole rooted snapshot | Element borrows cannot outlive the snapshot |
+| vector | `RootedObjectBatch` | Whole rooted snapshot, optional independent element roots | Strong GC ownership; no escaped heap pointers |
+| symbol, keyword | `IdentifierBuffer`, rooted identity | Bulk owned names and official constructors | Name equality is not object identity |
 | nil, void | typed sentinel views | Checked predicates/projections | Not collections |
-| s8/u16/s16/u32/s32/u64/s64/f32/f64 vectors | no typed owned bridge representation | Not implemented | Need element-width, range, alignment, endian, GC and copy contracts |
-| rational, complex numbers | no owned bridge representation | Not implemented | Need lossless numerical representation and checked error policy |
-| hash table, struct/object, procedure, port | no owned bridge conversion | Not implemented | Need explicit identity/ownership or serialization contracts; not raw pointer casts |
+| s8/u16/s16/u32/s32/u64/s64/f32/f64 vectors | sealed `NumericBuffer<T>` | Whole-span construction and transactional copying | Native element layout, owner affinity and GC checked |
+| rational, complex numbers | rooted batches and component snapshots | Whole construction, exactness and normalization owned by Scheme | Not a detached recursive Rust number-tower serializer |
+| Gambit hash table | strong root and key/value snapshot | Whole construction with explicit equality and shallow bulk projection | Unspecified order; no weak ownership or generic HashTable serialization |
+| struct/object, procedure, port | no complete owned bridge serialization | Not implemented | Explicit identity/lifecycle contracts still needed; not raw pointer casts |
 
 Missing families must not be advertised as supported by reusing an unclassified
 word or passing an unrooted `Vec<GerbilValueHandle>` across a GC boundary. Numeric

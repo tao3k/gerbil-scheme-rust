@@ -1,0 +1,4 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo clippy --workspace --all-targets --locked -- -D warnings
+   Compiling gerbil-scheme v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/crates/gerbil-scheme)
+    Checking gerbil-scheme-build v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/crates/gerbil-scheme-build)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 2.21s

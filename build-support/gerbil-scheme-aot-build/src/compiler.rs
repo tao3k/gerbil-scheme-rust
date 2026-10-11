@@ -29,6 +29,7 @@ fn run_native_build() {
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime-collections.ss");
+    println!("cargo:rerun-if-changed=../../scheme/runtime-composites.ss");
     println!("cargo:rerun-if-changed=../../scheme/utf8.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ssi");
     println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm");

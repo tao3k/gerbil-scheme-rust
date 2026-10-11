@@ -19,6 +19,7 @@
         (let (active (##current-vm-processor-count))
           (displayln "SMP requested=" requested " active=" active)
           (unless (= active requested)
+            (displayln "SMP capability rejected: inspect the SDK's per-VM threading and max-processors configuration; multiple VMs or Rust queue concurrency do not satisfy this gate")
             (error "SDK did not activate the requested VM processors" requested active)))
         (let (workers (map (lambda (name) (spawn/name name checksum))
                           '(smp-left smp-right)))

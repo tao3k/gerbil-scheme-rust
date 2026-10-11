@@ -32,6 +32,13 @@ pub(super) fn production(value: &Root) -> String {
     convert_owned(value, true)
 }
 
+/// Test-only allocation policy; shrinking remains inside the timed conversion.
+pub(super) fn compact(value: &Root) -> String {
+    let mut text = production(value);
+    text.shrink_to_fit();
+    text
+}
+
 fn convert_owned(value: &Root, production: bool) -> String {
     let mut characters: usize = 0;
     // SAFETY: input root remains live on its foreign-entry owner.
@@ -87,6 +94,7 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
         let value = root_text(runtime, &text);
         assert_eq!(convert(&value), text, "full scalar parity {start}");
         assert_eq!(production(&value), text, "production scalar parity {start}");
+        assert_eq!(compact(&value), text, "compact scalar parity {start}");
     }
     for text in [String::new(), "ASCII\0data".into(), "汉字😀\0".repeat(8193)] {
         assert_eq!(convert(&root_text(runtime, &text)), text);
@@ -106,6 +114,7 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
         );
         assert_eq!(convert(&value), expected);
         assert_eq!(production(&value), expected);
+        assert_eq!(compact(&value), expected);
         assert_eq!(super::convert(&value, 3), expected);
     }
     assert_eq!(snapshot, "a".repeat(4096));

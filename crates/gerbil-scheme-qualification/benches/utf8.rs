@@ -31,6 +31,9 @@ fn convert(value: &Root, mode: i32) -> String {
     if mode == 5 {
         return buffer::production(value);
     }
+    if mode == 6 {
+        return buffer::compact(value);
+    }
     // SAFETY: the preflighted mode and live string root belong to this owner.
     let raw = unsafe { gerbil_utf8_comparison_encode(value.0.0, mode) };
     assert!(
@@ -92,10 +95,12 @@ fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32
             unsafe { gerbil_utf8_comparison_snapshot(0) };
             let start = Instant::now();
             let mut total = 0;
+            let mut capacity_total = 0;
             for index in 0..jobs {
                 let text_slot = index % values.len();
                 let text = convert(&values[text_slot], mode);
                 assert_eq!(text, texts[text_slot], "changing text exact content");
+                capacity_total += text.capacity();
                 total += std::hint::black_box(text).len();
             }
             let elapsed = start.elapsed().as_secs_f64();
@@ -122,7 +127,7 @@ fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32
             gc_count[slot] += collections;
             group_times[position] = elapsed;
             eprintln!(
-                "UTF8-MATCHED jobs={jobs} left={left} right={right} group={group} position={position} mode={mode} completed={} elapsed_ms={:.3}",
+                "UTF8-MATCHED jobs={jobs} left={left} right={right} group={group} position={position} mode={mode} completed={} elapsed_ms={:.3} output_bytes={total} capacity_bytes_sum={capacity_total}",
                 wall[slot].len(),
                 elapsed * 1000.0
             );
@@ -152,9 +157,10 @@ fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32
 fn main() {
     let argument = std::env::args().nth(1);
     let direct = argument.as_deref() == Some("--buffer");
+    let compact = argument.as_deref() == Some("--compact");
     let contracts_only = argument.as_deref() == Some("--contracts");
     let requested = argument
-        .filter(|_| !direct && !contracts_only)
+        .filter(|_| !direct && !compact && !contracts_only)
         .map(|value| {
             let jobs: usize = value.parse().expect("load must be a number");
             assert!([1_000, 10_000, 100_000].contains(&jobs), "unsupported load");
@@ -162,7 +168,7 @@ fn main() {
         });
     let program = gerbil_scheme_qualification::linked_program();
     let runtime = GerbilRuntime::initialize_program(program).expect("one owner-local AOT runtime");
-    if direct || contracts_only {
+    if direct || compact || contracts_only {
         buffer::contracts(&runtime);
         if contracts_only {
             return;
@@ -186,7 +192,9 @@ fn main() {
         if requested.is_some_and(|load| load != jobs) {
             continue;
         }
-        if direct {
+        if compact {
+            admitted &= compare(&values, &texts, jobs, 5, 6) <= 1.0;
+        } else if direct {
             admitted &= compare(&values, &texts, jobs, 3, 5) <= 1.0;
         } else {
             compare(&values, &texts, jobs, 0, 1);

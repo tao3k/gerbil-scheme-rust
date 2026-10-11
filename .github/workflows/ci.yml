@@ -37,14 +37,6 @@ jobs:
         with:
           release-root: ${{ env.GERBIL_RELEASE_ROOT }}
 
-      - name: Configure Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          cache-save: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
-          disk-cache: gerbil-v0.19-${{ runner.os }}-${{ runner.arch }}
-          repository-cache: true
-
       - name: Cargo format
         run: cargo fmt --all --check
 
@@ -78,6 +70,32 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_machine_workers
           cargo clippy -p gerbil-scheme-qualification --features actor-aot --all-targets --locked -- -D warnings
 
+  # Cargo and Bazel own independent build graphs. Keep both complete gates,
+  # without spending Bazel's watchdog budget on Cargo compilation first.
+  bazel:
+    name: Bazel bindings (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Configure Bazel
+        uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          cache-save: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          disk-cache: gerbil-v0.19-${{ runner.os }}-${{ runner.arch }}
+          repository-cache: true
       - name: Bazel gates
         run: |
           bazel query //...

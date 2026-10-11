@@ -9,6 +9,16 @@ mod buffer;
 #[path = "utf8/costs.rs"]
 mod costs;
 
+const SCENARIOS: [&str; 7] = [
+    "mixed",
+    "ascii",
+    "two-byte",
+    "bmp",
+    "supplementary",
+    "ascii-wide-prefix",
+    "wide-ascii-prefix",
+];
+
 unsafe extern "C" {
     fn gerbil_utf8_comparison_encode(root: i64, mode: i32) -> i64;
     fn gerbil_utf8_comparison_snapshot(slot: i32);
@@ -159,6 +169,31 @@ fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32
     median(&paired)
 }
 
+fn texts_for_scenario(scenario: &str) -> Vec<String> {
+    // These prefixes deliberately mislead a first-character selector at every
+    // 256-character leaf. Compare variants within a corpus, not absolute times
+    // between corpora of different byte/character lengths.
+    if scenario == "ascii-wide-prefix" {
+        return ["汉", "字", "文", "语"]
+            .map(|prefix| format!("{prefix}{}", "a".repeat(255)).repeat(16))
+            .to_vec();
+    }
+    if scenario == "wide-ascii-prefix" {
+        return ["汉", "字", "文", "语"]
+            .map(|wide| format!("a{}", wide.repeat(255)).repeat(16))
+            .to_vec();
+    }
+    let fixtures = match scenario {
+        "mixed" => ["a\0汉字😀", "b\0漢語🚀", "c\0中文🌍", "d\0文字🎉"],
+        "ascii" => ["a\0bcd", "b\0cde", "c\0def", "d\0efg"],
+        "two-byte" => ["é\0ñøå", "ñ\0øåé", "ø\0åéñ", "å\0éñø"],
+        "bmp" => ["汉\0字文语", "字\0文语汉", "文\0语汉字", "语\0汉字文"],
+        "supplementary" => ["😀\0🚀🌍🎉", "🚀\0🌍🎉😀", "🌍\0🎉😀🚀", "🎉\0😀🚀🌍"],
+        _ => panic!("unsupported UTF-8 scenario"),
+    };
+    fixtures.into_iter().map(|text| text.repeat(683)).collect()
+}
+
 fn main() {
     let argument = std::env::args().nth(1);
     let direct = argument.as_deref() == Some("--buffer");
@@ -182,54 +217,58 @@ fn main() {
             return;
         }
     }
-    // Equal character counts and reserve policies expose width-dispatch
-    // tradeoffs without changing the default changing mixed-text workload.
+    // Each pair shares current inputs and the reserve policy. The default
+    // changing mixed-text workload remains unchanged.
     // Cargo appends --bench to harness=false executables; it is not a corpus.
     let scenario = std::env::args().nth(2).filter(|arg| arg != "--bench");
-    let fixtures = match scenario.as_deref() {
-        None | Some("mixed") => ["a\0汉字😀", "b\0漢語🚀", "c\0中文🌍", "d\0文字🎉"],
-        Some("ascii") => ["a\0bcd", "b\0cde", "c\0def", "d\0efg"],
-        Some("two-byte") => ["é\0ñøå", "ñ\0øåé", "ø\0åéñ", "å\0éñø"],
-        Some("bmp") => ["汉\0字文语", "字\0文语汉", "文\0语汉字", "语\0汉字文"],
-        Some("supplementary") => ["😀\0🚀🌍🎉", "🚀\0🌍🎉😀", "🌍\0🎉😀🚀", "🎉\0😀🚀🌍"],
-        Some(_) => panic!("unsupported UTF-8 scenario"),
+    let scenario = scenario.as_deref().unwrap_or("mixed");
+    let scenarios = if scenario == "all" {
+        &SCENARIOS[..]
+    } else {
+        std::slice::from_ref(&scenario)
     };
-    println!("UTF8-SCENARIO {}", scenario.as_deref().unwrap_or("mixed"));
-    let texts: Vec<_> = fixtures.into_iter().map(|text| text.repeat(683)).collect();
-    let values: Vec<_> = texts
-        .iter()
-        .map(|text| buffer::root_text(&runtime, text))
-        .collect();
-    if costs {
-        let empty = buffer::root_text(&runtime, "");
-        costs::run(&values, &texts, &empty);
-        return;
-    }
-    for mode in 0..3 {
-        for (value, text) in values.iter().zip(&texts) {
-            assert_eq!(convert(value, mode), *text);
-        }
-    }
     let mut admitted = true;
-    for jobs in [1_000, 10_000, 100_000] {
-        if requested.is_some_and(|load| load != jobs) {
+    for scenario in scenarios {
+        println!("UTF8-SCENARIO {scenario}");
+        let texts = texts_for_scenario(scenario);
+        let values: Vec<_> = texts
+            .iter()
+            .map(|text| buffer::root_text(&runtime, text))
+            .collect();
+        if costs {
+            let empty = buffer::root_text(&runtime, "");
+            costs::run(&values, &texts, &empty);
             continue;
         }
-        if codec {
-            admitted &= compare(&values, &texts, jobs, 4, 7) <= 1.0;
-        } else if owned {
-            // Current frozen caller-buffer control versus the checked public
-            // ABI, with the same allocation policy and complete validation.
-            admitted &= compare(&values, &texts, jobs, 4, 5) <= 1.0;
-        } else if compact {
-            admitted &= compare(&values, &texts, jobs, 5, 6) <= 1.0;
-        } else if direct {
-            admitted &= compare(&values, &texts, jobs, 3, 5) <= 1.0;
-        } else {
-            compare(&values, &texts, jobs, 0, 1);
-            compare(&values, &texts, jobs, 1, 2);
+        for mode in 0..3 {
+            for (value, text) in values.iter().zip(&texts) {
+                assert_eq!(convert(value, mode), *text);
+            }
+        }
+        for jobs in [1_000, 10_000, 100_000] {
+            if requested.is_some_and(|load| load != jobs) {
+                continue;
+            }
+            if codec {
+                admitted &= compare(&values, &texts, jobs, 4, 7) <= 1.0;
+            } else if owned {
+                // Current frozen caller-buffer control versus the checked public
+                // ABI, with the same allocation policy and complete validation.
+                admitted &= compare(&values, &texts, jobs, 4, 5) <= 1.0;
+            } else if compact {
+                admitted &= compare(&values, &texts, jobs, 5, 6) <= 1.0;
+            } else if direct {
+                admitted &= compare(&values, &texts, jobs, 3, 5) <= 1.0;
+            } else {
+                compare(&values, &texts, jobs, 0, 1);
+                compare(&values, &texts, jobs, 1, 2);
+            }
         }
     }
+    println!(
+        "UTF8-MATRIX corpora={} admitted={admitted}",
+        scenarios.len()
+    );
     assert_eq!(runtime.add_i64(40, 2).unwrap(), 42);
     // Collect every load before rejecting; never hide a slower negative sample.
     assert!(

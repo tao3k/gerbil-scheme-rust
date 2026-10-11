@@ -1,0 +1,113 @@
+#+TITLE: Adaptive UTF-8 selection: complete cross-corpus rejection
+
+* Identity and selection algorithms
+
+Production and generated SCM return exactly to =fc4562c=; PR #18 remains at
+=520a2423fbc6296e46d2f34904036722169f2a31=. No kernel, SDK, acceptance limit,
+Rust reserve policy, public ABI or SMP capability is changed.
+
+Official local Gambit =lib/c_intf.c:1270-1360= dispatches bounded stream encoders;
+=lib/gambit/string/string.scm:560-669= determines width before choosing ASCII
+copying or multibyte emission. These motivate two actual source experiments,
+not a claim that upstream implements our selectors:
+
+- First-character selection chooses the existing ASCII-first or partitioned
+  tree per current 256-character leaf. Direct emission preserves each tree's
+  scalar checks. Prefixes are deliberately not assumed representative.
+- Complete-leaf selection reads every current scalar, OR-reduces width bits
+  and selects ASCII, two-byte, BMP or general emission. Power-of-two bounds on
+  the OR are conservative width proofs, not an estimate of average density.
+  A fresh local =___C[256]= span prevents classification/emission disagreement.
+  Storage is at most 1 KiB per active C leaf, never a retained string/encoding
+  cache. It is removed on rollback. All scalars are still encoded each request.
+
+Both preserve pointer tags, capacity/type checks, scalar rejection, 256-scalar
+polling and full Rust UTF-8 validation. No per-character foreign call is added.
+
+* Complete serial matrices
+
+Each candidate executes seven distributions, three loads and twenty samples
+per variant/load (840 rows each), ABBA inside one image per corpus. Inputs,
+owner, allocation, validation and current text are matched within each pair.
+All seven corpora complete even after earlier failures; no tolerance is added.
+
+The following are paired wall ratios, not ratios of independent medians.
+Any value above one rejects the candidate.
+
+| Selector / corpus | 1000 | 10000 | 100000 |
+|-------------------+------+-------+--------|
+| First / mixed | 1.057842 | 1.058703 | 1.054550 |
+| First / ASCII | 0.990026 | 0.982003 | 0.988668 |
+| First / two-byte | 0.986126 | 1.002889 | 0.998758 |
+| First / BMP | 1.039315 | 1.049179 | 1.043289 |
+| First / supplementary | 0.985275 | 0.996902 | 0.996514 |
+| First / ASCII with wide prefix | 1.109910 | 1.116126 | 1.100194 |
+| First / wide with ASCII prefix | 1.049761 | 1.025412 | 1.017470 |
+| Complete / mixed | 1.367963 | 1.304241 | 1.442552 |
+| Complete / ASCII | 1.034107 | 1.008358 | 0.981349 |
+| Complete / two-byte | 1.028069 | 1.078884 | 1.083668 |
+| Complete / BMP | 1.342842 | 1.215413 | 1.272478 |
+| Complete / supplementary | 1.308057 | 1.224726 | 1.296015 |
+| Complete / ASCII with wide prefix | 1.579251 | 1.612414 | 1.575261 |
+| Complete / wide with ASCII prefix | 1.019953 | 1.240843 | 1.230822 |
+
+Both matrices reject, and all producer source changes are rolled back.
+At 100,000 mixed requests the complete selector's CPU is 705.248 versus
+524.735 ms (approximately 34% higher), with equal collection counts. GC CPU is
+14.991 versus 13.917 ms. This is not merely a wall-clock scheduling effect;
+neither exact selection nor fewer dispatch alternatives automatically wins
+after scanning/copying costs. Individual scan/copy costs are not isolated here.
+
+Source-only replay patches and all 1,680 rows are retained under
+=benchmarks/20261011-utf8-adaptive-direct-*= and =adaptive-summary-*=.
+An earlier helper-based exploratory mixed/ASCII trial contains 240 rows.
+Those two runs overlap; they are explicitly ineligible for matched admission,
+not relabeled as a successful result. The helper replay patch is retained.
+
+* Allocation, GC and Rust capacity
+
+Restored production completes seven diagnostic phases, three loads and twenty
+samples (420 rows, exit zero). Owned wall medians are 4.604 / 46.469 / 564.716 ms.
+At 100,000 owned CPU is 517.612 ms and GC CPU 13.648 ms (approximately 2.6%).
+Encoding diagnostic CPU is 421.553 ms, validation 108.587 ms and Rust
+allocation/release 2.688 ms. These independently timed phases are NOT additive.
+Absolute medians across separate executions are not a new speedup or a claim
+that unchanged production code regressed. Wall/CPU separation remains recorded.
+
+| Corpus | Output bytes/result | Rust capacity | Spare |
+|--------+---------------------+---------------+-------|
+| Mixed | 8196 | 13660 | 40% |
+| ASCII | 3415 | 13660 | 75% |
+| Two-byte | 6147 | 13660 | 55% |
+| BMP | 8879 | 13660 | 35% |
+| Supplementary | 11611 | 13660 | 15% |
+| ASCII with wide prefix | 4128 | 16384 | 74.8% |
+| Wide with ASCII prefix | 12256 | 16384 | 25.2% |
+
+The prefix corpora have different lengths; only within-corpus pairs are compared.
+One output is live in this fixture. Capacity traffic is not RSS. Neither
+selector reduces the public ABI's four-byte-per-character admission budget.
+A narrower emission kernel is not permission to allocate insufficient output
+space. No default shrink, extra retained allocation or text cache is installed.
+
+* Executable matrix and remaining gate
+
+=just bridge-utf8-matched --codec all= now gathers every corpus/load in a single
+AOT runtime, runs full contracts once and aggregates failures only at the end.
+This removes external shell sequencing and repeated process/conformance startup.
+The default mixed fixture remains unchanged. Individual corpora remain selectable.
+
+The restored checked public ABI executes this =all= driver completely:
+840 samples in 42 groups, then exit 101. BMP ratios are
+1.045520 / 1.073448 / 1.022604; wide-with-ASCII-prefix ratios are
+1.004071 / 1.023706 / 1.055047. These compare checked ABI with the frozen raw
+control framing, not a changed encoding algorithm. The expanded entry-framing
+gate is NOT passed and no universal performance claim is admitted.
+
+Four-route Scheme scalar/surrogate/mutation conformance, OS-counter resolution,
+actor-AOT warning-denying lint and filename policy pass. All source patches
+remain replayable against restored production. The two serial candidate matrices,
+restored phase matrix and native all-corpus driver retain 2,940 complete samples;
+the 240 exploratory samples remain separate. Bridge qualification is not Org
+parsing or parsing parallelism. Exact-head remote CI is separate: Linux/macOS
+for =520a242= are still running; SMP is explicitly skipped, never passed.

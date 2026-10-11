@@ -77,6 +77,7 @@ bridge-actor-benchmark *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --locked -- {{ args }}
 
 # Same AOT image/owner/validation, ABBA, 20 complete samples per variant/load.
+# Optional corpus "all" collects every corpus/load before aggregate rejection.
 bridge-utf8-matched *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features actor-aot --bench utf8 --locked -- {{ args }}
 

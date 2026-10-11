@@ -6,6 +6,8 @@ use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
 
 #[path = "utf8/buffer.rs"]
 mod buffer;
+#[path = "utf8/costs.rs"]
+mod costs;
 
 unsafe extern "C" {
     fn gerbil_utf8_comparison_encode(root: i64, mode: i32) -> i64;
@@ -33,6 +35,9 @@ fn convert(value: &Root, mode: i32) -> String {
     }
     if mode == 6 {
         return buffer::compact(value);
+    }
+    if mode == 7 {
+        return buffer::codec(value);
     }
     // SAFETY: the preflighted mode and live string root belong to this owner.
     let raw = unsafe { gerbil_utf8_comparison_encode(value.0.0, mode) };
@@ -158,9 +163,11 @@ fn main() {
     let argument = std::env::args().nth(1);
     let direct = argument.as_deref() == Some("--buffer");
     let compact = argument.as_deref() == Some("--compact");
+    let costs = argument.as_deref() == Some("--costs");
+    let codec = argument.as_deref() == Some("--codec");
     let contracts_only = argument.as_deref() == Some("--contracts");
     let requested = argument
-        .filter(|_| !direct && !compact && !contracts_only)
+        .filter(|_| !direct && !compact && !costs && !codec && !contracts_only)
         .map(|value| {
             let jobs: usize = value.parse().expect("load must be a number");
             assert!([1_000, 10_000, 100_000].contains(&jobs), "unsupported load");
@@ -168,7 +175,7 @@ fn main() {
         });
     let program = gerbil_scheme_qualification::linked_program();
     let runtime = GerbilRuntime::initialize_program(program).expect("one owner-local AOT runtime");
-    if direct || compact || contracts_only {
+    if direct || compact || costs || codec || contracts_only {
         buffer::contracts(&runtime);
         if contracts_only {
             return;
@@ -182,6 +189,11 @@ fn main() {
         .iter()
         .map(|text| buffer::root_text(&runtime, text))
         .collect();
+    if costs {
+        let empty = buffer::root_text(&runtime, "");
+        costs::run(&values, &texts, &empty);
+        return;
+    }
     for mode in 0..3 {
         for (value, text) in values.iter().zip(&texts) {
             assert_eq!(convert(value, mode), *text);
@@ -192,7 +204,9 @@ fn main() {
         if requested.is_some_and(|load| load != jobs) {
             continue;
         }
-        if compact {
+        if codec {
+            admitted &= compare(&values, &texts, jobs, 4, 7) <= 1.0;
+        } else if compact {
             admitted &= compare(&values, &texts, jobs, 5, 6) <= 1.0;
         } else if direct {
             admitted &= compare(&values, &texts, jobs, 3, 5) <= 1.0;

@@ -6,6 +6,11 @@ use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
 unsafe extern "C" {
     fn gerbil_utf8_buffer_encode(root: i64, output: *mut u8, capacity: u64) -> i64;
     fn gerbil_utf8_buffer_mutate(root: i64, index: u64, codepoint: u32);
+    fn gerbil_scheme_rust_root_string_encode_into_raw(
+        root: i64,
+        output: *mut u8,
+        capacity: u64,
+    ) -> i64;
 }
 
 pub(super) fn root_text(runtime: &GerbilRuntime, text: &str) -> Root {
@@ -25,11 +30,16 @@ pub(super) fn root_text(runtime: &GerbilRuntime, text: &str) -> Root {
 }
 
 pub(super) fn convert(value: &Root) -> String {
-    convert_owned(value, false)
+    convert_owned(value, 4)
 }
 
 pub(super) fn production(value: &Root) -> String {
-    convert_owned(value, true)
+    convert_owned(value, 5)
+}
+
+/// Same raw-entry framing as the frozen control; public ABI contracts run separately.
+pub(super) fn codec(value: &Root) -> String {
+    convert_owned(value, 7)
 }
 
 /// Test-only allocation policy; shrinking remains inside the timed conversion.
@@ -39,7 +49,7 @@ pub(super) fn compact(value: &Root) -> String {
     text
 }
 
-fn convert_owned(value: &Root, production: bool) -> String {
+fn convert_owned(value: &Root, mode: i32) -> String {
     let mut characters: usize = 0;
     // SAFETY: input root remains live on its foreign-entry owner.
     assert_eq!(
@@ -52,7 +62,7 @@ fn convert_owned(value: &Root, production: bool) -> String {
     let mut bytes = Vec::<u8>::with_capacity(capacity);
     // SAFETY: exclusive Rust allocation stays live/stable throughout the
     // synchronous call. No foreign pointer or Scheme body is retained.
-    let written = if production {
+    let written = if mode == 5 {
         let mut written = 0;
         // SAFETY: identical stable exclusive capacity, through the actual ABI.
         assert_eq!(
@@ -68,8 +78,13 @@ fn convert_owned(value: &Root, production: bool) -> String {
         );
         written
     } else {
+        let encode = if mode == 7 {
+            gerbil_scheme_rust_root_string_encode_into_raw
+        } else {
+            gerbil_utf8_buffer_encode
+        };
         let written = unsafe {
-            gerbil_utf8_buffer_encode(
+            encode(
                 value.0.0,
                 bytes.as_mut_ptr(),
                 u64::try_from(capacity).unwrap(),

@@ -1,0 +1,193 @@
+#+TITLE: Encoding, allocation and entry cost attribution
+
+* Scope and source identity
+
+Frozen reference: =6ad680c6311957eadf2529765ab1efd751132554=.
+Production encoder entering this audit: =f48bd8d7f4b4438223a0f79e5e5686f0fc14a924=.
+The qualification runs use the installed SDK; no SDK download, rebuild or
+kernel change is involved. These are owner-local bridge conversions, not
+Org parsing latency or evidence of parallel Scheme processors.
+
+The official source inspected is the local matching checkout under
+=gerbil-bazel/.data/gxtest-next-ci-source/src/gambit/lib=:
+
+- =_kernel.scm:3999-4056=: process statistics, including GC wall time and the
+  statistics object's own allocation at index 9.
+- =mem.c:359-370,7683-7697=: allocation accounting includes movable heap AND
+  stack occupancy. It is not a malloc event counter or peak resident memory.
+- =os_time.c=: process CPU uses =getrusage(RUSAGE_SELF)=.
+- =c_intf.c:398-443=: UTF-8 emission shares a backwards-written suffix.
+  Its historical five/six-byte support is not admitted by this bridge.
+
+* Reproducible attribution boundary
+
+=just bridge-utf8-matched --costs= measures six diagnostic phases with twenty
+complete samples each at 1,000, 10,000 and 100,000 requests. Phase order rotates
+per round. Every encoding operates on the current one of four changing texts;
+no stable encoded snapshot replaces encoding. Raw samples retain GC CPU/wall,
+Scheme allocation accounting, minor faults and voluntary/involuntary switches.
+An unavailable OS counter or a major page fault rejects the diagnostic.
+
+The owned phase includes actual checked ABI calls, allocation and full UTF-8
+validation. The encoding phase uses an exclusive preallocated destination and
+the actual checked ABI; it verifies byte parity but does NOT admit a String.
+The allocation phase measures allocator request/release without writing pages;
+it does not measure resident memory or materialization cost. The validation
+phase validates all current input bytes. Isolated phases must not be summed or
+subtracted into a fictitious exact end-to-end decomposition: GC and allocator
+state differ, and process CPU includes GC CPU already.
+Each diagnostic phase reserves one unfilled scratch buffer outside timing for
+uniform preparation; only encoding uses its contents. The owned phase's own
+output allocation is still inside timing. This diagnostic's extra reservation
+must not be presented as production peak memory.
+
+The additional empty-string successful encoding call measures an entry floor:
+actual checked ABI, root lookup, null-pointer marshalling and exception framing,
+but no encoding leaves. It cannot be subtracted to claim exact costs for
+large-text entry/dispatch. It is diagnostic, not the changing-text workload.
+Null marshalling differs from a non-null destination's foreign wrapper; this
+floor does not isolate that wrapper's allocation or lifetime cost.
+
+The initial diagnostic prototype crashed before producing timing rows. It had
+an unnecessary Scheme-to-C round trip for OS snapshots; the replacement calls
+the qualification-only C functions directly. The failed launch is retained in
+the receipt, and is not treated as a completed matrix. Production was unchanged.
+
+* Memory and throughput policy
+
+For this fixture, current text has 3,415 characters and 8,196 encoded bytes.
+Worst-case reservation is 13,660 bytes: 5,464 bytes of spare capacity. This is
+40 percent of reserved capacity, not measured RSS. Only one result is retained
+at a time; multiplying capacity by request count is cumulative traffic, not
+concurrently live memory. More independently retained results increase live
+capacity in proportion to their actual lifetime, not the benchmark load label.
+
+Worst-case reservation avoids an extra counting pass and output relocation.
+Always shrinking adds allocator/copy work; previous complete matched trials
+rejected that default. Reuse retains a high-water capacity but requires the
+consumer to finish using the old bytes before another write; previous reuse
+trials also failed the unchanged wall-time gate. These negatives remain valid.
+No automatic worker/request threshold, new public policy or default shrink is
+admitted by this audit. A caller's explicit retained-memory budget is distinct
+from a claim of faster conversion.
+
+* Complete attribution receipt
+
+All 300 phase samples completed: five phases, three loads, twenty samples.
+Raw receipts, including the initial failed diagnostic launch, are retained in
+=benchmarks/20261011-utf8-cost-attribution.log=. All OS snapshots were available;
+no major faults occurred. Medians are in milliseconds:
+
+| Requests | Owned wall | Owned CPU | GC CPU | GC wall | Length CPU | Rust alloc CPU | Encoding CPU | Validation CPU |
+|----------+------------+-----------+--------+---------+------------+----------------+--------------+----------------|
+|     1000 |     40.249 |     7.391 |  0.213 |   0.212 |      0.069 |          0.029 |        5.976 |          1.062 |
+|    10000 |    400.338 |    74.513 |  1.749 |   4.316 |      0.992 |          0.275 |       61.877 |         11.828 |
+|   100000 |   4177.636 |   735.607 | 18.028 |  60.500 |     10.775 |          3.775 |      619.969 |        123.249 |
+
+At 100,000 the owned phase records median 3,794 involuntary and 23 voluntary
+switches. Even the validation-only phase has zero GC but wall 522.874 ms versus
+CPU 123.249 ms, with 770 involuntary switches. Thus GC cannot account for all
+non-CPU wall time. Preemption is observed, not merely inferred from a slower
+median. These counters do not identify the competing process, time each
+switch, or separate all SDK polling/blocking from host scheduling effects.
+The difference between separately computed medians is not a measured sum of
+per-sample blocked durations. This is not proof that every slowdown is external.
+
+The source-based encoding target is materially larger than the isolated hot
+allocator request/release cost. CPU scales roughly tenfold per tenfold load;
+these samples do not establish a superlinear encoding algorithm. The slower
+wall samples must remain visible and cannot be replaced with CPU admission.
+The owned Scheme allocation-accounting median is 70,760,040 bytes at 100,000;
+the two Rust-only phases each report a fixed 56-byte Scheme framing residual.
+Stack/GC accounting changes between phases prevent interpreting these as exact
+heap allocation events or assigning every byte to exception catching.
+
+* Algorithm candidate
+
+An actual source change tested the official shared-suffix UTF-8 emission
+algorithm, not a capacity-only benchmark adjustment. It keeps the ASCII fast
+path, rejects surrogates and values above U+10FFFF before writes, shares the
+continuation-byte writes and calculates width once per non-ASCII scalar.
+Capacity, polling, leaf bounds and full Rust validation remain unchanged.
+=--codec= compares frozen caller-buffer control with current encoding through
+the same raw-entry/owned-output framing; public checked ABI contracts run
+separately before timing. A slower paired wall median at ANY load rejects the
+candidate after all twenty samples per variant/load have completed.
+
+The complete matched result rejects the candidate at 10,000:
+
+| Requests | Control wall ms | Candidate wall ms | Paired ratio | Control CPU ms | Candidate CPU ms |
+|----------+-----------------+-------------------+--------------+----------------+------------------|
+|     1000 |          15.837 |            14.759 |     0.788689 |          6.559 |            8.095 |
+|    10000 |         246.378 |           344.898 |     1.792596 |         74.559 |           72.893 |
+|   100000 |        3120.498 |          2955.206 |     0.886544 |        733.790 |          725.219 |
+
+All 120 raw rows, twenty per variant/load, are retained in
+=benchmarks/20261011-utf8-shared-suffix-abba.log=. Unicode parity for every
+scalar, all 2,048 surrogate rejections, mutation and public ABI bounds/root
+contracts completed before timing. No improvement claim is admitted from the
+two passing loads, or from the CPU-only reduction at 10,000. Source inspection
+inspired the candidate; the official generic emission pattern is not sufficient
+evidence that it improves this stricter, bounded four-byte implementation.
+
+The production algorithm has been rolled back exactly; =scheme/utf8.ss= has no
+diff from the admitted encoder. The source-only replay patch
+=benchmarks/20261011-utf8-shared-suffix.patch= passes =git apply --check= after
+rollback. The retained =--codec= harness compares the existing frozen
+caller-buffer control with current production using matched raw-entry framing;
+it does not enable a rejected runtime mode or introduce a public ABI.
+
+* Completed entry-floor matrix after rollback
+
+The extended six-phase matrix completed all 360 samples after source rollback,
+again twenty per phase/load. The receipt is
+=benchmarks/20261011-utf8-cost-entry-attribution.log=. The actual ABI's empty
+success path also confirms null destination with zero capacity leaves a valid
+zero result length. CPU medians in milliseconds:
+
+| Requests | Owned CPU | Encoding CPU | Validation CPU | Rust alloc CPU | Length CPU | Empty entry CPU | Owned GC CPU | Owned wall |
+|----------+-----------+--------------+----------------+----------------+------------+-----------------+--------------+------------|
+|     1000 |     7.285 |        5.975 |          1.071 |          0.029 |      0.069 |           0.279 |        0.081 |     14.215 |
+|    10000 |    71.971 |       63.198 |         12.489 |          0.271 |      0.743 |           1.995 |        1.536 |    338.683 |
+|   100000 |   736.132 |      625.968 |        123.715 |          3.329 |     10.573 |          21.588 |       17.017 |   3822.500 |
+
+The entry floor at 100,000 includes GC CPU 8.397 ms and GC wall 30.189 ms;
+its wall median is 113.248 ms. The owned phase's GC wall is 78.173 ms, far
+smaller than its overall wall time. Validation again has zero GC and wall
+731.867 ms despite CPU 123.715 ms. Owned involuntary switches have median
+3,658; no major page faults were observed. The length-only entry is inexpensive
+relative to encoding this payload, but that does not price every encoding leaf
+or the non-null foreign pointer wrapper. Null-entry allocation accounting is
+70,558,608 bytes, illustrating why stack/continuation accounting is not a
+payload-byte or exact heap-event counter.
+
+A names-only process CPU snapshot during this run also observed a concurrent
+=gxi= process and active interactive services. It corroborates a non-isolated
+host, but is an average CPU snapshot, not an attribution of each delayed
+sample. No process priority, CPU affinity or scheduling policy was changed.
+The three complete receipts contain 780 timing rows overall: the initial 300
+phase rows, the 120 matched candidate/control rows and the final 360 phase rows.
+Neither GC reductions nor host contention excuses the rejected wall-time gate.
+
+* Local publication checks
+
+=just bridge-actor-lint= passes with =--all-targets= and =-D warnings=.
+The first lint attempt found similar local names and a floating comparison;
+both are fixed without lint exemptions. The integral major-fault counter now
+requires exact positive-zero bits outside timing, not an epsilon or a relaxed
+threshold. No timed operation changed after the completed receipts.
+
+=just bridge-root-contracts= passes three focused tests; its one pre-existing
+ignored local latency test is not claimed as passing or used for admission.
+The separate complete matched and phase receipts above supply this audit's
+timing evidence. =just bridge-path-check= and =git diff --check= pass. The
+production encoding source has no diff, and the replay patch applies cleanly.
+The unrelated =MODULE.bazel.lock= change is preserved and excluded from staging.
+
+* Exact-head remote CI
+
+PR #18 head =8dba5f0366daf94bce5f184364179a5fd63482a1=, run =38102898587=:
+both platforms completed with failure at the unchanged Scheme actor capability
+gate. Linux requested 4 processors and activated 1; macOS requested 3 and
+activated 1. No successful local bridge measurement repairs that remote SMP
+failure, and the gate is not relaxed.

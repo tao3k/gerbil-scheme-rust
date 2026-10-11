@@ -106,6 +106,36 @@ package: gerbil-scheme-rust/qualification
     (f64vector-ref (vector-ref gerbil-scheme-rust/qualification/utf8-controls#snapshots 0) index))))
 
 (begin-foreign
+ (c-define (snapshot-overhead) () double
+  "gerbil_utf8_snapshot_overhead" "extern"
+  (f64vector-ref (vector-ref gerbil-scheme-rust/qualification/utf8-controls#snapshots 1) 9))
+ (c-declare #<<C-END
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+static struct rusage utf8_usage[2];
+static int utf8_usage_valid[2];
+void gerbil_utf8_os_snapshot(int slot) {
+  if (slot >= 0 && slot < 2)
+    utf8_usage_valid[slot] = getrusage(RUSAGE_SELF, &utf8_usage[slot]) == 0;
+}
+double gerbil_utf8_os_stat(int field) {
+  if (!utf8_usage_valid[0] || !utf8_usage_valid[1]) return -1;
+  switch (field) {
+  case 0: return (double)(utf8_usage[1].ru_minflt - utf8_usage[0].ru_minflt);
+  case 1: return (double)(utf8_usage[1].ru_majflt - utf8_usage[0].ru_majflt);
+  case 2: return (double)(utf8_usage[1].ru_nvcsw - utf8_usage[0].ru_nvcsw);
+  case 3: return (double)(utf8_usage[1].ru_nivcsw - utf8_usage[0].ru_nivcsw);
+  default: return -1;
+  }
+}
+#else
+void gerbil_utf8_os_snapshot(int slot) { (void)slot; }
+double gerbil_utf8_os_stat(int field) { (void)field; return -1; }
+#endif
+C-END
+ ))
+
+(begin-foreign
  (c-declare #<<C-END
 static ___SCMOBJ comparison_utf8_count(___SCMOBJ text, ___SCMOBJ first, ___SCMOBJ last) {
  ___SCMOBJ ___temp;

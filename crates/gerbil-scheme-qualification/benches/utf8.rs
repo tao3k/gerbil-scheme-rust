@@ -182,10 +182,20 @@ fn main() {
             return;
         }
     }
-    let texts: Vec<_> = ["a\0汉字😀", "b\0漢語🚀", "c\0中文🌍", "d\0文字🎉"]
-        .into_iter()
-        .map(|text| text.repeat(683))
-        .collect();
+    // Equal character counts and reserve policies expose width-dispatch
+    // tradeoffs without changing the default changing mixed-text workload.
+    // Cargo appends --bench to harness=false executables; it is not a corpus.
+    let scenario = std::env::args().nth(2).filter(|arg| arg != "--bench");
+    let fixtures = match scenario.as_deref() {
+        None | Some("mixed") => ["a\0汉字😀", "b\0漢語🚀", "c\0中文🌍", "d\0文字🎉"],
+        Some("ascii") => ["a\0bcd", "b\0cde", "c\0def", "d\0efg"],
+        Some("two-byte") => ["é\0ñøå", "ñ\0øåé", "ø\0åéñ", "å\0éñø"],
+        Some("bmp") => ["汉\0字文语", "字\0文语汉", "文\0语汉字", "语\0汉字文"],
+        Some("supplementary") => ["😀\0🚀🌍🎉", "🚀\0🌍🎉😀", "🌍\0🎉😀🚀", "🎉\0😀🚀🌍"],
+        Some(_) => panic!("unsupported UTF-8 scenario"),
+    };
+    println!("UTF8-SCENARIO {}", scenario.as_deref().unwrap_or("mixed"));
+    let texts: Vec<_> = fixtures.into_iter().map(|text| text.repeat(683)).collect();
     let values: Vec<_> = texts
         .iter()
         .map(|text| buffer::root_text(&runtime, text))

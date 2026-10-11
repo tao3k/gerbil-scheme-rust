@@ -112,8 +112,20 @@ fn pointer_contract() {
     );
 }
 
-pub(super) fn contracts(runtime: &GerbilRuntime) {
-    pointer_contract();
+fn width_transition_contracts(runtime: &GerbilRuntime) {
+    // Width transitions and exact leaf tails must survive run-specialization
+    // attempts. All data is encoded anew, including embedded NUL characters.
+    for length in [255, 256, 257, 511, 512, 513] {
+        for pattern in ["aé汉😀\0", "汉字😀éa\0", "a\0bcd"] {
+            let text: String = pattern.chars().cycle().take(length).collect();
+            let value = root_text(runtime, &text);
+            assert_eq!(convert(&value), text, "control leaf tail {length}");
+            assert_eq!(production(&value), text, "production leaf tail {length}");
+        }
+    }
+}
+
+fn scalar_parity_contracts(runtime: &GerbilRuntime) {
     for start in (0..0x11_0000_u32).step_by(4096) {
         let text: String = (start..(start + 4096).min(0x11_0000))
             .filter_map(char::from_u32)
@@ -123,6 +135,12 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
         assert_eq!(production(&value), text, "production scalar parity {start}");
         assert_eq!(compact(&value), text, "compact scalar parity {start}");
     }
+}
+
+pub(super) fn contracts(runtime: &GerbilRuntime) {
+    pointer_contract();
+    scalar_parity_contracts(runtime);
+    width_transition_contracts(runtime);
     for text in [String::new(), "ASCII\0data".into(), "汉字😀\0".repeat(8193)] {
         assert_eq!(convert(&root_text(runtime, &text)), text);
     }

@@ -19,6 +19,9 @@ simdutf8 = { workspace = true, optional = true }
 [build-dependencies]
 gerbil-scheme-aot-build.workspace = true
 
+[dev-dependencies]
+libc = "=0.2.186"
+
 [[bench]]
 name = "actors"
 harness = false

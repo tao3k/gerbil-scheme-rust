@@ -1,6 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
 (export gerbil-rs-root-string gerbil-rs-root-bytevector
+        gerbil-rs-root-object gerbil-rs-rooted-call
         gerbil-rs-abi-version
         gerbil-rs-add-i64
         gerbil-rs-is-even-i64
@@ -34,6 +35,18 @@
 (def (gerbil-rs-root-bytevector value)
   (if (u8vector? value) (gerbil-rs-rooted-value-store! value) 0))
 
+;; Linked application exports transfer strong tokens, including false/zero.
+;; The argument stays rooted throughout user code and exceptions cannot cross C.
+(def (gerbil-rs-root-object value)
+  (gerbil-rs-rooted-value-store! value))
+(def (gerbil-rs-rooted-call root procedure)
+  (with-catch
+    (lambda (_) 0)
+    (lambda ()
+      (let (value (gerbil-rs-rooted-value-ref root))
+        (if (eq? value gerbil-rs-root-missing) 0
+          (gerbil-rs-root-object (procedure value)))))))
+
 (def (gerbil-rs-rooted-value-store! value)
   (let (root-id gerbil-rs-next-root-id)
     (set! gerbil-rs-next-root-id (1+ root-id))
@@ -49,6 +62,7 @@
     #f))
 
 (include "runtime-collections.ss")
+(include "runtime-object-kinds.ss")
 (include "runtime-composites.ss")
 
 (def (gerbil-rs-bytestring-delimiter code)

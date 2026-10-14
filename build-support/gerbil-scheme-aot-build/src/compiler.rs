@@ -29,12 +29,14 @@ fn run_native_build() {
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime-collections.ss");
+    println!("cargo:rerun-if-changed=../../scheme/runtime-object-kinds.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime-composites.ss");
     println!("cargo:rerun-if-changed=../../scheme/utf8.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ssi");
     println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm");
     println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm");
     println!("cargo:rerun-if-changed=../../ffi/runtime.c");
+    println!("cargo:rerun-if-changed=../../ffi/host_io.h");
 
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let workspace = manifest_dir

@@ -21,8 +21,8 @@ pub use gerbil_scheme_sys::{
 mod runtime;
 pub use runtime::{
     BigIntegerBuffer, BinaryInteger, CollectionKind, IdentifierBuffer, IdentifierKind, NumberKind,
-    NumericBuffer, NumericElement, RootedObjectBatch, RootedSchemeCollection, RootedSchemeObject,
-    SchemeObjectRef, TableEquality,
+    NumericBuffer, NumericElement, ObjectKind, RootedObjectBatch, RootedSchemeCollection,
+    RootedSchemeObject, SchemeObjectRef, TableEquality,
 };
 
 pub use runtime::{
@@ -35,8 +35,8 @@ pub use runtime::{
 
 pub use runtime::{
     GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilRuntimeReceipt, GerbilUtf8,
-    GerbilValue, GerbilValueProvenance, LinkedBytesExport, LinkedGerbilProgram, LinkedStringExport,
-    NativeError, NativeResult, VmCapabilities,
+    GerbilValue, GerbilValueProvenance, LinkedBytesExport, LinkedGerbilProgram, LinkedObjectExport,
+    LinkedStringExport, NativeError, NativeResult, VmCapabilities,
 };
 
 pub mod tool_environment;

@@ -17,6 +17,11 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     fs::write(workspace.join("gerbil.pkg"), "package-v1\n").expect("write gerbil.pkg");
     fs::write(workspace.join("scheme/runtime.ss"), "native-v1\n").expect("write native.ss");
     fs::write(
+        workspace.join("scheme/runtime-object-kinds.ss"),
+        "object-kinds-v1\n",
+    )
+    .expect("write object kinds include");
+    fs::write(
         workspace.join("scheme/runtime-collections.ss"),
         "collections-v1\n",
     )
@@ -50,6 +55,13 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     )
     .expect("change composite include");
     assert_ne!(before_composites, workspace_input_fingerprint(&workspace));
+    let before_kinds = workspace_input_fingerprint(&workspace);
+    fs::write(
+        workspace.join("scheme/runtime-object-kinds.ss"),
+        "object-kinds-v2\n",
+    )
+    .expect("change object kinds include");
+    assert_ne!(before_kinds, workspace_input_fingerprint(&workspace));
     fs::remove_dir_all(workspace).expect("remove Scheme input root");
 }
 

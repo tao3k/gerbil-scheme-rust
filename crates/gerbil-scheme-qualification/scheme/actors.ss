@@ -6,6 +6,15 @@ package: gerbil-scheme-rust/qualification
 
 (def (main . _) (void))
 
+;; Generic strong-object exports are bridge qualification, not application policy.
+(begin-foreign
+ (c-define (object-echo root) (int64) int64 "gerbil_objects_echo" "extern"
+   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
+     (lambda (value) (##gc) value)))
+ (c-define (object-reject root) (int64) int64 "gerbil_objects_reject" "extern"
+   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
+     (lambda (_) (error "expected object export rejection")))))
+
 ;; Updated only by the foreign-entry owner after joining every actor.
 (def last-processor-count 0)
 (def last-active-processors 0)

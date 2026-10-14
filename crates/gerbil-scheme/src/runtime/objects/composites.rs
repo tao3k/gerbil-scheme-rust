@@ -66,6 +66,25 @@ impl GerbilRuntime {
         equality: TableEquality,
         entries: &[(&RootedSchemeObject<'_>, &RootedSchemeObject<'_>)],
     ) -> Result<RootedSchemeObject<'_>, NativeError> {
+        self.table(equality.code(), entries)
+    }
+    /// Construct Gerbil's `HashTable` interface, preserving its native dispatch.
+    /// This differs from a Gambit table even when both use structural equality.
+    /// Requires an AOT graph containing Gerbil's native `HashTable` implementation.
+    /// # Errors
+    /// Rejects invalid roots, wrong-thread entry or size overflow.
+    pub fn gerbil_hash_table(
+        &self,
+        equality: TableEquality,
+        entries: &[(&RootedSchemeObject<'_>, &RootedSchemeObject<'_>)],
+    ) -> Result<RootedSchemeObject<'_>, NativeError> {
+        self.table(equality.code() + 3, entries)
+    }
+    fn table(
+        &self,
+        equality: i32,
+        entries: &[(&RootedSchemeObject<'_>, &RootedSchemeObject<'_>)],
+    ) -> Result<RootedSchemeObject<'_>, NativeError> {
         self.check_thread()?;
         let roots = root_pairs(entries)?;
         // SAFETY: live strong input roots, complete pair span, synchronous copy.
@@ -73,7 +92,7 @@ impl GerbilRuntime {
             sys::gerbil_scheme_rust_table_create(
                 roots.as_ptr(),
                 u64::try_from(entries.len()).map_err(|_| invalid("table count"))?,
-                equality.code(),
+                equality,
             )
         };
         own(root).map(|owner| RootedSchemeObject { owner })

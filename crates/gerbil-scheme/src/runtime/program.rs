@@ -2,8 +2,24 @@
 
 //! Static program descriptors; runtime policy stays with the downstream owner.
 
+use super::RootedSchemeObject;
 use super::types::RootedSchemeOwner;
 use super::{GerbilRuntime, NativeError, NativeResult, RootedSchemeBytevector, RootedSchemeString};
+
+/// Statically linked application export accepting one strong object token and
+/// transferring a fresh strong result token. Neither GC words nor Rust pointers
+/// cross the call. The descriptor and results remain on their VM owner thread.
+///
+/// ```compile_fail
+/// use gerbil_scheme::LinkedObjectExport;
+/// fn send<T: Send>() {}
+/// send::<LinkedObjectExport<'static>>();
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct LinkedObjectExport<'runtime> {
+    runtime: &'runtime GerbilRuntime,
+    export: unsafe extern "C" fn(i64) -> i64,
+}
 
 /// A build-owned AOT module graph containing the native bridge.
 #[derive(Clone, Copy, Debug)]
@@ -41,6 +57,27 @@ pub struct LinkedBytesExport<'runtime> {
 }
 
 impl GerbilRuntime {
+    /// Bind an initialized application export using the upstream strong-root ABI.
+    ///
+    /// # Errors
+    /// Rejects a call outside the live runtime's owner thread.
+    ///
+    /// # Safety
+    /// The process-lived export must belong to this runtime's AOT graph. It may
+    /// borrow the input token only during the call and must not release it. It
+    /// must catch all Scheme exceptions, return zero on failure, and otherwise
+    /// transfer exactly one fresh live root from `gerbil-rs-root-object`. It must
+    /// not reenter this owner, finalize the runtime, or retain Rust pointers.
+    pub unsafe fn bind_object_export(
+        &self,
+        export: unsafe extern "C" fn(i64) -> i64,
+    ) -> Result<LinkedObjectExport<'_>, NativeError> {
+        self.check_thread()?;
+        Ok(LinkedObjectExport {
+            runtime: self,
+            export,
+        })
+    }
     /// Register a build-owned Scheme export against this live runtime.
     ///
     /// # Errors
@@ -87,6 +124,31 @@ impl GerbilRuntime {
             runtime: self,
             export,
         })
+    }
+}
+
+impl<'runtime> LinkedObjectExport<'runtime> {
+    /// Call the application with a borrowed strong input and own its result root.
+    /// Invalid/failed return tokens never become result owners; the input remains
+    /// owned by the caller and survives both successful and failed calls.
+    #[must_use]
+    pub fn call(
+        &self,
+        input: &RootedSchemeObject<'_>,
+    ) -> NativeResult<RootedSchemeObject<'runtime>> {
+        let result = (|| {
+            self.runtime.check_thread()?;
+            // SAFETY: binding guarantees the initialized owner-local export,
+            // a call-scoped borrowed input, and a fresh strong result token.
+            let root = gerbil_scheme_sys::GerbilRootId(unsafe { (self.export)(input.root_id().0) });
+            RootedSchemeOwner::new(
+                gerbil_scheme_sys::GerbilStatus::Ok,
+                root,
+                "linked object export",
+            )
+            .map(RootedSchemeObject::from_owner)
+        })();
+        result.into()
     }
 }
 

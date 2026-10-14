@@ -7,7 +7,8 @@
 ;; Bazel invokes this script as an outer orchestration layer.
 (defbuild-script
   '("scheme/utf8"
-    (gxc: "scheme/runtime" (extra-inputs: ("scheme/runtime-collections.ss")))
+    (gxc: "scheme/runtime" (extra-inputs: ("scheme/runtime-collections.ss"
+      "scheme/runtime-object-kinds.ss" "scheme/runtime-composites.ss")))
     "scheme/program-build")
   optimize: #t
   parallelize: 1)

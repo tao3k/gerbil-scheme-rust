@@ -23,10 +23,11 @@
                    (vector-set! out (+ 1 (* 2 index)) (right item))
                    (loop (+ index 1))))))))))
     ((2)
-     (and (table? value)
-       (let ((out (make-vector (* 2 (table-length value)))) (index 0))
+     (and (or (table? value) (hash-table? value))
+       (let ((out (make-vector (* 2 (if (table? value) (table-length value) (hash-length value))))) (index 0))
          ;; Official traversal invokes proc(key,value); order is unspecified.
-         (table-for-each
+         ((if (table? value) table-for-each
+            (lambda (visit table) (hash-for-each visit table)))
            (lambda (key item)
              (vector-set! out index key)
              (vector-set! out (+ index 1) item)
@@ -68,10 +69,14 @@
    "gerbil_scheme_rust_table_create" "extern"
    (with-exception-catcher (lambda (_exception) 0)
      (lambda ()
-       (let ((test (case equality ((0) eq?) ((1) eqv?) ((2) equal?) (else #f))))
+       (let ((test (case equality ((0 3) eq?) ((1 4) eqv?) ((2 5) equal?) (else #f)))
+             (gerbil? (<= 3 equality 5)))
          (if (not (and test (fixnum? count)
                        (fixnum? (* 2 count)))) 0
-           (let ((out (make-table test: test weak-keys: #f weak-values: #f)))
+           (let ((out (if gerbil?
+                        (case equality ((3) (make-hash-table-eq))
+                                       ((4) (make-hash-table-eqv)) (else (make-hash-table)))
+                        (make-table test: test weak-keys: #f weak-values: #f))))
              (let loop ((index 0))
                (if (= index count)
                  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! out)
@@ -81,7 +86,8 @@
                                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-id-at roots (+ 1 (* 2 index))))))
                    (if (or (eq? key gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)
                            (eq? value gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)) 0
-                     (begin (table-set! out key value) (loop (+ index 1)))))))))))))
+                     (begin (if gerbil? (hash-put! out key value) (table-set! out key value))
+                            (loop (+ index 1)))))))))))))
  (c-define (gerbil-rs-composite-snapshot root index kind length)
    (int64 int64 int32 (pointer unsigned-int64)) int64
    "gerbil_scheme_rust_composite_snapshot" "extern"

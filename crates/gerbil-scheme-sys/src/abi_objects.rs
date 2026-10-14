@@ -2,11 +2,20 @@
 use crate::GerbilRootId;
 unsafe extern "C" {
     /// # Safety
+    /// Owner-local creation. Tags: void, bool, fixnum, char, flonum, nil (0..5).
+    /// A positive result transfers exactly one fresh strong root.
+    pub fn gerbil_scheme_rust_scalar_object(tag: i32, integer: i64, real: f64) -> i64;
+    /// # Safety
+    /// Live owner/root; -1 selects the root, otherwise a live snapshot vector slot.
+    /// Returns a stable shape tag (0..15), or -1 for invalid root/index.
+    pub fn gerbil_scheme_rust_object_kind(root: i64, index: i64) -> i32;
+    /// # Safety
     /// Owner-local, readable 2*count root IDs. Kind 0 rational or 1 complex.
     /// Positive output transfers a whole number-vector root.
     pub fn gerbil_scheme_rust_composite_create(roots: *const i64, count: u64, kind: i32) -> i64;
     /// # Safety
     /// Owner-local readable key/value root pairs; equality 0 eq?, 1 eqv?, 2 equal?.
+    /// Add three for Gerbil `HashTable` rather than Gambit's native table.
     /// Positive result owns one strong table; duplicate keys use last value.
     pub fn gerbil_scheme_rust_table_create(roots: *const i64, count: u64, equality: i32) -> i64;
     /// # Safety

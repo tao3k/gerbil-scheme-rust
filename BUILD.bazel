@@ -55,6 +55,7 @@ filegroup(
     srcs = glob(["scheme/**/*"]) + [
         "build.ss",
         "ffi/runtime.c",
+        "ffi/host_io.h",
         "gerbil.pkg",
     ],
 )

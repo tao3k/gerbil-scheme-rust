@@ -1,7 +1,7 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=56c6641e8663a8d41d55036a16cd8ff1b3914021bd6b4730b1a33404bc25e306 body-sha256=0ac29d6e7dc5db5af017137635786acbda54e6a8fbc85a09055f1224b7fa332e
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=8d66deeeaa53f0c56ba781a1b02591127c988858587d7650ae8e5ba540780cfa body-sha256=bcf18566aa1f246636019d4d2c09127241db58af8ab15a78a37ea8e39258adee
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/utf8::timestamp 1791723868)
+  (define gerbil-scheme-rust/scheme/utf8::timestamp 1791993320)
   (begin
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8
       (lambda (_%str485%_)
@@ -18,12 +18,12 @@
                     (declare (not safe))
                     (##fx< _%start496%_ _%length487%_))
                   (let* ((_%end499%_
-                          (if (let ((__tmp4978
+                          (if (let ((__tmp5067
                                      (let ()
                                        (declare (not safe))
                                        (##fx- _%length487%_ _%start496%_))))
                                 (declare (not safe))
-                                (##fx< __tmp4978 '256))
+                                (##fx< __tmp5067 '256))
                               _%length487%_
                               (let ()
                                 (declare (not safe))
@@ -61,12 +61,12 @@
                   (declare (not safe))
                   (##fx< _%start477%_ _%length470%_))
                 (let* ((_%end480%_
-                        (if (let ((__tmp4979
+                        (if (let ((__tmp5068
                                    (let ()
                                      (declare (not safe))
                                      (##fx- _%length470%_ _%start477%_))))
                               (declare (not safe))
-                              (##fx< __tmp4979 '256))
+                              (##fx< __tmp5068 '256))
                             _%length470%_
                             (let ()
                               (declare (not safe))

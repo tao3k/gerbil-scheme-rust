@@ -15,8 +15,8 @@ mod rooted;
 mod scalar_batch;
 pub use objects::{
     BigIntegerBuffer, BinaryInteger, CollectionKind, IdentifierBuffer, IdentifierKind, NumberKind,
-    NumericBuffer, NumericElement, RootedObjectBatch, RootedSchemeCollection, RootedSchemeObject,
-    SchemeObjectRef, TableEquality,
+    NumericBuffer, NumericElement, ObjectKind, RootedObjectBatch, RootedSchemeCollection,
+    RootedSchemeObject, SchemeObjectRef, TableEquality,
 };
 pub use scalar_batch::ScalarBatch;
 mod types;
@@ -26,7 +26,7 @@ mod value;
 mod value_buffers;
 pub use capabilities::VmCapabilities;
 pub use lifecycle::{GerbilI64Callback, GerbilI64CallbackAbi};
-pub use program::{LinkedBytesExport, LinkedGerbilProgram, LinkedStringExport};
+pub use program::{LinkedBytesExport, LinkedGerbilProgram, LinkedObjectExport, LinkedStringExport};
 pub use types::{
     ByteOrder, BytestringDelimiter, ExactIntegerTarget, GerbilRuntime, GerbilRuntimeReceipt,
     GerbilUtf8, GerbilValue, GerbilValueProvenance, IntegerDecoding, IntegerEncoding, IntegerWidth,

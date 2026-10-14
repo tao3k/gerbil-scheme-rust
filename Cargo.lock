@@ -454,6 +454,7 @@ dependencies = [
  "gerbil-scheme",
  "gerbil-scheme-aot-build",
  "gerbil-scheme-sys",
+ "libc",
  "simdutf8",
  "tokio",
 ]

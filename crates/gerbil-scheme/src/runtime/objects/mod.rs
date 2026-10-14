@@ -9,6 +9,7 @@ pub use numeric::{NumericBuffer, NumericElement};
 mod values;
 pub use integer::{BigIntegerBuffer, BinaryInteger};
 pub use values::{
-    CollectionKind, RootedObjectBatch, RootedSchemeCollection, RootedSchemeObject, SchemeObjectRef,
+    CollectionKind, ObjectKind, RootedObjectBatch, RootedSchemeCollection, RootedSchemeObject,
+    SchemeObjectRef,
 };
 use values::{invalid, own};

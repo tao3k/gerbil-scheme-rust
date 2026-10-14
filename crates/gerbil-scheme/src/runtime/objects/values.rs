@@ -5,6 +5,55 @@ use crate::runtime::{
 };
 use gerbil_scheme_sys::{self as sys, GerbilRootId, GerbilStatus};
 use std::marker::PhantomData;
+
+/// Scheme object shape; ownership and application meaning remain separate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ObjectKind {
+    Void,
+    Boolean,
+    ExactInteger,
+    String,
+    Nil,
+    Pair,
+    Vector,
+    GambitTable,
+    GerbilHashTable,
+    Character,
+    Flonum,
+    Bytevector,
+    Symbol,
+    Keyword,
+    Procedure,
+    Other,
+}
+impl SchemeObjectRef<'_> {
+    /// Inspect a live strongly rooted value, including false/zero and snapshot slots.
+    /// # Errors
+    /// Rejects invalid native roots and snapshot indices.
+    pub fn kind(self) -> Result<ObjectKind, NativeError> {
+        // SAFETY: this reference borrows its owner root and cannot cross threads.
+        let tag = unsafe { sys::gerbil_scheme_rust_object_kind(self.root.0, self.index) };
+        Ok(match tag {
+            0 => ObjectKind::Void,
+            1 => ObjectKind::Boolean,
+            2 => ObjectKind::ExactInteger,
+            3 => ObjectKind::String,
+            4 => ObjectKind::Nil,
+            5 => ObjectKind::Pair,
+            6 => ObjectKind::Vector,
+            7 => ObjectKind::GambitTable,
+            8 => ObjectKind::GerbilHashTable,
+            9 => ObjectKind::Character,
+            10 => ObjectKind::Flonum,
+            11 => ObjectKind::Bytevector,
+            12 => ObjectKind::Symbol,
+            13 => ObjectKind::Keyword,
+            14 => ObjectKind::Procedure,
+            15 => ObjectKind::Other,
+            _ => return Err(invalid("object kind")),
+        })
+    }
+}
 pub(super) fn invalid(operation: &'static str) -> NativeError {
     NativeError::Status {
         operation,
@@ -18,6 +67,9 @@ pub struct RootedSchemeObject<'runtime> {
     pub(super) owner: RootedSchemeOwner<'runtime>,
 }
 impl RootedSchemeObject<'_> {
+    pub(in crate::runtime) fn root_id(&self) -> GerbilRootId {
+        self.owner.root_id()
+    }
     /// Borrow an object without extending its root lifetime.
     #[must_use]
     pub fn as_ref(&self) -> SchemeObjectRef<'_> {
@@ -26,6 +78,52 @@ impl RootedSchemeObject<'_> {
             index: -1,
             _runtime: PhantomData,
         }
+    }
+}
+impl<'runtime> RootedSchemeObject<'runtime> {
+    pub(in crate::runtime) fn from_owner(owner: RootedSchemeOwner<'runtime>) -> Self {
+        Self { owner }
+    }
+    /// Check a string root and transfer its unique ownership without copying.
+    /// # Errors
+    /// Rejects a non-string and releases its consumed root.
+    pub fn into_string(self) -> Result<crate::RootedSchemeString<'runtime>, NativeError> {
+        if self.as_ref().kind()? != ObjectKind::String {
+            return Err(invalid("string object"));
+        }
+        Ok(crate::RootedSchemeString { owner: self.owner })
+    }
+    /// Check a collection shape and transfer its unique ownership without copying.
+    /// # Errors
+    /// Rejects the wrong shape, improper lists or native length overflow.
+    pub fn into_collection(
+        self,
+        kind: CollectionKind,
+    ) -> Result<RootedSchemeCollection<'runtime>, NativeError> {
+        // SAFETY: live strong owner; native shape and proper-list checks precede length.
+        let length = unsafe {
+            sys::gerbil_scheme_rust_collection_length_raw(self.owner.root_id().0, kind.code())
+        };
+        let length = usize::try_from(length).map_err(|_| invalid("collection object"))?;
+        Ok(RootedSchemeCollection {
+            owner: self.owner,
+            kind,
+            length,
+        })
+    }
+}
+impl<'runtime> crate::RootedSchemeString<'runtime> {
+    /// Transfer the string's unique strong owner to the generic object API.
+    #[must_use]
+    pub fn into_object(self) -> RootedSchemeObject<'runtime> {
+        RootedSchemeObject { owner: self.owner }
+    }
+}
+impl<'runtime> crate::RootedSchemeBytevector<'runtime> {
+    /// Transfer the bytevector's unique strong owner to the generic object API.
+    #[must_use]
+    pub fn into_object(self) -> RootedSchemeObject<'runtime> {
+        RootedSchemeObject { owner: self.owner }
     }
 }
 
@@ -220,6 +318,44 @@ impl<'r> RootedObjectBatch<'r> {
 }
 
 impl GerbilRuntime {
+    /// Allocate a strongly rooted scalar through the official Scheme constructors.
+    /// # Errors
+    /// Rejects a wrong owner, out-of-range fixnum or native allocation failure.
+    pub fn scalar_object(
+        &self,
+        value: SchemeScalar,
+    ) -> Result<RootedSchemeObject<'_>, NativeError> {
+        let (tag, integer, real) = match value {
+            SchemeScalar::Boolean(value) => (1, i64::from(value), 0.0),
+            SchemeScalar::Fixnum(value) => (2, value as i64, 0.0),
+            SchemeScalar::Char(value) => (3, i64::from(u32::from(value)), 0.0),
+            SchemeScalar::Flonum(value) => (4, 0, value),
+        };
+        self.marker_object(tag, integer, real)
+    }
+    /// Create a fresh strong owner of Scheme void.
+    /// # Errors
+    /// Rejects wrong-thread entry or native allocation failure.
+    pub fn void_object(&self) -> Result<RootedSchemeObject<'_>, NativeError> {
+        self.marker_object(0, 0, 0.0)
+    }
+    /// Create a fresh strong owner of the empty Scheme list.
+    /// # Errors
+    /// Rejects wrong-thread entry or native allocation failure.
+    pub fn nil_object(&self) -> Result<RootedSchemeObject<'_>, NativeError> {
+        self.marker_object(5, 0, 0.0)
+    }
+    fn marker_object(
+        &self,
+        tag: i32,
+        integer: i64,
+        real: f64,
+    ) -> Result<RootedSchemeObject<'_>, NativeError> {
+        self.check_thread()?;
+        // SAFETY: owner checked; the native constructor returns a fresh strong root.
+        let root = unsafe { sys::gerbil_scheme_rust_scalar_object(tag, integer, real) };
+        own(root).map(|owner| RootedSchemeObject { owner })
+    }
     /// Strongly root a trusted borrowed object, including Scheme false/zero.
     /// # Errors
     /// Rejects untrusted provenance, foreign owners or failed root creation.

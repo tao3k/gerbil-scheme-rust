@@ -8,6 +8,7 @@
 #include <sys/resource.h>
 #endif
 #include "../include/gerbil_scheme_rust.h"
+#include "host_io.h"
 
 ___BEGIN_C_LINKAGE
 #ifndef GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM
@@ -118,6 +119,7 @@ int64_t gerbil_scheme_rust_identity_i64(int64_t value) { return value; }
 int32_t gerbil_scheme_rust_runtime_init_program(
     ___mod_or_lnk (*linker)(___global_state_struct *)) {
   ___setup_params_struct params;
+  gerbil_host_io host;
 
   if (gerbil_scheme_rust_state == 1) {
     return 6;
@@ -139,7 +141,14 @@ int32_t gerbil_scheme_rust_runtime_init_program(
    * Do not override the selected SDK's VM defaults with a host worker count.
    */
   /* Failed setup is terminal too: never retry partially initialized state. */
-  if (___setup(&params) != ___FIX(___NO_ERR)) {
+  if (gerbil_host_io_capture(&host) != 0) {
+    gerbil_scheme_rust_state = 2;
+    return 4;
+  }
+  ___SCMOBJ initialized = ___setup(&params);
+  int host_restored = gerbil_host_io_restore(&host);
+  if (initialized != ___FIX(___NO_ERR) || host_restored != 0) {
+    if (initialized == ___FIX(___NO_ERR)) ___cleanup();
     gerbil_scheme_rust_state = 2;
     return 4;
   }

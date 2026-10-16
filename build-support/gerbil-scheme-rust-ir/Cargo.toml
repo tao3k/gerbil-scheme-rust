@@ -16,7 +16,7 @@ serde_json.workspace = true
 syn = { workspace = true, features = ["visit"] }
 
 [dev-dependencies]
-asp-rust = { git = "https://github.com/tao3k/asp-rust", rev = "2419414ee5379bad89506496e3eaab928df68daf", version = "0.1.2", default-features = false }
+asp-rust.workspace = true
 
 [lints]
 workspace = true

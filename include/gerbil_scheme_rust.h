@@ -101,6 +101,8 @@ struct ___global_state_struct;
 union ___mod_or_lnk_union;
 typedef union ___mod_or_lnk_union *(*GerbilProgramLinker)(struct ___global_state_struct *);
 int32_t gerbil_scheme_rust_runtime_init_program(GerbilProgramLinker linker);
+int32_t gerbil_scheme_rust_runtime_init_program_single_processor(GerbilProgramLinker linker);
+uint32_t gerbil_scheme_rust_current_vm_processors(void);
 int32_t gerbil_scheme_rust_runtime_cleanup(void);
 /* Linked ABI capabilities; these do not certify worker or scheduler safety. */
 #define GERBIL_VM_CAP_MULTIPLE_VMS 1u

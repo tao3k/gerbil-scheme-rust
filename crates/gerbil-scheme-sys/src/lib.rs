@@ -34,7 +34,11 @@ mod scheme_fixnum;
 mod scheme_flonum;
 
 pub use abi::{GerbilGlobalState, GerbilModuleOrLink};
-pub use abi_program::{GerbilProgramLinker, gerbil_scheme_rust_runtime_init_program};
+pub use abi_program::{
+    GerbilProgramLinker, gerbil_scheme_rust_current_vm_processors,
+    gerbil_scheme_rust_runtime_init_program,
+    gerbil_scheme_rust_runtime_init_program_single_processor,
+};
 pub use abi_vm::{
     GERBIL_VM_CAP_MULTIPLE_VMS, GERBIL_VM_CAP_THREAD_LOCAL_ENTRY,
     gerbil_scheme_rust_vm_capability_flags, gerbil_scheme_rust_vm_max_processors,

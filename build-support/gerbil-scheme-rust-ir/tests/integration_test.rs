@@ -26,3 +26,5 @@ mod event_state_ir;
 
 #[path = "integration/source_match_ir.rs"]
 mod source_match_ir;
+#[path = "integration/closure_ir.rs"]
+mod closure_ir;

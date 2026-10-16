@@ -37,6 +37,7 @@ static RUNTIME_LIFECYCLE: Mutex<()> = Mutex::new(());
 const RUNTIME_NEVER_INITIALIZED: u8 = 0;
 const RUNTIME_RUNNING: u8 = 1;
 const RUNTIME_FINALIZED: u8 = 2;
+const RUNTIME_INITIALIZING: u8 = 3;
 
 static RUNTIME_STATE: AtomicU8 = AtomicU8::new(RUNTIME_NEVER_INITIALIZED);
 
@@ -111,6 +112,13 @@ unsafe extern "C" fn gerbil_i64_callback_trampoline(
 }
 
 impl GerbilRuntime {
+    /// Observe any native initialization attempt without entering Scheme,
+    /// including an attempt still in progress. This is not execution admission.
+    #[must_use]
+    pub fn has_been_initialized() -> bool {
+        RUNTIME_STATE.load(Ordering::Acquire) != RUNTIME_NEVER_INITIALIZED
+    }
+
     /// Initializes the process-global Gerbil runtime and native binding module.
     ///
     /// # Errors
@@ -118,7 +126,7 @@ impl GerbilRuntime {
     /// Returns [`NativeError::AlreadyInitialized`] when another live handle
     /// owns the runtime, or a checked status/ABI error when native setup fails.
     pub fn initialize() -> Result<Self, NativeError> {
-        Self::initialize_with_linker(None)
+        Self::initialize_with_linker(None, false)
     }
 
     /// Initialize one statically linked downstream program with the shared
@@ -129,11 +137,41 @@ impl GerbilRuntime {
     /// Returns a lifecycle, ABI, or native setup error when initialization
     /// cannot establish the unique runtime owner.
     pub fn initialize_program(program: LinkedGerbilProgram) -> Result<Self, NativeError> {
-        Self::initialize_with_linker(Some(program.linker))
+        Self::initialize_with_linker(Some(program.linker), false)
+    }
+
+    /// Initialize a linked program with one active processor, independently of
+    /// the SDK's compiled processor capacity. This does not admit a second VM.
+    ///
+    /// # Errors
+    /// Returns a lifecycle, ABI or setup error, including failure to establish
+    /// the requested single-processor population.
+    pub fn initialize_program_single_processor(
+        program: LinkedGerbilProgram,
+    ) -> Result<Self, NativeError> {
+        Self::initialize_with_linker(Some(program.linker), true)
+    }
+
+    /// Read the selected VM's actual processor population on its owner thread.
+    ///
+    /// # Errors
+    /// Returns an owner-thread or native lifecycle error.
+    pub fn active_processors(&self) -> Result<u32, NativeError> {
+        self.check_thread()?;
+        // SAFETY: this live, thread-affine handle excludes concurrent cleanup.
+        let count = unsafe { gerbil_scheme_sys::gerbil_scheme_rust_current_vm_processors() };
+        if count == 0 {
+            return Err(NativeError::Status {
+                operation: "VM processor population",
+                code: -1,
+            });
+        }
+        Ok(count)
     }
 
     fn initialize_with_linker(
         linker: Option<gerbil_scheme_sys::GerbilProgramLinker>,
+        single_processor: bool,
     ) -> Result<Self, NativeError> {
         let _lifecycle = RUNTIME_LIFECYCLE
             .lock()
@@ -150,8 +188,14 @@ impl GerbilRuntime {
 
         // SAFETY: lifecycle operations are serialized by RUNTIME_LIFECYCLE and
         // no safe GerbilRuntime exists while RUNTIME_INITIALIZED is false.
+        RUNTIME_STATE.store(RUNTIME_INITIALIZING, Ordering::Release);
         let status = unsafe {
             match linker {
+                Some(linker) if single_processor => {
+                    gerbil_scheme_sys::gerbil_scheme_rust_runtime_init_program_single_processor(
+                        Some(linker),
+                    )
+                }
                 Some(linker) => {
                     gerbil_scheme_sys::gerbil_scheme_rust_runtime_init_program(Some(linker))
                 }

@@ -116,8 +116,8 @@ uint32_t gerbil_scheme_rust_vm_max_processors(void) {
 
 int64_t gerbil_scheme_rust_identity_i64(int64_t value) { return value; }
 
-int32_t gerbil_scheme_rust_runtime_init_program(
-    ___mod_or_lnk (*linker)(___global_state_struct *)) {
+static int32_t runtime_init_program(
+    ___mod_or_lnk (*linker)(___global_state_struct *), int single_processor) {
   ___setup_params_struct params;
   gerbil_host_io host;
 
@@ -134,11 +134,11 @@ int32_t gerbil_scheme_rust_runtime_init_program(
   ___setup_params_reset(&params);
   params.version = ___VERSION;
   params.linker = linker;
+  if (single_processor) params.parallelism_level = 1;
   /*
-   * Keep Gambit's setup-reset VM policy. Foreign-entry owner affinity does
-   * not imply a single Scheme processor: Scheme owns its actor scheduling,
-   * while Rust owns host admission and root publication at the ABI boundary.
-   * Do not override the selected SDK's VM defaults with a host worker count.
+   * The default entry retains Gambit's policy; the explicit single-processor
+   * entry sets one active processor, independently of host worker count or
+   * compiled SDK capacity. Scheme owns scheduling within that population.
    */
   /* Failed setup is terminal too: never retry partially initialized state. */
   if (gerbil_host_io_capture(&host) != 0) {
@@ -147,13 +147,29 @@ int32_t gerbil_scheme_rust_runtime_init_program(
   }
   ___SCMOBJ initialized = ___setup(&params);
   int host_restored = gerbil_host_io_restore(&host);
-  if (initialized != ___FIX(___NO_ERR) || host_restored != 0) {
+  if (initialized != ___FIX(___NO_ERR) || host_restored != 0 ||
+      (single_processor && ___VMSTATE->processor_count != 1)) {
     if (initialized == ___FIX(___NO_ERR)) ___cleanup();
     gerbil_scheme_rust_state = 2;
     return 4;
   }
   gerbil_scheme_rust_state = 1;
   return 0;
+}
+
+int32_t gerbil_scheme_rust_runtime_init_program(
+    ___mod_or_lnk (*linker)(___global_state_struct *)) {
+  return runtime_init_program(linker, 0);
+}
+
+int32_t gerbil_scheme_rust_runtime_init_program_single_processor(
+    ___mod_or_lnk (*linker)(___global_state_struct *)) {
+  return runtime_init_program(linker, 1);
+}
+
+uint32_t gerbil_scheme_rust_current_vm_processors(void) {
+  if (gerbil_scheme_rust_state != 1) return 0;
+  return (uint32_t)___VMSTATE->processor_count;
 }
 
 int32_t gerbil_scheme_rust_runtime_init(void) {

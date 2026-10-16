@@ -93,6 +93,15 @@ impl<'runtime> RootedSchemeObject<'runtime> {
         }
         Ok(crate::RootedSchemeString { owner: self.owner })
     }
+    /// Transfer a checked bytevector root without copying or borrowing GC words.
+    /// # Errors
+    /// Rejects a different object kind, releasing the consumed root.
+    pub fn into_bytevector(self) -> Result<crate::RootedSchemeBytevector<'runtime>, NativeError> {
+        if self.as_ref().kind()? != ObjectKind::Bytevector {
+            return Err(invalid("bytevector object"));
+        }
+        Ok(crate::RootedSchemeBytevector { owner: self.owner })
+    }
     /// Check a collection shape and transfer its unique ownership without copying.
     /// # Errors
     /// Rejects the wrong shape, improper lists or native length overflow.

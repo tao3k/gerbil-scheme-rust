@@ -60,7 +60,7 @@ fn source_inventory_publishes_verified_files_without_build_tools() {
     assert_eq!(manifest.roots, ["_sources"]);
     manifest.verify(&package).unwrap();
     assert!(output.join("source_inventory.json").is_file());
-    fs::write(package.join("_sources/code.ssi"), b"changed").unwrap();
+    fs::write(package.join("_sources/code.ssi/source.bin"), b"changed").unwrap();
     assert!(manifest.verify(&package).is_err());
     assert!(
         stage_source_inventory(
@@ -74,6 +74,58 @@ fn source_inventory_publishes_verified_files_without_build_tools() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn frozen_source_inventory_is_inert_under_installer_byte_compilation() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("source");
+    fs::write(
+        source.join("__init__.py"),
+        b"raise AssertionError('archive executed')",
+    )
+    .unwrap();
+    fs::write(
+        source.join("source.bin"),
+        b"distinct source with the payload name",
+    )
+    .unwrap();
+    let output = fixture.0.join("frozen-output");
+    let package = fixture.0.join("frozen-installed");
+    let receipt = stage_source_inventory(
+        &output,
+        &package,
+        &[ResourceTree::complete(&source, "_sources/library")],
+        "_sources",
+    )
+    .unwrap();
+    let manifest: PackageManifest = serde_json::from_slice(&fs::read(receipt).unwrap()).unwrap();
+    assert_eq!(manifest.files.len(), 4);
+    assert_eq!(
+        fs::read(package.join("_sources/library/__init__.py/source.bin")).unwrap(),
+        fs::read(source.join("__init__.py")).unwrap()
+    );
+    assert_eq!(
+        fs::read(package.join("_sources/library/source.bin/source.bin")).unwrap(),
+        fs::read(source.join("source.bin")).unwrap()
+    );
+    // Exercise the installer's actual Python byte compiler, not a mocked scan.
+    let python = std::env::var_os("PYO3_PYTHON").unwrap_or_else(|| "python3".into());
+    assert!(
+        std::process::Command::new(python)
+            .args(["-m", "compileall", "-q"])
+            .arg(&package)
+            .status()
+            .unwrap()
+            .success()
+    );
+    manifest.verify(&package).unwrap();
+    fs::write(
+        package.join("_sources/library/undeclared.pyc"),
+        b"undeclared",
+    )
+    .unwrap();
+    assert!(manifest.verify(&package).is_err());
 }
 
 #[test]

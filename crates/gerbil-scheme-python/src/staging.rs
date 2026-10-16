@@ -120,7 +120,9 @@ fn inventory_roots(trees: &[ResourceTree<'_>]) -> io::Result<Vec<String>> {
         .collect())
 }
 
-/// Freeze declared inputs into one owned package root and embed its manifest.
+/// Freeze declared inputs as inert data into one owned root and embed its manifest.
+/// Each original path is a directory containing `source.bin`; installers cannot
+/// mistake archived Python files for executable modules and create bytecode there.
 /// Failed staging remains untouched; replacement uses verified publication only.
 /// # Errors
 /// Rejects missing/aliased inputs, incomplete root coverage and unowned output.
@@ -132,14 +134,50 @@ pub fn stage_source_inventory(
 ) -> io::Result<PathBuf> {
     fs::create_dir_all(output)?;
     let stage = output.join(format!("source-inputs-{}", std::process::id()));
-    let mut manifest = stage_resources(&stage, trees, &[])?;
-    manifest.roots = vec![root.to_owned()];
-    manifest.verify(&stage)?.publish_to(package)?;
+    let raw = stage_resources(&stage, trees, &[])?;
+    let frozen = output.join(format!("source-data-{}", std::process::id()));
+    let manifest = freeze_source_data(&stage, &frozen, &raw, root)?;
+    manifest.verify(&frozen)?.publish_to(package)?;
     let manifest_path = output.join("source_inventory.json");
     fs::write(&manifest_path, serde_json::to_vec(&manifest)?)?;
-    manifest.verify(&stage)?;
+    manifest.verify(&frozen)?;
+    raw.verify(&stage)?;
     fs::remove_dir_all(&stage)?;
+    fs::remove_dir_all(&frozen)?;
     Ok(manifest_path)
+}
+fn freeze_source_data(
+    source: &Path,
+    destination: &Path,
+    raw: &PackageManifest,
+    root: &str,
+) -> io::Result<PackageManifest> {
+    let manifest = PackageManifest {
+        schema: raw.schema.clone(),
+        roots: vec![root.to_owned()],
+        load_paths: vec![],
+        files: raw
+            .files
+            .iter()
+            .map(|(name, item)| (format!("{name}/source.bin"), item.clone()))
+            .collect(),
+    };
+    PackageManifest::from_json(&serde_json::to_vec(&manifest)?)?;
+    fs::create_dir(destination)?;
+    for (name, item) in &raw.files {
+        let target = destination.join(name).join("source.bin");
+        fs::create_dir_all(
+            target
+                .parent()
+                .ok_or_else(|| io::Error::other("source parent"))?,
+        )?;
+        fs::copy(source.join(name), &target)?;
+        if sha256_file(&target)? != item.sha256 {
+            return Err(io::Error::other("source changed while freezing data"));
+        }
+    }
+    manifest.verify(destination)?;
+    Ok(manifest)
 }
 pub(crate) fn stage_tree(
     source: &Path,

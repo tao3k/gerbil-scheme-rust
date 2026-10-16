@@ -172,7 +172,7 @@ impl PackageManifest {
     }
 }
 
-fn inspect(
+pub(super) fn inspect(
     root: &Path,
     path: &Path,
     expected: &BTreeMap<String, PackageResource>,
@@ -187,6 +187,9 @@ fn inspect(
         )));
     }
     if kind.is_dir() {
+        #[cfg(feature = "parallel-verification")]
+        super::parallel::children(root, path, expected, seen)?;
+        #[cfg(not(feature = "parallel-verification"))]
         for entry in fs::read_dir(path)? {
             inspect(root, &entry?.path(), expected, seen)?;
         }

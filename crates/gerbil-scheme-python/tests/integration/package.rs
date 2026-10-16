@@ -76,6 +76,38 @@ fn source_inventory_publishes_verified_files_without_build_tools() {
     );
 }
 
+#[cfg(feature = "parallel-verification")]
+#[test]
+fn parallel_inventory_keeps_complete_nested_resources_and_fails_closed() {
+    let fixture = Fixture::new();
+    for directory in 0..16 {
+        let path = fixture.0.join("source").join(format!("group-{directory}"));
+        fs::create_dir(&path).unwrap();
+        for file in 0_u8..8 {
+            fs::write(path.join(format!("file-{file}")), vec![file; 4096]).unwrap();
+        }
+    }
+    let manifest = fixture.stage();
+    let package = fixture.0.join("package");
+    let verified = manifest.verify(&package).unwrap();
+    assert_eq!(verified.manifest(), &manifest);
+    assert_eq!(verified.manifest().files.len(), 130);
+    verified.reverify().unwrap();
+
+    let extra = package.join("_runtime/library/group-0/extra");
+    fs::write(&extra, "undeclared").unwrap();
+    assert!(manifest.verify(&package).is_err());
+    fs::remove_file(extra).unwrap();
+
+    let changed = package.join("_runtime/library/group-0/file-0");
+    fs::write(&changed, vec![1; 4096]).unwrap();
+    assert!(manifest.verify(&package).is_err());
+    fs::write(&changed, vec![0; 4096]).unwrap();
+    manifest.verify(&package).unwrap();
+    fs::remove_file(changed).unwrap();
+    assert!(manifest.verify(&package).is_err());
+}
+
 #[test]
 fn frozen_source_inventory_is_inert_under_installer_byte_compilation() {
     let fixture = Fixture::new();

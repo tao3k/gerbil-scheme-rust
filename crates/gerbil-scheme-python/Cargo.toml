@@ -16,6 +16,7 @@ python = ["dep:pyo3", "owned-values", "pyo3/num-bigint"]
 scheme-backend = ["python", "dep:gerbil-scheme", "dep:num-bigint", "pyo3/num-bigint"]
 rust-backend = ["python"]
 external-program = ["gerbil-scheme?/external-program"]
+parallel-verification = ["dep:rayon"]
 
 [dependencies]
 serde.workspace = true
@@ -24,6 +25,7 @@ sha2.workspace = true
 pyo3 = { workspace = true, optional = true }
 gerbil-scheme = { workspace = true, optional = true }
 num-bigint = { version = "0.4", optional = true }
+rayon = { version = "=1.12.0", optional = true }
 
 [dev-dependencies]
 asp-rust.workspace = true

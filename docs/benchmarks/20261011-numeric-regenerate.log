@@ -1,0 +1,24 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1 GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo check -p gerbil-scheme-sys --locked
+   Compiling gerbil-scheme-sys v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/crates/gerbil-scheme-sys)
+warning: function `gerbil_scheme_rust_numeric_create` is never used
+ --> crates/gerbil-scheme-sys/src/abi_objects.rs:7:12
+  |
+7 |     pub fn gerbil_scheme_rust_numeric_create(kind: i32, bytes: *const u8, len: u64) -> i64;
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `gerbil_scheme_rust_numeric_size` is never used
+  --> crates/gerbil-scheme-sys/src/abi_objects.rs:10:12
+   |
+10 |     pub fn gerbil_scheme_rust_numeric_size(root: i64, index: i64, kind: i32) -> i64;
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `gerbil_scheme_rust_numeric_copy` is never used
+  --> crates/gerbil-scheme-sys/src/abi_objects.rs:14:12
+   |
+14 |     pub fn gerbil_scheme_rust_numeric_copy(
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `gerbil-scheme-sys` (lib) generated 3 warnings
+    Finished `dev` profile [optimized + debuginfo] target(s) in 12.99s

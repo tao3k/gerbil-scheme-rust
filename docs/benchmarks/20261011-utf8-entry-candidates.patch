@@ -1,0 +1,440 @@
+diff --git a/crates/gerbil-scheme-qualification/benches/utf8.rs b/crates/gerbil-scheme-qualification/benches/utf8.rs
+index 9427574..440c2ef 100644
+--- a/crates/gerbil-scheme-qualification/benches/utf8.rs
++++ b/crates/gerbil-scheme-qualification/benches/utf8.rs
+@@ -6,6 +6,8 @@ use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
+
+ #[path = "utf8/buffer.rs"]
+ mod buffer;
++#[path = "utf8/sample.rs"]
++mod sample;
+
+ unsafe extern "C" {
+     fn gerbil_utf8_comparison_encode(root: i64, mode: i32) -> i64;
+@@ -34,6 +36,9 @@ fn convert(value: &Root, mode: i32) -> String {
+     if mode == 6 {
+         return buffer::compact(value);
+     }
++    if mode == 9 {
++        return buffer::status(value);
++    }
+     // SAFETY: the preflighted mode and live string root belong to this owner.
+     let raw = unsafe { gerbil_utf8_comparison_encode(value.0.0, mode) };
+     assert!(
+@@ -94,15 +99,7 @@ fn compare(values: &[Root], texts: &[String], jobs: usize, left: i32, right: i32
+             // SAFETY: diagnostic snapshots are owner-local, outside timing.
+             unsafe { gerbil_utf8_comparison_snapshot(0) };
+             let start = Instant::now();
+-            let mut total = 0;
+-            let mut capacity_total = 0;
+-            for index in 0..jobs {
+-                let text_slot = index % values.len();
+-                let text = convert(&values[text_slot], mode);
+-                assert_eq!(text, texts[text_slot], "changing text exact content");
+-                capacity_total += text.capacity();
+-                total += std::hint::black_box(text).len();
+-            }
++            let (total, capacity_total) = sample::run(values, texts, jobs, mode);
+             let elapsed = start.elapsed().as_secs_f64();
+             assert!(
+                 elapsed.is_finite() && elapsed > 0.0,
+@@ -158,9 +155,12 @@ fn main() {
+     let argument = std::env::args().nth(1);
+     let direct = argument.as_deref() == Some("--buffer");
+     let compact = argument.as_deref() == Some("--compact");
++    let reuse = argument.as_deref() == Some("--reuse");
++    let reuse_direct = argument.as_deref() == Some("--reuse-direct");
++    let status = argument.as_deref() == Some("--status");
+     let contracts_only = argument.as_deref() == Some("--contracts");
+     let requested = argument
+-        .filter(|_| !direct && !compact && !contracts_only)
++        .filter(|_| !direct && !compact && !reuse && !reuse_direct && !status && !contracts_only)
+         .map(|value| {
+             let jobs: usize = value.parse().expect("load must be a number");
+             assert!([1_000, 10_000, 100_000].contains(&jobs), "unsupported load");
+@@ -168,7 +168,7 @@ fn main() {
+         });
+     let program = gerbil_scheme_qualification::linked_program();
+     let runtime = GerbilRuntime::initialize_program(program).expect("one owner-local AOT runtime");
+-    if direct || compact || contracts_only {
++    if direct || compact || reuse || reuse_direct || status || contracts_only {
+         buffer::contracts(&runtime);
+         if contracts_only {
+             return;
+@@ -192,7 +192,13 @@ fn main() {
+         if requested.is_some_and(|load| load != jobs) {
+             continue;
+         }
+-        if compact {
++        if status {
++            admitted &= compare(&values, &texts, jobs, 5, 9) <= 1.0;
++        } else if reuse_direct {
++            admitted &= compare(&values, &texts, jobs, 5, 8) <= 1.0;
++        } else if reuse {
++            admitted &= compare(&values, &texts, jobs, 5, 7) <= 1.0;
++        } else if compact {
+             admitted &= compare(&values, &texts, jobs, 5, 6) <= 1.0;
+         } else if direct {
+             admitted &= compare(&values, &texts, jobs, 3, 5) <= 1.0;
+diff --git a/crates/gerbil-scheme-qualification/benches/utf8/buffer.rs b/crates/gerbil-scheme-qualification/benches/utf8/buffer.rs
+index 8c7dee2..78ea237 100644
+--- a/crates/gerbil-scheme-qualification/benches/utf8/buffer.rs
++++ b/crates/gerbil-scheme-qualification/benches/utf8/buffer.rs
+@@ -6,6 +6,7 @@ use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
+ unsafe extern "C" {
+     fn gerbil_utf8_buffer_encode(root: i64, output: *mut u8, capacity: u64) -> i64;
+     fn gerbil_utf8_buffer_mutate(root: i64, index: u64, codepoint: u32);
++    fn gerbil_utf8_status_encode(root: i64, output: *mut u8, capacity: u64) -> i64;
+ }
+
+ pub(super) fn root_text(runtime: &GerbilRuntime, text: &str) -> Root {
+@@ -25,11 +26,15 @@ pub(super) fn root_text(runtime: &GerbilRuntime, text: &str) -> Root {
+ }
+
+ pub(super) fn convert(value: &Root) -> String {
+-    convert_owned(value, false)
++    convert_owned(value, 4)
+ }
+
+ pub(super) fn production(value: &Root) -> String {
+-    convert_owned(value, true)
++    convert_owned(value, 5)
++}
++
++pub(super) fn status(value: &Root) -> String {
++    convert_owned(value, 9)
+ }
+
+ /// Test-only allocation policy; shrinking remains inside the timed conversion.
+@@ -39,7 +44,97 @@ pub(super) fn compact(value: &Root) -> String {
+     text
+ }
+
+-fn convert_owned(value: &Root, production: bool) -> String {
++/// Streaming control: exclusive reusable storage, fresh encoding every call.
++pub(super) fn reuse<'a>(value: &Root, output: &'a mut Vec<u8>) -> Result<&'a str, GerbilStatus> {
++    let mut characters = 0_usize;
++    // SAFETY: live owner-local root, writable length destination.
++    let status = unsafe {
++        gerbil_scheme_sys::gerbil_scheme_rust_root_string_length(value.0, &raw mut characters)
++    };
++    if status != GerbilStatus::Ok {
++        return Err(status);
++    }
++    let capacity = characters
++        .checked_mul(4)
++        .ok_or(GerbilStatus::InvalidValue)?;
++    output.clear();
++    output
++        .try_reserve_exact(capacity)
++        .map_err(|_| GerbilStatus::InvalidValue)?;
++    let written = attempt(value, output, capacity)?;
++    admit(output, written)
++}
++
++/// Scheme checks the current length itself. Only insufficient capacity needs
++/// a separate length query and one bounded growth/retry; no text is cached.
++pub(super) fn reuse_direct<'a>(
++    value: &Root,
++    output: &'a mut Vec<u8>,
++) -> Result<&'a str, GerbilStatus> {
++    output.clear();
++    let written = match attempt(value, output, output.capacity()) {
++        Ok(written) => written,
++        Err(GerbilStatus::InvalidValue) => {
++            let mut characters = 0_usize;
++            // SAFETY: live owner-local root and writable length destination.
++            let status = unsafe {
++                gerbil_scheme_sys::gerbil_scheme_rust_root_string_length(
++                    value.0,
++                    &raw mut characters,
++                )
++            };
++            if status != GerbilStatus::Ok {
++                return Err(status);
++            }
++            let capacity = characters
++                .checked_mul(4)
++                .ok_or(GerbilStatus::InvalidValue)?;
++            if capacity <= output.capacity() {
++                return Err(GerbilStatus::InvalidValue);
++            }
++            output
++                .try_reserve_exact(capacity)
++                .map_err(|_| GerbilStatus::InvalidValue)?;
++            attempt(value, output, capacity)?
++        }
++        Err(status) => return Err(status),
++    };
++    admit(output, written)
++}
++
++fn attempt(value: &Root, output: &mut Vec<u8>, capacity: usize) -> Result<usize, GerbilStatus> {
++    assert!(capacity <= output.capacity());
++    let mut written = 0;
++    // SAFETY: exclusive writable capacity is stable during the synchronous call.
++    let status = unsafe {
++        gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
++            value.0,
++            output.as_mut_ptr(),
++            capacity,
++            &raw mut written,
++        )
++    };
++    if status != GerbilStatus::Ok {
++        return Err(status);
++    }
++    if written > capacity {
++        return Err(GerbilStatus::InvalidValue);
++    }
++    Ok(written)
++}
++
++fn admit(output: &mut Vec<u8>, written: usize) -> Result<&str, GerbilStatus> {
++    // SAFETY: only successful full initialization admits this prefix.
++    unsafe { output.set_len(written) };
++    if simdutf8::basic::from_utf8(output).is_err() {
++        output.clear();
++        return Err(GerbilStatus::InvalidValue);
++    }
++    // SAFETY: validated prefix stays exclusively borrowed for the return lifetime.
++    Ok(unsafe { std::str::from_utf8_unchecked(output) })
++}
++
++fn convert_owned(value: &Root, mode: i32) -> String {
+     let mut characters: usize = 0;
+     // SAFETY: input root remains live on its foreign-entry owner.
+     assert_eq!(
+@@ -52,7 +147,7 @@ fn convert_owned(value: &Root, production: bool) -> String {
+     let mut bytes = Vec::<u8>::with_capacity(capacity);
+     // SAFETY: exclusive Rust allocation stays live/stable throughout the
+     // synchronous call. No foreign pointer or Scheme body is retained.
+-    let written = if production {
++    let written = if mode == 5 {
+         let mut written = 0;
+         // SAFETY: identical stable exclusive capacity, through the actual ABI.
+         assert_eq!(
+@@ -68,8 +163,13 @@ fn convert_owned(value: &Root, production: bool) -> String {
+         );
+         written
+     } else {
++        let encode = if mode == 9 {
++            gerbil_utf8_status_encode
++        } else {
++            gerbil_utf8_buffer_encode
++        };
+         let written = unsafe {
+-            gerbil_utf8_buffer_encode(
++            encode(
+                 value.0.0,
+                 bytes.as_mut_ptr(),
+                 u64::try_from(capacity).unwrap(),
+@@ -87,6 +187,8 @@ fn convert_owned(value: &Root, production: bool) -> String {
+ }
+
+ pub(super) fn contracts(runtime: &GerbilRuntime) {
++    reuse_contracts(runtime);
++    let mut reusable = Vec::new();
+     for start in (0..0x11_0000_u32).step_by(4096) {
+         let text: String = (start..(start + 4096).min(0x11_0000))
+             .filter_map(char::from_u32)
+@@ -94,7 +196,14 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
+         let value = root_text(runtime, &text);
+         assert_eq!(convert(&value), text, "full scalar parity {start}");
+         assert_eq!(production(&value), text, "production scalar parity {start}");
++        assert_eq!(status(&value), text, "status scalar parity {start}");
+         assert_eq!(compact(&value), text, "compact scalar parity {start}");
++        assert_eq!(
++            reuse(&value, &mut reusable).unwrap(),
++            text,
++            "reuse scalar parity {start}"
++        );
++        assert_eq!(reuse_direct(&value, &mut reusable).unwrap(), text);
+     }
+     for text in [String::new(), "ASCII\0data".into(), "汉字😀\0".repeat(8193)] {
+         assert_eq!(convert(&root_text(runtime, &text)), text);
+@@ -114,7 +223,10 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
+         );
+         assert_eq!(convert(&value), expected);
+         assert_eq!(production(&value), expected);
++        assert_eq!(status(&value), expected);
+         assert_eq!(compact(&value), expected);
++        assert_eq!(reuse(&value, &mut reusable).unwrap(), expected);
++        assert_eq!(reuse_direct(&value, &mut reusable).unwrap(), expected);
+         assert_eq!(super::convert(&value, 3), expected);
+     }
+     assert_eq!(snapshot, "a".repeat(4096));
+@@ -122,6 +234,18 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
+     for codepoint in 0xd800..=0xdfff {
+         // SAFETY: only a negative fixture uses Gambit's raw surrogate primitive.
+         unsafe { gerbil_utf8_buffer_mutate(value.0.0, 0, codepoint) };
++        // SAFETY: exclusive output; invalid scalar must fail without publication.
++        assert!(unsafe { gerbil_utf8_status_encode(value.0.0, output.as_mut_ptr(), 16384) } < 0);
++        assert_eq!(
++            reuse(&value, &mut reusable),
++            Err(GerbilStatus::InvalidValue)
++        );
++        assert!(reusable.is_empty());
++        assert_eq!(
++            reuse_direct(&value, &mut reusable),
++            Err(GerbilStatus::InvalidValue)
++        );
++        assert!(reusable.is_empty());
+         // SAFETY: a valid exclusive span is supplied; rejection precedes writes
+         // because the first character is invalid. No output length is admitted.
+         assert!(
+@@ -159,6 +283,8 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
+         (wrong.root_id(), 16_384),
+         (GerbilRootId(0), 16_384),
+     ] {
++        // SAFETY: impossible capacity/type is rejected before writing.
++        assert!(unsafe { gerbil_utf8_status_encode(root.0, output.as_mut_ptr(), capacity) } < 0);
+         // SAFETY: impossible capacity/type is rejected before touching the
+         // valid span. The exaggerated span must never reach a write.
+         assert!(unsafe { gerbil_utf8_buffer_encode(root.0, output.as_mut_ptr(), capacity) } < 0);
+@@ -181,6 +307,16 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
+     let mut written = usize::MAX;
+     // SAFETY: late invalid input exercises partial writes without publication.
+     unsafe { gerbil_utf8_buffer_mutate(value.0.0, 4095, 0xd800) };
++    assert_eq!(
++        reuse(&value, &mut reusable),
++        Err(GerbilStatus::InvalidValue)
++    );
++    assert!(reusable.is_empty());
++    assert_eq!(
++        reuse_direct(&value, &mut reusable),
++        Err(GerbilStatus::InvalidValue)
++    );
++    assert!(reusable.is_empty());
+     assert_eq!(
+         unsafe {
+             gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+@@ -199,3 +335,30 @@ pub(super) fn contracts(runtime: &GerbilRuntime) {
+         "UTF8-BUFFER-CONTRACTS Unicode=1112064 surrogates=2048 mutation=OK bounds=OK roots=OK"
+     );
+ }
++
++fn reuse_contracts(runtime: &GerbilRuntime) {
++    let mut direct = Vec::new();
++    for length in [0, 1, 255, 256, 257, 8193, 17, 0] {
++        let text = "a\0汉字😀".repeat(length);
++        assert_eq!(
++            reuse_direct(&root_text(runtime, &text), &mut direct).unwrap(),
++            text
++        );
++    }
++    let mut output = Vec::new();
++    for length in [0, 1, 255, 256, 257, 8193, 17, 0] {
++        let text = "a\0汉字😀".repeat(length);
++        assert_eq!(
++            reuse(&root_text(runtime, &text), &mut output).unwrap(),
++            text
++        );
++    }
++    let pointer = output.as_ptr();
++    let capacity = output.capacity();
++    for text in ["small", "\0中文😀", ""] {
++        assert_eq!(reuse(&root_text(runtime, text), &mut output).unwrap(), text);
++        assert_eq!(output.as_ptr(), pointer);
++        assert_eq!(output.capacity(), capacity);
++    }
++    eprintln!("UTF8-REUSE-CONTRACTS growth=OK retained-capacity=OK varying-length=OK");
++}
+diff --git a/crates/gerbil-scheme-qualification/scheme/utf8-buffer-control.ss b/crates/gerbil-scheme-qualification/scheme/utf8-buffer-control.ss
+index 27fa176..ecc943c 100644
+--- a/crates/gerbil-scheme-qualification/scheme/utf8-buffer-control.ss
++++ b/crates/gerbil-scheme-qualification/scheme/utf8-buffer-control.ss
+@@ -1,7 +1,7 @@
+ ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+ ;;; Test-only caller-owned output, following c_intf.c's bounded buffer route.
+ package: gerbil-scheme-rust/qualification
+-(import :gerbil-scheme-rust/scheme/runtime)
++(import :gerbil-scheme-rust/scheme/runtime :gerbil-scheme-rust/scheme/utf8)
+ (extern buffer-chunk)
+
+ (def (encode-buffer text pointer capacity)
+@@ -64,6 +64,10 @@ C-END
+      (lambda () (gerbil-scheme-rust/qualification/utf8-buffer-control#encode-buffer text pointer capacity)))
+     -1)))
+  ;; Test-only mutation, including raw surrogate values. Never a public API.
++ (c-define (status-encode root pointer capacity) (int64 (pointer void) unsigned-int64) int64
++  "gerbil_utf8_status_encode" "extern"
++  (let ((text (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
++   (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-into/status text pointer capacity)))
+  (c-define (buffer-mutate root index codepoint) (int64 unsigned-int64 unsigned-int32) void
+   "gerbil_utf8_buffer_mutate" "extern"
+   (let ((text (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
+diff --git a/scheme/utf8.ss b/scheme/utf8.ss
+index 29124aa..659e8b7 100644
+--- a/scheme/utf8.ss
++++ b/scheme/utf8.ss
+@@ -1,6 +1,6 @@
+ ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+
+-(export gerbil-rs-encode-utf8 gerbil-rs-encode-utf8-into)
++(export gerbil-rs-encode-utf8 gerbil-rs-encode-utf8-into gerbil-rs-encode-utf8-into/status)
+
+ ;; Bridge-local encoder: Gambit's gambit/string/string.scm codepoint rules,
+ ;; with Gerbil std/encoding/utf16.ss's bounded allocation / single-pass shrink
+@@ -45,6 +45,26 @@
+   (let (next (gerbil-rs-encode-utf8-buffer-chunk-c str pointer capacity start end written))
+     (if (##fx< next 0) (error "Illegal Unicode scalar or caller bounds") next)))
+
++;; Qualification candidate: expected input failures are values rather than
++;; exceptions. Preserve the same leaf bounds and polling between chunks.
++;; Pointer marshalling belongs to the checked foreign entry, not Scheme users.
++(def (gerbil-rs-encode-utf8-into/status str pointer capacity)
++  (if (and (string? str) (fixnum? capacity) (##fx>= capacity 0)
++           (##fx<= (string-length str) (##fxquotient capacity 4)))
++    (let (length (string-length str))
++      (let loop ((start 0) (written 0))
++        (if (##fx< start length)
++          (let* ((end (if (##fx< (##fx- length start) 256)
++                         length (##fx+ start 256)))
++                 (next (gerbil-rs-encode-utf8-status-chunk str pointer capacity start end written)))
++            (if (##fx< next 0) next (loop end next)))
++          written)))
++    -2))
++
++(def (gerbil-rs-encode-utf8-status-chunk str pointer capacity start end written)
++  (declare (not interrupts-enabled))
++  (gerbil-rs-encode-utf8-buffer-chunk-c str pointer capacity start end written))
++
+ ;; One bulk call per bounded chunk, never one foreign call per character.
+ ;; Body pointers exist only inside this synchronous, allocation-free leaf;
+ ;; no pointer survives a return to Scheme or a possible GC/poll boundary.
+diff --git a/crates/gerbil-scheme-qualification/benches/utf8/sample.rs b/crates/gerbil-scheme-qualification/benches/utf8/sample.rs
+new file mode 100644
+index 0000000..cdb79e1
+--- /dev/null
++++ b/crates/gerbil-scheme-qualification/benches/utf8/sample.rs
+@@ -0,0 +1,29 @@
++//! Consumer finishes each current text before reusing its exclusive destination.
++use super::{Root, buffer, convert};
++
++pub(super) fn run(values: &[Root], texts: &[String], jobs: usize, mode: i32) -> (usize, usize) {
++    // Allocation and the first growth remain inside sample timing, not setup.
++    let mut output = Vec::new();
++    let mut total = 0;
++    let mut capacity_total = 0;
++    for index in 0..jobs {
++        let slot = index % values.len();
++        if mode == 7 || mode == 8 {
++            let text = if mode == 7 {
++                buffer::reuse(&values[slot], &mut output)
++            } else {
++                buffer::reuse_direct(&values[slot], &mut output)
++            }
++            .expect("complete fresh encoding");
++            assert_eq!(text, texts[slot], "changing text exact content");
++            total += std::hint::black_box(text).len();
++            capacity_total += output.capacity();
++        } else {
++            let text = convert(&values[slot], mode);
++            assert_eq!(text, texts[slot], "changing text exact content");
++            capacity_total += text.capacity();
++            total += std::hint::black_box(text).len();
++        }
++    }
++    (total, capacity_total)
++}

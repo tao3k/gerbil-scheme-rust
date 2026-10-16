@@ -1,0 +1,168 @@
+#+TITLE: UTF-8 leaf dispatch and non-CPU wall-time qualification
+#+AUTHOR: tao3k team
+
+* Evidence boundary
+
+The frozen reference remains =6ad680c6311957eadf2529765ab1efd751132554=.
+The encoder entering this audit is the one at =f48bd8d7f4b4438223a0f79e5e5686f0fc14a924=.
+These are changing-text bridge transfers, not Org parsing, Scheme SMP admission,
+or an independent-VM qualification. No kernel, scheduler priority, installed
+SDK, throughput threshold, or processor-activation gate is changed.
+
+* Official source audit
+
+The matching local Gambit source under the Gerbil SDK source checkout is used;
+no compiler download or rebuild is required.
+
+- =lib/c_intf.c:2795-2855=: foreign-pointer conversion checks tags and reads the
+  pointer field without allocating, calling Scheme, or collecting garbage.
+- =include/gambit.h.in:10325-10378=: the generated =c-lambda= route uses CFUN
+  framing and an out-of-line selection. Its overhead is distinct from scalar
+  encoding work.
+- The actual generated encoder passes the =(void*)= tag list. Passing =#f=
+  instead would accept unrelated typed pointers; it is not an equivalent fast
+  path. A new bounded static sentinel verifies rejection of an =int*= foreign
+  pointer without modifying its bytes, for both baseline and candidate.
+- =lib/_kernel.scm:3999-4056= and =lib/mem.c:359-370,7683-7697=: process statistics
+  include GC CPU in total CPU. Allocation accounting includes Scheme heap and
+  stack consumption, not malloc calls or retained Rust capacity.
+
+* Full baseline attribution
+
+=just bridge-utf8-matched --costs= completed with exit zero. Each of seven
+phases has 20 samples at each of 1,000, 10,000, and 100,000 requests: 420 raw
+rows, with no missing or truncated rows in
+[[file:benchmarks/20261011-utf8-leaf-cost-attribution.log][the complete receipt]].
+The earlier prototype's transport-truncated capture is explicitly non-admitted
+in [[file:benchmarks/20261011-utf8-leaf-cost-partial.log][the partial receipt]];
+it is not used to fill gaps in the full run.
+
+The new dispatch control uses the production fixnum chunk arithmetic and the
+actual private encoder wrapper. Each of the fourteen bounded leaves receives
+an empty span, while pointer conversion and bounds checks remain active. The
+destination canary must remain unchanged. This control includes its own outer
+entry, loop, and GC: it is not an exact subtractable price for a production leaf.
+
+The owner-thread CPU counter uses the OS =CLOCK_THREAD_CPUTIME_ID= directly from
+C, without an additional Scheme callback. Each row records signed wall minus
+thread CPU; tiny negative residuals reflect snapshot boundaries and are not
+clamped. Unavailable counters or a major page fault reject the diagnostic.
+
+| Requests | Owned wall ms | Owner CPU ms | Median per-row residual ms |
+|----------+---------------+--------------+----------------------------|
+|     1000 |        16.040 |        7.166 |                      8.598 |
+|    10000 |       480.368 |       74.829 |                    406.341 |
+|   100000 |      4733.998 |      729.632 |                   4000.407 |
+
+At 100,000 requests:
+
+| Phase      | Wall ms | Thread CPU ms | GC CPU ms | GC wall ms |
+|------------+---------+---------------+-----------+------------|
+| Encoding   | 3828.705 |       614.325 |    15.351 |     97.554 |
+| Validation |  695.158 |       121.276 |     0.000 |      0.000 |
+| Allocation |   10.228 |         2.881 |     0.000 |      0.000 |
+| Empty entry |  70.120 |        20.464 |     8.105 |     26.993 |
+| Dispatch   |  294.071 |        46.966 |    10.741 |     59.124 |
+
+GC does not explain most of the observed wall time. Even the GC-free Rust
+validation phase has a median per-row non-CPU residual of 576.279 ms. Process
+and owner-thread CPU approximately agree. Owned transfers record a median of
+3,856 involuntary switches. A read-only host snapshot found 1,324 processes,
+91 runnable, and 1,114.8% aggregate CPU utilization. This supports scheduling
+contention as an important contributor, but does not identify every blocking
+cause or assign all delay to one external application. No processes are stopped.
+
+CPU work scales approximately with load; wall time does not under this shared
+host's changing contention. Lower GC counters alone cannot admit an optimization.
+The non-null empty-leaf control also differs from the null-pointer empty-entry
+floor, so neither is subtracted to manufacture an encoder-only throughput claim.
+
+* Memory and optimization decision
+
+For this corpus, each Rust result contains 8,196 bytes and reserves 13,660 bytes.
+The extra 5,464 bytes are spare capacity, not an RSS measurement. The allocation
+phase is not the dominant CPU cost. A second exact-size scan or default shrinking
+adds work and cannot be justified by a lower capacity number alone.
+
+The candidate keeps the scalar algorithm, capacity policy, 256-character bound,
+pointer-tag checks, interrupt boundary, and complete output validation unchanged.
+It uses =##c-code= with the official allocation-free pointer converter to avoid
+the private =c-lambda= CFUN framing. The complete source-only experiment is saved
+in [[file:benchmarks/20261011-utf8-checked-inline-leaf.patch][the replayable patch]].
+Its source base is the pre-audit PR head =7d172c9487c53c8d3544ca3ae945ceed50f20920=;
+reverse-apply validation against the candidate succeeds without changing files.
+
+Admission requires full same-process ABBA testing: twenty samples per variant
+at each load, full Unicode/surrogate/mutation/bounds/root/pointer contracts, and
+no paired wall-time regression. The diagnostic table is not a substitute gate.
+
+* Checked inline-leaf result
+
+=just bridge-utf8-matched --codec= completed with exit zero and all 120 timing
+rows: twenty samples per variant/load. Both routes use identical owner, AOT
+image, exclusive owned capacity, content verification, and full UTF-8 validation.
+The saved [[file:benchmarks/20261011-utf8-checked-inline-leaf-abba.log][receipt]]
+includes Unicode, surrogate, mutation, bounds, roots, and typed-pointer contracts.
+
+| Requests | C-lambda wall ms | Inline wall ms | Paired ratio | C-lambda CPU ms | Inline CPU ms |
+|----------+------------------+----------------+--------------+-----------------+---------------|
+|     1000 |           17.397 |         13.148 |     0.796826 |           7.045 |         6.839 |
+|    10000 |          264.703 |        237.782 |     0.869992 |          72.721 |        72.054 |
+|   100000 |         9168.644 |       9071.846 |     0.948828 |         728.432 |       722.237 |
+
+All three paired wall medians satisfy the unchanged no-regression gate.
+The CPU reduction is modest; at 100,000, GC CPU is 17.802 versus 17.500 ms and
+both variants have 1,237 total collections across twenty samples. There is no
+evidence of a major GC/allocation breakthrough from this framing change.
+Another read-only host snapshot during this run found 153 runnable processes
+and 1,117.6% aggregate CPU utilization. This is a shared-host qualification,
+not a stable isolated-host speedup promise. CPU does not replace wall admission.
+
+The generated =utf8.scm= and shared provenance are synchronized through
+=just bridge-regenerate= (exit zero), without rebuilding the installed SDK.
+
+* Actual public ABI and frozen-reference gate
+
+=just bridge-utf8-matched --buffer= also completed with exit zero: all 120 rows,
+twenty samples per variant/load, full contracts before timing, actual checked
+public encoding ABI, owned allocation, current-text parity, and full validation.
+The [[file:benchmarks/20261011-utf8-checked-inline-public-abba.log][public ABI receipt]]
+compares the frozen =6ad680c= Scheme-bytevector route with the current Rust-owned
+destination route. This is a different comparison from the framing-only trial.
+
+| Requests | Frozen wall ms | Public ABI wall ms | Paired ratio | Frozen CPU ms | Public ABI CPU ms |
+|----------+----------------+--------------------+--------------+---------------+-------------------|
+|     1000 |         17.205 |             11.898 |     0.575732 |         9.923 |             7.064 |
+|    10000 |        429.149 |            285.645 |     0.662820 |        96.437 |            73.679 |
+|   100000 |       4570.337 |           3228.753 |     0.807312 |       960.289 |           733.038 |
+
+All loads satisfy the original paired wall gate. At 100,000, GC CPU is 141.223
+versus 17.048 ms. Most of that difference belongs to the previously admitted
+avoidance of a Scheme intermediate bytevector, not this audit's small CFUN
+framing change. These runs occur under different host contention from the
+diagnostic and must not be compared across runs as a new speedup ratio.
+
+The checked inline leaf is retained after both complete three-load gates.
+Worst-case Rust reservation remains explicit, and no default shrinking is added.
+The frozen reference and its independent test control remain unchanged.
+
+* Local checks and remote boundary
+
+- =bridge-regenerate=: exit zero; generated source/provenance synchronized.
+- =bridge-actor-lint=: final exit zero with all targets and warnings denied.
+  The first run rejected a 104-line contract function. Its new pointer assertion
+  was factored into a named test function; no lint suppression was introduced.
+- =bridge-root-contracts=: exit zero, three passed and one intentionally ignored
+  local timing test. That ignored test is not counted as a new passing receipt.
+- =bridge-utf8-matched --contracts=: exit zero after the test-function factoring;
+  full Unicode, surrogate, mutable-text, bounds, root, and pointer-tag checks.
+- Formatting, filename policy, source-patch reverse check, and diff whitespace
+  checks pass. No hot measurement loop was changed by the lint repair.
+
+Before this push, PR #18's exact head was
+=7d172c9487c53c8d3544ca3ae945ceed50f20920=. Both jobs in
+[[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/38105337841][its CI run]]
+passed Cargo gates and failed processor activation: Linux requested four but
+observed one; macOS requested three but observed one. That unchanged failure is
+not green, and these bridge receipts do not resolve it. The exact new head must
+be checked after pushing. No SMP threshold, kernel, or installed SDK is changed.

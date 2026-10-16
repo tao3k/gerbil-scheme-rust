@@ -1,0 +1,138 @@
+Command: just bridge-utf8-matched --buffer
+Control: frozen 6ad680c owned bridge; candidate: actual checked public ABI with inline leaf.
+Exit: 0
+   Compiling gerbil-scheme-sys v0.1.0 (/private/tmp/orgize-native-recovery-20261009-f7ey6w/bridge/crates/gerbil-scheme-sys)
+   Compiling gerbil-scheme-qualification v0.1.0 (/private/tmp/orgize-native-recovery-20261009-f7ey6w/bridge/crates/gerbil-scheme-qualification)
+   Compiling gerbil-scheme v0.1.0 (/private/tmp/orgize-native-recovery-20261009-f7ey6w/bridge/crates/gerbil-scheme)
+    Finished `bench` profile [optimized] target(s) in 58.65s
+     Running benches/utf8.rs (target/release/deps/utf8-461f469b848a9e47)
+UTF8-BUFFER-CONTRACTS Unicode=1112064 surrogates=2048 mutation=OK bounds=OK roots=OK
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=0 mode=3 completed=1 elapsed_ms=14.805 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=1 mode=5 completed=1 elapsed_ms=8.540 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=2 mode=5 completed=2 elapsed_ms=8.524 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=0 position=3 mode=3 completed=2 elapsed_ms=16.557 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=0 mode=3 completed=3 elapsed_ms=22.513 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=1 mode=5 completed=3 elapsed_ms=11.451 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=2 mode=5 completed=4 elapsed_ms=8.835 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=1 position=3 mode=3 completed=4 elapsed_ms=26.322 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=0 mode=3 completed=5 elapsed_ms=23.936 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=1 mode=5 completed=5 elapsed_ms=19.843 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=2 mode=5 completed=6 elapsed_ms=12.272 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=2 position=3 mode=3 completed=6 elapsed_ms=49.575 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=0 mode=3 completed=7 elapsed_ms=8.768 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=1 mode=5 completed=7 elapsed_ms=10.768 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=2 mode=5 completed=8 elapsed_ms=11.512 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=3 position=3 mode=3 completed=8 elapsed_ms=7.706 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=0 mode=3 completed=9 elapsed_ms=12.264 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=1 mode=5 completed=9 elapsed_ms=11.575 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=2 mode=5 completed=10 elapsed_ms=16.247 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=4 position=3 mode=3 completed=10 elapsed_ms=10.629 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=0 mode=3 completed=11 elapsed_ms=21.839 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=1 mode=5 completed=11 elapsed_ms=11.378 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=2 mode=5 completed=12 elapsed_ms=6.078 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=5 position=3 mode=3 completed=12 elapsed_ms=17.854 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=0 mode=3 completed=13 elapsed_ms=11.701 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=1 mode=5 completed=13 elapsed_ms=12.221 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=2 mode=5 completed=14 elapsed_ms=6.831 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=6 position=3 mode=3 completed=14 elapsed_ms=11.887 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=0 mode=3 completed=15 elapsed_ms=12.084 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=1 mode=5 completed=15 elapsed_ms=12.649 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=2 mode=5 completed=16 elapsed_ms=21.373 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=7 position=3 mode=3 completed=16 elapsed_ms=22.181 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=0 mode=3 completed=17 elapsed_ms=8.200 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=1 mode=5 completed=17 elapsed_ms=14.891 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=2 mode=5 completed=18 elapsed_ms=12.772 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=8 position=3 mode=3 completed=18 elapsed_ms=33.341 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=0 mode=3 completed=19 elapsed_ms=75.113 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=1 mode=5 completed=19 elapsed_ms=39.123 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=2 mode=5 completed=20 elapsed_ms=19.934 output_bytes=8196000 capacity_bytes_sum=13660000
+UTF8-MATCHED jobs=1000 left=3 right=5 group=9 position=3 mode=3 completed=20 elapsed_ms=59.259 output_bytes=8196000 capacity_bytes_sum=8196000
+UTF8-MATCHED-SUMMARY jobs=1000 mode=3 samples=20 wall_median_ms=17.205 cpu_median_ms=9.923 gc_cpu_median_ms=1.431 gc_count_total=179
+UTF8-MATCHED-SUMMARY jobs=1000 mode=5 samples=20 wall_median_ms=11.898 cpu_median_ms=7.064 gc_cpu_median_ms=0.087 gc_count_total=10
+UTF8-MATCHED-DECISION jobs=1000 left=3 right=5 paired_ratio_median=0.575732 slower=false
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=0 mode=3 completed=1 elapsed_ms=591.968 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=1 mode=5 completed=1 elapsed_ms=611.396 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=2 mode=5 completed=2 elapsed_ms=270.408 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=0 position=3 mode=3 completed=2 elapsed_ms=405.639 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=0 mode=3 completed=3 elapsed_ms=109.397 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=1 mode=5 completed=3 elapsed_ms=210.395 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=2 mode=5 completed=4 elapsed_ms=687.215 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=1 position=3 mode=3 completed=4 elapsed_ms=512.466 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=0 mode=3 completed=5 elapsed_ms=477.856 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=1 mode=5 completed=5 elapsed_ms=405.592 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=2 mode=5 completed=6 elapsed_ms=387.151 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=2 position=3 mode=3 completed=6 elapsed_ms=518.766 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=0 mode=3 completed=7 elapsed_ms=1069.839 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=1 mode=5 completed=7 elapsed_ms=427.446 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=2 mode=5 completed=8 elapsed_ms=504.355 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=3 position=3 mode=3 completed=8 elapsed_ms=437.669 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=0 mode=3 completed=9 elapsed_ms=1162.047 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=1 mode=5 completed=9 elapsed_ms=798.802 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=2 mode=5 completed=10 elapsed_ms=316.565 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=4 position=3 mode=3 completed=10 elapsed_ms=480.359 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=0 mode=3 completed=11 elapsed_ms=565.823 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=1 mode=5 completed=11 elapsed_ms=869.067 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=2 mode=5 completed=12 elapsed_ms=191.245 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=5 position=3 mode=3 completed=12 elapsed_ms=318.870 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=0 mode=3 completed=13 elapsed_ms=210.280 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=1 mode=5 completed=13 elapsed_ms=105.965 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=2 mode=5 completed=14 elapsed_ms=128.225 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=6 position=3 mode=3 completed=14 elapsed_ms=228.448 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=0 mode=3 completed=15 elapsed_ms=233.984 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=1 mode=5 completed=15 elapsed_ms=97.828 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=2 mode=5 completed=16 elapsed_ms=126.535 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=7 position=3 mode=3 completed=16 elapsed_ms=220.999 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=0 mode=3 completed=17 elapsed_ms=955.957 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=1 mode=5 completed=17 elapsed_ms=137.833 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=2 mode=5 completed=18 elapsed_ms=189.891 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=8 position=3 mode=3 completed=18 elapsed_ms=291.602 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=0 mode=3 completed=19 elapsed_ms=328.147 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=1 mode=5 completed=19 elapsed_ms=300.883 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=2 mode=5 completed=20 elapsed_ms=164.669 output_bytes=81960000 capacity_bytes_sum=136600000
+UTF8-MATCHED-SUMMARY jobs=10000 mode=3 samples=20 wall_median_ms=429.149 cpu_median_ms=96.437 gc_cpu_median_ms=13.884 gc_count_total=1849
+UTF8-MATCHED-SUMMARY jobs=10000 mode=5 samples=20 wall_median_ms=285.645 cpu_median_ms=73.679 gc_cpu_median_ms=1.528 gc_count_total=121
+UTF8-MATCHED-DECISION jobs=10000 left=3 right=5 paired_ratio_median=0.662820 slower=false
+UTF8-MATCHED jobs=10000 left=3 right=5 group=9 position=3 mode=3 completed=20 elapsed_ms=420.629 output_bytes=81960000 capacity_bytes_sum=81960000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=0 mode=3 completed=1 elapsed_ms=5036.615 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=1 mode=5 completed=1 elapsed_ms=2244.480 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=2 mode=5 completed=2 elapsed_ms=2880.111 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=0 position=3 mode=3 completed=2 elapsed_ms=3197.764 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=0 mode=3 completed=3 elapsed_ms=2797.104 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=1 mode=5 completed=3 elapsed_ms=3342.144 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=2 mode=5 completed=4 elapsed_ms=5034.919 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=1 position=3 mode=3 completed=4 elapsed_ms=5242.177 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=0 mode=3 completed=5 elapsed_ms=4600.368 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=1 mode=5 completed=5 elapsed_ms=2370.353 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=2 mode=5 completed=6 elapsed_ms=3412.082 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=2 position=3 mode=3 completed=6 elapsed_ms=4127.995 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=0 mode=3 completed=7 elapsed_ms=1634.634 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=1 mode=5 completed=7 elapsed_ms=3025.282 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=2 mode=5 completed=8 elapsed_ms=1873.903 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=3 position=3 mode=3 completed=8 elapsed_ms=3601.628 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=0 mode=3 completed=9 elapsed_ms=4235.847 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=1 mode=5 completed=9 elapsed_ms=2963.338 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=2 mode=5 completed=10 elapsed_ms=2940.979 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=4 position=3 mode=3 completed=10 elapsed_ms=2644.270 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=0 mode=3 completed=11 elapsed_ms=4977.259 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=1 mode=5 completed=11 elapsed_ms=4561.647 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=2 mode=5 completed=12 elapsed_ms=4482.744 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=5 position=3 mode=3 completed=12 elapsed_ms=4957.557 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=0 mode=3 completed=13 elapsed_ms=5327.751 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=1 mode=5 completed=13 elapsed_ms=3115.363 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=2 mode=5 completed=14 elapsed_ms=3517.414 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=6 position=3 mode=3 completed=14 elapsed_ms=5480.305 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=0 mode=3 completed=15 elapsed_ms=4559.692 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=1 mode=5 completed=15 elapsed_ms=3078.826 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=2 mode=5 completed=16 elapsed_ms=2150.769 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=7 position=3 mode=3 completed=16 elapsed_ms=4580.982 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=0 mode=3 completed=17 elapsed_ms=4107.214 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=1 mode=5 completed=17 elapsed_ms=3942.724 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=2 mode=5 completed=18 elapsed_ms=4347.667 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=8 position=3 mode=3 completed=18 elapsed_ms=5638.047 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=0 mode=3 completed=19 elapsed_ms=5048.796 output_bytes=819600000 capacity_bytes_sum=819600000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=1 mode=5 completed=19 elapsed_ms=3978.714 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=2 mode=5 completed=20 elapsed_ms=5415.482 output_bytes=819600000 capacity_bytes_sum=1366000000
+UTF8-MATCHED-SUMMARY jobs=100000 mode=3 samples=20 wall_median_ms=4570.337 cpu_median_ms=960.289 gc_cpu_median_ms=141.223 gc_count_total=18518
+UTF8-MATCHED-SUMMARY jobs=100000 mode=5 samples=20 wall_median_ms=3228.753 cpu_median_ms=733.038 gc_cpu_median_ms=17.048 gc_count_total=1232
+UTF8-MATCHED-DECISION jobs=100000 left=3 right=5 paired_ratio_median=0.807312 slower=false
+UTF8-MATCHED jobs=100000 left=3 right=5 group=9 position=3 mode=3 completed=20 elapsed_ms=4500.301 output_bytes=819600000 capacity_bytes_sum=819600000

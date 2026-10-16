@@ -1,0 +1,38 @@
+diff --git a/scheme/utf8.ss b/scheme/utf8.ss
+index d441c61..aa00904 100644
+--- a/scheme/utf8.ss
++++ b/scheme/utf8.ss
+@@ -95,18 +95,24 @@ for (___U64 i = start; i < end; ++i) {
+   const ___U32 c = source[i];
+   if (c <= 0x7f) *cursor++ = (___U8)c;
+   else if (c <= 0x7ff) {
+-    *cursor++ = (___U8)(0xc0 | (c >> 6));
+-    *cursor++ = (___U8)(0x80 | (c & 0x3f));
++    const ___U8 bytes[2] = {(___U8)(0xc0 | (c >> 6)),
++                           (___U8)(0x80 | (c & 0x3f))};
++    __builtin_memcpy(cursor, bytes, sizeof bytes);
++    cursor += sizeof bytes;
+   } else if (c <= 0xffff) {
+     if ((c >> 11) == 0x1b) return ___FIX(-1);
+-    *cursor++ = (___U8)(0xe0 | (c >> 12));
+-    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
+-    *cursor++ = (___U8)(0x80 | (c & 0x3f));
++    const ___U8 bytes[3] = {(___U8)(0xe0 | (c >> 12)),
++                           (___U8)(0x80 | ((c >> 6) & 0x3f)),
++                           (___U8)(0x80 | (c & 0x3f))};
++    __builtin_memcpy(cursor, bytes, sizeof bytes);
++    cursor += sizeof bytes;
+   } else if (c <= 0x10ffff) {
+-    *cursor++ = (___U8)(0xf0 | (c >> 18));
+-    *cursor++ = (___U8)(0x80 | ((c >> 12) & 0x3f));
+-    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
+-    *cursor++ = (___U8)(0x80 | (c & 0x3f));
++    const ___U8 bytes[4] = {(___U8)(0xf0 | (c >> 18)),
++                           (___U8)(0x80 | ((c >> 12) & 0x3f)),
++                           (___U8)(0x80 | ((c >> 6) & 0x3f)),
++                           (___U8)(0x80 | (c & 0x3f))};
++    __builtin_memcpy(cursor, bytes, sizeof bytes);
++    cursor += sizeof bytes;
+   } else return ___FIX(-1);
+ }
+ return ___FIX((___S64)(cursor - output));

@@ -9,7 +9,7 @@ exports_files([
     "install_gerbil_dependencies.sh.tpl",
     "local_gerbil.BUILD.bazel.tpl",
     "native_scheme_env.sh.tpl",
-    "native_abi_fingerprint.sh",
+    "abi_fingerprint.sh",
     "native_tool.sh.tpl",
     "run_scheme_project.sh",
     "run_scheme_tests.sh",

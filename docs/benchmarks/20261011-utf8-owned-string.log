@@ -1,0 +1,75 @@
+Command: just bridge-benchmark buffers::utf8_fresh
+Scope: actual production owned-string bridge, not Org parsing
+    Finished `bench` profile [optimized] target(s) in 1m 08s
+     Running benches/ffi.rs (target/release/deps/ffi-119d3e31de7fc5f0)
+ffi               fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ buffers                      │               │               │               │         │
+   ╰─ utf8_fresh                │               │               │               │         │
+      ├─ 1000     Timer precision: 41 ns
+UTF8-LOAD jobs=1000 bytes=8196 snapshot=false scheme-owners=1
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=1
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=2
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=3
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=4
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=5
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=6
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=7
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=8
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=9
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=10
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=11
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=12
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=13
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=14
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=15
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=16
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=17
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=18
+UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=19
+6.507 ms      │ 79.87 ms      │ 15.21 ms      │ 20.33 ms      │ 20      │ 20
+      ├─ 10000    UTF8-SAMPLE jobs=1000 snapshot=false completed-batches=20
+UTF8-LOAD jobs=10000 bytes=8196 snapshot=false scheme-owners=1
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=1
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=2
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=3
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=4
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=5
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=6
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=7
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=8
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=9
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=10
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=11
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=12
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=13
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=14
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=15
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=16
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=17
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=18
+UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=19
+99.49 ms      │ 421 ms        │ 156.3 ms      │ 191.6 ms      │ 20      │ 20
+      ╰─ 100000   UTF8-SAMPLE jobs=10000 snapshot=false completed-batches=20
+UTF8-LOAD jobs=100000 bytes=8196 snapshot=false scheme-owners=1
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=1
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=2
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=3
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=4
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=5
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=6
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=7
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=8
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=9
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=10
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=11
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=12
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=13
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=14
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=15
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=16
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=17
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=18
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=19
+1.216 s       │ 5.343 s       │ 2.498 s       │ 2.632 s       │ 20      │ 20
+
+UTF8-SAMPLE jobs=100000 snapshot=false completed-batches=20

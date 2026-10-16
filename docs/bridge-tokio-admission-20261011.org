@@ -1,0 +1,120 @@
+#+title: Bounded admission, external wakeups and owner waiting
+
+* Baseline and evidence boundary
+
+Baseline: =9cd2604efe2a40d53554ee8ffe38d5a8eff4c79e= on existing PR #18.
+The accepted encoder, typed conversions, Scheme owner and installed SDK
+are unchanged. This receipt concerns a closed-loop UTF-8 bridge workload,
+not Org parsing or Scheme parsing parallelism. SMP remains unsupported.
+
+* Official Tokio 1.53.1 source audit
+
+The installed Cargo source, not an alternative scheduler implementation,
+provides the following mechanism:
+
+- =sync/mpsc/chan.rs:289-338=: dequeue returns one capacity permit before
+  processing the request. =:578-579= delegates that return to the semaphore.
+- =sync/batch_semaphore.rs:303-370=: permit release assigns existing FIFO
+  waiters first, collects their wakers and wakes them after releasing the
+  wait-list lock. Free permits remain only after queued demand is satisfied.
+- =sync/oneshot.rs:1299-1315=: response completion separately publishes state
+  and wakes a registered receiver. Its heap allocation is separate from
+  bounded admission; holding a reply channel while awaiting capacity is
+  not necessary for this protocol.
+- =runtime/task/state.rs:253-279=: already-notified and running tasks
+  coalesce wakes. Two wake calls do NOT imply two queue insertions.
+- =runtime/scheduler/multi_thread/worker.rs:1341-1368,1420-1427=:
+  owner-thread wakes of idle Tokio tasks enter the remote injection path,
+  lock =shared.synced=, enqueue and notify parked workers. Worker-local
+  scheduling has a different path. No thread-count tuning removes this
+  external-owner publication boundary.
+- =sync/batch_semaphore.rs:266-295,589-614= and
+  =sync/mpsc/bounded.rs:1356-1364=: =try_reserve= uses the atomic available
+  permit path, while async acquisition also polls the cooperative budget.
+  A full queue still needs the normal async acquisition and backpressure.
+
+This separates admission semaphore locking, remote task injection, task
+resume delay and owner waiting. They must not be conflated into a single
+"mutex cost" inferred from response wall time. A blocked owner's receive
+can mean producers have not resumed; service wall minus owner CPU can mean
+preemption, and is not automatically GC or the injected-queue lock.
+
+* Source-guided candidate
+
+Keep the same worker count, callers, bounded mpsc, per-request oneshot and
+single Scheme owner. Try acquiring an immediately available permit before
+falling back to async reserve. Create the candidate's reply allocation only
+after admission, so waiting callers do not retain unused response channels.
+There is no spinning, channel replacement, response batching, unsafe
+cross-thread Scheme access or global scheduler configuration override.
+
+The candidate is bounded and preserves the semaphore's queued-demand
+priority; its async fallback retains cancellation/drop permit release.
+Executable contracts check exhausted capacity, dropped reservations and
+closed-channel handling. This does not disable cooperative response polls
+or claim starvation/overload qualification for an open-loop workload.
+
+* Matched acceptance
+
+Command: =just bridge-utf8-matched --scheduling-audit all= with the candidate
+patch applied. Seven rotating character distributions; 1,000 / 10,000 /
+100,000 requests per batch; 20 batches PER variant/load, ten ABBA groups.
+Both modes disable per-request CPU/GC/wake observers. Identical validation,
+encoding, owner and payloads are inside timing. This is 840 timed batches
+and 31,080,000 requests, excluding warmups.
+
+P95/P99 are nearest-rank individual-request percentiles, not percentiles of
+20 batch means. Admission, queue, service and response are distinct. The
+nine admission gates use median paired ratios, including wall and both
+tails of each phase. A favorable pooled average does not override a failed
+paired gate. Memory observer retention is identical: 128 bytes/request,
+2,560,000 / 25,600,000 / 256,000,000 bytes per variant across its 20 batches.
+Two variants coexist, plus scratch allocations. Shared process high-water
+RSS is not attributable exclusively to one variant; deferred reply
+allocation does not eliminate the reply allocation for admitted requests.
+
+Raw matrix: [[file:benchmarks/20261011-admission-fastpath-abba.log]].
+
+* Completed result and rollback
+
+All 840 batches completed without request errors. All 42 variant/load
+summaries contain 20 batches. The candidate failed 78 of 189 paired metric
+gates and is REJECTED. Its source is reverted exactly to the baseline;
+[[file:benchmarks/20261011-admission-fastpath-rejected.patch][the rejected patch]] remains reproducible evidence,
+not active library or benchmark policy. Actor/AOT clippy passed before
+timing. The final qualification commands run after reverting the candidate.
+
+For changing reverse-prefix text, control/candidate results are:
+
+| Requests/batch | Mean wall (ms) | Response P95 (µs) | Response P99 (µs) | Throughput (requests/s) |
+|----------------+----------------+-------------------+-------------------+-------------------------|
+| 1,000 | 8.231850 / 8.424150 | 275.709 / 314.083 | 393.250 / 421.541 | 121,479 / 118,706 |
+| 10,000 | 122.795300 / 135.550300 | 479.000 / 546.875 | 1,965.209 / 2,504.833 | 81,436 / 73,773 |
+| 100,000 | 1,016.049150 / 976.082950 | 403.166 / 369.500 | 997.833 / 1,049.333 | 98,420 / 102,450 |
+
+The 100,000-request pooled throughput gain does not rescue its P99
+regression or the other failed paired gates. Shared peak RSS was
+634,241,024 bytes; observer storage accounts for 512,000,000 bytes for the
+two retained large-load variants, before scratch. That is NOT production
+memory/request. Both paths still allocate one oneshot and owned text per
+completed request. Deferring that allocation decreases its pre-admission
+lifetime but provides no measured allocation-count reduction. No claim of
+per-variant RSS reduction is supported by this shared-process measurement.
+
+The atomic fast path does not remove capacity-release or external response
+wakes. On a full queue it adds a failed availability check before the same
+async waiter; on a ready queue it changes cooperative-budget accounting.
+These are source-established tradeoffs, not a measured attribution of
+78 failures to one cause. Exact injection-mutex hold/wait time and owner
+receive off-CPU time remain unisolated. The results rule out adopting this
+candidate as the solution; they do not establish that lock contention is
+the dominant cost. No kernel change or acceptance relaxation occurred.
+
+After exact source rollback, =just bridge-workspace= passed 659 tests with
+zero failures and eight existing ignored tests. =just bridge-actor-lint=
+and =just bridge-lint= passed with warnings denied. Their raw receipts are
+=benchmarks/20261011-admission-final-*.log=. =git apply --check= confirms
+that the archived rejected patch can still be applied to this baseline.
+Remote CI for the resulting documentation/evidence commit remains a
+separate exact-head gate; none of these results admit Scheme SMP or Org
+parsing performance.

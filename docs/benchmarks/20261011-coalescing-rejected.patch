@@ -1,0 +1,284 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index f411462..fa7e076 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -401,6 +401,30 @@ dependencies = [
+  "percent-encoding",
+ ]
+ 
++[[package]]
++name = "futures-core"
++version = "0.3.34"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "92d699e522242e69e3003b94ecc1f960f3a5e015aa7c5d7486e65ad01dd94f5e"
++
++[[package]]
++name = "futures-task"
++version = "0.3.34"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "cd417de3d1d015fc3bfd2b1ea46dfc7bab72ef86f1cc7cc9c78e728b34a6d1fd"
++
++[[package]]
++name = "futures-util"
++version = "0.3.34"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "0d50a92467f8ba5dd6e3ee5d4bd04d73ab2e4e1c44474a0674821dfce14b79bc"
++dependencies = [
++ "futures-core",
++ "futures-task",
++ "pin-project-lite",
++ "slab",
++]
++
+ [[package]]
+ name = "generic-array"
+ version = "0.14.7"
+@@ -451,6 +475,7 @@ name = "gerbil-scheme-qualification"
+ version = "0.1.0"
+ dependencies = [
+  "divan",
++ "futures-util",
+  "gerbil-scheme",
+  "gerbil-scheme-aot-build",
+  "gerbil-scheme-sys",
+@@ -950,6 +975,12 @@ version = "2.7.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
+ 
++[[package]]
++name = "slab"
++version = "0.4.12"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
++
+ [[package]]
+ name = "smallvec"
+ version = "1.15.2"
+diff --git a/Cargo.toml b/Cargo.toml
+index 48b2744..08a606e 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -44,6 +44,7 @@ cbindgen = "0.29.4"
+ divan = "0.1.21"
+ simdutf8 = "0.1.5"
+ tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
++futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+ gerbil-scheme-aot-build = { path = "build-support/gerbil-scheme-aot-build" }
+ gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-scheme-rust-project-harness-policy" }
+ gerbil-scheme-rust-project-harness = { path = "build-support/gerbil-scheme-rust-project-harness", version = "0.1.2" }
+diff --git a/crates/gerbil-scheme-qualification/Cargo.toml b/crates/gerbil-scheme-qualification/Cargo.toml
+index 730a4bc..8ab7b36 100644
+--- a/crates/gerbil-scheme-qualification/Cargo.toml
++++ b/crates/gerbil-scheme-qualification/Cargo.toml
+@@ -6,7 +6,7 @@ license.workspace = true
+ publish = false
+ 
+ [features]
+-actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tokio", "dep:simdutf8"]
++actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tokio", "dep:simdutf8", "dep:futures-util"]
+ instance-probe = ["dep:divan", "dep:tokio"]
+ 
+ [dependencies]
+@@ -14,6 +14,7 @@ gerbil-scheme = { workspace = true, optional = true, features = ["external-progr
+ gerbil-scheme-sys = { workspace = true, optional = true, features = ["external-program"] }
+ divan = { workspace = true, optional = true }
+ tokio = { workspace = true, optional = true, features = ["time"] }
++futures-util = { workspace = true, optional = true }
+ simdutf8 = { workspace = true, optional = true }
+ 
+ [build-dependencies]
+diff --git a/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs b/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs
+index 19509c2..a47d193 100644
+--- a/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs
++++ b/crates/gerbil-scheme-qualification/benches/utf8/scheduling.rs
+@@ -1,18 +1,16 @@
+ //! Same-owner ABBA admission controls; collect every regression before rejection.
+ use super::{GerbilRuntime, SCENARIOS, buffer, convert, latency, texts_for_scenario};
++use futures_util::{StreamExt, stream::FuturesUnordered};
+ use std::{
+     sync::{Arc, mpsc as std_mpsc},
+     thread,
+     time::Instant,
+ };
+-#[path = "wake_probe.rs"]
+-mod wake_probe;
+ use tokio::{
+     runtime::Runtime,
+     sync::{mpsc, oneshot},
+     task::JoinSet,
+ };
+-use wake_probe::observe;
+ 
+ pub(super) fn run() {
+     latency::contracts();
+@@ -27,7 +25,7 @@ pub(super) fn run() {
+     let owner = thread::spawn(move || owner(receive, ready));
+     wait.recv().unwrap();
+     println!(
+-        "UTF8-SCHED-AUDIT-METHOD workers={workers} callers={callers} capacity={workers} scheme_owners=1 workload=closed_loop parser_parallelism=false samples_per_variant=20 comparator=ordinary_observation candidate=perturbed_wake_cpu_observation optimization_admission=false"
++        "UTF8-SCHED-AUDIT-METHOD workers={workers} callers={callers} capacity={workers} scheme_owners=1 workload=closed_loop parser_parallelism=false samples_per_variant=20 comparator=independent_caller_tasks candidate=coalesced_caller_futures instrumentation=false optimization_admission=true"
+     );
+     let requested = std::env::args().nth(2).filter(|arg| arg != "--bench");
+     let mut admitted = true;
+@@ -46,12 +44,9 @@ pub(super) fn run() {
+     drop(send);
+     owner.join().unwrap();
+     println!(
+-        "UTF8-SCHED-AUDIT-COMPLETE optimization_admission=false observer_not_slower={admitted}"
+-    );
+-    println!(
+-        "UTF8-SCHED-AUDIT-BOUNDARY optimized=false instrumentation_slower={}",
+-        !admitted
++        "UTF8-SCHED-AUDIT-COMPLETE optimization_admission=true candidate_not_slower={admitted}"
+     );
++    println!("UTF8-SCHED-AUDIT-BOUNDARY candidate_rejected={}", !admitted);
+ }
+ 
+ fn quantiles(rows: &[[u64; 16]]) -> [u64; 8] {
+@@ -281,65 +276,99 @@ fn owner(mut incoming: mpsc::Receiver<Request>, ready: std_mpsc::Sender<()>) {
+     drop(roots);
+     drop(runtime);
+ }
++async fn caller_requests(
++    send: mpsc::Sender<Request>,
++    texts: Arc<Vec<String>>,
++    corpus: usize,
++    jobs: usize,
++    callers: usize,
++    caller: usize,
++) -> Vec<[u64; 16]> {
++    let mut rows = Vec::with_capacity(jobs.div_ceil(callers));
++    for index in (caller..jobs).step_by(callers) {
++        let slot = index % texts.len();
++        let issued = Instant::now();
++        let (reply, wait) = oneshot::channel();
++        let permit = send.reserve().await.expect("bounded admission");
++        let enqueued = Instant::now();
++        let admission = u64::try_from(enqueued.duration_since(issued).as_nanos()).unwrap();
++        permit.send(Request {
++            corpus,
++            slot,
++            enqueued,
++            reply,
++            diagnostic: false,
++        });
++        let result = wait.await.expect("live owner");
++        let response = nanos(issued);
++        let handoff = nanos(result.ready);
++        assert_eq!(result.text, texts[slot]);
++        assert!(response >= admission + result.queue_ns + result.service_ns);
++        rows.push([
++            admission,
++            result.queue_ns,
++            result.service_ns,
++            response,
++            handoff,
++            result.counters[0],
++            result.counters[1],
++            result.counters[2],
++            result.counters[3],
++            result.counters[4],
++            0,
++            0,
++            0,
++            0,
++            0,
++            0,
++        ]);
++    }
++    rows
++}
+ async fn batch_requests(
+     send: &mpsc::Sender<Request>,
+     texts: &Arc<Vec<String>>,
+     corpus: usize,
+     jobs: usize,
+     callers: usize,
+-    diagnostic: bool,
++    coalesced: bool,
+ ) -> Vec<[u64; 16]> {
+-    let mut tasks = JoinSet::new();
+-    for caller in 0..callers.min(jobs) {
++    if coalesced {
+         let send = send.clone();
+         let texts = Arc::clone(texts);
+-        tasks.spawn(async move {
+-            let mut rows = Vec::with_capacity(jobs.div_ceil(callers));
+-            let mut probe = None;
+-            for index in (caller..jobs).step_by(callers) {
+-                let slot = index % texts.len();
+-                let issued = Instant::now();
+-                let (reply, wait) = oneshot::channel();
+-                let permit = send.reserve().await.expect("bounded admission");
+-                let enqueued = Instant::now();
+-                let admission = u64::try_from(enqueued.duration_since(issued).as_nanos()).unwrap();
+-                permit.send(Request {
++        // Normal worker task, not Runtime::block_on's calling thread.
++        // Replies complete independently; no response batch is retained.
++        return tokio::spawn(async move {
++            let mut futures = FuturesUnordered::new();
++            for caller in 0..callers.min(jobs) {
++                futures.push(caller_requests(
++                    send.clone(),
++                    Arc::clone(&texts),
+                     corpus,
+-                    slot,
+-                    enqueued,
+-                    reply,
+-                    diagnostic,
+-                });
+-                let (result, wake) = if diagnostic {
+-                    observe(async { wait.await.expect("live owner") }, &mut probe).await
+-                } else {
+-                    (wait.await.expect("live owner"), [0; 6])
+-                };
+-                let response = nanos(issued);
+-                let handoff = nanos(result.ready);
+-                assert_eq!(result.text, texts[slot]);
+-                assert!(response >= admission + result.queue_ns + result.service_ns);
+-                rows.push([
+-                    admission,
+-                    result.queue_ns,
+-                    result.service_ns,
+-                    response,
+-                    handoff,
+-                    result.counters[0],
+-                    result.counters[1],
+-                    result.counters[2],
+-                    result.counters[3],
+-                    wake[0],
+-                    wake[1],
+-                    wake[2],
+-                    result.counters[4],
+-                    wake[3],
+-                    wake[4],
+-                    wake[5],
+-                ]);
++                    jobs,
++                    callers,
++                    caller,
++                ));
++            }
++            let mut rows = Vec::with_capacity(jobs);
++            while let Some(caller_rows) = futures.next().await {
++                rows.extend(caller_rows);
+             }
+             rows
+-        });
++        })
++        .await
++        .expect("coordinator completes");
++    }
++    let mut tasks = JoinSet::new();
++    for caller in 0..callers.min(jobs) {
++        tasks.spawn(caller_requests(
++            send.clone(),
++            Arc::clone(texts),
++            corpus,
++            jobs,
++            callers,
++            caller,
++        ));
+     }
+     let mut rows = Vec::with_capacity(jobs);
+     while let Some(result) = tasks.join_next().await {

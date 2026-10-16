@@ -1,0 +1,967 @@
+//! Bounded stateful event procedures lowered from Scheme-owned parser IR.
+//!
+//! This backend owns no language rule: it validates a closed event vocabulary
+//! and constructs Rust syntax. The Scheme frontend owns every predicate and
+//! transition supplied through the versioned IR.
+
+use proc_macro2::TokenStream;
+use quote::quote;
+use std::collections::{BTreeMap, BTreeSet};
+use syn::visit::Visit;
+
+use crate::CompileError;
+
+#[path = "event_byte_set_helpers.rs"]
+mod event_byte_set_helpers;
+#[path = "event_future_compiler.rs"]
+mod event_future_compiler;
+#[path = "event_join_compiler.rs"]
+mod event_join_compiler;
+#[path = "event_list_compiler.rs"]
+mod event_list_compiler;
+#[path = "event_marker_collector.rs"]
+mod event_marker_collector;
+#[path = "event_offset_helpers.rs"]
+mod event_offset_helpers;
+#[path = "event_parameter_compiler.rs"]
+mod event_parameter_compiler;
+#[path = "event_state_compiler.rs"]
+mod event_state_compiler;
+#[path = "event_token_compiler.rs"]
+mod event_token_compiler;
+use event_byte_set_helpers::compile_byte_set_helpers;
+use event_future_compiler::{
+    compile_future_cache_declarations, compile_future_heading_title, compile_future_named_marker,
+    compile_future_predicate,
+};
+use event_join_compiler::compile_join_once;
+use event_list_compiler::{
+    compile_close_all_frames, compile_close_frame, compile_close_frames_while,
+    compile_scan_list_marker,
+};
+use event_marker_collector::collect_line_markers;
+use event_offset_helpers::compile_offset_helpers;
+use event_parameter_compiler::{
+    compile_event_initial, compile_event_parameters, compile_helper_parameters,
+};
+use event_state_compiler::compile_state_statement;
+use event_token_compiler::compile_token_statement;
+
+#[path = "event_ir_types.rs"]
+mod event_ir_types;
+pub use event_ir_types::{
+    EVENT_FUNCTION_IR_SCHEMA, EventBoundaryIr, EventComputedOffsetIr, EventFunctionIr,
+    EventHelperIr, EventListMarkerIr, EventOffsetIr, EventPredicateIr, EventStateSlot,
+    EventStatementIr, EventUsizeIr, EventUsizeParameterIr,
+};
+/// Compile a versioned Scheme event IR document into a Rust event function.
+///
+/// # Errors
+/// Rejects unknown wire forms, identifiers, digests, and generated syntax.
+pub fn compile_event_function_json(input: &str) -> Result<String, CompileError> {
+    let function: EventFunctionIr = serde_json::from_str(input).map_err(CompileError::Json)?;
+    compile_event_function(&function)
+}
+
+/// Construct and validate Rust tokens for a Scheme-owned event procedure.
+///
+/// # Errors
+/// Rejects unknown schemas, malformed identifiers or digests, and invalid syntax.
+pub fn compile_event_function(function: &EventFunctionIr) -> Result<String, CompileError> {
+    validate_event_function(function)?;
+    let tokens = compile_event_tokens(function)?;
+    let file = syn::parse2::<syn::File>(tokens)?;
+    Ok(prettyplease::unparse(&file))
+}
+
+fn compile_event_tokens(function: &EventFunctionIr) -> Result<TokenStream, CompileError> {
+    let name = syn::parse_str::<syn::Ident>(&function.name)?;
+    let root = function.root_kind;
+    let digest = syn::LitStr::new(&function.parser_digest, proc_macro2::Span::call_site());
+    let (generated_name, parameters, wrapper) = compile_event_parameters(function, &name)?;
+    let initial = compile_event_initial(function)?;
+    let line = compile_statements(&function.line, false)?;
+    let finish = compile_statements(&function.finish, false)?;
+    let helpers = compile_event_helpers(function)?;
+    let cached_markers = compile_marker_cache(&function.line)?;
+    let future_caches = compile_future_cache_declarations(&[&function.line, &function.finish])?;
+    let byte_set_helpers = compile_byte_set_helpers(&quote! {
+        #line #finish #(#helpers)*
+    })?;
+    let offset_helpers = compile_offset_helpers(&quote! {
+        #line #finish #(#helpers)*
+    })?;
+    Ok(quote! {
+        pub const PARSER_DIGEST: &str = #digest;
+
+        #wrapper
+        pub fn #generated_name(source: &str, #(#parameters),*) -> Vec<TreeEvent> {
+            #[inline(always)]
+            fn __event_push_token(events: &mut Vec<TreeEvent>, kind: u16, start: usize, end: usize) {
+                if start != end {
+                    events.push(TreeEvent::Token { kind, start, end });
+                }
+            }
+            #byte_set_helpers
+            #offset_helpers
+            #(#helpers)*
+            let bytes = source.as_bytes();
+            let mut events = Vec::with_capacity(bytes.len() / 16 + 2);
+            events.push(TreeEvent::StartNode(#root));
+            #initial
+            #(#future_caches)*
+            let mut start = 0usize;
+            while start < bytes.len() {
+                let mut end = start;
+                while end < bytes.len() && bytes[end] != b'\n' && bytes[end] != b'\r' {
+                    end += 1;
+                }
+                if end < bytes.len() {
+                    if bytes[end] == b'\r' && bytes.get(end + 1) == Some(&b'\n') {
+                        end += 2;
+                    } else {
+                        end += 1;
+                    }
+                }
+                let line = &source[start..end];
+                #(#cached_markers)*
+                #line
+                start = end;
+            }
+            #finish
+            events.push(TreeEvent::FinishNode);
+            events
+        }
+    })
+}
+
+fn validate_event_function(function: &EventFunctionIr) -> Result<(), CompileError> {
+    if function.schema != EVENT_FUNCTION_IR_SCHEMA {
+        return Err(CompileError::Schema(function.schema.clone()));
+    }
+    if !function.parser_digest.starts_with("sha256:")
+        || function.parser_digest.len() != 71
+        || !function.parser_digest[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(CompileError::Schema(function.parser_digest.clone()));
+    }
+    Ok(())
+}
+
+fn compile_event_helpers(function: &EventFunctionIr) -> Result<Vec<TokenStream>, CompileError> {
+    let helper_arities = function
+        .helpers
+        .iter()
+        .map(|helper| (helper.name.as_str(), helper.parameters.len()))
+        .collect::<BTreeMap<_, _>>();
+    if helper_arities.len() != function.helpers.len() {
+        return Err(CompileError::Schema("duplicate event helper name".into()));
+    }
+    validate_helper_calls(&function.line, &helper_arities)?;
+    validate_helper_calls(&function.finish, &helper_arities)?;
+    let mut dependencies = BTreeMap::new();
+    for helper in &function.helpers {
+        validate_helper_calls(&helper.body, &helper_arities)?;
+        let mut calls = BTreeSet::new();
+        collect_helper_calls(&helper.body, &mut calls);
+        dependencies.insert(helper.name.clone(), calls);
+    }
+    let mut active = BTreeSet::new();
+    let mut completed = BTreeSet::new();
+    for name in dependencies.keys() {
+        validate_helper_acyclic(name, &dependencies, &mut active, &mut completed)?;
+    }
+    function
+        .helpers
+        .iter()
+        .map(compile_event_helper)
+        .collect::<Result<Vec<_>, _>>()
+}
+
+fn compile_marker_cache(statements: &[EventStatementIr]) -> Result<Vec<TokenStream>, CompileError> {
+    let mut markers = BTreeSet::new();
+    collect_line_markers(statements, &mut markers);
+    markers
+        .into_iter()
+        .map(|(marker, separator)| {
+            let name = marker_name(marker, separator)?;
+            Ok(quote! {
+                let #name = {
+                    let run = line.as_bytes().iter().take_while(|byte| **byte == #marker).count();
+                    if run > 0 && line.as_bytes().get(run) == Some(&#separator) {
+                        run
+                    } else {
+                        0
+                    }
+                };
+            })
+        })
+        .collect()
+}
+
+fn marker_name(marker: u8, separator: u8) -> Result<syn::Ident, CompileError> {
+    Ok(syn::parse_str(&format!(
+        "__event_marker_{marker}_{separator}"
+    ))?)
+}
+
+fn line_index_name(name: &str) -> Result<syn::Ident, CompileError> {
+    let name = syn::parse_str::<syn::Ident>(name)?;
+    Ok(syn::parse_str(&format!("__event_index_{name}"))?)
+}
+
+fn compile_statements(
+    statements: &[EventStatementIr],
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
+    let tokens = statements
+        .iter()
+        .map(|statement| compile_statement(statement, in_helper))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(quote! { #(#tokens)* })
+}
+
+fn compile_statement(
+    statement: &EventStatementIr,
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
+    Ok(match statement {
+        EventStatementIr::LetBool { .. }
+        | EventStatementIr::LetUsize { .. }
+        | EventStatementIr::LetUsizeStack { .. }
+        | EventStatementIr::SetBool { .. }
+        | EventStatementIr::SetUsize { .. } => compile_state_statement(statement)?,
+        EventStatementIr::CloseThroughLevel { stack, level } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            let level = compile_usize(level)?;
+            quote! {
+                while #stack.last().is_some_and(|&open| open >= #level) {
+                    let _ = #stack.pop();
+                    events.push(TreeEvent::FinishNode);
+                }
+            }
+        }
+        EventStatementIr::OpenLevel {
+            stack,
+            level,
+            syntax_kind,
+        } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            let level = compile_usize(level)?;
+            quote! {
+                events.push(TreeEvent::StartNode(#syntax_kind));
+                #stack.push(#level);
+            }
+        }
+        EventStatementIr::CloseAllLevels { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            quote! {
+                while #stack.pop().is_some() {
+                    events.push(TreeEvent::FinishNode);
+                }
+            }
+        }
+        EventStatementIr::StartNode { syntax_kind } => {
+            quote! { events.push(TreeEvent::StartNode(#syntax_kind)); }
+        }
+        EventStatementIr::Token {
+            syntax_kind,
+            start,
+            end,
+        } => compile_token_statement(*syntax_kind, start, end, in_helper)?,
+        EventStatementIr::FinishNode => quote! { events.push(TreeEvent::FinishNode); },
+        EventStatementIr::If {
+            condition,
+            consequent,
+            alternate,
+        } => compile_if_statement(condition, consequent, alternate, in_helper)?,
+        EventStatementIr::JoinOnce {
+            handled,
+            branches,
+            continuation,
+        } => compile_join_once(handled, branches, continuation, in_helper)?,
+        EventStatementIr::ForLineBytes {
+            index,
+            from,
+            until,
+            body,
+        } => compile_line_byte_loop(index, from, until, body, in_helper)?,
+        EventStatementIr::WithSourceBounds { from, until, body } => {
+            compile_source_bounds(from, until, body, in_helper)?
+        }
+        EventStatementIr::CallSourceHelper {
+            name,
+            from,
+            until,
+            arguments,
+        } => compile_source_helper_call(name, from, until, arguments, in_helper)?,
+        EventStatementIr::ScanListMarker { marker } => compile_scan_list_marker(marker)?,
+        EventStatementIr::PushFrame { .. } | EventStatementIr::PopFrame { .. } => {
+            compile_stack_statement(statement)?
+        }
+        EventStatementIr::CloseFrame {
+            stack,
+            finish_count,
+        } => compile_close_frame(stack, *finish_count)?,
+        EventStatementIr::CloseFramesWhile {
+            stack,
+            condition,
+            finish_count,
+        } => compile_close_frames_while(stack, condition, *finish_count)?,
+        EventStatementIr::CloseAllFrames {
+            stack,
+            finish_count,
+        } => compile_close_all_frames(stack, *finish_count)?,
+    })
+}
+
+fn compile_source_helper_call(
+    name: &str,
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    arguments: &[EventUsizeIr],
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
+    let name = helper_ident(name)?;
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let arguments = arguments
+        .iter()
+        .map(compile_usize)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(if in_helper {
+        quote! { #name(source, &mut *events, #from, #until, #(#arguments),*); }
+    } else {
+        quote! { #name(source, &mut events, #from, #until, #(#arguments),*); }
+    })
+}
+
+fn compile_stack_statement(statement: &EventStatementIr) -> Result<TokenStream, CompileError> {
+    match statement {
+        EventStatementIr::PushFrame { stack, value } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            let value = compile_usize(value)?;
+            Ok(quote! { #stack.push(#value); })
+        }
+        EventStatementIr::PopFrame { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            Ok(quote! { let _ = #stack.pop(); })
+        }
+        _ => Err(CompileError::Schema("expected stack statement".into())),
+    }
+}
+
+fn compile_line_byte_loop(
+    index: &str,
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    body: &[EventStatementIr],
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
+    let index = line_index_name(index)?;
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let body = compile_statements(body, in_helper)?;
+    Ok(quote! {
+        let iteration_from = #from;
+        let iteration_until = #until;
+        if iteration_from >= start && iteration_from <= iteration_until
+            && iteration_until <= end {
+            for #index in iteration_from..iteration_until { #body }
+        }
+    })
+}
+
+fn compile_source_bounds(
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    body: &[EventStatementIr],
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let cached_markers = compile_marker_cache(body)?;
+    let body = compile_statements(body, in_helper)?;
+    Ok(quote! {
+        let bounds_from = #from;
+        let bounds_until = #until;
+        if let Some(line) = source.get(bounds_from..bounds_until) {
+            let start = bounds_from;
+            let end = bounds_until;
+            #(#cached_markers)*
+            #body
+        }
+    })
+}
+
+fn helper_ident(name: &str) -> Result<syn::Ident, CompileError> {
+    let name = syn::parse_str::<syn::Ident>(name)?;
+    Ok(syn::parse_str(&format!("__event_helper_{name}"))?)
+}
+
+fn validate_helper_calls(
+    statements: &[EventStatementIr],
+    arities: &BTreeMap<&str, usize>,
+) -> Result<(), CompileError> {
+    for statement in statements {
+        match statement {
+            EventStatementIr::CallSourceHelper {
+                name, arguments, ..
+            } if arities.get(name.as_str()) != Some(&arguments.len()) => {
+                return Err(CompileError::Schema(format!(
+                    "unknown event helper or argument arity: {name}"
+                )));
+            }
+            EventStatementIr::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                validate_helper_calls(consequent, arities)?;
+                validate_helper_calls(alternate, arities)?;
+            }
+            EventStatementIr::JoinOnce {
+                branches,
+                continuation,
+                ..
+            } => {
+                validate_helper_calls(branches, arities)?;
+                validate_helper_calls(continuation, arities)?;
+            }
+            EventStatementIr::ForLineBytes { body, .. }
+            | EventStatementIr::WithSourceBounds { body, .. } => {
+                validate_helper_calls(body, arities)?;
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn collect_helper_calls(statements: &[EventStatementIr], calls: &mut BTreeSet<String>) {
+    for statement in statements {
+        match statement {
+            EventStatementIr::CallSourceHelper { name, .. } => {
+                calls.insert(name.clone());
+            }
+            EventStatementIr::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                collect_helper_calls(consequent, calls);
+                collect_helper_calls(alternate, calls);
+            }
+            EventStatementIr::JoinOnce {
+                branches,
+                continuation,
+                ..
+            } => {
+                collect_helper_calls(branches, calls);
+                collect_helper_calls(continuation, calls);
+            }
+            EventStatementIr::ForLineBytes { body, .. }
+            | EventStatementIr::WithSourceBounds { body, .. } => {
+                collect_helper_calls(body, calls);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn validate_helper_acyclic(
+    name: &str,
+    dependencies: &BTreeMap<String, BTreeSet<String>>,
+    active: &mut BTreeSet<String>,
+    completed: &mut BTreeSet<String>,
+) -> Result<(), CompileError> {
+    if completed.contains(name) {
+        return Ok(());
+    }
+    if !active.insert(name.to_owned()) {
+        return Err(CompileError::Schema(format!(
+            "recursive event helper: {name}"
+        )));
+    }
+    for dependency in &dependencies[name] {
+        validate_helper_acyclic(dependency, dependencies, active, completed)?;
+    }
+    active.remove(name);
+    completed.insert(name.to_owned());
+    Ok(())
+}
+
+fn compile_event_helper(helper: &EventHelperIr) -> Result<TokenStream, CompileError> {
+    if helper.initial.iter().any(|statement| {
+        !matches!(
+            statement,
+            EventStatementIr::LetBool { .. }
+                | EventStatementIr::LetUsize { .. }
+                | EventStatementIr::LetUsizeStack { .. }
+        )
+    }) {
+        return Err(CompileError::Schema(
+            "event helper initial state must be declarations".into(),
+        ));
+    }
+    if !compile_future_cache_declarations(&[&helper.body])?.is_empty() {
+        return Err(CompileError::Schema(
+            "event helpers do not admit future-line searches".into(),
+        ));
+    }
+    let name = helper_ident(&helper.name)?;
+    let (parameters, initial) = compile_helper_parameters(helper)?;
+    let cached_markers = compile_marker_cache(&helper.body)?;
+    let body = compile_statements(&helper.body, true)?;
+    let body_syntax = syn::parse2::<syn::Block>(quote! {{ #body }})?;
+    let mut source_bytes = SourceBytesUse::default();
+    source_bytes.visit_block(&body_syntax);
+    let bytes = source_bytes
+        .found
+        .then(|| quote! { let bytes = source.as_bytes(); });
+    Ok(quote! {
+        fn #name(source: &str, events: &mut Vec<TreeEvent>,
+                 bounds_from: usize, bounds_until: usize,
+                 #(#parameters),*) {
+            #bytes
+            if let Some(line) = source.get(bounds_from..bounds_until) {
+                let _ = line;
+                let start = bounds_from;
+                let end = bounds_until;
+                #initial
+                #(#cached_markers)*
+                #body
+            }
+        }
+    })
+}
+
+#[derive(Default)]
+struct SourceBytesUse {
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for SourceBytesUse {
+    fn visit_expr_path(&mut self, path: &'ast syn::ExprPath) {
+        self.found |= path.path.is_ident("bytes");
+    }
+}
+
+fn compile_if_statement(
+    condition: &EventPredicateIr,
+    consequent: &[EventStatementIr],
+    alternate: &[EventStatementIr],
+    in_helper: bool,
+) -> Result<TokenStream, CompileError> {
+    let condition = compile_predicate(condition)?;
+    let consequent = compile_statements(consequent, in_helper)?;
+    if alternate.is_empty() {
+        return Ok(quote! { if #condition { #consequent } });
+    }
+    if let [
+        EventStatementIr::If {
+            condition: next_condition,
+            consequent: next_consequent,
+            alternate: next_alternate,
+        },
+    ] = alternate
+    {
+        let next =
+            compile_if_statement(next_condition, next_consequent, next_alternate, in_helper)?;
+        return Ok(quote! { if #condition { #consequent } else #next });
+    }
+    let alternate = compile_statements(alternate, in_helper)?;
+    Ok(quote! { if #condition { #consequent } else { #alternate } })
+}
+
+fn compile_offset(offset: &EventOffsetIr) -> Result<TokenStream, CompileError> {
+    Ok(match offset {
+        EventOffsetIr::Boundary(EventBoundaryIr::Start) => quote! { start },
+        EventOffsetIr::Boundary(EventBoundaryIr::End) => quote! { end },
+        EventOffsetIr::Computed(EventComputedOffsetIr::LinePrefixEnd { value }) => {
+            let bytes = value.len();
+            quote! { start.saturating_add(#bytes).min(end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineSkipHorizontal { from }) => {
+            let from = compile_offset(from)?;
+            quote! { __event_skip_horizontal(bytes, end, #from) }
+        }
+        EventOffsetIr::Computed(
+            scan @ (EventComputedOffsetIr::LineScanWord { .. }
+            | EventComputedOffsetIr::LineScanKey { .. }
+            | EventComputedOffsetIr::LineScanNonspaceUntil { .. }
+            | EventComputedOffsetIr::LineScanUntil { .. }),
+        ) => compile_scan_offset(scan)?,
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineStep { from }) => {
+            let mut base = from.as_ref();
+            let mut steps = 1usize;
+            while let EventOffsetIr::Computed(EventComputedOffsetIr::LineStep { from }) = base {
+                base = from.as_ref();
+                steps += 1;
+            }
+            let base = compile_offset(base)?;
+            quote! { (#base).saturating_add(#steps).min(end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LinePhysicalEnd { from }) => {
+            let from = compile_offset(from)?;
+            quote! { __event_line_physical_end(bytes, start, end, #from) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEnd) => {
+            quote! { __event_trim_whitespace_end(bytes, start, end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineTrimEndFrom { from }) => {
+            let from = compile_offset(from)?;
+            quote! { __event_trim_whitespace_end(bytes, #from, end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineContentEnd) => {
+            quote! { __event_line_content_end(bytes, start, end) }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineIndex { name }) => {
+            let name = line_index_name(name)?;
+            quote! { #name }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::StateOffset { name }) => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            quote! { #name }
+        }
+        EventOffsetIr::Computed(EventComputedOffsetIr::LineMarkerEnd { marker, separator }) => {
+            let name = marker_name(*marker, *separator)?;
+            quote! { start + #name }
+        }
+    })
+}
+
+fn compile_scan_offset(scan: &EventComputedOffsetIr) -> Result<TokenStream, CompileError> {
+    Ok(match scan {
+        EventComputedOffsetIr::LineScanWord { from } => {
+            let from = compile_offset(from)?;
+            quote! { __event_scan_word(bytes, end, #from) }
+        }
+        EventComputedOffsetIr::LineScanKey { from } => {
+            let from = compile_offset(from)?;
+            quote! { __event_scan_key(bytes, end, #from) }
+        }
+        EventComputedOffsetIr::LineScanNonspaceUntil { from, delimiter } => {
+            let from = compile_offset(from)?;
+            quote! { __event_scan_nonspace_until(bytes, end, #from, #delimiter) }
+        }
+        EventComputedOffsetIr::LineScanUntil { from, delimiter } => {
+            let from = compile_offset(from)?;
+            quote! { __event_scan_until(bytes, end, #from, #delimiter) }
+        }
+        _ => unreachable!("compile_scan_offset is only called for scan offsets"),
+    })
+}
+
+fn compile_predicate(predicate: &EventPredicateIr) -> Result<TokenStream, CompileError> {
+    Ok(match predicate {
+        EventPredicateIr::Bool { value } => quote! { #value },
+        EventPredicateIr::State { name } => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            quote! { #name }
+        }
+        EventPredicateIr::UsizePositive { value } => {
+            let value = compile_usize(value)?;
+            quote! { (#value) > 0 }
+        }
+        EventPredicateIr::UsizeEqual { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left) == (#right) }
+        }
+        EventPredicateIr::UsizeNotEqual { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left) != (#right) }
+        }
+        EventPredicateIr::UsizeGreater { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left) > (#right) }
+        }
+        EventPredicateIr::OffsetLess { left, right } => {
+            let left = compile_offset(left)?;
+            let right = compile_offset(right)?;
+            quote! { (#left) < (#right) }
+        }
+        EventPredicateIr::StackNonempty { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            quote! { !#stack.is_empty() }
+        }
+        EventPredicateIr::LineStartsWith { .. }
+        | EventPredicateIr::LineStartsWithAsciiCaseInsensitive { .. }
+        | EventPredicateIr::LinePrefixBoundaryAsciiCaseInsensitive { .. }
+        | EventPredicateIr::LineMarkerAsciiCaseInsensitive { .. }
+        | EventPredicateIr::LineBlank
+        | EventPredicateIr::LineHasWordAfterPrefix { .. }
+        | EventPredicateIr::LineHasKeyAfterPrefix { .. } => compile_line_predicate(predicate),
+        EventPredicateIr::FutureLineMarkerBeforeBoundary { .. } => {
+            compile_future_predicate(predicate)?
+        }
+        EventPredicateIr::FutureHeadingTitle { .. } => compile_future_heading_title(predicate)?,
+        EventPredicateIr::FutureNamedLineMarkerBeforeBoundary { .. } => {
+            compile_future_named_marker(predicate)?
+        }
+        EventPredicateIr::LineByteEqual { at, value } => compile_line_byte_equal(at, *value)?,
+        EventPredicateIr::LineBytesAllIn {
+            from,
+            until,
+            values,
+        } => compile_line_byte_set(from, until, values, true)?,
+        EventPredicateIr::LineBytesAnyIn {
+            from,
+            until,
+            values,
+        } => compile_line_byte_set(from, until, values, false)?,
+        EventPredicateIr::LineBytesInSet {
+            from,
+            until,
+            values,
+        } => compile_line_bytes_in_set(from, until, values)?,
+        EventPredicateIr::SourceSlicesEqual {
+            left_from,
+            left_until,
+            right_from,
+            right_until,
+            ascii_case_insensitive,
+        } => compile_source_slices_equal(
+            left_from,
+            left_until,
+            right_from,
+            right_until,
+            *ascii_case_insensitive,
+        )?,
+        EventPredicateIr::Not { value } => {
+            let value = compile_predicate(value)?;
+            quote! { !(#value) }
+        }
+        EventPredicateIr::And { left, right } => {
+            let left = compile_predicate(left)?;
+            let right = compile_predicate(right)?;
+            quote! { (#left) && (#right) }
+        }
+        EventPredicateIr::Or { left, right } => {
+            let left = compile_predicate(left)?;
+            let right = compile_predicate(right)?;
+            quote! { (#left) || (#right) }
+        }
+    })
+}
+
+fn compile_line_predicate(predicate: &EventPredicateIr) -> TokenStream {
+    match predicate {
+        EventPredicateIr::LineStartsWith { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! { line.starts_with(#value) }
+        }
+        EventPredicateIr::LineStartsWithAsciiCaseInsensitive { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(#value))
+            }
+        }
+        EventPredicateIr::LinePrefixBoundaryAsciiCaseInsensitive { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .is_some_and(|_| line.as_bytes().get(#value.len())
+                        .is_none_or(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')))
+            }
+        }
+        EventPredicateIr::LineMarkerAsciiCaseInsensitive { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .is_some_and(|_| line.as_bytes()[#value.len()..]
+                        .iter().all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')))
+            }
+        }
+        EventPredicateIr::LineBlank => {
+            quote! { line.as_bytes().iter().all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')) }
+        }
+        EventPredicateIr::LineHasWordAfterPrefix { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .and_then(|_| line.as_bytes()[#value.len()..]
+                        .iter().find(|byte| !matches!(byte, b' ' | b'\t')))
+                    .is_some_and(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+            }
+        }
+        EventPredicateIr::LineHasKeyAfterPrefix { value } => {
+            let value = syn::LitStr::new(value, proc_macro2::Span::call_site());
+            quote! {
+                line.get(..#value.len())
+                    .filter(|prefix| prefix.eq_ignore_ascii_case(#value))
+                    .is_some_and(|_| {
+                        let mut cursor = #value.len();
+                        while cursor < line.len() && (bytes[start + cursor].is_ascii_alphanumeric()
+                            || matches!(bytes[start + cursor], b'_' | b'-')) {
+                            cursor += 1;
+                        }
+                        cursor > #value.len() && bytes.get(start + cursor) == Some(&b':')
+                    })
+            }
+        }
+        _ => unreachable!("compile_line_predicate only receives line predicates"),
+    }
+}
+
+fn compile_line_byte_equal(at: &EventOffsetIr, value: u8) -> Result<TokenStream, CompileError> {
+    let at = compile_offset(at)?;
+    Ok(quote! {{
+        let at = #at;
+        at >= start && at < end && bytes.get(at) == Some(&#value)
+    }})
+}
+
+fn compile_line_byte_set(
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    values: &[u8],
+    all: bool,
+) -> Result<TokenStream, CompileError> {
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    if values.len() >= 16 {
+        let mut mask = [0u64; 4];
+        for &value in values {
+            mask[usize::from(value / 64)] |= 1u64 << (value % 64);
+        }
+        let helper = if all {
+            quote! { __event_all_bytes_in_mask }
+        } else {
+            quote! { __event_any_byte_in_mask }
+        };
+        return Ok(quote! {
+            #helper(bytes, start, end, #from, #until, [#(#mask),*])
+        });
+    }
+    let helper = if all {
+        quote! { __event_all_bytes_in }
+    } else {
+        quote! { __event_any_byte_in }
+    };
+    Ok(quote! {
+        #helper(bytes, start, end, #from, #until, &[#(#values),*])
+    })
+}
+
+fn compile_line_bytes_in_set(
+    from: &EventOffsetIr,
+    until: &EventOffsetIr,
+    values: &[String],
+) -> Result<TokenStream, CompileError> {
+    if values.is_empty()
+        || values
+            .iter()
+            .any(|value| value.is_empty() || !value.is_ascii())
+        || values.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(CompileError::Schema(
+            "line byte name set must be nonempty, ASCII, sorted, and unique".into(),
+        ));
+    }
+    let from = compile_offset(from)?;
+    let until = compile_offset(until)?;
+    let names = values
+        .iter()
+        .map(|value| syn::LitByteStr::new(value.as_bytes(), proc_macro2::Span::call_site()));
+    Ok(quote! {{
+        let from = #from;
+        let until = #until;
+        const NAMES: &[&[u8]] = &[#(#names),*];
+        from >= start && from <= until && until <= end
+            && bytes.get(from..until).is_some_and(|slice| NAMES.binary_search(&slice).is_ok())
+    }})
+}
+
+fn compile_source_slices_equal(
+    left_from: &EventOffsetIr,
+    left_until: &EventOffsetIr,
+    right_from: &EventOffsetIr,
+    right_until: &EventOffsetIr,
+    ascii_case_insensitive: bool,
+) -> Result<TokenStream, CompileError> {
+    let left_from = compile_offset(left_from)?;
+    let left_until = compile_offset(left_until)?;
+    let right_from = compile_offset(right_from)?;
+    let right_until = compile_offset(right_until)?;
+    let compare = if ascii_case_insensitive {
+        quote! { left.eq_ignore_ascii_case(right) }
+    } else {
+        quote! { left == right }
+    };
+    Ok(quote! {{
+        let left_from = #left_from;
+        let left_until = #left_until;
+        let right_from = #right_from;
+        let right_until = #right_until;
+        left_from <= left_until && right_from <= right_until
+            && bytes.get(left_from..left_until).zip(bytes.get(right_from..right_until))
+                .is_some_and(|(left, right)| #compare)
+    }})
+}
+
+fn compile_usize(value: &EventUsizeIr) -> Result<TokenStream, CompileError> {
+    Ok(match value {
+        EventUsizeIr::Usize { value } => quote! { #value },
+        EventUsizeIr::State { name } => {
+            let name = syn::parse_str::<syn::Ident>(name)?;
+            quote! { #name }
+        }
+        EventUsizeIr::LineMarkerLevel { marker, separator } => {
+            let name = marker_name(*marker, *separator)?;
+            quote! { #name }
+        }
+        EventUsizeIr::Offset { value } => compile_offset(value)?,
+        EventUsizeIr::LineIndentColumn { tab_width } => {
+            if *tab_width == 0 {
+                return Err(CompileError::Schema("tab width must be positive".into()));
+            }
+            quote! {{
+                let mut cursor = start;
+                let mut column = 0usize;
+                while cursor < end && matches!(bytes[cursor], b' ' | b'\t') {
+                    if bytes[cursor] == b'\t' {
+                        column = (column / #tab_width + 1) * #tab_width;
+                    } else {
+                        column += 1;
+                    }
+                    cursor += 1;
+                }
+                column
+            }}
+        }
+        EventUsizeIr::StackTop { stack } => {
+            let stack = syn::parse_str::<syn::Ident>(stack)?;
+            quote! { #stack.last().copied().unwrap_or(0) }
+        }
+        EventUsizeIr::Add { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left).saturating_add(#right) }
+        }
+        EventUsizeIr::Multiply { left, right } => {
+            let left = compile_usize(left)?;
+            let right = compile_usize(right)?;
+            quote! { (#left).saturating_mul(#right) }
+        }
+        EventUsizeIr::Divide { left, right } => {
+            let left = compile_usize(left)?;
+            match right.as_ref() {
+                EventUsizeIr::Usize { value } if *value > 0 => quote! { (#left) / #value },
+                _ => {
+                    let right = compile_usize(right)?;
+                    quote! { (#left) / (#right).max(1) }
+                }
+            }
+        }
+    })
+}

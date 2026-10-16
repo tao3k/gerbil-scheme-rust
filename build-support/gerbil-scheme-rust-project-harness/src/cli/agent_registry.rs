@@ -245,7 +245,7 @@ fn agent_registry_json(project_root: &Path) -> Value {
                 { "path": "schemas/semantic-evidence-graph.v1.schema.json", "schemaId": "agent.semantic-protocols.semantic-evidence-graph", "schemaVersion": "1" },
                 { "path": "schemas/semantic-assurance-case.v1.schema.json", "schemaId": "agent.semantic-protocols.semantic-assurance-case", "schemaVersion": "1" },
                 { "path": "schemas/semantic-handle.v1.schema.json", "schemaId": "agent.semantic-protocols.semantic-handle", "schemaVersion": "1" },
-                { "path": "schemas/semantic-native-syntax-fact-index.v1.schema.json", "schemaId": "agent.semantic-protocols.semantic-native-syntax-fact-index", "schemaVersion": "1" },
+                { "path": "schemas/semantic-syntax-fact-index.v1.schema.json", "schemaId": "agent.semantic-protocols.semantic-native-syntax-fact-index", "schemaVersion": "1" },
                 { "path": "schemas/semantic-ast-patch.v1.schema.json", "schemaId": "agent.semantic-protocols.semantic-ast-patch", "schemaVersion": "1" },
                 { "path": "schemas/semantic-ast-patch-receipt.v1.schema.json", "schemaId": "agent.semantic-protocols.semantic-ast-patch-receipt", "schemaVersion": "1" },
                 { "schemaId": "agent.semantic-protocols.rust-ast-patch-real-project-evidence", "schemaVersion": "1", "path": "schemas/rust-ast-patch-real-project-evidence.v1.schema.json" },

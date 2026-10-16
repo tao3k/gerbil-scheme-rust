@@ -1,0 +1,156 @@
+#+title: Private injection-lock and owner receive timing
+
+* Scope and frozen production checkout
+
+Baseline: =fbb43ca63d3740cb4e19b26fa2abd1ea3ee4ecdb=, existing PR #18.
+The installed SDK, kernel, encoder and production dependency revisions are
+unchanged. The production checkout has no Tokio patch. Instrumentation
+exists only in an isolated archive of that commit and a copy of the
+already-cached official Tokio 1.53.1 source. No SDK download or rebuild.
+
+This is a rotating-input UTF-8 bridge qualification, NOT Org parsing,
+Scheme parallel parsing or SMP admission. The workloads remain closed-loop
+with 12 host workers, 24 callers, bounded capacity 12 and one Scheme owner.
+The candidate changes task granularity, not machine/worker counts.
+
+* Direct source probes and their limits
+
+=runtime/scheduler/multi_thread/worker.rs::push_remote_task= is instrumented
+at lock request, acquisition and immediately before unlock. Five atomic
+statistics record count, total request-to-acquisition ns, total
+acquisition-to-before-unlock ns and cumulative maxima. Statistic updates
+execute AFTER releasing the guard. No additional lock guards the probe.
+Wait includes lock acquisition CPU and any preemption; hold includes the
+timestamp read and any preemption while holding the lock. Neither is a
+pure uncontended instruction-cycle measurement. Unlock and parked-worker
+notification are outside the measured hold interval. Other acquisitions
+of =shared.synced= (e.g. dequeue/idle management) are not directly probed.
+
+The original official worker source SHA-256 is
+=b7860cfa69f197eb52f3374a1cf0fe6adc2ff82a6971d8d27985fea65c08d94c=.
+[[file:benchmarks/20261011-private-injection-lock-probe.patch][The isolated diagnostic patch]] contains the exact source probe,
+owner timing, manifest override and Justfile entry. To reproduce, create
+an archive as =repo/= beside the cached source copy as =tokio/=, apply the
+patch from their parent and run =just bridge-lock-profile= inside =repo/=.
+The isolated lockfile resolves offline; it never replaces the production
+lockfile. Reverse =git apply --check= validated the archived instrumentation.
+
+Owner receive wall time brackets =blocking_recv= only. Native
+=CLOCK_THREAD_CPUTIME_ID= reads bracket that operation, without process
+statistics or Scheme GC reads. The CPU window also contains the wall clock
+reads, so very short intervals can have CPU greater than measured wall.
+Raw CPU and wall totals remain separate; wall-minus-CPU is published only
+for explicitly counted comparable intervals. It is NOT summed with lock
+wait: receive includes capacity-return wake work, so intervals overlap.
+Receive intervals starting before the batch's epoch are excluded to avoid
+counting report generation and interbatch idle time as request waiting.
+
+An initial build failed on a diagnostic module path, then was corrected.
+The first executed probe's CPU window included =getrusage= and was invalid
+for receive attribution; it was stopped, retained as an invalid receipt,
+and replaced by a complete run using direct thread CPU clocks. These are
+not accepted samples. The valid baseline diagnostic completed all 420
+batches: seven corpora, three loads, 20 batches per load, 15,540,000 requests.
+[[file:benchmarks/20261011-private-injection-lock-profile.log][Complete valid baseline probe]].
+
+For mixed text, weighted diagnostic means are:
+
+| Requests/batch | Injection events/request | Lock request-to-acquire (µs/event) | Lock hold (µs/event) | Owner receive wall (µs/receive) | Owner receive CPU (µs/receive) |
+|----------------+--------------------------+------------------------------------+----------------------+---------------------------------+--------------------------------|
+| 1,000 | 2.0064 | 0.301190 | 0.054133 | 1.316193 | 0.876446 |
+| 10,000 | 1.9948 | 0.507623 | 0.052185 | 5.488933 | 0.891381 |
+| 100,000 | 1.9963 | 0.358844 | 0.056695 | 2.860260 | 0.852333 |
+
+These are instrumented diagnostic observations, not unprobed latency
+claims. Small average hold time does not rule out long stalls: cumulative
+maxima and per-batch owner receive P95/P99 are in the raw log. Approximately
+two injection events/request do not mean precisely two wakes/request:
+initial task submissions and task-state wake coalescing also contribute.
+Shared diagnostic peak RSS is 78,708,736 bytes; the probe discards each
+batch rather than retaining both 20-batch variant histories.
+
+* Source-guided coalescing candidate, not a new scheduler
+
+Tokio =runtime/task/state.rs:253-279= coalesces notifications of already
+notified/running tasks; idle independent caller tasks require separate
+remote submissions. Official =futures-util 0.3.34=,
+=stream/futures_unordered/task.rs:102-126=, queues a ready child only once
+and wakes its parent. This existing ecosystem implementation can expose
+many independently pending calls through one normally scheduled task.
+
+The candidate uses one =tokio::spawn= coordinator on a host worker, with
+24 independent caller futures in =FuturesUnordered= instead of 24 spawned
+caller tasks. Same bounded mpsc, same one-per-request oneshot, same owner,
+same per-caller sequential requests and changing payloads. It does not
+poll callers on =Runtime::block_on='s external calling thread. Replies are
+processed when ready, not retained for a response batch. No hand-written
+ready queue, wake protocol, thread-affinity workaround or unsafe Scheme
+cross-thread sharing is introduced. Both modes use the same caller body
+and disable per-request CPU/GC/wake observers during acceptance.
+
+* Complete uninstrumented acceptance and rollback
+
+=just bridge-utf8-matched --scheduling-audit all= completed 840 batches,
+31,080,000 requests, seven character distributions, three loads, 20 batches
+PER variant/load and ten ABBA groups. Exact pooled request P95/P99 cover
+admission, queue, service and response. Paired median ratios gate wall and
+each tail independently; a favorable aggregate does not override failure.
+Actor/AOT Clippy passed before timing. [[file:benchmarks/20261011-coalescing-abba.log][Full acceptance log]].
+
+The candidate failed 51 of 189 paired metric gates: REJECTED. Benchmark
+source, both manifests and the complete lockfile are restored exactly to
+the frozen baseline. [[file:benchmarks/20261011-coalescing-rejected.patch][Rejected code and dependency patch]] is evidence, not an active
+production feature. An initial unused diagnostic field lint failure was
+corrected without adding a lint exemption; its failed receipt is retained.
+
+Illustrative ASCII results, control / rejected candidate:
+
+| Requests/batch | Mean batch wall (ms) | Response P95 (µs) | Response P99 (µs) | Throughput (requests/s) |
+|----------------+----------------------+-------------------+-------------------+-------------------------|
+| 1,000 | 3.784 / 2.886 | 165.125 / 115.833 | 254.209 / 236.042 | 264,268 / 346,453 |
+| 10,000 | 50.072 / 48.643 | 241.958 / 320.709 | 1,115.167 / 1,067.959 | 199,714 / 205,578 |
+| 100,000 | 515.229 / 433.500 | 221.750 / 159.875 | 637.625 / 372.459 | 194,088 / 230,680 |
+
+Mean batch walls above are derived from rounded 20-batch totals. The
+100,000-request gain does not rescue the 10,000-request P95 regression or
+other failed gates. Each accepted request still allocates a reply channel
+and owned output text. FuturesUnordered owns caller nodes; this is not
+allocation-free. Observer capacity remains 2,560,000 / 25,600,000 /
+256,000,000 bytes per variant at the three loads, excluding scratch and
+Scheme heap. Shared peak RSS was 634,470,400 bytes and cannot be assigned
+exclusively to one mode. No per-mode memory saving is claimed.
+
+* Candidate lock diagnostic and final checks
+
+The isolated coalesced candidate completed all 420 batches for seven corpora,
+three loads and 20 batches. It is temporally separate from the baseline
+profile, not an ABBA speed comparison. Its role is to check injection-event
+counts and scoped lock/receive intervals; only the uninstrumented matched
+matrix above decides adoption. [[file:benchmarks/20261011-private-injection-lock-coalesced-profile.log][Complete candidate diagnostic]],
+[[file:benchmarks/20261011-private-injection-lock-coalesced-probe.patch][complete isolated candidate probe patch]]. Reverse application checks
+confirm this second archived patch matches the executed isolated sources.
+
+For mixed text, baseline / coalesced injection events/request were
+2.0064 / 0.5349 at 1,000; 1.9948 / 0.5357 at 10,000; and
+1.9963 / 0.5714 at 100,000. The candidate's request-to-acquisition / hold
+means at 100,000 were 0.199396 / 0.086127 µs/event. These separate runs
+support the expected coalescing mechanism, not a paired wall-speed claim.
+Candidate receive wall / CPU means were 2.210714 / 0.545929 µs/receive;
+their unequal windows still prohibit indiscriminate subtraction. Candidate
+diagnostic peak RSS was 78,315,520 bytes with batch-discarded observations,
+not comparable to the acceptance harness's retained-history RSS.
+
+The scoped evidence now rules out "the lock is still unmeasured" for the
+remote push interval. It does NOT explain every long response outlier or
+measure all scheduler lock sites. We have reduced remote injection events
+in a prototype, but have not admitted a general-purpose faster scheduler.
+The working checkout contains no rejected transport/dependency change.
+Post-rollback =just bridge-workspace= passed 659 tests, zero failures,
+eight existing ignored tests. =just bridge-actor-lint= and =just bridge-lint=
+passed with warnings denied. Raw receipts are
+=benchmarks/20261012-lock-owner-final-*.log=. The rejected code patch
+passes =git apply --check= against the restored checkout. Production
+source/manifests/lockfile have no diff against the frozen commit. README
+and the evidence index now point to these scoped results. Exact-head
+remote CI and downstream Org acceptance remain separate gates; no Scheme
+SMP pass or net scheduler speedup is claimed.

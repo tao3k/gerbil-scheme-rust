@@ -1,0 +1,482 @@
+diff --git a/scheme/generated/runtime.scm b/scheme/generated/runtime.scm
+index 38c2f96..fef5521 100644
+--- a/scheme/generated/runtime.scm
++++ b/scheme/generated/runtime.scm
+@@ -1,67 +1,449 @@
+-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=aab87f75d0e400309e89989e99cdad5215a0ecf67199251fd221c016d55f1ed6 body-sha256=9adf0d7a613a801bbca209667eeae5a2db6e76b2e1ec13e02ffbb95d5a40cffa
++;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=d2dbb54209d937a18b3c78eeacc42eb7dbf2d4c857d43d61f4816823e61dfd22 body-sha256=4d72acae8c0e77b0a75646b500110eb6f4a986ac25f0b3ec2dae5dd8dcb8f97e
+ (declare (block) (standard-bindings) (extended-bindings))
+ (begin
+-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1791705096)
++  (define gerbil-scheme-rust/scheme/runtime::timestamp 1791724757)
+   (begin
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
+       (lambda () '1))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-add-i64
+-      (lambda (_%left673%_ _%right674%_) (+ _%left673%_ _%right674%_)))
++      (lambda (_%left679%_ _%right680%_) (+ _%left679%_ _%right680%_)))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-is-even-i64
+-      (lambda (_%value671%_) (if (even? _%value671%_) '1 '0)))
++      (lambda (_%value677%_) (if (even? _%value677%_) '1 '0)))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-compare-i64
+-      (lambda (_%left665%_ _%right666%_)
+-        (if (< _%left665%_ _%right666%_)
++      (lambda (_%left671%_ _%right672%_)
++        (if (< _%left671%_ _%right672%_)
+             '-1
+-            (if (> _%left665%_ _%right666%_) '1 '0))))
++            (if (> _%left671%_ _%right672%_) '1 '0))))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-next-root-id '1)
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
+       (make-table 'test: eqv? 'weak-keys: '#f 'weak-values: '#f))
++    (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing
++      (let () (declare (not safe)) (##gensym 'missing-root)))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-string
+-      (lambda (_%value663%_)
+-        (if (string? _%value663%_)
++      (lambda (_%value669%_)
++        (if (string? _%value669%_)
+             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+-             _%value663%_)
++             _%value669%_)
+             '0)))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector
+-      (lambda (_%value661%_)
+-        (if (u8vector? _%value661%_)
++      (lambda (_%value667%_)
++        (if (u8vector? _%value667%_)
+             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+-             _%value661%_)
++             _%value667%_)
+             '0)))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+-      (lambda (_%value657%_)
+-        (let ((_%root-id659%_
++      (lambda (_%value663%_)
++        (let ((_%root-id665%_
+                gerbil-scheme-rust/scheme/runtime#gerbil-rs-next-root-id))
+           (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-next-root-id
+-                (+ _%root-id659%_ '1))
++                (+ _%root-id665%_ '1))
+           (let ()
+             (declare (not safe))
+             (##table-set!
+              gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
+-             _%root-id659%_
+-             _%value657%_))
+-          _%root-id659%_)))
++             _%root-id665%_
++             _%value663%_))
++          _%root-id665%_)))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
+-      (lambda (_%root-id655%_)
++      (lambda (_%root-id661%_)
+         (let ()
+           (declare (not safe))
+           (##table-ref
+            gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
+-           _%root-id655%_
+-           '#f))))
++           _%root-id661%_
++           gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing))))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!
+-      (lambda (_%root-id653%_)
+-        (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
+-             _%root-id653%_)
++      (lambda (_%root-id659%_)
++        (if (eq? (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                  _%root-id659%_)
++                 gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)
++            '#f
+             (begin
+               (let ()
+                 (declare (not safe))
+                 (##table-set!
+                  gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
+-                 _%root-id653%_))
+-              '#t)
+-            '#f)))
++                 _%root-id659%_))
++              '#t))))
++    (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-collection-view
++      (lambda (_%value653%_ _%kind654%_)
++        (let ((_%$e656%_ _%kind654%_))
++          (if (eq? '0 _%$e656%_)
++              (if (vector? _%value653%_) _%value653%_ '#f)
++              (if (eq? '1 _%$e656%_)
++                  (if (list? _%value653%_) (list->vector _%value653%_) '#f)
++                  (if (eq? '2 _%$e656%_)
++                      (if (pair? _%value653%_)
++                          (vector (let ()
++                                    (declare (not safe))
++                                    (##car _%value653%_))
++                                  (let ()
++                                    (declare (not safe))
++                                    (##cdr _%value653%_)))
++                          '#f)
++                      '#f))))))
++    (namespace
++     ("gerbil-scheme-rust/scheme/runtime#"
++      gerbil-rs-root-id-at
++      gerbil-rs-write-root-id
++      gerbil-rs-scalar-copy-c
++      gerbil-rs-object-scalar-raw
++      gerbil-rs-root-count-raw
++      gerbil-rs-force-gc-raw
++      gerbil-rs-read-limb
++      gerbil-rs-write-limb
++      gerbil-rs-object-root-raw
++      gerbil-rs-object-word-raw
++      gerbil-rs-collection-create-raw
++      gerbil-rs-collection-length-raw
++      gerbil-rs-collection-element-raw
++      gerbil-rs-collection-copy-raw
++      gerbil-rs-pair-copy
++      gerbil-rs-roots-release-raw
++      gerbil-rs-bigint-create-raw
++      gerbil-rs-bigint-size-raw
++      gerbil-rs-bigint-copy-raw
++      gerbil-rs-bigint-create-byte-control
++      gerbil-rs-bigint-copy-byte-control))
++    (define gerbil-rs-root-id-at
++      (c-lambda
++       ((pointer int64) unsigned-int64)
++       int64
++       "___return(___arg1[___arg2]);"))
++    (define gerbil-rs-write-root-id
++      (c-lambda
++       ((pointer int64) unsigned-int64 int64)
++       void
++       "___arg1[___arg2] = ___arg3;"))
++    (c-declare "#include <string.h>")
++    (define gerbil-rs-scalar-copy-c
++      (c-lambda
++       (scheme-object (pointer unsigned-int8))
++       int32
++       "___FLONUMP_DECL\n___U32 tag=0, reserved=0;\n___U64 bits=0;\nif (___arg1 == ___FAL || ___arg1 == ___TRU) { tag=1; bits=___arg1 == ___TRU; }\nelse if (___FIXNUMP(___arg1)) { tag=2; bits=(___U64)(___S64)___INT(___arg1); }\nelse if (___CHARP(___arg1)) {\n  bits=___ORD(___arg1);\n  if (bits <= 0x10ffff && !(bits >= 0xd800 && bits <= 0xdfff)) tag=3;\n} else if (___FLONUMP(___arg1)) { tag=4; double n=___F64UNBOX(___arg1); memcpy(&bits,&n,8); }\nif (tag == 0) ___return(3);\nmemcpy(___arg2,&tag,4); memcpy(___arg2+4,&reserved,4); memcpy(___arg2+8,&bits,8);\n___return(0);"))
++    (c-define
++     (gerbil-rs-object-scalar-raw root output)
++     (int64 (pointer unsigned-int8))
++     int32
++     "gerbil_scheme_rust_object_scalar_raw"
++     "extern"
++     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-scalar-copy-c
++      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)
++      output))
++    (define gerbil-rs-read-limb
++      (c-lambda
++       ((pointer unsigned-int8) unsigned-int64 unsigned-int64)
++       unsigned-int64
++       "___U64 n=0; for (___U64 i=0;i<___arg3;i++) n |= (___U64)___arg1[___arg2+i] << (i*8); ___return(n);"))
++    (define gerbil-rs-write-limb
++      (c-lambda
++       ((pointer unsigned-int8) unsigned-int64 unsigned-int64 unsigned-int64)
++       void
++       "for (___U64 i=0;i<___arg3;i++) ___arg1[___arg2+i] = (___U8)(___arg4 >> (i*8));"))
++    (c-define
++     (gerbil-rs-object-root-raw value)
++     (scheme-object)
++     int64
++     "gerbil_scheme_rust_object_root_raw"
++     "extern"
++     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! value))
++    (c-define
++     (gerbil-rs-object-word-raw root)
++     (int64)
++     scheme-object
++     "gerbil_scheme_rust_object_word_raw"
++     "extern"
++     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root))
++    (c-define
++     (gerbil-rs-root-count-raw)
++     ()
++     int64
++     "gerbil_scheme_rust_root_count_raw"
++     "extern"
++     (table-length gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values))
++    (c-define
++     (gerbil-rs-force-gc-raw)
++     ()
++     int32
++     "gerbil_scheme_rust_force_gc_raw"
++     "extern"
++     (##gc)
++     0)
++    (c-define
++     (gerbil-rs-collection-create-raw roots size kind)
++     ((pointer int64) unsigned-int64 int32)
++     int64
++     "gerbil_scheme_rust_collection_create_raw"
++     "extern"
++     (with-exception-catcher
++      (lambda (_exception) 0)
++      (lambda ()
++        (if (or (not (<= 0 kind 2)) (and (= kind 2) (not (= size 2))))
++            0
++            (let ((values (make-vector size)))
++              (let lp ((index 0))
++                (if (= index size)
++                    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++                     (case kind
++                       ((0) values)
++                       ((1) (vector->list values))
++                       ((2)
++                        (cons (vector-ref values 0) (vector-ref values 1)))))
++                    (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                                  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-id-at
++                                   roots
++                                   index))))
++                      (if (eq? value
++                               gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)
++                          0
++                          (begin
++                            (vector-set! values index value)
++                            (lp (+ index 1))))))))))))
++    (c-define
++     (gerbil-rs-collection-length-raw root kind)
++     (int64 int32)
++     int64
++     "gerbil_scheme_rust_collection_length_raw"
++     "extern"
++     (let ((values (gerbil-scheme-rust/scheme/runtime#gerbil-rs-collection-view
++                    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                     root)
++                    kind)))
++       (if values (vector-length values) -1)))
++    (c-define
++     (gerbil-rs-collection-element-raw root kind index)
++     (int64 int32 unsigned-int64)
++     int64
++     "gerbil_scheme_rust_collection_element_raw"
++     "extern"
++     (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                   root)))
++       (case kind
++         ((0)
++          (if (and (vector? value) (< index (vector-length value)))
++              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++               (vector-ref value index))
++              0))
++         ((1)
++          (if (and (list? value) (< index (length value)))
++              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++               (list-ref value index))
++              0))
++         ((2)
++          (if (and (pair? value) (< index 2))
++              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++               (if (= index 0) (car value) (cdr value)))
++              0))
++         (else 0))))
++    (define (gerbil-rs-pair-copy value output size)
++      (if (not (and (pair? value) (= size 2)))
++          3
++          (let ((ids (make-vector 2 0)))
++            (with-exception-catcher
++             (lambda (_exception)
++               (when (> (vector-ref ids 0) 0)
++                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!
++                  (vector-ref ids 0)))
++               (when (> (vector-ref ids 1) 0)
++                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!
++                  (vector-ref ids 1)))
++               3)
++             (lambda ()
++               (vector-set!
++                ids
++                0
++                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++                 (car value)))
++               (vector-set!
++                ids
++                1
++                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++                 (cdr value)))
++               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-write-root-id
++                output
++                0
++                (vector-ref ids 0))
++               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-write-root-id
++                output
++                1
++                (vector-ref ids 1))
++               0)))))
++    (c-define
++     (gerbil-rs-collection-copy-raw root kind output size)
++     (int64 int32 (pointer int64) unsigned-int64)
++     int32
++     "gerbil_scheme_rust_collection_copy_raw"
++     "extern"
++     (if (= kind 2)
++         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-pair-copy
++          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)
++          output
++          size)
++         (let ((values (gerbil-scheme-rust/scheme/runtime#gerbil-rs-collection-view
++                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                         root)
++                        kind)))
++           (if (not (and values (= size (vector-length values))))
++               3
++               (let ((ids (make-vector size 0)) (created 0))
++                 (with-exception-catcher
++                  (lambda (_exception)
++                    (let cleanup ((index 0))
++                      (when (< index created)
++                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!
++                         (vector-ref ids index))
++                        (cleanup (+ index 1))))
++                    3)
++                  (lambda ()
++                    (let lp ((index 0))
++                      (when (< index size)
++                        (vector-set!
++                         ids
++                         index
++                         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++                          (vector-ref values index)))
++                        (set! created (+ index 1))
++                        (lp (+ index 1))))
++                    (let publish ((index 0))
++                      (when (< index size)
++                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-write-root-id
++                         output
++                         index
++                         (vector-ref ids index))
++                        (publish (+ index 1))))
++                    0)))))))
++    (c-define
++     (gerbil-rs-roots-release-raw roots size)
++     ((pointer int64) unsigned-int64)
++     int32
++     "gerbil_scheme_rust_roots_release_raw"
++     "extern"
++     (let validate ((index 0) (previous 0))
++       (if (= index size)
++           (begin
++             (let release ((index 0))
++               (when (< index size)
++                 (table-set!
++                  gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
++                  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-id-at
++                   roots
++                   index))
++                 (release (+ index 1))))
++             0)
++           (let ((id (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-id-at
++                      roots
++                      index)))
++             (if (and (> id previous)
++                      (not (eq? (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                                 id)
++                                gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)))
++                 (validate (+ index 1) id)
++                 3)))))
++    (c-define
++     (gerbil-rs-bigint-create-raw source size negative)
++     ((pointer unsigned-int8) unsigned-int64 int32)
++     int64
++     "gerbil_scheme_rust_bigint_create_raw"
++     "extern"
++     (if (= size 1)
++         (let ((number (gerbil-scheme-rust/scheme/runtime#gerbil-rs-read-limb
++                        source
++                        0
++                        1)))
++           (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++            (if (= negative 0) number (- number))))
++         (let lp ((end size) (number 0))
++           (if (zero? end)
++               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++                (if (= negative 0) number (- number)))
++               (let* ((start (max 0 (- end 8))) (count (- end start)))
++                 (lp start
++                     (bitwise-ior
++                      (arithmetic-shift number (* count 8))
++                      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-read-limb
++                       source
++                       start
++                       count))))))))
++    (c-define
++     (gerbil-rs-bigint-size-raw root)
++     (int64)
++     int64
++     "gerbil_scheme_rust_bigint_size_raw"
++     "extern"
++     (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                   root)))
++       (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer? value)
++           (quotient (+ (integer-length (abs value)) 7) 8)
++           -1)))
++    (c-define
++     (gerbil-rs-bigint-create-byte-control source size negative)
++     ((pointer unsigned-int8) unsigned-int64 int32)
++     int64
++     "gerbil_scheme_rust_bigint_create_byte_control"
++     "extern"
++     (let lp ((end size) (number 0))
++       (if (zero? end)
++           (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
++            (if (= negative 0) number (- number)))
++           (lp (- end 1)
++               (bitwise-ior
++                (arithmetic-shift number 8)
++                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-read-limb
++                 source
++                 (- end 1)
++                 1))))))
++    (c-define
++     (gerbil-rs-bigint-copy-byte-control root output size)
++     (int64 (pointer unsigned-int8) unsigned-int64)
++     int32
++     "gerbil_scheme_rust_bigint_copy_byte_control"
++     "extern"
++     (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                   root)))
++       (if (not (and (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer?
++                      value)
++                     (= size (quotient (+ (integer-length (abs value)) 7) 8))))
++           -1
++           (begin
++             (let lp ((offset 0) (rest (abs value)))
++               (when (< offset size)
++                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-write-limb
++                  output
++                  offset
++                  1
++                  (bitwise-and rest 255))
++                 (lp (+ offset 1) (arithmetic-shift rest -8))))
++             (if (< value 0) 1 0)))))
++    (c-define
++     (gerbil-rs-bigint-copy-raw root output size)
++     (int64 (pointer unsigned-int8) unsigned-int64)
++     int32
++     "gerbil_scheme_rust_bigint_copy_raw"
++     "extern"
++     (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
++                   root)))
++       (if (not (and (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer?
++                      value)
++                     (= size (quotient (+ (integer-length (abs value)) 7) 8))))
++           -1
++           (begin
++             (if (= size 1)
++                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-write-limb
++                  output
++                  0
++                  1
++                  (abs value))
++                 (let lp ((offset 0) (rest (abs value)))
++                   (when (< offset size)
++                     (let ((count (min 8 (- size offset))))
++                       (gerbil-scheme-rust/scheme/runtime#gerbil-rs-write-limb
++                        output
++                        offset
++                        count
++                        (bitwise-and rest 18446744073709551615))
++                       (lp (+ offset count)
++                           (arithmetic-shift rest (* -8 count)))))))
++             (if (< value 0) 1 0)))))
+     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring-delimiter
+       (lambda (_%code648%_)
+         (if (= _%code648%_ '-1)

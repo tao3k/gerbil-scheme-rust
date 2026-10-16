@@ -6,7 +6,7 @@ use std::path::Path;
 
 use serde_json::{Map, Value, json};
 
-use crate::parser::native_syntax::projection_code;
+use crate::parser::syntax::projection_code;
 
 use super::semantic_query_projection::{
     projection_node_classification, projection_semantic_responsibilities,

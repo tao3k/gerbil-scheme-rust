@@ -127,7 +127,7 @@ bazel test //crates/gerbil-scheme/...
 ** Deliverables
 
 - [X] Create the minimal Gerbil package and canonical =build.ss=.
-- [X] Implement =gerbil-scheme-native-build= toolchain discovery.
+- [X] Implement =gerbil-scheme-aot-build= toolchain discovery.
 - [X] Produce a Gerbil AOT object or native archive deterministically.
 - [X] Emit link metadata consumable by Cargo and Bazel.
 - [X] Add public header/declaration drift validation.
@@ -136,7 +136,7 @@ bazel test //crates/gerbil-scheme/...
 ** Gate
 
 #+begin_src sh
-cargo test -p gerbil-scheme-native-build --locked
+cargo test -p gerbil-scheme-aot-build --locked
 bazel build //...
 bazel test //tests:real_gerbil_smoke
 #+end_src
@@ -230,7 +230,7 @@ green; a successful package dry run does not authorize publication.
 The active slice makes this repository the single upstream bindings dependency:
 
 1. parameterize archive/link/header/compiler helpers in
-   =gerbil-scheme-native-build=;
+   =gerbil-scheme-aot-build=;
 2. port generic Marlin build-support tests as provenance-recorded Scenarios;
 3. publish a pinned git revision for downstream validation without declaring a
    release;

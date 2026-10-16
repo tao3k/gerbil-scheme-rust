@@ -1,0 +1,21 @@
+diff --git a/scheme/utf8.ss b/scheme/utf8.ss
+index ec6a3df..9b90af2 100644
+--- a/scheme/utf8.ss
++++ b/scheme/utf8.ss
+@@ -90,7 +90,15 @@ const ___C *source = ___CAST(const ___C*, ___BODY_AS(str, ___tSTRING));
+ ___U64 j = output_start;
+ for (___U64 i = start; i < end; ++i) {
+   const ___U32 c = source[i];
+-  if (c <= 0x7f) output[j++] = (___U8)c;
++  if (c <= 0x7f) {
++    /* Official string.scm separates ASCII copying from width dispatch.
++       Pair only current adjacent ASCII scalars inside this bounded leaf. */
++    if (i + 1 < end && source[i + 1] <= 0x7f) {
++      output[j] = (___U8)c;
++      output[j + 1] = (___U8)source[++i];
++      j += 2;
++    } else output[j++] = (___U8)c;
++  }
+   else if (c <= 0x7ff) {
+     output[j++] = (___U8)(0xc0 | (c >> 6));
+     output[j++] = (___U8)(0x80 | (c & 0x3f));

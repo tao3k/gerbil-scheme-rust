@@ -1,0 +1,81 @@
+diff --git a/scheme/utf8.ss b/scheme/utf8.ss
+index d441c61..6e8049e 100644
+--- a/scheme/utf8.ss
++++ b/scheme/utf8.ss
+@@ -70,6 +70,29 @@ C-END
+ (begin-foreign
+  (namespace ("gerbil-scheme-rust/scheme/utf8#" gerbil-rs-encode-utf8-chunk-c gerbil-rs-encode-utf8-buffer-chunk-c))
+  (c-declare #<<END-C
++/* Both width kernels share exactly the same Unicode emission and rejection.
++   Selection reads current data inside the checked leaf, never a text cache. */
++static inline ___U8 *gerbil_utf8_emit_wide(___U32 c, ___U8 *cursor) {
++  if (c <= 0xffff) {
++    if ((c >> 11) == 0x1b) return 0;
++    *cursor++ = (___U8)(0xe0 | (c >> 12));
++    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
++    *cursor++ = (___U8)(0x80 | (c & 0x3f));
++  } else if (c <= 0x10ffff) {
++    *cursor++ = (___U8)(0xf0 | (c >> 18));
++    *cursor++ = (___U8)(0x80 | ((c >> 12) & 0x3f));
++    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
++    *cursor++ = (___U8)(0x80 | (c & 0x3f));
++  } else return 0;
++  return cursor;
++}
++
++static inline ___U8 *gerbil_utf8_emit_two(___U32 c, ___U8 *cursor) {
++  *cursor++ = (___U8)(0xc0 | (c >> 6));
++  *cursor++ = (___U8)(0x80 | (c & 0x3f));
++  return cursor;
++}
++
+ static ___SCMOBJ gerbil_utf8_encode_into(___SCMOBJ str, ___U8 *output,
+                                        ___SCMOBJ size, ___SCMOBJ first,
+                                        ___SCMOBJ last, ___SCMOBJ position) {
+@@ -91,23 +114,29 @@ const ___C *source = ___CAST(const ___C*, ___BODY_AS(str, ___tSTRING));
+    Handle an empty null destination before any pointer arithmetic. */
+ if (start == end) return ___FIX((___S64)output_start);
+ ___U8 *cursor = output + output_start;
+-for (___U64 i = start; i < end; ++i) {
+-  const ___U32 c = source[i];
+-  if (c <= 0x7f) *cursor++ = (___U8)c;
+-  else if (c <= 0x7ff) {
+-    *cursor++ = (___U8)(0xc0 | (c >> 6));
+-    *cursor++ = (___U8)(0x80 | (c & 0x3f));
+-  } else if (c <= 0xffff) {
+-    if ((c >> 11) == 0x1b) return ___FIX(-1);
+-    *cursor++ = (___U8)(0xe0 | (c >> 12));
+-    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
+-    *cursor++ = (___U8)(0x80 | (c & 0x3f));
+-  } else if (c <= 0x10ffff) {
+-    *cursor++ = (___U8)(0xf0 | (c >> 18));
+-    *cursor++ = (___U8)(0x80 | ((c >> 12) & 0x3f));
+-    *cursor++ = (___U8)(0x80 | ((c >> 6) & 0x3f));
+-    *cursor++ = (___U8)(0x80 | (c & 0x3f));
+-  } else return ___FIX(-1);
++/* Select once per bounded current-data span, not once per request count.
++   Every subsequent scalar still gets complete classification and checking. */
++if (source[start] <= 0x7ff) {
++  for (___U64 i = start; i < end; ++i) {
++    const ___U32 c = source[i];
++    if (c <= 0x7f) *cursor++ = (___U8)c;
++    else if (c <= 0x7ff) cursor = gerbil_utf8_emit_two(c, cursor);
++    else {
++      cursor = gerbil_utf8_emit_wide(c, cursor);
++      if (!cursor) return ___FIX(-1);
++    }
++  }
++} else {
++  for (___U64 i = start; i < end; ++i) {
++    const ___U32 c = source[i];
++    if (c <= 0x7ff) {
++      if (c <= 0x7f) *cursor++ = (___U8)c;
++      else cursor = gerbil_utf8_emit_two(c, cursor);
++    } else {
++      cursor = gerbil_utf8_emit_wide(c, cursor);
++      if (!cursor) return ___FIX(-1);
++    }
++  }
+ }
+ return ___FIX((___S64)(cursor - output));
+ }

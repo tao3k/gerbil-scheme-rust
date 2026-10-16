@@ -7,7 +7,7 @@ semantics. Their =build.ss= compiles those modules. =gerbil-rs-stage-program=
 uses the Gerbil compiler's runtime dependency graph to emit a versioned native
 link manifest; Rust does not parse Scheme or reconstruct imports.
 
-=gerbil-scheme-native-build= compiles that manifest. An =external-program=
+=gerbil-scheme-aot-build= compiles that manifest. An =external-program=
 consumer supplies the complete AOT graph, including exactly one bridge module.
 Its =ProgramArchiveRequest= names the manifest, compiler, archive, linker and
 output directory. Validation, staging, compilation and archive publication
@@ -29,8 +29,32 @@ closure. The executable Scenario runs an unchanged input twice and then changes
 it, proving one warm compiler invocation is skipped and the changed input is
 compiled again.
 
+Package C headers are explicit =NativeHeaderInput= values in the program
+contract. Each input declares an include directory and its complete header
+files. The builder rejects missing files and files outside that directory,
+reports each file to the source observer, and incorporates header bytes into
+module compiler options and therefore object cache identity. A header-only
+change recompiles the module objects. Include paths are quoted for the compiler
+shell; ambient include flags do not replace these declarations.
+
 The sys crate supplies only the shared lifecycle shim in this configuration.
 It must not also load the standalone fixture graph or create another runtime.
+
+* Native build progress
+
+With =GERBIL_BUILD_VERBOSE= greater than zero, compiler subprocess output is
+inherited and forwarded during execution instead of buffered until exit.
+Gambit receives =-:1n,2n,d5qQ -verbose=: line-buffered stdout/stderr, genuine
+compiler tracing and genuine garbage-collection reports. Runtime options
+precede compiler options. Errors and interrupts terminate with nonzero status;
+there is no interactive REPL fallback. Quiet builds retain captured failure
+diagnostics. Heap limits, allocation policy and compiler optimization remain
+unchanged.
+
+These events describe actual compiler work. There is no periodic timer output,
+and an idle watchdog can still reject a compiler that emits no actual events.
+Cold module builds must finish successfully; observing GC activity alone is
+not proof of archive completion or semantic conformance.
 
 * Runtime contract
 
@@ -56,6 +80,17 @@ This string transport is for explicit native boundary projections, not a
 public JSON/S-expression language. Application object construction remains in
 Scheme; no Cedar, policy routing or runtime scheduling belongs in this repo.
 
+=bind_bytes_export= extends the same build-owned registration boundary to a
+call-scoped borrowed byte slice and a freshly rooted Scheme bytevector. A
+downstream export may inspect the pointer only until it returns, must return
+zero on failure, and must transfer exactly one root made with
+=gerbil-rs-root-bytevector= on success. The Rust owner validates the root type
+before exposing it and releases it on drop. A checked native bulk-copy call
+projects the rooted bytevector into exactly sized Rust storage in one FFI
+crossing; mismatched lengths and stale roots leave the destination untouched.
+This transport alone does not
+define an application wire format or choose a downstream parser algorithm.
+
 * Optimizer is the default
 
 Development and test Rust profiles use optimization level 2, full debug
@@ -76,3 +111,114 @@ and release its root, and reject invalid lifecycle/call states. Downstream
 authorization additionally requires its own policy, signature, replay and
 effect-consumption checks. No proof theorem follows from these executable
 checks alone.
+
+** Compiler-owned linker artifact progress
+
+Verbose linker compilation on a Gambit SDK declaring
+=BUILD_FEATURE_C_COMP="gcc"= adds =-save-temps=obj -Q= to its existing compiler
+options. The SDK's =gambuild-C= declaration is read beside the canonical GSC
+executable; ambient =CC= is not used to select this capability. Other declared
+compilers and quiet builds keep their existing options. The effective options
+participate in the object fingerprint.
+
+The helper observes only that linker's =.i= and =.s= files. A new event requires
+at least 256 KiB of compiler-written growth. Polling a missing or unchanged
+file emits nothing, so a stalled child still fails the caller's idle gate.
+Stale intermediates are removed before launch; both success and failure remove
+these extra intermediates after the child exits. The compiler exit status
+remains mandatory; artifact growth cannot turn a failed compilation into a
+successful archive. Additional intermediate disk use is limited to the linker
+operation, not all parallel module objects.
+
+The actual 8,582,602-byte generated MRR linker C reproduced the silent GCC phase.
+An owned-process sample identified initializer parsing with nested macro
+expansion. A diagnostic compile with the same SDK, ABI flags and =-O2= produced
+real =.i= growth and completed under the unchanged 30-second idle build gate.
+This is progress qualification, not a controlled speedup or full downstream
+runtime qualification. The mechanism follows GCC's documented intermediate
+output behavior:
+[[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC developer options, save-temps=obj and -Q]].
+
+The implemented Rust helper passed six default library regressions (including
+cache identity and failure/stale-artifact cleanup), the six-second artifact
+fixture under five-second idle supervision, and the actual generated-linker
+fixture under 30-second idle build supervision. The actual fixture completed
+in 21.00s on this host; this is not an A/B performance claim. A direct strict
+Clippy-driver check of the current helper test crate, using dependencies from
+the successful Cargo test compilation, passed. Full Cargo Clippy attempts
+still failed the 30-second idle gate while checking/compiling the separate
+Rust project harness dependency, including =--no-deps=; this remains distinct
+from the native compiler repair and is not reported as a passed full lint gate.
+
+** GCC module load-motion and full object progress
+
+The published-pin cold downstream build completed 58/59 module objects before
+idle30 refusal. The sole unfinished object was =clan/poo/trie=. An owned GCC
+16.2.0 process sample found =pass_rtl_pre=, =one_pre_gcse_pass= and
+=ldst_entry= expression hashing/comparison. Adding =-fopt-info-all= by itself
+still failed idle30. Compiler CPU activity is diagnostic evidence and is not
+an acceptance event.
+
+The generated-module policy for SDK-declared GCC now retains =-O2= and all
+SDK ABI flags, while disabling just load motion with =-fno-gcse-lm=. This
+policy is independent of verbosity and participates in the existing content
+fingerprint. Linker objects retain their optimization policy. Other SDK
+compiler backends are unchanged. The actual trie source completed with this
+narrow policy under idle30; full archive, semantics and target-specific
+performance qualification are separate gates.
+
+Verbose GCC compilation now exposes =-fopt-info-all= and observes =.i/.s=
+growth for module objects as well as the linker. Each object has distinct
+intermediates, stale files are removed before launch, and both success and
+failure clean them. Temporary disk use now includes concurrently compiled
+modules; no extra worker limit is introduced. Polling without newly written
+bytes remains silent. Optimization output cannot admit an unsuccessful object.
+
+GCC documents load motion as a subpass enabled with GCSE and explicitly notes
+that computed-goto programs can behave differently under GCSE:
+[[https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html][GCC optimization options]].
+The sampled mechanism also matches the load-motion expression-table code in
+[[https://github.com/gcc-mirror/gcc/blob/master/gcc/gcse.cc][GCC gcse.cc]];
+that moving upstream source is corroboration, not exact SDK-version proof.
+This workaround carries no steady-state speedup claim. Paired release-query
+and memory measurements remain required before final performance acceptance.
+
+The current candidate helper compiled successfully under idle30, passed six
+non-ignored library regressions, and passed the actual generated trie fixture
+in 51.43s under idle30. The fixture invokes the real archive module compiler
+and verifies object existence and removal of its =.i/.s= intermediates. Direct
+strict Clippy-driver qualification of current helper/test source also passed
+using dependencies from the previously qualified Cargo build. This remains
+separate from the open full Cargo Clippy gate. One first fixture invocation
+failed because SDK =~~bin= was not mapped; the corrected invocation used the
+same explicit versioned SDK mappings as the downstream build launcher.
+
+** Register-allocation diagnostics: 2026-10-05
+
+A downstream cold build with GSC =3635dfa= and MRR =277b783= passed
+program staging (40.22 seconds), module C generation and GSC linking, then
+refused idle30 during large SDK GCC object compilation. This remains a failed
+full-build receipt. The independent OpenCypher grammar object completed under
+idle30 after enabling actual IRA diagnostics; a small paired =-O2= compilation
+produced byte-identical objects with and without that diagnostic option.
+
+Verbose SDK GCC objects now add =-fira-verbose=15=: the default allocator dump
+verbosity (5), sent to stderr. This does not alter allocation policy, optimizer
+limits, worker counts or ABI options. The diagnostic flag is appended after
+content-verified cache lookup and does not invalidate completed object caches.
+No output is emitted for a stalled allocator by a timer. Full linked Source
+qualification, result admission and current-head CI remain separate gates.
+See [[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC developer options]]
+for the documented stderr behavior.
+
+The current helper Cargo build completes with the Apple host linker; an earlier
+ambient Nix =cc= invocation failed to resolve macOS =-liconv=. This environment
+correction changes no compiler optimization or watchdog budget. All 16 ordinary
+library tests pass, including content-cache integrity and failure cleanup. The
+six-second real child stream passes idle5 supervision (6.06 seconds). The actual
+OpenCypher grammar module compiles through =compile_program_module= with the
+configured GCC SDK under idle30/wall1200 (90.13 seconds); its object exists and
+its preprocessor/assembly intermediates are removed. An initial invocation
+without the required =GERBIL_BUILD_VERBOSE= setting refused idle30 and remains
+a failed receipt. These local helper results do not qualify the downstream
+Source build or current-head CI.

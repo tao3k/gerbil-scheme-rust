@@ -1,0 +1,728 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme --bench types --locked
+   Compiling unicode-ident v1.0.24
+   Compiling stable_deref_trait v1.2.1
+   Compiling typenum v1.20.1
+   Compiling litemap v0.8.2
+   Compiling writeable v0.6.3
+   Compiling winnow v1.0.4
+   Compiling smallvec v1.15.2
+   Compiling serde_core v1.0.228
+   Compiling icu_normalizer_data v2.1.1
+   Compiling icu_properties_data v2.1.2
+   Compiling memchr v2.8.3
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling proc-macro2 v1.0.106
+   Compiling utf8_iter v1.0.4
+   Compiling const-oid v0.10.2
+   Compiling winnow v0.7.15
+   Compiling percent-encoding v2.3.2
+   Compiling zmij v1.0.23
+   Compiling regex-syntax v0.8.11
+   Compiling itoa v1.0.18
+   Compiling form_urlencoded v1.2.2
+   Compiling cpufeatures v0.3.0
+   Compiling tokio v1.53.1
+   Compiling toml_parser v1.1.2+spec-1.1.0
+   Compiling aho-corasick v1.1.4
+   Compiling quote v1.0.46
+   Compiling syn v2.0.119
+   Compiling syn v3.0.6
+   Compiling hybrid-array v0.4.13
+   Compiling generic-array v0.14.7
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling digest v0.11.3
+   Compiling regex-automata v0.4.16
+   Compiling serde_spanned v1.1.1
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling semver v1.0.28
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling toml v1.1.3+spec-1.1.0
+   Compiling serde_json v1.0.150
+   Compiling sha2 v0.11.0
+   Compiling synstructure v0.13.2
+   Compiling regex v1.13.1
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling zerovec-derive v0.11.3
+   Compiling displaydoc v0.2.6
+   Compiling serde_derive v1.0.228
+   Compiling divan-macros v0.1.21
+   Compiling divan v0.1.21
+   Compiling serde v1.0.228
+   Compiling zerofrom v0.1.8
+   Compiling cargo_toml v1.0.0
+   Compiling cbindgen v0.29.4
+   Compiling yoke v0.8.3
+   Compiling zerovec v0.11.6
+   Compiling zerotrie v0.2.4
+   Compiling tinystr v0.8.3
+   Compiling potential_utf v0.1.5
+   Compiling icu_collections v2.1.1
+   Compiling icu_locale_core v2.1.1
+   Compiling icu_provider v2.1.1
+   Compiling icu_properties v2.1.2
+   Compiling icu_normalizer v2.1.1
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling cargo-lock v11.0.1
+   Compiling gerbil-scheme-rust-project-harness v0.1.2 (/private/tmp/bridge-ci-18-ZBBVcM/repo/build-support/gerbil-scheme-rust-project-harness)
+   Compiling gerbil-scheme-rust-project-harness-policy v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/build-support/gerbil-scheme-rust-project-harness-policy)
+   Compiling gerbil-scheme-aot-build v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/build-support/gerbil-scheme-aot-build)
+   Compiling gerbil-scheme v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/crates/gerbil-scheme)
+   Compiling gerbil-scheme-sys v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/crates/gerbil-scheme-sys)
+    Finished `bench` profile [optimized] target(s) in 2m 16s
+     Running benches/types.rs (target/release/deps/types-3b9cbad41133540c)
+TYPES-METHOD samples_per_variant=20 order=ABBA owners=1 values_per_request=8 percentiles=nearest_rank request_unit=ns wall_unit=ms memory_unit=bytes scope=scalar_projection parser_parallelism=false
+TYPES-BATCH family=boolean requests=1000 group=0 mode=0 wall_ms=0.798125 throughput_requests_s=1252936.570 p95_ns=1417 p99_ns=1708 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=0 mode=1 wall_ms=0.069541 throughput_requests_s=14380006.040 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=0 mode=1 wall_ms=0.069167 throughput_requests_s=14457761.649 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=0 mode=0 wall_ms=0.802417 throughput_requests_s=1246234.813 p95_ns=1459 p99_ns=1750 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=1 mode=0 wall_ms=1.376666 throughput_requests_s=726392.604 p95_ns=1417 p99_ns=1708 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=1 mode=1 wall_ms=0.069125 throughput_requests_s=14466546.112 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=1 mode=1 wall_ms=0.069083 throughput_requests_s=14475341.256 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=1 mode=0 wall_ms=0.723208 throughput_requests_s=1382728.067 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=2 mode=0 wall_ms=0.721458 throughput_requests_s=1386082.073 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=2 mode=1 wall_ms=0.069042 throughput_requests_s=14483937.314 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=2 mode=1 wall_ms=0.070833 throughput_requests_s=14117713.495 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=2 mode=0 wall_ms=1.333792 throughput_requests_s=749742.089 p95_ns=791 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=3 mode=0 wall_ms=0.730459 throughput_requests_s=1369002.230 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=3 mode=1 wall_ms=0.069500 throughput_requests_s=14388489.209 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=3 mode=1 wall_ms=0.068958 throughput_requests_s=14501580.672 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=3 mode=0 wall_ms=0.737083 throughput_requests_s=1356699.313 p95_ns=833 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=4 mode=0 wall_ms=1.319083 throughput_requests_s=758102.409 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=4 mode=1 wall_ms=0.069000 throughput_requests_s=14492753.623 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=4 mode=1 wall_ms=0.068542 throughput_requests_s=14589594.701 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=4 mode=0 wall_ms=0.740541 throughput_requests_s=1350364.126 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=5 mode=0 wall_ms=0.730917 throughput_requests_s=1368144.399 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=5 mode=1 wall_ms=0.072459 throughput_requests_s=13800908.100 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=5 mode=1 wall_ms=0.069375 throughput_requests_s=14414414.414 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=5 mode=0 wall_ms=1.385375 throughput_requests_s=721826.220 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=6 mode=0 wall_ms=0.770166 throughput_requests_s=1298421.379 p95_ns=833 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=6 mode=1 wall_ms=0.072125 throughput_requests_s=13864818.024 p95_ns=83 p99_ns=166 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=6 mode=1 wall_ms=0.071750 throughput_requests_s=13937282.230 p95_ns=83 p99_ns=166 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=6 mode=0 wall_ms=0.748417 throughput_requests_s=1336153.508 p95_ns=834 p99_ns=916 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=7 mode=0 wall_ms=1.329792 throughput_requests_s=751997.305 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=7 mode=1 wall_ms=0.069167 throughput_requests_s=14457761.649 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=7 mode=1 wall_ms=0.069458 throughput_requests_s=14397189.669 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=7 mode=0 wall_ms=0.772625 throughput_requests_s=1294288.950 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=8 mode=0 wall_ms=0.733583 throughput_requests_s=1363172.265 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=8 mode=1 wall_ms=0.070250 throughput_requests_s=14234875.445 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=8 mode=1 wall_ms=0.070084 throughput_requests_s=14268591.975 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=8 mode=0 wall_ms=1.369417 throughput_requests_s=730237.758 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=9 mode=0 wall_ms=0.731542 throughput_requests_s=1366975.512 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=9 mode=1 wall_ms=0.069708 throughput_requests_s=14345555.747 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=9 mode=1 wall_ms=0.069542 throughput_requests_s=14379799.258 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=boolean requests=1000 group=9 mode=0 wall_ms=1.310417 throughput_requests_s=763115.863 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-SUMMARY family=boolean requests=1000 mode=0 batches=20 total_wall_ms=19.165083 throughput_requests_s=1043564.487 pooled_p95_ns=792 pooled_p99_ns=1417
+TYPES-SUMMARY family=boolean requests=1000 mode=1 batches=20 total_wall_ms=1.396709 throughput_requests_s=14319375.045 pooled_p95_ns=83 pooled_p99_ns=84
+TYPES-GATE family=boolean requests=1000 admitted=true
+TYPES-BATCH family=boolean requests=10000 group=0 mode=0 wall_ms=9.066417 throughput_requests_s=1102971.549 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=0 mode=1 wall_ms=0.710167 throughput_requests_s=14081194.987 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=0 mode=1 wall_ms=0.694208 throughput_requests_s=14404904.582 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=0 mode=0 wall_ms=9.680916 throughput_requests_s=1032960.104 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=1 mode=0 wall_ms=9.017875 throughput_requests_s=1108908.695 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=1 mode=1 wall_ms=0.704291 throughput_requests_s=14198676.399 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=1 mode=1 wall_ms=0.692667 throughput_requests_s=14436951.667 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=1 mode=0 wall_ms=9.738375 throughput_requests_s=1026865.365 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=2 mode=0 wall_ms=9.159625 throughput_requests_s=1091747.752 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=2 mode=1 wall_ms=0.758583 throughput_requests_s=13182473.111 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=2 mode=1 wall_ms=0.699250 throughput_requests_s=14301036.825 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=2 mode=0 wall_ms=9.889041 throughput_requests_s=1011220.400 p95_ns=833 p99_ns=916 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=3 mode=0 wall_ms=9.116166 throughput_requests_s=1096952.381 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=3 mode=1 wall_ms=0.695833 throughput_requests_s=14371264.369 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=3 mode=1 wall_ms=0.691542 throughput_requests_s=14460437.689 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=3 mode=0 wall_ms=9.901542 throughput_requests_s=1009943.704 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=4 mode=0 wall_ms=9.183417 throughput_requests_s=1088919.299 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=4 mode=1 wall_ms=0.762375 throughput_requests_s=13116904.411 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=4 mode=1 wall_ms=0.699833 throughput_requests_s=14289123.262 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=4 mode=0 wall_ms=9.784500 throughput_requests_s=1022024.631 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=5 mode=0 wall_ms=8.992042 throughput_requests_s=1112094.450 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=5 mode=1 wall_ms=0.690333 throughput_requests_s=14485762.668 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=5 mode=1 wall_ms=0.691958 throughput_requests_s=14451744.181 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=5 mode=0 wall_ms=9.612958 throughput_requests_s=1040262.529 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=6 mode=0 wall_ms=9.056750 throughput_requests_s=1104148.839 p95_ns=791 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=6 mode=1 wall_ms=0.689625 throughput_requests_s=14500634.403 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=6 mode=1 wall_ms=0.693167 throughput_requests_s=14426537.905 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=6 mode=0 wall_ms=9.712291 throughput_requests_s=1029623.186 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=7 mode=0 wall_ms=9.045000 throughput_requests_s=1105583.195 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=7 mode=1 wall_ms=0.687750 throughput_requests_s=14540167.212 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=7 mode=1 wall_ms=0.686917 throughput_requests_s=14557799.559 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=7 mode=0 wall_ms=14.586792 throughput_requests_s=685551.696 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=8 mode=0 wall_ms=9.157000 throughput_requests_s=1092060.719 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=8 mode=1 wall_ms=0.697833 throughput_requests_s=14330076.107 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=8 mode=1 wall_ms=0.695875 throughput_requests_s=14370396.982 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=8 mode=0 wall_ms=9.109958 throughput_requests_s=1097699.902 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=9 mode=0 wall_ms=9.614167 throughput_requests_s=1040131.714 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=9 mode=1 wall_ms=0.696875 throughput_requests_s=14349775.785 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=9 mode=1 wall_ms=0.692291 throughput_requests_s=14444792.724 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=boolean requests=10000 group=9 mode=0 wall_ms=9.033250 throughput_requests_s=1107021.282 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-SUMMARY family=boolean requests=10000 mode=0 batches=20 total_wall_ms=192.458082 throughput_requests_s=1039187.328 pooled_p95_ns=792 pooled_p99_ns=834
+TYPES-SUMMARY family=boolean requests=10000 mode=1 batches=20 total_wall_ms=14.031373 throughput_requests_s=14253772.599 pooled_p95_ns=83 pooled_p99_ns=84
+TYPES-GATE family=boolean requests=10000 admitted=true
+TYPES-BATCH family=boolean requests=100000 group=0 mode=0 wall_ms=97.830042 throughput_requests_s=1022180.896 p95_ns=1375 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=0 mode=1 wall_ms=12.820667 throughput_requests_s=7799906.198 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=0 mode=1 wall_ms=6.931250 throughput_requests_s=14427412.083 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=0 mode=0 wall_ms=188.879166 throughput_requests_s=529439.017 p95_ns=1417 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=1 mode=0 wall_ms=171.723542 throughput_requests_s=582331.338 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=1 mode=1 wall_ms=7.594459 throughput_requests_s=13167494.880 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=1 mode=1 wall_ms=6.954709 throughput_requests_s=14378746.832 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=1 mode=0 wall_ms=118.376583 throughput_requests_s=844761.670 p95_ns=1417 p99_ns=1666 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=2 mode=0 wall_ms=98.790042 throughput_requests_s=1012247.773 p95_ns=833 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=2 mode=1 wall_ms=7.028542 throughput_requests_s=14227701.848 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=2 mode=1 wall_ms=7.108000 throughput_requests_s=14068655.037 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=2 mode=0 wall_ms=101.901500 throughput_requests_s=981339.823 p95_ns=875 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=3 mode=0 wall_ms=97.201625 throughput_requests_s=1028789.385 p95_ns=792 p99_ns=1416 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=3 mode=1 wall_ms=7.175375 throughput_requests_s=13936553.839 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=3 mode=1 wall_ms=6.982625 throughput_requests_s=14321261.703 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=3 mode=0 wall_ms=97.083000 throughput_requests_s=1030046.455 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=4 mode=0 wall_ms=94.605750 throughput_requests_s=1057018.204 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=4 mode=1 wall_ms=6.929417 throughput_requests_s=14431228.486 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=4 mode=1 wall_ms=6.957458 throughput_requests_s=14373065.565 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=4 mode=0 wall_ms=101.789625 throughput_requests_s=982418.395 p95_ns=791 p99_ns=1000 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=5 mode=0 wall_ms=100.301667 throughput_requests_s=996992.403 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=5 mode=1 wall_ms=8.896958 throughput_requests_s=11239796.793 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=5 mode=1 wall_ms=6.915916 throughput_requests_s=14459400.606 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=5 mode=0 wall_ms=126.972916 throughput_requests_s=787569.532 p95_ns=833 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=6 mode=0 wall_ms=160.466167 throughput_requests_s=623184.325 p95_ns=1417 p99_ns=1583 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=6 mode=1 wall_ms=7.092375 throughput_requests_s=14099649.271 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=6 mode=1 wall_ms=6.933875 throughput_requests_s=14421950.208 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=6 mode=0 wall_ms=96.736666 throughput_requests_s=1033734.200 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=7 mode=0 wall_ms=96.858167 throughput_requests_s=1032437.461 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=7 mode=1 wall_ms=7.136375 throughput_requests_s=14012716.540 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=7 mode=1 wall_ms=6.950792 throughput_requests_s=14386849.729 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=7 mode=0 wall_ms=93.987750 throughput_requests_s=1063968.443 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=8 mode=0 wall_ms=97.666584 throughput_requests_s=1023891.652 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=8 mode=1 wall_ms=6.955375 throughput_requests_s=14377370.020 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=8 mode=1 wall_ms=7.282750 throughput_requests_s=13731076.860 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=8 mode=0 wall_ms=99.418250 throughput_requests_s=1005851.541 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=9 mode=0 wall_ms=94.269208 throughput_requests_s=1060791.770 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=9 mode=1 wall_ms=7.116292 throughput_requests_s=14052262.049 p95_ns=83 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=9 mode=1 wall_ms=7.135958 throughput_requests_s=14013535.394 p95_ns=83 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=boolean requests=100000 group=9 mode=0 wall_ms=97.898625 throughput_requests_s=1021464.806 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-SUMMARY family=boolean requests=100000 mode=0 batches=20 total_wall_ms=2232.756875 throughput_requests_s=895753.596 pooled_p95_ns=792 pooled_p99_ns=1417
+TYPES-SUMMARY family=boolean requests=100000 mode=1 batches=20 total_wall_ms=148.899168 throughput_requests_s=13431908.498 pooled_p95_ns=84 pooled_p99_ns=125
+TYPES-GATE family=boolean requests=100000 admitted=true
+TYPES-BATCH family=fixnum requests=1000 group=0 mode=0 wall_ms=1.446541 throughput_requests_s=691304.291 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=0 mode=1 wall_ms=0.074875 throughput_requests_s=13355592.654 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=0 mode=1 wall_ms=0.074375 throughput_requests_s=13445378.151 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=0 mode=0 wall_ms=0.716041 throughput_requests_s=1396568.074 p95_ns=750 p99_ns=791 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=1 mode=0 wall_ms=1.299750 throughput_requests_s=769378.727 p95_ns=750 p99_ns=791 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=1 mode=1 wall_ms=0.074500 throughput_requests_s=13422818.792 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=1 mode=1 wall_ms=0.074125 throughput_requests_s=13490725.126 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=1 mode=0 wall_ms=0.719375 throughput_requests_s=1390095.569 p95_ns=750 p99_ns=791 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=2 mode=0 wall_ms=0.714834 throughput_requests_s=1398926.184 p95_ns=750 p99_ns=750 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=2 mode=1 wall_ms=0.074292 throughput_requests_s=13460399.505 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=2 mode=1 wall_ms=0.075084 throughput_requests_s=13318416.707 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=2 mode=0 wall_ms=1.301500 throughput_requests_s=768344.218 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=3 mode=0 wall_ms=0.911916 throughput_requests_s=1096592.230 p95_ns=1417 p99_ns=1833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=3 mode=1 wall_ms=0.143333 throughput_requests_s=6976760.411 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=3 mode=1 wall_ms=0.089333 throughput_requests_s=11194071.620 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=3 mode=0 wall_ms=0.719750 throughput_requests_s=1389371.309 p95_ns=791 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=4 mode=0 wall_ms=2.887708 throughput_requests_s=346295.401 p95_ns=1667 p99_ns=1917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=4 mode=1 wall_ms=0.143416 throughput_requests_s=6972722.709 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=4 mode=1 wall_ms=0.142834 throughput_requests_s=7001134.184 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=4 mode=0 wall_ms=1.615375 throughput_requests_s=619051.304 p95_ns=1750 p99_ns=1875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=5 mode=0 wall_ms=1.705209 throughput_requests_s=586438.378 p95_ns=1750 p99_ns=1834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=5 mode=1 wall_ms=0.144709 throughput_requests_s=6910420.223 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=5 mode=1 wall_ms=0.144250 throughput_requests_s=6932409.012 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=5 mode=0 wall_ms=2.532125 throughput_requests_s=394925.211 p95_ns=1542 p99_ns=1875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=6 mode=0 wall_ms=0.721333 throughput_requests_s=1386322.267 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=6 mode=1 wall_ms=0.074667 throughput_requests_s=13392797.354 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=6 mode=1 wall_ms=0.074166 throughput_requests_s=13483267.265 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=6 mode=0 wall_ms=0.718250 throughput_requests_s=1392272.885 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=7 mode=0 wall_ms=1.321750 throughput_requests_s=756572.726 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=7 mode=1 wall_ms=0.074667 throughput_requests_s=13392797.354 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=7 mode=1 wall_ms=0.074583 throughput_requests_s=13407881.153 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=7 mode=0 wall_ms=0.715375 throughput_requests_s=1397868.251 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=8 mode=0 wall_ms=0.713750 throughput_requests_s=1401050.788 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=8 mode=1 wall_ms=0.074166 throughput_requests_s=13483267.265 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=8 mode=1 wall_ms=0.074208 throughput_requests_s=13475636.050 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=8 mode=0 wall_ms=1.301500 throughput_requests_s=768344.218 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=9 mode=0 wall_ms=0.713333 throughput_requests_s=1401869.814 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=9 mode=1 wall_ms=0.074584 throughput_requests_s=13407701.384 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=9 mode=1 wall_ms=0.074334 throughput_requests_s=13452794.145 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=fixnum requests=1000 group=9 mode=0 wall_ms=0.712875 throughput_requests_s=1402770.472 p95_ns=750 p99_ns=750 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-SUMMARY family=fixnum requests=1000 mode=0 batches=20 total_wall_ms=23.488290 throughput_requests_s=851488.125 pooled_p95_ns=1417 pooled_p99_ns=1709
+TYPES-SUMMARY family=fixnum requests=1000 mode=1 batches=20 total_wall_ms=1.850501 throughput_requests_s=10807883.919 pooled_p95_ns=125 pooled_p99_ns=125
+TYPES-GATE family=fixnum requests=1000 admitted=true
+TYPES-BATCH family=fixnum requests=10000 group=0 mode=0 wall_ms=9.475041 throughput_requests_s=1055404.404 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=0 mode=1 wall_ms=0.747542 throughput_requests_s=13377174.794 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=0 mode=1 wall_ms=0.744709 throughput_requests_s=13428063.848 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=0 mode=0 wall_ms=14.973375 throughput_requests_s=667852.104 p95_ns=1500 p99_ns=1833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=1 mode=0 wall_ms=9.533875 throughput_requests_s=1048891.453 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=1 mode=1 wall_ms=0.744833 throughput_requests_s=13425828.340 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=1 mode=1 wall_ms=0.747375 throughput_requests_s=13380163.907 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=1 mode=0 wall_ms=8.910917 throughput_requests_s=1122218.959 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=2 mode=0 wall_ms=9.674625 throughput_requests_s=1033631.795 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=2 mode=1 wall_ms=0.747666 throughput_requests_s=13374956.197 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=2 mode=1 wall_ms=0.748292 throughput_requests_s=13363767.086 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=2 mode=0 wall_ms=9.030083 throughput_requests_s=1107409.533 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=3 mode=0 wall_ms=9.807583 throughput_requests_s=1019619.207 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=3 mode=1 wall_ms=0.767709 throughput_requests_s=13025768.879 p95_ns=84 p99_ns=166 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=3 mode=1 wall_ms=0.757583 throughput_requests_s=13199873.809 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=3 mode=0 wall_ms=9.170833 throughput_requests_s=1090413.488 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=4 mode=0 wall_ms=9.710375 throughput_requests_s=1029826.346 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=4 mode=1 wall_ms=0.750958 throughput_requests_s=13316323.949 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=4 mode=1 wall_ms=0.750166 throughput_requests_s=13330382.875 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=4 mode=0 wall_ms=8.961833 throughput_requests_s=1115843.154 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=5 mode=0 wall_ms=9.535916 throughput_requests_s=1048666.956 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=5 mode=1 wall_ms=0.747417 throughput_requests_s=13379412.028 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=5 mode=1 wall_ms=0.745917 throughput_requests_s=13406317.325 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=5 mode=0 wall_ms=8.904750 throughput_requests_s=1122996.154 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=6 mode=0 wall_ms=9.669166 throughput_requests_s=1034215.360 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=6 mode=1 wall_ms=0.867459 throughput_requests_s=11527922.357 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=6 mode=1 wall_ms=1.445666 throughput_requests_s=6917227.077 p95_ns=125 p99_ns=208 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=6 mode=0 wall_ms=16.461667 throughput_requests_s=607471.892 p95_ns=1500 p99_ns=2333 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=7 mode=0 wall_ms=16.871958 throughput_requests_s=592699.437 p95_ns=1458 p99_ns=1750 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=7 mode=1 wall_ms=1.181209 throughput_requests_s=8465902.309 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=7 mode=1 wall_ms=0.746500 throughput_requests_s=13395847.287 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=7 mode=0 wall_ms=8.924583 throughput_requests_s=1120500.532 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=8 mode=0 wall_ms=9.424667 throughput_requests_s=1061045.446 p95_ns=750 p99_ns=791 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=8 mode=1 wall_ms=0.750000 throughput_requests_s=13333333.333 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=8 mode=1 wall_ms=0.744209 throughput_requests_s=13437085.550 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=8 mode=0 wall_ms=52.352000 throughput_requests_s=191014.670 p95_ns=1417 p99_ns=1708 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=9 mode=0 wall_ms=9.542875 throughput_requests_s=1047902.231 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=9 mode=1 wall_ms=0.746958 throughput_requests_s=13387633.575 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=9 mode=1 wall_ms=0.744833 throughput_requests_s=13425828.340 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=fixnum requests=10000 group=9 mode=0 wall_ms=13.633833 throughput_requests_s=733469.451 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-SUMMARY family=fixnum requests=10000 mode=0 batches=20 total_wall_ms=254.569955 throughput_requests_s=785638.667 pooled_p95_ns=1416 pooled_p99_ns=1459
+TYPES-SUMMARY family=fixnum requests=10000 mode=1 batches=20 total_wall_ms=16.227001 throughput_requests_s=12325136.358 pooled_p95_ns=125 pooled_p99_ns=125
+TYPES-GATE family=fixnum requests=10000 admitted=true
+TYPES-BATCH family=fixnum requests=100000 group=0 mode=0 wall_ms=92.359500 throughput_requests_s=1082725.654 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=0 mode=1 wall_ms=7.519416 throughput_requests_s=13298905.128 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=0 mode=1 wall_ms=7.475458 throughput_requests_s=13377106.794 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=0 mode=0 wall_ms=94.509375 throughput_requests_s=1058096.088 p95_ns=791 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=1 mode=0 wall_ms=95.344125 throughput_requests_s=1048832.322 p95_ns=792 p99_ns=1375 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=1 mode=1 wall_ms=7.824333 throughput_requests_s=12780642.133 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=1 mode=1 wall_ms=7.933875 throughput_requests_s=12604181.437 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=1 mode=0 wall_ms=99.663208 throughput_requests_s=1003379.301 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=2 mode=0 wall_ms=93.201291 throughput_requests_s=1072946.511 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=2 mode=1 wall_ms=8.378041 throughput_requests_s=11935964.505 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=2 mode=1 wall_ms=7.462167 throughput_requests_s=13400933.000 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=2 mode=0 wall_ms=99.025416 throughput_requests_s=1009841.756 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=3 mode=0 wall_ms=93.067791 throughput_requests_s=1074485.587 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=3 mode=1 wall_ms=7.559833 throughput_requests_s=13227805.429 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=3 mode=1 wall_ms=7.478458 throughput_requests_s=13371740.538 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=3 mode=0 wall_ms=98.903042 throughput_requests_s=1011091.246 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=4 mode=0 wall_ms=96.166917 throughput_requests_s=1039858.645 p95_ns=792 p99_ns=1375 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=4 mode=1 wall_ms=16.927500 throughput_requests_s=5907546.891 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=4 mode=1 wall_ms=7.459458 throughput_requests_s=13405799.724 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=4 mode=0 wall_ms=137.659375 throughput_requests_s=726430.728 p95_ns=1417 p99_ns=1667 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=5 mode=0 wall_ms=93.041541 throughput_requests_s=1074788.733 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=5 mode=1 wall_ms=7.558084 throughput_requests_s=13230866.447 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=5 mode=1 wall_ms=7.481542 throughput_requests_s=13366228.513 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=5 mode=0 wall_ms=93.417541 throughput_requests_s=1070462.773 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=6 mode=0 wall_ms=96.004125 throughput_requests_s=1041621.909 p95_ns=792 p99_ns=1166 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=6 mode=1 wall_ms=7.601917 throughput_requests_s=13154576.668 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=6 mode=1 wall_ms=7.594541 throughput_requests_s=13167352.708 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=6 mode=0 wall_ms=96.279292 throughput_requests_s=1038644.946 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=7 mode=0 wall_ms=94.180000 throughput_requests_s=1061796.560 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=7 mode=1 wall_ms=8.012542 throughput_requests_s=12480433.800 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=7 mode=1 wall_ms=7.469333 throughput_requests_s=13388076.285 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=7 mode=0 wall_ms=93.262375 throughput_requests_s=1072243.764 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=8 mode=0 wall_ms=108.696333 throughput_requests_s=919994.238 p95_ns=1375 p99_ns=1459 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=8 mode=1 wall_ms=9.200959 throughput_requests_s=10868432.301 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=8 mode=1 wall_ms=10.132667 throughput_requests_s=9869070.009 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=8 mode=0 wall_ms=101.572375 throughput_requests_s=984519.659 p95_ns=833 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=9 mode=0 wall_ms=98.302084 throughput_requests_s=1017272.431 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=9 mode=1 wall_ms=8.483167 throughput_requests_s=11788050.383 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=9 mode=1 wall_ms=8.062542 throughput_requests_s=12403036.164 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=fixnum requests=100000 group=9 mode=0 wall_ms=98.221625 throughput_requests_s=1018105.738 p95_ns=791 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-SUMMARY family=fixnum requests=100000 mode=0 batches=20 total_wall_ms=1972.877331 throughput_requests_s=1013747.773 pooled_p95_ns=792 pooled_p99_ns=1417
+TYPES-SUMMARY family=fixnum requests=100000 mode=1 batches=20 total_wall_ms=167.615833 throughput_requests_s=11932047.016 pooled_p95_ns=84 pooled_p99_ns=125
+TYPES-GATE family=fixnum requests=100000 admitted=true
+TYPES-BATCH family=char requests=1000 group=0 mode=0 wall_ms=1.452333 throughput_requests_s=688547.324 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=0 mode=1 wall_ms=0.087750 throughput_requests_s=11396011.396 p95_ns=84 p99_ns=166 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=0 mode=1 wall_ms=0.087250 throughput_requests_s=11461318.052 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=0 mode=0 wall_ms=0.758208 throughput_requests_s=1318899.299 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=1 mode=0 wall_ms=0.767209 throughput_requests_s=1303425.794 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=1 mode=1 wall_ms=0.088125 throughput_requests_s=11347517.730 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=1 mode=1 wall_ms=0.087292 throughput_requests_s=11455803.510 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=1 mode=0 wall_ms=1.350042 throughput_requests_s=740717.696 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=2 mode=0 wall_ms=0.746417 throughput_requests_s=1339733.688 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=2 mode=1 wall_ms=0.086625 throughput_requests_s=11544011.544 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=2 mode=1 wall_ms=0.087791 throughput_requests_s=11390689.251 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=2 mode=0 wall_ms=1.333041 throughput_requests_s=750164.474 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=3 mode=0 wall_ms=0.749209 throughput_requests_s=1334741.040 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=3 mode=1 wall_ms=0.087625 throughput_requests_s=11412268.188 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=3 mode=1 wall_ms=0.086667 throughput_requests_s=11538417.160 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=3 mode=0 wall_ms=0.748250 throughput_requests_s=1336451.721 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=4 mode=0 wall_ms=1.324500 throughput_requests_s=755001.888 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=4 mode=1 wall_ms=0.086916 throughput_requests_s=11505361.498 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=4 mode=1 wall_ms=0.087375 throughput_requests_s=11444921.316 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=4 mode=0 wall_ms=0.748417 throughput_requests_s=1336153.508 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=5 mode=0 wall_ms=0.743667 throughput_requests_s=1344687.878 p95_ns=791 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=5 mode=1 wall_ms=0.087167 throughput_requests_s=11472231.464 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=5 mode=1 wall_ms=0.087416 throughput_requests_s=11439553.400 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=5 mode=0 wall_ms=1.326500 throughput_requests_s=753863.551 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=6 mode=0 wall_ms=1.532208 throughput_requests_s=652652.904 p95_ns=1583 p99_ns=2833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=6 mode=1 wall_ms=0.171667 throughput_requests_s=5825231.407 p95_ns=167 p99_ns=209 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=6 mode=1 wall_ms=0.181042 throughput_requests_s=5523580.164 p95_ns=167 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=6 mode=0 wall_ms=1.195167 throughput_requests_s=836703.155 p95_ns=1583 p99_ns=2000 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=7 mode=0 wall_ms=1.388292 throughput_requests_s=720309.560 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=7 mode=1 wall_ms=0.087083 throughput_requests_s=11483297.544 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=7 mode=1 wall_ms=0.086833 throughput_requests_s=11516358.988 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=7 mode=0 wall_ms=0.752375 throughput_requests_s=1329124.439 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=8 mode=0 wall_ms=0.752042 throughput_requests_s=1329712.968 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=8 mode=1 wall_ms=0.088083 throughput_requests_s=11352928.488 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=8 mode=1 wall_ms=0.087584 throughput_requests_s=11417610.522 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=8 mode=0 wall_ms=1.335291 throughput_requests_s=748900.427 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=9 mode=0 wall_ms=0.756000 throughput_requests_s=1322751.323 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=9 mode=1 wall_ms=0.087542 throughput_requests_s=11423088.346 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=9 mode=1 wall_ms=0.087041 throughput_requests_s=11488838.593 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=char requests=1000 group=9 mode=0 wall_ms=0.762292 throughput_requests_s=1311833.261 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-SUMMARY family=char requests=1000 mode=0 batches=20 total_wall_ms=20.521460 throughput_requests_s=974589.527 pooled_p95_ns=834 pooled_p99_ns=1500
+TYPES-SUMMARY family=char requests=1000 mode=1 batches=20 total_wall_ms=1.924874 throughput_requests_s=10390290.481 pooled_p95_ns=125 pooled_p99_ns=167
+TYPES-GATE family=char requests=1000 admitted=true
+TYPES-BATCH family=char requests=10000 group=0 mode=0 wall_ms=10.008458 throughput_requests_s=999154.915 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=0 mode=1 wall_ms=0.894333 throughput_requests_s=11181517.399 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=0 mode=1 wall_ms=0.874666 throughput_requests_s=11432935.543 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=0 mode=0 wall_ms=9.279959 throughput_requests_s=1077590.968 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=1 mode=0 wall_ms=9.861166 throughput_requests_s=1014078.862 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=1 mode=1 wall_ms=0.918083 throughput_requests_s=10892261.375 p95_ns=84 p99_ns=166 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=1 mode=1 wall_ms=1.070000 throughput_requests_s=9345794.393 p95_ns=166 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=1 mode=0 wall_ms=9.698292 throughput_requests_s=1031109.395 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=2 mode=0 wall_ms=9.984209 throughput_requests_s=1001581.598 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=2 mode=1 wall_ms=0.879291 throughput_requests_s=11372799.221 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=2 mode=1 wall_ms=0.920625 throughput_requests_s=10862186.015 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=2 mode=0 wall_ms=9.600709 throughput_requests_s=1041589.741 p95_ns=833 p99_ns=916 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=3 mode=0 wall_ms=9.985000 throughput_requests_s=1001502.253 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=3 mode=1 wall_ms=0.878875 throughput_requests_s=11378182.335 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=3 mode=1 wall_ms=0.879583 throughput_requests_s=11369023.731 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=3 mode=0 wall_ms=10.711750 throughput_requests_s=933554.275 p95_ns=834 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=4 mode=0 wall_ms=10.097750 throughput_requests_s=990319.626 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=4 mode=1 wall_ms=0.883959 throughput_requests_s=11312741.881 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=4 mode=1 wall_ms=0.875833 throughput_requests_s=11417701.776 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=4 mode=0 wall_ms=10.166667 throughput_requests_s=983606.525 p95_ns=834 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=5 mode=0 wall_ms=10.028750 throughput_requests_s=997133.242 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=5 mode=1 wall_ms=0.882792 throughput_requests_s=11327696.671 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=5 mode=1 wall_ms=0.899291 throughput_requests_s=11119871.098 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=5 mode=0 wall_ms=9.507416 throughput_requests_s=1051810.502 p95_ns=792 p99_ns=959 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=6 mode=0 wall_ms=9.897917 throughput_requests_s=1010313.584 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=6 mode=1 wall_ms=0.880584 throughput_requests_s=11356100.043 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=6 mode=1 wall_ms=0.944625 throughput_requests_s=10586211.460 p95_ns=84 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=6 mode=0 wall_ms=9.299292 throughput_requests_s=1075350.683 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=7 mode=0 wall_ms=9.884375 throughput_requests_s=1011697.755 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=7 mode=1 wall_ms=0.888125 throughput_requests_s=11259676.284 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=7 mode=1 wall_ms=0.875750 throughput_requests_s=11418783.900 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=7 mode=0 wall_ms=9.448500 throughput_requests_s=1058369.053 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=8 mode=0 wall_ms=11.805042 throughput_requests_s=847095.673 p95_ns=1500 p99_ns=1917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=8 mode=1 wall_ms=0.895042 throughput_requests_s=11172660.054 p95_ns=84 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=8 mode=1 wall_ms=0.888833 throughput_requests_s=11250707.388 p95_ns=84 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=8 mode=0 wall_ms=9.369041 throughput_requests_s=1067345.100 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=9 mode=0 wall_ms=10.618917 throughput_requests_s=941715.619 p95_ns=875 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=9 mode=1 wall_ms=0.883834 throughput_requests_s=11314341.833 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=9 mode=1 wall_ms=0.884542 throughput_requests_s=11305285.673 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=char requests=10000 group=9 mode=0 wall_ms=9.345584 throughput_requests_s=1070024.088 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-SUMMARY family=char requests=10000 mode=0 batches=20 total_wall_ms=198.598794 throughput_requests_s=1007055.461 pooled_p95_ns=833 pooled_p99_ns=1000
+TYPES-SUMMARY family=char requests=10000 mode=1 batches=20 total_wall_ms=17.998666 throughput_requests_s=11111934.629 pooled_p95_ns=84 pooled_p99_ns=125
+TYPES-GATE family=char requests=10000 admitted=true
+TYPES-BATCH family=char requests=100000 group=0 mode=0 wall_ms=96.733041 throughput_requests_s=1033772.938 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=0 mode=1 wall_ms=8.756208 throughput_requests_s=11420468.769 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=0 mode=1 wall_ms=8.795500 throughput_requests_s=11369450.287 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=0 mode=0 wall_ms=99.038209 throughput_requests_s=1009711.313 p95_ns=833 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=1 mode=0 wall_ms=109.716167 throughput_requests_s=911442.705 p95_ns=1500 p99_ns=1584 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=1 mode=1 wall_ms=8.727375 throughput_requests_s=11458199.058 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=1 mode=1 wall_ms=9.414125 throughput_requests_s=10622336.117 p95_ns=125 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=1 mode=0 wall_ms=103.339875 throughput_requests_s=967680.675 p95_ns=1000 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=2 mode=0 wall_ms=97.634584 throughput_requests_s=1024227.235 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=2 mode=1 wall_ms=9.007208 throughput_requests_s=11102219.467 p95_ns=84 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=2 mode=1 wall_ms=9.427708 throughput_requests_s=10607031.953 p95_ns=84 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=2 mode=0 wall_ms=105.937000 throughput_requests_s=943957.258 p95_ns=875 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=3 mode=0 wall_ms=103.626625 throughput_requests_s=965002.961 p95_ns=834 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=3 mode=1 wall_ms=9.079125 throughput_requests_s=11014277.257 p95_ns=84 p99_ns=166 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=3 mode=1 wall_ms=8.776250 throughput_requests_s=11394388.264 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=3 mode=0 wall_ms=110.011916 throughput_requests_s=908992.440 p95_ns=833 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=4 mode=0 wall_ms=96.671417 throughput_requests_s=1034431.925 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=4 mode=1 wall_ms=8.787000 throughput_requests_s=11380448.390 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=4 mode=1 wall_ms=8.771333 throughput_requests_s=11400775.686 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=4 mode=0 wall_ms=96.939708 throughput_requests_s=1031569.024 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=5 mode=0 wall_ms=96.438625 throughput_requests_s=1036928.928 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=5 mode=1 wall_ms=8.844291 throughput_requests_s=11306728.827 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=5 mode=1 wall_ms=8.828958 throughput_requests_s=11326364.901 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=5 mode=0 wall_ms=100.806833 throughput_requests_s=991996.247 p95_ns=833 p99_ns=917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=6 mode=0 wall_ms=122.583209 throughput_requests_s=815772.411 p95_ns=1459 p99_ns=1584 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=6 mode=1 wall_ms=9.875417 throughput_requests_s=10126154.673 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=6 mode=1 wall_ms=9.039375 throughput_requests_s=11062711.747 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=6 mode=0 wall_ms=97.399375 throughput_requests_s=1026700.633 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=7 mode=0 wall_ms=109.862541 throughput_requests_s=910228.355 p95_ns=833 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=7 mode=1 wall_ms=11.567917 throughput_requests_s=8644598.678 p95_ns=125 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=7 mode=1 wall_ms=14.973333 throughput_requests_s=6678539.775 p95_ns=167 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=7 mode=0 wall_ms=119.423083 throughput_requests_s=837359.056 p95_ns=1208 p99_ns=1542 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=8 mode=0 wall_ms=114.580375 throughput_requests_s=872749.806 p95_ns=1458 p99_ns=1500 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=8 mode=1 wall_ms=9.882084 throughput_requests_s=10119323.009 p95_ns=84 p99_ns=166 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=8 mode=1 wall_ms=9.016709 throughput_requests_s=11090520.943 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=8 mode=0 wall_ms=98.175833 throughput_requests_s=1018580.611 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=9 mode=0 wall_ms=98.976167 throughput_requests_s=1010344.238 p95_ns=833 p99_ns=916 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=9 mode=1 wall_ms=8.969875 throughput_requests_s=11148427.375 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=9 mode=1 wall_ms=8.839083 throughput_requests_s=11313390.767 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=char requests=100000 group=9 mode=0 wall_ms=97.024166 throughput_requests_s=1030671.060 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-SUMMARY family=char requests=100000 mode=0 batches=20 total_wall_ms=2074.918749 throughput_requests_s=963893.165 pooled_p95_ns=833 pooled_p99_ns=1500
+TYPES-SUMMARY family=char requests=100000 mode=1 batches=20 total_wall_ms=189.378874 throughput_requests_s=10560840.065 pooled_p95_ns=84 pooled_p99_ns=166
+TYPES-GATE family=char requests=100000 admitted=true
+TYPES-BATCH family=flonum requests=1000 group=0 mode=0 wall_ms=1.427958 throughput_requests_s=700300.709 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=0 mode=1 wall_ms=0.076208 throughput_requests_s=13121981.944 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=0 mode=1 wall_ms=0.075875 throughput_requests_s=13179571.664 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=0 mode=0 wall_ms=0.719250 throughput_requests_s=1390337.157 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=1 mode=0 wall_ms=0.719833 throughput_requests_s=1389211.109 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=1 mode=1 wall_ms=0.077250 throughput_requests_s=12944983.819 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=1 mode=1 wall_ms=0.077000 throughput_requests_s=12987012.987 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=1 mode=0 wall_ms=1.305583 throughput_requests_s=765941.346 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=2 mode=0 wall_ms=0.712792 throughput_requests_s=1402933.815 p95_ns=750 p99_ns=791 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=2 mode=1 wall_ms=0.075625 throughput_requests_s=13223140.496 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=2 mode=1 wall_ms=0.075416 throughput_requests_s=13259785.722 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=2 mode=0 wall_ms=0.714208 throughput_requests_s=1400152.337 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=3 mode=0 wall_ms=1.326750 throughput_requests_s=753721.500 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=3 mode=1 wall_ms=0.075667 throughput_requests_s=13215800.811 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=3 mode=1 wall_ms=0.076208 throughput_requests_s=13121981.944 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=3 mode=0 wall_ms=0.718084 throughput_requests_s=1392594.738 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=4 mode=0 wall_ms=1.336417 throughput_requests_s=748269.440 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=4 mode=1 wall_ms=0.075792 throughput_requests_s=13194004.644 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=4 mode=1 wall_ms=0.075541 throughput_requests_s=13237844.349 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=4 mode=0 wall_ms=0.713209 throughput_requests_s=1402113.546 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=5 mode=0 wall_ms=0.715833 throughput_requests_s=1396973.875 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=5 mode=1 wall_ms=0.075375 throughput_requests_s=13266998.342 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=5 mode=1 wall_ms=0.075708 throughput_requests_s=13208643.736 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=5 mode=0 wall_ms=1.319875 throughput_requests_s=757647.504 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=6 mode=0 wall_ms=0.714125 throughput_requests_s=1400315.071 p95_ns=750 p99_ns=791 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=6 mode=1 wall_ms=0.075542 throughput_requests_s=13237669.111 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=6 mode=1 wall_ms=0.076250 throughput_requests_s=13114754.098 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=6 mode=0 wall_ms=0.711209 throughput_requests_s=1406056.448 p95_ns=750 p99_ns=791 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=7 mode=0 wall_ms=1.327625 throughput_requests_s=753224.743 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=7 mode=1 wall_ms=0.076250 throughput_requests_s=13114754.098 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=7 mode=1 wall_ms=0.075583 throughput_requests_s=13230488.337 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=7 mode=0 wall_ms=0.711583 throughput_requests_s=1405317.440 p95_ns=750 p99_ns=750 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=8 mode=0 wall_ms=0.712167 throughput_requests_s=1404165.034 p95_ns=750 p99_ns=750 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=8 mode=1 wall_ms=0.075542 throughput_requests_s=13237669.111 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=8 mode=1 wall_ms=0.075417 throughput_requests_s=13259609.902 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=8 mode=0 wall_ms=3.398625 throughput_requests_s=294236.640 p95_ns=1417 p99_ns=1917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=9 mode=0 wall_ms=0.751583 throughput_requests_s=1330525.038 p95_ns=792 p99_ns=958 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=9 mode=1 wall_ms=0.093167 throughput_requests_s=10733414.192 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=9 mode=1 wall_ms=0.076958 throughput_requests_s=12994100.678 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=flonum requests=1000 group=9 mode=0 wall_ms=0.768042 throughput_requests_s=1302012.130 p95_ns=833 p99_ns=917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-SUMMARY family=flonum requests=1000 mode=0 batches=20 total_wall_ms=20.824751 throughput_requests_s=960395.637 pooled_p95_ns=791 pooled_p99_ns=1417
+TYPES-SUMMARY family=flonum requests=1000 mode=1 batches=20 total_wall_ms=1.536374 throughput_requests_s=13017663.668 pooled_p95_ns=84 pooled_p99_ns=84
+TYPES-GATE family=flonum requests=1000 admitted=true
+TYPES-BATCH family=flonum requests=10000 group=0 mode=0 wall_ms=9.672833 throughput_requests_s=1033823.286 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=0 mode=1 wall_ms=0.760375 throughput_requests_s=13151405.556 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=0 mode=1 wall_ms=0.768292 throughput_requests_s=13015884.586 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=0 mode=0 wall_ms=9.171375 throughput_requests_s=1090349.048 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=1 mode=0 wall_ms=9.459916 throughput_requests_s=1057091.839 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=1 mode=1 wall_ms=0.761084 throughput_requests_s=13139154.154 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=1 mode=1 wall_ms=0.760083 throughput_requests_s=13156457.913 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=1 mode=0 wall_ms=9.108000 throughput_requests_s=1097935.881 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=2 mode=0 wall_ms=9.855334 throughput_requests_s=1014678.955 p95_ns=833 p99_ns=959 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=2 mode=1 wall_ms=0.769209 throughput_requests_s=13000367.910 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=2 mode=1 wall_ms=0.770958 throughput_requests_s=12970875.197 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=2 mode=0 wall_ms=9.130208 throughput_requests_s=1095265.300 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=3 mode=0 wall_ms=9.640167 throughput_requests_s=1037326.428 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=3 mode=1 wall_ms=0.762416 throughput_requests_s=13116199.030 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=3 mode=1 wall_ms=0.760708 throughput_requests_s=13145648.527 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=3 mode=0 wall_ms=8.992416 throughput_requests_s=1112048.197 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=4 mode=0 wall_ms=9.510666 throughput_requests_s=1051451.076 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=4 mode=1 wall_ms=0.759084 throughput_requests_s=13173772.600 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=4 mode=1 wall_ms=0.770667 throughput_requests_s=12975772.934 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=4 mode=0 wall_ms=9.008958 throughput_requests_s=1110006.285 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=5 mode=0 wall_ms=9.654041 throughput_requests_s=1035835.667 p95_ns=792 p99_ns=916 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=5 mode=1 wall_ms=0.761834 throughput_requests_s=13126219.098 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=5 mode=1 wall_ms=0.765584 throughput_requests_s=13061923.969 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=5 mode=0 wall_ms=8.941708 throughput_requests_s=1118354.569 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=6 mode=0 wall_ms=9.501709 throughput_requests_s=1052442.250 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=6 mode=1 wall_ms=0.757750 throughput_requests_s=13196964.698 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=6 mode=1 wall_ms=0.758833 throughput_requests_s=13178130.102 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=6 mode=0 wall_ms=9.038542 throughput_requests_s=1106373.130 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=7 mode=0 wall_ms=9.686000 throughput_requests_s=1032417.923 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=7 mode=1 wall_ms=0.772333 throughput_requests_s=12947782.886 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=7 mode=1 wall_ms=0.769125 throughput_requests_s=13001787.746 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=7 mode=0 wall_ms=8.939750 throughput_requests_s=1118599.513 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=8 mode=0 wall_ms=9.729292 throughput_requests_s=1027824.018 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=8 mode=1 wall_ms=0.762458 throughput_requests_s=13115476.525 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=8 mode=1 wall_ms=0.884208 throughput_requests_s=11309556.123 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=8 mode=0 wall_ms=9.038584 throughput_requests_s=1106367.989 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=9 mode=0 wall_ms=9.466792 throughput_requests_s=1056324.043 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=9 mode=1 wall_ms=0.757209 throughput_requests_s=13206393.479 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=9 mode=1 wall_ms=0.756500 throughput_requests_s=13218770.654 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=flonum requests=10000 group=9 mode=0 wall_ms=8.924208 throughput_requests_s=1120547.616 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-SUMMARY family=flonum requests=10000 mode=0 batches=20 total_wall_ms=186.470499 throughput_requests_s=1072555.718 pooled_p95_ns=791 pooled_p99_ns=834
+TYPES-SUMMARY family=flonum requests=10000 mode=1 batches=20 total_wall_ms=15.388710 throughput_requests_s=12996540.971 pooled_p95_ns=84 pooled_p99_ns=84
+TYPES-GATE family=flonum requests=10000 admitted=true
+TYPES-BATCH family=flonum requests=100000 group=0 mode=0 wall_ms=104.325167 throughput_requests_s=958541.480 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=0 mode=1 wall_ms=7.886083 throughput_requests_s=12680566.512 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=0 mode=1 wall_ms=7.652500 throughput_requests_s=13067624.959 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=0 mode=0 wall_ms=100.048791 throughput_requests_s=999512.328 p95_ns=834 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=1 mode=0 wall_ms=106.281917 throughput_requests_s=940893.831 p95_ns=1416 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=1 mode=1 wall_ms=7.698291 throughput_requests_s=12989896.069 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=1 mode=1 wall_ms=8.344958 throughput_requests_s=11983283.798 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=1 mode=0 wall_ms=92.990166 throughput_requests_s=1075382.530 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=2 mode=0 wall_ms=93.056625 throughput_requests_s=1074614.516 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=2 mode=1 wall_ms=7.665250 throughput_requests_s=13045888.914 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=2 mode=1 wall_ms=7.679542 throughput_requests_s=13021609.882 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=2 mode=0 wall_ms=93.491209 throughput_requests_s=1069619.284 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=3 mode=0 wall_ms=96.965666 throughput_requests_s=1031292.870 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=3 mode=1 wall_ms=7.671167 throughput_requests_s=13035826.231 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=3 mode=1 wall_ms=7.691167 throughput_requests_s=13001928.056 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=3 mode=0 wall_ms=93.763000 throughput_requests_s=1066518.776 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=4 mode=0 wall_ms=94.342625 throughput_requests_s=1059966.267 p95_ns=792 p99_ns=1416 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=4 mode=1 wall_ms=7.609334 throughput_requests_s=13141754.587 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=4 mode=1 wall_ms=7.727458 throughput_requests_s=12940866.194 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=4 mode=0 wall_ms=93.421000 throughput_requests_s=1070423.138 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=5 mode=0 wall_ms=98.227500 throughput_requests_s=1018044.845 p95_ns=834 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=5 mode=1 wall_ms=9.947958 throughput_requests_s=10052314.254 p95_ns=125 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=5 mode=1 wall_ms=7.658625 throughput_requests_s=13057174.101 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=5 mode=0 wall_ms=104.379708 throughput_requests_s=958040.618 p95_ns=1416 p99_ns=1459 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=6 mode=0 wall_ms=101.628042 throughput_requests_s=983980.386 p95_ns=1375 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=6 mode=1 wall_ms=7.746250 throughput_requests_s=12909472.325 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=6 mode=1 wall_ms=7.629208 throughput_requests_s=13107520.466 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=6 mode=0 wall_ms=94.608333 throughput_requests_s=1056989.346 p95_ns=792 p99_ns=1042 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=7 mode=0 wall_ms=93.173750 throughput_requests_s=1073263.661 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=7 mode=1 wall_ms=7.661833 throughput_requests_s=13051707.078 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=7 mode=1 wall_ms=7.774208 throughput_requests_s=12863046.628 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=7 mode=0 wall_ms=93.958208 throughput_requests_s=1064302.972 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=8 mode=0 wall_ms=93.137458 throughput_requests_s=1073681.869 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=8 mode=1 wall_ms=7.952833 throughput_requests_s=12574135.531 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=8 mode=1 wall_ms=7.765250 throughput_requests_s=12877885.451 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=8 mode=0 wall_ms=93.350875 throughput_requests_s=1071227.238 p95_ns=750 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=9 mode=0 wall_ms=93.488250 throughput_requests_s=1069653.138 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=9 mode=1 wall_ms=7.635250 throughput_requests_s=13097148.096 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=9 mode=1 wall_ms=7.937917 throughput_requests_s=12597763.368 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=flonum requests=100000 group=9 mode=0 wall_ms=110.921750 throughput_requests_s=901536.443 p95_ns=1416 p99_ns=1542 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-SUMMARY family=flonum requests=100000 mode=0 batches=20 total_wall_ms=1945.560040 throughput_requests_s=1027981.640 pooled_p95_ns=792 pooled_p99_ns=1417
+TYPES-SUMMARY family=flonum requests=100000 mode=1 batches=20 total_wall_ms=157.335082 throughput_requests_s=12711723.124 pooled_p95_ns=84 pooled_p99_ns=125
+TYPES-GATE family=flonum requests=100000 admitted=true
+TYPES-BATCH family=mixed requests=1000 group=0 mode=0 wall_ms=1.487834 throughput_requests_s=672117.992 p95_ns=833 p99_ns=917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=0 mode=1 wall_ms=0.080542 throughput_requests_s=12415882.397 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=0 mode=1 wall_ms=0.080042 throughput_requests_s=12493440.944 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=0 mode=0 wall_ms=0.740083 throughput_requests_s=1351199.798 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=1 mode=0 wall_ms=0.743208 throughput_requests_s=1345518.347 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=1 mode=1 wall_ms=0.080208 throughput_requests_s=12467584.281 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=1 mode=1 wall_ms=0.079875 throughput_requests_s=12519561.815 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=1 mode=0 wall_ms=1.360000 throughput_requests_s=735294.118 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=2 mode=0 wall_ms=0.737875 throughput_requests_s=1355243.097 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=2 mode=1 wall_ms=0.080208 throughput_requests_s=12467584.281 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=2 mode=1 wall_ms=0.080042 throughput_requests_s=12493440.944 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=2 mode=0 wall_ms=0.737208 throughput_requests_s=1356469.273 p95_ns=750 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=3 mode=0 wall_ms=1.341375 throughput_requests_s=745503.681 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=3 mode=1 wall_ms=0.079959 throughput_requests_s=12506409.535 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=3 mode=1 wall_ms=0.079375 throughput_requests_s=12598425.197 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=3 mode=0 wall_ms=0.738875 throughput_requests_s=1353408.899 p95_ns=791 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=4 mode=0 wall_ms=0.743125 throughput_requests_s=1345668.629 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=4 mode=1 wall_ms=0.080459 throughput_requests_s=12428690.389 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=4 mode=1 wall_ms=0.080625 throughput_requests_s=12403100.775 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=4 mode=0 wall_ms=1.550875 throughput_requests_s=644797.292 p95_ns=834 p99_ns=1125 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=5 mode=0 wall_ms=0.772542 throughput_requests_s=1294428.005 p95_ns=833 p99_ns=1208 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=5 mode=1 wall_ms=0.080834 throughput_requests_s=12371031.991 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=5 mode=1 wall_ms=0.081166 throughput_requests_s=12320429.737 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=5 mode=0 wall_ms=1.523334 throughput_requests_s=656454.855 p95_ns=834 p99_ns=1042 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=6 mode=0 wall_ms=0.740833 throughput_requests_s=1349831.878 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=6 mode=1 wall_ms=0.080000 throughput_requests_s=12500000.000 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=6 mode=1 wall_ms=0.078792 throughput_requests_s=12691643.822 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=6 mode=0 wall_ms=0.830500 throughput_requests_s=1204093.919 p95_ns=875 p99_ns=1334 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=7 mode=0 wall_ms=1.776958 throughput_requests_s=562759.502 p95_ns=834 p99_ns=959 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=7 mode=1 wall_ms=0.079916 throughput_requests_s=12513138.796 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=7 mode=1 wall_ms=0.079333 throughput_requests_s=12605094.979 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=7 mode=0 wall_ms=1.006708 throughput_requests_s=993336.697 p95_ns=1500 p99_ns=2167 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=8 mode=0 wall_ms=0.864125 throughput_requests_s=1157239.983 p95_ns=958 p99_ns=1625 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=8 mode=1 wall_ms=0.128542 throughput_requests_s=7779558.432 p95_ns=167 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=8 mode=1 wall_ms=0.079750 throughput_requests_s=12539184.953 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=8 mode=0 wall_ms=1.458958 throughput_requests_s=685420.691 p95_ns=833 p99_ns=958 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=9 mode=0 wall_ms=0.747166 throughput_requests_s=1338390.666 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=9 mode=1 wall_ms=0.080083 throughput_requests_s=12487044.691 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=9 mode=1 wall_ms=0.080125 throughput_requests_s=12480499.220 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-BATCH family=mixed requests=1000 group=9 mode=0 wall_ms=0.757167 throughput_requests_s=1320712.604 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=328000
+TYPES-SUMMARY family=mixed requests=1000 mode=0 batches=20 total_wall_ms=20.658749 throughput_requests_s=968112.832 pooled_p95_ns=833 pooled_p99_ns=1458
+TYPES-SUMMARY family=mixed requests=1000 mode=1 batches=20 total_wall_ms=1.649876 throughput_requests_s=12122123.117 pooled_p95_ns=84 pooled_p99_ns=125
+TYPES-GATE family=mixed requests=1000 admitted=true
+TYPES-BATCH family=mixed requests=10000 group=0 mode=0 wall_ms=13.568750 throughput_requests_s=736987.563 p95_ns=1458 p99_ns=1833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=0 mode=1 wall_ms=0.792833 throughput_requests_s=12612996.684 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=0 mode=1 wall_ms=0.800000 throughput_requests_s=12500000.000 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=0 mode=0 wall_ms=14.536250 throughput_requests_s=687935.334 p95_ns=833 p99_ns=959 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=1 mode=0 wall_ms=10.021750 throughput_requests_s=997829.720 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=1 mode=1 wall_ms=0.802750 throughput_requests_s=12457178.449 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=1 mode=1 wall_ms=0.799750 throughput_requests_s=12503907.471 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=1 mode=0 wall_ms=9.688458 throughput_requests_s=1032155.994 p95_ns=833 p99_ns=917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=2 mode=0 wall_ms=10.017416 throughput_requests_s=998261.428 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=2 mode=1 wall_ms=0.798750 throughput_requests_s=12519561.815 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=2 mode=1 wall_ms=0.800417 throughput_requests_s=12493487.770 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=2 mode=0 wall_ms=9.829166 throughput_requests_s=1017380.315 p95_ns=833 p99_ns=958 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=3 mode=0 wall_ms=10.067500 throughput_requests_s=993295.257 p95_ns=833 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=3 mode=1 wall_ms=0.807416 throughput_requests_s=12385189.295 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=3 mode=1 wall_ms=0.810084 throughput_requests_s=12344398.852 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=3 mode=0 wall_ms=9.837916 throughput_requests_s=1016475.441 p95_ns=833 p99_ns=917 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=4 mode=0 wall_ms=9.955542 throughput_requests_s=1004465.653 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=4 mode=1 wall_ms=0.802250 throughput_requests_s=12464942.350 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=4 mode=1 wall_ms=0.802667 throughput_requests_s=12458466.587 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=4 mode=0 wall_ms=9.204083 throughput_requests_s=1086474.340 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=5 mode=0 wall_ms=9.676792 throughput_requests_s=1033400.325 p95_ns=791 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=5 mode=1 wall_ms=0.803667 throughput_requests_s=12442964.561 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=5 mode=1 wall_ms=0.800875 throughput_requests_s=12486343.062 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=5 mode=0 wall_ms=9.092542 throughput_requests_s=1099802.453 p95_ns=791 p99_ns=792 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=6 mode=0 wall_ms=9.748875 throughput_requests_s=1025759.382 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=6 mode=1 wall_ms=0.803500 throughput_requests_s=12445550.716 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=6 mode=1 wall_ms=0.795542 throughput_requests_s=12570046.585 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=6 mode=0 wall_ms=9.342834 throughput_requests_s=1070339.043 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=7 mode=0 wall_ms=9.702083 throughput_requests_s=1030706.499 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=7 mode=1 wall_ms=0.803958 throughput_requests_s=12438460.716 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=7 mode=1 wall_ms=0.816042 throughput_requests_s=12254271.226 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=7 mode=0 wall_ms=10.546375 throughput_requests_s=948193.100 p95_ns=1416 p99_ns=1542 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=8 mode=0 wall_ms=10.126750 throughput_requests_s=987483.645 p95_ns=792 p99_ns=916 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=8 mode=1 wall_ms=0.798083 throughput_requests_s=12530025.073 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=8 mode=1 wall_ms=0.810125 throughput_requests_s=12343774.109 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=8 mode=0 wall_ms=9.151125 throughput_requests_s=1092761.819 p95_ns=792 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=9 mode=0 wall_ms=11.616584 throughput_requests_s=860838.264 p95_ns=1458 p99_ns=1750 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=9 mode=1 wall_ms=1.721875 throughput_requests_s=5807622.505 p95_ns=167 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=9 mode=1 wall_ms=1.493541 throughput_requests_s=6695497.479 p95_ns=167 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-BATCH family=mixed requests=10000 group=9 mode=0 wall_ms=9.182125 throughput_requests_s=1089072.519 p95_ns=791 p99_ns=833 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=3280000
+TYPES-SUMMARY family=mixed requests=10000 mode=0 batches=20 total_wall_ms=204.912916 throughput_requests_s=976024.371 pooled_p95_ns=792 pooled_p99_ns=1458
+TYPES-SUMMARY family=mixed requests=10000 mode=1 batches=20 total_wall_ms=17.664125 throughput_requests_s=11322383.645 pooled_p95_ns=125 pooled_p99_ns=167
+TYPES-GATE family=mixed requests=10000 admitted=true
+TYPES-BATCH family=mixed requests=100000 group=0 mode=0 wall_ms=133.935125 throughput_requests_s=746630.132 p95_ns=834 p99_ns=1459 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=0 mode=1 wall_ms=8.053458 throughput_requests_s=12417026.326 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=0 mode=1 wall_ms=8.034875 throughput_requests_s=12445744.333 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=0 mode=0 wall_ms=96.316042 throughput_requests_s=1038248.644 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=1 mode=0 wall_ms=96.916291 throughput_requests_s=1031818.273 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=1 mode=1 wall_ms=16.494208 throughput_requests_s=6062734.264 p95_ns=166 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=1 mode=1 wall_ms=8.462625 throughput_requests_s=11816664.451 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=1 mode=0 wall_ms=98.589833 throughput_requests_s=1014303.371 p95_ns=792 p99_ns=1083 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=2 mode=0 wall_ms=97.227959 throughput_requests_s=1028510.739 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=2 mode=1 wall_ms=7.995708 throughput_requests_s=12506709.850 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=2 mode=1 wall_ms=8.087833 throughput_requests_s=12364251.339 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=2 mode=0 wall_ms=101.595458 throughput_requests_s=984295.971 p95_ns=833 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=3 mode=0 wall_ms=114.426291 throughput_requests_s=873925.032 p95_ns=1458 p99_ns=1667 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=3 mode=1 wall_ms=7.988959 throughput_requests_s=12517275.405 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=3 mode=1 wall_ms=8.158875 throughput_requests_s=12256591.748 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=3 mode=0 wall_ms=106.430208 throughput_requests_s=939582.867 p95_ns=792 p99_ns=1417 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=4 mode=0 wall_ms=99.781875 throughput_requests_s=1002186.018 p95_ns=792 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=4 mode=1 wall_ms=8.206458 throughput_requests_s=12185525.107 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=4 mode=1 wall_ms=8.038708 throughput_requests_s=12439809.979 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=4 mode=0 wall_ms=104.172583 throughput_requests_s=959945.478 p95_ns=916 p99_ns=1459 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=5 mode=0 wall_ms=96.649541 throughput_requests_s=1034666.062 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=5 mode=1 wall_ms=8.175708 throughput_requests_s=12231356.599 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=5 mode=1 wall_ms=8.280375 throughput_requests_s=12076747.732 p95_ns=84 p99_ns=125 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=5 mode=0 wall_ms=96.017959 throughput_requests_s=1041471.835 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=6 mode=0 wall_ms=99.712208 throughput_requests_s=1002886.226 p95_ns=833 p99_ns=1458 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=6 mode=1 wall_ms=8.136875 throughput_requests_s=12289730.394 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=6 mode=1 wall_ms=8.073000 throughput_requests_s=12386968.909 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=6 mode=0 wall_ms=97.226000 throughput_requests_s=1028531.463 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=7 mode=0 wall_ms=95.927542 throughput_requests_s=1042453.480 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=7 mode=1 wall_ms=8.012667 throughput_requests_s=12480239.101 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=7 mode=1 wall_ms=7.967167 throughput_requests_s=12551512.978 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=7 mode=0 wall_ms=96.088417 throughput_requests_s=1040708.164 p95_ns=792 p99_ns=875 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=8 mode=0 wall_ms=122.670125 throughput_requests_s=815194.409 p95_ns=1458 p99_ns=1542 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=8 mode=1 wall_ms=8.104041 throughput_requests_s=12339522.961 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=8 mode=1 wall_ms=9.260584 throughput_requests_s=10798455.043 p95_ns=125 p99_ns=167 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=8 mode=0 wall_ms=100.195708 throughput_requests_s=998046.743 p95_ns=833 p99_ns=1459 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=9 mode=0 wall_ms=95.517708 throughput_requests_s=1046926.293 p95_ns=792 p99_ns=834 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=9 mode=1 wall_ms=7.979792 throughput_requests_s=12531654.960 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=9 mode=1 wall_ms=8.084834 throughput_requests_s=12368837.752 p95_ns=84 p99_ns=84 scratch_reserved_bytes=192 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-BATCH family=mixed requests=100000 group=9 mode=0 wall_ms=105.536917 throughput_requests_s=947535.733 p95_ns=1416 p99_ns=1459 scratch_reserved_bytes=0 output_reserved_bytes=128 observer_reserved_bytes=32800000
+TYPES-SUMMARY family=mixed requests=100000 mode=0 batches=20 total_wall_ms=2054.933790 throughput_requests_s=973267.367 pooled_p95_ns=833 pooled_p99_ns=1458
+TYPES-SUMMARY family=mixed requests=100000 mode=1 batches=20 total_wall_ms=171.596750 throughput_requests_s=11655232.398 pooled_p95_ns=84 pooled_p99_ns=125
+TYPES-GATE family=mixed requests=100000 admitted=true
+TYPES-RESULT all_gates_pass=true

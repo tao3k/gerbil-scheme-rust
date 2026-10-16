@@ -50,6 +50,22 @@ pub fn publish_value(value: &OwnedValue) -> Result<RawValue, Error> {
     Ok(RawValue { abi_version: ABI_VERSION, flags: NO_VM,
         context: Box::into_raw(storage).cast(), view, release: Some(release_published_value) })
 }
+
+/// Measure the actual borrowed ABI view and byte spans before a producer call.
+/// This is a caller policy measurement, not an allocation or sandbox guarantee.
+/// # Errors
+/// Rejects structural bounds and byte-count overflow using the same encoder.
+pub fn request_size(value: &OwnedValue) -> Result<usize, Error> {
+    fn size(value: &Encoded) -> Result<usize, Error> {
+        value.children.iter().try_fold(
+            std::mem::size_of::<View>().checked_add(value.bytes.len())
+                .ok_or(Error::Invalid("input size overflow"))?,
+            |total, child| total.checked_add(size(child)?)
+                .ok_or(Error::Invalid("input size overflow")),
+        )
+    }
+    size(&Encoded::new(value, 0, &mut 0)?)
+}
 unsafe extern "C" fn release_published_value(context: *mut c_void) {
     if !context.is_null() {
         // SAFETY: publish_value transfers this exact allocation and one release right.
@@ -389,8 +405,8 @@ impl ForeignState {
 #[derive(Debug)]
 struct Encoded {
     view: View,
-    _bytes: Vec<u8>,
-    _children: Vec<Self>,
+    bytes: Vec<u8>,
+    children: Vec<Self>,
     _views: Vec<View>,
 }
 impl Encoded {
@@ -449,8 +465,8 @@ impl Encoded {
         view.count = views.len();
         Ok(Self {
             view,
-            _bytes: bytes,
-            _children: children,
+            bytes,
+            children,
             _views: views,
         })
     }

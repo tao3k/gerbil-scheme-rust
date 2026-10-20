@@ -245,7 +245,9 @@ fn compile_expression(expression: &ExprIr) -> Result<TokenStream, CompileError> 
         return result;
     }
     Ok(match expression {
-        ExprIr::Borrow { .. } | ExprIr::Try { .. } | ExprIr::Vector { .. }
+        ExprIr::Borrow { .. }
+        | ExprIr::Try { .. }
+        | ExprIr::Vector { .. }
         | ExprIr::Closure { .. } => unreachable!("owned expression handled above"),
         ExprIr::Block { bindings, result } => {
             let bindings = compile_bindings(bindings)?;
@@ -340,8 +342,11 @@ fn compile_expression(expression: &ExprIr) -> Result<TokenStream, CompileError> 
     })
 }
 
-fn compile_binary(operator: &BinaryOperator, left: &ExprIr, right: &ExprIr)
-    -> Result<TokenStream, CompileError> {
+fn compile_binary(
+    operator: &BinaryOperator,
+    left: &ExprIr,
+    right: &ExprIr,
+) -> Result<TokenStream, CompileError> {
     let left = compile_expression(left)?;
     let right = compile_expression(right)?;
     Ok(match operator {
@@ -356,24 +361,40 @@ fn compile_owned_expression(expression: &ExprIr) -> Option<Result<TokenStream, C
     Some(match expression {
         ExprIr::Borrow { value } => compile_expression(value).map(|value| quote! { &(#value) }),
         ExprIr::Try { value } => compile_expression(value).map(|value| quote! { (#value)? }),
-        ExprIr::Vector { values } => compile_arguments(values).map(|values| quote! { vec![#(#values),*] }),
-        ExprIr::Closure { parameters, result, body, move_capture } =>
-            compile_closure(parameters, result, body, *move_capture),
+        ExprIr::Vector { values } => {
+            compile_arguments(values).map(|values| quote! { vec![#(#values),*] })
+        }
+        ExprIr::Closure {
+            parameters,
+            result,
+            body,
+            move_capture,
+        } => compile_closure(parameters, result, body, *move_capture),
         _ => return None,
     })
 }
 
-fn compile_closure(parameters: &[ParameterIr], result: &str, body: &BlockIr,
-                   move_capture: bool) -> Result<TokenStream, CompileError> {
+fn compile_closure(
+    parameters: &[ParameterIr],
+    result: &str,
+    body: &BlockIr,
+    move_capture: bool,
+) -> Result<TokenStream, CompileError> {
     let mut seen = std::collections::BTreeSet::new();
-    let parameters = parameters.iter().map(|parameter| {
-        let name = syn::parse_str::<syn::Ident>(&parameter.name)?;
-        if !seen.insert(parameter.name.clone()) {
-            return Err(CompileError::Syntax(syn::Error::new_spanned(name, "duplicate closure parameter")));
-        }
-        let ty = syn::parse_str::<syn::Type>(&parameter.ty)?;
-        Ok(quote! { #name: #ty })
-    }).collect::<Result<Vec<_>, CompileError>>()?;
+    let parameters = parameters
+        .iter()
+        .map(|parameter| {
+            let name = syn::parse_str::<syn::Ident>(&parameter.name)?;
+            if !seen.insert(parameter.name.clone()) {
+                return Err(CompileError::Syntax(syn::Error::new_spanned(
+                    name,
+                    "duplicate closure parameter",
+                )));
+            }
+            let ty = syn::parse_str::<syn::Type>(&parameter.ty)?;
+            Ok(quote! { #name: #ty })
+        })
+        .collect::<Result<Vec<_>, CompileError>>()?;
     let result = syn::parse_str::<syn::Type>(result)?;
     let bindings = compile_bindings(&body.bindings)?;
     let value = compile_expression(&body.result)?;

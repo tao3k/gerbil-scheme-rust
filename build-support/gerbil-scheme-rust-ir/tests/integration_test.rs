@@ -24,7 +24,7 @@ mod event_future_ir;
 #[path = "integration/event_state_ir.rs"]
 mod event_state_ir;
 
-#[path = "integration/source_match_ir.rs"]
-mod source_match_ir;
 #[path = "integration/closure_ir.rs"]
 mod closure_ir;
+#[path = "integration/source_match_ir.rs"]
+mod source_match_ir;

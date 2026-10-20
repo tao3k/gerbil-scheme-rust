@@ -9,16 +9,16 @@ mod green;
 mod observe;
 #[path = "instance_resources/order_profile.rs"]
 mod order_profile;
+#[path = "instance_resources/orders.rs"]
+mod orders;
 #[path = "instance_resources/owned_vm.rs"]
 mod owned_vm;
 #[path = "instance_resources/owner_wake.rs"]
 mod owner_wake;
-#[path = "instance_resources/orders.rs"]
-mod orders;
-#[path = "instance_resources/retirement.rs"]
-mod retirement;
 #[path = "instance_resources/retained.rs"]
 mod retained;
+#[path = "instance_resources/retirement.rs"]
+mod retirement;
 #[path = "instance_resources/reuse.rs"]
 mod reuse;
 #[path = "instance_resources/root_ab.rs"]

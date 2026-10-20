@@ -1,6 +1,10 @@
 #+TITLE: Progress-supervised O2 qualification and matched native workloads
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Updated build admission
 
 The user authorized a longer build when the compiler has genuine progress.
@@ -178,15 +182,15 @@ results do not establish that O2 expansion performance is preserved.
 
 Exact source/SDK/wheel identities, every cohort, all observed negative results
 and typed outcomes are retained in
-[[file:receipts/20261020-o2-progress-and-native-ab/identity.json][identity.json]],
-[[file:receipts/20261020-o2-progress-and-native-ab/outcomes.json][outcomes.json]] and
-[[file:receipts/20261020-o2-progress-and-native-ab/macro-summary.json][macro-summary.json]].
+identity.json,
+outcomes.json and
+macro-summary.json.
 
 A read-only ownership audit found the three persistent high-CPU devenv
 processes in another project directory, with parent PID 1 and start times
 predating this build attempt. Their ownership is outside this runtime
 qualification. The audit is retained in
-[[file:receipts/20261020-o2-progress-and-native-ab/host-ownership-audit.txt][host-ownership-audit.txt]]. No source or process changes were made to that
+host-ownership-audit.txt. No source or process changes were made to that
 project to obtain a benchmark sample.
 
 * Follow-up: quiet-host capture preparation

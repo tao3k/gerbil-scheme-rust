@@ -1,4 +1,0 @@
-env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1 GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 cargo check -p gerbil-scheme-sys --locked
-   Compiling gerbil-scheme-aot-build v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/build-support/gerbil-scheme-aot-build)
-   Compiling gerbil-scheme-sys v0.1.0 (/private/tmp/bridge-ci-18-ZBBVcM/repo/crates/gerbil-scheme-sys)
-    Finished `dev` profile [optimized + debuginfo] target(s) in 14.44s

@@ -1,6 +1,10 @@
 #+title: Installed Python Native Scheme Owners and Dispatch Qualification
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Follow-up
 
 The expander failure in this receipt is preserved. The subsequent native-module
@@ -19,7 +23,7 @@ control. This does not establish an SMP defect or a Tokio-specific failure.
 Repository: =tao3k/gerbil-scheme-rust=, branch =codex/typed-fold-aot=, base HEAD
 =bb71bbb5ad91bbaef2035979319514c7ced4c4ca= plus dirty sources. Exact selected
 source hashes, SDK path and three wheel hashes are in
-[[file:receipts/20261019-python-native-owners/identity.json][identity.json]]. CPython 3.14.7 and cached offline maturin 1.15.0
+identity.json. CPython 3.14.7 and cached offline maturin 1.15.0
 built and installed the wheels. The final wheel SHA256 is
 =f07b4025138b2b50f64e8b4cbd466c915ea950ccd25f72188953a0f7c6c4e496=.
 This is local evidence, not a published release, PR-head CI or portable wheel
@@ -87,7 +91,7 @@ owner retains its resources rather than having code/files retired underneath it.
 | Additional build-helper lint | Incomplete; stopped after observing elapsed 3m02s, beyond build budget; not a pass | clippy-build-helper-completed.log |
 
 All named receipts are under
-[[file:receipts/20261019-python-native-owners/][receipts/20261019-python-native-owners/]]. The installed suite exercises
+receipts/20261019-python-native-owners/. The installed suite exercises
 big integers and finite native collections, shared/cyclic graphs through GC,
 closures, per-owner state, exceptions/recovery, concurrent hosts, and actual
 Scheme Actors. In every VM a Python-retained Scheme delimited continuation is

@@ -1,9 +1,0 @@
-{
-  "status": "INCOMPLETE_REDUNDANT_CHECK_STOPPED",
-  "pids": [
-    75576,
-    75577,
-    76903
-  ],
-  "reason": "The owning-workspace strict check already completed and reported two actionable warnings in changed code; fix those and rerun that exact check. No other task was interrupted."
-}

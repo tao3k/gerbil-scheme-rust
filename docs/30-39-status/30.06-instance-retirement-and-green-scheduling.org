@@ -1,6 +1,10 @@
 #+title: Native Instance Retirement and Scheme Green Scheduling
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Checkout and execution boundary
 
 This local working-tree qualification is based on
@@ -254,6 +258,6 @@ Strict Clippy passes for the library and qualification crate with all targets.
 The original five-second startup, response, shutdown and genuine-progress
 watchdog bounds are unchanged. Raw successful, failed and excluded receipts,
 SDK header/binary evidence, and working-tree source/image digests are under
-[[file:receipts/20261019-retirement-green/][the receipt directory]]. Historical JSON and native qualification logs are
+the receipt directory. Historical JSON and native qualification logs are
 preserved separately. No remote CI, portable backend, full unload, general
 actor-protocol or unbounded leak-freedom claim is made.

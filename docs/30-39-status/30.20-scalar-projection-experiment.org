@@ -1,9 +1,13 @@
 #+TITLE: Native scalar projection experiment and non-admission
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Decision
 
-Keep the adopted 30.19 owner-resident payload route and its latest 10.10x matched observation as the working baseline. The scalar projection candidate in this report is NOT ADMITTED to the production API. The complete candidate patch, source snapshots, native wheel identity and raw results remain replayable in receipts. The six experimental production/harness files were restored to their committed versions after capture. No dispatcher default, optimization level, Scheme program or runtime capability changed.
+Keep the adopted 30.19 owner-resident payload route and its latest 10.10x matched observation as the working baseline. The scalar projection candidate in this report is NOT ADMITTED to the production API. The candidate patch, source snapshots, native wheel identity and raw results are archived outside this repository. The six experimental production/harness files were restored to their committed versions after capture. No dispatcher default, optimization level, Scheme program or runtime capability changed.
 
 The candidate removes one repeated object-kind read for scalar leaves and uses the existing immediate scalar ABI for fixnums. A non-immediate exact integer falls back only on that ABI's explicit unsupported-scalar status (3), preserving binary sign/magnitude conversion; other failures propagate. An opt-in =project_many(..., fast_scalars=True)= existed only in the measured candidate. It is not part of the retained public API.
 
@@ -65,6 +69,6 @@ The measured candidate passes 16 owner-routing/type/GC/continuation tests, the e
 
 The existing PR's two Gerbil CI jobs failed at Cargo format, before native tests. The logs identify three already committed Rust IR files and the resource benchmark entry. A separate formatting-only commit uses committed HEAD sources and preserves all local IR worktree bytes; it does not incorporate pending semantic research. CI status must be checked on the subsequent pushed head.
 
-Evidence: [[file:receipts/20261020-scalar-projection-candidate/decision.json][non-admission decision]], [[file:receipts/20261020-scalar-projection-candidate/candidate.patch][candidate patch]], [[file:receipts/20261020-scalar-projection-candidate/identity.json][source and wheel identity]], [[file:receipts/20261020-scalar-projection-candidate/summary.json][paired endpoint summary]], [[file:receipts/20261020-scalar-projection-candidate/projection-only-summary.json][projection-only paired summary]], [[file:receipts/20261020-scalar-projection-candidate/projection-diagnostics.json][allocation counters]], and [[file:receipts/20261020-scalar-projection-candidate/sha256.json][receipt hashes]].
+Evidence: non-admission decision, candidate patch, source and wheel identity, paired endpoint summary, projection-only paired summary, allocation counters, and receipt hashes.
 
-To replay, apply the retained patch in an isolated checkout of the recorded baseline, build the example through the existing Cargo/maturin O2 chain described in 30.18, and install that wheel in a separate environment. Run the patched maintained harness with =--projection-ab=, then separately =--projection-ab --owner-trace --rounds 4=. The retained =projection_only.py= runs with the candidate wheel. The unmodified production wheel intentionally does not accept =fast_scalars=. Do not replace historical captures or declare fixed numeric gates from these observations.
+The candidate is retired from the production API. Diagnostic replay requires the candidate material in the external local archive and a separate candidate wheel. The maintained production benchmark runs the adopted owner-resident payload route; it intentionally does not accept the rejected =fast_scalars= option. Historical diagnostic filenames above describe local captures, not files published with this report.

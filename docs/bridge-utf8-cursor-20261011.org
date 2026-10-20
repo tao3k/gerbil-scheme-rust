@@ -1,5 +1,9 @@
 #+TITLE: Checked UTF-8 output cursor: matched bridge qualification
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Source, baseline, and algorithm
 
 Entering production is =4d0fc584c8f2eb87b19333edfa52ab3c14693c5a=;
@@ -20,7 +24,7 @@ Empty spans return before any arithmetic on a potentially null destination.
 Pointers remain local to a synchronous allocation-free leaf; no Scheme body
 pointer survives polling. Rust output and Scheme source are distinct objects.
 
-[[file:benchmarks/20261011-utf8-cursor-arm64.asm][Both leaf functions in the same ARM64 benchmark binary]]
+Both leaf functions in the same ARM64 benchmark binary
 show different addressing: the cursor enables post-indexed/fixed-offset stores;
 the frozen control retains output-base plus running-index stores. This confirms
 the tested source change reaches machine code under unchanged =-O2= flags.
@@ -42,7 +46,7 @@ The unchanged strict paired wall-time ratio must not exceed one at any load.
 | 10000 | 60.316 | 46.144 | 0.765051 | Admit |
 | 100000 | 604.759 | 463.893 | 0.767514 | Admit |
 
-[[file:benchmarks/20261011-utf8-cursor-owned-abba.log][Complete public-ABI receipt]].
+Complete public-ABI receipt.
 The =--owned= option compares the current frozen caller-buffer control (mode 4)
 against the actual checked public ABI (mode 5); it does not remove public-entry
 overhead to manufacture the improvement. Both reserve the same four bytes per
@@ -50,12 +54,12 @@ character and admit only fully validated initialized output.
 
 The independently repeated leaf-isolation comparison (mode 4 versus raw
 current entry mode 7) also passes all loads, paired ratios 0.749298, 0.767744,
-and 0.764936. [[file:benchmarks/20261011-utf8-cursor-codec-abba.log][Complete leaf receipt]].
+and 0.764936. Complete leaf receipt.
 An earlier exploratory run completed successfully but its first output capture
 was truncated; the complete repeat, not that capture, is the authoritative
 leaf receipt. No negative sample or rejected decision was discarded.
 
-[[file:benchmarks/20261011-utf8-cursor-historical-abba.log][Historical-to-public comparison]]
+Historical-to-public comparison
 also passes, but its mode-3 Scheme-bytevector baseline predates caller-owned
 output. It must not be used to attribute all of that gain to this cursor change.
 
@@ -66,7 +70,7 @@ CPU medians are 602.638 versus 462.360 ms; GC CPU medians are 11.627 versus
 11.325 ms. The large improvement is in CPU computation, not a GC policy change.
 The same allocation and complete validation remain in both sides.
 
-[[file:benchmarks/20261011-utf8-cursor-costs.log][Complete seven-phase diagnostic]]
+Complete seven-phase diagnostic
 contains 420 rows: seven phases, three loads, twenty samples per phase/load.
 At 100,000, owned wall/CPU medians are 466.091/464.157 ms; encoding CPU
 377.332 ms, validation 96.110 ms, allocation request/release 2.711 ms,
@@ -114,7 +118,7 @@ proof of parallel Scheme parsing.
 
 The final public-ABI repeat, after all test-control changes, also completes
 all 120 rows and passes the additional direct empty/null leaf regression:
-[[file:benchmarks/20261011-utf8-cursor-final-owned-abba.log][Final matched receipt]].
+Final matched receipt.
 
 | Requests | Frozen control ms | Checked public ABI ms | Paired ratio |
 |----------+-------------------+-----------------------+--------------|

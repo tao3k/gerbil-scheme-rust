@@ -1,8 +1,0 @@
-{
-  "crates/gerbil-scheme-qualification/benches/instance_resources/retained.rs": "d8f6d6477a6a984cd890227cd65f9fbd4da49ce265d990dc2a518bb01d83bce6",
-  "examples/python-ledger/tests/bench_owner_dispatch.py": "fc28212f093afde69bf5f7528200cdefb566ed0836c36a26204498c1d3f9123f",
-  "examples/python-ledger/tests/qualify_full_scheme.py": "ade6b2ecc95aa81015334aa6b1b9067ee544206e3125173acddce182602fcee5",
-  "examples/python-ledger/tests/qualify_owner_reuse.py": "6e2a6fa074e4926bc1fc9a1ae149efc0b39de37f498d4d3dd8e2688a359a59de",
-  "examples/python-ledger/tests/test_library.py": "4dcaf74fb346db3d264ac6cb5b91c3dccedb92c9337416e0c8de3e62478a2506",
-  "examples/python-ledger/tests/test_rust_backend.py": "4b835d82fdf51832e6664756918a3d3d3670dadd62188c58825c844e5f071981"
-}

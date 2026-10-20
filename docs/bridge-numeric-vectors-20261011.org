@@ -1,5 +1,9 @@
 #+title: Homogeneous numeric spans and wake-path qualification
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and baseline
 
 This receipt extends the bridge, not Org parsing. The prior PR head is
@@ -72,7 +76,7 @@ In the first u32 100,000-request ABBA group, control GC counts were 160/160
 versus bulk 7/8. GC wall was 147.530/88.559 ms versus 3.996/4.344 ms.
 Total wall also improved; this is not a GC-only speed claim.
 
-Raw receipt: [[file:benchmarks/20261011-numeric-abba.log]].
+Raw receipt: =20261011-numeric-abba.log= (local diagnostic archive).
 
 * Scheduler evidence boundaries
 
@@ -96,7 +100,7 @@ it is not isolated injection-mutex time. Wake-to-ready time is not bare
 context-switch latency. Negative observer comparisons do not replace the
 baseline with a slower diagnostic wrapper.
 
-Raw full matrix: [[file:benchmarks/20261011-wake-phases-all.log]].
+Raw full matrix: =20261011-wake-phases-all.log= (local diagnostic archive).
 All seven corpora completed 840 batches and 31,080,000 measured requests:
 three loads, 20 batches per variant, two variants, with 12 Tokio workers,
 24 closed-loop callers, queue capacity 12 and exactly one Scheme owner.
@@ -142,8 +146,8 @@ unsupported-element compile-fail gates. =just bridge-lint= and
 remain distinct from these correctness gates and from remote exact-head CI.
 No local Bazel execution is claimed; there is no local Bazel executable.
 
-[[file:benchmarks/20261011-numeric-workspace.log][Workspace receipt]],
-[[file:benchmarks/20261011-numeric-lint.log][workspace lint]],
-[[file:benchmarks/20261011-numeric-actor-lint.log][actor lint]],
-[[file:benchmarks/20261011-numeric-contracts.log][focused owner contracts]] and
-[[file:benchmarks/20261011-numeric-regenerate.log][canonical generated-source receipt]].
+Workspace receipt,
+workspace lint,
+actor lint,
+focused owner contracts and
+canonical generated-source receipt.

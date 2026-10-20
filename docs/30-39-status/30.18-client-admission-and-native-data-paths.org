@@ -1,6 +1,10 @@
 #+TITLE: Client admission, bounded dispatch and native Scheme data reuse
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and execution contract
 
 The Python Rust backend keeps four complete Scheme runtimes on four fixed owner OS threads. Rust admits and distributes requests; Scheme executes the application, expansion, Actors, green threads, GC and continuations. The native Gerbil/Gambit/C O2 compilation path is unchanged. All 78 packaged resources, including the runtime image and module bundles, are byte-identical to the previous O2 wheel. No Scheme algorithm was translated to Rust.
@@ -145,7 +149,7 @@ Retained failures include initial PyO3 multiple-method and redundant-match lint 
 
 Native image bytes are shared in identity comparisons, not mutable heaps. Source and harness snapshots identify the prepared-only, global-only and owner-bounded artifacts separately. A metadata string was corrected after the first input capture; its original harness is retained. A later candidate-window parser option has a separate snapshot from the already completed window-16 captures. Raw captures are not rewritten.
 
-Evidence: [[file:receipts/20261020-client-admission-data-paths/identity-qualified.json][final artifact identity]], [[file:receipts/20261020-client-admission-data-paths/summary.json][all matched summaries]], [[file:receipts/20261020-client-admission-data-paths/negative-outcomes.json][negative outcomes]], [[file:receipts/20261020-client-admission-data-paths/exits-window4.jsonl][final policy exits]] and [[file:receipts/20261020-client-admission-data-paths/sha256.json][receipt hashes]].
+Evidence: final artifact identity, all matched summaries, negative outcomes, final policy exits and receipt hashes.
 
 * Reproduction
 

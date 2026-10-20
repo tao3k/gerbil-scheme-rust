@@ -1,5 +1,9 @@
 #+TITLE: Current-head UTF-8 algorithm audit and conservative rollback
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Baselines and source boundary
 
 Production entering and leaving this audit is unchanged from
@@ -60,16 +64,16 @@ corpora and is not justification for a default scenario-specific fast path.
 Both candidates return exit 101 after completing all loads and are rolled back
 exactly. Their source-only patches and raw receipts remain available:
 
-- [[file:benchmarks/20261011-utf8-fixed-offset.patch][fixed-offset patch]] and
-  [[file:benchmarks/20261011-utf8-fixed-offset-abba.log][complete rejected receipt]].
-- [[file:benchmarks/20261011-utf8-ascii-pair.patch][ASCII-pair patch]] and
-  [[file:benchmarks/20261011-utf8-ascii-pair-abba.log][complete rejected receipt]].
+- fixed-offset patch and
+  complete rejected receipt.
+- ASCII-pair patch and
+  complete rejected receipt.
 
 * Restored production cost matrix
 
 After rollback, the unchanged producer ran all seven diagnostic phases, three
 loads, twenty samples: 420 complete rows, exit zero, no major page faults.
-[[file:benchmarks/20261011-utf8-restored-baseline-costs.log][Raw restored receipt]].
+Raw restored receipt.
 
 | Requests | Owned wall ms | Owned CPU ms | GC CPU ms | Median per-row non-CPU ms |
 |----------+---------------+--------------+-----------+---------------------------|

@@ -1,6 +1,10 @@
 #+TITLE: Owner-affine sessions and native batch projection
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Routing contract
 
 The Rust backend executes complete native Scheme runtimes on fixed owner
@@ -293,10 +297,10 @@ outside this change. No SMP runtime source or other task was modified.
 
 * Receipts
 
-[[file:receipts/20261020-routing-owner-projection/identity-closed-loop.json][Initial capture artifact/source identity]],
-[[file:receipts/20261020-routing-owner-projection/identity-scheduled.json][fixed-cohort artifact/source identity]],
-[[file:receipts/20261020-routing-owner-projection/ab-exits.jsonl][all final capture commands/exits]],
-[[file:receipts/20261020-routing-owner-projection/ab-summary.json][summaries and complete paired ratios]], and
-[[file:receipts/20261020-routing-owner-projection/outcomes.json][qualification outcomes]] accompany all raw captures. The two harness snapshots
+Initial capture artifact/source identity,
+fixed-cohort artifact/source identity,
+all final capture commands/exits,
+summaries and complete paired ratios, and
+qualification outcomes accompany all raw captures. The two harness snapshots
 identify the source used before/after adding the fixed scheduled cohort. Earlier
 small smoke captures and superseded-wheel checks remain diagnostic receipts.

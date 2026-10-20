@@ -1,9 +1,0 @@
-test_completed_owner_has_no_artificial_trailing_wait (test_benchmark_metrics.CompletionFairnessTests.test_completed_owner_has_no_artificial_trailing_wait) ... ok
-test_equal_coverage_can_hide_late_service (test_benchmark_metrics.CompletionFairnessTests.test_equal_coverage_can_hide_late_service) ... ok
-test_native_window_clock_restarts_and_owner_offset_continues (test_benchmark_metrics.CompletionFairnessTests.test_native_window_clock_restarts_and_owner_offset_continues) ... ok
-test_single_owner_and_empty_actor_groups (test_benchmark_metrics.CompletionFairnessTests.test_single_owner_and_empty_actor_groups) ... ok
-
-----------------------------------------------------------------------
-Ran 4 tests in 0.000s
-
-OK

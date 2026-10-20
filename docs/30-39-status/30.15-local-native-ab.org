@@ -1,6 +1,10 @@
 #+TITLE: Local native Scheme O0/O2 and owner dispatch measurements
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Execution and scope
 
 The user explicitly authorized immediate local execution without a quiet-host gate.
@@ -69,7 +73,7 @@ establish fairness, and these results do not establish starvation freedom.
 
 ** Matched-round uncertainty
 
-[[file:receipts/20261020-local-native-ab/paired-rounds.json][Paired round ratios]] compare each mode with direct in the same four-mode
+Paired round ratios compare each mode with direct in the same four-mode
 round. The capture uses balanced order, not simultaneous execution. The
 descriptive 95% intervals resample 16 complete paired rounds 4000 times with
 a fixed random seed. They condition on one process and do not model independent
@@ -222,7 +226,7 @@ GC and cleanup checks complete in each successful
 process. They do not establish long-duration leak freedom or repeat the full
 continuation/exception acceptance suite, which remains separately recorded.
 
-[[file:receipts/20261020-local-native-ab/identity.json][Artifact and source identities]],
-[[file:receipts/20261020-local-native-ab/exits.jsonl][all exits and commands]],
-[[file:receipts/20261020-local-native-ab/summary.json][complete summaries and fairness metrics]] and
-[[file:receipts/20261020-local-native-ab/dispatch.csv][dispatch table]] accompany the raw JSONL/stderr receipts.
+Artifact and source identities,
+all exits and commands,
+complete summaries and fairness metrics and
+dispatch table accompany the raw JSONL/stderr receipts.

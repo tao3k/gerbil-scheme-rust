@@ -1,6 +1,10 @@
 #+title: Library-Owned Native Scheme Instances: JSON and Lifecycle Qualification
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Identity and execution path
 
 Repository =tao3k/gerbil-scheme-rust=, branch =codex/typed-fold-aot=,
@@ -15,7 +19,7 @@ Rust owns dispatch and byte transfer. Native Scheme owns JSON parsing/writing,
 exact-integer validation, table aggregation, sorting, heap allocation, forced
 GC, closures, continuations, dynamic binding and exceptions.
 
-See [[file:../instance-runtime.org][the API and native image contract]] and [[file:receipts/20261019-instance-library/receipt.json][the complete identity/sample manifest]].
+See [[file:../instance-runtime.org][the API and native image contract]] and the complete identity/sample manifest.
 The image reuses the production C single-processor lifecycle including host-I/O
 restoration, compiled by the existing compiler-owned program archive builder.
 The qualification executable also links its ordinary host graph for the negative
@@ -127,10 +131,10 @@ ignored benchmark; the ignored benchmark is not claimed as executed. Source layo
 The lockfile adds only the qualification crate's existing serde_json dependency;
 no dependency version changed.
 
-- [[file:receipts/20261019-instance-library/final.log][Complete final native log]]
-- [[file:receipts/20261019-instance-library/receipt.json][Source/image identities, all checked samples, cold costs and cleanup observations]]
-- [[file:receipts/20261019-instance-library/activity.log][One-second native/compiler activity observations]]
-- [[file:receipts/20261019-instance-library/excluded-overlap.log][Excluded full run overlapping another native test]]
+- Complete final native log
+- Source/image identities, all checked samples, cold costs and cleanup observations
+- One-second native/compiler activity observations
+- Excluded full run overlapping another native test
 - Development compile and queue-test failures are preserved alongside that receipt;
   they are not relabeled as accepted runtime or timing evidence.
 

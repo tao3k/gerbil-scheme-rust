@@ -1,6 +1,10 @@
 #+title: Native Batch API and Scheme Actor Qualification
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Implementation and checkout
 
 Local working-tree evidence on =codex/typed-fold-aot=, base
@@ -199,6 +203,6 @@ env -u SDKROOT PATH=/Users/guangtao/.cargo/bin:/usr/bin:/bin:/opt/homebrew/bin \
 The final timing run invoked the Cargo-built release binary directly after
 compilation, with the same arguments, so no owned compiler overlapped timing.
 The original five-second startup/response/shutdown/progress gates remain intact.
-See [[file:receipts/20261019-native-batch-api/README.org][the receipt inventory]], raw samples and source/image digests. Strict current
+See the receipt inventory, raw samples and source/image digests. Strict current
 Clippy, generated Scheme provenance and native-root compile-fail ownership
 checks are recorded separately from execution/performance evidence.

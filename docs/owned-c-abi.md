@@ -8,7 +8,7 @@ for arbitrary Scheme. Rust does not implement the producer's closure body or
 component transition. The producer supplies actual C-compatible function pointers.
 
 Use `gerbil-scheme-python` with `default-features = false, features = ["c-abi"]`.
-Add `rust-backend` only when Python conversion is required. `owned-values` contains
+Add `python` only when Python conversion is required. `owned-values` contains
 the shared data types without Python. Neither combination enables `gerbil-scheme`
 or `gerbil-scheme-sys`. The feature name does not prove an external producer is
 VM-independent; exact producer source and artifact admission remain necessary.

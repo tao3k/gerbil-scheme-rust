@@ -1,12 +1,16 @@
 #+title: Owner Wakeup, Native Type GC, and Explicit Scheme Runtime Requirements
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and identity
 
 This continues the Rust--Gerbil library work on =codex/typed-fold-aot=,
 base commit =bb71bbb5ad91bbaef2035979319514c7ced4c4ca= plus uncommitted sources.
 The source inventory, native artifacts and raw logs are bound in
-[[file:receipts/20261019-owner-wakeup-gc/manifest.json][the receipt manifest]]. This is local Darwin evidence, not remote CI,
+the receipt manifest. This is local Darwin evidence, not remote CI,
 installed-wheel migration or a release. Earlier negative receipts remain intact.
 
 Scheme continues through Gerbil -> Gambit C -> native code. Rust dispatches
@@ -207,7 +211,7 @@ just bridge-instance-resources --orders
 
 Raw stdout/stderr, negative candidate source, artifact/source hashes, final
 metrics and native module inventory are under
-[[file:receipts/20261019-owner-wakeup-gc/][20261019-owner-wakeup-gc]]. This source inventory is scoped to the touched
+20261019-owner-wakeup-gc. This source inventory is scoped to the touched
 bridge, owned ABI and qualification path; it is not a complete dependency
 supply-chain attestation. Historical artifacts retain their own identities. The measured executable was
 saved before adding the final result-root lifetime assertions; its native order,

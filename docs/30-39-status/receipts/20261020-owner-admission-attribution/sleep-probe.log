@@ -1,3 +1,0 @@
-(begin (##thread-sleep! 0.01) 42) 42 0.585264166991692
-(begin (import :gerbil/gambit) (thread-sleep! 0.01) 42) Native { operation: "native root", code: 0 }
-(begin (import :gerbil/gambit/threads) (thread-sleep! 0.01) 42) Native { operation: "native root", code: 0 }

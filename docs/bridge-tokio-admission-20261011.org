@@ -1,5 +1,9 @@
 #+title: Bounded admission, external wakeups and owner waiting
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Baseline and evidence boundary
 
 Baseline: =9cd2604efe2a40d53554ee8ffe38d5a8eff4c79e= on existing PR #18.
@@ -73,14 +77,14 @@ Two variants coexist, plus scratch allocations. Shared process high-water
 RSS is not attributable exclusively to one variant; deferred reply
 allocation does not eliminate the reply allocation for admitted requests.
 
-Raw matrix: [[file:benchmarks/20261011-admission-fastpath-abba.log]].
+Raw matrix: =20261011-admission-fastpath-abba.log= (local diagnostic archive).
 
 * Completed result and rollback
 
 All 840 batches completed without request errors. All 42 variant/load
 summaries contain 20 batches. The candidate failed 78 of 189 paired metric
 gates and is REJECTED. Its source is reverted exactly to the baseline;
-[[file:benchmarks/20261011-admission-fastpath-rejected.patch][the rejected patch]] remains reproducible evidence,
+the rejected patch remains reproducible evidence,
 not active library or benchmark policy. Actor/AOT clippy passed before
 timing. The final qualification commands run after reverting the candidate.
 

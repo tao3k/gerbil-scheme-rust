@@ -1,5 +1,9 @@
 #+TITLE: Post-cursor UTF-8 audit: reject regressions and preserve fc4562c
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Baseline and matched controls
 
 Production entering and leaving this audit is exactly
@@ -51,11 +55,11 @@ All three finish every load and return exit 101. Independent medians cannot
 replace the paired admission statistic. All source changes are rolled back.
 The complete 360 sample rows and replayable source-only patches are retained:
 
-- [[file:benchmarks/20261011-utf8-input-cursor-rejected.log][Input-cursor receipt]], [[file:benchmarks/20261011-utf8-input-cursor.patch][patch]].
-- [[file:benchmarks/20261011-utf8-noalias-rejected.log][No-alias receipt]], [[file:benchmarks/20261011-utf8-noalias.patch][patch]].
-- [[file:benchmarks/20261011-utf8-packed-rejected.log][Packed receipt]], [[file:benchmarks/20261011-utf8-packed.patch][patch]].
+- Input-cursor receipt, patch.
+- No-alias receipt, patch.
+- Packed receipt, patch.
 
-[[file:benchmarks/20261011-utf8-packed-rejected-arm64.asm][Packed and frozen leaf machine code in the same binary]]
+Packed and frozen leaf machine code in the same binary
 shows halfword/word stores with additional packing operations. There is no
 out-of-line memcpy call or stack temporary in these optimized leaves. Even
 with fewer stores, extra computation/ordering costs can dominate. At 100,000,
@@ -64,7 +68,7 @@ ms; both have 1,237 collections. This is not a GC or heap-allocation regression.
 
 * Restored allocation and GC diagnosis
 
-[[file:benchmarks/20261011-utf8-fc4562c-restored-costs.log][Restored production cost matrix]]
+Restored production cost matrix
 contains all 420 rows: seven phases, three loads, twenty samples each, exit
 zero. Two earlier successful diagnostic executions had truncated stdout
 captures; this complete repeat, not a selected subset, is the authoritative

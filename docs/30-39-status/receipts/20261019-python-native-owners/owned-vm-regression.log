@@ -1,2 +1,0 @@
-RESOURCE-DRAIN joined=4 pending=0 roots=[0, 0, 0, 0] native-cleanup-ns=[37916, 32166, 28833, 28291] io-retired-bytes=[2048, 2048, 2048, 2048] files-removed=[true, true, true, true]
-OWNED-VM owners=4 native-types=true gc=true multishot=true exception=true alias-close=true release-once=true roots=0

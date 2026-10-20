@@ -1,6 +1,10 @@
 #+title: Native Batch Tail Attribution and Minimal Scheme Scheduling Repair
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and decision
 
 Local working-tree qualification on =codex/typed-fold-aot=, base
@@ -173,7 +177,7 @@ panics complete naturally; retained-heap growth and release both measure
 134,219,264 bytes. FD/thread counts return to baseline and native roots are zero.
 Initialized image mappings retain their previously documented lifecycle boundary.
 
-See [[file:receipts/20261019-native-batch-tail/README.org][receipt inventory]] for frozen controls, rejected experiments, full latency
+See receipt inventory for frozen controls, rejected experiments, full latency
 records, phase/GC traces, source/image digests and command outcomes. The existing
 five-second startup/response/shutdown/progress gates are retained. No compiler
 process was present in the final paired before/after surveys; this remains a

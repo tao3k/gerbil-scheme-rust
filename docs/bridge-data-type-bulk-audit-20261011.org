@@ -1,5 +1,9 @@
 #+title: Data-type bulk FFI audit and scalar qualification
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Evidence boundaries
 
 The encoder baseline remains =fc4562c91af0c8ed81840b5ceaaf40712555e0aa=.
@@ -109,10 +113,10 @@ capacity accounting, not allocator metadata, allocation counts, per-mode
 RSS or GC measurements. Initial warm/compile-adjacent results are retained
 separately and are not the final receipt.
 
-Raw final receipt: [[file:benchmarks/20261011-scalar-bulk-abba.log]].
-Initial receipt: [[file:benchmarks/20261011-scalar-bulk-initial-abba.log]].
-Owner contracts: [[file:benchmarks/20261011-scalar-root-contracts.log]].
-Lint: [[file:benchmarks/20261011-scalar-lint.log]].
+Raw final receipt: =20261011-scalar-bulk-abba.log= (local diagnostic archive).
+Initial receipt: =20261011-scalar-bulk-initial-abba.log= (local diagnostic archive).
+Owner contracts: =20261011-scalar-root-contracts.log= (local diagnostic archive).
+Lint: =20261011-scalar-lint.log= (local diagnostic archive).
 
 * Scheduling boundary and remaining work
 

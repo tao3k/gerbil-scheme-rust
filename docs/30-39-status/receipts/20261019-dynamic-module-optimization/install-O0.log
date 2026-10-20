@@ -1,8 +1,0 @@
-Using CPython 3.14.7 interpreter at: /opt/homebrew/opt/python@3.14/bin/python3.14
-Creating virtual environment at: /private/tmp/gerbil-module-opt-20261019/venv-O0
-Activate with: source /private/tmp/gerbil-module-opt-20261019/venv-O0/bin/activate
-Using Python 3.14.7 environment at: /private/tmp/gerbil-module-opt-20261019/venv-O0
-Resolved 1 package in 20ms
-Prepared 1 package in 119ms
-Installed 1 package in 10ms
- + gerbil-ledger==0.1.0 (from file:///private/tmp/gerbil-module-opt-20261019/wheels-O0/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl)

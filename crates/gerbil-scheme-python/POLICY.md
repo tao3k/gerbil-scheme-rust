@@ -30,18 +30,13 @@ an ancestor/descendant of an old root is denied. Failed partial publication
 retains staging/backup data and is not an admitted package. The publisher does
 not claim concurrent-writer serialization, multi-root atomicity or durability.
 
-The IR crate's existing `compiler.rs` hint describes pure JSON-to-typed-Rust
-generation: that owner does not perform filesystem, process or runtime entry.
-Its `lib.rs` hint describes public exports. Generated-code execution tests are
-separate from those source responsibilities; a hint does not assert they
-passed. Standalone ledger and ASCENT gates additionally classify actual foreign
-calls, state lifetimes and maintainer build operations.
+The native instance backend owns the complete Scheme runtime path. The retired Scheme-to-Rust IR compiler and VM-free qualification examples are not part of this package's verification matrix.
 
 ```sh
-cargo test --locked -p gerbil-scheme-python -p gerbil-scheme-rust-ir
+cargo test --locked -p gerbil-scheme-python
 ```
 
-Compile `scheme-backend,external-program` separately in the maintainer build
+Compile `instance-backend,external-program` and `scheme-backend,external-program` separately in the maintainer build
 environment. Run each standalone example's `integration_test` target with an
 explicit compiled backend. Installed-wheel tests remain independent acceptance
 requirements; downstream applications never receive a compiler or SDK setup.

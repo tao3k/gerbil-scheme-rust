@@ -1,6 +1,10 @@
 #+title: Native Typed Instance Resource Qualification
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and implementation
 
 This local Darwin qualification uses the Rust library's fixed-owner
@@ -141,7 +145,7 @@ cannot escape as a queued job result. The repository whitespace check passes.
 
 * Evidence and remaining boundaries
 
-Raw local receipts are in [[file:receipts/20261019-native-resources/][the receipt directory]]. The source/image digest
+Raw local receipts are in the receipt directory. The source/image digest
 manifest identifies the working-tree artifacts; the base commit alone does not
 identify these uncommitted changes. Historical JSON receipts remain unchanged.
 Source, native runtime acceptance and remote exact-head CI are separate gates;

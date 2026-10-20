@@ -1,6 +1,10 @@
 #+TITLE: UTF-8 leaf dispatch and non-CPU wall-time qualification
 #+AUTHOR: tao3k team
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Evidence boundary
 
 The frozen reference remains =6ad680c6311957eadf2529765ab1efd751132554=.
@@ -32,9 +36,9 @@ no compiler download or rebuild is required.
 =just bridge-utf8-matched --costs= completed with exit zero. Each of seven
 phases has 20 samples at each of 1,000, 10,000, and 100,000 requests: 420 raw
 rows, with no missing or truncated rows in
-[[file:benchmarks/20261011-utf8-leaf-cost-attribution.log][the complete receipt]].
+the complete receipt.
 The earlier prototype's transport-truncated capture is explicitly non-admitted
-in [[file:benchmarks/20261011-utf8-leaf-cost-partial.log][the partial receipt]];
+in the partial receipt;
 it is not used to fill gaps in the full run.
 
 The new dispatch control uses the production fixnum chunk arithmetic and the
@@ -88,7 +92,7 @@ The candidate keeps the scalar algorithm, capacity policy, 256-character bound,
 pointer-tag checks, interrupt boundary, and complete output validation unchanged.
 It uses =##c-code= with the official allocation-free pointer converter to avoid
 the private =c-lambda= CFUN framing. The complete source-only experiment is saved
-in [[file:benchmarks/20261011-utf8-checked-inline-leaf.patch][the replayable patch]].
+in the replayable patch.
 Its source base is the pre-audit PR head =7d172c9487c53c8d3544ca3ae945ceed50f20920=;
 reverse-apply validation against the candidate succeeds without changing files.
 
@@ -101,7 +105,7 @@ no paired wall-time regression. The diagnostic table is not a substitute gate.
 =just bridge-utf8-matched --codec= completed with exit zero and all 120 timing
 rows: twenty samples per variant/load. Both routes use identical owner, AOT
 image, exclusive owned capacity, content verification, and full UTF-8 validation.
-The saved [[file:benchmarks/20261011-utf8-checked-inline-leaf-abba.log][receipt]]
+The saved receipt
 includes Unicode, surrogate, mutation, bounds, roots, and typed-pointer contracts.
 
 | Requests | C-lambda wall ms | Inline wall ms | Paired ratio | C-lambda CPU ms | Inline CPU ms |
@@ -126,7 +130,7 @@ The generated =utf8.scm= and shared provenance are synchronized through
 =just bridge-utf8-matched --buffer= also completed with exit zero: all 120 rows,
 twenty samples per variant/load, full contracts before timing, actual checked
 public encoding ABI, owned allocation, current-text parity, and full validation.
-The [[file:benchmarks/20261011-utf8-checked-inline-public-abba.log][public ABI receipt]]
+The public ABI receipt
 compares the frozen =6ad680c= Scheme-bytevector route with the current Rust-owned
 destination route. This is a different comparison from the framing-only trial.
 

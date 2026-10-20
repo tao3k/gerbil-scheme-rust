@@ -29,3 +29,12 @@
 /examples/python-ledger/python/gerbil_ledger/__pycache__/
 /examples/python-ledger/python/gerbil_ledger/_resources/
 /examples/python-ledger/python/gerbil_ledger/.gerbil-*
+
+# Generated diagnostics and rejected experiments stay outside the source tree.
+/docs/benchmarks/
+/docs/30-39-status/receipts/
+/local-diagnostics/
+/docs/**/*.log
+/docs/**/*.stderr
+/docs/**/*.jsonl
+/docs/**/*.patch

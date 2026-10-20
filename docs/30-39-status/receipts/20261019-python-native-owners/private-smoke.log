@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "<stdin>", line 3, in <module>
-  File "/private/tmp/gerbil-python-vm/venv/lib/python3.14/site-packages/gerbil_ledger/__init__.py", line 7, in open_library
-    return _open(str(Path(__file__).parent), backend, owners)
-RuntimeError: Scheme configure: Timeout; shutdown: ShutdownReceipt { owners: [OwnerShutdown { owner: 1, roots_before_cleanup: 0, gc_collections: 1, status: 0, cleanup_time: 43.625µs, image_file_removed: true, image_file_error: None, native_io_released_bytes: 2048, finalizer_status: Some(0) }, OwnerShutdown { owner: 2, roots_before_cleanup: 0, gc_collections: 1, status: 0, cleanup_time: 32.417µs, image_file_removed: true, image_file_error: None, native_io_released_bytes: 2048, finalizer_status: Some(0) }, OwnerShutdown { owner: 3, roots_before_cleanup: 0, gc_collections: 1, status: 0, cleanup_time: 29.458µs, image_file_removed: true, image_file_error: None, native_io_released_bytes: 2048, finalizer_status: Some(0) }], joined: 3, pending: 1, panicked: 0 }; resources: /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/gerbil-owners-93048-0

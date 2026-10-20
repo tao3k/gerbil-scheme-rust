@@ -1,5 +1,9 @@
 #+title: Private injection-lock and owner receive timing
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and frozen production checkout
 
 Baseline: =fbb43ca63d3740cb4e19b26fa2abd1ea3ee4ecdb=, existing PR #18.
@@ -28,7 +32,7 @@ of =shared.synced= (e.g. dequeue/idle management) are not directly probed.
 
 The original official worker source SHA-256 is
 =b7860cfa69f197eb52f3374a1cf0fe6adc2ff82a6971d8d27985fea65c08d94c=.
-[[file:benchmarks/20261011-private-injection-lock-probe.patch][The isolated diagnostic patch]] contains the exact source probe,
+The isolated diagnostic patch contains the exact source probe,
 owner timing, manifest override and Justfile entry. To reproduce, create
 an archive as =repo/= beside the cached source copy as =tokio/=, apply the
 patch from their parent and run =just bridge-lock-profile= inside =repo/=.
@@ -51,7 +55,7 @@ for receive attribution; it was stopped, retained as an invalid receipt,
 and replaced by a complete run using direct thread CPU clocks. These are
 not accepted samples. The valid baseline diagnostic completed all 420
 batches: seven corpora, three loads, 20 batches per load, 15,540,000 requests.
-[[file:benchmarks/20261011-private-injection-lock-profile.log][Complete valid baseline probe]].
+Complete valid baseline probe.
 
 For mixed text, weighted diagnostic means are:
 
@@ -95,11 +99,11 @@ and disable per-request CPU/GC/wake observers during acceptance.
 PER variant/load and ten ABBA groups. Exact pooled request P95/P99 cover
 admission, queue, service and response. Paired median ratios gate wall and
 each tail independently; a favorable aggregate does not override failure.
-Actor/AOT Clippy passed before timing. [[file:benchmarks/20261011-coalescing-abba.log][Full acceptance log]].
+Actor/AOT Clippy passed before timing. Full acceptance log.
 
 The candidate failed 51 of 189 paired metric gates: REJECTED. Benchmark
 source, both manifests and the complete lockfile are restored exactly to
-the frozen baseline. [[file:benchmarks/20261011-coalescing-rejected.patch][Rejected code and dependency patch]] is evidence, not an active
+the frozen baseline. Rejected code and dependency patch is evidence, not an active
 production feature. An initial unused diagnostic field lint failure was
 corrected without adding a lint exemption; its failed receipt is retained.
 
@@ -126,8 +130,8 @@ The isolated coalesced candidate completed all 420 batches for seven corpora,
 three loads and 20 batches. It is temporally separate from the baseline
 profile, not an ABBA speed comparison. Its role is to check injection-event
 counts and scoped lock/receive intervals; only the uninstrumented matched
-matrix above decides adoption. [[file:benchmarks/20261011-private-injection-lock-coalesced-profile.log][Complete candidate diagnostic]],
-[[file:benchmarks/20261011-private-injection-lock-coalesced-probe.patch][complete isolated candidate probe patch]]. Reverse application checks
+matrix above decides adoption. Complete candidate diagnostic,
+complete isolated candidate probe patch. Reverse application checks
 confirm this second archived patch matches the executed isolated sources.
 
 For mixed text, baseline / coalesced injection events/request were

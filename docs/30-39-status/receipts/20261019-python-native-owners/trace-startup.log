@@ -1,8 +1,0 @@
-PHASE configure-enter
-PHASE load-path-set
-PHASE expander-before
-Traceback (most recent call last):
-  File "<stdin>", line 2, in <module>
-  File "/private/tmp/gerbil-python-vm/venv/lib/python3.14/site-packages/gerbil_ledger/__init__.py", line 7, in open_library
-    return _open(str(Path(__file__).parent), backend, owners)
-RuntimeError: Scheme configure: Timeout; shutdown: ShutdownReceipt { owners: [], joined: 0, pending: 1, panicked: 0 }; resources: /var/folders/pj/n33bqzy94yn9wxggj3rny0d00000gn/T/gerbil-owners-8316-0

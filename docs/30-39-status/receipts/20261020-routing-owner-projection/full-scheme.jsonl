@@ -1,6 +1,0 @@
-"/private/tmp/gerbil-routing-batch-20261020/venv/bin/python" examples/python-ledger/tests/qualify_full_scheme.py
-{"status": "PASS", "stage": "hygienic-dsl", "owner": 0, "ns": 1235895625}
-{"status": "PASS", "stage": "hygienic-dsl", "owner": 1, "ns": 1249876709}
-{"status": "PASS", "stage": "hygienic-dsl", "owner": 2, "ns": 795664250}
-{"status": "PASS", "stage": "hygienic-dsl", "owner": 3, "ns": 705228042}
-{"status": "PASS", "stage": "shutdown", "roots": [0, 0, 0, 0], "files_removed": true}

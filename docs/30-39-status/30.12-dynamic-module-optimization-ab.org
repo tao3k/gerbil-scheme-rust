@@ -1,6 +1,10 @@
 #+TITLE: Dynamic module optimization A/B and quiet-host admission
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Target and execution boundary
 
 The acceptance comparison is =-O0= versus =-O2=. =-O1= is a diagnostic
@@ -135,8 +139,8 @@ Clippy (94s) and rustfmt checks. No remote CI, release, O2 performance or quiet
 host acceptance is claimed.
 
 Durable raw results and source/wheel identities are in
-[[file:receipts/20261019-dynamic-module-optimization/outcomes.json][outcomes.json]] and
-[[file:receipts/20261019-dynamic-module-optimization/identity.json][identity.json]].
+outcomes.json and
+identity.json.
 The experimental wheels remain outside the repository, under
 =/private/tmp/gerbil-module-opt-20261019/=. O0 SHA256:
 =6d99da0fce11d5042beadaec49118e369add32a8af0b5d9057e09d87d8460812=.

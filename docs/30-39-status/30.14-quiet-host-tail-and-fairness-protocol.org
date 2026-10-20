@@ -1,6 +1,10 @@
 #+TITLE: Quiet-host tail and completion fairness protocol
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Follow-up execution
 
 The user subsequently authorized immediate execution on the local host without
@@ -140,8 +144,8 @@ member hashes. The O0/O2 artifacts were reused without rebuilding or changing
 Scheme/Rust execution. This verifies artifact selection, not new performance.
 
 The source/artifact identities and current blocked status are retained in
-[[file:receipts/20261020-quiet-tail-fairness-preparation/identity.json][identity.json]] and
-[[file:receipts/20261020-quiet-tail-fairness-preparation/outcomes.json][outcomes.json]].
+identity.json and
+outcomes.json.
 The recorded preflight, four metric tests and historical/busy-entrypoint
 replays are separate receipts. No quiet-host measurement or non-regression
 conclusion is claimed by these preparation checks.

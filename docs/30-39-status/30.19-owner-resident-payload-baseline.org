@@ -1,6 +1,10 @@
 #+TITLE: Owner-resident Scheme payload baseline and projection attribution
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Adopted execution path
 
 Reusable application data stays in the complete Scheme runtime of its fixed owner thread. Rust routes native typed requests; Scheme retains execution, Actors, green threads, GC, closures and continuations. The native O2 compiler chain and dispatcher defaults are unchanged. This work changes the maintained benchmark and documentation, not native execution code.
@@ -73,4 +77,4 @@ The benchmark records schema, harness/installed-extension SHA-256, Python versio
 
 Both captures exit zero, preserve VM identities, reuse payloads after explicit GC, retire every root to [0,0,0,0] and remove runtime files. These checks do not establish full RSS return or indefinite leak freedom. Owner routing/native capability regression results are retained separately.
 
-Evidence: [[file:receipts/20261020-owner-resident-baseline/baseline-contract.json][baseline contract]], [[file:receipts/20261020-owner-resident-baseline/baseline.jsonl][untraced paired replication]], [[file:receipts/20261020-owner-resident-baseline/trace.jsonl][diagnostic spans]], [[file:receipts/20261020-owner-resident-baseline/trace-summary.json][phase summary]], [[file:receipts/20261020-owner-resident-baseline/routing.log][owner routing regression]], and [[file:receipts/20261020-owner-resident-baseline/sha256.json][receipt hashes]].
+Evidence: baseline contract, untraced paired replication, diagnostic spans, phase summary, owner routing regression, and receipt hashes.

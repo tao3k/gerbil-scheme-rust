@@ -1,9 +1,0 @@
-🍹 Building a mixed python/rust project
-🐍 Found CPython 3.14 at /opt/homebrew/opt/python@3.14/bin/python3.14
-🔗 Found pyo3 bindings with abi3-py3.10 support
-📡 Using build options features from pyproject.toml
-💻 Using `MACOSX_DEPLOYMENT_TARGET=11.0` for aarch64-apple-darwin by default
-   Compiling gerbil-python-ledger v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/examples/python-ledger)
-real 120.02
-user 0.22
-sys 0.17

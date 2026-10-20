@@ -1,1 +1,0 @@
-"/private/tmp/gerbil-routing-batch-20261020/venv/bin/python" examples/python-ledger/tests/bench_owner_projection.py --rounds 4 --requests 16 --cpu --scheduled-probes --probe-count 2

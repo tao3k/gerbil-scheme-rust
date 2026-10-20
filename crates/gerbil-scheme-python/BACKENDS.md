@@ -1,16 +1,6 @@
 # Explicit Execution Backends
 
-For the required distinction between algorithm origin and execution host, see
-[Hybrid compilation and runtime ownership](../../docs/hybrid-execution.md).
-`rust-backend` is not a requirement to hand-port Scheme algorithms or add a
-runtime interpreter. Build-time generated functions and qualified independent
-algorithm exports are compatible with a Rust host. VM-rooted exports remain
-dependent on their explicitly selected Scheme runtime; FFI does not erase that
-dependency. This clarification does not introduce a new backend or fallback.
-
-The primary consumer migration uses existing compiled Scheme/C algorithm exports
-through the typed C ABI and ownership bridge. Scheme-to-Rust IR compilation is
-not a substitute for that reuse and must not be reported as C ABI qualification.
+The execution contract is [native Scheme execution with Rust dispatch](../../docs/hybrid-execution.md). Scheme application code remains on the native Gerbil/Gambit/C path. The former Scheme-to-Rust IR and VM-free qualification examples have been retired.
 
 `select_backend` selects a library-owned provider named `scheme` or `rust`.
 A library may declare its default; the ledger defaults to `rust`. `auto`, unknown names and missing providers are errors.
@@ -18,11 +8,7 @@ Selection does not parse DSL, compile code or invoke another provider after a
 failure. Python exposes the choice but does not implement either language.
 
 Provider availability is fixed by Cargo features, not runtime probing. The
-support crate defaults to resource-only code. `scheme-backend` includes the
-Scheme bridge; `rust-backend` enables Python transport for a library's Rust
-provider. Maintainers build wheels with either or both features. Installed
-applications select only providers compiled into their wheel and never run a
-compiler to enable a missing provider.
+support crate defaults to resource-only code. `scheme-backend` includes the linked Scheme bridge; `instance-backend` includes Python transport and complete fixed-owner Scheme instances. The old support-crate `rust-backend` feature is removed. The ledger has its own `rust-backend` feature selecting `instance-backend`. Installed applications select only providers compiled into their wheel and never run a compiler to enable a missing provider.
 
 ## Independent Library
 
@@ -94,12 +80,11 @@ excluding Python result projection. Its `direct` control uses exactly the same
 VMs, Scheme program and workload. The measured Tokio candidate regressed; see
 [installed owner qualification](../../docs/30-39-status/30.10-python-native-owner-integration.org).
 
-The legacy `scheme` provider remains a separate process-global linked owner.
+The linked `scheme` provider remains a separate process-global linked owner.
 The experimental private-image provider is Darwin-only. The subsequent grouped native-module package passes the tested four-owner
 expander, hygienic macro, closure/GC and shutdown gates inside the original
 five-second operation budget. Prior failures remain in 30.10; see [the repair
-and direct/Tokio/Rayon matrix](../../docs/30-39-status/30.11-expander-startup-and-dispatch-benchmarks.org). This does not establish universal Scheme conformance or optimized phase-code performance. The separate `python-ascent` kernel
-qualification has not been migrated to this runtime.
+and direct/Tokio/Rayon matrix](../../docs/30-39-status/30.11-expander-startup-and-dispatch-benchmarks.org). This does not establish universal Scheme conformance or optimized phase-code performance.
 The actual O2 wheel also passes these exercised capability gates; see
 [the progress-supervised O0/O2 qualification](../../docs/30-39-status/30.13-progress-supervised-o2-qualification.org).
 All matched macro timing cohorts were noisy, and quiet-host macro and dispatcher
@@ -109,50 +94,6 @@ Both providers verify the package's complete per-path SHA inventory before
 opening. A result's successful scalar projection does not prove complete DSL
 coverage, source refinement, or performance equivalence.
 
-## ASCENT Qualification
+## Qualification records
 
-`examples/python-ascent` exercises ASCENT's existing pure Rust
-`Program::read_sources` / `Engine` / `Session` API at revision
-`e6884b83c7b141ec66e2095252e4fb9e17da9869` (PR #1). It does not use the
-`ascent-scheme` crate or the Scheme frontend followed by a Rayon kernel. The
-supported runtime input is ASCENT's finite typed relational `(ascent ...)`
-subset. General Scheme forms and `define-evidence` are explicitly unsupported.
-This test adapter is not a replacement for ASCENT's complete public Python API.
-Its Scheme provider is unavailable and rejects selection rather than falling
-back. Opaque result projection errors retain the complete Rust snapshot.
-
-The remote Git dependency preparation timed out at its 15-second cap. That
-failure remains. A separate local build used byte-fixed sources exported from
-the same Git commit, not the dirty ASCENT checkout: only `rust` and
-`program/rust-execution.ss` were needed. This local transport is recorded in the
-receipt and is not a claim that remote Cargo preparation or portable CI passed.
-
-## Historical Evidence Boundary (Before Source Snapshot 020)
-
-Local receipts are under the consumer workspace's `.data/upstream-python-015`.
-Candidate 012 built in 62.902 seconds under 120 seconds. Its installed Rust
-ledger suite passed 5 tests in 3.445 seconds under 15 seconds, observing no
-Scheme initialization before or after each case. Six selected Scheme controls
-passed on the same wheel; the known full DSL timeout was not rerun or admitted.
-
-The fixed-source ASCENT Rust wheel built in 33.118 seconds under 120 seconds.
-Three installed tests passed in 0.685 seconds under 15 seconds with SDK/source
-reads and known compiler execution denied by the qualification sandbox. These
-cover real recursive rules, source withdrawal, concurrent independent Rust
-sessions, snapshot retention and explicit unsupported inputs. Rust sessions are
-not Scheme VMs.
-
-These are local subset observations, not whole-project closure or exact-head
-CI. Parallel Scheme VM creation/entry/root isolation/destruction, both complete
-Library paths, full regressions and the existing Scheme DSL loading timeout
-remain open. No completed dual-backend or multi-VM release is claimed.
-
-## Frozen Source Snapshot 020
-
-New builds and installed tests are recorded in `WHEEL_QUALIFICATION.md`.
-They use the actual GitHub-pinned ASCENT Cargo dependency, with its exact Git
-objects supplied from the local upstream repository. The earlier network
-timeout remains a failure; local Git transport is not remote-fetch success.
-The Rust-only, Scheme-only and combined feature builds have distinct wheel
-identities. Combined-feature selection has been tested without Scheme entry
-on the Rust path. Independent Scheme VM execution remains unimplemented.
+The current native [wheel qualification](WHEEL_QUALIFICATION.md) and [10.10x matched baseline](../../docs/30-39-status/30.19-owner-resident-payload-baseline.org) state tested behavior and limits. The retired VM-free ASCENT and typed-fold wheels are historical subset experiments and do not qualify complete Scheme execution. Raw diagnostics and rejected patches are archived outside the repository.

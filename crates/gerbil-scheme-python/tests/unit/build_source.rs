@@ -13,7 +13,8 @@ fn inventory_belongs_to_the_compiled_dependency() {
         "Cargo.toml",
         "Cargo.lock",
         "include/gerbil_scheme_owned.h",
-        "build-support/gerbil-scheme-rust-ir/src/lib.rs",
+        "build-support/gerbil-scheme-aot-build/src/instance.rs",
+        "crates/gerbil-scheme/src/instances/mod.rs",
     ] {
         assert!(root.join(relative).is_file(), "missing {relative}");
     }

@@ -1,6 +1,10 @@
 #+TITLE: Bounded owner admission and mixed-load tail attribution
 #+STARTUP: overview
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Performance architecture
 
 A high-performance embedding library needs explicit execution, ownership,
@@ -170,7 +174,7 @@ Native construction and Scheme call both consume substantial wall time. GC is me
 - Fairness metric unit checks: 5/5; these do not establish native correctness.
 - Strict bridge Clippy with -D warnings: pass. No build or lint job launched by this task ran concurrently with the primary captures.
 
-The durable evidence is under [[file:receipts/20261020-owner-admission-attribution/identity.json][artifact identity]], [[file:receipts/20261020-owner-admission-attribution/summary.json][full metrics and paired intervals]], [[file:receipts/20261020-owner-admission-attribution/exits.jsonl][run exits]], [[file:receipts/20261020-owner-admission-attribution/receipt-negative.json][retained negative manifest]] and [[file:receipts/20261020-owner-admission-attribution/sha256.json][receipt hashes]]. The source remains in a dirty checkout at the recorded head; no repository-wide CI, release, long-duration leak freedom or portable-backend acceptance is claimed.
+The durable evidence is under artifact identity, full metrics and paired intervals, run exits, retained negative manifest and receipt hashes. The source remains in a dirty checkout at the recorded head; no repository-wide CI, release, long-duration leak freedom or portable-backend acceptance is claimed.
 
 * Remaining architecture work
 

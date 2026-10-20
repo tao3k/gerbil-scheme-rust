@@ -1,5 +1,9 @@
 #+title: Signed vectors and identifier ownership qualification
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and baseline
 
 Parent commit: =0a034f0958c4bc839f10c5ee123d9889958a7afa=.
@@ -116,8 +120,8 @@ as isolated per-variant memory or causal GC speedup. Compile/setup and
 interning are outside timed copy requests. Wall/throughput therefore do
 not qualify an ingestion workload that constructs a fresh name each time.
 
-Raw signed receipt: [[file:benchmarks/20261011-signed-abba.log]].
-Raw identifier receipt: [[file:benchmarks/20261011-identifiers-abba.log]].
+Raw signed receipt: =20261011-signed-abba.log= (local diagnostic archive).
+Raw identifier receipt: =20261011-identifiers-abba.log= (local diagnostic archive).
 
 * Scheduling experiment
 
@@ -185,9 +189,9 @@ official self-tuning policy remains unchanged; there is no admitted
 scheduler speedup or Scheme parsing parallelism claim.
 
 Complete raw receipt:
-[[file:benchmarks/20261011-injection-interval-abba.log]].
+=20261011-injection-interval-abba.log= (local diagnostic archive).
 Rejected candidate for reproducibility only:
-[[file:benchmarks/20261011-injection-interval-rejected.patch]].
+=20261011-injection-interval-rejected.patch= (local diagnostic archive).
 
 * Final verification
 
@@ -197,9 +201,9 @@ Expected compile-fail diagnostics remain part of lifetime/non-Send tests;
 they are not failed runtime tests. SMP remains explicitly unqualified.
 
 Final workspace:
-[[file:benchmarks/20261011-signed-identifiers-final-workspace.log]].
+=20261011-signed-identifiers-final-workspace.log= (local diagnostic archive).
 Workspace lint:
-[[file:benchmarks/20261011-signed-identifiers-final-lint.log]].
+=20261011-signed-identifiers-final-lint.log= (local diagnostic archive).
 Actor/AOT lint after scheduler rollback:
-[[file:benchmarks/20261011-signed-identifiers-final-actor-lint.log]].
+=20261011-signed-identifiers-final-actor-lint.log= (local diagnostic archive).
 

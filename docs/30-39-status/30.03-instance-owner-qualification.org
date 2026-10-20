@@ -1,6 +1,10 @@
 #+title: Fixed Rust Owners with Native Scheme Runtime Instances
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Scope and repository identity
 
 This local qualification belongs to =tao3k/gerbil-scheme-rust=, branch
@@ -118,8 +122,8 @@ The smoke command and complete run both exited zero. The focused Clippy gate
 passed with warnings denied. The initial pre-change instance probe smoke also
 completed; it is not substituted for the new continuation/lifecycle checks.
 
-- [[file:receipts/20261019-instance-owner.log][Complete final native log and all ABBA samples]]
-- [[file:receipts/20261019-instance-owner.json][Source/image identity and independently checked sample summary]]
+- Complete final native log and all ABBA samples
+- Source/image identity and independently checked sample summary
 
 * Remaining admission limits
 

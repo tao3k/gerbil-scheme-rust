@@ -1,6 +1,10 @@
 #+title: Native Expander Startup and Concurrent Dispatch Benchmark Matrix
 #+date: 2026-10-19
 
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
 * Admission order
 
 First close the cold expander and bounded owner-destruction gates through the
@@ -84,8 +88,8 @@ removed the private directory. All 10 installed tests passed in 5.552s.
 
 The source/dependency/wheel identities, raw positive and negative logs, build
 failures and observation summaries are in
-[[file:receipts/20261019-expander-native-groups/identity.json][identity.json]] and
-[[file:receipts/20261019-expander-native-groups/outcomes.json][outcomes.json]]. The source snapshot is dirty; no commit, push, release or
+identity.json and
+outcomes.json. The source snapshot is dirty; no commit, push, release or
 remote CI acceptance is claimed. The wheel still requires host Homebrew native
 dependencies and its macOS tag is not cross-platform/old-macOS admission.
 

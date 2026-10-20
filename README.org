@@ -9,47 +9,28 @@ This is a standalone bridge, not an application runtime or parser.
 Marlin, POO Flow, Orgize, graph execution and application policy remain
 downstream concerns.
 
-* Hybrid compilation and execution hosts
+* Native Scheme execution with Rust dispatch
 
-A Rust execution host does not require handwritten Rust replacements for
-Scheme-authored algorithms. Prefer existing compiled Scheme/C algorithm exports
-through the typed C ABI; build-time Rust IR lowering is a separate facility,
-not a substitute for actually reusing those exports.
-Rust owns host scheduling, owned transport and lifecycle. Python consumers
-install the built library without an SDK or compilation workflow.
+Scheme application code follows Gerbil -> Gambit C -> native compilation.
+Rust owns host admission, cross-instance dispatch and lifecycle. The default
+Python ledger backend starts four complete Scheme runtimes on fixed OS owners.
+Scheme retains macros, GC, closures, continuations and Actor/green-thread
+scheduling. Tokio and Rayon submit jobs; they do not schedule Scheme continuations.
 
-This hybrid boundary is intentional, not an exception to the Rust-host
-architecture. A compiled Scheme C export can still require a Scheme VM;
-VM-independent execution must be qualified for the actual artifact.
-Read [[file:docs/hybrid-execution.md][Hybrid compilation and runtime ownership]]
-before extending providers, callable values, closure/state support or compiler
-lowering. It records current implementations, unresolved capabilities and
-why a second handwritten interpreter is not the migration strategy.
+The former Scheme-to-Rust IR compiler and VM-free subset examples are removed.
+The ledger's =rust-backend= selects native Scheme instances. Native typed values
+and owner-affine handles preserve actual Scheme objects; no subset fallback
+replaces their execution. See [[file:docs/hybrid-execution.md][the execution contract]].
 
-* Rust dispatch retains the Scheme runtime
-
-The full Scheme execution path is Rust dispatch -> fixed OS owner -> complete
-Gerbil/Gambit runtime -> compiled Scheme. =InstancePool= retains one native VM
-per owner; Rust transfers owned native values between the caller and that owner.
-Scheme retains GC, closures, continuations, dynamic bindings and cooperative
-Actor/green-thread scheduling. Rust dispatch does not schedule Scheme green threads.
-
-A Rust backend is not inherently a "no Scheme VM" backend. The separate
-Scheme-to-Rust IR kernels and the ASCENT Python subset example do not qualify
-complete Scheme execution. The ledger now defaults to four native Scheme owners;
-its installed tests and the previous expander failure are recorded in
-[[file:docs/30-39-status/30.10-python-native-owner-integration.org][the integration report]]. They are not a substitute for this native runtime path.
-The Owned C ABI declares =NO_VM= or =SCHEME_VM= explicitly; the latter requires
-a live fixed-owner VM through every callback/release. The flag itself is not a
-runtime lease. The instance API is experimental on Darwin; packaging, portability
-and hot unloading have separate gates. Read [[file:docs/instance-runtime.org][the actual API contract]].
-
-The subsequent native module packaging repair passes the installed four-owner
-expander, hygienic macro and clean-shutdown gates; see
-[[file:docs/30-39-status/30.11-expander-startup-and-dispatch-benchmarks.org][the repair and direct/Tokio/Rayon benchmark matrix]].
-The actual =-O2= wheel also passes the exercised Scheme capability gates;
-[[file:docs/30-39-status/30.13-progress-supervised-o2-qualification.org][the O0/O2 qualification]] retains noisy and negative results. Quiet-host performance
-admission remains pending.
+The latest matched read-only payload-reuse baseline is 10.10x Actor-item
+throughput with scheduled short-request p99 72.045 ms. This is a bounded
+observation, not a universal speedup or fixed acceptance threshold. Read
+[[file:docs/30-39-status/30.19-owner-resident-payload-baseline.org][the baseline]] and
+[[file:docs/30-39-status/30.20-scalar-projection-experiment.org][the rejected projection experiment]]
+for conditions and negative results. The private-image API is experimental on
+Darwin; portable packaging, hot unloading and crash containment need separate
+qualification. Raw diagnostic logs and experimental patches stay outside this
+repository; maintained tests and English summaries are versioned.
 
 * Runtime and ownership
 

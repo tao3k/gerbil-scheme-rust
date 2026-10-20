@@ -3,15 +3,23 @@ use gerbil_scheme::instances::{ImageMappingReceipt, ImageMappingState};
 use pyo3::{PyResult, exceptions::PyRuntimeError, pyclass};
 use std::mem::ManuallyDrop;
 
+/// Observed native code lifetime; no state grants permission to enter Scheme.
 #[pyclass(name = "ImageMappingState", eq, eq_int)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PythonImageMappingState {
+    /// The owner has not completed native cleanup and thread retirement.
     OwnerLive,
+    /// Clean retirement completed; provider policy retains the base image.
     RetainedByPolicy,
+    /// External code leases still protect the image and its SDK modules.
     RetainedByLeases,
+    /// Cleanup or quiescence failed; native code remains deliberately mapped.
     Quarantined,
+    /// Owned module and base-image references are being released.
     Unloading,
+    /// All qualified, owned module and base-image references were released.
     Released,
+    /// A loader release failed; inspect the receipt error.
     ReleaseFailed,
 }
 /// A receipt is an observation at close, not a lease or permission to enter Scheme.

@@ -365,6 +365,12 @@ All thirteen native controls pass on the final source, including concurrent reti
 
 Both finite endurance lanes execute in independent concurrent processes on the local host. Their differing completed work totals and wall times do not establish a throughput, p99 or fairness improvement. No scheduler/topology/allocator default, native optimization level or execution deadline is changed. Raw failures, profiles, wheels and receipts remain outside Git under =/private/tmp/gerbil-mapping-leases-20261020=.
 
+* Exact-head CI documentation correction
+
+On =a662218=, the native owner lifecycle job and Quint job passed independently. Ubuntu Cargo and Bazel rejected the newly public =PythonImageMappingState= because its declaration lacked a Rust doc comment (=RUST-AGENT-DOCS-PUBLIC-002=). Preserve that failed run; it is not a native lifecycle failure or a successful aggregate CI result.
+
+Add English documentation to the enum and its seven states without changing execution logic, type representation, provider authorization or native deadlines. The exact failing local =cargo test -p gerbil-scheme-python --lib enforce_asp_rust_gate= now passes. Original native/artifact receipts above retain their source identities; exact-head remote CI for the documentation follow-up is checked separately.
+
 * Remaining native scope
 
 The concrete directory/SDK-ENOENT and post-open/post-close host-signal regressions are closed by actual native controls, not model results. Multi-hour fixed-VM reuse, longer image churn, complete attribution of residual allocations and a general image-unload protocol, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. The twelve-transition symbolic target also remains incomplete; the eight-transition smoke result does not replace it.

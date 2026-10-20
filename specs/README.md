@@ -1,9 +1,10 @@
-# Cross-runtime FFI/AOT handoff
+# Rust–Scheme boundary protocols
 
 This model covers the bridge-owned candidate protocol, not Tokio's scheduler
 or Gerbil's actor implementation. Neither scheduler is reimplemented here.
-The currently shipped bridge remains a single, thread-affine runtime owner.
-Passing the candidate model does not enable parallel foreign calls.
+The Python ledger backend now uses complete Scheme runtimes on fixed OS owners.
+The ordinary linked FFI remains thread-affine. Passing a protocol model does not
+enable arbitrary parallel entry into either runtime.
 
 `bridge_handoff.qnt` checks bounded admission, exclusive request ownership,
 root retention across cancellation, exactly-once terminal completion and the
@@ -149,3 +150,20 @@ benchmarks concurrently with compilation or symbolic verification.
 Next implementation work belongs in the bridge's lifecycle/processor and
 publication interfaces. Do not add unsafe `Send`/`Sync`, arbitrary parallel
 foreign entry, a custom Tokio replacement, kernel changes or parser processes.
+
+
+## Fixed-owner lifecycle extension
+
+`owner_lifecycle.qnt` complements the existing handoff model. It does not copy
+its queue, receiver-notification or worker-scheduling transitions. It checks
+close-flag publication, lazy Rayon pool retirement, owner-bound handles and
+late reply metadata. See [scope, source correspondence and assumptions](owner_lifecycle.md).
+
+- `just native-model-check` runs the existing handoff gate and the new owner gate.
+- `just owner-model-check` checks two finite domains, deterministic scenarios,
+  sampled traces and four mutations that must yield real invariant violations.
+- `just owner-model-verify-smoke` selects a separate eight-transition symbolic bound.
+- `just owner-model-verify` requests 12-transition symbolic checking on the small
+  domain. Only a completed `NoError` is bounded symbolic evidence.
+- The independent CI job runs the pinned CLI and the same owner-check script.
+  It does not label simulation as symbolic verification or native acceptance.

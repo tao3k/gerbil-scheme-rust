@@ -121,3 +121,13 @@ Use the maintained `bridge-python-dispatch-startup`, `bridge-python-dispatch-str
 `bridge-python-owner-deadline` and `bridge-python-resident-dispatch-ab` targets.
 Keep generated output outside the repository. Qualification status and open
 industrial gates are recorded in the dispatch qualification report.
+
+## Sustained acceptance boundary
+
+The finite owner-lifecycle Quint model and its mutation controls are separate
+from native acceptance. The sustained memory qualifier currently reproduces
+DSL recovery failures and an intermittent repeated-lifecycle startup failure; its targets are regression probes,
+not an industrial-ready certification. Initialized images remain mapped after
+successful close, so zero roots and removed files do not imply full RSS return.
+See `docs/30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org` in the
+repository root for controls, negative results and the remaining native gates.

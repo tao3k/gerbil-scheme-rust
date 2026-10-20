@@ -210,3 +210,20 @@ bridge-python-dispatch-stress python="python3" *args:
 
 bridge-python-resident-dispatch-ab python="python3" *args:
     "{{ python }}" examples/python-ledger/tests/bench_resident_dispatch.py {{ args }}
+
+# Native reuse/lifecycle diagnostics; generated observations stay outside Git.
+bridge-python-dispatch-memory python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/qualify_dispatch_memory.py {{ args }}
+
+# Complements handoff checks; no Scheme/Tokio/Rayon scheduler is reimplemented.
+owner-model-check:
+    sh tools/check-owner-model.sh
+
+owner-model-verify:
+    sh tools/verify-owner-model.sh 12
+
+native-model-check: model-check owner-model-check
+
+# Separate smaller bound; never substitutes for the 12-transition target.
+owner-model-verify-smoke:
+    sh tools/verify-owner-model.sh 8

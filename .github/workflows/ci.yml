@@ -126,3 +126,17 @@ jobs:
         run: gxi scheme/runtime-smp-test.ss
       - name: Multi-processor actor AOT qualification
         run: cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test machine_processors
+
+  owner-protocol:
+    name: Native owner lifecycle protocol (Quint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Quint CLI
+        run: npm install --global @informalsystems/quint@0.33.0
+      - name: Check lifecycle scenarios, sampled traces and negative controls
+        run: sh tools/check-owner-model.sh

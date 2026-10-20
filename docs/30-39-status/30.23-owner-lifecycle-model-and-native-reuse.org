@@ -1,0 +1,87 @@
+#+TITLE: Owner lifecycle model and sustained native reuse blockers
+#+STARTUP: overview
+
+* Decision
+
+Add a narrow Quint protocol extension to the existing handoff model, and keep native acceptance independent. The new model covers late publication, lazy executor recreation, owner-bound handles, observation timeout and close/drain/retirement. It does not reimplement Tokio, Rayon, Scheme GC, Actors, green threads or SMP scheduling.
+
+The native tests found two real blockers. Industrial sustained-reuse acceptance is NOT green. Do not hide these failures behind successful short tests, diagnostic wrappers, source checks or the model. No dispatcher/window/owner default or native optimization setting changes.
+
+* Model scope and source boundary
+
+=specs/owner_lifecycle.qnt= complements =bridge_handoff.qnt= instead of copying its queue and receiver machinery. =specs/owner_lifecycle.md= maps transitions to the actual Rust source and records lock linearization assumptions. Initialization and correct native owner execution are external preconditions; the model cannot explain an SDK setup failure or zero native root.
+
+The host closes admission, drains native tasks, clears registry metadata and retires its executor slot and files. Initialized images remain retained. An overlapping operation may linearize before close even when it returns later. A late reply copy is not authorization to use or republish a destroyed native value. The executor slot is not every outstanding Arc or OS thread; the native test joins client threads before counting retirement.
+
+The model checks immutable owner association at handle-use admission, no late registry publication or lazy pool recreation, accepted-work drain before join, and closed-state root/registry/file retirement. Timeout does not cancel accepted work. Closed images cannot reopen in this model. Stuttering is allowed: no eventual completion, fairness, arbitrary-native-hang recovery or unbounded leak-freedom theorem is claimed.
+
+* Executed protocol gates
+
+Quint 0.33.0 executes two finite domains: three requests/two owners and five requests/two owners. Each has eight deterministic scenarios, including deliberately unsafe transitions whose violations are asserted. Both pass. Two sets of 1,000 sampled traces, each at most 64 transitions, report no safety violation. These are bounded samples, not exhaustive state exploration.
+
+All four missing-guard mutations produce real =Invariant violated= counterexamples: late registry publication, late lazy executor creation, premature join and foreign-owner handle use. The shell gate requires exit 1 and that exact invariant diagnostic; parser or dependency errors cannot pass a negative control.
+
+The composed =just native-model-check= runs the existing handoff checks plus this new gate. A new independent CI job uses pinned Quint and the same maintained shell entrypoint. No native/latency pass is inferred from that CI job.
+
+The unchanged model SHA-256 is =fb131a8acf589fed9b6b1490e553a595862465b6934163e835531bed29906e13=. A separate eight-transition symbolic check completes with =NoError= using Apalache 0.62.1 and the existing invariant-mode configuration (65.902 seconds). The maintained external-output wrapper repeats that bound with =NoError= (50.012 seconds). This establishes bounded safety only for that finite domain and depth.
+
+The twelve-transition attempt becomes expensive in later SMT queries and is deliberately stopped incomplete. Its partial state checks are not a pass. =owner-model-verify= retains the twelve-transition target; =owner-model-verify-smoke= explicitly selects eight. The smaller result does not replace or close the larger target. The model, safety predicate and transitions are unchanged between them. Symbolic output now runs in a temporary directory outside the checkout.
+
+* Native artifact and observation method
+
+Use the previously qualified O2 wheel SHA-256 =6af7f691dbd3a09c89d24c7a40e65372b278f766747da3aba6d309320f9a8b15=. Rust/Scheme runtime sources are unchanged in this work. Gerbil/Gambit/C native compilation and full Scheme execution remain in place. Python only drives the actual library API and observes its process; native lists/vectors, binary integers/bytes, rooted procedures and continuations carry work. JSON is diagnostic output.
+
+=qualify_dispatch_memory.py= warms full hygienic expansion on each owner, retains three native handles per owner, rotates direct/Tokio/Rayon/Rayon-blocking, validates real Actor results and worker distribution, applies retained procedures/continuations, exercises expected Scheme exceptions and repeats DSL recovery. Periodic GC checks an exact external-root baseline. A four-MiB retained allocation is an extra-root/collector diagnostic control. Releasing handles does not imply RSS must decrease.
+
+The observer records current Darwin RSS, OS thread rows, loaded images in this process's owner/module namespaces and whether their files still exist. Namespace image counts include runtime/module images, not extra VMs. SDK heap capacity is not live data; the SDK post-GC live value is retained in its raw units. These are resource observations, not throughput A/B or dedicated-host latency certification. A two-GiB sampled RSS guard remains in place; it did not trigger these failures.
+
+* Reproduced native failures
+
+| Case | Observation | Admission |
+|------+-------------+-----------|
+| First mixed reuse pilot | Repeated DSL recovery returned zero native root | FAIL |
+| Ten-minute fixed-four-VM target | Failed after 119.505 process seconds, owner 3, zero-based turn 1344, direct arm | FAIL; target did not complete |
+| Continuation-resumption control | Continuation stays rooted but ordinary procedure replaces resumption; same DSL failure at 32.772 seconds, owner 0, turn 528 | FAIL; continuation resumption is not necessary for the bug |
+| Eight create/use/close cycles target | Three cycles close cleanly; fourth startup rejects owner 0 with status 4, phase 1, no cleanup receipt | FAIL; target did not complete |
+
+The DSL error is =Native { operation: "native root", code: 0 }=. The current ABI collapses the underlying caught Scheme exception to zero, so its precise cause is not yet established. Sequential repeated DSL, concurrent DSL, continuation-plus-DSL, Actor-plus-DSL, Actor-plus-continuation and Actor-plus-exception controls pass 32 or 40 rounds. Later short original-path one- and four-owner captures also pass. None of these cancels the reproduced sustained failure.
+
+Diagnostic Scheme wrappers can execute many rounds successfully, but one variant imports another application module and changes image population; neither wrapper substitutes for the normal entry path. They are not admitted as fixes or equivalent acceptance controls.
+
+The startup error is =Initialization { owner: 0, status: 4, phase: 1, cleanup: None }=. This code combines several setup/host-I/O/processor-validation failures; the exact branch is unresolved. The backend poisons further admission. The setup-attempted image is deliberately quarantined rather than unloaded without a successful cleanup receipt. There is one remaining mapped image file in that failed process; do not classify it as a successful retirement or silently remove it to green the test.
+
+* Memory classification evidence
+
+| Completed lifecycle | Post-close RSS MiB | Owner-namespace images | Existing image files | OS threads |
+|---------------------+--------------------+------------------------+----------------------+------------|
+| First | 249.8 | 4 | 0 | 1 |
+| Second | 352.8 | 8 | 0 | 1 |
+| Third | 399.4 | 12 | 0 | 1 |
+
+External roots are zero on all three successful closes. The fourth startup failure leaves 13 mapped images, one with a retained file. Thus fixed-VM reuse and repeatedly constructing fresh VM images are materially different resource regimes.
+
+A separate short native control closes four VMs with zero roots, removed files and one OS thread. Current RSS remains 263.1 MiB and four initialized images remain mapped. The opt-in diagnostic =malloc_zone_pressure_relief(NULL, 0)= reports zero bytes released and RSS does not drop. Darwin's installed malloc header specifies maximal best-effort relief across all zones for those arguments. This is a post-close diagnostic only, not a production cleanup change or performance optimization.
+
+A later descriptor-instrumented eight-cycle capture completes successfully. Every close has zero external roots, no remaining image files, one OS thread and three open descriptors, against a soft limit of 1,048,575. Owner-namespace image counts reach 32. Post-close RSS spans 263.3--623.9 MiB and then falls to 365.0 MiB in the final cycle; it is not monotonic with mapped-image count. This control does not reproduce the earlier startup rejection, establish its cause or erase it. It supplies no evidence of cumulative descriptor exhaustion in those cycles. Transient setup faults and the sustained DSL failure remain unresolved.
+
+Known intentional retention: initialized code mappings, required by the current loader/hook lifetime policy. Not demonstrated: that all residual RSS is necessary or that it is ordinary reclaimable malloc cache. The zero relief result does not prove absence of every cache or establish a real allocation leak. SDK permanent allocations, other mapped data and native cleanup behavior still require attribution. Do not force dlclose, reuse finalized SDK state, remove continuation coverage or weaken Scheme execution to mask the result.
+
+* Next native closure
+
+1. Preserve the actual Scheme exception across the zero-root error boundary without switching execution routes or exposing a fallback interpreter.
+2. Distinguish setup failure branches and retain the original SDK status, host-I/O errno/status and processor observation. Status 4 alone is insufficient diagnosis.
+3. Repair only the established cause, then rerun the identical mixed reuse and lifecycle targets. Keep the current failed captures as controls.
+4. After those targets complete, extend to multi-hour fixed-VM reuse, RSS/live-heap trends, fault injection and separately instrumented sanitizer builds. No industrial-ready or full-reclamation claim is admitted now.
+
+* Reproduction
+
+#+begin_src sh
+just native-model-check
+just owner-model-verify-smoke
+just owner-model-verify
+just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 600 --sample-seconds 10
+just bridge-python-dispatch-memory /path/to/venv/bin/python --case lifecycle --cycles 8
+just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 0 --allocator-relief
+#+end_src
+
+All raw captures, failed attempts, diagnostic wrappers, checker output and source identities stay outside Git. Only maintained models, tests, CI wiring and English summaries are committed. The previous commit =6bb8f6c= completed all four required platform Cargo/Bazel CI jobs successfully. Those checks do not exercise or close the newly found sustained-native failures. Remote checks of the next published commit remain separate from local protocol and native evidence.

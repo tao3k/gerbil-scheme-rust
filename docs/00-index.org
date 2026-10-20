@@ -22,6 +22,8 @@
 
 * 30--39 Native runtime status
 
+- [[file:30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org][30.23 Owner lifecycle model and sustained native reuse blockers]]
+
 - [[file:30-39-status/30.22-native-dispatch-qualification.org][30.22 Native Tokio and Rayon safety/performance qualification]]
 
 - [[file:30-39-status/30.21-native-runtime-retirement-and-source-hygiene.org][30.21 Retire VM-free paths and remove generated diagnostics]]

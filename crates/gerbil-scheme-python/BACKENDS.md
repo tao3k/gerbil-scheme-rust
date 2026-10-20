@@ -139,5 +139,15 @@ Initialized images remain mapped: the eight-cycle capture grows from 263.1 to
 731.2 MiB RSS, with 32 retained images. Complete RSS return and indefinite leak
 freedom are not established. Darwin thread-directory private SPI is an explicit
 platform dependency; other OS-global resources require separate qualification.
+The follow-up distinguishes retained image mappings from allocator residency:
+32 images represent eight retired four-owner pools; live malloc remains about
+4.34--4.36 MiB in the mapping-observer capture despite 263.4--684.0 MiB RSS.
+A separate maintained-observer repeat reaches 768.5 MiB RSS with 4.98 MiB live
+malloc. No large outstanding Scheme heap leak is established, but small
+residual allocations are not all attributed. The current no-unload policy is
+conservative; it is not proof that every mapping is intrinsically necessary.
+Fresh pool replacement remains unbounded in mappings. Reuse the fixed pool;
+general native callback/TLS retirement must be qualified before hot unload.
+
 See `docs/30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org` in the
 repository root for the exact artifact, preserved failures, controls and limits.

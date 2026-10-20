@@ -132,9 +132,67 @@ The unchanged eight-cycle create/use/close target completes in 82.885 process se
 
 The rising 263.1--731.2 MiB RSS in this final lifecycle capture is retained as a negative resource finding. The code-image population intentionally rises to 32, but not every residual byte is attributed. This result neither proves full reclamation nor establishes an allocation leak. The earlier nonmonotonic capture and zero allocator-relief result remain separate observations. Do not force dlclose or reinitialize retired images to make RSS appear green.
 
+* Attribution follow-up on the same O2 artifact
+
+The follow-up starts from PR #18 head =150dd6c052c24a9a089a0aeecb4ae92d42be37ab=, with a clean runtime source tree and the same installed wheel identified above. All four Cargo/Bazel platform CI jobs fail the same project-harness self-policy test: the new =tests/owner_model.rs= is a root test implementation without a declared harness role. Quint succeeds; SMP is explicitly skipped. The repair moves its implementation under =tests/integration/owner_model.rs= and mounts it from the standard thin =integration_test.rs= aggregate. Just/CI select the exact qualified test name. No rule suppression or model weakening is added. The local project-harness suite now passes all 47 tests. The replacement exact selector executes one test (not zero), including the scenarios, sampled traces and four expected mutation counterexamples; it passes in 47.36 seconds.
+
+The memory qualifier now records Darwin =malloc_statistics_t= live bytes, reserved capacity and block count through the existing Python observer. This is test glue, not a new execution or build path. The original Scheme workloads, four owners, mode rotation, GC checks, exceptions, continuations, timeouts and two-GiB guard are unchanged. An external diagnostic reuses =owner_memory.h= to observe mappings and allocator regions; its code and raw captures stay outside Git.
+
+** Eight-cycle classification capture
+
+The same lifecycle workload completes all eight cycles and 1,536 validated batch requests. All closes retain zero external roots, one thread, three FDs and zero existing image files. Its post-close observations are:
+
+| Cycle | RSS MiB | Malloc live bytes | Malloc blocks | Retained images | Image virtual MiB |
+|-------+---------+-------------------+---------------+-----------------+-------------------|
+| 1 | 263.422 | 4552208 | 8399 | 4 | 44.875 |
+| 2 | 394.188 | 4563600 | 8411 | 8 | 89.750 |
+| 3 | 462.000 | 4564752 | 8419 | 12 | 134.625 |
+| 4 | 532.766 | 4566160 | 8427 | 16 | 179.500 |
+| 5 | 578.469 | 4567312 | 8435 | 20 | 224.375 |
+| 6 | 625.938 | 4569488 | 8443 | 24 | 269.250 |
+| 7 | 633.047 | 4570640 | 8451 | 28 | 314.125 |
+| 8 | 684.000 | 4571792 | 8459 | 32 | 359.000 |
+
+The earlier 731.2 MiB result remains a separate negative capture. The lower 684.0 MiB rerun is not a repair or a latency/throughput improvement. These are resource captures on the local host, with other work allowed; they are not dedicated-host performance comparisons.
+
+| Class | Evidence | Conclusion and limit |
+|-------+----------+----------------------|
+| Intentionally retained images | Exactly four additional initialized base images per completed pool; 11.21875 MiB virtual mapping per image | 32 is eight pools times four owners, not 32 running VMs. =Image::finish= cleans the VM and removes the file; =Preflight= only closes the dlopen reference when setup was never attempted. Initialized references remain held. |
+| Allocator retention | Live malloc stays about 4.34--4.36 MiB after close, while reserved capacity reaches 488 MiB and malloc-region resident pages reach about 404.6 MiB | Most allocator residency is not outstanding Scheme heap allocation. A live-phase =vmmap= capture independently reports 303.1 MiB in empty MALLOC_SMALL regions and 12 MiB in empty MALLOC_LARGE regions. That snapshot is not the final close snapshot. |
+| Small residual live allocations | Live bytes increase by 19,584 and block count by 60 between closes one and eight | These process-level counters include loader/Python bookkeeping. They do not attribute every remaining allocation or prove absence of a small terminal leak. |
+| Files, roots and threads | All eight successful closes remove files and return to zero external roots, one thread and three FDs | Those specific resources retire. Zero external roots alone does not measure all Scheme heap/global state. |
+
+Image virtual size, =mincore= in-core pages, malloc-region resident pages, allocator live/reserved bytes and task RSS have different meanings. In-core file-backed pages must not be added to allocator residency as an exact RSS decomposition. The classification attributes the dominant sources without pretending to account for every byte of the original 731.2 MiB sample.
+
+** Independent allocator control and retained negative result
+
+The existing native =instance_resources --allocator= target initializes no Scheme VM. Each wave touches 128 MiB across four Rust workers and then frees the blocks and joins. In this capture, live allocation falls to 23,232 bytes after the first wave while RSS remains 137.8 MiB; after the second wave, live allocation is 32,416 bytes while RSS remains 218.1 MiB. The second wave reuses 192 of 512 exact addresses. This is lower reuse than the earlier 496-address capture and remains recorded, not relabeled as identical reuse.
+
+Both this control and the lifecycle diagnostic report zero bytes released by =malloc_zone_pressure_relief(NULL, 0)=. The [[https://github.com/apple-oss-distributions/libmalloc/blob/main/include/malloc/malloc.h][allocator API]] promises best-effort relief, not a guaranteed RSS return. Adding an unconditional pressure-relief call to production would have no demonstrated benefit here and would affect host allocation policy.
+
+** Maintained-observer repeat and allocator-policy control
+
+A second eight-cycle run uses the maintained Python telemetry directly, without the external mapping observer. It completes in 123.926 process seconds with all 1,536 validated batch requests. Every close reports zero roots, one thread, three FDs and removed files. Final RSS is 768.531 MiB, malloc live is 5,221,376 bytes, reserved capacity is 599,785,472 bytes, and 32 images remain. This higher RSS is another preserved negative result; observer/process baselines differ, so absolute live-byte totals are not pooled across captures.
+
+An additional diagnostic-only fresh process sets =MallocAggressiveMadvise=1= and runs the same eight-cycle workload. It also completes, with final RSS 741.203 MiB, live bytes 5,221,376, reserved capacity 553,648,128 and 32 retained images. It does not solve mapping accumulation or produce a reliable RSS-return policy. These local resource captures do not constitute a controlled allocator performance A/B; the setting is not adopted or added to production. The [[https://github.com/apple-oss-distributions/libmalloc/blob/main/src/malloc.c][allocator source]] makes these policies host-process options, not Scheme semantic controls.
+
+The existing native-only =instance_resources --retirement= control also completes eight one-owner cleanups under an external allocation-reference observer. Each retires 2,048 bytes of native I/O scratch; after dropping bookkeeping its live malloc observation is 15,344 bytes. The final reference tree contains host/runtime/loader allocations and no =___gstate= allocation root. This simpler qualification program has a different image size and workload from the Python library; it is a supporting cleanup control, not a replacement for the original tests or proof that every Python residual allocation is benign.
+
+** Same 600-second fixed-pool repeat
+
+The maintained observer completes the original 600-second reuse workload in 617.090 process seconds, with 690,384 validated batch requests across 14,383 turns. It retains the same four owners and validates native types, saved continuations/procedures, Actor distribution, expected exceptions, DSL recovery and GC root baselines. Live samples retain eight namespace images (four base images plus the program modules), with RSS 279.344--400.516 MiB; the population does not grow during reuse. After release and close, roots are [0,0,0,0], one thread and three FDs remain, image files are gone, and only the four base images remain mapped. Final RSS is 370.938 MiB, malloc live is 5,202,320 bytes and reserved capacity is 486,539,264 bytes.
+
+This is finite resource acceptance on the unchanged O2 native wheel, not a new speedup or p99 claim. The different request count from the earlier 910,368-request capture is not normalized into a performance result; local concurrent work and extra observations are not controlled performance conditions. Reusing one fixed pool and repeatedly creating fresh pools remain distinct resource regimes.
+
+** Repair boundary
+
+No large outstanding native heap leak is established by these captures, so this follow-up does not invent a native free or force-unload initialized code. The current no-unload policy is conservative backend policy, not proof that Gambit intrinsically requires every mapping forever. Full Scheme permits native callbacks, dynamic modules and TLS destructor paths; retirement of all such references is not yet qualified. Preserving that capability rules out silently disabling those paths to make unloading appear safe.
+
+The concrete changes are the failing CI suite layout and reproducible allocator telemetry. Repeated creation of fresh pools remains unbounded in retained mappings. Reusing a fixed pool bounds image population in the tested route; it does not authorize reinitializing a finalized SDK image or prove indefinite leak freedom. A general unload protocol and attribution of the small residual live allocation remain open.
+
 * Remaining native scope
 
-The concrete directory/SDK-ENOENT and post-open/post-close host-signal regressions are closed by actual native controls, not model results. Multi-hour fixed-VM reuse, longer image churn, attribution of retained RSS, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. The twelve-transition symbolic target also remains incomplete; the eight-transition smoke result does not replace it.
+The concrete directory/SDK-ENOENT and post-open/post-close host-signal regressions are closed by actual native controls, not model results. Multi-hour fixed-VM reuse, longer image churn, complete attribution of residual allocations and a general image-unload protocol, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. The twelve-transition symbolic target also remains incomplete; the eight-transition smoke result does not replace it.
 
 * Reproduction
 

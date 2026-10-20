@@ -41,6 +41,18 @@ dyld._dyld_get_image_name.restype = ctypes.c_char_p
 prefixes = (f"/gerbil-owners-{os.getpid()}-", f"/gerbil-python-modules-{os.getpid()}-")
 
 
+class MallocStatistics(ctypes.Structure):
+    # Darwin malloc/malloc.h; allocated is reserved capacity, not live objects.
+    _fields_ = (("blocks_in_use", ctypes.c_uint),
+                ("size_in_use", ctypes.c_size_t),
+                ("max_size_in_use", ctypes.c_size_t),
+                ("size_allocated", ctypes.c_size_t))
+
+
+dyld.malloc_zone_statistics.argtypes = (ctypes.c_void_p, ctypes.POINTER(MallocStatistics))
+dyld.malloc_zone_statistics.restype = None
+
+
 def emit(kind, **row):
     print(json.dumps(dict(kind=kind, elapsed_seconds=time.monotonic()-started, **row)), flush=True)
 
@@ -57,7 +69,11 @@ def process():
         except (OSError, ValueError):
             continue
         descriptors.append(int(entry))
-    return dict(rss_bytes=rss, os_threads=threads, open_fds=len(descriptors),
+    allocation = MallocStatistics()
+    dyld.malloc_zone_statistics(None, ctypes.byref(allocation))
+    return dict(malloc_live_bytes=allocation.size_in_use,
+                malloc_reserved_bytes=allocation.size_allocated,
+                malloc_blocks=allocation.blocks_in_use, rss_bytes=rss, os_threads=threads, open_fds=len(descriptors),
                 fd_soft_limit=resource.getrlimit(resource.RLIMIT_NOFILE)[0],
                 loaded_owner_images=sum(prefixes[0] in p for p in owned),
                 loaded_module_images=sum(prefixes[1] in p for p in owned), loaded_images_with_existing_files=sum(Path(p).exists() for p in owned))

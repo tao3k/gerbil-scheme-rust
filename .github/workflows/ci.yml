@@ -131,4 +131,4 @@ jobs:
       - name: Install pinned Quint CLI
         run: npm install --global @informalsystems/quint@0.33.0
       - name: Check lifecycle scenarios, sampled traces and negative controls
-        run: cargo test -p gerbil-scheme-rust-project-harness --test owner_model owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture
+        run: cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture

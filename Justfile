@@ -217,13 +217,13 @@ bridge-python-dispatch-memory python="python3" *args:
 
 # Complements handoff checks; no Scheme/Tokio/Rayon scheduler is reimplemented.
 owner-model-check:
-    {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test owner_model owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture
+    {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture
 
 owner-model-verify:
-    {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test owner_model owner_protocol_symbolic_12 --locked -- --ignored --exact --nocapture
+    {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_symbolic_12 --locked -- --ignored --exact --nocapture
 
 native-model-check: model-check owner-model-check
 
 # Separate smaller bound; never substitutes for the 12-transition target.
 owner-model-verify-smoke:
-    {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test owner_model owner_protocol_symbolic_8 --locked -- --ignored --exact --nocapture
+    {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_symbolic_8 --locked -- --ignored --exact --nocapture

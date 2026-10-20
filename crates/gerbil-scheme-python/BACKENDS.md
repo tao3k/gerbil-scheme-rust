@@ -149,5 +149,20 @@ conservative; it is not proof that every mapping is intrinsically necessary.
 Fresh pool replacement remains unbounded in mappings. Reuse the fixed pool;
 general native callback/TLS retirement must be qualified before hot unload.
 
+Failed finalization, unbalanced roots and owner unwind now quarantine the
+initialized VM instead of treating queue drain as permission to destroy it.
+Rust receipts expose `native_cleanup_attempted`; an unclean Python close keeps
+its resource directory and reports failure. Quarantine deliberately retains
+resources and poisons image admission; it is not clean reclamation.
+
+Native controls now demonstrate actual unload after owner exit, TLS destructor
+completion/key retirement and callback revocation, with an owned early-unload
+SIGSEGV counterexample. The default policy still retains initialized base
+images: arbitrary native callbacks/modules and TLS on other threads are not
+certified. Full Scheme execution and native module loading remain available.
+The small-allocation follow-up identifies 8,064 bytes of process-reachable XPC
+metadata keyed by unloaded expander-module paths, plus Rust epoch/Python
+retention; complete residual attribution remains bounded by those observations.
+
 See `docs/30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org` in the
 repository root for the exact artifact, preserved failures, controls and limits.

@@ -1,6 +1,6 @@
 //! Persistent native roots must remain owner and generation checked.
 use super::{GATE, Progress, config, finish, normal, observed};
-use gerbil_scheme::instances::{InstanceError, InstancePool};
+use gerbil_scheme::instances::{InstanceDispatcher, InstanceError, InstancePool};
 use std::sync::mpsc;
 pub(super) fn run(progress: &Progress) {
     let mut pool = InstancePool::start(&normal(), config(2)).unwrap();
@@ -48,42 +48,7 @@ pub(super) fn run(progress: &Progress) {
             .wait(GATE)
             .is_err()
     );
-    let failed = dispatch
-        .submit_native_on::<(), _>(0, |session| {
-            session.retain(session.string("failed task")?)?;
-            Err(InstanceError::TaskPanicked)
-        })
-        .unwrap()
-        .wait(GATE);
-    assert!(failed.is_err());
-    let (entered, ready) = mpsc::channel();
-    let (unblock, blocked) = mpsc::channel();
-    let barrier = dispatch
-        .submit_native_on(0, move |_| {
-            entered.send(()).unwrap();
-            blocked.recv_timeout(GATE).unwrap();
-            Ok(())
-        })
-        .unwrap();
-    ready.recv_timeout(GATE).unwrap();
-    let abandoned = dispatch
-        .submit_native_on(0, |session| {
-            session.retain(session.string("abandoned reply")?)
-        })
-        .unwrap();
-    drop(abandoned);
-    unblock.send(()).unwrap();
-    barrier.wait(GATE).unwrap();
-    let roots = dispatch
-        .submit_native_on(0, |session| session.usage())
-        .unwrap()
-        .wait(GATE)
-        .unwrap()[3];
-    assert_eq!(roots, 0.0);
-    observed(
-        progress,
-        "observed failed and abandoned queued replies roll back new roots",
-    );
+    abandoned(&dispatch, progress);
     let stale = dispatch
         .submit_native_on(0, |session| {
             session.retain(session.string("old generation")?)
@@ -111,5 +76,44 @@ pub(super) fn run(progress: &Progress) {
     );
     println!(
         "RETAINED-PASS owner-affinity=checked gc=checked failed-task=rolled-back abandoned-queued-reply=rolled-back stale-generation=rejected"
+    );
+}
+
+fn abandoned(dispatch: &InstanceDispatcher, progress: &Progress) {
+    let failed = dispatch
+        .submit_native_on::<(), _>(0, |session| {
+            session.retain(session.string("failed task")?)?;
+            Err(InstanceError::TaskPanicked)
+        })
+        .unwrap()
+        .wait(GATE);
+    assert!(failed.is_err());
+    let (entered, ready) = mpsc::channel();
+    let (unblock, blocked) = mpsc::channel();
+    let barrier = dispatch
+        .submit_native_on(0, move |_| {
+            entered.send(()).unwrap();
+            blocked.recv_timeout(GATE).unwrap();
+            Ok(())
+        })
+        .unwrap();
+    ready.recv_timeout(GATE).unwrap();
+    let abandoned = dispatch
+        .submit_native_on(0, |session| {
+            session.retain(session.string("abandoned reply")?)
+        })
+        .unwrap();
+    drop(abandoned);
+    unblock.send(()).unwrap();
+    barrier.wait(GATE).unwrap();
+    let roots = dispatch
+        .submit_native_on(0, |session| session.usage().map(|usage| usage[3].to_bits()))
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    assert_eq!(roots, 0.0_f64.to_bits());
+    observed(
+        progress,
+        "observed failed and abandoned queued replies roll back new roots",
     );
 }

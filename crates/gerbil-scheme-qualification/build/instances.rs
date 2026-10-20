@@ -40,6 +40,7 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
             "../../../ffi/instance.h",
             "../../../ffi/instance.c",
             "owner_memory.h",
+            "owner_callbacks.h",
         ] {
             println!(
                 "cargo:rerun-if-changed={}",
@@ -122,6 +123,11 @@ const OWNER_EXPORTS: &[&str] = &[
     "gerbil_owner_allocator_relief",
     "gerbil_owner_memory_regions",
     "gerbil_owner_tls_available",
+    "gerbil_owner_callback_tls_start",
+    "gerbil_owner_callback_tls_retire",
+    "gerbil_owner_callback",
+    "gerbil_owner_failed_finalizer",
+    "gerbil_owner_runtime_state",
     "gerbil_owner_native_call",
     "gerbil_owner_orders_call",
 ];

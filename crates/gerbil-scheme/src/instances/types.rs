@@ -90,7 +90,8 @@ impl IsolatedProgram {
     /// rejection or transfer one fresh object root, and retain no Rust
     /// pointer. It must not finalize the VM, move roots, escape foreign frames,
     /// or enter an unqualified multi-processor configuration. Image constructors
-    /// must not initialize a VM. All native functions must return normally.
+    /// must not initialize a VM or leave callbacks/TLS destructors that cannot
+    /// retire during preflight dlclose. All native functions must return normally.
     ///
     /// # Errors
     /// Returns a loader error if the image path cannot be resolved.
@@ -170,12 +171,14 @@ impl<R> InstanceTicket<R> {
     }
 }
 
-/// Cleanup observed on an owner after its accepted queue drained.
+/// Terminal owner observation; unverified quiescence retains the native heap.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OwnerShutdown {
     pub owner: usize,
     pub roots_before_cleanup: i64,
     pub gc_collections: u64,
+    /// False when failed quiescence/root balance quarantined the initialized VM.
+    pub native_cleanup_attempted: bool,
     pub status: i32,
     pub cleanup_time: Duration,
     /// True only after the copied image path was removed or was already absent.
@@ -205,7 +208,8 @@ impl ShutdownReceipt {
             && self.panicked == 0
             && self.owners.len() == self.joined
             && self.owners.iter().all(|owner| {
-                owner.status == 0
+                owner.native_cleanup_attempted
+                    && owner.status == 0
                     && owner.roots_before_cleanup == 0
                     && owner.image_file_removed
                     && owner.image_file_error.is_none()

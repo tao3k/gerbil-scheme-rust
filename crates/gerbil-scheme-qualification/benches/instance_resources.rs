@@ -1,6 +1,8 @@
 //! Native types, task failures, initialization rollback and fixed-owner reuse.
 #[path = "instance_resources/ab.rs"]
 mod ab;
+#[path = "instance_resources/callbacks.rs"]
+mod callbacks;
 #[path = "instance_resources/contracts.rs"]
 mod contracts;
 #[path = "instance_resources/green.rs"]
@@ -139,6 +141,11 @@ fn main() {
     let observer = observe::Observer::new();
     let mode = std::env::args().nth(1).unwrap_or_else(|| "--reuse".into());
     match mode.as_str() {
+        "--root-quarantine" => callbacks::roots(&progress),
+        "--owner-unwind" => callbacks::unwind(&progress),
+        "--callbacks" => callbacks::run(&observer, &progress),
+        "--finalizer-failure" => callbacks::failure(&progress),
+        "--tls-unload-negative" => callbacks::early_unload(&progress),
         "--owned-vm" => owned_vm::run(&progress),
         "--retained" => retained::run(&progress),
         "--owner-wake" => owner_wake::run(&progress),

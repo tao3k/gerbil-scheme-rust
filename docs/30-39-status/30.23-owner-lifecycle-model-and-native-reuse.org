@@ -190,6 +190,79 @@ No large outstanding native heap leak is established by these captures, so this 
 
 The concrete changes are the failing CI suite layout and reproducible allocator telemetry. Repeated creation of fresh pools remains unbounded in retained mappings. Reusing a fixed pool bounds image population in the tested route; it does not authorize reinitializing a finalized SDK image or prove indefinite leak freedom. A general unload protocol and attribution of the small residual live allocation remain open.
 
+* Callback, TLS and module retirement follow-up
+
+The exact published head =418adc8e25c38481c25dde26fdb62e02fa961d8c= completes all four Cargo/Bazel platform CI jobs and the owner-protocol job successfully. SMP is explicitly skipped. The following native lifecycle repair has separate local receipts; the earlier remote success does not certify a later commit.
+
+** Concrete unload boundaries
+
+The paired installed ledger binary's =___cleanup_os= calls =___cleanup_dyn_module=. That function walks the dynamic-module list, calls =dlclose= on each handle, frees the list nodes and clears the list. The full Python DSL workload has four program-module images while live and none after clean shutdown. These module images are distinct from the four retained base images.
+
+The actual ledger binary contains an emulated-TLS descriptor, but its thread setup/cleanup path does not register a pthread TLS destructor. A descriptor alone is not evidence of an outstanding destructor. This observation is specific to the inspected artifact; it is not a source-name/symbol heuristic authorizing arbitrary image unload.
+
+| Population / condition | Native evidence | Admission boundary |
+|------------------------+-----------------+--------------------|
+| Trusted image rejected before native setup | Existing preflight control repeatedly closes the copied image and removes its path without growing the loaded-image population | Constructors must not initialize a VM or leave callback/TLS references that cannot retire during preflight dlclose |
+| SDK-managed modules in the actual DSL workload | SDK cleanup closes module handles; program-module mappings disappear after close | Observed for the packaged Scheme modules; arbitrary native module exit hooks are not certified |
+| Initialized image after owner join, TLS retirement and callback revocation | Qualification runs real Scheme GC, multi-shot continuation/dynamic-wind and exception work; owner TLS destructor runs once, its key is deleted, the foreign callback is revoked, and diagnostic dlclose actually removes the image | Finite native proof for this controlled program; production retention policy remains unchanged |
+| Code unmapped before a registered TLS destructor executes | Owned negative child receives SIGSEGV on thread exit, with no Scheme VM setup | A successful SDK cleanup alone cannot authorize unload before owner exit |
+| Unknown foreign callbacks, TLS on other threads or native module hooks | No complete registration/retirement authority is established | Keep initialized mappings; do not disable Scheme/native features to manufacture unload safety |
+
+The positive callback control deliberately calls a plain native callback after SDK cleanup while its code mapping is still retained. That callback does not enter a finalized Scheme VM. It demonstrates why host callback revocation is a separate condition from SDK heap cleanup. A destructor that accesses Scheme must be quiesced before heap destruction, not merely before code unmapping. TLS on unrelated threads and callbacks registered outside this test's protocol remain outside its proof.
+
+** Small allocation attribution
+
+A same-process allocation-reference capture compares the first and eighth completed four-owner closes. Live malloc rises from 4,488,928 to 4,508,000 bytes: 19,072 bytes and 60 net blocks. The system =__atexit= reference tree gains exactly 28 XPC dictionaries plus their 28 storage blocks. Each pair is 288 bytes, totaling 8,064 bytes. A correctly typed native Blocks observer inspects only dictionary keys: the new keys are the per-owner =gerbil/core/expander~1.o1= paths, increasing from four such keys to 32. These program modules are already absent from the loaded-image population at close.
+
+Thus this portion is process-reachable image-path metadata retained across module unload, not a live Scheme object graph. The owning system/private cache is not mutated or freed by the library. Its eventual eviction policy is not established. The allocation tree also shows four additional nodes (about ten KiB) reachable from the Rust Crossbeam epoch collector; Python/observer roots change too. Those observations distinguish process/runtime retention from Scheme heap ownership without asserting that every residual byte is benign or indefinitely bounded.
+
+The allocation tool reports no unreachable leaks for the captured processes, but this is not a terminal-ownership or leak-freedom proof. Earlier native I/O scratch retention was reachable too. Here the root paths and module-path keys supply the attribution; a zero leak count alone does not.
+
+The first stack-logging attempt aborts in the allocator tracer's =uniquing_table_node_release_internal= before any workload configuration/setup observation. Disabling compaction reproduces that tracer assertion. Separate no-VM interpreter/import controls exit normally, so the exact tracer abort cause remains unassigned. The uninstrumented reference-graph route completes the original workload. Failed external observer attempts (a variable collision and an incorrect raw-function/Blocks callback binding) are also preserved separately; neither is Scheme native acceptance. The corrected native Blocks bridge completes all eight cycles.
+
+** Minimal repair: failed quiescence is not destruction permission
+
+A new actual-owner failure control installs a rooted finalizer that rejects its call while one native root remains retained. Before repair, shutdown reports finalizer status -71 but still releases that root, destroys the SDK (adapter state 2) and retires 2,048 I/O scratch bytes. The native assertion fails: this is the preserved pre-repair counterexample.
+
+A second control abandons a typed Rust reply whose destructor panics after the native job returns. Before repair, owner unwind reaches =Image::drop= and destroys the SDK without an application-finalizer receipt. The owner is reported panicked, but adapter state is already 2. This is a separate preserved counterexample.
+
+The repair gates destruction on successful application quiescence and zero external roots. A rejected finalizer preserves its retained roots. Nonzero roots after an otherwise successful finalizer also prevent SDK destruction. Unwinding does not re-enter Scheme or attempt emergency destruction. These paths retain heap, base mapping and copied image for process-terminal quarantine and poison further image admission. They are failures, not successful resource reclamation or crash containment.
+
+=OwnerShutdown.native_cleanup_attempted= distinguishes an attempted SDK cleanup from quarantine. =is_clean()= requires it to be true in addition to status zero, zero roots, removed files and joined owners. Host status -71 means rejected finalizer; -72 means a root-balance barrier prevented cleanup. A panicked owner has no successful cleanup receipt. The existing Python service already retains its resource directory on an unclean receipt.
+
+The repaired finalizer control observes adapter state 1, one retained root, =native_cleanup_attempted=false=, zero I/O scratch retirement and an existing copied image; retry is rejected. Native unwind and intentionally forgotten-root controls exercise the other two barriers. Known initialized startup rollback remains a separate tested path; this repair does not claim quiescence for arbitrary custom initialization hooks.
+
+** Artifact and evidence boundaries
+
+The repaired O2 wheel has SHA-256 =4d00b42e51c77459b4d526a0486d7c62245edce5fe8f50bd3d61f488d775eb84=. Its complete native Scheme image is byte-identical to the preceding wheel: SHA-256 =a7cba177966cb74eeedb136c1e79a09fb309e1b86957377e6b595889eaefd353=. The changed production path is Rust's terminal lifecycle guard; Scheme sources, native compilation, native types, scheduler defaults and execution capabilities are unchanged. Rust still dispatches across fixed owners; Scheme owns Actor/green-thread execution.
+
+A diagnostic override on the preceding O2 artifact completes eight full Python lifecycle cycles with all base images physically unmapped after each clean owner join. It ends with zero owner/module images and RSS 468.5 MiB: allocator residency and small path metadata remain even when the images are gone. This override is outside the library API and outside Git; it does not promote general hot unload or establish a performance improvement.
+
+The same diagnostic override on the repaired wheel completes all eight cycles in 126.024 process seconds, with 1,536 validated batch requests and zero base/module images after every close. Paired observations immediately before/after releasing the four base images show RSS reductions of 32.25--33.125 MiB per close. Final RSS remains 420.188 MiB, live malloc 4,501,200 bytes and reserved capacity 503,316,480 bytes. This is an observed resource effect in one controlled process, not general unload admission or a throughput/p99 result.
+
+The repaired wheel also completes the original production-policy targets:
+
+| Native gate | Result |
+|-------------+--------|
+| Same 600-second fixed-pool workload | PASS; 610.429 process seconds; 924,720 validated batch requests; RSS samples 278.813--407.688 MiB |
+| Same eight create/use/close cycles | PASS; 135.374 process seconds; 1,536 validated batch requests |
+| Actual Python native backend API suite | 12 PASS; GC, continuations, full DSL, errors, native graphs/types, Actor distribution, cwd and host-signal controls |
+| Rejected finalizer with retained root | PASS; SDK not destroyed, root retained, copied image kept, cleanup not attempted, further admission rejected |
+| Abandoned Rust reply destructor panic | PASS; owner marked panicked, SDK not destroyed, copied image kept, further admission rejected |
+| Intentionally forgotten native root | PASS; host status -72; SDK/root/image retained; cleanup not attempted |
+| Startup faults before/after known SDK initialization | PASS; existing bounded phase/rollback semantics and cleanup receipts preserved |
+| Foreign callback / TLS / actual unload | PASS; TLS destructor exactly once, key capacity 509 restored, callback revoked, actual mapping population restored |
+| Early code-unload sensitivity control | Owned child SIGSEGV as expected; no Scheme VM setup; parent gate passes only when that signal is observed |
+| Preflight reject/unload and later valid initialization | 136 rejections complete; mapped-image/FD/thread baselines stable; later native setup and cleanup pass |
+| Existing retained-root/abandoned reply/stale-generation control | PASS after the focused responsibility split |
+| Strict qualification-bench Clippy | PASS without suppressions |
+
+All production-policy closes have zero external roots, one process thread, three FDs and removed files. Fixed-pool reuse ends at 372.422 MiB RSS with four retained base images, malloc live 5,201,280 bytes and reserved 499,122,176 bytes. The eight-cycle default-policy run still ends at 764.531 MiB RSS with 32 base images, malloc live 5,219,936 bytes and reserved 578,813,952 bytes. That rising-RSS negative remains open; the correctness repair does not claim to reduce normal-path memory.
+
+The first preflight wrapper stops incomplete at its 60-second outer budget after the snapshot covering 80 rejections; it is not a native pass or native five-second stall. The complete rerun uses a 180-second outer budget and finishes in 121.569 seconds, preserving the existing five-second progress gate. Earlier lint/compiler diagnostics and all observer failures remain outside Git. No Scheme execution/admission deadline is widened.
+
+The native tests use the existing Cargo/Gerbil qualification graph, including its watched C header. Strict lint also required a small responsibility split in the existing retained-root control; its exact zero-root assertion is preserved as an integer bit comparison, without tolerance or suppression. No Bash, alternative Scheme build pipeline, scheduler reimplementation or duplicate model is added. Raw logs, graphs, disassembly, failed attempts, diagnostic overrides and receipts remain outside Git.
+
 * Remaining native scope
 
 The concrete directory/SDK-ENOENT and post-open/post-close host-signal regressions are closed by actual native controls, not model results. Multi-hour fixed-VM reuse, longer image churn, complete attribution of residual allocations and a general image-unload protocol, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. The twelve-transition symbolic target also remains incomplete; the eight-transition smoke result does not replace it.
@@ -203,6 +276,12 @@ just owner-model-verify
 just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 600 --sample-seconds 10
 just bridge-python-dispatch-memory /path/to/venv/bin/python --case lifecycle --cycles 8
 just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 0 --allocator-relief
+just bridge-instance-resources --callbacks
+just bridge-instance-resources --finalizer-failure
+just bridge-instance-resources --owner-unwind
+just bridge-instance-resources --root-quarantine
+just bridge-instance-resources --preflight
+just bridge-instance-resources --retained
 #+end_src
 
 All raw captures, failed attempts, diagnostic wrappers, checker output and source identities stay outside Git. Only maintained models, tests, CI wiring and English summaries are committed. The preceding commit =0126e6c= completed all four platform Cargo/Bazel jobs and the owner-protocol CI job successfully; SMP was explicitly skipped. Those checks did not cover the sustained failures found locally. Exact-head checks after publishing this repair remain separate from the completed local native receipts.

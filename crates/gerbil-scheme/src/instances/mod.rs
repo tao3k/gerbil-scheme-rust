@@ -24,7 +24,7 @@ mod retirement;
 mod types;
 pub use dispatch::InstanceDispatcher;
 pub use pool::InstancePool;
-use pool::{LIFECYCLE, Request};
+use pool::Request;
 pub use types::{
     InstanceConfig, InstanceError, InstanceReply, InstanceTicket, IsolatedProgram, OwnerReceipt,
     OwnerShutdown, ShutdownReceipt,

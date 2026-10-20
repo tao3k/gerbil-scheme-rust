@@ -352,16 +352,23 @@ impl Image {
                 }
             }
         });
-        self.release_retained();
+        let quiesced = finalizer_status.is_none_or(|status| status == 0);
+        if quiesced {
+            self.release_retained();
+        }
         self.live = false;
         let start = Instant::now();
-        // SAFETY: queue drained; this owner still owns all native entry.
-        let (roots, collections, sdk_status) =
-            unsafe { ((self.roots)(), (self.gc)(), (self.cleanup)()) };
-        let status = if sdk_status == 0 {
-            finalizer_status.unwrap_or(0)
+        // SAFETY: owner-local observations while the SDK is still initialized.
+        let (roots, collections) = unsafe { ((self.roots)(), (self.gc)()) };
+        let native_cleanup_attempted = quiesced && roots == 0;
+        let status = if native_cleanup_attempted {
+            // SAFETY: accepted queue drained, application finalizer succeeded,
+            // and no external roots remain. Unverified quiescence is quarantined.
+            unsafe { (self.cleanup)() }
         } else {
-            sdk_status
+            finalizer_status
+                .filter(|status| *status != 0)
+                .unwrap_or(-72)
         };
         if roots != 0 || status != 0 {
             crate::instance_backend::poison_images();
@@ -372,6 +379,7 @@ impl Image {
             owner: self.receipt.owner,
             roots_before_cleanup: roots,
             gc_collections: collections,
+            native_cleanup_attempted,
             status,
             cleanup_time,
             image_file_removed,
@@ -386,14 +394,11 @@ impl Image {
 impl Drop for Image {
     fn drop(&mut self) {
         if self.live {
-            self.release_retained();
-            let _guard = super::LIFECYCLE
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            // SAFETY: unwinding remains on the fixed owner; no native call is active.
-            // This emergency cleanup is not a successful shutdown receipt.
-            let status = unsafe { (self.cleanup)() };
-            let _ = super::retirement::file(&self.file, status);
+            // Unwinding has no successful application-finalizer receipt. Do not
+            // enter Scheme, release roots or destroy a possibly active heap.
+            // Keep the mapping, heap and file for process-terminal quarantine.
+            self.live = false;
+            crate::instance_backend::poison_images();
         }
     }
 }
@@ -416,6 +421,7 @@ fn rollback_initialized(
         owner,
         roots_before_cleanup,
         gc_collections,
+        native_cleanup_attempted: true,
         status,
         cleanup_time,
         image_file_removed,

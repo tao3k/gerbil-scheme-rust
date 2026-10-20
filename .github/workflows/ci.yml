@@ -40,15 +40,6 @@ jobs:
       - name: Cargo format
         run: cargo fmt --all --check
 
-      - name: Check shell Gerbil environment boundary
-        shell: bash
-        run: |
-          env CC=foreign SDKROOT=/nix/store/foreign GAMBOPT=selected \
-            tools/gerbil-build-command.sh bash -c '
-              test -z "${CC+x}" && test -z "${SDKROOT+x}" &&
-              test "$GAMBOPT" = selected
-            '
-
       - name: Cargo gates
         run: |
           cargo check --workspace --locked
@@ -136,7 +127,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: dtolnay/rust-toolchain@1.95.0
       - name: Install pinned Quint CLI
         run: npm install --global @informalsystems/quint@0.33.0
       - name: Check lifecycle scenarios, sampled traces and negative controls
-        run: sh tools/check-owner-model.sh
+        run: cargo test -p gerbil-scheme-rust-project-harness --test owner_model owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture

@@ -7,12 +7,35 @@
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+/* Process control belongs to the embedding host. Leave the SDK's internal
+ * timer signals alone so Scheme green-thread scheduling remains native. */
+typedef struct {
+  struct sigaction actions[3];
+  unsigned saved;
+} gerbil_host_signals;
+static const int gerbil_host_signal_numbers[3] = { SIGCHLD, SIGINT, SIGTERM };
+static int gerbil_host_signals_capture(gerbil_host_signals *signals) {
+  memset(signals, 0, sizeof(*signals));
+  for (unsigned i = 0; i < 3; ++i) {
+    if (sigaction(gerbil_host_signal_numbers[i], NULL, &signals->actions[i]) < 0)
+      return -1;
+    signals->saved++;
+  }
+  return 0;
+}
+static int gerbil_host_signals_restore(const gerbil_host_signals *signals) {
+  int result = 0;
+  for (unsigned i = 0; i < signals->saved; ++i) {
+    if (sigaction(gerbil_host_signal_numbers[i], &signals->actions[i], NULL) < 0)
+      result = -1;
+  }
+  return result;
+}
 typedef struct {
   int saved[3];
   int descriptor_flags[3];
   FILE *private_stream[3];
-  struct sigaction child;
-  int child_saved;
+  gerbil_host_signals signals;
 } gerbil_host_io;
 
 static FILE *gerbil_private_stream(void) {
@@ -44,7 +67,7 @@ static int gerbil_host_io_restore(gerbil_host_io *host) {
       close(fd); /* It was closed before native setup, and remains host-closed. */
     }
   }
-  if (host->child_saved && sigaction(SIGCHLD, &host->child, NULL) < 0) result = -1;
+  if (gerbil_host_signals_restore(&host->signals) != 0) result = -1;
   for (int fd = 0; fd < 3; ++fd) {
     FILE *stream = host->private_stream[fd];
     if (stream == NULL) continue;
@@ -75,8 +98,7 @@ static int gerbil_host_io_capture(gerbil_host_io *host) {
     host->saved[fd] = -1;
     host->descriptor_flags[fd] = -2; /* not yet inspected */
   }
-  if (sigaction(SIGCHLD, NULL, &host->child) < 0) return -1;
-  host->child_saved = 1;
+  if (gerbil_host_signals_capture(&host->signals) != 0) return -1;
   for (int fd = 0; fd < 3; ++fd) {
     int flags = fcntl(fd, F_GETFD);
     if (flags < 0 && errno == EBADF) { host->descriptor_flags[fd] = -1; continue; }
@@ -99,7 +121,10 @@ failed:
   return -1;
 }
 #else
-typedef struct { int unused; } gerbil_host_io;
+typedef struct { int unused; } gerbil_host_signals;
+static int gerbil_host_signals_capture(gerbil_host_signals *signals) { (void)signals; return 0; }
+static int gerbil_host_signals_restore(const gerbil_host_signals *signals) { (void)signals; return 0; }
+typedef struct { gerbil_host_signals signals; } gerbil_host_io;
 static int gerbil_host_io_capture(gerbil_host_io *host) { (void)host; return 0; }
 static int gerbil_host_io_restore(gerbil_host_io *host) { (void)host; return 0; }
 #endif

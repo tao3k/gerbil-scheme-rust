@@ -54,7 +54,7 @@ The safety predicate checks closed-state retirement, ownership, result/root
 conservation constraints and absence of late publication, late executor creation
 or foreign handle use. Four mutations deliberately remove one boundary each:
 late publication, late executor creation, early join and foreign handle use.
-The shell gate requires exit 1 **and** `error: Invariant violated`; parser, tool
+The Rust integration test requires exit 1 **and** `error: Invariant violated`; parser, tool
 or dependency failures cannot satisfy a negative control.
 
 The small domain has three requests and two owners; the wide domain has five
@@ -69,10 +69,13 @@ stuck native code need not ever join.
 
 The memory qualifier exercises real Actors, hygienic DSL evaluation, retained
 procedures/continuations, binary native values, exception recovery, GC and close.
-The first mixed-reuse pilot failed with a zero native root during repeated DSL
-recovery. Smaller isolated controls and later short runs passed. This unresolved
-negative is not erased by the protocol model, diagnostic wrappers or successful
-reruns. It prevents claiming full sustained native acceptance.
+Historical sustained failures are preserved. Native diagnostics establish a
+process-cwd race in the SDK normalizer and an independent host-signal ownership
+failure. The repaired O2 artifact completes the identical 600-second reuse and
+eight-cycle lifecycle targets and independent fault controls. These are native
+receipts, not consequences of this model. Retained code images, rising lifecycle
+RSS, longer endurance and additional OS-global boundaries remain unqualified;
+see status report 30.23 for the artifact, actual results and remaining scope.
 
 Use `just bridge-python-dispatch-memory <python> --case reuse --seconds 600`
 and `--case lifecycle --cycles 8` against an identified native O2 wheel. Generated

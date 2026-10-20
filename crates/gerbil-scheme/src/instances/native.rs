@@ -54,6 +54,23 @@ impl<'owner> NativeSession<'owner> {
             _owner: PhantomData,
         })
     }
+    pub(super) fn call_result(&self, root: i64) -> Result<NativeRoot<'owner>, InstanceError> {
+        if root == 0
+            && let Some(take) = self.image.native.call_error
+        {
+            // SAFETY: same owner, immediately after the rooted call. The
+            // optional export consumes the diagnostic and transfers a root.
+            let token = unsafe { take() };
+            if token > 0 {
+                let message = self.own(token)?;
+                let bytes = self.image.copy_reply(message.root, 16384)?;
+                return Err(InstanceError::Scheme(
+                    String::from_utf8_lossy(&bytes).into_owned(),
+                ));
+            }
+        }
+        self.own(root)
+    }
     pub(super) fn input(&self, bytes: usize) -> Result<(), InstanceError> {
         let total = self
             .transferred
@@ -129,7 +146,7 @@ impl<'owner> NativeSession<'owner> {
         self.local(input)?;
         // SAFETY: the descriptor admits this export; input remains rooted and
         // exceptions are contained in Scheme. Output transfers a fresh root.
-        self.own(unsafe { (self.image.call)(input.root) })
+        self.call_result(unsafe { (self.image.call)(input.root) })
     }
     /// Force the selected SDK's collector on this instance's owner.
     /// # Errors

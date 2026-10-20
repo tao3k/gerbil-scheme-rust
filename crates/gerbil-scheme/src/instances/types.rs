@@ -20,6 +20,8 @@ pub enum InstanceError {
     Loader(String),
     /// Native ABI operation failed; Scheme exceptions return a rejected root.
     Native { operation: &'static str, code: i64 },
+    /// Caught Scheme exception from the original owner-local native call.
+    Scheme(String),
     /// This process already selected the ordinary linked runtime.
     BackendConflict,
     /// Startup failed; observed drain state is retained, including pending owners.
@@ -33,6 +35,7 @@ pub enum InstanceError {
         owner: usize,
         status: i32,
         phase: u32,
+        diagnostic: Option<Box<[i64; 4]>>,
         cleanup: Option<OwnerShutdown>,
     },
     /// Owner queue has reached its configured bound; request was not admitted.

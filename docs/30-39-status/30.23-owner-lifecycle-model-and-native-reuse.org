@@ -1,11 +1,11 @@
-#+TITLE: Owner lifecycle model and sustained native reuse blockers
+#+TITLE: Owner lifecycle model and native OS boundary repairs
 #+STARTUP: overview
 
 * Decision
 
 Add a narrow Quint protocol extension to the existing handoff model, and keep native acceptance independent. The new model covers late publication, lazy executor recreation, owner-bound handles, observation timeout and close/drain/retirement. It does not reimplement Tokio, Rayon, Scheme GC, Actors, green threads or SMP scheduling.
 
-The native tests found two real blockers. Industrial sustained-reuse acceptance is NOT green. Do not hide these failures behind successful short tests, diagnostic wrappers, source checks or the model. No dispatcher/window/owner default or native optimization setting changes.
+The original two native blockers are diagnosed and repaired at the OS directory boundary. A separately reproduced host-signal crash is repaired at native setup/cleanup. The identical 600-second reuse and eight-cycle lifecycle targets now complete on the repaired O2 artifact. This is finite native acceptance, not industrial endurance or complete memory-reclamation certification. Historical failures remain below. No dispatcher/window/owner default or native optimization setting changes.
 
 * Model scope and source boundary
 
@@ -19,23 +19,23 @@ The model checks immutable owner association at handle-use admission, no late re
 
 Quint 0.33.0 executes two finite domains: three requests/two owners and five requests/two owners. Each has eight deterministic scenarios, including deliberately unsafe transitions whose violations are asserted. Both pass. Two sets of 1,000 sampled traces, each at most 64 transitions, report no safety violation. These are bounded samples, not exhaustive state exploration.
 
-All four missing-guard mutations produce real =Invariant violated= counterexamples: late registry publication, late lazy executor creation, premature join and foreign-owner handle use. The shell gate requires exit 1 and that exact invariant diagnostic; parser or dependency errors cannot pass a negative control.
+All four missing-guard mutations produce real =Invariant violated= counterexamples: late registry publication, late lazy executor creation, premature join and foreign-owner handle use. The Rust integration test requires exit 1 and that exact invariant diagnostic; parser or dependency errors cannot pass a negative control.
 
-The composed =just native-model-check= runs the existing handoff checks plus this new gate. A new independent CI job uses pinned Quint and the same maintained shell entrypoint. No native/latency pass is inferred from that CI job.
+The composed =just native-model-check= runs the existing handoff checks plus this new gate. A new independent CI job uses pinned Quint and the same existing Cargo test harness entrypoint. No native/latency pass is inferred from that CI job.
 
-The unchanged model SHA-256 is =fb131a8acf589fed9b6b1490e553a595862465b6934163e835531bed29906e13=. A separate eight-transition symbolic check completes with =NoError= using Apalache 0.62.1 and the existing invariant-mode configuration (65.902 seconds). The maintained external-output wrapper repeats that bound with =NoError= (50.012 seconds). This establishes bounded safety only for that finite domain and depth.
+The unchanged model SHA-256 is =fb131a8acf589fed9b6b1490e553a595862465b6934163e835531bed29906e13=. A separate eight-transition symbolic check completes with =NoError= using Apalache 0.62.1 and the existing invariant-mode configuration (65.902 seconds). The earlier external-output wrapper repeated that bound with =NoError= (50.012 seconds). The replacement Rust/Just entrypoint also completes the unchanged eight-transition target with =NoError= (56.66 test seconds), keeping output outside the checkout. This establishes bounded safety only for that finite domain and depth.
 
 The twelve-transition attempt becomes expensive in later SMT queries and is deliberately stopped incomplete. Its partial state checks are not a pass. =owner-model-verify= retains the twelve-transition target; =owner-model-verify-smoke= explicitly selects eight. The smaller result does not replace or close the larger target. The model, safety predicate and transitions are unchanged between them. Symbolic output now runs in a temporary directory outside the checkout.
 
 * Native artifact and observation method
 
-Use the previously qualified O2 wheel SHA-256 =6af7f691dbd3a09c89d24c7a40e65372b278f766747da3aba6d309320f9a8b15=. Rust/Scheme runtime sources are unchanged in this work. Gerbil/Gambit/C native compilation and full Scheme execution remain in place. Python only drives the actual library API and observes its process; native lists/vectors, binary integers/bytes, rooted procedures and continuations carry work. JSON is diagnostic output.
+The original failure captures use O2 wheel SHA-256 =6af7f691dbd3a09c89d24c7a40e65372b278f766747da3aba6d309320f9a8b15=. Runtime sources were unchanged in that model-only stage; the native repairs and their separately identified artifact are described below. Gerbil/Gambit/C native compilation and full Scheme execution remain in place. Python only drives the actual library API and observes its process; native lists/vectors, binary integers/bytes, rooted procedures and continuations carry work. JSON is diagnostic output.
 
 =qualify_dispatch_memory.py= warms full hygienic expansion on each owner, retains three native handles per owner, rotates direct/Tokio/Rayon/Rayon-blocking, validates real Actor results and worker distribution, applies retained procedures/continuations, exercises expected Scheme exceptions and repeats DSL recovery. Periodic GC checks an exact external-root baseline. A four-MiB retained allocation is an extra-root/collector diagnostic control. Releasing handles does not imply RSS must decrease.
 
 The observer records current Darwin RSS, OS thread rows, loaded images in this process's owner/module namespaces and whether their files still exist. Namespace image counts include runtime/module images, not extra VMs. SDK heap capacity is not live data; the SDK post-GC live value is retained in its raw units. These are resource observations, not throughput A/B or dedicated-host latency certification. A two-GiB sampled RSS guard remains in place; it did not trigger these failures.
 
-* Reproduced native failures
+* Preserved native failures before repair
 
 | Case | Observation | Admission |
 |------+-------------+-----------|
@@ -44,11 +44,11 @@ The observer records current Darwin RSS, OS thread rows, loaded images in this p
 | Continuation-resumption control | Continuation stays rooted but ordinary procedure replaces resumption; same DSL failure at 32.772 seconds, owner 0, turn 528 | FAIL; continuation resumption is not necessary for the bug |
 | Eight create/use/close cycles target | Three cycles close cleanly; fourth startup rejects owner 0 with status 4, phase 1, no cleanup receipt | FAIL; target did not complete |
 
-The DSL error is =Native { operation: "native root", code: 0 }=. The current ABI collapses the underlying caught Scheme exception to zero, so its precise cause is not yet established. Sequential repeated DSL, concurrent DSL, continuation-plus-DSL, Actor-plus-DSL, Actor-plus-continuation and Actor-plus-exception controls pass 32 or 40 rounds. Later short original-path one- and four-owner captures also pass. None of these cancels the reproduced sustained failure.
+The DSL error is =Native { operation: "native root", code: 0 }=. At that stage, the ABI collapsed the caught Scheme exception to zero and its cause was unresolved. Sequential repeated DSL, concurrent DSL, continuation-plus-DSL, Actor-plus-DSL, Actor-plus-continuation and Actor-plus-exception controls pass 32 or 40 rounds. Later short original-path one- and four-owner captures also pass. None of these cancels the reproduced sustained failure.
 
 Diagnostic Scheme wrappers can execute many rounds successfully, but one variant imports another application module and changes image population; neither wrapper substitutes for the normal entry path. They are not admitted as fixes or equivalent acceptance controls.
 
-The startup error is =Initialization { owner: 0, status: 4, phase: 1, cleanup: None }=. This code combines several setup/host-I/O/processor-validation failures; the exact branch is unresolved. The backend poisons further admission. The setup-attempted image is deliberately quarantined rather than unloaded without a successful cleanup receipt. There is one remaining mapped image file in that failed process; do not classify it as a successful retirement or silently remove it to green the test.
+The startup error is =Initialization { owner: 0, status: 4, phase: 1, cleanup: None }=. This code combines several setup/host-I/O/processor-validation failures; the exact branch was unresolved at that stage. The backend poisons further admission. The setup-attempted image is deliberately quarantined rather than unloaded without a successful cleanup receipt. There is one remaining mapped image file in that failed process; do not classify it as a successful retirement or silently remove it to green the test.
 
 * Memory classification evidence
 
@@ -62,16 +62,79 @@ External roots are zero on all three successful closes. The fourth startup failu
 
 A separate short native control closes four VMs with zero roots, removed files and one OS thread. Current RSS remains 263.1 MiB and four initialized images remain mapped. The opt-in diagnostic =malloc_zone_pressure_relief(NULL, 0)= reports zero bytes released and RSS does not drop. Darwin's installed malloc header specifies maximal best-effort relief across all zones for those arguments. This is a post-close diagnostic only, not a production cleanup change or performance optimization.
 
-A later descriptor-instrumented eight-cycle capture completes successfully. Every close has zero external roots, no remaining image files, one OS thread and three open descriptors, against a soft limit of 1,048,575. Owner-namespace image counts reach 32. Post-close RSS spans 263.3--623.9 MiB and then falls to 365.0 MiB in the final cycle; it is not monotonic with mapped-image count. This control does not reproduce the earlier startup rejection, establish its cause or erase it. It supplies no evidence of cumulative descriptor exhaustion in those cycles. Transient setup faults and the sustained DSL failure remain unresolved.
+A later descriptor-instrumented eight-cycle capture completes successfully. Every close has zero external roots, no remaining image files, one OS thread and three open descriptors, against a soft limit of 1,048,575. Owner-namespace image counts reach 32. Post-close RSS spans 263.3--623.9 MiB and then falls to 365.0 MiB in the final cycle; it is not monotonic with mapped-image count. This control does not reproduce the earlier startup rejection, establish its cause or erase it. It supplies no evidence of cumulative descriptor exhaustion in those cycles. Those captures did not resolve the setup or sustained DSL cause; the later native diagnosis below does.
 
 Known intentional retention: initialized code mappings, required by the current loader/hook lifetime policy. Not demonstrated: that all residual RSS is necessary or that it is ordinary reclaimable malloc cache. The zero relief result does not prove absence of every cache or establish a real allocation leak. SDK permanent allocations, other mapped data and native cleanup behavior still require attribution. Do not force dlclose, reuse finalized SDK state, remove continuation coverage or weaken Scheme execution to mask the result.
 
-* Next native closure
+* Native diagnosis and directory repair
 
-1. Preserve the actual Scheme exception across the zero-root error boundary without switching execution routes or exposing a fallback interpreter.
-2. Distinguish setup failure branches and retain the original SDK status, host-I/O errno/status and processor observation. Status 4 alone is insufficient diagnosis.
-3. Repair only the established cause, then rerun the identical mixed reuse and lifecycle targets. Keep the current failed captures as controls.
-4. After those targets complete, extend to multi-hour fixed-VM reuse, RSS/live-heap trends, fault injection and separately instrumented sanitizer builds. No industrial-ready or full-reclamation claim is admitted now.
+The optional diagnostic ABI preserves the caught Scheme exception on the original rooted-call path. It retains at most 4,096 characters, transfers the UTF-8 diagnostic as an ordinary temporary native root exactly once, and clears it before a subsequent rooted call. Successful calls keep the original native value protocol. Diagnostic encoding failures remain caught. Older images without these optional exports retain the generic rejected-root error. Initialization diagnostics separately record the failed branch, original decoded SDK status, host errno and active processor observation; unavailable diagnostics are not invented as zeroes.
+
+The diagnostic O2 wheel reproduces the mixed-reuse failure after 16.192 seconds, owner 1, turn 288, direct mode. The actual exception is a module-read syntax error: it attempts to read a nonexistent =owner-2-modules/.../gerbil-python-ledger/scheme/core.ssi=. The same wheel rejects the fourth lifecycle startup with SDK status =-515899390=. The paired SDK header decodes facility 320, code 2: =ENOENT=. Host capture/restore and processor validation are not the failing branch in that capture.
+
+A directory-only native control reproduces the host cwd changing into a temporary owner directory. A separate lifecycle observer records the host cwd in owner 2's module directory after work, then =getcwd= returning =ENOENT= after resource retirement, followed by SDK setup returning the same error. These are independent failures in the original execution path, not wrapper-based passes.
+
+Inspection of the paired native image establishes the mechanism: =___os_path_normalize_directory= calls =getcwd=, =chdir= and restore =chdir= while holding an image-local pthread mutex. Each copied SDK owns a different mutex, while the process cwd is shared. Concurrent normalizers can therefore save, read and restore another owner's directory. Removing retired files then leaves a deleted process cwd, which also prevents a later SDK setup. Native root correctness alone cannot prevent this OS-global interaction.
+
+The minimal Darwin instance adapter binds its statically linked SDK's =chdir=/=fchdir= calls to owner-thread directory operations. The minimal export list keeps those bindings local to the private image; host libc calls are not interposed. Each owner captures its initial directory before setup, and cleanup clears the private directory reference after SDK retirement. Setup failures also clear it before the owner exits. Linked single-VM execution is unchanged. No global Scheme execution lock, alternate evaluator, reduced expander, timeout relaxation or scheduler default change is introduced.
+
+This uses Darwin's =pthread_chdir_np=/=pthread_fchdir_np= private SPI. Apple's [[https://github.com/apple-oss-distributions/libpthread/blob/main/private/pthread/private.h][maintained declaration]] describes per-thread cwd, errno behavior and clearing with descriptor -1, available since macOS 10.12. The existing private-image backend is Darwin-only; this is an explicit platform dependency, not a portable or public-POSIX guarantee. The loader must resolve those symbols; there is no fallback to process-global chdir. A native C control verifies per-thread getcwd, relative reads, failed chdir, descriptor-based restore and unchanged host cwd. Mach-O inspection confirms SDK calls bind to the image-local implementation, which is absent from the public export table.
+
+The maintained Python backend regression uses four real owners, 1,000 directory normalizations each, Scheme current-directory parameterization and relative file reads. The independently captured unfixed control leaves the host cwd invalid even though native shutdown reports zero roots. The same control and the original 600-second reuse/eight-cycle lifecycle targets must pass on the repaired O2 artifact before admitting this repair.
+
+The three model shell wrappers and duplicate Bash SDK-environment wrapper are removed. Quint runs through the existing Cargo test harness and Just/CI entrypoints; existing Rust native-build tests own the SDK environment boundary. No new test dependency or alternate build system is added.
+
+* Host process-control signal regression
+
+An early repaired-artifact reuse attempt is deliberately interrupted while advancing the source to preserve POSIX =fchdir(-1) -> EBADF= semantics. It does not finish the 600-second target. The requested SIGINT is followed by SIGSEGV (exit -11) at 209.862 process seconds, without a clean-shutdown receipt. This result is retained as a separate native failure, not relabeled as a normal stop or sustained pass.
+
+Independent one-owner controls establish the host-signal regression: no VM produces Python =KeyboardInterrupt= and exits 0; an active VM terminates with SIGSEGV (-11); after close, SIGINT terminates the process (-2) instead of reaching Python. No Actor work or GC pressure is required. A read-only sigaction/dladdr observer finds SIGINT/SIGTERM pointing into the last private SDK image while active, and SIGINT reset to default after cleanup rather than restored to Python.
+
+The common native boundary now saves and restores host SIGINT/SIGTERM alongside the already preserved SIGCHLD during setup, and preserves current host handlers across cleanup too. Cleanup captures the current host handler, including changes made after open. SDK-internal timer signals are unchanged: this does not disable Scheme green-thread scheduling, translate Scheme execution into Rust, cancel accepted native work or remove native Scheme exception/continuation capability.
+
+The existing actual API suite now checks SIGINT and a custom SIGTERM handler with four live VMs, native-call recovery after delivery, a handler changed during VM lifetime, and delivery after clean close. Fresh-process baseline/live/closed controls and the original sustained workloads are separate required receipts on the final artifact. Delivery inside the SDK setup/cleanup transition and arbitrary user-installed OS signal handlers are not certified by these finite post-open/post-close tests. OS timer signal ownership and other process-global resources still require an embedding contract; same-process VM images are not crash containment.
+
+* Repaired artifact and completed focused gates
+
+The repaired O2 wheel SHA-256 is =95af584758152d71e2574915f69c992bdf15fe9d62eed18cfecfb5f043892ff7=. It is built by the normal Cargo/maturin/Gerbil/Gambit/C chain with dynamic module optimization level 2. A captured source identity matches every changed executable input after build; no source substitution or fallback evaluator is used. Native external-library packaging remains host-dependent, as before; this local artifact is not a self-contained portable release.
+
+| Gate on repaired source/artifact | Result |
+|----------------------------------+--------|
+| Actual Python Rust-backend API suite, including GC/continuations/exception details, directory and host signals | 12 PASS |
+| Independent four-owner directory normalization control that fails before repair | PASS |
+| Fresh-process SIGINT controls: no VM, one active VM, after close | All exit 0 with Python KeyboardInterrupt |
+| Read-only signal observer | SIGINT remains bound to Python before, during and after VM lifetime |
+| Original mixed workload interrupted after its first sample | Host exception; clean close; roots [0,0,0,0]; files removed; one thread/three FDs |
+| Native fault before SDK setup | Status 61, phase 0; two joins; initialized peer cleaned; zero remaining files; retry rejected |
+| Native fault after SDK setup | Status 62, phase 2; explicit rollback status 0 and zero roots; two joins; zero remaining files; retry rejected |
+| Linked native/source unit gate after the common C lifecycle repair | 45 PASS |
+| Strict Clippy for both real instance-feature runtime crates | PASS |
+| Rust-harness replacement for owner Quint scenarios/samples/mutation controls | PASS; native evidence remains separate |
+
+The interrupted mixed workload deliberately emits a =KeyboardInterrupt= failure observation before its outer control checks the shutdown receipt and exits 0. It is an exception/cleanup control, not a 600-second sustained pass. Earlier missing-export diagnostics and intermediate Clippy failures are retained outside Git as well.
+
+* Completed original sustained targets
+
+The unchanged 600-second four-owner workload completes in 609.244 process seconds with 910,368 validated batch requests across 18,966 turns. It rotates the same four dispatch modes, keeps the same native payloads, procedures, saved continuation, expected exceptions, full DSL recovery and GC checks. Every sampled live owner has exactly three external roots. All roots are then released; close reports [0,0,0,0], one OS thread, three FDs and no remaining image files. Sampled RSS spans 279.3--392.4 MiB; post-close RSS is 375.7 MiB with four initialized base images still mapped. No throughput, p99 or leak-freedom claim is inferred from these resource observations.
+
+The unchanged eight-cycle create/use/close target completes in 82.885 process seconds, 1,536 validated batch requests. All eight closes report zero external roots, one OS thread, three FDs and removed files. The intermittent SDK ENOENT is not reproduced after the directory repair. Post-close observations are:
+
+| Completed cycle | RSS MiB | Retained owner images | Existing image files | Roots |
+|-----------------+---------+-----------------------+----------------------+-------|
+| 1 | 263.1 | 4 | 0 | [0,0,0,0] |
+| 2 | 384.9 | 8 | 0 | [0,0,0,0] |
+| 3 | 491.9 | 12 | 0 | [0,0,0,0] |
+| 4 | 555.0 | 16 | 0 | [0,0,0,0] |
+| 5 | 607.2 | 20 | 0 | [0,0,0,0] |
+| 6 | 650.5 | 24 | 0 | [0,0,0,0] |
+| 7 | 693.4 | 28 | 0 | [0,0,0,0] |
+| 8 | 731.2 | 32 | 0 | [0,0,0,0] |
+
+The rising 263.1--731.2 MiB RSS in this final lifecycle capture is retained as a negative resource finding. The code-image population intentionally rises to 32, but not every residual byte is attributed. This result neither proves full reclamation nor establishes an allocation leak. The earlier nonmonotonic capture and zero allocator-relief result remain separate observations. Do not force dlclose or reinitialize retired images to make RSS appear green.
+
+* Remaining native scope
+
+The concrete directory/SDK-ENOENT and post-open/post-close host-signal regressions are closed by actual native controls, not model results. Multi-hour fixed-VM reuse, longer image churn, attribution of retained RSS, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. The twelve-transition symbolic target also remains incomplete; the eight-transition smoke result does not replace it.
 
 * Reproduction
 
@@ -84,4 +147,4 @@ just bridge-python-dispatch-memory /path/to/venv/bin/python --case lifecycle --c
 just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 0 --allocator-relief
 #+end_src
 
-All raw captures, failed attempts, diagnostic wrappers, checker output and source identities stay outside Git. Only maintained models, tests, CI wiring and English summaries are committed. The previous commit =6bb8f6c= completed all four required platform Cargo/Bazel CI jobs successfully. Those checks do not exercise or close the newly found sustained-native failures. Remote checks of the next published commit remain separate from local protocol and native evidence.
+All raw captures, failed attempts, diagnostic wrappers, checker output and source identities stay outside Git. Only maintained models, tests, CI wiring and English summaries are committed. The preceding commit =0126e6c= completed all four platform Cargo/Bazel jobs and the owner-protocol CI job successfully; SMP was explicitly skipped. Those checks did not cover the sustained failures found locally. Exact-head checks after publishing this repair remain separate from the completed local native receipts.

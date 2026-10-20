@@ -39,9 +39,19 @@
 ;; The argument stays rooted throughout user code and exceptions cannot cross C.
 (def (gerbil-rs-root-object value)
   (gerbil-rs-rooted-value-store! value))
+;; A consumed owner-local diagnostic does not retain the exception graph.
+(def gerbil-rs-call-error #f)
 (def (gerbil-rs-rooted-call root procedure)
+  (set! gerbil-rs-call-error #f)
   (with-catch
-    (lambda (_) 0)
+    (lambda (exception)
+      (set! gerbil-rs-call-error
+        (with-catch (lambda (_) "Scheme exception (formatting failed)")
+          (lambda ()
+            (let (message (call-with-output-string
+                           (lambda (port) (display-exception exception port))))
+              (substring message 0 (min 4096 (string-length message)))))))
+      0)
     (lambda ()
       (let (value (gerbil-rs-rooted-value-ref root))
         (if (eq? value gerbil-rs-root-missing) 0
@@ -829,6 +839,18 @@ END-C
     "gerbil_scheme_rust_root_exact_integer_u64_value_raw"
     "extern"
   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root-id))
+
+;; Optional diagnostic ABI: transfer one UTF-8 bytevector root exactly once.
+(c-define (gerbil-rs-take-call-error-raw)
+    () int64 "gerbil_scheme_rust_take_call_error_raw" "extern"
+  (let ((message gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error))
+    (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error #f)
+    (if message
+      (with-exception-catcher (lambda (_) 0)
+        (lambda ()
+          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector
+           (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8 message))))
+      0)))
 
 (c-define (gerbil-rs-root-string->utf8-raw root-id)
     (int64) int64

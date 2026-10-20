@@ -116,6 +116,8 @@ const OWNER_EXPORTS: &[&str] = &[
     "gerbil_scheme_instance_usage",
     "gerbil_scheme_instance_diagnostics",
     "gerbil_scheme_instance_setup_phase",
+    "gerbil_scheme_instance_setup_diagnostic",
+    "gerbil_scheme_rust_take_call_error_raw",
     "gerbil_owner_process_resources",
     "gerbil_owner_allocator_relief",
     "gerbil_owner_memory_regions",

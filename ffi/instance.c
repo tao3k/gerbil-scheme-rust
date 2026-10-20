@@ -3,6 +3,21 @@
 #include "runtime.c"
 #include "instance.h"
 #include <time.h>
+#if defined(__APPLE__)
+/* Darwin private pthread SPI, available since macOS 10.12. This backend
+ * already requires Darwin. Definitions are image-local under INSTANCE_EXPORTS:
+ * the statically linked SDK binds here; host libc callers remain unchanged.
+ * The SDK normalizer temporarily chdirs under an image-local mutex, which
+ * cannot protect process cwd from another VM's independent normalizer. */
+extern int pthread_chdir_np(const char *);
+extern int pthread_fchdir_np(int);
+int chdir(const char *path) { return pthread_chdir_np(path); }
+int fchdir(int descriptor) {
+  /* -1 clears Darwin thread cwd, but remains EBADF in the POSIX SDK API. */
+  if (descriptor < 0) { errno = EBADF; return -1; }
+  return pthread_fchdir_np(descriptor);
+}
+#endif
 #ifndef GERBIL_INSTANCE_LINKER
 #error "The canonical program build must specify GERBIL_INSTANCE_LINKER"
 #endif
@@ -17,9 +32,21 @@ int32_t gerbil_scheme_instance_setup(uint32_t owner) {
   /* Qualification faults are compiled into separate images. No environment,
    * source-name policy or shared SDK configuration controls production setup. */
   if (GERBIL_OWNER_FAILURE_STAGE == 1 && owner == 1) return 61;
+#if defined(__APPLE__)
+  if (pthread_chdir_np(".") != 0) {
+    setup_diagnostic[0] = 5;
+    setup_diagnostic[2] = errno;
+    return 4;
+  }
+#endif
   setup_phase = 1;
   int32_t status = gerbil_scheme_rust_runtime_init_program_single_processor(GERBIL_INSTANCE_LINKER);
-  if (status != 0) return status;
+  if (status != 0) {
+#if defined(__APPLE__)
+    pthread_fchdir_np(-1);
+#endif
+    return status;
+  }
   setup_phase = 2;
   if (GERBIL_OWNER_FAILURE_STAGE == 2 && owner == 1) return 62;
   return 0;
@@ -69,5 +96,10 @@ int32_t gerbil_scheme_instance_cleanup(void) {
       retired_io_bytes += bytes;
     }
   }
+#if defined(__APPLE__)
+  /* The dedicated owner is about to retire; do not leave a private directory
+   * reference to the module namespace after its resources have been removed. */
+  if (pthread_fchdir_np(-1) != 0 && status == 0) return -2;
+#endif
   return status;
 }

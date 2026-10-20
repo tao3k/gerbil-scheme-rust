@@ -22,7 +22,7 @@
 
 * 30--39 Native runtime status
 
-- [[file:30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org][30.23 Owner lifecycle model and sustained native reuse blockers]]
+- [[file:30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org][30.23 Owner lifecycle model and native OS boundary repairs]]
 
 - [[file:30-39-status/30.22-native-dispatch-qualification.org][30.22 Native Tokio and Rayon safety/performance qualification]]
 

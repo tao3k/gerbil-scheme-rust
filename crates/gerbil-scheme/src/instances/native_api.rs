@@ -5,6 +5,8 @@ use std::ffi::c_void;
 
 #[derive(Debug)]
 pub(super) struct NativeApi {
+    pub setup_diagnostic: Option<unsafe extern "C" fn(*mut i64) -> i32>,
+    pub call_error: Option<unsafe extern "C" fn() -> i64>,
     pub objects: Option<super::object_api::ObjectApi>,
     pub numeric_create: unsafe extern "C" fn(i32, *const u8, u64) -> i64,
     pub numeric_size: unsafe extern "C" fn(i64, i64, i32) -> i64,
@@ -20,11 +22,31 @@ pub(super) struct NativeApi {
     pub usage: unsafe extern "C" fn(*mut f64) -> i32,
 }
 impl NativeApi {
+    pub(super) fn setup_failure(&self) -> Option<Box<[i64; 4]>> {
+        let read = self.setup_diagnostic?;
+        let mut values = [0; 4];
+        // SAFETY: trusted optional export, resolved before setup; the private
+        // image remains loaded, and this is called on its rejected setup owner.
+        (unsafe { read(values.as_mut_ptr()) } == 0).then(|| Box::new(values))
+    }
+
     pub(super) unsafe fn load(handle: *mut c_void) -> Result<Self, InstanceError> {
         // SAFETY: the trusted image exports the existing typed bridge ABI; all
         // symbols are checked before any runtime initialization.
         unsafe {
             Ok(Self {
+                setup_diagnostic: symbol(handle, c"gerbil_scheme_instance_setup_diagnostic")
+                    .ok()
+                    .map(|address| {
+                        std::mem::transmute::<*mut c_void, unsafe extern "C" fn(*mut i64) -> i32>(
+                            address,
+                        )
+                    }),
+                call_error: symbol(handle, c"gerbil_scheme_rust_take_call_error_raw")
+                    .ok()
+                    .map(|address| {
+                        std::mem::transmute::<*mut c_void, unsafe extern "C" fn() -> i64>(address)
+                    }),
                 objects: super::object_api::ObjectApi::load(handle),
                 diagnostics: symbol(handle, c"gerbil_scheme_instance_diagnostics")
                     .ok()

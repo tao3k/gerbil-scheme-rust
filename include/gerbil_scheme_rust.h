@@ -66,6 +66,8 @@ typedef int64_t GerbilRootId;
  * roots only on success. Release spans contain ascending unique live IDs. */
 GerbilRootId gerbil_scheme_rust_object_root_raw(GerbilValueHandle value);
 int64_t gerbil_scheme_rust_root_count_raw(void);
+/* Optional, owner-local, consumed UTF-8 diagnostic root; release normally. */
+int64_t gerbil_scheme_rust_take_call_error_raw(void);
 int32_t gerbil_scheme_rust_force_gc_raw(void);
 int32_t gerbil_scheme_rust_object_scalar_raw(GerbilRootId root, GerbilScalarProjection *output);
 /* Index -1 projects the root; otherwise project a retained vector snapshot slot. */

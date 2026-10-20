@@ -156,6 +156,7 @@ pub(super) fn initialization(after: bool, observer: &Observer, progress: &Progre
         status,
         phase,
         cleanup,
+        ..
     } = *cause
     else {
         panic!("native phase failure")

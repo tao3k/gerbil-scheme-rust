@@ -88,6 +88,6 @@ impl<'vm> NativeSession<'vm> {
             .get(name)
             .ok_or_else(|| InstanceError::Loader(format!("undeclared export {name:?}")))?;
         // SAFETY: IsolatedProgram admits this exact unary rooted export ABI.
-        self.own(unsafe { call(input.root) })
+        self.call_result(unsafe { call(input.root) })
     }
 }

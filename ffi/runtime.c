@@ -19,6 +19,13 @@ ___END_C_LINKAGE
 
 /* 0 = never initialized, 1 = running, 2 = finalized and not restartable. */
 static int gerbil_scheme_rust_state = 0;
+/* Exact failed startup branch, SDK status, host errno and processor count. */
+static int64_t setup_diagnostic[4] = {0, 0, 0, 0};
+int32_t gerbil_scheme_instance_setup_diagnostic(int64_t *out) {
+  if (out == NULL) return -1;
+  memcpy(out, setup_diagnostic, sizeof(setup_diagnostic));
+  return 0;
+}
 
 /* Owner-local qualification snapshot. Heap size is capacity, not live bytes;
  * RSS is the process high-water mark and cannot be attributed to one variant. */
@@ -141,15 +148,26 @@ static int32_t runtime_init_program(
    * compiled SDK capacity. Scheme owns scheduling within that population.
    */
   /* Failed setup is terminal too: never retry partially initialized state. */
+  memset(setup_diagnostic, 0, sizeof(setup_diagnostic));
   if (gerbil_host_io_capture(&host) != 0) {
+    setup_diagnostic[0] = 1;
+    setup_diagnostic[2] = errno;
     gerbil_scheme_rust_state = 2;
     return 4;
   }
   ___SCMOBJ initialized = ___setup(&params);
+  setup_diagnostic[1] = ___FIXNUMP(initialized) ? ___INT(initialized) : (int64_t)initialized;
   int host_restored = gerbil_host_io_restore(&host);
+  if (host_restored != 0) setup_diagnostic[2] = errno;
+  if (initialized == ___FIX(___NO_ERR)) setup_diagnostic[3] = ___VMSTATE->processor_count;
+  setup_diagnostic[0] = initialized != ___FIX(___NO_ERR) ? 2 :
+    (host_restored != 0 ? 3 : ((single_processor && setup_diagnostic[3] != 1) ? 4 : 0));
   if (initialized != ___FIX(___NO_ERR) || host_restored != 0 ||
       (single_processor && ___VMSTATE->processor_count != 1)) {
-    if (initialized == ___FIX(___NO_ERR)) ___cleanup();
+    if (initialized == ___FIX(___NO_ERR)) {
+      ___cleanup();
+      gerbil_host_signals_restore(&host.signals);
+    }
     gerbil_scheme_rust_state = 2;
     return 4;
   }
@@ -189,7 +207,10 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
     return 8;
   }
 
+  gerbil_host_signals signals;
+  int captured = gerbil_host_signals_capture(&signals);
   ___cleanup();
   gerbil_scheme_rust_state = 2;
-  return 0;
+  int restored = gerbil_host_signals_restore(&signals);
+  return captured == 0 && restored == 0 ? 0 : 4;
 }

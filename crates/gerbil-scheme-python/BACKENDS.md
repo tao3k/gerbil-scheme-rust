@@ -124,10 +124,20 @@ industrial gates are recorded in the dispatch qualification report.
 
 ## Sustained acceptance boundary
 
-The finite owner-lifecycle Quint model and its mutation controls are separate
-from native acceptance. The sustained memory qualifier currently reproduces
-DSL recovery failures and an intermittent repeated-lifecycle startup failure; its targets are regression probes,
-not an industrial-ready certification. Initialized images remain mapped after
-successful close, so zero roots and removed files do not imply full RSS return.
+The finite owner-lifecycle Quint model is separate from native acceptance.
+The preserved DSL and startup failures were traced to the SDK normalizer's
+process-wide cwd mutation across independent images. The Darwin instance
+adapter confines directory operations to each fixed owner; the common lifecycle
+also preserves host SIGINT/SIGTERM/SIGCHLD handlers. Scheme execution, native
+types, GC, continuations and Actor/green-thread scheduling remain native.
+
+The repaired O2 artifact completes the original 600-second reuse and eight-cycle
+lifecycle targets, plus actual API, host-signal and initialization-failure
+controls. Every completed close has zero external roots, removed files and
+retired owner threads. This is finite acceptance, not industrial certification.
+Initialized images remain mapped: the eight-cycle capture grows from 263.1 to
+731.2 MiB RSS, with 32 retained images. Complete RSS return and indefinite leak
+freedom are not established. Darwin thread-directory private SPI is an explicit
+platform dependency; other OS-global resources require separate qualification.
 See `docs/30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org` in the
-repository root for controls, negative results and the remaining native gates.
+repository root for the exact artifact, preserved failures, controls and limits.

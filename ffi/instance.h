@@ -15,6 +15,12 @@
 uint32_t gerbil_scheme_instance_abi(void);
 int32_t gerbil_scheme_instance_setup(uint32_t owner);
 uint32_t gerbil_scheme_instance_setup_phase(void);
+/* Optional ABI-v3 startup diagnostic, callable after a rejected setup.
+ * Four i64 slots: branch (1 capture, 2 SDK setup, 3 restore, 4 processors,
+ * 5 initial owner directory),
+ * decoded SDK fixnum status (otherwise raw word), host errno, active processors.
+ * A zero branch means none of these failures. Missing data stays unavailable. */
+int32_t gerbil_scheme_instance_setup_diagnostic(int64_t *out);
 int32_t gerbil_scheme_instance_cleanup(void);
 uint64_t gerbil_scheme_instance_io_retired_bytes(void);
 uintptr_t gerbil_scheme_instance_state(void);

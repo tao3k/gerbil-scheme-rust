@@ -22,6 +22,13 @@ pub(super) static INITIALIZATION_ATTEMPTED: std::sync::atomic::AtomicBool =
 
 static NEXT_IMAGE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
+fn next_identity() -> Result<u64, InstanceError> {
+    use std::sync::atomic::Ordering;
+    NEXT_IMAGE_ID
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .map_err(|_| InstanceError::InvalidConfig("image generation exhausted"))
+}
+
 type Unary = unsafe extern "C" fn(i64) -> i64;
 #[derive(Debug)]
 pub(super) struct Image {
@@ -147,13 +154,7 @@ impl Image {
             let phase: unsafe extern "C" fn() -> u32 =
                 std::mem::transmute(symbol(handle, c"gerbil_scheme_instance_setup_phase")?);
             let native = NativeApi::load(handle)?;
-            let identity = NEXT_IMAGE_ID
-                .fetch_update(
-                    std::sync::atomic::Ordering::Relaxed,
-                    std::sync::atomic::Ordering::Relaxed,
-                    |id| id.checked_add(1),
-                )
-                .map_err(|_| InstanceError::InvalidConfig("image generation exhausted"))?;
+            let identity = next_identity()?;
             INITIALIZATION_ATTEMPTED.store(true, std::sync::atomic::Ordering::Release);
             let status = setup(u32::try_from(owner).expect("bounded owner"));
             let setup_phase = phase();
@@ -161,6 +162,7 @@ impl Image {
                 preflight.setup_attempted();
             }
             if status != 0 {
+                let diagnostic = native.setup_failure();
                 let rollback = (setup_phase == 2)
                     .then(|| rollback_initialized(owner, roots, gc, cleanup, &image_path, retired));
                 crate::instance_backend::poison_images();
@@ -168,6 +170,7 @@ impl Image {
                     owner,
                     status,
                     phase: setup_phase,
+                    diagnostic,
                     cleanup: rollback,
                 });
             }
@@ -213,6 +216,7 @@ impl Image {
             owner: cleanup.owner,
             status: -1,
             phase: 2,
+            diagnostic: None,
             cleanup: Some(cleanup),
         })
     }

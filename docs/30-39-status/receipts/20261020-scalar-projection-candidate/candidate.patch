@@ -1,0 +1,253 @@
+diff --git a/crates/gerbil-scheme-python/src/instance_projection.rs b/crates/gerbil-scheme-python/src/instance_projection.rs
+index 16c23e5..ef577a0 100644
+--- a/crates/gerbil-scheme-python/src/instance_projection.rs
++++ b/crates/gerbil-scheme-python/src/instance_projection.rs
+@@ -9,20 +9,27 @@ use std::{
+ };
+ 
+ impl InstanceService {
+-    pub(in super::super) fn project_many(&self, ids: &[u64]) -> Answer<Vec<Scalar>> {
++    pub(in super::super) fn project_many(
++        &self,
++        ids: &[u64],
++        fast_scalars: bool,
++    ) -> Answer<Vec<Scalar>> {
+         let apply = self.host.apply;
+-        let mut values =
+-            self.native_batch(ids, false, move |session, registry, id| {
+-                match execute(
+-                    session,
+-                    Command::Inspect(id, Projection::Scalar),
+-                    registry,
+-                    apply,
+-                )? {
+-                    super::NativeOutput::Plain(super::Output::Scalar(value)) => Ok(value),
+-                    _ => Err(InstanceError::InvalidConfig("native projection result")),
+-                }
+-            })?;
++        let mut values = self.native_batch(ids, false, move |session, registry, id| {
++            if fast_scalars {
++                let root = session.retained(registry.get(id)?)?;
++                return super::values::project(session, &root, &[], &mut (16 * 1024 * 1024), true);
++            }
++            match execute(
++                session,
++                Command::Inspect(id, Projection::Scalar),
++                registry,
++                apply,
++            )? {
++                super::NativeOutput::Plain(super::Output::Scalar(value)) => Ok(value),
++                _ => Err(InstanceError::InvalidConfig("native projection result")),
++            }
++        })?;
+         values.sort_by_key(|(index, _)| *index);
+         Ok(values.into_iter().map(|(_, value)| value).collect())
+     }
+diff --git a/crates/gerbil-scheme-python/src/instance_projection_api.rs b/crates/gerbil-scheme-python/src/instance_projection_api.rs
+index 17637ac..baf8618 100644
+--- a/crates/gerbil-scheme-python/src/instance_projection_api.rs
++++ b/crates/gerbil-scheme-python/src/instance_projection_api.rs
+@@ -44,6 +44,7 @@ pub(super) fn project_many(
+     py: Python<'_>,
+     input: &Bound<'_, PyList>,
+     release: bool,
++    fast_scalars: bool,
+ ) -> PyResult<Vec<Py<PyAny>>> {
+     let values = values(library, py, input)?;
+     let ids = values
+@@ -56,7 +57,7 @@ pub(super) fn project_many(
+         .as_ref()
+         .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
+     let projected = py
+-        .detach(|| instances.project_many(&ids))
++        .detach(|| instances.project_many(&ids, fast_scalars))
+         .map_err(PyRuntimeError::new_err)?;
+     let projected = projected
+         .into_iter()
+diff --git a/crates/gerbil-scheme-python/src/instance_values.rs b/crates/gerbil-scheme-python/src/instance_values.rs
+index fc4ff63..04cf8e6 100644
+--- a/crates/gerbil-scheme-python/src/instance_values.rs
++++ b/crates/gerbil-scheme-python/src/instance_values.rs
+@@ -79,6 +79,7 @@ pub(super) fn execute_staged(
+                     &root,
+                     &[],
+                     &mut (16 * 1024 * 1024),
++                    false,
+                 )?)),
+             }
+         }
+@@ -128,12 +129,38 @@ fn encode<'vm>(
+         }
+     }
+ }
+-fn scalar(session: &NativeSession<'_>, value: &NativeRoot<'_>) -> Result<Scalar, InstanceError> {
+-    match session.kind(value)? {
++fn scalar(
++    session: &NativeSession<'_>,
++    value: &NativeRoot<'_>,
++    kind: ObjectKind,
++    fast_scalars: bool,
++) -> Result<Scalar, InstanceError> {
++    // The rooted Scheme value cannot mutate during this synchronous owner turn.
++    let kind = if fast_scalars {
++        kind
++    } else {
++        session.kind(value)?
++    };
++    match kind {
+         ObjectKind::Void => Ok(Scalar::Null),
+         ObjectKind::String => session.copy_string(value).map(Scalar::Text),
+         ObjectKind::Bytevector => session.copy_bytes(value).map(Scalar::Bytes),
+         ObjectKind::ExactInteger => {
++            if fast_scalars {
++                match session.copy_scalar(value) {
++                    Ok(SchemeScalar::Fixnum(integer)) => {
++                        return Ok(Scalar::Integer(integer.into()));
++                    }
++                    // The existing ABI returns 3 for a non-immediate scalar. Exact
++                    // bignums keep their binary sign/magnitude projection below.
++                    Err(InstanceError::Native {
++                        operation: "native scalar projection",
++                        code: 3,
++                    }) => (),
++                    Err(error) => return Err(error),
++                    Ok(_) => return Err(InstanceError::InvalidConfig("native integer scalar")),
++                }
++            }
+             let value = session.copy_big_integer(value)?;
+             Ok(Scalar::Integer(BigInt::from_bytes_le(
+                 if value.is_negative() {
+@@ -155,11 +182,12 @@ fn scalar(session: &NativeSession<'_>, value: &NativeRoot<'_>) -> Result<Scalar,
+     }
+ }
+ 
+-fn project<'vm>(
++pub(super) fn project<'vm>(
+     session: &NativeSession<'vm>,
+     value: &NativeRoot<'vm>,
+     ancestors: &[&NativeRoot<'vm>],
+     remaining: &mut usize,
++    fast_scalars: bool,
+ ) -> Result<Scalar, InstanceError> {
+     *remaining = remaining
+         .checked_sub(std::mem::size_of::<Scalar>())
+@@ -193,18 +221,21 @@ fn project<'vm>(
+                 *remaining = remaining
+                     .checked_sub(key.len())
+                     .ok_or(InstanceError::InvalidConfig("projection byte bound"))?;
+-                map.insert(key, project(session, &pair[1], &stack, remaining)?);
++                map.insert(
++                    key,
++                    project(session, &pair[1], &stack, remaining, fast_scalars)?,
++                );
+             }
+             Ok(Scalar::Map(map))
+         } else {
+             children
+                 .iter()
+-                .map(|value| project(session, value, &stack, remaining))
++                .map(|value| project(session, value, &stack, remaining, fast_scalars))
+                 .collect::<Result<Vec<_>, _>>()
+                 .map(Scalar::List)
+         }
+     } else {
+-        let value = scalar(session, value)?;
++        let value = scalar(session, value, kind, fast_scalars)?;
+         let bytes = match &value {
+             Scalar::Text(value) => value.len(),
+             Scalar::Bytes(value) => value.len(),
+diff --git a/crates/gerbil-scheme-python/src/runtime.rs b/crates/gerbil-scheme-python/src/runtime.rs
+index 0fb0254..c54e0cd 100644
+--- a/crates/gerbil-scheme-python/src/runtime.rs
++++ b/crates/gerbil-scheme-python/src/runtime.rs
+@@ -416,14 +416,15 @@ impl PythonLibrary {
+     }
+     /// Project native values in owner batches. Projection errors preserve every root.
+     #[cfg(feature = "instance-backend")]
+-    #[pyo3(signature = (values, *, release=false))]
++    #[pyo3(signature = (values, *, release=false, fast_scalars=false))]
+     fn project_many(
+         &self,
+         py: Python<'_>,
+         values: &Bound<'_, PyList>,
+         release: bool,
++        fast_scalars: bool,
+     ) -> PyResult<Vec<Py<PyAny>>> {
+-        projection_api::project_many(self, py, values, release)
++        projection_api::project_many(self, py, values, release, fast_scalars)
+     }
+     /// Idempotent owner-batched release. A delivery failure may release a subset; retry is safe.
+     #[cfg(feature = "instance-backend")]
+diff --git a/examples/python-ledger/tests/bench_owner_payload.py b/examples/python-ledger/tests/bench_owner_payload.py
+index d91679f..58837cf 100644
+--- a/examples/python-ledger/tests/bench_owner_payload.py
++++ b/examples/python-ledger/tests/bench_owner_payload.py
+@@ -8,6 +8,7 @@ def percentile(v):return sorted(v)[max(0,math.ceil(len(v)*.99)-1)]
+ parser=argparse.ArgumentParser(description=__doc__)
+ parser.add_argument("--rounds",type=int,default=16,help="Balanced measured rounds; positive even number")
+ parser.add_argument("--owner-trace",action="store_true",help="Diagnostic run only; profiling perturbs performance")
++parser.add_argument("--projection-ab",action="store_true",help="Both arms reuse native payloads; compare existing and fast scalar projection")
+ args=parser.parse_args()
+ if args.rounds<2 or args.rounds%2:parser.error("--rounds must be an even number >= 2")
+ def identity(path):
+@@ -24,7 +25,7 @@ library.set_owner_profiling(args.owner_trace)
+ def emit(**row):print(json.dumps(row),flush=True)
+ def job(owner,arm,wake):
+     wake.wait()
+-    request=("actors",payloads[owner] if arm=="native" else items,1)
++    request=("actors",payloads[owner] if args.projection_ab or arm=="native" else items,1)
+     roots=sessions[owner].call_many([request]*32)
+     return roots,time.perf_counter_ns()
+ def probe(owner,index,wake,clock):
+@@ -36,9 +37,9 @@ def probe(owner,index,wake,clock):
+     return dict(owner=owner,index=index,ns=end-due,service_ns=end-start,lateness_ns=start-due,completed_at_ns=end-clock[0])
+ try:
+     emit(kind="configuration",schema="owner-native-payload-v2",measured_rounds=args.rounds,warmup_rounds=2,
+-        tracing=args.owner_trace,python=dict(executable=sys.executable,version=sys.version),platform=platform.platform(),
++        projection_ab=args.projection_ab,tracing=args.owner_trace,python=dict(executable=sys.executable,version=sys.version),platform=platform.platform(),
+         artifacts=dict(harness=identity(__file__),extension=identity(gerbil_ledger._core.__file__)),states=states,initialization_ns=initialization,native_payload_prepare_ns=preparation,
+-        host=host_snapshot(),contract="same four VMs; four pinned API clients; 128 requests, 32 Actor items, 48 pairs, quantum 1, no sleep; input graph is read-only; native arm reuses one rooted graph per owner, never shares Scheme objects between owners; both arms use session.call_many and bulk projection/release; preparation excluded from warm reuse timing")
++        host=host_snapshot(),arm_contract=("fresh=existing projection, native=fast scalar projection; both reuse native input" if args.projection_ab else "fresh=Python input graph, native=owner-local input graph; both use existing projection"),contract="same four VMs; four pinned API clients; 128 requests, 32 Actor items, 48 pairs, quantum 1, no sleep; input graph is read-only; native arm reuses one rooted graph per owner, never shares Scheme objects between owners; both arms use session.call_many and bulk projection/release; preparation excluded from warm reuse timing")
+     for round_index in range(args.rounds+2):
+         warmup=round_index<2
+         for arm in (["fresh","native"] if round_index%4 in (0,3) else ["native","fresh"]):
+@@ -50,7 +51,7 @@ try:
+             roots=[root for values,_ in outputs for root in values]
+             assert [root.owner for root in roots]==[owner for owner in range(4) for _ in range(32)]
+             returned=time.perf_counter_ns()
+-            rows=library.project_many(roots,release=True);end=time.perf_counter_ns()
++            rows=library.project_many(roots,release=True,**({"fast_scalars":arm=="native"} if args.projection_ab else {}));end=time.perf_counter_ns()
+             cohort=[future.result(timeout=20) for future in short]
+             assert len(cohort)==32
+             assert len(rows)==128
+diff --git a/examples/python-ledger/tests/test_owner_routing.py b/examples/python-ledger/tests/test_owner_routing.py
+index a390c71..0782e4c 100644
+--- a/examples/python-ledger/tests/test_owner_routing.py
++++ b/examples/python-ledger/tests/test_owner_routing.py
+@@ -187,6 +187,26 @@ class OwnerRoutingTests(unittest.TestCase):
+         with self.assertRaises(TypeError):self.library.release_many([live, 42])
+         self.assertEqual(live.to_python(),91);live.close()
+ 
++    def test_fast_scalar_projection_preserves_types_gc_and_failure_roots(self):
++        data=[0,1,-1,2**60-1,-(2**60),2**61,2**170,-(2**151),True,False,None,1.25,"λ",b"\x00\xff",[1,[2**180]],{"x":-42}]
++        roots=[self.library.session(i%4).call(("echo",v)) for i,v in enumerate(data)]
++        self.library.collect()
++        expected=self.library.project_many(roots)
++        self.assertEqual(self.library.project_many(roots+[roots[0]],fast_scalars=True),expected+[expected[0]])
++        function=self.library.session(2).call(("procedure",))
++        with self.assertRaises(RuntimeError):self.library.project_many([function],release=True,fast_scalars=True)
++        result=function.apply(41);self.assertEqual(result.to_python(),42);result.close();function.close()
++        self.assertEqual(self.library.project_many(roots,release=True,fast_scalars=True),expected)
++        cycle=self.library.session(1).call(("cycle",))
++        continuation=self.library.session(3).call(("saved-continuation",))
++        plain=self.library.session(0).call(("echo",42))
++        for opaque in (cycle,continuation):
++            with self.assertRaises(RuntimeError):self.library.project_many([plain,opaque],release=True,fast_scalars=True)
++        self.library.collect()
++        self.assertEqual(plain.to_python(),42)
++        result=continuation.apply(42);self.assertEqual(result.to_python(),65578);result.close()
++        cycle.close();continuation.close();plain.close()
++
+     def test_projection_and_release_across_native_windows(self):
+         roots=self.library.call_many([("echo", (i, 2**(130+i%3))) for i in range(257)], dispatch="direct")
+         roots.reverse()

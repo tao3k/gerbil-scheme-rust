@@ -1,0 +1,5 @@
+{"case": "routing", "exit": 0, "seconds": 15.946818828582764}
+{"case": "backend", "exit": 0, "seconds": 13.351722002029419}
+{"case": "full", "exit": 0, "seconds": 14.042033910751343}
+{"case": "projection-ab", "exit": 0, "seconds": 21.13920307159424}
+{"case": "projection-trace", "exit": 0, "seconds": 10.89733600616455}

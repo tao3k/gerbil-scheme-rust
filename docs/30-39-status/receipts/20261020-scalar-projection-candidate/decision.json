@@ -1,0 +1,14 @@
+{
+  "status": "NOT_ADMITTED",
+  "production_api_unchanged": true,
+  "reason": "No stable paired wall-time improvement; end-to-end main and short p99 regress; wide-integer projection p99 regresses.",
+  "tests": {
+    "owner_routing": 16,
+    "existing_backend": 10,
+    "full_scheme": "PASS",
+    "strict_clippy": "PASS"
+  },
+  "source_identity": "Uncommitted candidate sources on top of the recorded head; retained exactly in candidate-source and candidate.patch.",
+  "negative_results_retained": true,
+  "projection_only_exit": 0
+}

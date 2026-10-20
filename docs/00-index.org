@@ -22,6 +22,8 @@
 
 * 30--39 Native runtime status
 
+- [[file:30-39-status/30.20-scalar-projection-experiment.org][30.20 Native scalar projection experiment and non-admission]]
+
 - [[file:30-39-status/30.19-owner-resident-payload-baseline.org][30.19 Owner-resident Scheme payload baseline and projection attribution]]
 
 - [[file:30-39-status/30.18-client-admission-and-native-data-paths.org][30.18 Client admission and native Scheme data paths]]

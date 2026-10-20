@@ -1,0 +1,70 @@
+#+TITLE: Native scalar projection experiment and non-admission
+#+STARTUP: overview
+
+* Decision
+
+Keep the adopted 30.19 owner-resident payload route and its latest 10.10x matched observation as the working baseline. The scalar projection candidate in this report is NOT ADMITTED to the production API. The complete candidate patch, source snapshots, native wheel identity and raw results remain replayable in receipts. The six experimental production/harness files were restored to their committed versions after capture. No dispatcher default, optimization level, Scheme program or runtime capability changed.
+
+The candidate removes one repeated object-kind read for scalar leaves and uses the existing immediate scalar ABI for fixnums. A non-immediate exact integer falls back only on that ABI's explicit unsupported-scalar status (3), preserving binary sign/magnitude conversion; other failures propagate. An opt-in =project_many(..., fast_scalars=True)= existed only in the measured candidate. It is not part of the retained public API.
+
+All 78 packaged native Scheme resources are byte-identical to the prior O2 wheel. The candidate only changes Rust projection and test plumbing. This is not Scheme-to-Rust algorithm lowering or a new runtime.
+
+* Same-VM end-to-end A/B
+
+Both arms reuse owner-local native input graphs on the same four complete Scheme VMs. Both execute the same 128 actual Actor requests with 32 items each, 48 input pairs per item, quantum one, and no cooperative sleeps. The only arm intervention is projection strategy. Two warmup pairs precede 16 balanced measured pairs. Timed responses include projection and release. Short requests have the same planned arrivals and drain before the next arm.
+
+The harness retains its historic arm labels: =fresh= means existing projection with native input; =native= means candidate scalar projection with native input. The configuration's =projection_ab= and =arm_contract= explicitly identify this mapping. These labels do not mean the first arm copies fresh input in this experiment.
+
+| Metric | Existing projection | Candidate |
+|--------+---------------------+-----------|
+| Actor items/s median | 40702.49 | 48365.61 |
+| Main response p99 ms | 289.020 | 343.243 |
+| Scheduled short response p99 ms | 266.602 | 315.923 |
+| Projection/release median ms | 81.326 | 75.831 |
+| Short completions by owner | [128,128,128,128] | [128,128,128,128] |
+| Probes complete before main batch ends | 246 / 512 | 193 / 512 |
+
+The ratio of throughput medians is 1.1883, but only 8 of 16 paired rounds favor the candidate. The median paired ratio is 1.0376 with a descriptive bootstrap interval [0.5360,2.0608]. Both endpoint p99 metrics regress. This is insufficient evidence for a stable end-to-end improvement. Identical offered probes do not provide identical saturation duration, and finite balanced completions do not establish starvation freedom.
+
+Host observations retain concurrent compiler activity. No unrelated process was paused or changed. These absolute rates must not be compared with 30.19 to infer a code regression, and the 1.1883 ratio must not be multiplied into the historical 10.10x or 21.18x captures.
+
+* Projection-only control
+
+The projection-only fixture retains exactly the same native result roots for both arms. The Actor-result roots come from real Scheme execution; a second fixture contains wide signed exact integers. Each arm reconstructs every Python result, verifies values, and drops Python outputs outside timing. There is no result memoization. Execution and final retirement occur outside projection timing. Four VM identities remain unchanged through both fixtures. Two warmup pairs precede 32 balanced measured pairs per fixture.
+
+| Fixture / metric | Existing projection | Candidate |
+|------------------+---------------------+-----------|
+| Actor results median ms | 54.754 | 44.989 |
+| Actor results p99 ms | 299.488 | 258.316 |
+| Wide integers median ms | 35.076 | 33.551 |
+| Wide integers p99 ms | 139.210 | 151.585 |
+
+Actor-result ratio of medians is 1.2170, but the median paired ratio is 1.0176, with 16 / 32 favorable pairs and descriptive bootstrap interval [0.7989,1.2784]. Wide-integer ratio of medians is 1.0454; 18 / 32 favorable pairs and interval [0.7985,1.5134] likewise do not establish a stable gain. Wide-integer p99 regresses. The projection-only fixture has no short-request cohort and does not qualify endpoint fairness or latency.
+
+* Diagnostic allocation signal
+
+A separate four-pair profiled run identifies the following medians of four-owner projection totals:
+
+| Counter or interval | Existing projection | Candidate |
+|---------------------+---------------------+-----------|
+| Owner thread CPU, summed, ms | 49.564 | 41.640 |
+| GC count, summed | 20 | 12.5 |
+| GC real seconds, summed | 0.01652 | 0.01115 |
+| Root count delta, summed | 0 | 0 |
+| Projection enqueue-to-last-completion span ms | 33.088 | 29.337 |
+
+Owner CPU uses =CLOCK_THREAD_CPUTIME_ID=, not process CPU. Collector counters are native per-VM snapshots at the owner boundary. These are traced observations, not untraced endpoint evidence. GC time is already included in measured native work and must not be added again. The fractional GC count is a median across four measured groups. GC real times summed across owners overlap and are not elapsed critical-path time. No spans were dropped or failed.
+
+The signal warrants studying allocation and rooting during generic traversal. It does not override the negative endpoint result. Existing traversal snapshots collections and creates child roots, then independently converts each leaf; reducing a repeated scalar call leaves that work in place. The next candidate should reuse existing native batch interfaces where they match ordinary Scheme values and avoid temporary leaf roots while preserving parent rooting and bounds. Uniform numeric-vector APIs require actual uniform vectors and must not be silently applied to ordinary vectors or used to narrow arbitrary exact integers.
+
+A follow-up must keep the generic type fallback, cycle and depth/byte bounds, exception recovery, owner affinity, and the rule that all Python materialization succeeds before optional root retirement. Procedures, cycles and continuations must remain usable after projection rejection. Rust continues to dispatch across Scheme instances; Scheme continues to execute application code and schedule its green threads.
+
+* Qualification, retained evidence and replay
+
+The measured candidate passes 16 owner-routing/type/GC/continuation tests, the existing 10 native-backend tests, full hygienic macro/closure/exception qualification on all four owners, strict Clippy and owned-file formatting. Exact values, Actor worker distribution, duplicate roots, positive/negative fixnum boundaries, wide integers, procedure/continuation/cycle rejection, post-GC reuse, stable VM identities, zero shutdown roots and runtime-file removal are exercised. These are local candidate results; the retained production API is unchanged. They do not prove full RSS return or indefinite leak freedom.
+
+The existing PR's two Gerbil CI jobs failed at Cargo format, before native tests. The logs identify three already committed Rust IR files and the resource benchmark entry. A separate formatting-only commit uses committed HEAD sources and preserves all local IR worktree bytes; it does not incorporate pending semantic research. CI status must be checked on the subsequent pushed head.
+
+Evidence: [[file:receipts/20261020-scalar-projection-candidate/decision.json][non-admission decision]], [[file:receipts/20261020-scalar-projection-candidate/candidate.patch][candidate patch]], [[file:receipts/20261020-scalar-projection-candidate/identity.json][source and wheel identity]], [[file:receipts/20261020-scalar-projection-candidate/summary.json][paired endpoint summary]], [[file:receipts/20261020-scalar-projection-candidate/projection-only-summary.json][projection-only paired summary]], [[file:receipts/20261020-scalar-projection-candidate/projection-diagnostics.json][allocation counters]], and [[file:receipts/20261020-scalar-projection-candidate/sha256.json][receipt hashes]].
+
+To replay, apply the retained patch in an isolated checkout of the recorded baseline, build the example through the existing Cargo/maturin O2 chain described in 30.18, and install that wheel in a separate environment. Run the patched maintained harness with =--projection-ab=, then separately =--projection-ab --owner-trace --rounds 4=. The retained =projection_only.py= runs with the candidate wheel. The unmodified production wheel intentionally does not accept =fast_scalars=. Do not replace historical captures or declare fixed numeric gates from these observations.

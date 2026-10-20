@@ -1,0 +1,14 @@
+{
+  "wheel": "/private/tmp/gerbil-projection-scalar-20261020/wheels/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl",
+  "wheel_sha256": "eaea5f4f04ae4091decedafb52dd8806a973e56605a12e0e37bd99e9850b939c",
+  "native_resources_unchanged": 78,
+  "head": "c4848070df037ca75744bdb9c462adfdbfd58644",
+  "sources": {
+    "crates/gerbil-scheme-python/src/instance_values.rs": "e65f7cecb462e37a6ce96f39c0cccc380078cd7c57b0115d5a330ff9ed9f832b",
+    "crates/gerbil-scheme-python/src/instance_projection.rs": "151ca5156ec5eb85308a287b0405dc2902af0fde099879adbf88376bd52aabc7",
+    "crates/gerbil-scheme-python/src/instance_projection_api.rs": "c9924a90bdb1ef2d337faa3cf3c6ddd23be7bf875a0c24b95c8011a018016e86",
+    "crates/gerbil-scheme-python/src/runtime.rs": "b6b30889589f886277e0e5d67f88d160424a817c6d36258ff2bdd8d41e0af943",
+    "examples/python-ledger/tests/test_owner_routing.py": "cd8e71436748acd347a56a12f4e2f48933fb6518dacbf98d0fe47b24b1e1f8fa",
+    "examples/python-ledger/tests/bench_owner_payload.py": "9c1146414fca7c74ff81c0fdccad7ea8a3370addb742dd0f858bc77ddf0beef0"
+  }
+}

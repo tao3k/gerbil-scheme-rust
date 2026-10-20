@@ -1,0 +1,2 @@
+# Preserve native qualification receipts byte for byte, including historical line endings.
+docs/30-39-status/receipts/** -text

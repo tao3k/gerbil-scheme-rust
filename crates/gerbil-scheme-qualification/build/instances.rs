@@ -128,6 +128,8 @@ const OWNER_EXPORTS: &[&str] = &[
     "gerbil_owner_callback",
     "gerbil_owner_failed_finalizer",
     "gerbil_owner_runtime_state",
+    "gerbil_owner_blocking_tls_start",
+    "gerbil_owner_blocking_tls_retire",
     "gerbil_owner_native_call",
     "gerbil_owner_orders_call",
 ];

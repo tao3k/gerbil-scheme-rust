@@ -47,6 +47,7 @@ pub struct InstancePool {
     dispatcher: InstanceDispatcher,
     threads: Vec<Option<thread::JoinHandle<()>>>,
     done: mpsc::Receiver<OwnerShutdown>,
+    joins: Option<mpsc::Receiver<bool>>,
     stopped: Vec<OwnerShutdown>,
     receipts: Vec<OwnerReceipt>,
 
@@ -101,6 +102,7 @@ impl InstancePool {
             ),
             threads: Vec::new(),
             done,
+            joins: None,
             stopped: Vec::new(),
             receipts: Vec::new(),
 
@@ -228,19 +230,63 @@ impl InstancePool {
         self.dispatcher.clone()
     }
 
+    fn begin_joining(&mut self) {
+        if self.joins.is_some() || self.threads.iter().all(Option::is_none) {
+            return;
+        }
+        // is_finished() may become true before native TLS destructors return.
+        // Only a real join proves owner retirement. One temporary coordinator
+        // performs those blocking joins without blocking the caller's deadline.
+        let (handoff, workers) = mpsc::channel::<Vec<(usize, thread::JoinHandle<()>)>>();
+        let (joined, reports) = mpsc::channel();
+        let coordinator = thread::Builder::new()
+            .name("gerbil-owner-join".into())
+            .spawn(move || Self::join_owners(&workers, &joined));
+        if coordinator.is_err() {
+            // No ownership moved on spawn failure; a later shutdown can retry.
+            return;
+        }
+        let workers = self
+            .threads
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(index, worker)| worker.take().map(|worker| (index, worker)))
+            .collect();
+        if let Err(mpsc::SendError(workers)) = handoff.send(workers) {
+            self.restore_threads(workers);
+            return;
+        }
+        self.joins = Some(reports);
+        // Dropping this handle detaches only the coordinator. It runs no Scheme
+        // work; owner completion is admitted only through actual join reports.
+    }
+
+    fn join_owners(
+        workers: &mpsc::Receiver<Vec<(usize, thread::JoinHandle<()>)>>,
+        reports: &mpsc::Sender<bool>,
+    ) {
+        let Ok(workers) = workers.recv() else { return };
+        for (_, worker) in workers {
+            let _ = reports.send(worker.join().is_err());
+        }
+    }
+
+    fn restore_threads(&mut self, workers: Vec<(usize, thread::JoinHandle<()>)>) {
+        for (index, worker) in workers {
+            self.threads[index] = Some(worker);
+        }
+    }
+
     fn collect_finished_owners(&mut self) -> usize {
         self.stopped.extend(self.done.try_iter());
-        for worker in &mut self.threads {
-            if !worker.as_ref().is_some_and(thread::JoinHandle::is_finished) {
-                continue;
+        self.begin_joining();
+        if let Some(reports) = &self.joins {
+            for panicked in reports.try_iter() {
+                self.panicked += usize::from(panicked);
+                self.joined += 1;
             }
-            self.panicked += usize::from(worker.take().expect("finished owner").join().is_err());
-            self.joined += 1;
         }
-        self.threads
-            .iter()
-            .filter(|worker| worker.is_some())
-            .count()
+        self.threads.len() - self.joined
     }
 
     /// Close admission and drain accepted work within one shared deadline.

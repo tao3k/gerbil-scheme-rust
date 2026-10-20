@@ -143,6 +143,8 @@ fn main() {
     match mode.as_str() {
         "--root-quarantine" => callbacks::roots(&progress),
         "--owner-unwind" => callbacks::unwind(&progress),
+        "--blocking-tls-drop" => callbacks::blocking_tls(&observer, &progress, true),
+        "--blocking-tls" => callbacks::blocking_tls(&observer, &progress, false),
         "--callbacks" => callbacks::run(&observer, &progress),
         "--finalizer-failure" => callbacks::failure(&progress),
         "--tls-unload-negative" => callbacks::early_unload(&progress),

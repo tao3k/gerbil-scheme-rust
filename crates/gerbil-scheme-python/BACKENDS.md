@@ -166,3 +166,11 @@ retention; complete residual attribution remains bounded by those observations.
 
 See `docs/30-39-status/30.23-owner-lifecycle-model-and-native-reuse.org` in the
 repository root for the exact artifact, preserved failures, controls and limits.
+
+Shutdown counts an owner as joined only after its actual OS thread join returns,
+including native TLS destructors. One temporary Rust coordinator performs blocking
+joins so the caller can observe pending owners within its existing wait budget.
+A timeout does not cancel a destructor or authorize image/resource destruction.
+Dropping a pending pool lets the coordinator finish eventual joins. Native controls
+cover both repeated shutdown and drop after timeout, including FD/thread and TLS
+key retirement. Rust closure completion alone is insufficient retirement evidence.

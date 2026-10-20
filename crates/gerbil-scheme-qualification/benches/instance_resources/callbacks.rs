@@ -280,3 +280,96 @@ fn negative(progress: &Progress) {
     );
     eprintln!("TLS-NEGATIVE expected-signal=SIGSEGV observed=true scheme-setup=false");
 }
+
+/// A returned Rust owner closure does not prove that native TLS has retired.
+pub(super) fn blocking_tls(observer: &Observer, progress: &Progress, abandon: bool) {
+    use std::{
+        sync::Arc,
+        time::{Duration, Instant},
+    };
+    let baseline = observer.emit("blocking-tls-baseline", 0, &[]);
+    let tls = observer.tls("blocking-tls-baseline");
+    let flags = Arc::new([AtomicU64::new(0), AtomicU64::new(0)]);
+    let mut pool = InstancePool::start(&normal(), config(1)).unwrap();
+    let hooks = Hooks::open(&pool.image_directory.join("owner-0.dylib"), 2 | 4 | 16);
+    let symbol = |name: &std::ffi::CStr| {
+        // SAFETY: lookup only; this observer keeps the qualification image live.
+        let address = unsafe { dlsym(hooks.handle, name.as_ptr()) };
+        assert!(!address.is_null());
+        address
+    };
+    // SAFETY: compiler-owned qualification exports resolved from a live handle.
+    let (start, retire) = unsafe {
+        (
+            std::mem::transmute::<*mut c_void, unsafe extern "C" fn(*mut u64) -> i32>(symbol(
+                c"gerbil_owner_blocking_tls_start",
+            )),
+            std::mem::transmute::<*mut c_void, unsafe extern "C" fn() -> i32>(symbol(
+                c"gerbil_owner_blocking_tls_retire",
+            )),
+        )
+    };
+    let address = flags.as_ptr() as usize;
+    pool.dispatcher()
+        .submit_native_on(0, move |_| {
+            // SAFETY: both Arc owners outlive the actual native thread join.
+            assert_eq!(unsafe { start(address as *mut u64) }, 0);
+            Ok(())
+        })
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    let _initial = pool.shutdown(Duration::ZERO);
+    let entered = Instant::now();
+    while flags[0].load(Ordering::SeqCst) == 0 {
+        assert!(entered.elapsed() < GATE, "TLS destructor did not enter");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    observed(
+        progress,
+        "observed native TLS destructor holding owner exit",
+    );
+    let release_flags = Arc::clone(&flags);
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(750));
+        release_flags[1].store(1, Ordering::SeqCst);
+    });
+    let start = Instant::now();
+    let pending = pool.shutdown(Duration::from_millis(20));
+    let elapsed = start.elapsed();
+    let complete = if abandon {
+        drop(pool);
+        release.join().unwrap();
+        None
+    } else {
+        release.join().unwrap();
+        let receipt = pool.shutdown(GATE);
+        assert!(receipt.is_clean(), "{receipt:?}");
+        Some(receipt)
+    };
+    eprintln!(
+        "BLOCKING-TLS elapsed-us={} pending={pending:?} complete={complete:?}",
+        elapsed.as_micros()
+    );
+    assert_eq!(pending.pending, 1, "native destructor is still live");
+    assert_eq!(pending.joined, 0);
+    assert!(!pending.is_clean());
+    assert!(
+        elapsed < Duration::from_millis(250),
+        "shutdown exceeded its 20ms wait budget"
+    );
+    let after = observer.settled("blocking-tls-retired", 0, baseline[3]);
+    assert_eq!(after[2], baseline[2], "FDs must return after actual join");
+    assert_eq!(
+        after[3], baseline[3],
+        "temporary join coordinator must exit"
+    );
+    // SAFETY: actual owner exit (and coordinator exit) is observed above.
+    assert_eq!(unsafe { retire() }, 0);
+    assert_eq!(unsafe { (hooks.state)() }, 2);
+    assert_eq!(observer.tls("blocking-tls-retired"), tls);
+    observed(
+        progress,
+        "observed bounded shutdown and later actual native join",
+    );
+}

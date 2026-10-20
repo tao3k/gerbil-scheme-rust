@@ -263,6 +263,39 @@ The first preflight wrapper stops incomplete at its 60-second outer budget after
 
 The native tests use the existing Cargo/Gerbil qualification graph, including its watched C header. Strict lint also required a small responsibility split in the existing retained-root control; its exact zero-root assertion is preserved as an integer bit comparison, without tolerance or suppression. No Bash, alternative Scheme build pipeline, scheduler reimplementation or duplicate model is added. Raw logs, graphs, disassembly, failed attempts, diagnostic overrides and receipts remain outside Git.
 
+* Native TLS retirement and bounded shutdown
+
+A new native counterexample separates Rust closure completion from operating-system thread retirement. The qualification image registers a real pthread TLS destructor on its fixed Scheme owner. The destructor reports entry and waits for a test-owned release flag. The test holds that flag for 750 ms and calls =shutdown(20 ms)= while the destructor is known to be active. Before repair, =JoinHandle::is_finished()= is already true; the subsequent synchronous =join()= blocks the shutdown caller for 761.479 ms. It returns only after the destructor finishes. This violates the advertised shared wait budget. An independent Rust thread-local destructor control also observes =is_finished=true= before thread exit and a 754 ms blocking join.
+
+The minimal repair moves blocking owner joins to one temporary Rust coordinator, created only during shutdown. It does not execute Scheme, dispatch requests or change running-owner topology. A completed join report is the only source of the joined count. Native cleanup receipts may arrive earlier; they cannot make =is_clean()= true while native TLS still owns the thread. A coordinator spawn failure leaves all owner handles with the pool for a later retry. Pool drop closes admission; a coordinator that already owns handles continues joining accepted owners even if its receipt receiver is dropped.
+
+The final lint-clean source returns from the same native control in 21.703 ms with =pending=1= and =joined=0=. After releasing the destructor, the repeated shutdown reports one actually joined owner and clean native cleanup. A separate fresh-process route drops the pool after the timed-out call; it also returns to the observed FD/thread baseline after the destructor is released. Both routes restore TLS key capacity to 509. The baseline includes the existing qualification watchdog; it is compared exactly before and after, without relabeling a live native destructor as retired. These are finite OS-scheduled observations, not a hard-real-time guarantee or proof that an arbitrary destructor will terminate.
+
+The callback/unload, rejected-finalizer, unwinding-owner, forgotten-root, initialized startup rollback and retained-root controls also pass with this join path. The original preflight target completes 136 reject/unload cycles and a later valid initialization in 105.392 seconds, with FD/thread/image baselines restored and zero roots after the valid owner closes. Its native five-second progress gate and 180-second outer wrapper are unchanged. Intentional failure quarantine remains an unclean terminal outcome. The coordinator cannot safely cancel an arbitrary native destructor, free a VM with live roots, or grant permission to unload an image with unknown callbacks.
+
+The O2 wheel has SHA-256 =6f5562e99861d0efded1847b07a8631553aba3c405a8b586f44fb3d9bba81176=. Its native Scheme image remains byte-identical, SHA-256 =a7cba177966cb74eeedb136c1e79a09fb309e1b86957377e6b595889eaefd353=. Native type interfaces, Scheme Actor/green scheduling, continuations, GC, optimizer settings and Rust dispatch defaults are unchanged. This lifecycle change makes no throughput or p99 improvement claim. The existing model's join transition assumes an actual native join; this control qualifies that boundary without adding a duplicate model.
+
+The exact preceding published head =7d7614962e03a919d5212170a7a273e95c0a5d0e= completes all four platform Cargo/Bazel jobs plus Quint successfully; SMP is explicitly skipped. This revision adds a separate =Fixed-owner native lifecycle (macos-latest)= CI job using the same immutable SDK installer and existing Cargo/Gerbil qualification graph. It runs the blocking-destructor/repeated-close and pending-pool-drop controls, callback/unload sensitivity, quiescence/root/unwind barriers, initialized startup rollback, retained-root control and repeated preflight rejection/unload, followed by strict native Rust lint. Local results do not stand in for completion of that new remote job. No new Bash file or shell implementation is introduced.
+
+The initial candidate completes the original 600-second reuse target (616.505 outer process seconds, 784,992 validated batch requests), eight lifecycle cycles (106.332 seconds, 1,536 requests), and all 12 Python API tests. Its close boundaries have zero roots, one process thread, three FDs and removed files. Reuse ends at 373.391 MiB RSS with four retained images; eight cycles end at 729.469 MiB RSS with 32 retained images. This preserves the default retention negative. Two strict Clippy parameter-ownership findings are then fixed by borrowing the coordinator's channels within its owning thread closure. The final wheel has SHA-256 =2309b7a9813996d4e63854e17201d98c42974bc257beacfee24dc83d98de9719=. Its Rust extension differs; the complete original acceptance is rerun on that final wheel instead of transferring the earlier artifact's pass. The native Scheme image remains identical.
+
+Final-wheel acceptance is complete, separately from the initial candidate:
+
+| Final O2 artifact gate | Result |
+|------------------------+--------|
+| Original 600-second fixed-pool reuse | PASS; 619.917 outer process seconds; 586,752 validated batch requests; sampled RSS 199.719--375.719 MiB |
+| Original eight create/use/close cycles | PASS; 91.552 outer process seconds; 1,536 validated batch requests |
+| Actual Python backend API suite | 12 PASS; 9.700 test seconds |
+| Every normal close in both resource tests | Zero external roots, one process thread, three FDs and removed files |
+| Final-source native controls | Blocking TLS/repeated close, pending-pool drop, callback/unload sensitivity, rejected finalizer, owner unwind, root barrier, both startup faults and retained-root control PASS |
+| Original 136-cycle preflight rejection/unload | PASS; 105.392 seconds; later valid native setup/cleanup PASS; FD/thread/image population restored |
+| Final-source production and qualification Clippy | PASS with =-D warnings=; no suppression |
+| Format, whitespace and workflow syntax | PASS; workflow YAML parsed locally; remote native job remains a separate gate |
+
+Final fixed-pool reuse ends at 362.984 MiB RSS, malloc live 5,201,312 bytes, reserved 490,733,568 bytes and four retained base images. Eight lifecycle cycles end at 710.703 MiB RSS, malloc live 5,219,968 bytes, reserved 507,510,784 bytes and 32 retained base images. The new join coordinator is absent at observed post-close thread baselines. These finite resource captures are not matched throughput/p99 A/B measurements; differing work totals or RSS across artifacts are not promoted to performance gains. Retained base mappings, process metadata and complete residual-allocation ownership remain open. Failure quarantine is explicitly not clean reclamation. The native TLS deadline defect is closed; general zero-residue retirement is not claimed.
+
+All new raw receipts are stored outside Git under =/private/tmp/gerbil-tls-shutdown-20261020=. The pre-repair native failure, independent control, initial build-policy finding and sandbox resource-observer rejection are retained separately. The build-policy finding was repaired by extracting named join and handle-restoration operations, without suppression. An empty task-local offline maturin cache miss is preserved; the existing cached builder then produces the wheel through the original build graph.
+
 * Remaining native scope
 
 The concrete directory/SDK-ENOENT and post-open/post-close host-signal regressions are closed by actual native controls, not model results. Multi-hour fixed-VM reuse, longer image churn, complete attribution of residual allocations and a general image-unload protocol, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. The twelve-transition symbolic target also remains incomplete; the eight-transition smoke result does not replace it.
@@ -277,6 +310,8 @@ just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --secon
 just bridge-python-dispatch-memory /path/to/venv/bin/python --case lifecycle --cycles 8
 just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 0 --allocator-relief
 just bridge-instance-resources --callbacks
+just bridge-instance-resources --blocking-tls
+just bridge-instance-resources --blocking-tls-drop
 just bridge-instance-resources --finalizer-failure
 just bridge-instance-resources --owner-unwind
 just bridge-instance-resources --root-quarantine

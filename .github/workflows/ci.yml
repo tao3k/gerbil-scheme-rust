@@ -93,6 +93,41 @@ jobs:
           bazel build //...
           bazel test //:ci
 
+  # Real owner/TLS retirement has a separate native gate from the Quint model.
+  # This Darwin image backend uses independent single-processor Scheme runtimes.
+  native-owner:
+    name: Fixed-owner native lifecycle (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Native owner retirement and failure controls
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --blocking-tls
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --blocking-tls-drop
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --callbacks
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --finalizer-failure
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --owner-unwind
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --root-quarantine
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --before
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --after
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --retained
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --preflight
+      - name: Native owner Rust lint
+        run: |
+          cargo clippy -p gerbil-scheme --features external-program,isolated-instances,tokio-dispatch --lib --locked -- -D warnings
+          cargo clippy -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- -D warnings
+
   # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
   # execution inside a VM. Restore this job only with a qualified SDK release.
   scheme-smp:

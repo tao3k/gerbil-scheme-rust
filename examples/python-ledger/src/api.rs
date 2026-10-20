@@ -105,15 +105,35 @@ fn scheme_initialization_attempted() -> Option<bool> {
     }
 }
 
+#[cfg(feature = "qualified-image-retirement")]
+#[pyfunction]
+#[pyo3(signature=(root, owners=4, dispatch_workers=2))]
+fn _open_qualified_retirement(
+    py: Python<'_>,
+    root: &str,
+    owners: usize,
+    dispatch_workers: usize,
+) -> PyResult<Py<PyAny>> {
+    rust_backend::open_qualified(py, Path::new(root), &manifest()?, owners, dispatch_workers)?
+        .into_py_any(py)
+}
 #[pymodule]
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     {
         #[cfg(feature = "rust-backend")]
         module.add_class::<gerbil_scheme_python::PythonPreparedRequest>()?;
+        #[cfg(feature = "rust-backend")]
+        module.add_class::<gerbil_scheme_python::PythonImageMappingState>()?;
+        #[cfg(feature = "rust-backend")]
+        module.add_class::<gerbil_scheme_python::PythonImageCodeLease>()?;
+        #[cfg(feature = "rust-backend")]
+        module.add_class::<gerbil_scheme_python::PythonImageMappingReceipt>()?;
         module.add_class::<PythonLibrary>()?;
         module.add_class::<PythonValue>()?;
         module.add_class::<PythonSession>()?;
     }
+    #[cfg(feature = "qualified-image-retirement")]
+    module.add_function(wrap_pyfunction!(_open_qualified_retirement, module)?)?;
     module.add_function(wrap_pyfunction!(available_backends, module)?)?;
     module.add_function(wrap_pyfunction!(scheme_initialization_attempted, module)?)?;
     module.add_function(wrap_pyfunction!(_open, module)?)

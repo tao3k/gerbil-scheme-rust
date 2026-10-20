@@ -159,6 +159,36 @@ impl PythonLibrary {
     }
     #[cfg(feature = "instance-backend")]
     #[getter]
+    fn image_release_authorized(&self) -> bool {
+        self.service
+            .instances
+            .as_ref()
+            .is_some_and(instances::InstanceService::code_release_authorized)
+    }
+    #[cfg(feature = "instance-backend")]
+    fn lease_code_on(&self, py: Python<'_>, owner: usize) -> PyResult<super::PythonImageCodeLease> {
+        let service = self
+            .service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyValueError::new_err("independent Scheme owner required"))?;
+        py.detach(|| service.code_lease(owner))
+            .map(super::PythonImageCodeLease::new)
+            .map_err(PyRuntimeError::new_err)
+    }
+    #[cfg(feature = "instance-backend")]
+    #[getter]
+    fn shutdown_mappings(&self) -> Vec<super::PythonImageMappingReceipt> {
+        self.service
+            .instances
+            .as_ref()
+            .and_then(instances::InstanceService::shutdown_receipt)
+            .map_or_else(Vec::new, |r| {
+                r.mappings.into_iter().map(Into::into).collect()
+            })
+    }
+    #[cfg(feature = "instance-backend")]
+    #[getter]
     fn shutdown_roots(&self) -> Vec<i64> {
         self.service
             .instances

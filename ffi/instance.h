@@ -3,7 +3,7 @@
 #define GERBIL_SCHEME_INSTANCE_H
 #include <stdint.h>
 #include <stddef.h>
-/* Instance ABI v3. All calls after setup stay on its fixed OS owner.
+/* Instance ABI v4. All Scheme/SDK calls stay on their fixed OS owner.
  * Hide SDK globals; link the native SDK statically into each copied image.
  * Application entry: int64_t call(int64_t borrowed_object_root).
  * Catch Scheme exceptions; zero rejects, positive transfers a fresh object
@@ -11,7 +11,10 @@
  * Resolve all symbols before setup. Setup failure is terminal for admission.
  * setup_phase: 0 never entered native setup; 1 unknown partial setup; 2 completed.
  * Only phase-0 images may be dlclosed. Phase-2 failures can run known cleanup;
- * phase-1 rollback is not admitted. Never unload after native setup attempted. */
+ * phase-1 rollback is not admitted. Initialized code release requires provider
+ * authorization, clean SDK cleanup, actual native join and no code leases.
+ * Code leases cover this base image and SDK module references transferred at
+ * cleanup. They never grant permission to enter a finalized VM. */
 uint32_t gerbil_scheme_instance_abi(void);
 int32_t gerbil_scheme_instance_setup(uint32_t owner);
 uint32_t gerbil_scheme_instance_setup_phase(void);
@@ -40,4 +43,12 @@ int64_t gerbil_scheme_rust_bytes_to_bytevector_root_raw(const uint8_t*, uint64_t
 int64_t gerbil_scheme_rust_root_bytevector_length_raw(int64_t);
 int64_t gerbil_scheme_rust_root_bytevector_copy_raw(int64_t, uint8_t*, uint64_t);
 int32_t gerbil_scheme_rust_root_release_raw(int64_t);
+
+/* Plain adapter operations, no VM entry. Bind during preflight; scalar lease
+ * updates may run on host threads. Drain only after clean SDK cleanup, actual
+ * owner join and zero code leases. Count queries require a mapped base image. */
+void gerbil_scheme_instance_bind_loader(int32_t (*close_function)(void *));
+void gerbil_scheme_instance_code_leases(uint64_t count);
+uint64_t gerbil_scheme_instance_pending_modules(void);
+int32_t gerbil_scheme_instance_release_modules(void);
 #endif

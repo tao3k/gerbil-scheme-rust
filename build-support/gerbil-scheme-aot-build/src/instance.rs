@@ -48,6 +48,7 @@ pub fn build_native_instance_image(
     for file in [
         "ffi/instance.c",
         "ffi/instance.h",
+        "ffi/instance_loader.h",
         "ffi/runtime.c",
         "ffi/host_io.h",
     ] {
@@ -100,6 +101,10 @@ pub fn build_native_instance_image(
 }
 const INSTANCE_EXPORTS: &[&str] = &[
     "gerbil_scheme_instance_abi",
+    "gerbil_scheme_instance_bind_loader",
+    "gerbil_scheme_instance_code_leases",
+    "gerbil_scheme_instance_pending_modules",
+    "gerbil_scheme_instance_release_modules",
     "gerbil_scheme_instance_setup",
     "gerbil_scheme_instance_setup_phase",
     "gerbil_scheme_instance_setup_diagnostic",

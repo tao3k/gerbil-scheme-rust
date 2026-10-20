@@ -174,3 +174,44 @@ A timeout does not cancel a destructor or authorize image/resource destruction.
 Dropping a pending pool lets the coordinator finish eventual joins. Native controls
 cover both repeated shutdown and drop after timeout, including FD/thread and TLS
 key retirement. Rust closure completion alone is insufficient retirement evidence.
+
+## Explicit native code ownership
+
+Scheme roots and native code references have separate lifetimes. A fixed-owner
+`NativeSession::code_lease()` produces a transferable Rust `ImageCodeLease`.
+Python exposes `library.lease_code_on(owner)`, `lease.mapping`, and idempotent
+`lease.close()`. It keeps the owner's base image and SDK-managed module close
+references alive; it does not authorize entering a closed VM or retain its heap.
+Unrelated loader handles owned directly by native extensions require their own
+loader ownership; this guard covers the base and SDK-managed references only.
+VM-entering callbacks must quiesce before SDK cleanup. Foreign native TLS and
+non-VM callbacks must finish before the final code lease is dropped. Python
+release runs native unload hooks without the GIL. Inherited code-lease
+operations reject before locks after `fork`; child wrapper destruction retains
+its private copy without acquiring inherited host locks. Interpreter finalization
+conservatively retains a guard if it cannot attach to the host.
+
+`shutdown_mappings` is a typed, frozen observation, separate from external root
+counts and resource-file removal. It distinguishes default policy retention,
+necessary lease retention, failure quarantine, unload in progress, balanced
+loader references and release failures. `pending_module_closes` is unavailable
+until observed, rather than reporting a fabricated zero. A released backend
+reference does not prove that an external loader reference has also retired.
+
+Initialized images remain retained by default. An unsafe maintainer-owned
+`with_unload_after_join` descriptor authorizes release only after verified SDK
+cleanup, actual native thread join and zero code leases. Failed cleanup or
+unwind quarantines code. The adapter transfers SDK module close references
+during cleanup and drains them after the same boundary, outside lifecycle
+locks. Arbitrary native extensions require this ownership contract; Scheme
+evaluation, continuations, Actors, GC and native types remain available.
+
+The Python example's `qualified-image-retirement` feature enables a separate
+`gerbil_ledger.qualification.open_qualified_retirement_library` factory for owned
+qualification workloads. It does not change `open_library` or production defaults.
+Both factories use the same native Scheme image in the same wheel.
+
+`InstancePool::start_observed` provides validated native admission metadata for
+startup diagnosis. It reports actual completed owners on the caller and leaves
+the per-owner timeout unchanged. The default `start` path uses a no-op observer;
+this is not a periodic liveness signal or permission to enter Scheme off-owner.

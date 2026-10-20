@@ -26,6 +26,7 @@ pub use closure::{
 mod runtime;
 #[cfg(feature = "instance-backend")]
 pub use runtime::{
+    PythonImageCodeLease, PythonImageMappingReceipt, PythonImageMappingState,
     PythonInstanceProgram, PythonInstanceRequest, PythonPreparedRequest, open_instance_library,
 };
 

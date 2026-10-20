@@ -1,25 +1,23 @@
 //! Loading may be undone only before the image attempts native setup.
 use super::InstanceError;
-use std::{ffi::c_void, path::PathBuf};
-unsafe extern "C" {
-    fn dlclose(handle: *mut c_void) -> i32;
-}
+use std::{ffi::c_void, path::PathBuf, sync::Arc};
 #[derive(Debug)]
 pub(super) struct Preflight {
-    handle: *mut c_void,
+    mapping: Arc<super::mapping::Mapping>,
     path: PathBuf,
     uninitialized: bool,
 }
 impl Preflight {
-    pub(super) fn new(handle: *mut c_void, path: PathBuf) -> Self {
+    pub(super) fn new(mapping: Arc<super::mapping::Mapping>, path: PathBuf) -> Self {
         Self {
-            handle,
+            mapping,
             path,
             uninitialized: true,
         }
     }
     pub(super) fn setup_attempted(&mut self) {
         self.uninitialized = false;
+        self.mapping.initialized();
     }
 }
 impl Drop for Preflight {
@@ -29,7 +27,7 @@ impl Drop for Preflight {
         }
         // SAFETY: constructors may not initialize a VM; native setup was never
         // attempted. No Scheme callback or native process hook references code.
-        if unsafe { dlclose(self.handle) } == 0 {
+        if self.mapping.reject_uninitialized() {
             let _ = std::fs::remove_file(&self.path);
         } else {
             crate::instance_backend::poison_images();

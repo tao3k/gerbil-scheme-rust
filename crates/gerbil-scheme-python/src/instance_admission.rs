@@ -19,8 +19,20 @@ pub struct PythonInstanceProgram {
     configure: &'static CStr,
     apply: &'static CStr,
     finalizer: Option<&'static CStr>,
+    unload_after_join: bool,
 }
 impl PythonInstanceProgram {
+    /// Authorize post-join image release for this maintainer-owned program.
+    /// # Safety
+    /// The program satisfies `IsolatedProgram::with_unload_after_join`: quiesce
+    /// VM callbacks before cleanup and lease every escaping native-code reference.
+    /// This is a provider assertion, never a Python-selected unsafe runtime flag.
+    #[must_use]
+    pub const unsafe fn with_unload_after_join(mut self) -> Self {
+        self.unload_after_join = true;
+        self
+    }
+
     /// Set bounded Rust dispatch workers; native VM owners remain fixed.
     #[must_use]
     pub const fn with_dispatch_workers(mut self, workers: usize) -> Self {
@@ -51,6 +63,7 @@ impl PythonInstanceProgram {
             configure,
             apply,
             finalizer: None,
+            unload_after_join: false,
             workers: 2,
         }
     }
@@ -104,6 +117,10 @@ fn open(
     if let Some(finalizer) = program.finalizer {
         // SAFETY: PythonInstanceProgram admits this exact owner-local finalizer.
         image = unsafe { image.with_finalizer(finalizer) };
+    }
+    if program.unload_after_join {
+        // SAFETY: the unsafe provider descriptor admits the complete code-lifetime contract.
+        image = unsafe { image.with_unload_after_join() };
     }
     let mut pool = InstancePool::start(
         &image,
@@ -178,6 +195,7 @@ fn open(
             apply: program.apply,
             resource_root,
             resources_removed: AtomicBool::new(false),
+            release_after_join: program.unload_after_join,
         }),
     };
     Ok(Service {

@@ -123,6 +123,9 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --after
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --retained
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --preflight
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-release
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-foreign-tls
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --module-capture-failure
       - name: Native owner Rust lint
         run: |
           cargo clippy -p gerbil-scheme --features external-program,isolated-instances,tokio-dispatch --lib --locked -- -D warnings

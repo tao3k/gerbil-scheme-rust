@@ -19,6 +19,11 @@ use std::{
 
 pub(super) static LIFECYCLE: Mutex<()> = Mutex::new(());
 static GENERATION: AtomicUsize = AtomicUsize::new(0);
+#[derive(Debug)]
+struct OwnerThread {
+    worker: thread::JoinHandle<()>,
+    mapping: Arc<super::mapping::Mapping>,
+}
 
 #[derive(Debug)]
 pub(super) struct Request {
@@ -45,10 +50,11 @@ impl std::fmt::Debug for Work {
 #[derive(Debug)]
 pub struct InstancePool {
     dispatcher: InstanceDispatcher,
-    threads: Vec<Option<thread::JoinHandle<()>>>,
+    threads: Vec<Option<OwnerThread>>,
     done: mpsc::Receiver<OwnerShutdown>,
     joins: Option<mpsc::Receiver<bool>>,
     stopped: Vec<OwnerShutdown>,
+    mappings: Vec<Arc<super::mapping::Mapping>>,
     receipts: Vec<OwnerReceipt>,
 
     joined: usize,
@@ -69,6 +75,21 @@ impl InstancePool {
     /// Rejects invalid bounds, incompatible process backend, image/ABI failures,
     /// startup timeout or non-distinct runtime states. Failed setup is never retried.
     pub fn start(program: &IsolatedProgram, config: InstanceConfig) -> Result<Self, InstanceError> {
+        Self::start_observed(program, config, |_| {})
+    }
+
+    /// Initialize owners and report each successful native admission on the caller.
+    /// The callback receives validated metadata, never a Scheme reference. It runs
+    /// once per owner, after SDK setup and before starting the next owner.
+    /// # Errors
+    /// Preserves every `start` admission, native setup and per-owner timeout error.
+    /// # Panics
+    /// If the observer panics. Pool drop starts draining admitted owners.
+    pub fn start_observed(
+        program: &IsolatedProgram,
+        config: InstanceConfig,
+        mut ready: impl FnMut(&OwnerReceipt),
+    ) -> Result<Self, InstanceError> {
         if config.owners == 0
             || config.owners > 64
             || config.queue_capacity == 0
@@ -104,6 +125,7 @@ impl InstancePool {
             done,
             joins: None,
             stopped: Vec::new(),
+            mappings: Vec::new(),
             receipts: Vec::new(),
 
             joined: 0,
@@ -123,6 +145,7 @@ impl InstancePool {
                     image_directory: pool.image_directory.clone(),
                 });
             }
+            ready(pool.receipts.last().expect("validated owner admission"));
         }
         Ok(pool)
     }
@@ -135,6 +158,7 @@ impl InstancePool {
         finished: &mpsc::Sender<OwnerShutdown>,
         states: &mut BTreeSet<usize>,
     ) -> Result<(), InstanceError> {
+        let identity = super::image::next_identity()?;
         let path = self.image_directory.join(format!("owner-{owner}.dylib"));
         fs::copy(&program.path, &path).map_err(|e| {
             let _ = fs::remove_file(&path);
@@ -145,6 +169,8 @@ impl InstancePool {
         let program = program.clone();
         let finished = finished.clone();
         let failed_copy = path.clone();
+        let mapping = super::mapping::Mapping::new(owner, identity, program.unload_after_join);
+        let owner_mapping = Arc::clone(&mapping);
         let worker = thread::Builder::new()
             .name(format!("gerbil-owner-{owner}"))
             .spawn(move || {
@@ -152,7 +178,7 @@ impl InstancePool {
                     let _guard = LIFECYCLE
                         .lock()
                         .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    Image::load(&path, &program, owner)
+                    Image::load(&path, &program, owner, owner_mapping)
                 };
                 let image = match loaded {
                     Ok(image) => image,
@@ -191,7 +217,8 @@ impl InstancePool {
                 InstanceError::Loader(e.to_string())
             })?;
         self.dispatcher.add_sender(sender);
-        self.threads.push(Some(worker));
+        self.mappings.push(Arc::clone(&mapping));
+        self.threads.push(Some(OwnerThread { worker, mapping }));
         let receipt = initialized
             .recv_timeout(config.startup_timeout)
             .map_err(|_| InstanceError::Timeout)??;
@@ -237,7 +264,7 @@ impl InstancePool {
         // is_finished() may become true before native TLS destructors return.
         // Only a real join proves owner retirement. One temporary coordinator
         // performs those blocking joins without blocking the caller's deadline.
-        let (handoff, workers) = mpsc::channel::<Vec<(usize, thread::JoinHandle<()>)>>();
+        let (handoff, workers) = mpsc::channel::<Vec<(usize, OwnerThread)>>();
         let (joined, reports) = mpsc::channel();
         let coordinator = thread::Builder::new()
             .name("gerbil-owner-join".into())
@@ -262,16 +289,18 @@ impl InstancePool {
     }
 
     fn join_owners(
-        workers: &mpsc::Receiver<Vec<(usize, thread::JoinHandle<()>)>>,
+        workers: &mpsc::Receiver<Vec<(usize, OwnerThread)>>,
         reports: &mpsc::Sender<bool>,
     ) {
         let Ok(workers) = workers.recv() else { return };
         for (_, worker) in workers {
-            let _ = reports.send(worker.join().is_err());
+            let panicked = worker.worker.join().is_err();
+            worker.mapping.joined(panicked);
+            let _ = reports.send(panicked);
         }
     }
 
-    fn restore_threads(&mut self, workers: Vec<(usize, thread::JoinHandle<()>)>) {
+    fn restore_threads(&mut self, workers: Vec<(usize, OwnerThread)>) {
         for (index, worker) in workers {
             self.threads[index] = Some(worker);
         }
@@ -291,7 +320,8 @@ impl InstancePool {
 
     /// Close admission and drain accepted work within one shared deadline.
     /// Pending workers are not cancelled, destroyed or reported as clean. Call
-    /// again to observe eventual completion. Image code is never unloaded.
+    /// again to observe eventual completion. Code release requires explicit
+    /// provider authorization, clean native join and no outstanding code leases.
     #[must_use]
     pub fn shutdown(&mut self, timeout: Duration) -> ShutdownReceipt {
         self.dispatcher.close();
@@ -305,6 +335,11 @@ impl InstancePool {
                     joined: self.joined,
                     pending,
                     panicked: self.panicked,
+                    mappings: self
+                        .mappings
+                        .iter()
+                        .map(|mapping| mapping.snapshot())
+                        .collect(),
                 };
             }
             thread::park_timeout(
@@ -319,5 +354,6 @@ impl Drop for InstancePool {
         // Closing channels lets each owner finish accepted work and clean up.
         // Dropping JoinHandles only detaches; it never frees a running VM.
         self.dispatcher.close();
+        self.begin_joining();
     }
 }

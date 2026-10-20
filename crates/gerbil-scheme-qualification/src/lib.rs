@@ -32,3 +32,10 @@ pub fn owner_failure_image(after_native_setup: bool) -> &'static str {
         env!("GERBIL_OWNER_FAIL_BEFORE_IMAGE")
     }
 }
+
+/// Adapter allocation fault, using the identical compiler-owned Scheme graph.
+#[cfg(feature = "instance-library")]
+#[must_use]
+pub fn owner_capture_failure_image() -> &'static str {
+    env!("GERBIL_OWNER_FAIL_CAPTURE_IMAGE")
+}

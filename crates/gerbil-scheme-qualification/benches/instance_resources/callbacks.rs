@@ -12,15 +12,15 @@ unsafe extern "C" {
     fn dlsym(handle: *mut c_void, name: *const i8) -> *mut c_void;
 }
 #[derive(Debug)]
-struct Hooks {
-    handle: *mut c_void,
-    start: unsafe extern "C" fn(*mut u64) -> i32,
-    retire: unsafe extern "C" fn() -> i32,
-    state: unsafe extern "C" fn() -> i32,
-    callback: Option<unsafe extern "C" fn(u64) -> u64>,
+pub(super) struct Hooks {
+    pub(super) handle: *mut c_void,
+    pub(super) start: unsafe extern "C" fn(*mut u64) -> i32,
+    pub(super) retire: unsafe extern "C" fn() -> i32,
+    pub(super) state: unsafe extern "C" fn() -> i32,
+    pub(super) callback: Option<unsafe extern "C" fn(u64) -> u64>,
 }
 impl Hooks {
-    fn open(path: &Path, flags: i32) -> Self {
+    pub(super) fn open(path: &Path, flags: i32) -> Self {
         let path = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).unwrap();
         // SAFETY: compiler-owned qualification functions; caller owns the handle.
         unsafe {
@@ -49,7 +49,7 @@ impl Hooks {
             }
         }
     }
-    fn unload(mut self, references: usize) {
+    pub(super) fn unload(mut self, references: usize) {
         assert!(self.callback.is_none(), "foreign callback must be revoked");
         let handle = self.handle;
         self.handle = std::ptr::null_mut();

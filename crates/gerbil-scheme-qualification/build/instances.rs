@@ -38,6 +38,7 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
             "../../../ffi/runtime.c",
             "../../../ffi/host_io.h",
             "../../../ffi/instance.h",
+            "../../../ffi/instance_loader.h",
             "../../../ffi/instance.c",
             "owner_memory.h",
             "owner_callbacks.h",
@@ -71,6 +72,11 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
                 "GERBIL_OWNER_FAIL_AFTER_IMAGE",
                 "-O2 -DGERBIL_OWNER_FAILURE_STAGE=2",
             ),
+            (
+                "owner_fail_capture",
+                "GERBIL_OWNER_FAIL_CAPTURE_IMAGE",
+                "-O2 -DGERBIL_OWNER_CAPTURE_FAILURE=1",
+            ),
         ] {
             build_image(
                 package,
@@ -90,7 +96,12 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
 }
 
 const OWNER_EXPORTS: &[&str] = &[
+    "gerbil_owner_loader_roundtrip",
     "gerbil_scheme_instance_abi",
+    "gerbil_scheme_instance_bind_loader",
+    "gerbil_scheme_instance_code_leases",
+    "gerbil_scheme_instance_pending_modules",
+    "gerbil_scheme_instance_release_modules",
     "gerbil_scheme_instance_setup",
     "gerbil_scheme_instance_cleanup",
     "gerbil_scheme_instance_io_retired_bytes",

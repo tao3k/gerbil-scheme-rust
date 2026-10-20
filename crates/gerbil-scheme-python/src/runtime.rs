@@ -22,7 +22,12 @@ use std::thread::JoinHandle;
 #[path = "instance_runtime.rs"]
 mod instances;
 #[cfg(feature = "instance-backend")]
+#[path = "instance_mapping.rs"]
+mod mapping;
+#[cfg(feature = "instance-backend")]
 pub use instances::{PythonInstanceProgram, PythonInstanceRequest, open_instance_library};
+#[cfg(feature = "instance-backend")]
+pub use mapping::{PythonImageCodeLease, PythonImageMappingReceipt, PythonImageMappingState};
 #[path = "instance_resources.rs"]
 mod resources;
 #[path = "session.rs"]

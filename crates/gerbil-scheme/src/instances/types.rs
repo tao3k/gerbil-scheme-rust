@@ -61,8 +61,22 @@ pub struct IsolatedProgram {
     pub(super) entry: CString,
     pub(super) exports: Vec<CString>,
     pub(super) finalizer: Option<CString>,
+    pub(super) unload_after_join: bool,
 }
 impl IsolatedProgram {
+    /// Authorize balancing this image's loader reference after clean native join.
+    /// # Safety
+    /// All VM-entering callbacks must be quiesced before SDK cleanup. Every
+    /// code-group reference that can outlive its owner (host callbacks, foreign-thread
+    /// TLS, native module hooks) must hold an `ImageCodeLease` until revoked/retired.
+    /// Unregistered references are forbidden by this opt-in contract, not silently
+    /// disabled by the runtime. Native unload hooks must not re-enter a dead VM.
+    #[must_use]
+    pub unsafe fn with_unload_after_join(mut self) -> Self {
+        self.unload_after_join = true;
+        self
+    }
+
     /// Quiesce Scheme services after queue drain, before root/VM retirement.
     /// # Safety
     /// The export obeys the rooted unary ABI and returns after joining its children.
@@ -89,7 +103,8 @@ impl IsolatedProgram {
     /// if present, must borrow one input root, catch Scheme exceptions, return zero on
     /// rejection or transfer one fresh object root, and retain no Rust
     /// pointer. It must not finalize the VM, move roots, escape foreign frames,
-    /// or enter an unqualified multi-processor configuration. Image constructors
+    /// or enter an unqualified multi-processor configuration. VM-entering callbacks
+    /// must quiesce before SDK cleanup. Image constructors
     /// must not initialize a VM or leave callbacks/TLS destructors that cannot
     /// retire during preflight dlclose. All native functions must return normally.
     ///
@@ -105,6 +120,7 @@ impl IsolatedProgram {
             entry: entry.to_owned(),
             exports: Vec::new(),
             finalizer: None,
+            unload_after_join: false,
         })
     }
 }
@@ -198,13 +214,21 @@ pub struct ShutdownReceipt {
     pub joined: usize,
     pub pending: usize,
     pub panicked: usize,
+    pub mappings: Vec<super::ImageMappingReceipt>,
 }
 
 impl ShutdownReceipt {
     /// True only for observed cleanup, joined owners, balanced roots and removed copies.
     #[must_use]
     pub fn is_clean(&self) -> bool {
-        self.pending == 0
+        self.mappings.iter().all(|receipt| {
+            matches!(
+                receipt.state,
+                super::ImageMappingState::Released
+                    | super::ImageMappingState::RetainedByPolicy
+                    | super::ImageMappingState::RetainedByLeases(_)
+            )
+        }) && self.pending == 0
             && self.panicked == 0
             && self.owners.len() == self.joined
             && self.owners.iter().all(|owner| {

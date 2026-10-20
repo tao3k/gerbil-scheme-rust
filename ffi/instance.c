@@ -2,6 +2,7 @@
 #define GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM
 #include "runtime.c"
 #include "instance.h"
+#include "instance_loader.h"
 #include <time.h>
 #if defined(__APPLE__)
 /* Darwin private pthread SPI, available since macOS 10.12. This backend
@@ -26,7 +27,7 @@ extern ___mod_or_lnk GERBIL_INSTANCE_LINKER(___global_state_struct *);
 #define GERBIL_OWNER_FAILURE_STAGE 0
 #endif
 static uint32_t setup_phase = 0;
-uint32_t gerbil_scheme_instance_abi(void) { return 3; }
+uint32_t gerbil_scheme_instance_abi(void) { return 4; }
 uint32_t gerbil_scheme_instance_setup_phase(void) { return setup_phase; }
 int32_t gerbil_scheme_instance_setup(uint32_t owner) {
   /* Qualification faults are compiled into separate images. No environment,
@@ -89,7 +90,13 @@ int32_t gerbil_scheme_instance_cleanup(void) {
   uint64_t bytes = ((uint64_t)set->size + 7) / 8;
   set->readfds = set->writefds = set->exceptfds = NULL;
   set->size = 0;
+  __atomic_store_n(&gerbil_loader_retiring, 1, __ATOMIC_SEQ_CST);
   int32_t status = gerbil_scheme_rust_runtime_cleanup();
+  __atomic_store_n(&gerbil_loader_retiring, 0, __ATOMIC_SEQ_CST);
+  os_unfair_lock_lock(&gerbil_module_lock);
+  int capture_failed = gerbil_module_capture_failures != 0;
+  os_unfair_lock_unlock(&gerbil_module_lock);
+  if (capture_failed && status == 0) status = -3;
   for (unsigned i=0; i<3; ++i) {
     if (owned[i]) {
       ___FREE_MEM(owned[i]);

@@ -88,6 +88,7 @@ struct Host {
     apply: &'static CStr,
     resource_root: std::path::PathBuf,
     resources_removed: AtomicBool,
+    release_after_join: bool,
 }
 /// Runtime resources are deliberately not destructed in an inherited fork child.
 #[derive(Debug)]
@@ -147,6 +148,25 @@ impl InstanceService {
     }
     pub(super) fn states(&self) -> Vec<usize> {
         self.host.states.clone()
+    }
+    pub(super) fn code_release_authorized(&self) -> bool {
+        self.host.release_after_join
+    }
+    pub(super) fn code_lease(
+        &self,
+        owner: usize,
+    ) -> Answer<gerbil_scheme::instances::ImageCodeLease> {
+        if self.pid != std::process::id() {
+            return Err("inherited Scheme host after fork".into());
+        }
+        if self.host.closed.load(Ordering::Acquire) {
+            return Err("Scheme host is closed".into());
+        }
+        self.host
+            .dispatch
+            .submit_native_on(owner, |session| Ok(session.code_lease()))
+            .and_then(|ticket| ticket.wait(GATE))
+            .map_err(|e| e.to_string())
     }
     pub(super) fn shutdown_receipt(&self) -> Option<ShutdownReceipt> {
         self.host

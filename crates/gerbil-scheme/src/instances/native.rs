@@ -41,6 +41,14 @@ fn checked(code: i64, operation: &'static str) -> Result<(), InstanceError> {
     }
 }
 impl<'owner> NativeSession<'owner> {
+    /// Keep this owner's base and SDK-managed module code independently of heap roots.
+    /// The lease does not authorize native calls after VM cleanup. Revoke
+    /// VM-entering callbacks in the application's finalizer before cleanup.
+    #[must_use]
+    pub fn code_lease(&self) -> super::ImageCodeLease {
+        self.image.mapping.lease()
+    }
+
     pub(super) fn own(&self, root: i64) -> Result<NativeRoot<'owner>, InstanceError> {
         if root <= 0 {
             return Err(InstanceError::Native {

@@ -13,6 +13,8 @@ doctest = false
 
 [features]
 default = ["rust-backend"]
+# Controlled retirement qualification; unsafe program contract, never a new evaluator.
+qualified-image-retirement = ["rust-backend"]
 extension-module = ["pyo3/extension-module"]
 scheme-backend = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "gerbil-scheme-python/scheme-backend", "gerbil-scheme-python/external-program"]
 rust-backend = ["dep:gerbil-scheme", "gerbil-scheme-python/instance-backend", "gerbil-scheme-python/external-program"]

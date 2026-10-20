@@ -40,3 +40,11 @@ int32_t gerbil_owner_blocking_tls_start(uint64_t *flags) {
 int32_t gerbil_owner_blocking_tls_retire(void) {
   return pthread_key_delete(owner_blocking_key);
 }
+
+/* Pure C callback: acquire one loader reference, then use the image-local SDK
+ * close adapter. A live code lease forces the owned reference into retirement. */
+int32_t gerbil_owner_loader_roundtrip(const char *path) {
+  void *handle = dlopen(path, RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  if (!handle) return -2;
+  return dlclose(handle);
+}

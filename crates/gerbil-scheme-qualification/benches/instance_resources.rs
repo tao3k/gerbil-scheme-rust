@@ -3,10 +3,14 @@
 mod ab;
 #[path = "instance_resources/callbacks.rs"]
 mod callbacks;
+#[path = "instance_resources/capture_failure.rs"]
+mod capture_failure;
 #[path = "instance_resources/contracts.rs"]
 mod contracts;
 #[path = "instance_resources/green.rs"]
 mod green;
+#[path = "instance_resources/mapping.rs"]
+mod mapping;
 #[path = "instance_resources/observe.rs"]
 mod observe;
 #[path = "instance_resources/order_profile.rs"]
@@ -141,6 +145,9 @@ fn main() {
     let observer = observe::Observer::new();
     let mode = std::env::args().nth(1).unwrap_or_else(|| "--reuse".into());
     match mode.as_str() {
+        "--module-capture-failure" => capture_failure::run(&progress),
+        "--mapping-release" => mapping::release(&observer, &progress),
+        "--mapping-foreign-tls" => mapping::foreign_tls(&observer, &progress),
         "--root-quarantine" => callbacks::roots(&progress),
         "--owner-unwind" => callbacks::unwind(&progress),
         "--blocking-tls-drop" => callbacks::blocking_tls(&observer, &progress, true),
@@ -172,4 +179,8 @@ fn main() {
     }
     drop(progress);
     watchdog.join().unwrap();
+    // Profiling runs only after the unchanged native progress gate has passed.
+    if std::env::args().nth(2).as_deref() == Some("--allocation-graph") {
+        observe::capture_graph();
+    }
 }

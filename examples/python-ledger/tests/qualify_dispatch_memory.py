@@ -28,7 +28,14 @@ parser.add_argument("--owners", type=int, default=4)
 parser.add_argument("--sample-seconds", type=float, default=5)
 parser.add_argument("--max-rss-mib", type=float, default=2048)
 parser.add_argument("--allocator-relief", action="store_true", help="diagnostic-only Darwin allocator relief after the final close")
+parser.add_argument("--vmmap-summary", action="store_true", help="diagnostic-only OS region summary after all VM owners close")
+parser.add_argument("--image-policy", choices=("retained", "qualified-release"), default="retained")
 a = parser.parse_args()
+image_policy = a.image_policy
+if image_policy == "qualified-release":
+    from gerbil_ledger.qualification import open_qualified_retirement_library as open_test_library
+else:
+    open_test_library = gerbil_ledger.open_library
 if sys.platform != "darwin":
     parser.error("Darwin observer required; no substitute image-count metric")
 if any(not math.isfinite(x) for x in (a.seconds, a.sample_seconds, a.max_rss_mib)) or a.seconds < 0 or a.cycles < 1 or not 1 <= a.owners <= 8 or a.sample_seconds <= 0 or a.max_rss_mib <= 0:
@@ -93,6 +100,11 @@ def observe(kind, library=None, expected_roots=None, **extra):
 def close(library, initial_threads):
     path = library.runtime_directory
     library.close()
+    expected_state = (gerbil_ledger._core.ImageMappingState.Released if image_policy == "qualified-release"
+                      else gerbil_ledger._core.ImageMappingState.RetainedByPolicy)
+    assert len(library.shutdown_mappings) == a.owners
+    assert all(m.state == expected_state and m.code_leases == 0 and m.pending_module_closes == 0 and m.error is None
+               for m in library.shutdown_mappings)
     assert library.shutdown_clean and library.shutdown_roots == [0] * a.owners
     assert not Path(path).exists()
     deadline = time.monotonic()+5
@@ -152,13 +164,14 @@ def work(session, roots, mode, turn):
 
 
 emit("configuration", case=a.case, seconds=a.seconds, cycles=a.cycles, owners=a.owners,
-     harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+     image_policy=image_policy, harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
      contract="native types; same fixed VMs per reuse case; mode rotation; explicit roots; finite RSS guard; SDK live metric raw units")
 initial = observe("process-start")
 completed = 0
 try:
     for cycle in range(1 if a.case == "reuse" else a.cycles):
-        library = gerbil_ledger.open_library(owners=a.owners, dispatch_workers=2)
+        library = open_test_library(owners=a.owners, dispatch_workers=2)
+        assert library.image_release_authorized == (image_policy == "qualified-release")
         try:
             sessions, retained = setup(library)
             states = library.vm_states
@@ -188,7 +201,11 @@ try:
                     root.close()
             observe("released-all", library, [0]*a.owners, cycle=cycle, turns=turn)
             close(library, initial["os_threads"])
-            observe("closed", cycle=cycle, roots=library.shutdown_roots, files_removed=True)
+            closed = observe("closed", cycle=cycle, roots=library.shutdown_roots, files_removed=True,
+                             image_policy=image_policy,
+                             mapping_states=[str(m.state) for m in library.shutdown_mappings])
+            expected_images = 0 if image_policy == "qualified-release" else a.owners*(cycle+1)
+            assert closed["loaded_owner_images"] == expected_images, "native image population contradicts provider declaration"
         finally:
             library.close()
         del sessions, retained, library
@@ -203,6 +220,11 @@ try:
         released = relief(None, 0)
         after = observe("allocator-after", allocator_reported_released_bytes=released)
         assert before["loaded_owner_images"] == after["loaded_owner_images"]
+    if a.vmmap_summary:
+        # Read-only post-workload diagnosis, separate from native execution gates.
+        text = subprocess.check_output(["/usr/bin/vmmap", "-summary", str(os.getpid())],
+                                       text=True, stderr=subprocess.STDOUT, timeout=30)
+        emit("vmmap-summary", text=text)
     emit("summary", status="PASS", completed_batch_requests=completed, **process())
 except BaseException as error:
     emit("failure", error=repr(error), **process())

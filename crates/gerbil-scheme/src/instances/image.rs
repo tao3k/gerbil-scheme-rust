@@ -22,7 +22,7 @@ pub(super) static INITIALIZATION_ATTEMPTED: std::sync::atomic::AtomicBool =
 
 static NEXT_IMAGE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-fn next_identity() -> Result<u64, InstanceError> {
+pub(super) fn next_identity() -> Result<u64, InstanceError> {
     use std::sync::atomic::Ordering;
     NEXT_IMAGE_ID
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
@@ -33,6 +33,7 @@ type Unary = unsafe extern "C" fn(i64) -> i64;
 #[derive(Debug)]
 pub(super) struct Image {
     pub(super) identity: u64,
+    pub(super) mapping: std::sync::Arc<super::mapping::Mapping>,
     cleanup: unsafe extern "C" fn() -> i32,
     retired: unsafe extern "C" fn() -> u64,
     roots: unsafe extern "C" fn() -> i64,
@@ -58,10 +59,10 @@ unsafe fn validate_abi(handle: *mut c_void) -> Result<(), InstanceError> {
     // SAFETY: the admitted loaded image exposes a plain ABI-version query.
     let abi: unsafe extern "C" fn() -> u32 =
         unsafe { std::mem::transmute(symbol(handle, c"gerbil_scheme_instance_abi")?) };
-    if unsafe { abi() } == 3 {
+    if unsafe { abi() } == 4 {
         Ok(())
     } else {
-        Err(InstanceError::Loader("instance ABI is not 3".into()))
+        Err(InstanceError::Loader("instance ABI is not 4".into()))
     }
 }
 
@@ -100,6 +101,7 @@ impl Image {
         path: &Path,
         program: &IsolatedProgram,
         owner: usize,
+        mapping: std::sync::Arc<super::mapping::Mapping>,
     ) -> Result<Self, InstanceError> {
         let start = Instant::now();
         let image_path = path.to_owned();
@@ -113,7 +115,9 @@ impl Image {
             let _ = std::fs::remove_file(&image_path);
             return Err(InstanceError::Loader(message));
         }
-        let mut preflight = super::preflight::Preflight::new(handle, image_path.clone());
+        mapping.loaded(std::ptr::NonNull::new(handle).expect("loaded image"));
+        let mut preflight =
+            super::preflight::Preflight::new(std::sync::Arc::clone(&mapping), image_path.clone());
         // Resolve every required symbol before setup, so a missing symbol never
         // leaves an initialized VM without its cleanup function. Only images
         // that never attempted native setup may be unloaded on rejection.
@@ -154,7 +158,8 @@ impl Image {
             let phase: unsafe extern "C" fn() -> u32 =
                 std::mem::transmute(symbol(handle, c"gerbil_scheme_instance_setup_phase")?);
             let native = NativeApi::load(handle)?;
-            let identity = next_identity()?;
+            mapping.bind_modules(handle)?;
+            let identity = mapping.identity;
             INITIALIZATION_ATTEMPTED.store(true, std::sync::atomic::Ordering::Release);
             let status = setup(u32::try_from(owner).expect("bounded owner"));
             let setup_phase = phase();
@@ -176,6 +181,7 @@ impl Image {
             }
             let image = Self {
                 identity,
+                mapping,
                 cleanup,
                 retired,
                 native,
@@ -375,6 +381,8 @@ impl Image {
         }
         let cleanup_time = start.elapsed();
         let (image_file_removed, image_file_error) = super::retirement::file(&self.file, status);
+        self.mapping
+            .cleaned(native_cleanup_attempted && roots == 0 && status == 0);
         super::OwnerShutdown {
             owner: self.receipt.owner,
             roots_before_cleanup: roots,
@@ -398,6 +406,7 @@ impl Drop for Image {
             // enter Scheme, release roots or destroy a possibly active heap.
             // Keep the mapping, heap and file for process-terminal quarantine.
             self.live = false;
+            self.mapping.quarantine();
             crate::instance_backend::poison_images();
         }
     }

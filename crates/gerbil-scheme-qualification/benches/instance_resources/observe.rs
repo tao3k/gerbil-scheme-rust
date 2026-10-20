@@ -138,3 +138,28 @@ impl Observer {
         values
     }
 }
+
+/// Optional, post-acceptance diagnosis; never runs inside the native watchdog.
+pub(super) fn capture_graph() {
+    let directory =
+        std::env::temp_dir().join(format!("gerbil-native-final-{}", std::process::id()));
+    std::fs::create_dir(&directory).unwrap();
+    eprintln!(
+        "NATIVE-GATES-COMPLETE allocation-graph={}",
+        directory.display()
+    );
+    let graph = directory.join("final.memgraph");
+    let output = std::process::Command::new("/usr/bin/leaks")
+        .arg("--noContent")
+        .arg(format!("--outputGraph={}", graph.display()))
+        .arg(std::process::id().to_string())
+        .output()
+        .unwrap();
+    std::fs::write(directory.join("stdout.log"), &output.stdout).unwrap();
+    std::fs::write(directory.join("stderr.log"), &output.stderr).unwrap();
+    assert!(
+        output.status.success(),
+        "allocation graph failed: {:?}",
+        output.status
+    );
+}

@@ -10,6 +10,8 @@ module owner_lifecycle {
     accepted: Set[int], completed: Set[int], ready: Set[int],
     roots: Set[int], registry: Set[int], timedOut: Set[int],
     executor: str, filesPresent: bool, imagesRetained: bool,
+    codeLeases: Set[int], unloadAuthorized: bool, codeQuarantined: bool,
+    unsafeCodeRelease: bool,
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
@@ -18,6 +20,8 @@ module owner_lifecycle {
     phase: "open", accepted: Set(), completed: Set(), ready: Set(),
     roots: Set(), registry: Set(), timedOut: Set(), executor: "absent",
     filesPresent: true, imagesRetained: true,
+    codeLeases: Set(), unloadAuthorized: false, codeQuarantined: false,
+    unsafeCodeRelease: false,
     latePublication: false, lateExecutor: false, foreignUse: false
   }
   action admit(r: int): bool = all {
@@ -74,12 +78,43 @@ module owner_lifecycle {
     s.phase == "joined", s.registry.size() == 0,
     s' = { ...s, phase: "closed", executor: "retired", filesPresent: false }
   }
+  // Code leases are separate from Scheme heap roots. Existing lease holders
+  // may clone after owner exit; an empty retired image cannot acquire a lease.
+  action codeLease(r: int): bool = all {
+    s.imagesRetained, JOBS.contains(r), not(s.codeLeases.contains(r)),
+    s.phase == "open" or s.codeLeases.size() > 0,
+    s' = { ...s, codeLeases: s.codeLeases.union(Set(r)) }
+  }
+  action releaseCodeLease(r: int): bool = all {
+    s.codeLeases.contains(r), s' = { ...s, codeLeases: s.codeLeases.exclude(Set(r)) }
+  }
+  action authorizeCodeRelease = all {
+    s.phase == "open", not(s.unloadAuthorized),
+    s' = { ...s, unloadAuthorized: true }
+  }
+  action quarantineCode = all {
+    s.imagesRetained, not(s.codeQuarantined), s' = { ...s, codeQuarantined: true }
+  }
+  // Join assumes successful native cleanup; failure quarantine is qualified
+  // natively. This flag represents the backend loader reference, not every
+  // possible dlopen reference held by another host library.
+  val canReleaseCode = and {
+    s.imagesRetained, Set("joined", "closed").contains(s.phase),
+    s.unloadAuthorized, s.codeLeases.size() == 0, not(s.codeQuarantined)
+  }
+  action releaseCodeUnchecked = all {
+    s.imagesRetained,
+    s' = { ...s, imagesRetained: false,
+      unsafeCodeRelease: s.unsafeCodeRelease or not(canReleaseCode) }
+  }
+  action releaseCode = all { canReleaseCode, releaseCodeUnchecked }
   action stutter = s' = s
   action step = {
     nondet r = JOBS.oneOf()
     nondet owner = Set(1, 2).oneOf()
     any { admit(r), complete(r), observeTimeout(r), publish(r), use(r, owner),
-      release(r, owner), createExecutor, close, join, clearRegistry, retire, stutter }
+      release(r, owner), createExecutor, close, join, clearRegistry, retire,
+      codeLease(r), releaseCodeLease(r), authorizeCodeRelease, quarantineCode, releaseCode, stutter }
   }
   val safety = and {
     s.accepted.subseteq(JOBS), s.completed.subseteq(s.accepted),
@@ -91,13 +126,16 @@ module owner_lifecycle {
       s.accepted.subseteq(s.completed), s.roots.size() == 0 }),
     implies(s.phase == "closed", and { s.executor == "retired",
       not(s.filesPresent), s.registry.size() == 0 }),
-    // Removing files and roots does not mean initialized code was unloaded.
-    s.imagesRetained
+    s.codeLeases.subseteq(JOBS), not(s.unsafeCodeRelease),
+    implies(not(s.imagesRetained), and {
+      Set("joined", "closed").contains(s.phase), s.unloadAuthorized,
+      s.codeLeases.size() == 0, not(s.codeQuarantined) })
   }
 
   action unsafePublicationStep = { nondet r = JOBS.oneOf(); any { step, publishUnchecked(r) } }
   action unsafeExecutorStep = any { step, createExecutorUnchecked }
   action unsafeJoinStep = any { step, joinUnchecked }
+  action unsafeCodeReleaseStep = any { step, releaseCodeUnchecked }
   action unsafeForeignUse = {
     nondet r = JOBS.oneOf()
     nondet owner = Set(1, 2).oneOf()
@@ -106,6 +144,21 @@ module owner_lifecycle {
   }
   action unsafeForeignStep = any { step, unsafeForeignUse }
 
+  run codeLeasePreventsReleaseTest = init.then(authorizeCodeRelease).then(codeLease(1))
+    .then(close).then(join)
+    .then(all { assert(not(canReleaseCode)), assert(s.imagesRetained), stutter })
+    .then(codeLease(2)).then(releaseCodeLease(1))
+    .then(all { assert(not(canReleaseCode)), stutter })
+    .then(releaseCodeLease(2)).then(releaseCode)
+    .then(all { assert(not(s.imagesRetained)), assert(safety), stutter })
+  run policyRetainsCodeTest = init.then(close).then(join)
+    .then(all { assert(not(canReleaseCode)), assert(s.imagesRetained), assert(safety), stutter })
+  run quarantineRetainsCodeTest = init.then(authorizeCodeRelease).then(close)
+    .then(join).then(quarantineCode)
+    .then(all { assert(not(canReleaseCode)), assert(s.imagesRetained), assert(safety), stutter })
+  run earlyCodeReleaseMutationTest = init.then(authorizeCodeRelease).then(codeLease(1))
+    .then(close).then(join).then(releaseCodeUnchecked)
+    .then(all { assert(not(safety)), stutter })
   run timeoutIsNotCancellationTest = init.then(admit(1)).then(observeTimeout(1)).then(close)
     .then(all { assert(not(canJoin)), assert(s.accepted.contains(1)), stutter })
     .then(complete(1)).then(join).then(clearRegistry).then(retire)

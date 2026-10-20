@@ -211,6 +211,10 @@ bridge-python-dispatch-stress python="python3" *args:
 bridge-python-resident-dispatch-ab python="python3" *args:
     "{{ python }}" examples/python-ledger/tests/bench_resident_dispatch.py {{ args }}
 
+# Explicit code leases, real SDK module retirement and fork rejection.
+bridge-python-image-retirement python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/test_image_retirement.py {{ args }}
+
 # Native reuse/lifecycle diagnostics; generated observations stay outside Git.
 bridge-python-dispatch-memory python="python3" *args:
     "{{ python }}" examples/python-ledger/tests/qualify_dispatch_memory.py {{ args }}

@@ -25,7 +25,8 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 | `canUse`, `release` | Library identity/owner validation and owner-native release |
 | `join` | `instances/pool.rs::shutdown`, completed owner drain and native cleanup |
 | `clearRegistry`, `retire` | Registry clear, executor slot removal, resource-file retirement |
-| `imagesRetained` | `instances/image.rs` and `retirement.rs`: initialized images are not unloaded |
+| `imagesRetained` | Default retention of initialized code; not a live Scheme heap |
+| `codeLease`, `releaseCodeLease`, `authorizeCodeRelease`, `quarantineCode`, `releaseCode` | `instances/mapping.rs`: explicit code ownership, provider authorization, actual join and quarantine |
 
 ## Safety and abstraction boundaries
 
@@ -36,7 +37,8 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 - A join requires all accepted native tasks to finish. Registry metadata is
   cleared before host retirement; a completed reply copy may still arrive later.
 - The closed host has no roots, registry entries, live executor slot or resource
-  files. Initialized code images deliberately remain retained. Root/file removal
+  files. Initialized code images remain retained unless a provider authorizes
+  release after clean native join with no remaining code leases. Root/file removal
   is not complete RSS reclamation.
 - Publication and executor creation abstract their lock-protected linearization
   points. An operation overlapping close may linearize before close even when
@@ -52,14 +54,22 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 
 The safety predicate checks closed-state retirement, ownership, result/root
 conservation constraints and absence of late publication, late executor creation
-or foreign handle use. Four mutations deliberately remove one boundary each:
-late publication, late executor creation, early join and foreign handle use.
+or foreign handle use. Five mutations deliberately remove one boundary each:
+late publication, late executor creation, early join, foreign handle use and
+unsafe code release. The code-lease extension also permits cloning an existing
+lease after join, but cannot create a first lease after code release.
+
+The model treats each owner code group as one resource. It does not model OS
+loader reference counts, module-destructor ordering or allocation failures.
+The native adapter transfers SDK-owned module close references, and drains them
+after actual owner join and the last lease. Native counterexamples and actual
+image observations are required independently; model success cannot admit unload.
 The Rust integration test requires exit 1 **and** `error: Invariant violated`; parser, tool
 or dependency failures cannot satisfy a negative control.
 
 The small domain has three requests and two owners; the wide domain has five
 requests and two owners. These are exploration parameters, not runtime limits.
-Each has eight deterministic scenarios and 1,000 sampled traces of at most 64
+Each has twelve deterministic scenarios and 1,000 sampled traces of at most 64
 transitions. A 12-transition symbolic check is a separate command. Neither finite
 simulation nor bounded symbolic checking is an unbounded theorem, implementation
 refinement, fairness proof or throughput result. Stuttering is allowed; arbitrary
@@ -83,8 +93,10 @@ captures and checker traces belong outside the repository. The resource observer
 uses the existing native `collect` API and Darwin process/dyld observations; it
 does not replace native type calls with JSON. JSON is diagnostic output only.
 
-The eight-transition symbolic run completes with `NoError` on the unchanged
-three-request domain. The twelve-transition attempt is stopped incomplete as
+Before the code-lease extension, the eight-transition symbolic run completed
+with `NoError` on the three-request domain. That historical result is not
+transferred to the extended source; its scenarios, simulations and five mutation
+controls have been rerun independently. The twelve-transition attempt was stopped incomplete as
 later SMT queries become expensive. It is not a pass, and the eight-step result
 does not replace that target. Symbolic wrappers preserve all generated output
 in a fresh temporary directory outside the checkout.

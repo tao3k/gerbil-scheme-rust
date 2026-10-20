@@ -170,6 +170,27 @@ class OwnerRoutingTests(unittest.TestCase):
         result = right.call(("echo", value));self.assertTrue(value.is_identical(result))
         result.close();value.close()
 
+    def test_pinned_dispatch_preserves_native_identity_order_and_recovery(self):
+        session=self.library.session(2)
+        payload=session.value([2**180,b"\x00\xff",[1,2]])
+        for mode in ("direct","tokio","rayon","rayon-blocking"):
+            roots=session.call_many([("echo",payload)]*17,dispatch=mode,admission_window=3)
+            self.assertEqual([root.owner for root in roots],[2]*17)
+            for root in roots:self.assertTrue(payload.is_identical(root))
+            self.assertEqual(self.library.project_many(roots,release=True),[[2**180,b"\x00\xff",[1,2]]]*17)
+            with self.assertRaises(RuntimeError):session.call_many([("echo",payload),("unknown",)],dispatch=mode)
+            self.library.collect()
+            self.assertEqual(payload.to_python(),[2**180,b"\x00\xff",[1,2]])
+            prior=session.call(("entries",));count=len(prior.to_python());prior.close()
+            written=session.call_many([("append",i) for i in range(17)],dispatch=mode,admission_window=3)
+            self.assertEqual(self.library.project_many(written,release=True),list(range(count+1,count+18)))
+            entries=session.call(("entries",));self.assertEqual(entries.to_python()[-17:],list(range(17)));entries.close()
+        before=session.call(("entries",));expected=before.to_python();before.close()
+        for mode in ("not-a-dispatcher","tokio-pipeline"):
+            with self.assertRaises(RuntimeError):session.call_many([("append",999)],dispatch=mode)
+        after=session.call(("entries",));self.assertEqual(after.to_python(),expected);after.close()
+        payload.close()
+
     def test_bulk_order_duplicates_types_and_idempotent_retirement(self):
         data = [None, False, 2**170, -(2**151), 1.25, "λ", b"\x00\xff", [1,[2]], {"x":3}]
         roots = [self.library.session(i%4).call(("echo", v)) for i,v in enumerate(data)]

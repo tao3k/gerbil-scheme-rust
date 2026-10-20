@@ -7,6 +7,7 @@ use super::{
 use pyo3::types::{PyList, PyListMethods};
 use pyo3::{pyclass, pymethods};
 
+/// Explicit affinity handle sharing the selected owner's native Scheme state.
 #[pyclass(module = "gerbil_scheme", frozen)]
 #[derive(Debug)]
 pub struct PythonSession {
@@ -51,10 +52,13 @@ impl PythonSession {
         self.invoke(py, value, true)
     }
     #[cfg(feature = "instance-backend")]
+    #[pyo3(signature = (requests, *, dispatch="direct", admission_window=128))]
     fn call_many(
         &self,
         py: Python<'_>,
         requests: &Bound<'_, PyList>,
+        dispatch: &str,
+        admission_window: usize,
     ) -> PyResult<Vec<PythonValue>> {
         self.service
             .check_process()
@@ -69,7 +73,7 @@ impl PythonSession {
             .as_ref()
             .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
         let outputs = py
-            .detach(|| instances.call_many_on(self.owner, &inputs))
+            .detach(|| instances.call_many_on(self.owner, &inputs, dispatch, admission_window))
             .map_err(PyRuntimeError::new_err)?;
         outputs
             .iter()

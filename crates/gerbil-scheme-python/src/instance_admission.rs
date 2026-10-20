@@ -1,6 +1,6 @@
 //! Verified package admission and fixed-owner startup.
-use super::super::{Answer, Connection, PythonLibrary, Service};
 use super::{GATE, Host, InstanceService, Registry, resources};
+use crate::runtime::{Answer, Connection, ExecutionKind, PythonLibrary, Service};
 use crate::{PackageManifest, VerifiedPackage};
 use gerbil_scheme::instances::{InstanceConfig, InstancePool, IsolatedProgram};
 use pyo3::{PyResult, Python, exceptions::PyRuntimeError};
@@ -55,16 +55,28 @@ impl PythonInstanceProgram {
         }
     }
 }
+/// Maintainer-selected native image, package and owner topology.
+#[derive(Clone, Copy, Debug)]
+pub struct PythonInstanceRequest<'a> {
+    pub program: PythonInstanceProgram,
+    pub manifest: &'a PackageManifest,
+    pub root: &'a Path,
+    pub owners: usize,
+}
+
 /// Open the packaged Scheme image; Rust provides cross-instance dispatch only.
 /// # Errors
 /// Preserves package validation, setup/drain failures and finite owner bounds.
 pub fn open_instance_library(
     py: Python<'_>,
-    program: PythonInstanceProgram,
-    manifest: &PackageManifest,
-    root: &Path,
-    owners: usize,
+    request: PythonInstanceRequest<'_>,
 ) -> PyResult<PythonLibrary> {
+    let PythonInstanceRequest {
+        program,
+        manifest,
+        root,
+        owners,
+    } = request;
     let service = py
         .detach(|| open(program, manifest, root, owners))
         .map_err(PyRuntimeError::new_err)?;
@@ -169,6 +181,7 @@ fn open(
         }),
     };
     Ok(Service {
+        kind: ExecutionKind::Independent(owners),
         connection: Mutex::<Option<Connection>>::new(None),
         pid: std::process::id(),
         package,
@@ -181,13 +194,8 @@ fn dispatch_runtime(
     workers: usize,
     pool: &mut InstancePool,
     resource_root: &Path,
-) -> Answer<tokio::runtime::Runtime> {
-    match tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(workers)
-        .thread_name("gerbil-dispatch")
-        .enable_all()
-        .build()
-    {
+) -> Answer<super::DispatchRuntime> {
+    match super::DispatchRuntime::start_runtime(workers) {
         Ok(runtime) => Ok(runtime),
         Err(error) => {
             let receipt = pool.shutdown(GATE);

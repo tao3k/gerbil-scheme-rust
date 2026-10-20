@@ -15,12 +15,16 @@ pub(super) fn copy(package: &VerifiedPackage, destination: &Path) -> io::Result<
         .values()
         .map(String::as_str)
         .collect::<std::collections::BTreeSet<_>>();
+    let loads = package
+        .manifest()
+        .load_paths
+        .iter()
+        .map(Path::new)
+        .collect::<std::collections::BTreeSet<_>>();
     for (name, resource) in &package.manifest().files {
-        if !package
-            .manifest()
-            .load_paths
-            .iter()
-            .any(|root| Path::new(name).starts_with(root))
+        if !Path::new(name)
+            .ancestors()
+            .any(|parent| loads.contains(parent))
             && !groups.contains(name.as_str())
         {
             continue;

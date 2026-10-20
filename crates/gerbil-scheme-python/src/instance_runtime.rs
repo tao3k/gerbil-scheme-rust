@@ -23,12 +23,15 @@ use super::resources;
 #[path = "instance_values.rs"]
 mod values;
 use values::execute;
+#[path = "dispatch_runtime.rs"]
+mod dispatch_runtime;
+use dispatch_runtime::DispatchRuntime;
 #[path = "instance_trace.rs"]
 mod trace;
 use trace::prepare;
 #[path = "instance_admission.rs"]
 mod admission;
-pub use admission::{PythonInstanceProgram, open_instance_library};
+pub use admission::{PythonInstanceProgram, PythonInstanceRequest, open_instance_library};
 const GATE: Duration = Duration::from_secs(5);
 #[derive(Debug, Default)]
 struct Registry {
@@ -45,16 +48,23 @@ impl Registry {
             .copied()
             .ok_or(InstanceError::Closed)
     }
-    fn insert(&self, value: RetainedValue) -> Answer<u64> {
+    fn insert(&self, value: RetainedValue, closed: &AtomicBool) -> Answer<u64> {
+        let mut values = self
+            .values
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Shutdown marks closed before clearing under this same lock. A late
+        // result cannot repopulate the retired registry with stale metadata.
+        if closed.load(Ordering::Acquire) {
+            return Err(InstanceError::Closed.to_string());
+        }
+
         let id = self
             .next
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .map_err(|_| "Python token exhausted")?
             + 1;
-        self.values
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(id, value);
+        values.insert(id, value);
         Ok(id)
     }
 }
@@ -66,7 +76,7 @@ enum NativeOutput {
 #[derive(Debug)]
 struct Host {
     pool: Mutex<Option<InstancePool>>,
-    runtime: Mutex<Option<Arc<tokio::runtime::Runtime>>>,
+    runtime: Mutex<Option<Arc<DispatchRuntime>>>,
     dispatch: InstanceDispatcher,
     registry: Arc<Registry>,
     closed: AtomicBool,
@@ -145,7 +155,7 @@ impl InstanceService {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
-    fn runtime(&self) -> Answer<Arc<tokio::runtime::Runtime>> {
+    fn runtime(&self) -> Answer<Arc<DispatchRuntime>> {
         if self.pid != std::process::id() {
             return Err("inherited Scheme host after fork".into());
         }
@@ -218,10 +228,14 @@ impl InstanceService {
     fn publish(&self, value: NativeOutput) -> Answer<Output> {
         match value {
             NativeOutput::Plain(value) => Ok(value),
-            NativeOutput::Root(value) => self.host.registry.insert(value).map(Output::Token),
+            NativeOutput::Root(value) => self
+                .host
+                .registry
+                .insert(value, &self.host.closed)
+                .map(Output::Token),
             NativeOutput::Children(values) => values
                 .into_iter()
-                .map(|value| self.host.registry.insert(value))
+                .map(|value| self.host.registry.insert(value, &self.host.closed))
                 .collect::<Answer<_>>()
                 .map(Output::Tokens),
         }
@@ -248,7 +262,7 @@ impl InstanceService {
         let registry = Arc::clone(&self.host.registry);
         let apply = self.host.apply;
         let job = prepare(command, registry, apply, owner);
-        let task = runtime.spawn(async move {
+        let task = runtime.spawn_task(async move {
             dispatch
                 .submit_native_async_on(owner, job)?
                 .wait_completed(GATE)

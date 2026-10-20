@@ -137,7 +137,7 @@ impl PackageManifest {
             relative(target)?;
             if self.files.contains_key(name)
                 || !self.files.contains_key(target)
-                || !self.load_paths.iter().any(|root| path.starts_with(root))
+                || !path.ancestors().any(|parent| loads.contains(parent))
             {
                 return Err(invalid("invalid native module alias"));
             }

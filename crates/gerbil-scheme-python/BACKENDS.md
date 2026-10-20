@@ -31,8 +31,14 @@ on four fixed OS owners (`owners=4`). Tokio dispatches requests across those
 owners; Scheme retains its actors, green threads, closures, GC and continuations.
 The build uses Gerbil -> Gambit C -> native code, without Rust IR lowering.
 `call` retains state on owner 0. `session(owner)` pins calls and values to an
-owner; sessions on one owner share its Scheme module state. `session.call_many`
-submits stateful work in input order. `call_stateless` and `call_many` reserve
+owner; sessions on one owner share its Scheme module state. `session.call_many` submits stateful work in input order. Its explicit
+`dispatch="direct"|"tokio"|"rayon"|"rayon-blocking"` and
+`admission_window=1..128` controls preserve that owner and within-batch execution
+order; defaults remain direct and 128. Tokio admits ordered native asynchronous
+tickets before supervising replies. Rayon admits the ordered stream on its
+worker pool; the blocking reference holds that worker while waiting. Concurrent
+batches may interleave and a batch is not a transaction. The experimental
+`tokio-pipeline` remains stateless-only and rejects pinned requests before entry. `call_stateless` and `call_many` reserve
 round-robin owners for caller-declared independent requests; native references
 require an owner-affine call. `call_on` remains an explicit pinned call.
 
@@ -97,3 +103,21 @@ coverage, source refinement, or performance equivalence.
 ## Qualification records
 
 The current native [wheel qualification](WHEEL_QUALIFICATION.md) and [10.10x matched baseline](../../docs/30-39-status/30.19-owner-resident-payload-baseline.org) state tested behavior and limits. The retired VM-free ASCENT and typed-fold wheels are historical subset experiments and do not qualify complete Scheme execution. Raw diagnostics and rejected patches are archived outside the repository.
+
+## Scheduler safety and failure semantics
+
+The owner queue has finite capacity. Overload may return `QueueFull`; accepted
+work and state transitions are not rolled back, and there is no automatic retry.
+`rayon-blocking` can instead limit producer progress by occupying the finite
+Rayon workers while they wait; this may starve other otherwise-idle VM owners.
+These controls are not interchangeable latency guarantees.
+
+A 128-request group shares its original five-second observation budget across
+smaller turns. Direct and Tokio admission check that budget before enqueueing
+new work, like the Rayon and pipeline paths. Observing/draining accepted results
+and retiring roots may take additional time. Timeout does not cancel Scheme.
+
+Use the maintained `bridge-python-dispatch-startup`, `bridge-python-dispatch-stress`,
+`bridge-python-owner-deadline` and `bridge-python-resident-dispatch-ab` targets.
+Keep generated output outside the repository. Qualification status and open
+industrial gates are recorded in the dispatch qualification report.

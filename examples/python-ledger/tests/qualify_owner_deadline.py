@@ -2,7 +2,7 @@
 import argparse, json, os, time
 import gerbil_ledger
 parser=argparse.ArgumentParser()
-parser.add_argument("--dispatch",default="direct",choices=["direct","tokio-pipeline"])
+parser.add_argument("--dispatch",default="direct",choices=["direct","tokio","rayon","rayon-blocking","tokio-pipeline"])
 args=parser.parse_args()
 library=gerbil_ledger.open_library(owners=1)
 try:
@@ -24,6 +24,7 @@ try:
     calls=sum(row["kind"]=="batch-call" for row in trace["spans"])
     assert 0<calls<128 and trace["dropped"]==0
     assert all(not row["failed"] for row in trace["spans"])
+    assert all(row[3]==0 for row in library.collect()),"abandoned deadline results retained roots"
     library.set_owner_profiling(False)
     path=library.runtime_directory;library.close()
     assert library.shutdown_clean and library.shutdown_roots==[0]

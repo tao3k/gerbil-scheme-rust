@@ -1,8 +1,8 @@
 //! Matched direct and Tokio admission to the same fixed Scheme owners.
-use super::super::Input;
 use super::trace::prepare_named;
 use super::{Answer, Command, GATE, InstanceError, InstanceService, Output};
-use rayon::prelude::*;
+use crate::runtime::Input;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Arc, time::Instant};
 impl InstanceService {
     pub(in super::super) fn call_many(
@@ -26,11 +26,16 @@ impl InstanceService {
         &self,
         owner: usize,
         inputs: &[Input],
+        mode: &str,
+        admission_window: usize,
     ) -> Answer<Vec<Output>> {
-        self.call_many_routed(inputs, "direct", Some(owner), 128)
+        self.call_many_routed(inputs, mode, Some(owner), admission_window)
             .map(|(values, _)| values)
     }
     fn validate_batch(&self, inputs: &[Input], mode: &str, pinned: Option<usize>) -> Answer<()> {
+        if pinned.is_some() && mode == "tokio-pipeline" {
+            return Err("tokio-pipeline requires stateless routing".into());
+        }
         if pinned.is_some_and(|owner| owner >= self.owners()) {
             return Err("native owner index out of range".into());
         }
@@ -107,31 +112,16 @@ impl InstanceService {
                 })
                 .collect::<Vec<_>>();
             self.host_span("rust-clone-turn", turn_started);
-            let values = if mode == "direct" {
+            let values = if pinned.is_some() && mode != "direct" {
+                self.pinned_window(&runtime, jobs, admitted, mode)?
+            } else if mode == "direct" {
                 self.direct_window(jobs, admitted)
             } else if mode == "rayon" || mode == "rayon-blocking" {
                 self.rayon_window(jobs, admitted, mode == "rayon-blocking")?
             } else {
                 self.tokio_window(&runtime, jobs, admitted)
             };
-            for value in values {
-                match value.and_then(|(value, completed)| {
-                    self.publish(value)
-                        .map(|value| (value, completed))
-                        .map_err(InstanceError::Loader)
-                }) {
-                    Ok((value, completed)) => {
-                        outputs.push(value);
-                        timings.push(
-                            u64::try_from(completed.duration_since(admitted).as_nanos())
-                                .unwrap_or(u64::MAX),
-                        );
-                    }
-                    Err(failure) => {
-                        error.get_or_insert(failure.to_string());
-                    }
-                }
-            }
+            error = self.publish_window(values, admitted, &mut outputs, &mut timings);
             self.host_span("rust-admission-turn", turn_started);
             if error.is_some() {
                 break;
@@ -150,9 +140,37 @@ impl InstanceService {
 }
 
 impl InstanceService {
+    fn publish_window(
+        &self,
+        values: Vec<Result<(super::NativeOutput, Instant), InstanceError>>,
+        admitted: Instant,
+        outputs: &mut Vec<Output>,
+        timings: &mut Vec<u64>,
+    ) -> Option<String> {
+        let mut error = None;
+        for value in values {
+            match value.and_then(|(value, completed)| {
+                self.publish(value)
+                    .map(|value| (value, completed))
+                    .map_err(InstanceError::Loader)
+            }) {
+                Ok((value, completed)) => {
+                    outputs.push(value);
+                    timings.push(
+                        u64::try_from(completed.duration_since(admitted).as_nanos())
+                            .unwrap_or(u64::MAX),
+                    );
+                }
+                Err(failure) => {
+                    error.get_or_insert(failure.to_string());
+                }
+            }
+        }
+        error
+    }
     fn tokio_window(
         &self,
-        runtime: &tokio::runtime::Runtime,
+        runtime: &super::DispatchRuntime,
         jobs: Vec<(usize, Input)>,
         admitted: Instant,
     ) -> Vec<Result<(super::NativeOutput, Instant), InstanceError>> {
@@ -164,7 +182,10 @@ impl InstanceService {
             for (owner, input) in jobs {
                 let dispatch = dispatch.clone();
                 let registry = Arc::clone(&registry);
-                pending.push(tokio::spawn(async move {
+                pending.push(runtime.spawn_task(async move {
+                    if admitted.elapsed() >= GATE {
+                        return Err(InstanceError::Timeout);
+                    }
                     dispatch
                         .submit_native_async_on(
                             owner,
@@ -187,28 +208,103 @@ impl InstanceService {
             results
         })
     }
+    fn submit_ordered(
+        &self,
+        jobs: Vec<(usize, Input)>,
+        admitted: Instant,
+    ) -> Vec<Result<gerbil_scheme::instances::InstanceTicket<super::NativeOutput>, InstanceError>>
+    {
+        jobs.into_iter()
+            .map(|(owner, input)| {
+                if admitted.elapsed() >= GATE {
+                    return Err(InstanceError::Timeout);
+                }
+                self.host.dispatch.submit_native_on(
+                    owner,
+                    prepare_named(
+                        Command::Call(input),
+                        Arc::clone(&self.host.registry),
+                        self.host.apply,
+                        owner,
+                        "batch-call",
+                    ),
+                )
+            })
+            .collect()
+    }
     fn direct_window(
         &self,
         jobs: Vec<(usize, Input)>,
         admitted: Instant,
     ) -> Vec<Result<(super::NativeOutput, Instant), InstanceError>> {
-        let mut pending = Vec::new();
-        for (owner, input) in jobs {
-            let registry = Arc::clone(&self.host.registry);
-            let apply = self.host.apply;
-            pending.push(self.host.dispatch.submit_native_on(
-                owner,
-                prepare_named(Command::Call(input), registry, apply, owner, "batch-call"),
-            ));
-        }
-        pending
+        self.submit_ordered(jobs, admitted)
             .into_iter()
             .map(|ticket| {
                 ticket.and_then(|ticket| {
                     ticket.wait_completed(GATE.saturating_sub(admitted.elapsed()))
                 })
             })
-            .collect::<Vec<_>>()
+            .collect()
+    }
+    // Stateful owner streams admit in input order. The scheduler may observe
+    // replies concurrently, but cannot reorder Scheme state transitions.
+    fn pinned_window(
+        &self,
+        runtime: &super::DispatchRuntime,
+        jobs: Vec<(usize, Input)>,
+        admitted: Instant,
+        mode: &str,
+    ) -> Answer<Vec<Result<(super::NativeOutput, Instant), InstanceError>>> {
+        if mode == "tokio" {
+            let tickets = jobs
+                .into_iter()
+                .map(|(owner, input)| {
+                    if admitted.elapsed() >= GATE {
+                        return Err(InstanceError::Timeout);
+                    }
+                    self.host.dispatch.submit_native_async_on(
+                        owner,
+                        prepare_named(
+                            Command::Call(input),
+                            Arc::clone(&self.host.registry),
+                            self.host.apply,
+                            owner,
+                            "batch-call",
+                        ),
+                    )
+                })
+                .collect::<Vec<_>>();
+            return Ok(runtime.block_on(async {
+                let pending = tickets
+                    .into_iter()
+                    .map(|ticket| {
+                        runtime.spawn_task(async move {
+                            ticket?
+                                .wait_completed(GATE.saturating_sub(admitted.elapsed()))
+                                .await
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                let mut results = Vec::new();
+                for task in pending {
+                    results.push(task.await.unwrap_or(Err(InstanceError::TaskPanicked)));
+                }
+                results
+            }));
+        }
+        let pool = self.rayon_pool()?;
+        if mode == "rayon-blocking" {
+            return Ok(pool.install(|| self.direct_window(jobs, admitted)));
+        }
+        let tickets = pool.install(|| self.submit_ordered(jobs, admitted));
+        Ok(tickets
+            .into_iter()
+            .map(|ticket| {
+                ticket.and_then(|ticket| {
+                    ticket.wait_completed(GATE.saturating_sub(admitted.elapsed()))
+                })
+            })
+            .collect())
     }
     fn rayon_pool(&self) -> Answer<Arc<rayon::ThreadPool>> {
         let mut pool = self
@@ -216,6 +312,11 @@ impl InstanceService {
             .rayon
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Close sets the flag before taking this same pool lock. No late
+        // caller may recreate the executor after shutdown has retired it.
+        if self.host.closed.load(std::sync::atomic::Ordering::Acquire) {
+            return Err(InstanceError::Closed.to_string());
+        }
         if let Some(pool) = pool.as_ref() {
             return Ok(Arc::clone(pool));
         }

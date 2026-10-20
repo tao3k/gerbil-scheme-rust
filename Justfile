@@ -189,8 +189,8 @@ bridge-python-macro-ab python="python3" *args:
 bridge-python-owner-routing-tests python="python3":
     "{{ python }}" examples/python-ledger/tests/test_owner_routing.py -v
 
-bridge-python-owner-deadline python="python3":
-    "{{ python }}" examples/python-ledger/tests/qualify_owner_deadline.py
+bridge-python-owner-deadline python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/qualify_owner_deadline.py {{ args }}
 
 bridge-python-native-payload-ab python="python3" *args:
     "{{ python }}" examples/python-ledger/tests/bench_owner_payload.py {{ args }}
@@ -200,3 +200,13 @@ bridge-python-scalar-cycle python="python3":
 
 bridge-python-projection-ab python="python3" *args:
     "{{ python }}" examples/python-ledger/tests/bench_owner_projection.py {{ args }}
+
+# Native scheduler qualification; keep generated output outside the repository.
+bridge-python-dispatch-startup python="python3":
+    "{{ python }}" examples/python-ledger/tests/qualify_dispatch_startup.py
+
+bridge-python-dispatch-stress python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/qualify_dispatch_stress.py {{ args }}
+
+bridge-python-resident-dispatch-ab python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/bench_resident_dispatch.py {{ args }}

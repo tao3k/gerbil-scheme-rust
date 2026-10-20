@@ -680,13 +680,13 @@ fn grouped_native_inventory_keeps_metadata_and_rejects_group_tampering() {
         &[ResourceTree::file(&group, "_groups/group.o1")],
     )
     .unwrap();
-    gerbil_scheme_python::coalesce_module_resources(
-        &package,
-        &mut manifest,
-        &closure,
-        &roots,
-        &[("_groups/group.o1".into(), vec![source.join("code.o1")])],
-    )
+    gerbil_scheme_python::coalesce_module_resources(gerbil_scheme_python::ModuleBundleRequest {
+        root: &package,
+        manifest: &mut manifest,
+        closure: &closure,
+        roots: &roots,
+        groups: &[("_groups/group.o1".into(), vec![source.join("code.o1")])],
+    })
     .unwrap();
     assert!(package.join("_runtime/library/code.ssi").is_file());
     assert!(!package.join("_runtime/library/code.o1").exists());

@@ -1,9 +1,9 @@
 //! Completion-driven bounded admission; every Scheme operation stays on its fixed owner.
-use super::super::Input;
 use super::{
     Answer, Command, GATE, InstanceError, InstanceService, NativeOutput, Output, Registry,
     trace::prepare_named,
 };
+use crate::runtime::Input;
 use gerbil_scheme::instances::InstanceDispatcher;
 use std::{collections::VecDeque, ffi::CStr, sync::Arc, time::Instant};
 use tokio::task::JoinSet;
@@ -16,7 +16,7 @@ struct Context {
     apply: &'static CStr,
     admitted: Instant,
 }
-fn spawn(
+fn admit_one(
     pending: &mut JoinSet<Completion>,
     context: &Context,
     index: usize,
@@ -97,11 +97,84 @@ fn fill(
         let Some((index, owner)) = schedule.admit_next() else {
             break;
         };
-        spawn(pending, context, index, owner, inputs[index].clone());
+        admit_one(pending, context, index, owner, inputs[index].clone());
     }
 }
 
+async fn collect_group(
+    context: &Context,
+    inputs: &[Input],
+    owners: usize,
+    first: usize,
+    limit: usize,
+) -> Vec<NativeResult> {
+    let mut pending = JoinSet::new();
+    let mut schedule = Schedule::new(owners, first, inputs.len(), limit);
+    let mut failed = false;
+    let mut results = Vec::new();
+    loop {
+        if !failed {
+            fill(&mut pending, context, &mut schedule, inputs, limit);
+            if schedule.remaining > 0 && context.admitted.elapsed() >= GATE {
+                failed = true;
+                results.push(Err(InstanceError::Timeout));
+            }
+        }
+        let Some(completed) = pending.join_next().await else {
+            break;
+        };
+        let result = match completed {
+            Ok((owner, result)) => {
+                schedule.active[owner] -= 1;
+                result
+            }
+            Err(_) => Err(InstanceError::TaskPanicked),
+        };
+        failed |= result.is_err();
+        results.push(result);
+    }
+    results
+}
+
+struct PublishedGroup {
+    outputs: Vec<Output>,
+    timings: Vec<u64>,
+    failure: Option<String>,
+}
 impl InstanceService {
+    fn publish_group(&self, results: Vec<NativeResult>, admitted: Instant) -> PublishedGroup {
+        let mut outputs = Vec::new();
+        let mut timings = Vec::new();
+        let mut failure = None;
+        let mut results = results;
+        results.sort_by_key(|result| result.as_ref().map_or(usize::MAX, |(index, _, _)| *index));
+        // Drain every accepted future before retiring any published partial result.
+        for result in results {
+            match result {
+                Ok((_, value, completed)) => match self.publish(value) {
+                    Ok(value) => {
+                        outputs.push(value);
+                        timings.push(
+                            u64::try_from(completed.duration_since(admitted).as_nanos())
+                                .unwrap_or(u64::MAX),
+                        );
+                    }
+                    Err(error) => {
+                        failure.get_or_insert(error);
+                    }
+                },
+                Err(error) => {
+                    failure.get_or_insert(error.to_string());
+                }
+            }
+        }
+        PublishedGroup {
+            outputs,
+            timings,
+            failure,
+        }
+    }
+
     pub(super) fn pipeline(
         &self,
         inputs: &[Input],
@@ -120,59 +193,18 @@ impl InstanceService {
                 apply: self.host.apply,
                 admitted,
             };
-            let results = runtime.block_on(async {
-                let mut pending = JoinSet::new();
-                let mut schedule =
-                    Schedule::new(self.owners(), first + group * 128, inputs.len(), limit);
-                let mut failed = false;
-                let mut results = Vec::new();
-                loop {
-                    if !failed {
-                        fill(&mut pending, &context, &mut schedule, inputs, limit);
-                        if schedule.remaining > 0 && admitted.elapsed() >= GATE {
-                            failed = true;
-                            results.push(Err(InstanceError::Timeout));
-                        }
-                    }
-                    let Some(completed) = pending.join_next().await else {
-                        break;
-                    };
-                    let result = match completed {
-                        Ok((owner, result)) => {
-                            schedule.active[owner] -= 1;
-                            result
-                        }
-                        Err(_) => Err(InstanceError::TaskPanicked),
-                    };
-                    failed |= result.is_err();
-                    results.push(result);
-                }
-                results
-            });
+            let results = runtime.block_on(collect_group(
+                &context,
+                inputs,
+                self.owners(),
+                first + group * 128,
+                limit,
+            ));
             self.host_span("rust-pipeline-group", admitted);
-            let mut results = results;
-            results
-                .sort_by_key(|result| result.as_ref().map_or(usize::MAX, |(index, _, _)| *index));
-            // Drain every accepted future before retiring any published partial result.
-            for result in results {
-                match result {
-                    Ok((_, value, completed)) => match self.publish(value) {
-                        Ok(value) => {
-                            outputs.push(value);
-                            timings.push(
-                                u64::try_from(completed.duration_since(admitted).as_nanos())
-                                    .unwrap_or(u64::MAX),
-                            );
-                        }
-                        Err(error) => {
-                            failure.get_or_insert(error);
-                        }
-                    },
-                    Err(error) => {
-                        failure.get_or_insert(error.to_string());
-                    }
-                }
-            }
+            let published = self.publish_group(results, admitted);
+            outputs.extend(published.outputs);
+            timings.extend(published.timings);
+            failure = published.failure;
             if failure.is_some() {
                 break;
             }

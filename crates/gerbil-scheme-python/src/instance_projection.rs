@@ -1,6 +1,6 @@
 //! Owner-batched native projection and idempotent retirement. No Scheme root migrates.
-use super::super::{Projection, Scalar};
 use super::{Answer, Command, GATE, InstanceError, InstanceService, Registry, execute};
+use crate::runtime::{Projection, Scalar};
 use gerbil_scheme::instances::NativeSession;
 use std::{
     collections::{BTreeMap, BTreeSet},

@@ -18,12 +18,16 @@ pub use package::{PackageManifest, PackageResource, VerifiedPackage, sha256_file
 mod staging;
 pub use staging::{ResourceTree, stage_resources, stage_source_inventory};
 mod closure;
-pub use closure::{ModuleClosure, ModuleRoot, coalesce_module_resources, stage_module_closure};
+pub use closure::{
+    ModuleBundleRequest, ModuleClosure, ModuleRoot, coalesce_module_resources, stage_module_closure,
+};
 
 #[cfg(any(feature = "scheme-backend", feature = "instance-backend"))]
 mod runtime;
 #[cfg(feature = "instance-backend")]
-pub use runtime::{PythonInstanceProgram, PythonPreparedRequest, open_instance_library};
+pub use runtime::{
+    PythonInstanceProgram, PythonInstanceRequest, PythonPreparedRequest, open_instance_library,
+};
 
 #[cfg(any(feature = "scheme-backend", feature = "instance-backend"))]
 pub use runtime::{

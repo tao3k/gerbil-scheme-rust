@@ -131,17 +131,28 @@ fn stage_selected(
     Ok(())
 }
 
+/// Compiler-selected grouping and its verified publication owner.
+#[derive(Debug)]
+pub struct ModuleBundleRequest<'a> {
+    pub root: &'a Path,
+    pub manifest: &'a mut PackageManifest,
+    pub closure: &'a ModuleClosure,
+    pub roots: &'a [ModuleRoot<'a>],
+    pub groups: &'a [(String, Vec<PathBuf>)],
+}
+
 /// Replace compiler-selected native parts with physical groups already in the
 /// staged inventory. Source metadata and every logical loader path are retained.
 /// # Errors
 /// Rejects unknown sources, undeclared targets, collisions and invalid manifests.
-pub fn coalesce_module_resources(
-    root: &Path,
-    manifest: &mut PackageManifest,
-    closure: &ModuleClosure,
-    roots: &[ModuleRoot<'_>],
-    groups: &[(String, Vec<PathBuf>)],
-) -> io::Result<()> {
+pub fn coalesce_module_resources(request: ModuleBundleRequest<'_>) -> io::Result<()> {
+    let ModuleBundleRequest {
+        root,
+        manifest,
+        closure,
+        roots,
+        groups,
+    } = request;
     let selected = select_modules(closure, roots)?;
     for (target, sources) in groups {
         coalesce_group(root, manifest, &selected, target, sources)?;

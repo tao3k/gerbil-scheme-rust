@@ -67,10 +67,21 @@ fn ffi_runtime_is_the_default_api_without_an_opt_in_alias() {
     let manifest = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"));
     let api = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/lib.rs"));
     assert!(manifest.contains("gerbil-scheme-sys.workspace = true"));
-    assert!(!manifest.contains("optional = true"));
     assert!(!manifest.contains("native ="));
     assert!(!manifest.contains("required-features"));
-    assert!(!api.contains("cfg(feature"));
+    let syntax = syn::parse_file(api).expect("valid public Rust API");
+    let runtime = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            syn::Item::Mod(module) if module.ident == "runtime" => Some(module),
+            _ => None,
+        })
+        .expect("default native runtime module");
+    assert!(
+        runtime.attrs.is_empty(),
+        "native runtime must be unconditional"
+    );
 }
 
 #[test]
@@ -188,8 +199,16 @@ fn native_source_is_the_tracked_ffi_contract() {
 fn external_program_runtime_preserves_the_sdk_vm_policy() {
     assert!(
         preserves_vm_defaults(NATIVE_RUNTIME),
-        "FFI owner affinity must not override the SDK's VM processor policy"
+        "the default entry must preserve SDK policy; only the explicit entry selects one processor"
     );
+    assert!(!preserves_vm_defaults(&NATIVE_RUNTIME.replace(
+        "return runtime_init_program(linker, 0);",
+        "return runtime_init_program(linker, 1);",
+    )));
+    assert!(!preserves_vm_defaults(&NATIVE_RUNTIME.replace(
+        "if (single_processor) params.parallelism_level = 1;",
+        "params.parallelism_level = 1;",
+    )));
     for override_value in [1, 12] {
         let regression = format!("{NATIVE_RUNTIME}\nparams.parallelism_level = {override_value};");
         assert!(!preserves_vm_defaults(&regression));
@@ -197,8 +216,14 @@ fn external_program_runtime_preserves_the_sdk_vm_policy() {
 }
 
 fn preserves_vm_defaults(source: &str) -> bool {
+    let explicit_single = "if (single_processor) params.parallelism_level = 1;";
     source.contains("___setup_params_reset(&params);")
-        && !source.contains("params.parallelism_level")
+        && source.matches(explicit_single).count() == 1
+        && !source
+            .replace(explicit_single, "")
+            .contains("params.parallelism_level")
+        && source.contains("return runtime_init_program(linker, 0);")
+        && source.contains("return runtime_init_program(linker, 1);")
 }
 
 #[test]

@@ -5,7 +5,8 @@ use gerbil_scheme_aot_build::{
     discover_gambit_gsc_from_env, gerbil_command, run_native_process, source_workspace,
 };
 use gerbil_scheme_python::{
-    ModuleClosure, ModuleRoot, ResourceTree, coalesce_module_resources, stage_module_closure,
+    ModuleBundleRequest, ModuleClosure, ModuleRoot, ResourceTree, coalesce_module_resources,
+    stage_module_closure,
 };
 use std::{env, fs, path::PathBuf};
 
@@ -179,11 +180,11 @@ fn main() {
             )
         })
         .collect::<Vec<_>>();
-    coalesce_module_resources(
-        &staging,
-        &mut manifest,
-        &closure,
-        &[
+    coalesce_module_resources(ModuleBundleRequest {
+        root: &staging,
+        manifest: &mut manifest,
+        closure: &closure,
+        roots: &[
             ModuleRoot {
                 source: &gerbil_path.join("lib"),
                 destination: "_resources/runtime/application",
@@ -193,8 +194,8 @@ fn main() {
                 destination: "_resources/runtime/sdk",
             },
         ],
-        &mappings,
-    )
+        groups: &mappings,
+    })
     .unwrap();
     manifest
         .verify(&staging)

@@ -1,6 +1,6 @@
 //! Native conversion and projection; no Scheme heap pointer crosses an owner.
-use super::super::{Input, Projection, Scalar};
 use super::{Command, NativeOutput, Output, Registry};
+use crate::runtime::{Input, Projection, Scalar};
 use gerbil_scheme::{
     BinaryInteger, ObjectKind, SchemeScalar,
     instances::{InstanceError, NativeRoot, NativeSession},

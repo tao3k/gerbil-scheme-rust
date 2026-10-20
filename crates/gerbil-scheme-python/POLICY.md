@@ -16,10 +16,16 @@ or disabled verification tasks in this crate's gate.
 | `src/package/publication.rs` | Persistent generated output, filesystem operations and ownership boundary | Verified previous inventory, changed-byte denial, collision/overlap denial, source preservation |
 | `src/staging.rs` | Public staging API, filesystem reads/writes and source trust boundary | Complete trees, source drift, aliases, fresh output |
 | `src/closure.rs` | Public dependency-closure transport, filesystem operations and exact-source mapping | Unknown schema, duplicate files, ambiguous roots, complete source inventory |
-| `src/runtime.rs` | Public Python ABI, VM/foreign dependency, handle trust boundary, availability and latency | Owner-thread entry/exit, close, roots, failed replies, real installed-wheel lifecycle and matched performance |
+| `src/runtime.rs` | Shared native protocol, service topology and lifetime | Process/fork checks, idempotent retirement, actual selected host |
+| `src/runtime_library.rs` | Python library API and owner routing | Native type admission, explicit modes, errors and bulk projection |
+| `src/runtime_value.rs` | Python native result handles | Affinity, apply, projection failure and release |
+| `src/runtime_input.rs` | Host input conversion and trust boundary | Cycles/depth, foreign handles, exact native values |
+| `src/runtime_linked.rs` | Linked Scheme owner startup, execution and codec | Single-owner lifecycle and native root balance |
+| `src/dispatch_runtime.rs` | Tokio executor owner and supervised task handles | Fixed worker count, observed handles and shutdown |
+| `src/session.rs` | Owner-affine stateful batches | Same-owner identity, within-batch execution order and failures |
 
-`runtime.rs` is deliberately not classified as pure domain logic: it starts a
-thread, enters Scheme, waits for replies and owns VM roots. Source hints do not
+The runtime modules are not pure domain logic: they start owner threads, enter
+Scheme, wait for replies and own VM roots. Source hints do not
 prove cancellation safety, bounded callbacks, multiple independent VMs or
 performance. Resource-only Cargo tests do not qualify that runtime branch.
 

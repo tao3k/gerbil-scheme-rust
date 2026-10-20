@@ -1,0 +1,31 @@
+{
+  "native_exit_codes": {
+    "owner-wake": 0,
+    "profile-before": 0,
+    "profile-final": 0,
+    "profile-acceptance": 0,
+    "root-ab-1": 0,
+    "root-ab-2": 0,
+    "root-repro": 0,
+    "root-acceptance": 0,
+    "owned-vm": 0,
+    "owned-vm-final": 0,
+    "owned-vm-rooted-result": 0,
+    "orders-final": 0,
+    "orders-old-abi": 0,
+    "smoke-final": 0
+  },
+  "strict_clippy_final": 0,
+  "independent_c_abi_tests": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0
+  },
+  "initial_clippy_failure_retained": true,
+  "production_root_lifetimes_restored": true,
+  "sdk_headers_unchanged": true,
+  "production_runtime_c_unchanged": true,
+  "old_image_optional_diagnostic_symbol_absent": true,
+  "same_vm_candidate": "rejected",
+  "published": false
+}

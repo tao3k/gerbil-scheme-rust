@@ -1,0 +1,200 @@
+{
+  "native_sdk_control": 0,
+  "packaged_copies_control": 124,
+  "sdk_inode_control": 0,
+  "clone_control": 124,
+  "parallel_validation_control": 124,
+  "python_parallel_validation": 1,
+  "coalesced_native_control": 0,
+  "wheel_build_1": {
+    "cargo_exit": 101,
+    "result": "failed build; outer maturin failure, see log"
+  },
+  "wheel_build_2": {
+    "cargo_exit": 101,
+    "result": "failed build; outer maturin failure, see log"
+  },
+  "wheel_build_3": 124,
+  "wheel_build_4_cached": 124,
+  "wheel_build_5_native_policy": 124,
+  "wheel_build_6_module_option": {
+    "cargo_exit": 101,
+    "result": "failed build; outer maturin failure, see log"
+  },
+  "wheel_build_7_module_ref": 0,
+  "wheel_build_8_export_contract": 0,
+  "final_wheel": 0,
+  "final_full_scheme": 0,
+  "final_installed": {
+    "exit": 0,
+    "passed": 10,
+    "skipped": 0,
+    "seconds": 5.552
+  },
+  "package_final": {
+    "exit": 0,
+    "passed": 27
+  },
+  "runtime_strict_clippy": 0,
+  "native_helper_strict_clippy": 0,
+  "producer_lint": {
+    "exit": 124,
+    "stage": "native producer build did not finish before 120s; not a lint pass"
+  },
+  "first_sweep_attempts": {
+    "status": "observer import-shadowing failure; retained"
+  },
+  "default_four_mode_benchmark": {
+    "exit": 0,
+    "admission": "observational; own checks overlapped, no per-round host qualification"
+  },
+  "final_wheel_seconds": 58.71,
+  "final_full_scheme_ms": [
+    713.173333,
+    522.475417,
+    510.22375,
+    497.988625
+  ],
+  "topology_sweep": {
+    "exit": 0,
+    "cells": {
+      "sweep-cpu-w2-observer-fixed": {
+        "summary": {
+          "direct": {
+            "actors_per_second_median": 13813.144513494677,
+            "pooled_native_ready_p99_ns": 184939292,
+            "projection_release_ns_median": 119725000.0,
+            "rank_displacement_p99": 0
+          },
+          "tokio": {
+            "actors_per_second_median": 13610.537653462728,
+            "pooled_native_ready_p99_ns": 224570833,
+            "projection_release_ns_median": 223077020.5,
+            "rank_displacement_p99": 0
+          },
+          "rayon": {
+            "actors_per_second_median": 13642.909662619091,
+            "pooled_native_ready_p99_ns": 173264291,
+            "projection_release_ns_median": 147998146.0,
+            "rank_displacement_p99": 0
+          },
+          "rayon-blocking": {
+            "actors_per_second_median": 9133.00948400069,
+            "pooled_native_ready_p99_ns": 338770667,
+            "projection_release_ns_median": 60417229.0,
+            "rank_displacement_p99": 0
+          }
+        },
+        "cohorts": 20,
+        "contaminated_cohorts": 2,
+        "os_threads": [
+          7,
+          9
+        ]
+      },
+      "sweep-cpu-w4-observer-fixed": {
+        "summary": {
+          "direct": {
+            "actors_per_second_median": 9120.274729322613,
+            "pooled_native_ready_p99_ns": 425711167,
+            "projection_release_ns_median": 214877208.5,
+            "rank_displacement_p99": 0
+          },
+          "tokio": {
+            "actors_per_second_median": 8051.081688756531,
+            "pooled_native_ready_p99_ns": 380867084,
+            "projection_release_ns_median": 220335417.0,
+            "rank_displacement_p99": 0
+          },
+          "rayon": {
+            "actors_per_second_median": 8509.96708186731,
+            "pooled_native_ready_p99_ns": 409132583,
+            "projection_release_ns_median": 348664041.5,
+            "rank_displacement_p99": 0
+          },
+          "rayon-blocking": {
+            "actors_per_second_median": 7903.8842567990505,
+            "pooled_native_ready_p99_ns": 547605958,
+            "projection_release_ns_median": 157829437.5,
+            "rank_displacement_p99": 0
+          }
+        },
+        "cohorts": 20,
+        "contaminated_cohorts": 12,
+        "os_threads": [
+          9,
+          13
+        ]
+      },
+      "sweep-mixed-w1-observer-fixed": {
+        "summary": {
+          "direct": {
+            "actors_per_second_median": 6595.263150929112,
+            "pooled_native_ready_p99_ns": 536365250,
+            "projection_release_ns_median": 221383667.0,
+            "rank_displacement_p99": 9
+          },
+          "tokio": {
+            "actors_per_second_median": 8438.644172885193,
+            "pooled_native_ready_p99_ns": 372787292,
+            "projection_release_ns_median": 134319083.5,
+            "rank_displacement_p99": 9
+          },
+          "rayon": {
+            "actors_per_second_median": 8277.112391625698,
+            "pooled_native_ready_p99_ns": 348760000,
+            "projection_release_ns_median": 201569395.5,
+            "rank_displacement_p99": 9
+          },
+          "rayon-blocking": {
+            "actors_per_second_median": 3267.9818360445634,
+            "pooled_native_ready_p99_ns": 1337273500,
+            "projection_release_ns_median": 119282917.0,
+            "rank_displacement_p99": 9
+          }
+        },
+        "cohorts": 20,
+        "contaminated_cohorts": 20,
+        "os_threads": [
+          6,
+          7
+        ]
+      },
+      "sweep-mixed-w4-observer-fixed": {
+        "summary": {
+          "direct": {
+            "actors_per_second_median": 7154.842104496032,
+            "pooled_native_ready_p99_ns": 398267833,
+            "projection_release_ns_median": 473753562.5,
+            "rank_displacement_p99": 9
+          },
+          "tokio": {
+            "actors_per_second_median": 7228.768271082835,
+            "pooled_native_ready_p99_ns": 443697084,
+            "projection_release_ns_median": 246724791.5,
+            "rank_displacement_p99": 9
+          },
+          "rayon": {
+            "actors_per_second_median": 6232.5564858260095,
+            "pooled_native_ready_p99_ns": 445072667,
+            "projection_release_ns_median": 265008166.5,
+            "rank_displacement_p99": 9
+          },
+          "rayon-blocking": {
+            "actors_per_second_median": 4789.123124655605,
+            "pooled_native_ready_p99_ns": 707804541,
+            "projection_release_ns_median": 269027999.5,
+            "rank_displacement_p99": 9
+          }
+        },
+        "cohorts": 20,
+        "contaminated_cohorts": 20,
+        "os_threads": [
+          9,
+          13
+        ]
+      }
+    },
+    "performance_admission": "not admitted as optimum; external compiler activity in several rounds, small sample, native-ready latency only"
+  }
+}

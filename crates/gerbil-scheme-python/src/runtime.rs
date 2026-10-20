@@ -21,6 +21,24 @@ use std::sync::{
 };
 use std::thread::JoinHandle;
 
+#[cfg(feature = "instance-backend")]
+#[path = "instance_runtime.rs"]
+mod instances;
+#[cfg(feature = "instance-backend")]
+pub use instances::{PythonInstanceProgram, open_instance_library};
+#[path = "instance_resources.rs"]
+mod resources;
+#[path = "session.rs"]
+mod session;
+pub use session::PythonSession;
+#[cfg(feature = "instance-backend")]
+#[path = "prepared.rs"]
+mod prepared;
+#[cfg(feature = "instance-backend")]
+#[path = "instance_projection_api.rs"]
+mod projection_api;
+#[cfg(feature = "instance-backend")]
+pub use prepared::PythonPreparedRequest;
 type Answer<T> = Result<T, String>;
 type Root<'a> = RootedSchemeObject<'a>;
 
@@ -56,7 +74,7 @@ impl PythonProgram {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Input {
     Void,
     Bool(bool),
@@ -68,6 +86,23 @@ enum Input {
     Vector(Vec<Self>),
     Table(Vec<(Self, Self)>),
     Reference(u64),
+    #[cfg(feature = "instance-backend")]
+    Shared(Arc<Self>),
+}
+#[cfg(feature = "instance-backend")]
+impl Input {
+    fn contains_reference(&self) -> bool {
+        match self {
+            Self::Reference(_) => true,
+            Self::List(values) | Self::Vector(values) => {
+                values.iter().any(Self::contains_reference)
+            }
+            Self::Table(values) => values
+                .iter()
+                .any(|(key, value)| key.contains_reference() || value.contains_reference()),
+            _ => false,
+        }
+    }
 }
 #[derive(Clone, Copy, Debug)]
 enum Projection {
@@ -108,6 +143,9 @@ struct Service {
     connection: Mutex<Option<Connection>>,
     pid: u32,
     package: VerifiedPackage,
+    namespace: Option<std::path::PathBuf>,
+    #[cfg(feature = "instance-backend")]
+    instances: Option<instances::InstanceService>,
 }
 
 impl Service {
@@ -117,8 +155,32 @@ impl Service {
         }
         Ok(())
     }
+    fn request_on(&self, owner: usize, command: Command) -> Answer<Output> {
+        self.check_process()?;
+        #[cfg(feature = "instance-backend")]
+        if let Some(instances) = &self.instances {
+            return instances.request_on(owner, command);
+        }
+        if owner != 0 {
+            return Err("native owner index out of range".into());
+        }
+        self.request(command)
+    }
+    fn token_owner(&self, id: u64) -> Answer<usize> {
+        self.check_process()?;
+        #[cfg(feature = "instance-backend")]
+        if let Some(instances) = &self.instances {
+            return instances.token_owner(id);
+        }
+        let _ = id;
+        Ok(0)
+    }
     fn request(&self, command: Command) -> Answer<Output> {
         self.check_process()?;
+        #[cfg(feature = "instance-backend")]
+        if let Some(instances) = &self.instances {
+            return instances.request(command);
+        }
         let connection = self
             .connection
             .lock()
@@ -138,6 +200,10 @@ impl Service {
     }
     fn close(&self) -> Answer<()> {
         self.check_process()?;
+        #[cfg(feature = "instance-backend")]
+        if let Some(instances) = &self.instances {
+            return instances.close();
+        }
         let connection = self
             .connection
             .lock()
@@ -166,6 +232,9 @@ impl Service {
                 .join()
                 .map_err(|_| "Scheme owner panicked")?;
             result?;
+            if let Some(namespace) = &self.namespace {
+                resources::retire(namespace).map_err(|e| e.to_string())?;
+            }
         }
         Ok(())
     }
@@ -190,6 +259,8 @@ pub struct PythonLibrary {
 #[derive(Clone, Copy, Debug)]
 pub struct PythonRuntimeCapabilities {
     linked: VmCapabilities,
+    model: &'static str,
+    independent: bool,
 }
 
 #[pymethods]
@@ -212,12 +283,11 @@ impl PythonRuntimeCapabilities {
 
     #[getter]
     fn execution_model(&self) -> &'static str {
-        "process-global-single-vm-owner"
+        self.model
     }
-
     #[getter]
     fn independent_vm_execution(&self) -> bool {
-        false
+        self.independent
     }
 }
 
@@ -263,11 +333,19 @@ impl Drop for PythonValue {
 impl PythonLibrary {
     #[getter]
     fn backend(&self) -> &'static str {
+        #[cfg(feature = "instance-backend")]
+        if self.service.instances.is_some() {
+            return "rust";
+        }
         "scheme"
     }
     /// Lifecycle observation without Scheme VM entry or SDK configuration.
     #[staticmethod]
     fn scheme_initialization_attempted() -> bool {
+        #[cfg(feature = "instance-backend")]
+        if gerbil_scheme::instances::InstancePool::has_been_initialized() {
+            return true;
+        }
         GerbilRuntime::has_been_initialized()
     }
     /// Observe actual active processors on this library's owner, not SDK capacity.
@@ -287,6 +365,12 @@ impl PythonLibrary {
     fn capabilities() -> PythonRuntimeCapabilities {
         PythonRuntimeCapabilities {
             linked: VmCapabilities::linked(),
+            model: if cfg!(feature = "instance-backend") {
+                "available-fixed-scheme-owners"
+            } else {
+                "process-global-single-vm-owner"
+            },
+            independent: cfg!(all(feature = "instance-backend", target_os = "macos")),
         }
     }
     /// Explicit audit boundary; retained calls do not repeatedly scan immutable resources.
@@ -301,15 +385,259 @@ impl PythonLibrary {
         let output = py
             .detach(|| self.service.request(Command::Encode(input)))
             .map_err(PyRuntimeError::new_err)?;
-        token(&self.service, output)
+        token(&self.service, &output)
     }
-    /// Invoke this library's linked domain export with the GIL released.
+    /// A session binds calls and constructed values to one VM; sessions on one owner share its Scheme state.
+    fn session(&self, owner: usize) -> PyResult<PythonSession> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        if owner >= self.vm_count() {
+            return Err(PyValueError::new_err("native owner index out of range"));
+        }
+        Ok(PythonSession::new(&self.service, owner))
+    }
+    /// Caller-declared independent work; live native references require a session.
+    #[cfg(feature = "instance-backend")]
+    fn call_stateless(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<PythonValue> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        let input = read(value, &self.service, &mut BTreeSet::new())?;
+        let instances = self
+            .service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
+        let output = py
+            .detach(|| instances.call_stateless(input))
+            .map_err(PyRuntimeError::new_err)?;
+        token(&self.service, &output)
+    }
+    /// Project native values in owner batches. Projection errors preserve every root.
+    #[cfg(feature = "instance-backend")]
+    #[pyo3(signature = (values, *, release=false))]
+    fn project_many(
+        &self,
+        py: Python<'_>,
+        values: &Bound<'_, PyList>,
+        release: bool,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        projection_api::project_many(self, py, values, release)
+    }
+    /// Idempotent owner-batched release. A delivery failure may release a subset; retry is safe.
+    #[cfg(feature = "instance-backend")]
+    fn release_many(&self, py: Python<'_>, values: &Bound<'_, PyList>) -> PyResult<()> {
+        projection_api::release_many(self, py, values)
+    }
+    /// Invoke the default stateful session on owner 0 with the GIL released.
     fn call(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<PythonValue> {
         let input = read(value, &self.service, &mut BTreeSet::new())?;
         let output = py
             .detach(|| self.service.request(Command::Call(input)))
             .map_err(PyRuntimeError::new_err)?;
-        token(&self.service, output)
+        token(&self.service, &output)
+    }
+    #[getter]
+    fn vm_count(&self) -> usize {
+        #[cfg(feature = "instance-backend")]
+        if let Some(instances) = &self.service.instances {
+            return instances.owners();
+        }
+        1
+    }
+    #[getter]
+    fn execution_model(&self) -> &'static str {
+        #[cfg(feature = "instance-backend")]
+        if self.service.instances.is_some() {
+            return "tokio-dispatch-fixed-scheme-owners";
+        }
+        "process-global-single-vm-owner"
+    }
+    #[cfg(feature = "instance-backend")]
+    #[getter]
+    fn vm_states(&self) -> Vec<usize> {
+        self.service
+            .instances
+            .as_ref()
+            .map_or_else(Vec::new, instances::InstanceService::states)
+    }
+    #[cfg(feature = "instance-backend")]
+    #[getter]
+    fn shutdown_clean(&self) -> Option<bool> {
+        self.service
+            .instances
+            .as_ref()
+            .and_then(instances::InstanceService::shutdown_receipt)
+            .map(|r| {
+                r.is_clean()
+                    && self
+                        .service
+                        .instances
+                        .as_ref()
+                        .is_some_and(instances::InstanceService::resources_removed)
+            })
+    }
+    #[cfg(feature = "instance-backend")]
+    #[getter]
+    fn shutdown_roots(&self) -> Vec<i64> {
+        self.service
+            .instances
+            .as_ref()
+            .and_then(instances::InstanceService::shutdown_receipt)
+            .map_or_else(Vec::new, |r| {
+                r.owners.iter().map(|o| o.roots_before_cleanup).collect()
+            })
+    }
+    #[cfg(feature = "instance-backend")]
+    #[getter]
+    fn runtime_directory(&self) -> Option<String> {
+        self.service
+            .instances
+            .as_ref()
+            .map(instances::InstanceService::resource_directory)
+    }
+    #[cfg(feature = "instance-backend")]
+    fn collect(&self, py: Python<'_>) -> PyResult<Vec<[f64; 4]>> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        let instances = self
+            .service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
+        py.detach(|| instances.collect())
+            .map_err(PyRuntimeError::new_err)
+    }
+    /// Pin a stateful session to an explicit native owner; handles remain owner checked.
+    #[cfg(feature = "instance-backend")]
+    fn call_on(
+        &self,
+        py: Python<'_>,
+        owner: usize,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PythonValue> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        let input = read(value, &self.service, &mut BTreeSet::new())?;
+        let instances = self
+            .service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
+        let output = py
+            .detach(|| instances.request_on(owner, Command::Call(input)))
+            .map_err(PyRuntimeError::new_err)?;
+        token(&self.service, &output)
+    }
+    /// Snapshot portable typed input once without native entry or compilation.
+    #[cfg(feature = "instance-backend")]
+    fn prepare_request(&self, value: &Bound<'_, PyAny>) -> PyResult<PythonPreparedRequest> {
+        prepared::prepare(self, value)
+    }
+    /// Independent requests are assigned across instances; stateful call stays on owner 0.
+    #[cfg(feature = "instance-backend")]
+    #[pyo3(signature = (requests, *, dispatch="tokio", admission_window=128))]
+    fn call_many(
+        &self,
+        py: Python<'_>,
+        requests: &Bound<'_, PyList>,
+        dispatch: &str,
+        admission_window: usize,
+    ) -> PyResult<Vec<PythonValue>> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        let instances = self
+            .service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
+        let read_started = std::time::Instant::now();
+        let inputs = requests
+            .iter()
+            .map(|v| read(&v, &self.service, &mut BTreeSet::new()))
+            .collect::<PyResult<Vec<_>>>()?;
+        instances.host_span("python-read-many", read_started);
+        let (values, detached) = py.detach(|| {
+            let value = instances.call_many(&inputs, dispatch, admission_window);
+            (value, std::time::Instant::now())
+        });
+        instances.host_span("gil-reacquire", detached);
+        let values = values.map_err(PyRuntimeError::new_err)?;
+        let materialize = std::time::Instant::now();
+        let result = values
+            .into_iter()
+            .map(|output| token(&self.service, &output))
+            .collect();
+        instances.host_span("python-wrap-results", materialize);
+        result
+    }
+    /// Enable bounded diagnostic spans. Toggle only after outstanding work drains.
+    #[cfg(feature = "instance-backend")]
+    fn set_owner_profiling(&self, enabled: bool) -> PyResult<()> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        self.service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?
+            .set_owner_profiling(enabled)
+            .map_err(PyRuntimeError::new_err)
+    }
+    /// Drain owned JSON diagnostics; request and result values still use native types.
+    #[cfg(feature = "instance-backend")]
+    fn owner_profile(&self) -> PyResult<String> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        self.service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?
+            .owner_profile()
+            .map_err(PyRuntimeError::new_err)
+    }
+    /// Return per-window admission-to-native-ready nanoseconds, before Python projection.
+    #[cfg(feature = "instance-backend")]
+    #[pyo3(signature = (requests, *, dispatch="tokio", admission_window=128))]
+    fn call_many_profiled(
+        &self,
+        py: Python<'_>,
+        requests: &Bound<'_, PyList>,
+        dispatch: &str,
+        admission_window: usize,
+    ) -> PyResult<(Vec<PythonValue>, Vec<u64>)> {
+        self.service
+            .check_process()
+            .map_err(PyRuntimeError::new_err)?;
+        let instances = self
+            .service
+            .instances
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
+        let read_started = std::time::Instant::now();
+        let inputs = requests
+            .iter()
+            .map(|value| read(&value, &self.service, &mut BTreeSet::new()))
+            .collect::<PyResult<Vec<_>>>()?;
+        instances.host_span("python-read-many", read_started);
+        let (result, detached) = py.detach(|| {
+            let result = instances.call_many_profiled(&inputs, dispatch, admission_window);
+            (result, std::time::Instant::now())
+        });
+        instances.host_span("gil-reacquire", detached);
+        let (outputs, timings) = result.map_err(PyRuntimeError::new_err)?;
+        let materialize = std::time::Instant::now();
+        let values = outputs
+            .into_iter()
+            .map(|output| token(&self.service, &output))
+            .collect::<PyResult<Vec<_>>>()?;
+        instances.host_span("python-wrap-results", materialize);
+        Ok((values, timings))
     }
     /// Release all roots and join the VM owner; no forced interruption is implied.
     fn close(&self, py: Python<'_>) -> PyResult<()> {
@@ -339,6 +667,12 @@ impl PythonValue {
         }
     }
     /// Scalar projection is separate from native ownership/execution semantics.
+    #[getter]
+    fn owner(&self) -> PyResult<usize> {
+        self.service
+            .token_owner(self.id()?)
+            .map_err(PyRuntimeError::new_err)
+    }
     fn to_python(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         match self.inspect(py, Projection::Scalar)? {
             Output::Scalar(value) => value.to_python(py),
@@ -368,7 +702,7 @@ impl PythonValue {
                     .request(Command::Apply(id, Input::List(arguments)))
             })
             .map_err(PyRuntimeError::new_err)?;
-        token(&self.service, output)
+        token(&self.service, &output)
     }
     fn is_identical(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
         if !Arc::ptr_eq(&self.service, &other.service) {
@@ -393,9 +727,9 @@ impl PythonValue {
             .map_err(PyRuntimeError::new_err)
     }
 }
-fn token(service: &Arc<Service>, output: Output) -> PyResult<PythonValue> {
+fn token(service: &Arc<Service>, output: &Output) -> PyResult<PythonValue> {
     match output {
-        Output::Token(v) => Ok(PythonValue::new(service, v)),
+        Output::Token(v) => Ok(PythonValue::new(service, *v)),
         _ => Err(protocol()),
     }
 }
@@ -431,6 +765,15 @@ fn read(
     }
     if let Ok(bytes) = value.cast::<PyBytes>() {
         return Ok(Input::Bytes(bytes.as_bytes().to_vec()));
+    }
+    #[cfg(feature = "instance-backend")]
+    if let Ok(request) = value.extract::<PyRef<'_, PythonPreparedRequest>>() {
+        if seen.len() + request.depth > 128 {
+            return Err(PyValueError::new_err(
+                "prepared nesting exceeds bridge stack bound",
+            ));
+        }
+        return Ok(Input::Shared(Arc::clone(&request.input)));
     }
     let address = value.as_ptr() as usize;
     if !seen.insert(address) {
@@ -486,33 +829,34 @@ pub fn open_library(
             // One complete admission, before runtime entry; no duplicate scan
             // in the facade and no stat-only substitute for per-path SHA.
             let package = manifest.verify(package_root).map_err(|e| e.to_string())?;
-            let paths = package.load_paths();
-            let paths = paths
-                .into_iter()
-                .map(|p| {
-                    p.into_os_string()
-                        .into_string()
-                        .map_err(|_| "non-UTF8 load path".to_owned())
-                })
-                .collect::<Answer<Vec<_>>>()?;
+            let (paths, namespace) = resources::linked(&package).map_err(|e| e.to_string())?;
             let (sender, requests) = mpsc::channel();
             let (ready, initialized) = mpsc::sync_channel(1);
             let worker = std::thread::Builder::new()
                 .name("gerbil-python-owner".into())
-                .spawn(move || owner(program, &paths, requests, ready))
+                .spawn(move || owner(program, &paths, requests, &ready))
                 .map_err(|e| e.to_string())?;
             match initialized.recv() {
                 Ok(Ok(())) => Ok(Arc::new(Service {
                     connection: Mutex::new(Some(Connection { sender, worker })),
                     pid: std::process::id(),
                     package,
+                    namespace,
+                    #[cfg(feature = "instance-backend")]
+                    instances: None,
                 })),
                 Ok(Err(error)) => {
                     let _ = worker.join();
+                    if let Some(namespace) = &namespace {
+                        let _ = resources::retire(namespace);
+                    }
                     Err(error)
                 }
                 Err(error) => {
                     let _ = worker.join();
+                    if let Some(namespace) = &namespace {
+                        let _ = resources::retire(namespace);
+                    }
                     Err(error.to_string())
                 }
             }
@@ -521,23 +865,19 @@ pub fn open_library(
     Ok(PythonLibrary { service })
 }
 
-fn owner(
+fn configure_owner(
+    runtime: &GerbilRuntime,
     program: PythonProgram,
     paths: &[String],
-    requests: mpsc::Receiver<Request>,
-    ready: mpsc::SyncSender<Answer<()>>,
-) {
-    let runtime = match GerbilRuntime::initialize_program_single_processor(program.program) {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            let _ = ready.send(Err(error.to_string()));
-            return;
-        }
-    };
-    let configured = (|| {
+) -> Result<(), gerbil_scheme::NativeError> {
+    (|| {
         let roots = paths
             .iter()
-            .map(|p| runtime.string_from_utf8(p).map(|v| v.into_object()))
+            .map(|p| {
+                runtime
+                    .string_from_utf8(p)
+                    .map(gerbil_scheme::RootedSchemeString::into_object)
+            })
             .collect::<Result<Vec<_>, _>>()?;
         let input = runtime
             .collection_from_objects(CollectionKind::List, &roots.iter().collect::<Vec<_>>())?
@@ -547,7 +887,23 @@ fn owner(
             .call(&input)
             .into_result()
             .map(drop)
-    })();
+    })()
+}
+
+fn owner(
+    program: PythonProgram,
+    paths: &[String],
+    requests: mpsc::Receiver<Request>,
+    ready: &mpsc::SyncSender<Answer<()>>,
+) {
+    let runtime = match GerbilRuntime::initialize_program_single_processor(program.program) {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            let _ = ready.send(Err(error.to_string()));
+            return;
+        }
+    };
+    let configured = configure_owner(&runtime, program, paths);
     if let Err(error) = configured {
         let _ = ready.send(Err(error.to_string()));
         return;
@@ -556,14 +912,12 @@ fn owner(
         return;
     }
     // SAFETY: PythonProgram requires this process-lived initialized export.
-    let export = match unsafe { runtime.bind_object_export(program.dispatch) } {
-        Ok(v) => v,
-        Err(_) => return,
+    let Ok(export) = (unsafe { runtime.bind_object_export(program.dispatch) }) else {
+        return;
     };
     // SAFETY: the descriptor names the upstream linked rooted apply export.
-    let apply = match unsafe { runtime.bind_object_export(program.apply) } {
-        Ok(v) => v,
-        Err(_) => return,
+    let Ok(apply) = (unsafe { runtime.bind_object_export(program.apply) }) else {
+        return;
     };
     let mut roots: BTreeMap<u64, Root<'_>> = BTreeMap::new();
     let mut next = 1_u64;
@@ -630,7 +984,7 @@ fn owner(
                 }
             }
         })();
-        deliver_reply(request.reply, result, &mut roots);
+        deliver_reply(&request.reply, result, &mut roots);
         if closing {
             break;
         }
@@ -639,7 +993,7 @@ fn owner(
 }
 
 fn deliver_reply(
-    reply: mpsc::SyncSender<Answer<Output>>,
+    reply: &mpsc::SyncSender<Answer<Output>>,
     result: Answer<Output>,
     roots: &mut BTreeMap<u64, Root<'_>>,
 ) {
@@ -669,6 +1023,8 @@ fn encode<'a>(
     input: &Input,
 ) -> Result<Root<'a>, gerbil_scheme::NativeError> {
     match input {
+        #[cfg(feature = "instance-backend")]
+        Input::Shared(input) => encode(runtime, roots, input),
         Input::Void => runtime.void_object(),
         Input::Bool(v) => runtime.scalar_object(SchemeScalar::Boolean(*v)),
         Input::Integer(v) => {
@@ -679,8 +1035,12 @@ fn encode<'a>(
             runtime.big_integer(&BinaryInteger::new(sign == Sign::Minus, bytes)?)
         }
         Input::Real(v) => runtime.scalar_object(SchemeScalar::Flonum(*v)),
-        Input::Text(v) => runtime.string_from_utf8(v).map(|v| v.into_object()),
-        Input::Bytes(v) => runtime.bytevector_from_bytes(v).map(|v| v.into_object()),
+        Input::Text(v) => runtime
+            .string_from_utf8(v)
+            .map(gerbil_scheme::RootedSchemeString::into_object),
+        Input::Bytes(v) => runtime
+            .bytevector_from_bytes(v)
+            .map(gerbil_scheme::RootedSchemeBytevector::into_object),
         Input::List(values) | Input::Vector(values) => {
             let values = values
                 .iter()
@@ -695,7 +1055,7 @@ fn encode<'a>(
                     },
                     &values.iter().collect::<Vec<_>>(),
                 )
-                .map(|v| v.into_object())
+                .map(gerbil_scheme::RootedSchemeCollection::into_object)
         }
         Input::Table(values) => {
             let values = values
@@ -776,7 +1136,7 @@ fn children<'a>(runtime: &'a GerbilRuntime, root: &Root<'a>) -> Answer<Vec<Root<
     (|| -> Result<_, gerbil_scheme::NativeError> {
         match kind {
             ObjectKind::GambitTable | ObjectKind::GerbilHashTable => {
-                root.copy_table_entries(&mut snapshot)?
+                root.copy_table_entries(&mut snapshot)?;
             }
             ObjectKind::Pair | ObjectKind::Vector | ObjectKind::Nil => {
                 let collection =

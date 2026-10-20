@@ -20,6 +20,7 @@ pub(super) struct Image {
     batch: Batch,
     marker: unsafe extern "C" fn() -> u32,
     cleanup: unsafe extern "C" fn() -> i32,
+    lifecycle: unsafe extern "C" fn(u32, u32) -> i64,
     pub(super) state: usize,
     _owner: PhantomData<Rc<()>>,
 }
@@ -41,7 +42,7 @@ impl Image {
             );
         }
         eprintln!("INSTANCE-LOAD loaded=OK");
-        // SAFETY: all five signatures are defined in instance_probe.c and the
+        // SAFETY: all signatures are defined in instance_probe.c and the
         // build's export list. This image remains loaded until process exit.
         unsafe {
             let initialize: unsafe extern "C" fn() -> i32 =
@@ -64,6 +65,9 @@ impl Image {
                     handle,
                     c"gerbil_instance_probe_cleanup",
                 )),
+                lifecycle: std::mem::transmute::<*mut c_void, unsafe extern "C" fn(u32, u32) -> i64>(
+                    symbol(handle, c"gerbil_instance_probe_lifecycle"),
+                ),
                 state: state(),
                 _owner: PhantomData,
             }
@@ -74,6 +78,12 @@ impl Image {
         // SAFETY: this !Send/!Sync image stays on its initialization thread.
         // The caller retains the optional callback context through this call.
         unsafe { (self.batch)(id, jobs, rounds, context) }
+    }
+
+    pub(super) fn contract(&self, operation: u32, owner: u32) -> i64 {
+        // SAFETY: scalar entry on the initialization owner. Operation 99
+        // checks only C lifecycle guards after cleanup, without Scheme entry.
+        unsafe { (self.lifecycle)(operation, owner) }
     }
 
     pub(super) fn marker(&self) -> u32 {
@@ -88,6 +98,7 @@ impl Drop for Image {
         // dlclose: process signal hooks may still reference image code. This
         // unresolved unload boundary prevents production executor admission.
         assert_eq!(unsafe { (self.cleanup)() }, 0, "image cleanup");
+        assert_eq!(self.contract(99, 0), 0, "finalized runtime rejects reuse");
     }
 }
 

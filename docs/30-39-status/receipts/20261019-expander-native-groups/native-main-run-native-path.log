@@ -1,0 +1,8 @@
+MAIN before-expander
+*** ERROR IN gx#core-import-module__% -- 
+*** ERROR IN ?
+--- Syntax Error: cannot find library module
+--- Context: 
+ at expand
+ at top
+... form:   :gerbil/core

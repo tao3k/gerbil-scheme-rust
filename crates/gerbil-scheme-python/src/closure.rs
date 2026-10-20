@@ -58,10 +58,11 @@ fn closure_manifest(
         roots: roots
             .iter()
             .map(|r| r.destination.to_owned())
-            .chain(sources.iter().map(|s| s.destination.to_owned()))
+            .chain(crate::staging::inventory_roots(sources)?)
             .collect(),
         load_paths: roots.iter().map(|r| r.destination.to_owned()).collect(),
         files: BTreeMap::new(),
+        native_modules: BTreeMap::new(),
     };
     PackageManifest::from_json(&serde_json::to_vec(&manifest)?)
 }
@@ -126,6 +127,56 @@ fn stage_selected(
             Path::new(tree.destination),
             &mut manifest.files,
         )?;
+    }
+    Ok(())
+}
+
+/// Replace compiler-selected native parts with physical groups already in the
+/// staged inventory. Source metadata and every logical loader path are retained.
+/// # Errors
+/// Rejects unknown sources, undeclared targets, collisions and invalid manifests.
+pub fn coalesce_module_resources(
+    root: &Path,
+    manifest: &mut PackageManifest,
+    closure: &ModuleClosure,
+    roots: &[ModuleRoot<'_>],
+    groups: &[(String, Vec<PathBuf>)],
+) -> io::Result<()> {
+    let selected = select_modules(closure, roots)?;
+    for (target, sources) in groups {
+        coalesce_group(root, manifest, &selected, target, sources)?;
+    }
+    manifest.verify(root)?;
+    Ok(())
+}
+
+fn coalesce_group(
+    root: &Path,
+    manifest: &mut PackageManifest,
+    selected: &BTreeMap<&PathBuf, PathBuf>,
+    target: &str,
+    sources: &[PathBuf],
+) -> io::Result<()> {
+    if !manifest.files.contains_key(target) {
+        return Err(io::Error::other("undeclared native group"));
+    }
+    for source in sources {
+        let logical = selected
+            .get(source)
+            .ok_or_else(|| io::Error::other("native part outside compiler closure"))?;
+        let name = logical
+            .to_str()
+            .ok_or_else(|| io::Error::other("UTF8 logical module"))?
+            .to_owned();
+        if manifest.files.remove(&name).is_none()
+            || manifest
+                .native_modules
+                .insert(name, target.to_owned())
+                .is_some()
+        {
+            return Err(io::Error::other("duplicate native module grouping"));
+        }
+        fs::remove_file(root.join(logical))?;
     }
     Ok(())
 }

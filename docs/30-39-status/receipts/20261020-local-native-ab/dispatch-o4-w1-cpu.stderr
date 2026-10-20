@@ -1,0 +1,1 @@
+"/private/tmp/gerbil-o2-progress-20261019/venv-O2/bin/python" examples/python-ledger/tests/bench_owner_dispatch.py --owners 4 --workers 1 --rounds 16 --cpu

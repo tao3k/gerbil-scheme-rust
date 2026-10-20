@@ -155,3 +155,48 @@ scheme-contracts:
 scheme-utf8-cost *phases:
     GERBIL_PATH="{{ justfile_directory() }}/target/scheme-contracts" gxi t/build.ss compile
     GERBIL_PATH="{{ justfile_directory() }}/target/scheme-contracts" gxi t/utf8-cost-test.ss {{ phases }}
+
+# Scheme continuations/GC/lifecycle, then equal-load ABBA (20 samples per variant).
+bridge-instance-lifecycle *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-probe --bench instance_lifecycle --locked -- {{ args }}
+
+# Actual library-owned queues, native Scheme JSON work, drain contracts and ABBA.
+bridge-instance-library *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_library --locked -- {{ args }}
+
+# Existing native Scheme types; setup faults, task exceptions and resource plateaus.
+bridge-instance-resources *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- {{ args }}
+
+# Installed native Scheme owners; use the Python interpreter of the installed wheel.
+bridge-python-owner-tests python="python3":
+    "{{ python }}" examples/python-ledger/tests/test_rust_backend.py -v
+
+bridge-python-owner-full python="python3":
+    "{{ python }}" examples/python-ledger/tests/qualify_full_scheme.py
+
+bridge-python-owner-ab python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/bench_owner_dispatch.py {{ args }}
+
+bridge-python-owner-reuse python="python3":
+    "{{ python }}" examples/python-ledger/tests/qualify_owner_reuse.py
+
+# Dynamic-module wheel A/B uses the same installed Scheme macro workload.
+bridge-python-macro-ab python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/bench_macro_expansion.py {{ args }}
+
+# Owner-affine sessions and native owner-batched projection/retirement.
+bridge-python-owner-routing-tests python="python3":
+    "{{ python }}" examples/python-ledger/tests/test_owner_routing.py -v
+
+bridge-python-owner-deadline python="python3":
+    "{{ python }}" examples/python-ledger/tests/qualify_owner_deadline.py
+
+bridge-python-native-payload-ab python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/bench_owner_payload.py {{ args }}
+
+bridge-python-scalar-cycle python="python3":
+    "{{ python }}" examples/python-ledger/tests/bench_scalar_cycle.py
+
+bridge-python-projection-ab python="python3" *args:
+    "{{ python }}" examples/python-ledger/tests/bench_owner_projection.py {{ args }}

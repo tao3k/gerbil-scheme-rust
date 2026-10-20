@@ -1,0 +1,23 @@
+{
+  "base_head": "bb71bbb5ad91bbaef2035979319514c7ced4c4ca",
+  "branch": "codex/typed-fold-aot",
+  "dirty": true,
+  "default_dynamic_optimization": "-O2",
+  "c_compiler": "/opt/homebrew/bin/gcc-16",
+  "build_cap_seconds": 120,
+  "native_call_cap_seconds": 5,
+  "source_sha256": {
+    "build-support/gerbil-scheme-aot-build/src/module_bundles.rs": "a8b84af1eb958b0eb9178611b1e49c6874fd2bf07486c725db3fcacd7f776a5d",
+    "build-support/gerbil-scheme-aot-build/src/program/archive.rs": "2a9f00a8fa84926839f3186f7f743c7b05df32c9cbe898c80a49d719551d30fb",
+    "build-support/gerbil-scheme-aot-build/src/program/mod.rs": "4bf112d1102afe182253094655d4ae2246f4be1946c810894f82c8bb7a61e81c",
+    "examples/python-ledger/scheme/ledger.ss": "acdc5feec74c7db5ea5dc9bc52a780a7f63a15749b82f076a9fcf924e588c4fb",
+    "examples/python-ledger/tests/bench_macro_expansion.py": "c42f3418057657885750394c42b3d301b23ba7357263744288eefc9c90c35166",
+    "examples/python-ledger/tests/bench_owner_dispatch.py": "a08c6db0c11f1cce2bc601f118ec717f262987de24779d6bc5d978f966df8c4e",
+    "examples/python-ledger/tests/benchmark_host.py": "5651b940ffd97b27fac32dda0478e88d2bfe380c2810235e15a5309dcf2fcbbf"
+  },
+  "wheel_sha256": {
+    "wheels-O1-cached/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl": "5c809434f5ba22f4d3582dc7cd64e64d3a29b234d619a8e1d1e134dbfe9174ce",
+    "wheels-O0/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl": "6d99da0fce11d5042beadaec49118e369add32a8af0b5d9057e09d87d8460812"
+  },
+  "artifact_note": "O0 and O1 artifacts precede the default-level correction to O2; explicit selected options are recorded by build variant. No O2 wheel completed."
+}

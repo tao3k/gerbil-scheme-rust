@@ -1,0 +1,42 @@
+import concurrent.futures,ctypes,json,os,struct,time
+from pathlib import Path
+import gerbil_ledger
+class Signature(ctypes.Structure):_fields_=[('start',ctypes.c_int64),('blob',ctypes.c_void_p),('size',ctypes.c_size_t)]
+class Validation(ctypes.Structure):_fields_=[('start',ctypes.c_int64),('size',ctypes.c_size_t),('message',ctypes.c_void_p)]
+libc=ctypes.CDLL(None,use_errno=True);libc.fcntl.argtypes=[ctypes.c_int,ctypes.c_int];libc.fcntl.restype=ctypes.c_int
+
+def validate(path):
+ start=time.perf_counter_ns();data=path.read_bytes();offset=32
+ for _ in range(struct.unpack_from('<I',data,16)[0]):
+  cmd,size=struct.unpack_from('<II',data,offset)
+  if cmd==0x1d:signature_offset,signature_size=struct.unpack_from('<II',data,offset+8);break
+  offset+=size
+ fd=os.open(path,os.O_RDONLY);sig=Signature(0,signature_offset,signature_size);message=ctypes.create_string_buffer(1024);val=Validation(0,1024,ctypes.addressof(message))
+ try:
+  for operation,argument in [(97,sig),(98,val)]:
+   if libc.fcntl(fd,operation,ctypes.byref(argument))<0:raise OSError(ctypes.get_errno(),message.value)
+ finally:os.close(fd)
+ return dict(path=str(path),ns=time.perf_counter_ns()-start)
+
+library=gerbil_ledger.open_library();print('opened',flush=True)
+root=Path(library.runtime_directory)/'owner-0-modules'
+files=[]
+for path in root.rglob('*'):
+ if not path.is_file():continue
+ data=path.read_bytes()[:32]
+ if len(data)>=32 and data[:4]==b'\xcf\xfa\xed\xfe' and struct.unpack_from('<I',data,12)[0]==8:files.append(path)
+pool=concurrent.futures.ThreadPoolExecutor(max_workers=32);start=time.perf_counter_ns();done=0
+try:
+ for future in concurrent.futures.as_completed([pool.submit(validate,path) for path in files],timeout=5):
+  result=future.result();done+=1
+  if done%16==0:print(json.dumps(dict(validated=done,of=len(files),elapsed_ns=time.perf_counter_ns()-start,last_ns=result['ns'])),flush=True)
+except Exception as error:
+ print(json.dumps(dict(status='FAIL',stage='validation',error=str(error),completed=done,ns=time.perf_counter_ns()-start)),flush=True);os._exit(1)
+print(json.dumps(dict(status='PASS',stage='validation',completed=done,ns=time.perf_counter_ns()-start)),flush=True)
+pool.shutdown()
+start=time.perf_counter_ns()
+try:
+ value=library.call(('dsl','(let ((foldl #f)) (ledger-sum 20 22))'));print(json.dumps(dict(status='PASS',stage='dsl',value=value.to_python(),ns=time.perf_counter_ns()-start)),flush=True);value.close()
+except Exception as error:
+ print(json.dumps(dict(status='FAIL',stage='dsl',error=str(error),ns=time.perf_counter_ns()-start)),flush=True);os._exit(1)
+library.close();print('closed',library.shutdown_clean,library.shutdown_roots,flush=True)

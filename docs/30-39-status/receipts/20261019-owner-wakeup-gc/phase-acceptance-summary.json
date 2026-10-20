@@ -1,0 +1,90 @@
+{
+  "('false', 1)": {
+    "rows": 10240,
+    "tail_rows": 103,
+    "conditional_tail_means_us": {
+      "total": 2976.162660194175,
+      "dispatch": 2898.9191067961165,
+      "items": 1.5190194174757283,
+      "envelope": 2.147980582524272,
+      "gcitems": 0.0,
+      "cpuitems": 1.4393592233011774,
+      "execute": 19.729805825242718,
+      "projection": 1.9866796116504855,
+      "admission_upper": 0.21323300970873785,
+      "queue_lower": 2898.705873786408
+    },
+    "slow_items": 4,
+    "slow_items_with_gc": 4,
+    "slow_item_means_us": {
+      "items": 847.60375,
+      "gcitems": 829.8158645629883,
+      "cpuitems": 801.698
+    }
+  },
+  "('false', 32)": {
+    "rows": 320,
+    "tail_rows": 4,
+    "conditional_tail_means_us": {
+      "total": 1243.44775,
+      "dispatch": 147.5935,
+      "items": 896.219,
+      "envelope": 7.43725,
+      "gcitems": 838.9949798583984,
+      "cpuitems": 836.4479999999983,
+      "execute": 130.73975,
+      "projection": 35.72925,
+      "admission_upper": 2.66675,
+      "queue_lower": 144.92675
+    },
+    "slow_items": 22,
+    "slow_items_with_gc": 22,
+    "slow_item_means_us": {
+      "items": 722.3693636363637,
+      "gcitems": 679.4604388150301,
+      "cpuitems": 687.7557727272722
+    }
+  },
+  "('true', 1)": {
+    "rows": 10240,
+    "tail_rows": 103,
+    "conditional_tail_means_us": {
+      "total": 10701.614194174757,
+      "dispatch": 9915.28972815534,
+      "items": 1.960728155339806,
+      "envelope": 5.487844660194175,
+      "gcitems": 0.0,
+      "cpuitems": 1.80585436893356,
+      "execute": 745.4575728155339,
+      "projection": 3.193330097087379,
+      "admission_upper": 0.11774757281553398,
+      "queue_lower": 9915.171980582523
+    },
+    "slow_items": 0,
+    "slow_items_with_gc": 0,
+    "slow_item_means_us": {}
+  },
+  "('true', 32)": {
+    "rows": 320,
+    "tail_rows": 4,
+    "conditional_tail_means_us": {
+      "total": 3316.823,
+      "dispatch": 13.11475,
+      "items": 653.30175,
+      "envelope": 5.07275,
+      "gcitems": 612.6761436462402,
+      "cpuitems": 632.6247500000014,
+      "execute": 2597.1565,
+      "projection": 32.23925,
+      "admission_upper": 3.208,
+      "queue_lower": 9.90675
+    },
+    "slow_items": 17,
+    "slow_items_with_gc": 17,
+    "slow_item_means_us": {
+      "items": 577.2500588235293,
+      "gcitems": 544.281566844267,
+      "cpuitems": 561.8701176470606
+    }
+  }
+}

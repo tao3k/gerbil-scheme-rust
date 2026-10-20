@@ -1,0 +1,11 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --preflight
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+error[E0425]: cannot find value `failed_copy` in this scope
+  --> crates/gerbil-scheme/src/instances/pool.rs:90:42
+   |
+90 |                 let _ = fs::remove_file(&failed_copy);
+   |                                          ^^^^^^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `gerbil-scheme` (lib) due to 1 previous error
+error: recipe `bridge-instance-resources` failed on line 169 with exit code 101

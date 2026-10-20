@@ -1,0 +1,36 @@
+   Compiling syn v2.0.119
+   Compiling target-lexicon v0.13.5
+   Compiling num-traits v0.2.19
+    Checking typenum v1.20.1
+   Compiling serde_core v1.0.228
+   Compiling memoffset v0.9.1
+    Checking unindent v0.2.4
+   Compiling indoc v2.0.7
+    Checking once_cell v1.21.4
+    Checking generic-array v0.14.7
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking num-integer v0.1.47
+    Checking num-bigint v0.4.8
+   Compiling synstructure v0.13.2
+   Compiling pyo3-build-config v0.27.2
+    Checking serde_json v1.0.150
+error: failed to run custom build command for `pyo3-build-config v0.27.2`
+
+Caused by:
+  process didn't exit successfully: `/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/debug/build/pyo3-build-config-e36548c6f9301ac3/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:rerun-if-env-changed=PYO3_CONFIG_FILE
+  cargo:rerun-if-env-changed=PYO3_BUILD_EXTENSION_MODULE
+  cargo:rerun-if-env-changed=PYO3_NO_PYTHON
+  cargo:rerun-if-env-changed=PYO3_ENVIRONMENT_SIGNATURE
+  cargo:rerun-if-env-changed=PYO3_PYTHON
+  cargo:rerun-if-env-changed=VIRTUAL_ENV
+  cargo:rerun-if-env-changed=CONDA_PREFIX
+  cargo:rerun-if-env-changed=PATH
+
+  --- stderr
+  error: cannot set a minimum Python version 3.10 higher than the interpreter version 3.9 (the minimum Python version is implied by the abi3-py310 feature)
+warning: build failed, waiting for other jobs to finish...

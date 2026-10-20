@@ -1,0 +1,112 @@
+cargo clippy: 15 errors, 0 warnings
+═══════════════════════════════════════
+
+Errors:
+  error: long literal lacking separators
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:42:35
+     |
+  42 |     for elements in [8192, 32768, 131072] {
+     |                                   ^^^^^^ help: consider: `131_072`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unreadable_literal
+     = note: `-D clippy::unreadable-literal` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::unreadable_literal)]`
+
+  error: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:11:38
+     |
+  11 |                         .map(|index| (index % 997 + salt) as i64)
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_wrap
+     = note: `-D clippy::cast-possible-wrap` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::cast_possible_wrap)]`
+
+  error: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:25:32
+     |
+  25 |             assert_eq!(*value, ((index + 1) % 997 + salt) as i64 * 3 + 7);
+     |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_wrap
+
+  error: casting `u128` to `f64` may cause a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:63:40
+     |
+  63 |         let median = |values: &[u128]| (values[9] + values[10]) as f64 / 2.0;
+     |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_precision_loss
+     = note: `-D clippy::cast-precision-loss` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::cast_precision_loss)]`
+
+  error: this function has too many lines (158/100)
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:10:1
+     |
+  10 | pub(super) fn run(smoke: bool, observer: &Observer, progress: &Progress) {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_lines
+     = note: `-D clippy::too-many-lines` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::too_many_lines)]`
+
+  error: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:22:56
+     |
+  22 |             command(&dispatch, owner, vec![2, 1, 100 + owner as i64], progress),
+     |                                                        ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_wrap
+
+  error: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:29:28
+     |
+  29 |                 2 => 107 + owner as i64,
+     |                            ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_wrap
+
+  error: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:30:28
+     |
+  30 |                 3 => 109 + owner as i64,
+     |                            ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_wrap
+
+  error: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:37:46
+     |
+  37 |                     vec![2, operation, 100 + owner as i64],
+     |                                              ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_wrap
+
+  error: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:72:51
+     |
+  72 | ...                   let mut values = vec![index as i64; size];
+     |                                             ^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_wrap
+
+  ... +5 more errors
+  casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers (8x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:11:38
+    crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:25:32
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:22:56
+    ... +5 more
+  casting `i64` to `f64` may cause a loss of precision (`i64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide) (2x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:146:19
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:154:25
+  casting `i64` to `usize` may truncate the value on targets with 32-bit wide pointers (1x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:141:45
+  casting `i64` to `usize` may lose the sign of the value (1x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:141:45
+  this function has too many lines (158/100) (1x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:10:1
+  casting `u128` to `f64` may cause a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide) (1x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:63:40
+  long literal lacking separators (1x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:42:35
+[full output: ~/Library/Application Support/rtk/tee/1792408235_cargo_clippy.log]

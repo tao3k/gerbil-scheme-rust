@@ -1,0 +1,7 @@
+Using Python 3.14.7 environment at: /private/tmp/gerbil-python-vm/venv
+Resolved 1 package in 17ms
+Prepared 1 package in 90ms
+Uninstalled 1 package in 79ms
+Installed 1 package in 29ms
+ - gerbil-ledger==0.1.0 (from file:///private/tmp/gerbil-python-vm/wheels-green-init/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl)
+ + gerbil-ledger==0.1.0 (from file:///private/tmp/gerbil-python-vm/wheels-trace/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl)

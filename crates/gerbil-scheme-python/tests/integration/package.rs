@@ -624,3 +624,86 @@ fn loader_inventory_excludes_debug_symbols_not_loadable_modules() {
             .exists()
     );
 }
+
+#[test]
+fn native_module_aliases_reject_escape_missing_target_and_shadowing() {
+    let fixture = Fixture::new();
+    let manifest = fixture.stage();
+    let package = fixture.0.join("package");
+    let mut admitted = manifest.clone();
+    admitted.native_modules.insert(
+        "_runtime/library/logical.o1".into(),
+        "_runtime/library/code.o1".into(),
+    );
+    admitted.verify(&package).unwrap();
+    for (logical, target) in [
+        ("../outside.o1", "_runtime/library/code.o1"),
+        ("_runtime/library/logical.o1", "../outside.o1"),
+        ("_runtime/library/logical.o1", "_runtime/library/missing.o1"),
+        ("_runtime/library/code.ssi", "_runtime/library/code.o1"),
+        ("_outside/logical.o1", "_runtime/library/code.o1"),
+    ] {
+        let mut rejected = manifest.clone();
+        rejected
+            .native_modules
+            .insert(logical.into(), target.into());
+        assert!(rejected.verify(&package).is_err(), "{logical} -> {target}");
+    }
+    fs::write(
+        package.join("_runtime/library/logical.o1"),
+        b"unadmitted alias",
+    )
+    .unwrap();
+    assert!(admitted.verify(&package).is_err());
+}
+
+#[test]
+fn grouped_native_inventory_keeps_metadata_and_rejects_group_tampering() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("source").canonicalize().unwrap();
+    let group = fixture.0.join("group.o1");
+    fs::write(&group, b"physical native group").unwrap();
+    let closure = ModuleClosure {
+        schema: "gerbil-scheme-python.closure.v1".into(),
+        entries: vec![":fixture/code".into()],
+        files: vec![source.join("code.ssi"), source.join("code.o1")],
+    };
+    let roots = [ModuleRoot {
+        source: &source,
+        destination: "_runtime/library",
+    }];
+    let package = fixture.0.join("grouped-package");
+    let mut manifest = stage_module_closure(
+        &package,
+        &closure,
+        &roots,
+        &[ResourceTree::file(&group, "_groups/group.o1")],
+    )
+    .unwrap();
+    gerbil_scheme_python::coalesce_module_resources(
+        &package,
+        &mut manifest,
+        &closure,
+        &roots,
+        &[("_groups/group.o1".into(), vec![source.join("code.o1")])],
+    )
+    .unwrap();
+    assert!(package.join("_runtime/library/code.ssi").is_file());
+    assert!(!package.join("_runtime/library/code.o1").exists());
+    assert_eq!(
+        manifest
+            .native_modules
+            .get("_runtime/library/code.o1")
+            .unwrap(),
+        "_groups/group.o1"
+    );
+    let installed = fixture.0.join("grouped-installed");
+    manifest
+        .verify(&package)
+        .unwrap()
+        .publish_to(&installed)
+        .unwrap();
+    manifest.verify(&installed).unwrap();
+    fs::write(installed.join("_groups/group.o1"), b"modified native group").unwrap();
+    assert!(manifest.verify(&installed).is_err());
+}

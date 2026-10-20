@@ -1,0 +1,148 @@
+#+title: Native Typed Instance Resource Qualification
+#+date: 2026-10-19
+
+* Scope and implementation
+
+This local Darwin qualification uses the Rust library's fixed-owner
+=InstancePool= and =InstanceDispatcher::submit_native_on=. The existing native
+Scheme type and strong-root ABI constructs and projects values in each owner's
+private runtime image. There is no JSON encoding in this path. Scheme performs
+the computation, collection, exception handling and continuation resumption.
+The existing Just/Cargo/Gerbil compiler graph produces the images; the SDK and
+production =ffi/runtime.c= lifecycle are reused.
+
+The native type matrix covers nine numeric vector families, four scalar
+families, Unicode/NUL strings and mixed vectors, including signed zero and NaN
+payloads. It does not qualify every conversion family in the library. Native
+roots are owner-local, cannot cross the scheduling queue, and release through
+RAII on normal return, conversion errors and caught Rust task unwinding.
+
+The native continuation case captures a Scheme heap payload, returns through
+FFI, collects/churns in later calls, and resumes the same delimited continuation
+twice. It checks owner markers, dynamic parameters, Scheme thread identity and
+=dynamic-wind=. No captured continuation enters a retired Rust frame.
+
+* Reproduction
+
+Run each mode in its own process. Native initialization failure permanently
+poisons subsequent image admission in that process.
+
+#+begin_src sh
+just bridge-instance-resources --preflight
+just bridge-instance-resources --before
+just bridge-instance-resources --after
+just bridge-instance-resources --churn
+just bridge-instance-resources --reuse
+just bridge-instance-resources --ab
+#+end_src
+
+The five-second startup, response and genuine-progress watchdog bounds remain
+unchanged. Sampling after confirmed Rust joins additionally waits at most that
+same bound for kernel thread retirement; it never reports a still-present
+thread as retired. The initial strict snapshot failures and compile failures
+remain in the receipt directory.
+
+* Initialization failure boundaries
+
+| Case | Observed result |
+|------+-----------------|
+| Missing export, 136 attempts | No native setup; unloaded images, removed copies and directories; later valid setup succeeds |
+| Owner 1 fails before native setup | Status 61, phase 0; uninitialized copy removed; previously initialized owner 0 cleaned; 2 joins, 0 pending |
+| Owner 1 fails after completed setup | Status 62, phase 2; failing owner cleanup status 0, roots 0; owner 0 also cleaned; 2 joins, 0 pending |
+| Native setup returns unknown partial state | Phase 1 is terminal; rollback remains unqualified |
+
+Separate compiled fault adapters inject the two known phase failures while
+using the production initialization and cleanup helpers. These are fault
+injection receipts, not proof of recovery from every SDK allocation failure.
+Both native phase-failure cases reject later setup in that process. Images
+that attempted setup remain mapped; only never-initialized images may unload.
+
+* Fixed pool reuse and failure recovery
+
+Four owners execute 32 epochs of 2,048 tasks: 65,536 total. The first two epochs
+use larger native vectors; later epochs retain the same instances and vary
+request values. Every successful output element is checked independently.
+
+| Result | Count |
+|--------+-------|
+| Successful Scheme closure computation and typed projection | 61,440 |
+| Caught Scheme task exceptions with collection and dynamic-wind | 3,584 |
+| Caught Rust job panics with a live native root guard | 512 |
+
+Each owner observes 896 Scheme task exceptions and 128 Rust task panics, then
+continues successful native calls. All checkpoints report zero external roots.
+Over the 28 post-warmup epochs,
+total post-GC live data stays at 4,295,904 bytes (1,073,976 per owner). Current
+RSS ranges from 83,001,344 to 83,066,880 bytes. File descriptors, threads and
+loaded images remain fixed at 11, 6 and 55. These are finite-run observations;
+they are not an unbounded leak-freedom proof.
+
+* Retention control and shutdown
+
+A Scheme-global list deliberately retains sixteen 8 MiB bytevectors without
+holding external transfer roots. The SDK post-GC live metric increases by
+134,219,328 bytes. Clearing the list and collecting releases the same measured
+live amount. This control prevents zero external roots from being treated as
+sufficient evidence of heap reclamation.
+
+After explicit shutdown, all four native cleanup calls return zero, all roots
+are zero, and all four owners join. File descriptors return to 3 and threads to
+2. Allocator live allocation drops from 337,955,296 to 25,408 bytes. However,
+current RSS remains 223,920,128 bytes, allocator reserved bytes remain
+473,956,352, and the four initialized images remain loaded. Test-only allocator
+pressure relief reports zero released bytes and leaves RSS unchanged. Production
+allocator policy is unchanged. Logical reclamation and OS residency are distinct
+observations; complete RSS reclamation is not established.
+
+* Replacement cost
+
+Eight sequential one-owner pools each run a native call, retain 32 MiB in
+Scheme, clear it, collect, clean up and join. FD and kernel-thread counts return
+to baseline after each pool. Loaded image count grows from 51 to 59, and eight
+copied files occupy 150,495,040 bytes. Final current RSS is 158,105,600 bytes;
+allocator live bytes are 33,216, while reserved bytes are 322,961,408.
+
+This backend is appropriate for a bounded fixed pool that is reused. Replacing
+pools indefinitely is not resource bounded under the current image retention
+contract. Hot unloading requires separate native process-hook/lifetime work;
+these receipts do not admit it or establish crash containment.
+
+* Native same-load A/B
+
+The native A/B uses one versus four fixed owners and the same eight s64vector
+requests in both variants, with Scheme closure computation and full result checking.
+Each size uses two warmup batches per variant, then ten ABBA blocks, yielding
+20 measured samples per variant. Measured time includes Rust input construction,
+native transfers, Scheme computation/GC and Rust validation. No JSON result is
+used to infer this path's speed.
+
+| Elements per request | 1 owner median ms | 4 owners median ms | Observed ratio |
+|----------------------+-------------------+--------------------+----------------|
+| 8,192 | 3.945083 | 2.304438 | 1.71x |
+| 32,768 | 11.252104 | 6.557479 | 1.72x |
+| 131,072 | 33.920687 | 17.443833 | 1.94x |
+
+Each sample validates eight complete results. These are local matched workload
+observations, not universal scaling or zero-copy claims. This task's compiler
+work completed before timed sampling; the machine was not an isolated benchmark
+host. Pool construction in this process took 699,663,750 ns for one owner and
+2,215,786,042 ns for four owners (one observation each, in that order). These
+construction observations are not fresh-process cost distributions. Both pools
+cleaned and joined with roots zero. Per-owner native cleanup ranged from
+44,208 to 85,084 ns in this run; queue drain and join are separately bounded by
+the five-second shutdown gate, rather than included in those native durations.
+
+* Additional verification
+
+Strict Clippy passes for the library and the qualification crate, including all
+targets. The ordinary linked runtime lifecycle regression reports one pass and
+one existing ignored test. The =NativeRoot= compile-fail doctest passes: a root
+cannot escape as a queued job result. The repository whitespace check passes.
+
+* Evidence and remaining boundaries
+
+Raw local receipts are in [[file:receipts/20261019-native-resources/][the receipt directory]]. The source/image digest
+manifest identifies the working-tree artifacts; the base commit alone does not
+identify these uncommitted changes. Historical JSON receipts remain unchanged.
+Source, native runtime acceptance and remote exact-head CI are separate gates;
+this report makes no remote CI, release, portability or every-type claim.

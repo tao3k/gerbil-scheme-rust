@@ -1,30 +1,26 @@
 # Rust Execution Runtime Transition
 
-## Current Clarification - 2026-10-16
+## Current Contract - 2026-10-19
 
 Read [Hybrid compilation and runtime ownership](hybrid-execution.md) for the
-current architecture decision. Rust owns the active execution host; this does
-not require rewriting Scheme algorithms in Rust or introducing another Scheme
-interpreter. Reuse typed ABI exports where their runtime requirements are met,
-and the existing Scheme-to-typed-IR build pipeline for VM-independent kernels.
-Rooted Scheme exports still require their live VM. The historical receipts
-and open VM-entry gaps below are unchanged; this clarification admits no new
-runtime, DSL, performance or release capability.
+current contract. Rust dispatch hosts complete Scheme runtimes on fixed owners;
+“Rust backend” does not imply “no Scheme VM”. Scheme retains its GC, closures,
+continuations, dynamic state and actor/green-thread scheduler. Native Gerbil/C
+compilation is preserved. Scheme-to-Rust IR lowering is a separate subset tool,
+not the full Scheme execution strategy.
 
-## Decision
+The [experimental Darwin instance API](instance-runtime.org) is implemented and
+has native lifecycle, continuation and same-VM batch receipts. The failed ordinary
+shared-runtime entry below remains failed; private images are a distinct path.
+The ledger now has an installed four-owner native path; its subsequent grouped-module package passes the tested expander and shutdown gates. See [the integration receipts](30-39-status/30.10-python-native-owner-integration.org). Portability, hot unloading and complete wheel migration remain unqualified.
 
-On 2026-10-15 the user redirected the active Python execution runtime to Rust.
-This means Rust owns execution, session state and concurrency; it is not a
-Rust scheduler around a Scheme VM. Cargo features select the provider at build
-time. Installed callers must explicitly request `backend="rust"`; unavailable
-providers and unsupported DSL fail without fallback.
+## Historical Python Subset Selection - 2026-10-15
 
-`examples/python-ascent/pyproject.toml` and
-`examples/python-ledger/pyproject.toml` select `extension-module,rust-backend`.
-The support crate's resource-only defaults and explicit Cargo feature contracts
-are unchanged. Standard builds of these examples do not enable `scheme-backend`.
-The Scheme backend and its tests remain as historical/reference assets, not a
-silent alternate execution route or a condition for Rust acceptance.
+The Python examples selected `extension-module,rust-backend` and explicit
+`backend="rust"` for their existing subset providers. The ledger has since moved to the Scheme instance API; the ASCENT kernel adapter
+has not. That historical choice is not a
+requirement to exclude Scheme from the library's Rust-scheduled execution host.
+No provider is silently replaced when it is unavailable or unsupported.
 
 ## Recorded Scheme Entry Gap
 
@@ -48,15 +44,18 @@ The ASCENT qualification uses the pinned upstream Rust `Program`, `Engine`,
 `Session` and immutable `Snapshot`, including source withdrawal and concurrent
 independent sessions. Python transports inputs and results; it does not parse
 or infer the DSL. Opaque projection failure preserves the complete snapshot.
-The independent ledger executes typed functions lowered to Rust at maintainer
-build time. Its installed execution does not call Scheme.
+The independent ledger now executes its Scheme program on four native owners
+through the default Rust dispatch provider. The previous typed lowering remains
+a historical subset experiment and is not selected by this path.
 
 Neither example establishes general Scheme compatibility. The ASCENT adapter
 supports the existing typed relational `(ascent ...)` subset, not arbitrary
-Scheme or complete `define-evidence` modules. The ledger has a precompiled
-typed-function interface, not a general runtime Scheme interpreter. Extending
-these semantics belongs in the Rust Library, with explicit capability and
-conformance tests, not Python special cases.
+Scheme or complete `define-evidence` modules. The ledger preserves native Scheme execution and opaque rooted graphs/procedures,
+and its subsequent runtime-loaded expander/DSL tests pass; see [the native packaging repair](30-39-status/30.11-expander-startup-and-dispatch-benchmarks.org). Resolving that embedding
+boundary belongs in the native library, not a Python interpreter or a Rust rewrite.
+The completed O2 wheel passes the exercised native Scheme gates;
+[the O0/O2 report](30-39-status/30.13-progress-supervised-o2-qualification.org)
+retains the actual mixed timing results and blocked quiet-host admission.
 
 The actual Gambit-SMP consumer still has richer catalog/review/history DSL and
 result/explanation contracts. Its dependency and interface are not silently
@@ -64,13 +63,14 @@ rewired to this smaller qualification adapter. Full consumer migration,
 complete current graph and matched performance remain open until supported
 by the actual Rust Library and qualified against the same complete inputs.
 
-## Required Admission
+## Admission Of The Historical Rust-Only Wheels
 
 New wheels must have exact source, dependency and wheel identities. Installed
 tests must run without SDK paths or a compiler and must verify independent
 state, concurrency, withdrawal, retained snapshots, close/invalidation and
 explicit unsupported inputs. Inspect linked dependencies and symbols to
-ensure the Rust profile has not included the Scheme runtime. Preserve all
+ensure those explicitly Rust-only kernel artifacts match their declared runtime.
+This exclusion is not the admission rule for a Rust host carrying Scheme VMs. Preserve all
 failed builds and executions. Existing build and execution deadlines remain
 120 seconds and 15 seconds respectively; no local subset pass is whole-project
 or latest-revision acceptance.

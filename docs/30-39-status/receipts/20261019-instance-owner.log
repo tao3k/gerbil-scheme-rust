@@ -1,0 +1,301 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-probe --bench instance_lifecycle --locked -- 
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+    Finished `bench` profile [optimized] target(s) in 4.48s
+     Running benches/instance_lifecycle.rs (target/release/deps/instance_lifecycle-a75fa0204f3d2e3a)
+INSTANCE-LOAD opening="/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-fb7ed62d76dd289c/out/lifecycle-87745-0/owner-0.dylib"
+INSTANCE-LOAD loaded=OK
+INSTANCE-INIT calling-official-setup
+INSTANCE-INIT completed=OK
+LIFECYCLE owner=101 initialized=true processors=1 gstate=0x108614a40
+INSTANCE-LOAD opening="/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-fb7ed62d76dd289c/out/lifecycle-87745-0/owner-1.dylib"
+INSTANCE-LOAD loaded=OK
+INSTANCE-INIT calling-official-setup
+INSTANCE-INIT completed=OK
+LIFECYCLE owner=202 initialized=true processors=1 gstate=0x1099a8a40
+LIFECYCLE first-owner-cleanup=OK second-owner-holds-continuation=true
+LIFECYCLE PASS gc-rooted-payload=true multi-shot=true dynamic-wind=true dynamic-binding=true scheme-thread-identity=true exception=true survivor-after-other-cleanup=true finalized-reuse-rejected=true images-unloaded=false
+INSTANCE-LOAD opening="/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-fb7ed62d76dd289c/out/lifecycle-87745-1/owner-0.dylib"
+INSTANCE-LOAD loaded=OK
+INSTANCE-INIT calling-official-setup
+INSTANCE-INIT completed=OK
+INSTANCE-IDENTITIES workers=1 distinct-gstates=1
+INSTANCE-LOAD opening="/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-fb7ed62d76dd289c/out/lifecycle-87745-2/owner-0.dylib"
+INSTANCE-LOAD loaded=OK
+INSTANCE-INIT calling-official-setup
+INSTANCE-INIT completed=OK
+INSTANCE-LOAD opening="/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-fb7ed62d76dd289c/out/lifecycle-87745-2/owner-1.dylib"
+INSTANCE-LOAD loaded=OK
+INSTANCE-INIT calling-official-setup
+INSTANCE-INIT completed=OK
+INSTANCE-LOAD opening="/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-fb7ed62d76dd289c/out/lifecycle-87745-2/owner-2.dylib"
+INSTANCE-LOAD loaded=OK
+INSTANCE-INIT calling-official-setup
+INSTANCE-INIT completed=OK
+INSTANCE-LOAD opening="/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-fb7ed62d76dd289c/out/lifecycle-87745-2/owner-3.dylib"
+INSTANCE-LOAD loaded=OK
+INSTANCE-INIT calling-official-setup
+INSTANCE-INIT completed=OK
+INSTANCE-IDENTITIES workers=4 distinct-gstates=4
+MATCHED setup-a-ns=403015333 setup-b-ns=1920123083 a-owners=1 b-owners=4 setup-includes-image-copy=true
+INSTANCE-ENTRY inside-scheme=1 gc-and-global-isolation=OK
+INSTANCE-ENTRY inside-scheme=4 gc-and-global-isolation=OK
+MATCHED-SAMPLE jobs=1000 rounds=32 block=0 variant=0 ns=200125 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=0 variant=1 ns=185625 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=0 variant=1 ns=184458 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=0 variant=0 ns=150125 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=1 variant=0 ns=125500 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=1 variant=1 ns=135917 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=1 variant=1 ns=127000 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=1 variant=0 ns=126459 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=2 variant=0 ns=118208 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=2 variant=1 ns=120083 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=2 variant=1 ns=134375 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=2 variant=0 ns=115792 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=3 variant=0 ns=158875 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=3 variant=1 ns=119500 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=3 variant=1 ns=106958 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=3 variant=0 ns=119417 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=4 variant=0 ns=111125 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=4 variant=1 ns=106000 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=4 variant=1 ns=104042 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=4 variant=0 ns=113541 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=5 variant=0 ns=110917 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=5 variant=1 ns=106917 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=5 variant=1 ns=130709 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=5 variant=0 ns=112208 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=6 variant=0 ns=110125 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=6 variant=1 ns=112792 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=6 variant=1 ns=106750 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=6 variant=0 ns=111000 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=7 variant=0 ns=109375 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=7 variant=1 ns=107375 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=7 variant=1 ns=124041 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=7 variant=0 ns=107791 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=8 variant=0 ns=106958 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=8 variant=1 ns=140875 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=8 variant=1 ns=128292 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=8 variant=0 ns=153125 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=9 variant=0 ns=125333 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=9 variant=1 ns=112375 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=9 variant=1 ns=119959 checksum=528000
+MATCHED-SAMPLE jobs=1000 rounds=32 block=9 variant=0 ns=137125 checksum=528000
+MATCHED-RESULT jobs=1000 rounds=32 samples-per-variant=20 a-median-ns=117000 b-median-ns=120021 checksum=528000 workload=scheme-checksum-with-forced-gc
+INSTANCE-ENTRY inside-scheme=1 gc-and-global-isolation=OK
+INSTANCE-ENTRY inside-scheme=4 gc-and-global-isolation=OK
+MATCHED-SAMPLE jobs=10000 rounds=32 block=0 variant=0 ns=361459 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=0 variant=1 ns=214375 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=0 variant=1 ns=170708 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=0 variant=0 ns=361209 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=1 variant=0 ns=380708 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=1 variant=1 ns=218584 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=1 variant=1 ns=181792 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=1 variant=0 ns=378250 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=2 variant=0 ns=366083 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=2 variant=1 ns=216292 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=2 variant=1 ns=189834 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=2 variant=0 ns=368458 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=3 variant=0 ns=386875 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=3 variant=1 ns=344750 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=3 variant=1 ns=422083 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=3 variant=0 ns=409542 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=4 variant=0 ns=367834 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=4 variant=1 ns=297000 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=4 variant=1 ns=320167 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=4 variant=0 ns=364583 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=5 variant=0 ns=402583 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=5 variant=1 ns=335458 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=5 variant=1 ns=309792 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=5 variant=0 ns=414792 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=6 variant=0 ns=366625 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=6 variant=1 ns=377291 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=6 variant=1 ns=590375 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=6 variant=0 ns=433667 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=7 variant=0 ns=416333 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=7 variant=1 ns=380708 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=7 variant=1 ns=356959 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=7 variant=0 ns=408292 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=8 variant=0 ns=376208 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=8 variant=1 ns=236208 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=8 variant=1 ns=239375 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=8 variant=0 ns=381375 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=9 variant=0 ns=369625 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=9 variant=1 ns=195875 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=9 variant=1 ns=207750 checksum=5280000
+MATCHED-SAMPLE jobs=10000 rounds=32 block=9 variant=0 ns=368167 checksum=5280000
+MATCHED-RESULT jobs=10000 rounds=32 samples-per-variant=20 a-median-ns=377229 b-median-ns=268187 checksum=5280000 workload=scheme-checksum-with-forced-gc
+INSTANCE-ENTRY inside-scheme=1 gc-and-global-isolation=OK
+INSTANCE-ENTRY inside-scheme=4 gc-and-global-isolation=OK
+MATCHED-SAMPLE jobs=100000 rounds=32 block=0 variant=0 ns=2628833 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=0 variant=1 ns=804000 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=0 variant=1 ns=783500 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=0 variant=0 ns=2714291 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=1 variant=0 ns=2764333 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=1 variant=1 ns=859500 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=1 variant=1 ns=828959 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=1 variant=0 ns=2665958 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=2 variant=0 ns=2696250 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=2 variant=1 ns=962291 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=2 variant=1 ns=923333 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=2 variant=0 ns=2766625 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=3 variant=0 ns=2709750 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=3 variant=1 ns=909750 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=3 variant=1 ns=1201458 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=3 variant=0 ns=2733167 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=4 variant=0 ns=2710167 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=4 variant=1 ns=1103000 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=4 variant=1 ns=1159167 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=4 variant=0 ns=2675750 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=5 variant=0 ns=2644416 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=5 variant=1 ns=926167 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=5 variant=1 ns=1107000 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=5 variant=0 ns=2978833 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=6 variant=0 ns=2674750 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=6 variant=1 ns=839333 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=6 variant=1 ns=826792 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=6 variant=0 ns=2803583 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=7 variant=0 ns=2703916 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=7 variant=1 ns=833958 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=7 variant=1 ns=800417 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=7 variant=0 ns=2807083 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=8 variant=0 ns=2776667 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=8 variant=1 ns=1198583 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=8 variant=1 ns=818667 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=8 variant=0 ns=2794458 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=9 variant=0 ns=2798583 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=9 variant=1 ns=1246916 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=9 variant=1 ns=1091291 checksum=52800000
+MATCHED-SAMPLE jobs=100000 rounds=32 block=9 variant=0 ns=2779375 checksum=52800000
+MATCHED-RESULT jobs=100000 rounds=32 samples-per-variant=20 a-median-ns=2723729 b-median-ns=916541 checksum=52800000 workload=scheme-checksum-with-forced-gc
+INSTANCE-ENTRY inside-scheme=1 gc-and-global-isolation=OK
+INSTANCE-ENTRY inside-scheme=4 gc-and-global-isolation=OK
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=0 variant=0 ns=3331792 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=0 variant=1 ns=1165750 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=0 variant=1 ns=969292 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=0 variant=0 ns=3297583 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=1 variant=0 ns=3358917 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=1 variant=1 ns=1352542 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=1 variant=1 ns=1008709 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=1 variant=0 ns=3486500 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=2 variant=0 ns=3412167 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=2 variant=1 ns=1451666 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=2 variant=1 ns=1209541 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=2 variant=0 ns=3189792 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=3 variant=0 ns=3248833 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=3 variant=1 ns=1141709 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=3 variant=1 ns=945875 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=3 variant=0 ns=3299375 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=4 variant=0 ns=3328500 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=4 variant=1 ns=1267458 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=4 variant=1 ns=1363709 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=4 variant=0 ns=3296084 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=5 variant=0 ns=3264334 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=5 variant=1 ns=955166 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=5 variant=1 ns=913334 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=5 variant=0 ns=3256375 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=6 variant=0 ns=3178833 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=6 variant=1 ns=959917 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=6 variant=1 ns=924209 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=6 variant=0 ns=3252833 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=7 variant=0 ns=3191125 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=7 variant=1 ns=948709 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=7 variant=1 ns=916667 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=7 variant=0 ns=3243166 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=8 variant=0 ns=3181875 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=8 variant=1 ns=943917 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=8 variant=1 ns=916041 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=8 variant=0 ns=3266209 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=9 variant=0 ns=3289500 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=9 variant=1 ns=935375 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=9 variant=1 ns=920458 checksum=8390656000
+MATCHED-SAMPLE jobs=1000 rounds=4096 block=9 variant=0 ns=3474958 checksum=8390656000
+MATCHED-RESULT jobs=1000 rounds=4096 samples-per-variant=20 a-median-ns=3277854 b-median-ns=957541 checksum=8390656000 workload=scheme-checksum-with-forced-gc
+INSTANCE-ENTRY inside-scheme=1 gc-and-global-isolation=OK
+INSTANCE-ENTRY inside-scheme=4 gc-and-global-isolation=OK
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=0 variant=0 ns=31881209 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=0 variant=1 ns=8163500 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=0 variant=1 ns=8730833 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=0 variant=0 ns=44802833 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=1 variant=0 ns=75909250 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=1 variant=1 ns=9971750 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=1 variant=1 ns=9504291 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=1 variant=0 ns=103659625 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=2 variant=0 ns=61239375 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=2 variant=1 ns=11775917 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=2 variant=1 ns=10994000 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=2 variant=0 ns=31763750 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=3 variant=0 ns=31856125 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=3 variant=1 ns=8170417 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=3 variant=1 ns=8039000 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=3 variant=0 ns=31404167 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=4 variant=0 ns=31645625 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=4 variant=1 ns=8130750 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=4 variant=1 ns=8041583 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=4 variant=0 ns=31657875 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=5 variant=0 ns=31430750 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=5 variant=1 ns=8522084 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=5 variant=1 ns=11399209 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=5 variant=0 ns=31977250 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=6 variant=0 ns=31685209 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=6 variant=1 ns=8819542 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=6 variant=1 ns=8516042 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=6 variant=0 ns=31770709 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=7 variant=0 ns=32011625 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=7 variant=1 ns=8338833 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=7 variant=1 ns=8498542 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=7 variant=0 ns=31637250 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=8 variant=0 ns=31208375 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=8 variant=1 ns=8536916 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=8 variant=1 ns=8308208 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=8 variant=0 ns=32040208 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=9 variant=0 ns=31362125 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=9 variant=1 ns=8117084 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=9 variant=1 ns=8302708 checksum=83906560000
+MATCHED-SAMPLE jobs=10000 rounds=4096 block=9 variant=0 ns=31342958 checksum=83906560000
+MATCHED-RESULT jobs=10000 rounds=4096 samples-per-variant=20 a-median-ns=31767229 b-median-ns=8507292 checksum=83906560000 workload=scheme-checksum-with-forced-gc
+INSTANCE-ENTRY inside-scheme=1 gc-and-global-isolation=OK
+INSTANCE-ENTRY inside-scheme=4 gc-and-global-isolation=OK
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=0 variant=0 ns=342583417 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=0 variant=1 ns=79178375 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=0 variant=1 ns=79438500 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=0 variant=0 ns=317113208 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=1 variant=0 ns=350144958 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=1 variant=1 ns=102795208 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=1 variant=1 ns=103584791 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=1 variant=0 ns=314857167 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=2 variant=0 ns=316579416 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=2 variant=1 ns=144134458 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=2 variant=1 ns=86883791 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=2 variant=0 ns=402357792 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=3 variant=0 ns=356265833 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=3 variant=1 ns=83697084 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=3 variant=1 ns=103886500 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=3 variant=0 ns=340177417 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=4 variant=0 ns=320733083 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=4 variant=1 ns=79236958 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=4 variant=1 ns=79221667 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=4 variant=0 ns=332965250 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=5 variant=0 ns=312183792 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=5 variant=1 ns=80063917 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=5 variant=1 ns=81771958 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=5 variant=0 ns=312726750 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=6 variant=0 ns=318347000 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=6 variant=1 ns=80912291 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=6 variant=1 ns=79163417 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=6 variant=0 ns=316718250 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=7 variant=0 ns=314408417 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=7 variant=1 ns=96371792 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=7 variant=1 ns=105612208 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=7 variant=0 ns=319737375 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=8 variant=0 ns=316306625 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=8 variant=1 ns=79319708 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=8 variant=1 ns=79544959 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=8 variant=0 ns=320833792 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=9 variant=0 ns=315116667 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=9 variant=1 ns=105672167 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=9 variant=1 ns=128456000 checksum=839065600000
+MATCHED-SAMPLE jobs=100000 rounds=4096 block=9 variant=0 ns=330166167 checksum=839065600000
+MATCHED-RESULT jobs=100000 rounds=4096 samples-per-variant=20 a-median-ns=319042187 b-median-ns=82734521 checksum=839065600000 workload=scheme-checksum-with-forced-gc
+INSTANCE-DRAIN owners-joined=OK images-retained-until-process-exit=true
+INSTANCE-ENTRY inside-scheme=4 gc-and-global-isolation=OK
+INSTANCE-DRAIN owners-joined=OK images-retained-until-process-exit=true
+MATCHED teardown-a-ns=2021833 teardown-b-ns=1978458 images-retained=true

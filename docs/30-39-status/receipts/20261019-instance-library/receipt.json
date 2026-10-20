@@ -1,0 +1,1405 @@
+{
+  "repository": "https://github.com/tao3k/gerbil-scheme-rust.git",
+  "base_head": "bb71bbb5ad91bbaef2035979319514c7ced4c4ca",
+  "branch": "codex/typed-fold-aot",
+  "tree": "dirty; tested source hashes below",
+  "date": "2026-10-19",
+  "platform": "macOS-26.6.1-arm64-arm-64bit-Mach-O",
+  "sdk": "Gerbil 1cfb032; existing paired native Homebrew SDK",
+  "command": "just bridge-instance-library",
+  "exit_code": 0,
+  "raw_log_sha256": "17aeaab851aa92f47c5373cba788fbef016e80484871c854c328ea4c11bcf720",
+  "activity_log_sha256": "76254410e990b6bd4884a9339f58353b2dfda11451be43bae639a03d235203e1",
+  "activity_observation": "one-second native/compiler snapshots; no extra matching processes observed in final run",
+  "excluded_overlap": "A separate gxi test-runner was observed before the preceding full run; its correctness observations are retained but its timings are excluded",
+  "ordinary_lifecycle_regression": {
+    "passed": 1,
+    "ignored": 1
+  },
+  "native_image": "/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-9ab56e20e43096c5/out/owner_instance.dylib",
+  "image_sha256": "6129b933d52a7bfc50981e29e12018c2d8579bb2b372983ae681554ba7045983",
+  "image_file_bytes": 18809608,
+  "source_sha256": {
+    "Cargo.lock": "88e3e892525b99a9311f33185f302a4de1d930c8a7640fa43f7181684cef696f",
+    "Justfile": "35a7b2bac16bdcfc756fbd95d7fad368d573a50ada8940fc2e23b8b63fe6c38d",
+    "crates/gerbil-scheme/Cargo.toml": "6370884789bf07635dbf2b6f7c424fe3c7232baa9fe74ccb565bdcf1745f2bb5",
+    "crates/gerbil-scheme/src/lib.rs": "ab16d73c1523dfa787b8274caf70aa3d8c7242f4491015a7f8ebb90aa1db24fe",
+    "crates/gerbil-scheme/src/runtime/lifecycle.rs": "91708e73c53a5a6bf441931cd803d046e91f27cabf8cda03b36db7c2eea13ab1",
+    "crates/gerbil-scheme/src/instance_backend.rs": "cd1d0744c080a7c0af94e495601509f8197502b8597a6e74a04fd75e1b7b487b",
+    "crates/gerbil-scheme-qualification/Cargo.toml": "f05ce4be6fb2846310fc8e36a62feca2b6fb9cdb3b3ab9c15a9f51f8ee57b69d",
+    "crates/gerbil-scheme-qualification/build.rs": "5093be6cc029b1f76663fd79ec786ed61e72e0266deb08a57bdbf70a0aac7a72",
+    "crates/gerbil-scheme-qualification/build/instances.rs": "06860f37c412efd2ee751577486672348bf65c849acf2377ec5239e6a18d4bf4",
+    "crates/gerbil-scheme-qualification/src/lib.rs": "c642e9de4782eba5495d7fc7361eb4bf7fe5e51091b95cd7c38fa575cd41c4c7",
+    "crates/gerbil-scheme-qualification/ffi/owner_instance.c": "74b4e05715cd4233a16169a49ad706994bb985009442dc796e63866de96d9cf7",
+    "crates/gerbil-scheme-qualification/scheme/actors.ss": "bd3286a7c1642c67a0040d6036a2ecdf324206bdbf240f8cd3d43db6fe25a4cc",
+    "crates/gerbil-scheme-qualification/scheme/instance-lifecycle.ss": "a894d2531d98c0f72bd6ee869e77930d1ca33cdd74fa9e6cf9d3569124548de7",
+    "crates/gerbil-scheme-qualification/scheme/instance-json.ss": "d91330a18d03966da4efe0fc4b3b98af59c779809ce9282168c61b2417e779c6",
+    "crates/gerbil-scheme-qualification/benches/instance_library.rs": "997c3d1c1542e14a4fab4341e302f290b308a6c0ca1c286673dda30c3b88f5f5",
+    "ffi/runtime.c": "91a430d2f85f25782497e3fa7ed0e9a70610d5bab425228c2f1252a06a40ca9e",
+    "ffi/host_io.h": "18fca48ecc6e80a1ec0b97bcf5d1e758f892fd7d5b19492248c3690c5dced9c4",
+    "ffi/instance.h": "b3ba2287094692a401382313e37c7c15804691cc8e97e5abc940a81d510b0664",
+    "crates/gerbil-scheme/src/instances/dispatch.rs": "b2473dd610ddf6d7fecaf35e4253c8189b8ad924263a138907e7639c57996523",
+    "crates/gerbil-scheme/src/instances/image.rs": "1f18bfd1e2dc6223cef2d84ce4a876284fc57b92f7824aaf1cb780b4d6b64012",
+    "crates/gerbil-scheme/src/instances/mod.rs": "f5996c5c4821b359dbbd5c8dcfea35459c7dd4045b51607aa3fcf063822fdbaf",
+    "crates/gerbil-scheme/src/instances/pool.rs": "ae0a97b1a1b6ef46ccbfec9a384d16673fa3cb30f641dc64e6efa1f3f9385310",
+    "crates/gerbil-scheme/src/instances/types.rs": "55f993b7242bb3ac260300e481a2acdd5c4df246b09dbf23e4c463c8bba82912",
+    "crates/gerbil-scheme-qualification/benches/instance_library/contracts.rs": "487d5ac2579a9eb3048d984354b1925b04e827d43a168b029ee6e0d2ba9221b7",
+    "crates/gerbil-scheme-qualification/benches/instance_library/workload.rs": "8fa333617474c62953bad23408e8f895c5f3eaf8ed672c1af9b053674920fd24"
+  },
+  "samples": [
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 4477708,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 2127167,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 2006333,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 4070625,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 4032708,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 2682709,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 2756125,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 5668500,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 5179208,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 14037541,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 5984542,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 5961042,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 4569542,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3933708,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 2837833,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 4171958,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 7026333,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 4689875,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3657333,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 4086750,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 6310541,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1779500,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 2140334,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 5586083,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 5029625,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1899292,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1929291,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3432542,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3270667,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1827250,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1876042,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3133334,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3839000,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1997500,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1681459,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3270459,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3254666,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1835000,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 1528750,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 64,
+      "requests": 8,
+      "ns": 3132667,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19315791,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 9795375,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 8886875,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 21228625,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 21430875,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 9307083,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 9383625,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 27651083,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 26017250,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 11788125,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 12451625,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 21139334,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19177167,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 11310792,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 10834084,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 20612625,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19683750,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 8664250,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 7900167,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 20053500,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 18958500,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 10992708,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 9064958,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 28000833,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 22673292,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 9908042,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 8790250,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19935458,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19092125,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 8055667,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 7770000,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 20657250,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19660708,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 7895875,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 8186458,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19324417,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19668375,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 7545333,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 6738000,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 1024,
+      "requests": 8,
+      "ns": 19559750,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 149375041,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 56599083,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 59688625,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 132031750,
+      "validated": 8,
+      "block": 0
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 135128458,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 45351625,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 64774916,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 138151375,
+      "validated": 8,
+      "block": 1
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 138908750,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 59725458,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 44602292,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 134728542,
+      "validated": 8,
+      "block": 2
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 164459083,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 51238042,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 57410667,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 133952709,
+      "validated": 8,
+      "block": 3
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 151622875,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 45089583,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 42767084,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 135636125,
+      "validated": 8,
+      "block": 4
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 142529250,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 41531708,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 44103375,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 137453750,
+      "validated": 8,
+      "block": 5
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 172617416,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 56061791,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 50449333,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 134478959,
+      "validated": 8,
+      "block": 6
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 135973334,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 44917250,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 42191208,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 143370791,
+      "validated": 8,
+      "block": 7
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 135173584,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 54271334,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 54472042,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 146927834,
+      "validated": 8,
+      "block": 8
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 149089666,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 60652916,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 1,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 66271209,
+      "validated": 8,
+      "block": 9
+    },
+    {
+      "variant": 0,
+      "rows-per-request": 8192,
+      "requests": 8,
+      "ns": 153459291,
+      "validated": 8,
+      "block": 9
+    }
+  ],
+  "summaries": [
+    {
+      "rows-per-request": 64,
+      "requests": 8,
+      "samples-per-variant": 20,
+      "a-median-ns": 4129354,
+      "b-median-ns": 2066750,
+      "workload": "native-scheme-json-aggregate",
+      "forced-gc-per-request": "true"
+    },
+    {
+      "rows-per-request": 1024,
+      "requests": 8,
+      "samples-per-variant": 20,
+      "a-median-ns": 19994479,
+      "b-median-ns": 8975916,
+      "workload": "native-scheme-json-aggregate",
+      "forced-gc-per-request": "true"
+    },
+    {
+      "rows-per-request": 8192,
+      "requests": 8,
+      "samples-per-variant": 20,
+      "a-median-ns": 138530062,
+      "b-median-ns": 52754688,
+      "workload": "native-scheme-json-aggregate",
+      "forced-gc-per-request": "true"
+    }
+  ],
+  "cold": [
+    {
+      "owners": 1,
+      "setup-ns": 588216959,
+      "first-batch-ns": 21795750,
+      "teardown-ns": 1538708,
+      "total-ns": 611561250,
+      "image-unload": "false"
+    },
+    {
+      "owners": 4,
+      "setup-ns": 2067162333,
+      "first-batch-ns": 10065041,
+      "teardown-ns": 1561750,
+      "total-ns": 2078797875,
+      "image-unload": "false"
+    },
+    {
+      "owners": 4,
+      "setup-ns": 2106420083,
+      "first-batch-ns": 6630375,
+      "teardown-ns": 1570041,
+      "total-ns": 2114631250,
+      "image-unload": "false"
+    },
+    {
+      "owners": 1,
+      "setup-ns": 516611292,
+      "first-batch-ns": 19566584,
+      "teardown-ns": 1531667,
+      "total-ns": 537721584,
+      "image-unload": "false"
+    },
+    {
+      "owners": 1,
+      "setup-ns": 503976084,
+      "first-batch-ns": 19420583,
+      "teardown-ns": 1532417,
+      "total-ns": 524957875,
+      "image-unload": "false"
+    },
+    {
+      "owners": 4,
+      "setup-ns": 2188673833,
+      "first-batch-ns": 6920083,
+      "teardown-ns": 1560375,
+      "total-ns": 2197161459,
+      "image-unload": "false"
+    },
+    {
+      "owners": 4,
+      "setup-ns": 1994851166,
+      "first-batch-ns": 8855084,
+      "teardown-ns": 1557167,
+      "total-ns": 2005271791,
+      "image-unload": "false"
+    },
+    {
+      "owners": 1,
+      "setup-ns": 499428833,
+      "first-batch-ns": 20691792,
+      "teardown-ns": 1549250,
+      "total-ns": 521677709,
+      "image-unload": "false"
+    }
+  ],
+  "cold_process_wall": [
+    {
+      "owners": 1,
+      "wall-ns": 629025875
+    },
+    {
+      "owners": 4,
+      "wall-ns": 2091809417
+    },
+    {
+      "owners": 4,
+      "wall-ns": 2128727333
+    },
+    {
+      "owners": 1,
+      "wall-ns": 547451875
+    },
+    {
+      "owners": 1,
+      "wall-ns": 535673709
+    },
+    {
+      "owners": 4,
+      "wall-ns": 2206994125
+    },
+    {
+      "owners": 4,
+      "wall-ns": 2013455750
+    },
+    {
+      "owners": 1,
+      "wall-ns": 534058834
+    }
+  ],
+  "cleanup": [
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 18,
+      "cleanup-ns": 41292
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 18,
+      "cleanup-ns": 38083
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 1,
+      "cleanup-ns": 102083
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 1,
+      "cleanup-ns": 34375
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 1,
+      "cleanup-ns": 72125
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 1,
+      "cleanup-ns": 57834
+    },
+    {
+      "owner": 3,
+      "roots": 0,
+      "collections": 1,
+      "cleanup-ns": 31750
+    },
+    {
+      "owner": 1,
+      "roots": 0,
+      "collections": 1,
+      "cleanup-ns": 31666
+    },
+    {
+      "owner": 2,
+      "roots": 0,
+      "collections": 1,
+      "cleanup-ns": 30625
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 1012,
+      "cleanup-ns": 87458
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 258,
+      "cleanup-ns": 100666
+    },
+    {
+      "owner": 2,
+      "roots": 0,
+      "collections": 258,
+      "cleanup-ns": 62875
+    },
+    {
+      "owner": 1,
+      "roots": 0,
+      "collections": 258,
+      "cleanup-ns": 69791
+    },
+    {
+      "owner": 3,
+      "roots": 0,
+      "collections": 258,
+      "cleanup-ns": 50292
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 18,
+      "cleanup-ns": 38041
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 47542
+    },
+    {
+      "owner": 1,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 33208
+    },
+    {
+      "owner": 2,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 29875
+    },
+    {
+      "owner": 3,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 36375
+    },
+    {
+      "owner": 1,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 54167
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 43625
+    },
+    {
+      "owner": 2,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 34666
+    },
+    {
+      "owner": 3,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 37833
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 18,
+      "cleanup-ns": 40250
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 18,
+      "cleanup-ns": 46458
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 35834
+    },
+    {
+      "owner": 1,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 32792
+    },
+    {
+      "owner": 2,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 28166
+    },
+    {
+      "owner": 3,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 24459
+    },
+    {
+      "owner": 1,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 35958
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 41166
+    },
+    {
+      "owner": 3,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 29250
+    },
+    {
+      "owner": 2,
+      "roots": 0,
+      "collections": 6,
+      "cleanup-ns": 26959
+    },
+    {
+      "owner": 0,
+      "roots": 0,
+      "collections": 18,
+      "cleanup-ns": 38625
+    }
+  ],
+  "development_attempts": [
+    {
+      "file": "rust-gerbil-library-smoke.log",
+      "sha256": "e72c9fdd34153432203ca910de5b2bd923dcb08ae0b3f8f8a2eb6e3d35a0b900",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-2.log",
+      "sha256": "1e58883cf40da3ae27c9904967b9e254a185f519b5e9d8e8b852e236cb0f6e32",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-3.log",
+      "sha256": "476e1e0de36128f046646712ba44d83483a11648402241c6c945a49e3c50b441",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-4.log",
+      "sha256": "1dd7c5328be18442aa088154d421b922a66668d183d29134ac72b757fdc4317d",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-5.log",
+      "sha256": "4c01696f468ac0ca18836a3610eb1e51f79ca62eb2c48103c7a1f60e3c72ae29",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-6.log",
+      "sha256": "af09b0a93ffd7533337e0a94828db5d5fa6cd5d26372da78dec7e3c8edb6d3e6",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-7.log",
+      "sha256": "0fef631731e182e6f7df047713d5639c0a48826475b9cc64609059343806ee93",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-8.log",
+      "sha256": "90974e4c926b0b0ebda2ab1d61b943096da9f54031c57651504ffe38b36ee39d",
+      "kind": "development attempt; timings are not admitted"
+    },
+    {
+      "file": "rust-gerbil-library-smoke-9.log",
+      "sha256": "d30dc012740f7edf74cfd32ac9b9121dba382959b5c0c35b60afdf8f8040e709",
+      "kind": "development attempt; timings are not admitted"
+    }
+  ],
+  "claims": [
+    "Actual gerbil-scheme public InstancePool and InstanceDispatcher path",
+    "Native Scheme SDK JSON parsing/writing and Scheme aggregation; Rust independent oracle",
+    "20 ABBA samples per variant per load; 960 individually checked measured requests",
+    "4 fresh process samples per owner count, separate setup/first-batch/cleanup/join"
+  ],
+  "limits": [
+    "Darwin private images; no hot unload or process crash containment",
+    "No leak-freedom or partial native setup rollback qualification",
+    "No arbitrary continuation transfer across owners or foreign-frame escape",
+    "Local execution, not remote CI or release qualification"
+  ]
+}

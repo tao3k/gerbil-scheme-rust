@@ -1,0 +1,7 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --file-failure
+    Finished `bench` profile [optimized] target(s) in 0.20s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+RESOURCE-SNAPSHOT phase=file-failure-baseline epoch=0 resident=9273344 footprint=8192336 fds=3 threads=2 images=51 malloc-live=12224 malloc-reserved=12582912 malloc-blocks=203 gc=[] capacity=[] live=[] roots=[]
+FILE-FAILURE cleanup=ShutdownReceipt { owners: [OwnerShutdown { owner: 0, roots_before_cleanup: 0, gc_collections: 1, status: 0, cleanup_time: 38.5µs, image_file_removed: false, image_file_error: Some("Permission denied (os error 13)"), native_io_released_bytes: 2048 }], joined: 1, pending: 0, panicked: 0 }
+RESOURCE-SNAPSHOT phase=file-failure-drained epoch=0 resident=24199168 footprint=17252736 fds=3 threads=2 images=52 malloc-live=18240 malloc-reserved=20971520 malloc-blocks=226 gc=[] capacity=[] live=[] roots=[]
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[28250] io-retired-bytes=[2048] files-removed=[true]

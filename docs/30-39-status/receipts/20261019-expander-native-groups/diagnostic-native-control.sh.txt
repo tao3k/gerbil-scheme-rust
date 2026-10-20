@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+export PATH=/opt/homebrew/bin:/usr/bin:/bin
+unset SDKROOT
+prefix=/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current
+export GAMBOPT="~~bin=$prefix/bin,~~lib=$prefix/lib,~~include=$prefix/include"
+work=/private/tmp/gerbil-expander-20261019/coalesce
+while IFS= read -r source; do
+  name=$(basename "$source" .scm)
+  "$prefix/bin/gsc" -c -o "$work/c/$name.o1.c" "$source"
+  "$prefix/bin/gsc" -obj -cc-options '-D___DYNAMIC -O0' -o "$work/obj/$name.o1.o" "$work/c/$name.o1.c"
+  printf '%s\n' "$name"
+done < "$work/selected-native-phases.txt"
+/usr/bin/cc -bundle -o "$work/bootstrap.o1" "$work"/obj/*.o

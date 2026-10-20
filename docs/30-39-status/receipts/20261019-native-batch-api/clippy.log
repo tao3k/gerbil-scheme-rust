@@ -1,0 +1,14 @@
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+   Compiling gerbil-scheme-sys v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-sys)
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+error: manual implementation of `.is_multiple_of()`
+  --> crates/gerbil-scheme-qualification/benches/instance_resources/orders.rs:16:66
+   |
+16 |     let mut input = vec![bounded_integer(id), i64::from(mixed && id % 7 == 0)];
+   |                                                                  ^^^^^^^^^^^ help: replace with: `id.is_multiple_of(7)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_is_multiple_of
+   = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: could not compile `gerbil-scheme-qualification` (bench "instance_resources") due to 1 previous error

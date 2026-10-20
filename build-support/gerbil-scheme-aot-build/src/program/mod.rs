@@ -13,3 +13,8 @@ pub use archive::{
 };
 
 pub use process::run_native_process;
+
+pub(crate) use archive::{
+    cached_native_output, compile_native_object, native_build_parallelism,
+    native_input_fingerprint, publish_native_output_fingerprint,
+};

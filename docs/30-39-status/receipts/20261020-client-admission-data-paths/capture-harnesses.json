@@ -1,0 +1,74 @@
+{
+  "input16-mixed": {
+    "path": "pre-pipeline/harness-first.py",
+    "sha256": "a9c9dadcf17804f4a6f464c0b5bdf7e102d559e19224a822ae9a4a0b68b727e9"
+  },
+  "input128-mixed": {
+    "path": "pre-pipeline/source/bench_owner_projection.py",
+    "sha256": "9be59c1062313e660951f457b299693ada33dd018c6c272aee5e135ecd7ad7e3"
+  },
+  "prepared-windows": {
+    "path": "pre-pipeline/source/bench_owner_projection.py",
+    "sha256": "9be59c1062313e660951f457b299693ada33dd018c6c272aee5e135ecd7ad7e3"
+  },
+  "input16-cpu": {
+    "path": "pre-pipeline/source/bench_owner_projection.py",
+    "sha256": "9be59c1062313e660951f457b299693ada33dd018c6c272aee5e135ecd7ad7e3"
+  },
+  "input16-trace": {
+    "path": "pre-pipeline/source/bench_owner_projection.py",
+    "sha256": "9be59c1062313e660951f457b299693ada33dd018c6c272aee5e135ecd7ad7e3"
+  },
+  "windows-trace": {
+    "path": "pre-pipeline/source/bench_owner_projection.py",
+    "sha256": "9be59c1062313e660951f457b299693ada33dd018c6c272aee5e135ecd7ad7e3"
+  },
+  "final-input16-mixed": {
+    "path": "pre-owner-quota/source/bench_owner_projection.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "pipeline16-mixed": {
+    "path": "pre-owner-quota/source/bench_owner_projection.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "pipeline16-cpu": {
+    "path": "pre-owner-quota/source/bench_owner_projection.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "pipeline16-trace": {
+    "path": "pre-owner-quota/source/bench_owner_projection.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "q-input16-mixed": {
+    "path": "quota16-harness.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "q-pipeline16-mixed": {
+    "path": "quota16-harness.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "q-pipeline16-cpu": {
+    "path": "quota16-harness.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "q-pipeline16-trace": {
+    "path": "quota16-harness.py",
+    "sha256": "ecea585ee873f4b81b6ca3a8387c48274f98ba7ae55ea23483da65e6a727ca2a"
+  },
+  "q-window4-mixed": {
+    "path": "qualified-source/bench_owner_projection.py",
+    "sha256": "ef301835559d736088e1a8452692d154644e706c6046e2e6fcc6bbfd983a6720"
+  },
+  "q-policy4-mixed": {
+    "path": "qualified-source/bench_owner_projection.py",
+    "sha256": "ef301835559d736088e1a8452692d154644e706c6046e2e6fcc6bbfd983a6720"
+  },
+  "q-policy4-cpu": {
+    "path": "qualified-source/bench_owner_projection.py",
+    "sha256": "ef301835559d736088e1a8452692d154644e706c6046e2e6fcc6bbfd983a6720"
+  },
+  "q-policy4-trace": {
+    "path": "qualified-source/bench_owner_projection.py",
+    "sha256": "ef301835559d736088e1a8452692d154644e706c6046e2e6fcc6bbfd983a6720"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "original": "q-scalar-calibration.stderr",
+  "original_exit": 1,
+  "reason": "extra closing parenthesis in newly added diagnostic output expression; failed before VM startup",
+  "corrected": "q-scalar-corrected.jsonl",
+  "corrected_exit": 0
+}

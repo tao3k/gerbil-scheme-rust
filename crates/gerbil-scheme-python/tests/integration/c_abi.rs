@@ -238,11 +238,17 @@ unsafe fn check_parallel_owners(library: &libloading::Library) {
 }
 #[test]
 fn abi_request_size_counts_complete_nested_views_and_utf8_spans() {
-    use gerbil_scheme_python::{OwnedValue, c_abi::{View, request_size}};
+    use gerbil_scheme_python::{
+        OwnedValue,
+        c_abi::{View, request_size},
+    };
     let width = std::mem::size_of::<View>();
     assert_eq!(request_size(&OwnedValue::Null).unwrap(), width);
-    let values = OwnedValue::List(vec![OwnedValue::Text("\u{6c49}\u{5b57}".into()),
-        OwnedValue::Bytes(vec![0, 255]), OwnedValue::Integer(256.into())]);
+    let values = OwnedValue::List(vec![
+        OwnedValue::Text("\u{6c49}\u{5b57}".into()),
+        OwnedValue::Bytes(vec![0, 255]),
+        OwnedValue::Integer(256.into()),
+    ]);
     assert_eq!(request_size(&values).unwrap(), width * 4 + 6 + 2 + 2);
     let map = OwnedValue::Map(std::collections::BTreeMap::from([("key".into(), values)]));
     // Map views contain adjacent key/value spans, without a pair wrapper.

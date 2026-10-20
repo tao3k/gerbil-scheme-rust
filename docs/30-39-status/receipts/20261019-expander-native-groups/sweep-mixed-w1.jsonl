@@ -1,0 +1,1 @@
+{"kind": "configuration", "owners": 4, "workers": 1, "requests": 128, "items": 32, "quantum": 1, "mixed": true, "initialization_ns": 2809240916, "compiler_activity": ["/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi", "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"]}

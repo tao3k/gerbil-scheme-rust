@@ -1,0 +1,12 @@
+{
+  "native_routing_tests": 15,
+  "existing_native_tests": 10,
+  "full_expander": "PASS on four owners",
+  "original_deadline_direct": "PASS",
+  "original_deadline_pipeline": "PASS",
+  "strict_clippy": "PASS",
+  "final_policy_runs": "PASS",
+  "native_payload_reuse": "PASS including post-GC execution and cleanup",
+  "scalar_original": "FAIL retained",
+  "scalar_corrected": "PASS"
+}

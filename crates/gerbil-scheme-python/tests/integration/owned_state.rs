@@ -40,7 +40,11 @@ fn concurrent_replacements_publish_only_complete_values() {
 #[test]
 fn poisoned_state_is_not_reclassified_as_closed_or_success() {
     struct Poison;
-    impl Drop for Poison { fn drop(&mut self) { panic!("controlled destructor failure"); } }
+    impl Drop for Poison {
+        fn drop(&mut self) {
+            panic!("controlled destructor failure");
+        }
+    }
     let state = OwnedState::new(Poison);
     let worker = state.clone();
     assert!(std::thread::spawn(move || worker.close()).join().is_err());

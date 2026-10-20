@@ -1,0 +1,12 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --allocator
+    Finished `bench` profile [optimized] target(s) in 0.08s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+RESOURCE-SNAPSHOT phase=allocator-before epoch=0 resident=9207808 footprint=8143184 fds=3 threads=2 images=51 malloc-live=12224 malloc-reserved=8388608 malloc-blocks=203 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=allocator-before malloc-virtual=12664832 malloc-resident=376832 malloc-dirtied=376832 malloc-reusable=0 image-text-virtual=0 image-text-resident=0 image-data-virtual=0 image-data-resident=0 image-data-modified=0 owner-images=0 image-virtual=0 image-resident=0
+RESOURCE-SNAPSHOT phase=allocator-live epoch=0 resident=144211968 footprint=143163872 fds=3 threads=6 images=51 malloc-live=134245824 malloc-reserved=155189248 malloc-blocks=756 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=allocator-live malloc-virtual=159989760 malloc-resident=135200768 malloc-dirtied=135200768 malloc-reusable=0 image-text-virtual=0 image-text-resident=0 image-data-virtual=0 image-data-resident=0 image-data-modified=0 owner-images=0 image-virtual=0 image-resident=0
+RESOURCE-SNAPSHOT phase=allocator-free epoch=0 resident=144228352 footprint=143131104 fds=3 threads=2 images=51 malloc-live=13568 malloc-reserved=155189248 malloc-blocks=214 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=allocator-free malloc-virtual=159989760 malloc-resident=135217152 malloc-dirtied=135217152 malloc-reusable=0 image-text-virtual=0 image-text-resident=0 image-data-virtual=0 image-data-resident=0 image-data-modified=0 owner-images=0 image-virtual=0 image-resident=0
+RESOURCE-SNAPSHOT phase=allocator-relief epoch=0 resident=144228352 footprint=143131104 fds=3 threads=2 images=51 malloc-live=13568 malloc-reserved=155189248 malloc-blocks=214 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=allocator-relief malloc-virtual=159989760 malloc-resident=135217152 malloc-dirtied=135217152 malloc-reusable=0 image-text-virtual=0 image-text-resident=0 image-data-virtual=0 image-data-resident=0 image-data-modified=0 owner-images=0 image-virtual=0 image-resident=0
+ALLOCATOR-CONTROL released-by-pressure=0 native-setups=0 touched-bytes=134217728

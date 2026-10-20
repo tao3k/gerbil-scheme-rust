@@ -1,0 +1,17 @@
+{
+  "processes": 22,
+  "macro_processes": 4,
+  "dispatch_topologies_and_loads": 18,
+  "dispatch_mode_cells": 72,
+  "all_exits_zero": true,
+  "measured_dispatch_rounds": 1152,
+  "measured_native_requests": 147456,
+  "measured_actor_work_items": 4718592,
+  "scheme_gc_and_cleanup_checks": "passed in all processes; not a long-duration leak-freedom proof",
+  "performance_scope": "user-authorized current local conditions; no quiet-host admission; no optimal topology or statistical non-regression claim",
+  "runtime_source_changes": false,
+  "rebuilds": false,
+  "automation_created": false,
+  "logical_cpus": 12,
+  "max_observed_measured_os_threads": 13
+}

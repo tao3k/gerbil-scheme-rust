@@ -19,6 +19,8 @@ pub use objects::{
     RootedSchemeObject, SchemeObjectRef, TableEquality,
 };
 pub use scalar_batch::ScalarBatch;
+#[cfg(all(feature = "isolated-instances", target_os = "macos"))]
+pub(crate) use scalar_batch::decode_scalar_projection;
 mod types;
 use types::RootedSchemeOwner;
 mod utf8;
@@ -38,3 +40,6 @@ pub use value::{
     NativeError, NativeResult, SchemeBorrowedBytevector, SchemeBorrowedVector, SchemeKeyword,
     SchemeList, SchemePair, SchemeScalar, SchemeSymbol,
 };
+
+#[cfg(all(feature = "isolated-instances", target_os = "macos"))]
+pub(crate) use objects::decode_kind;

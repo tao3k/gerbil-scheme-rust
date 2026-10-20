@@ -1,0 +1,148 @@
+#+TITLE: Dynamic module optimization A/B and quiet-host admission
+#+STARTUP: overview
+
+* Target and execution boundary
+
+The acceptance comparison is =-O0= versus =-O2=. =-O1= is a diagnostic
+intermediate, not an accepted substitute for the project's optimized build.
+The dynamic module builder now defaults to =-O2=; =-O0= must be explicitly
+selected for the control. No automatic downgrade or enlarged timeout is used.
+
+These are two different compiler stages:
+
+- The installed =gerbil/gxc-main.ss= describes =gxc -O= as "optimize gerbil
+  source". Gerbil continues to produce Scheme/Gambit compiler input.
+- =gsc -obj -cc-options "-D___DYNAMIC -O2"= selects C optimization for
+  Gambit's generated native module objects. The existing compiler-owned ABI
+  options and the existing GCC =-fno-gcse-lm= policy remain in effect.
+- Native program startup/linker objects already request =-O2=. The installed
+  SDK's configured C default (=FLAGS_OPT=" -O1"= on this machine) does not
+  change this project's explicit =-O2= target.
+
+The default Python library has four distinct Scheme VM images on four fixed
+OS owner threads, with one active Scheme processor per VM. Tokio and Rayon
+only distribute requests to those owners. Scheme owns its continuations,
+Actor scheduling, green threads and GC. This is not four VMs sharing one
+execution thread, nor four Scheme processors sharing one VM.
+
+The previous 713ms figure was one owner's first expander/module load plus DSL
+execution. It was not four calls per 713ms or a steady-state throughput result.
+Cold open, first DSL calls, warm expansion and response projection remain
+separate measurements. Cold initialization is still a real cost.
+
+* Reproduction
+
+The existing native build entry point accepts
+=GERBIL_DYNAMIC_MODULE_OPT_LEVEL=0|1|2|3|s|g= (default =2=). Values outside
+that set fail closed. C object names and fingerprints distinguish optimization
+levels. =GERBIL_BUILD_CORES= uses the existing native build worker budget,
+independently of runtime Scheme owner count.
+
+Build each wheel with the same maturin/native pipeline and unchanged 120s cap.
+Install the variants into separate Python environments; do not replace a live
+VM's module mappings. The Scheme source, native type protocol and workload
+stay identical. No handwritten compiler or Rust macro evaluator is used.
+
+#+begin_src sh
+just -- bridge-python-macro-ab /path/to/O0/bin/python --label O0 --require-quiet
+just -- bridge-python-macro-ab /path/to/O2/bin/python --label O2 --require-quiet
+just -- bridge-python-owner-ab /path/to/O2/bin/python --owners 4 --workers 2 --require-quiet
+#+end_src
+
+The macro script checks a hygienic =ledger-sum= use with a caller-side
+=foldl= binding. Each owner first evaluates the real DSL. Then each timed
+native request parses one expression, creates an expansion context, imports
+the original plugin, checks one evaluation result, and performs 32 iterations
+of either =core-expand= or =eval-syntax=. Thus the reported batch latency
+includes the same context/import/correctness setup; it is not a timer solely
+around the internal expansion loop. Python result projection/release is
+reported separately. There are two warmup rounds and eight measured rounds,
+with reversed operation order on alternating rounds, on all four owners.
+
+The four-process diagnostic order was O0 / O1 / O1 / O0. It cannot establish
+that O2 preserves performance. Native per-call deadlines remain five seconds.
+The 32 samples per operation/process support only a small diagnostic tail
+sample: their empirical p99 is effectively the observed maximum, not a
+well-qualified production p99.
+
+* Diagnostic O1 results retained
+
+| Process | Expand batches: median / p99 ms | Expand + eval: median / p99 ms | Contaminated measured batches |
+|---------+--------------------------------+-------------------------------+-------------------------------|
+| O0 first | 11.86 / 43.55 | 9.64 / 28.32 | 64/64 |
+| O1 first | 8.61 / 76.29 | 10.85 / 69.36 | 64/64 |
+| O1 second | 6.26 / 30.28 | 11.42 / 35.64 | 64/64 |
+| O0 last | 9.48 / 44.30 | 15.87 / 41.65 | 64/64 |
+
+All values and all negative samples are retained. These observations do not
+prove improvement or non-regression. In particular, the first O1 process has
+worse tails for both workloads and lower expand-plus-evaluate throughput.
+Other Gerbil, Lean, devenv, Java and GUI work was active. The first cold DSL
+calls across these processes ranged from approximately 446ms to 1135ms.
+
+The O1 wheel passed the full installed capability probe (hygienic macros,
+runtime macro definition, interpreted closures across GC, Scheme errors and
+recovery, and four-owner destruction). The installed regression suite passed
+10 tests in 7.233s. Shutdown roots were =[0,0,0,0]= and private files were
+removed. These are correctness results for O1, not O2 acceptance.
+
+* Quiet-host dispatch admission
+
+The dispatch script now observes active Gerbil executables, gxtest, Lean and
+other high-CPU processes, rather than treating only compiler executable names
+as host contention. =--require-quiet= records the blocking observation and
+returns status 75 before opening the pool when the host is already busy.
+Per-round observations remain outside the timed native calls. An initially
+quiet host can still become contaminated; all round observations must be
+reviewed before admitting a result.
+
+The four-owner/two-dispatch-worker quiet-host attempt returned 75. No new
+quiet-host direct/Tokio/Rayon comparison or optimum is claimed. The thread,
+throughput, native-ready p99 and finite fairness matrix remains defined in
+[[file:30.11-expander-startup-and-dispatch-benchmarks.org][30.11]]. Do not stop unrelated native acceptance work to manufacture a quiet
+host. Runtime owner count and dispatcher pool size are separate tuning axes.
+
+* Build and artifact outcomes
+
+The raw build, macro, capability, admission and identity receipts accompany
+this report. A successful cache-assisted wheel does not replace a failed
+first optimization build. The build cap remains 120s throughout. O2 results
+are recorded below when the corresponding operation completes.
+
+** Completed build outcomes
+
+| Variant | Native build workers | Outcome | Wall time |
+|---------+----------------------+---------+-----------|
+| O0 control, existing native caches | 4 | PASS | 61.84s |
+| O1 diagnostic, first optimized-object attempt | 4 | TIMEOUT (124) | 120.01s |
+| O1 diagnostic, cache-assisted artifact completion | 8 | PASS | 42.98s |
+| O1 diagnostic, optional fresh-object control | 8 | INTERRUPTED (143) to prioritize O2 | 36.33s |
+| O2 target, first optimized-object attempt | 8 | TIMEOUT (124) | 120.04s |
+| O2 target, cache-assisted artifact completion | 4 | TIMEOUT (124) | 120.02s |
+
+No O2 wheel completed. Consequently the O0/O2 macro comparison and O2 runtime
+capability acceptance remain NOT RUN. The O1 wheel's passing GC, continuation
+and exception checks cannot fill that gap. The default in source is O2; a
+build failure remains a failure, without a lower-optimization fallback.
+
+A one-second sample of this task's GCC compiler for =contract~10.o1.c= found
+all 801 recorded samples under =pass_reload::execute=, including LRA live-range,
+constraint and spill work. This locates one expensive compiler phase; it does
+not establish that host contention or this pass alone explains every timeout.
+No additional optimization pass was disabled on the basis of this sample.
+The existing =-fno-gcse-lm= policy is unchanged. The native helper passed strict
+Clippy (94s) and rustfmt checks. No remote CI, release, O2 performance or quiet
+host acceptance is claimed.
+
+Durable raw results and source/wheel identities are in
+[[file:receipts/20261019-dynamic-module-optimization/outcomes.json][outcomes.json]] and
+[[file:receipts/20261019-dynamic-module-optimization/identity.json][identity.json]].
+The experimental wheels remain outside the repository, under
+=/private/tmp/gerbil-module-opt-20261019/=. O0 SHA256:
+=6d99da0fce11d5042beadaec49118e369add32a8af0b5d9057e09d87d8460812=.
+
+* Follow-up: progress-supervised O2 completion
+
+The user subsequently authorized longer builds conditional on genuine compiler
+progress. [[file:30.13-progress-supervised-o2-qualification.org][30.13]] records that separate attempt and its runtime qualification.
+The original 120-second outcomes in this report remain unchanged.

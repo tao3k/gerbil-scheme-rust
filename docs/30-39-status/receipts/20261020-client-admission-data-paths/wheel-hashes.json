@@ -1,0 +1,5 @@
+{
+  "wheels/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl": "22f38c6e45c335ef9e6f433da70e07e497981d0f9a4ff6d4d4959ec50e2ce52a",
+  "wheels-qualified/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl": "803abb4d17f44d46fdde1794c00819d2a695bacd372f729a37eb31b10ded852e",
+  "wheels-pipeline/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl": "8f4ab532886e53170a97d5595e4c848859540f5f42bb2c4b6c9b8029aa612fb7"
+}

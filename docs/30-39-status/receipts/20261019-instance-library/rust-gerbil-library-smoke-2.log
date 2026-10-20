@@ -1,0 +1,187 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_library --locked -- --test
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.46
+   Compiling unicode-ident v1.0.24
+   Compiling stable_deref_trait v1.2.1
+   Compiling serde_core v1.0.228
+   Compiling libc v0.2.186
+   Compiling typenum v1.20.1
+   Compiling litemap v0.8.2
+   Compiling writeable v0.6.3
+   Compiling icu_normalizer_data v2.1.1
+   Compiling icu_properties_data v2.1.2
+   Compiling memchr v2.8.3
+   Compiling cfg-if v1.0.4
+   Compiling winnow v1.0.4
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling serde v1.0.228
+   Compiling zmij v1.0.23
+   Compiling smallvec v1.15.2
+   Compiling serde_json v1.0.150
+   Compiling toml_parser v1.1.2+spec-1.1.0
+   Compiling percent-encoding v2.3.2
+   Compiling hybrid-array v0.4.13
+   Compiling itoa v1.0.18
+   Compiling winnow v0.7.15
+   Compiling utf8_iter v1.0.4
+   Compiling form_urlencoded v1.2.2
+   Compiling aho-corasick v1.1.4
+   Compiling const-oid v0.10.2
+   Compiling regex-syntax v0.8.11
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling bitflags v2.13.1
+   Compiling version_check v0.9.5
+   Compiling syn v2.0.119
+   Compiling anstyle v1.0.14
+   Compiling digest v0.11.3
+   Compiling clap_lex v1.1.0
+   Compiling generic-array v0.14.7
+   Compiling utf8parse v0.2.2
+   Compiling anstyle-parse v1.0.0
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.4.3
+   Compiling anstyle-query v1.1.5
+   Compiling colorchoice v1.0.5
+   Compiling anstream v1.0.0
+   Compiling strsim v0.11.1
+   Compiling clap_builder v4.6.2
+   Compiling cpufeatures v0.3.0
+   Compiling errno v0.3.14
+   Compiling sha2 v0.11.0
+   Compiling fastrand v2.4.1
+   Compiling hashbrown v0.17.1
+   Compiling cbindgen v0.29.4
+   Compiling equivalent v1.0.2
+   Compiling once_cell v1.21.4
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling log v0.4.33
+   Compiling find-msvc-tools v0.1.9
+   Compiling shlex v2.0.1
+   Compiling indexmap v2.14.0
+   Compiling heck v0.5.0
+   Compiling regex-automata v0.4.16
+   Compiling cc v1.3.0
+   Compiling sha2 v0.10.9
+   Compiling pkg-config v0.3.34
+   Compiling tempfile v3.27.0
+   Compiling serde_spanned v1.1.1
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling semver v1.0.28
+   Compiling toml v1.1.3+spec-1.1.0
+   Compiling condtype v1.3.0
+   Compiling simdutf8 v0.1.5
+   Compiling pin-project-lite v0.2.17
+   Compiling regex-lite v0.1.9
+   Compiling tokio v1.53.1
+   Compiling clap v4.6.2
+   Compiling synstructure v0.13.2
+   Compiling regex v1.13.1
+   Compiling terminal_size v0.4.4
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling zerovec-derive v0.11.3
+   Compiling displaydoc v0.2.6
+   Compiling serde_derive v1.0.228
+   Compiling divan-macros v0.1.21
+   Compiling divan v0.1.21
+   Compiling zerofrom v0.1.8
+   Compiling cargo_toml v1.0.0
+   Compiling yoke v0.8.3
+   Compiling zerovec v0.11.6
+   Compiling zerotrie v0.2.4
+   Compiling tinystr v0.8.3
+   Compiling potential_utf v0.1.5
+   Compiling icu_collections v2.1.1
+   Compiling icu_locale_core v2.1.1
+   Compiling icu_provider v2.1.1
+   Compiling icu_normalizer v2.1.1
+   Compiling icu_properties v2.1.2
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling cargo-lock v11.0.1
+   Compiling gerbil-scheme-rust-project-harness v0.1.2 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build-support/gerbil-scheme-rust-project-harness)
+   Compiling gerbil-scheme-rust-project-harness-policy v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build-support/gerbil-scheme-rust-project-harness-policy)
+   Compiling gerbil-scheme-aot-build v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build-support/gerbil-scheme-aot-build)
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+error: failed to run custom build command for `gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)`
+
+Caused by:
+  process didn't exit successfully: `/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-93b8d73e0ea44024/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/Cargo.toml
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/ffi.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/objects/main.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/tokio_transport.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/types.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/build.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/tests
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/tests/unit/targets
+
+  --- stderr
+
+  thread 'main' (30071119) panicked at build-support/gerbil-scheme-rust-project-harness/src/build_gate/downstream.rs:188:9:
+  [RUST-MOD-R001] Warning: mod.rs contains implementation
+  @ /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs:28:1
+  fix: move implementation out of mod.rs into an owned leaf module
+  line: 28 | static LIFECYCLE: Mutex<()> = Mutex::new(());
+  Help: /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs contains implementation item `static` inside mod.rs.
+  Contract: Keep mod.rs as an interface file with module declarations and re-exports only.
+
+  [RUST-MOD-R001] Warning: mod.rs contains implementation
+  @ /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs:29:1
+  fix: move implementation out of mod.rs into an owned leaf module
+  line: 29 | static GENERATION: AtomicUsize = AtomicUsize::new(0);
+  Help: /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs contains implementation item `static` inside mod.rs.
+  Contract: Keep mod.rs as an interface file with module declarations and re-exports only.
+
+  [RUST-MOD-R001] Warning: mod.rs contains implementation
+  @ /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs:31:1
+  fix: move implementation out of mod.rs into an owned leaf module
+  line: 31 | #[derive(Debug)]
+  Help: /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs contains implementation item `struct` inside mod.rs.
+  Contract: Keep mod.rs as an interface file with module declarations and re-exports only.
+
+  [RUST-MOD-R001] Warning: mod.rs contains implementation
+  @ /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs:38:1
+  fix: move implementation out of mod.rs into an owned leaf module
+  line: 38 | /// Explicit image backend. No fallback to the process-global runtime.
+  Help: /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs contains implementation item `struct` inside mod.rs.
+  Contract: Keep mod.rs as an interface file with module declarations and re-exports only.
+
+  [RUST-MOD-R001] Warning: mod.rs contains implementation
+  @ /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs:53:1
+  fix: move implementation out of mod.rs into an owned leaf module
+  line: 53 | impl InstancePool {
+  Help: /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs contains implementation item `impl` inside mod.rs.
+  Contract: Keep mod.rs as an interface file with module declarations and re-exports only.
+
+  [RUST-MOD-R001] Warning: mod.rs contains implementation
+  @ /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs:241:1
+  fix: move implementation out of mod.rs into an owned leaf module
+  line: 241 | impl Drop for InstancePool {
+  Help: /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/mod.rs contains implementation item `impl` inside mod.rs.
+  Contract: Keep mod.rs as an interface file with module declarations and re-exports only.
+
+  [rust-harness-agent-guidance]
+  gate: gerbil-scheme-rust
+  trigger: cargo test runs the member build.rs before tests; keep rust-lang-project-harness under [build-dependencies].
+  repair:
+  - keep build.rs thin and call assert_rust_project_harness_downstream_policy_from_env.
+  - in a workspace, put common policy in the root harness/ module tree.
+  - construct RustProjectHarnessWorkspacePolicy once, then derive members with member_crate or member_crate_with_config.
+  - add crate-local owners, receipts, waivers, or report obligations in the member override only.
+  - rerun cargo test after updating policy or evidence.
+
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+warning: build failed, waiting for other jobs to finish...
+error: recipe `bridge-instance-library` failed on line 165 with exit code 101

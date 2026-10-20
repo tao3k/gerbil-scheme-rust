@@ -1,0 +1,54 @@
+#+title: Native Typed Resource Qualification Receipts
+
+These receipts belong to the local 2026-10-19 working tree, based on
+=bb71bbb5ad91bbaef2035979319514c7ced4c4ca=. They do not identify a published
+commit, release or remote CI result. See the parent status document for bounds.
+
+* Successful runs
+
+- =final2-preflight.log=: 136 rejected missing-symbol preflights, followed by valid setup.
+- =final2-before.log=: compiled failure before owner 1 enters native setup.
+- =final2-after.log=: compiled failure after owner 1 completes production setup.
+- =final3-churn.log=: eight replacement pools; retained image/file cost observed.
+- =final3-reuse.log=: initial full 65,536-task native type reuse qualification;
+  its exception routing concentrated failures on owner 0.
+- =final4-reuse.log=: final full reuse qualification distributes both kinds of
+  injected failure across all four owners and asserts per-owner counts.
+- =final-ab.log=: native same-load ABBA with 20 samples per variant/size.
+- =final-smoke.log=: native smoke after the initial helper/cast refactoring.
+- =core-clippy.log= and =qualification-clippy-final-pass.log=: strict Rust gates.
+- =runtime-lifecycle.log=: ordinary runtime regression (one pass, one existing ignore).
+- =root-doctest.log=: the compiler rejects exporting a native root as a job result.
+- =smoke-2.log= and =smoke-3.log=: preliminary native smoke and allocator observation.
+
+* Preserved failed attempts
+
+- =smoke-1.log=: the source policy rejected a dependency cycle; symbol resolution
+  was moved to the shared preflight module.
+- =--preflight.log=: an immediate post-join Mach snapshot transiently counted
+  three threads before returning to two; the old warm snapshot comparison failed.
+- =final-preflight.log=: a scoped copy-cleanup edit also touched a directory error
+  handler and caused an undefined-variable compile failure; that edit was fixed.
+- =final2-churn.log=: immediate post-join kernel thread retirement sampling failed
+  at the fifth pool. The final observer requires actual thread retirement under
+  the unchanged five-second bound and retains any transient observations.
+- =qualification-clippy.log=: strict source gates rejected unchecked numeric
+  casts and an oversized qualification function; checks were split and conversions
+  made explicit, with no lint suppressions.
+- =qualification-clippy-final.log= and =qualification-clippy-coverage.log=:
+  subsequent strict helper/midpoint/multiple checks; the final pass is separate.
+
+* Identity and timing
+
+The successful preflight/init logs precede later observer/helper factoring. The
+initial successful full reuse/churn logs precede the final qualification helper factoring
+and checked-cast cleanup. These source changes do not alter the native C/Scheme
+workload. The final4 reuse log follows the final owner-coverage changes. The
+native A/B precedes the final reuse-only owner routing change; its A/B module
+and native workload are unchanged. The final source manifest is a final
+working-tree identity; it must not
+be read as claiming that every historical log was generated from identical Rust
+source bytes. The native image hashes, final verification logs and A/B receipt
+identify the final run artifacts separately. Compiler overlap is recorded for
+resource qualification; resource metrics are process-local. Timed A/B must run
+after this task's compiler work finishes.

@@ -7,7 +7,10 @@
 *.scm
 *.c
 !ffi/runtime.c
+!ffi/instance.c
+!crates/gerbil-scheme-python/tests/fixtures/owned_exports.c
 !crates/gerbil-scheme-qualification/ffi/instance_probe.c
+!crates/gerbil-scheme-qualification/ffi/owner_instance.c
 !scheme/runtime.ssi
 !scheme/generated/
 !scheme/generated/runtime.scm
@@ -21,3 +24,8 @@
 **/.devenv/
 **/.direnv/
 **/target/
+/examples/python-ledger/python/gerbil_ledger/_runtime/
+/examples/python-ledger/python/gerbil_ledger/_sources/
+/examples/python-ledger/python/gerbil_ledger/__pycache__/
+/examples/python-ledger/python/gerbil_ledger/_resources/
+/examples/python-ledger/python/gerbil_ledger/.gerbil-*

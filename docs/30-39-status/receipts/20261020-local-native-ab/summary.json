@@ -1,0 +1,3645 @@
+{
+  "macro": {
+    "macro-O0-first": {
+      "summary": {
+        "macro-expand": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 11420250.5,
+          "p99_ns": 55748125,
+          "response_p99_ns": 76576417,
+          "expansions_per_second": 2143.911508565983,
+          "projected_expansions_per_second": 1631.278829589436
+        },
+        "macro-eval": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 13248562.5,
+          "p99_ns": 59297666,
+          "response_p99_ns": 98748250,
+          "expansions_per_second": 1885.7431377289859,
+          "projected_expansions_per_second": 1462.2900360991653
+        }
+      },
+      "quiet_snapshots": false,
+      "roots": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "macro-O0-last": {
+      "summary": {
+        "macro-expand": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 13399125.0,
+          "p99_ns": 51602542,
+          "response_p99_ns": 84234625,
+          "expansions_per_second": 2025.4958553984604,
+          "projected_expansions_per_second": 1483.1314460376996
+        },
+        "macro-eval": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 13235333.5,
+          "p99_ns": 71198166,
+          "response_p99_ns": 106673000,
+          "expansions_per_second": 1809.0335782176544,
+          "projected_expansions_per_second": 1336.185353116398
+        }
+      },
+      "quiet_snapshots": false,
+      "roots": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "macro-O2-first": {
+      "summary": {
+        "macro-expand": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 10252145.5,
+          "p99_ns": 39738917,
+          "response_p99_ns": 70542167,
+          "expansions_per_second": 2617.9455106225405,
+          "projected_expansions_per_second": 1984.2621784146002
+        },
+        "macro-eval": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 11330375.5,
+          "p99_ns": 40433583,
+          "response_p99_ns": 57385458,
+          "expansions_per_second": 2382.060553442177,
+          "projected_expansions_per_second": 1882.2014421250076
+        }
+      },
+      "quiet_snapshots": false,
+      "roots": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "macro-O2-second": {
+      "summary": {
+        "macro-expand": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 11518291.5,
+          "p99_ns": 49975500,
+          "response_p99_ns": 70382583,
+          "expansions_per_second": 2195.416733592998,
+          "projected_expansions_per_second": 1621.2469419559811
+        },
+        "macro-eval": {
+          "samples": 512,
+          "iterations": 32,
+          "median_ns": 13462562.5,
+          "p99_ns": 58889875,
+          "response_p99_ns": 93734459,
+          "expansions_per_second": 1924.4254070875083,
+          "projected_expansions_per_second": 1437.168342078848
+        }
+      },
+      "quiet_snapshots": false,
+      "roots": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "dispatch": {
+    "dispatch-o1-w1-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 1,
+        "workers": 1,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 956735625,
+        "host_activity": [
+          {
+            "pid": 4259,
+            "cpu": 89.1,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 19638,
+            "cpu": 31.1,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 20027,
+            "cpu": 32.8,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 88211,
+            "cpu": 29.5,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 93325,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 95850,
+            "cpu": 11.2,
+            "command": "/Users/guangtao/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc"
+          },
+          {
+            "pid": 96053,
+            "cpu": 12.4,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 96707,
+            "cpu": 11.7,
+            "command": "/Users/guangtao/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc"
+          },
+          {
+            "pid": 96988,
+            "cpu": 2.7,
+            "command": "/Users/guangtao/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc"
+          },
+          {
+            "pid": 97332,
+            "cpu": 31.3,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2927.875631531656,
+          "projected_actors_per_second_median": 2166.815581734894,
+          "pooled_native_ready_p99_ns": 1786317458,
+          "projection_release_ns_median": 403154854.5,
+          "pooled_batch_projected_response_p99_ns": 2843060584,
+          "assigned_owner_max_pending_gap_ns": [
+            218148500
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "tokio": {
+          "actors_per_second_median": 2357.099879948977,
+          "projected_actors_per_second_median": 1977.9507632329269,
+          "pooled_native_ready_p99_ns": 1993950333,
+          "projection_release_ns_median": 352961687.5,
+          "pooled_batch_projected_response_p99_ns": 3051973709,
+          "assigned_owner_max_pending_gap_ns": [
+            298362084
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "rayon": {
+          "actors_per_second_median": 2653.5619160271917,
+          "projected_actors_per_second_median": 2119.5743853492113,
+          "pooled_native_ready_p99_ns": 2083069750,
+          "projection_release_ns_median": 387192999.5,
+          "pooled_batch_projected_response_p99_ns": 2876911292,
+          "assigned_owner_max_pending_gap_ns": [
+            230797458
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2194.195077498299,
+          "projected_actors_per_second_median": 1868.7203661917413,
+          "pooled_native_ready_p99_ns": 2413546000,
+          "projection_release_ns_median": 339374312.0,
+          "pooled_batch_projected_response_p99_ns": 3947809583,
+          "assigned_owner_max_pending_gap_ns": [
+            315631833
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        4
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          4
+        ],
+        "tokio": [
+          4
+        ],
+        "rayon": [
+          4
+        ],
+        "rayon-blocking": [
+          4
+        ]
+      }
+    },
+    "dispatch-o1-w1-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 1,
+        "workers": 1,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 1199542084,
+        "host_activity": [
+          {
+            "pid": 357,
+            "cpu": 10.5,
+            "command": "/Users/guangtao/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc"
+          },
+          {
+            "pid": 388,
+            "cpu": 28.7,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 434,
+            "cpu": 25.1,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 485,
+            "cpu": 13.7,
+            "command": "/Users/guangtao/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc"
+          },
+          {
+            "pid": 488,
+            "cpu": 24.2,
+            "command": "/opt/homebrew/opt/node/bin/node"
+          },
+          {
+            "pid": 4259,
+            "cpu": 94.9,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 33600,
+            "cpu": 45.6,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 77711,
+            "cpu": 20.2,
+            "command": "/Applications/NeteaseMusic.app/Contents/Frameworks/NeteaseMusic Helper (GPU).app/Contents/MacOS/NeteaseMusic Helper (GPU)"
+          },
+          {
+            "pid": 77715,
+            "cpu": 21.0,
+            "command": "/Applications/NeteaseMusic.app/Contents/Frameworks/NeteaseMusic Helper (Renderer).app/Contents/MacOS/NeteaseMusic Helper (Renderer)"
+          },
+          {
+            "pid": 79093,
+            "cpu": 45.0,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 93325,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 98302,
+            "cpu": 12.4,
+            "command": "/Users/guangtao/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc"
+          },
+          {
+            "pid": 99599,
+            "cpu": 12.7,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 1463.5572042524325,
+          "projected_actors_per_second_median": 1203.1520383258144,
+          "pooled_native_ready_p99_ns": 3013526292,
+          "projection_release_ns_median": 439426125.5,
+          "pooled_batch_projected_response_p99_ns": 4968303375,
+          "assigned_owner_max_pending_gap_ns": [
+            259403500
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            17,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 1542.6008774413485,
+          "projected_actors_per_second_median": 1407.891037871087,
+          "pooled_native_ready_p99_ns": 3207317583,
+          "projection_release_ns_median": 385684646.5,
+          "pooled_batch_projected_response_p99_ns": 4187638000,
+          "assigned_owner_max_pending_gap_ns": [
+            360427750
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 1608.82386015847,
+          "projected_actors_per_second_median": 1417.5168463723994,
+          "pooled_native_ready_p99_ns": 2624204750,
+          "projection_release_ns_median": 388690562.0,
+          "pooled_batch_projected_response_p99_ns": 4731990750,
+          "assigned_owner_max_pending_gap_ns": [
+            260986000
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 1406.413805596932,
+          "projected_actors_per_second_median": 1274.7571812573535,
+          "pooled_native_ready_p99_ns": 2734116583,
+          "projection_release_ns_median": 359302562.5,
+          "pooled_batch_projected_response_p99_ns": 4049476542,
+          "assigned_owner_max_pending_gap_ns": [
+            205482125
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        4
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          4
+        ],
+        "tokio": [
+          4
+        ],
+        "rayon": [
+          4
+        ],
+        "rayon-blocking": [
+          4
+        ]
+      }
+    },
+    "dispatch-o1-w2-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 1,
+        "workers": 2,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 1260655583,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 51.9,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 2684,
+            "cpu": 16.4,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+          },
+          {
+            "pid": 4185,
+            "cpu": 27.3,
+            "command": "/Users/guangtao/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc"
+          },
+          {
+            "pid": 4259,
+            "cpu": 72.3,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 5140,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 5258,
+            "cpu": 12.6,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 5460,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 5462,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 5535,
+            "cpu": 11.8,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 5539,
+            "cpu": 11.8,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 5782,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 6075,
+            "cpu": 13.3,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 17216,
+            "cpu": 20.5,
+            "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"
+          },
+          {
+            "pid": 20027,
+            "cpu": 23.4,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 33600,
+            "cpu": 28.9,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 90189,
+            "cpu": 33.1,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 93325,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2668.2825411001645,
+          "projected_actors_per_second_median": 2346.155079010717,
+          "pooled_native_ready_p99_ns": 2243897750,
+          "projection_release_ns_median": 199584979.0,
+          "pooled_batch_projected_response_p99_ns": 3457911542,
+          "assigned_owner_max_pending_gap_ns": [
+            209063834
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "tokio": {
+          "actors_per_second_median": 2870.0609315463767,
+          "projected_actors_per_second_median": 2194.4802814104105,
+          "pooled_native_ready_p99_ns": 1835111625,
+          "projection_release_ns_median": 461531687.5,
+          "pooled_batch_projected_response_p99_ns": 3093863958,
+          "assigned_owner_max_pending_gap_ns": [
+            241136125
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "rayon": {
+          "actors_per_second_median": 2786.0171004944177,
+          "projected_actors_per_second_median": 2388.1546549577806,
+          "pooled_native_ready_p99_ns": 1602089917,
+          "projection_release_ns_median": 404038375.5,
+          "pooled_batch_projected_response_p99_ns": 2819840125,
+          "assigned_owner_max_pending_gap_ns": [
+            224706292
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            3,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2649.2985047208003,
+          "projected_actors_per_second_median": 2130.1759222135493,
+          "pooled_native_ready_p99_ns": 1930699125,
+          "projection_release_ns_median": 343093104.0,
+          "pooled_batch_projected_response_p99_ns": 2629203125,
+          "assigned_owner_max_pending_gap_ns": [
+            223960833
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        6
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          6
+        ],
+        "tokio": [
+          6
+        ],
+        "rayon": [
+          6
+        ],
+        "rayon-blocking": [
+          6
+        ]
+      }
+    },
+    "dispatch-o1-w2-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 1,
+        "workers": 2,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 1287774084,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 47.1,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 4259,
+            "cpu": 85.8,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 11153,
+            "cpu": 52.3,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 12790,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 12824,
+            "cpu": 88.9,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 13162,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 14892,
+            "cpu": 24.4,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 18945,
+            "cpu": 21.3,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 20027,
+            "cpu": 26.0,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 22534,
+            "cpu": 27.1,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 33600,
+            "cpu": 26.9,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 42863,
+            "cpu": 21.8,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 51928,
+            "cpu": 29.2,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 84517,
+            "cpu": 20.1,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 88211,
+            "cpu": 79.2,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 90189,
+            "cpu": 26.0,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 93325,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 97332,
+            "cpu": 81.9,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 1760.7484377105006,
+          "projected_actors_per_second_median": 1506.376726683719,
+          "pooled_native_ready_p99_ns": 2761291167,
+          "projection_release_ns_median": 468066208.5,
+          "pooled_batch_projected_response_p99_ns": 4460695167,
+          "assigned_owner_max_pending_gap_ns": [
+            311528959
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 2083.4287342572866,
+          "projected_actors_per_second_median": 1558.1475775444273,
+          "pooled_native_ready_p99_ns": 2496899625,
+          "projection_release_ns_median": 527831979.5,
+          "pooled_batch_projected_response_p99_ns": 3926065000,
+          "assigned_owner_max_pending_gap_ns": [
+            262841042
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 1837.7753978633796,
+          "projected_actors_per_second_median": 1568.296557628464,
+          "pooled_native_ready_p99_ns": 2254267291,
+          "projection_release_ns_median": 445470104.0,
+          "pooled_batch_projected_response_p99_ns": 3485532709,
+          "assigned_owner_max_pending_gap_ns": [
+            226658958
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2116.8392307176,
+          "projected_actors_per_second_median": 1780.83244380818,
+          "pooled_native_ready_p99_ns": 2941373291,
+          "projection_release_ns_median": 157832417.0,
+          "pooled_batch_projected_response_p99_ns": 4124597584,
+          "assigned_owner_max_pending_gap_ns": [
+            435692167
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            15,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        6
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          6
+        ],
+        "tokio": [
+          6
+        ],
+        "rayon": [
+          6
+        ],
+        "rayon-blocking": [
+          6
+        ]
+      }
+    },
+    "dispatch-o1-w4-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 1,
+        "workers": 4,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 1246612708,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 35.2,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 4259,
+            "cpu": 87.5,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 15997,
+            "cpu": 57.4,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+          },
+          {
+            "pid": 17876,
+            "cpu": 65.7,
+            "command": "/opt/homebrew/opt/node/bin/node"
+          },
+          {
+            "pid": 28181,
+            "cpu": 25.4,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 88211,
+            "cpu": 61.3,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 97332,
+            "cpu": 64.1,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2567.748141009305,
+          "projected_actors_per_second_median": 1984.5219589971202,
+          "pooled_native_ready_p99_ns": 1691122792,
+          "projection_release_ns_median": 491188124.5,
+          "pooled_batch_projected_response_p99_ns": 2754094166,
+          "assigned_owner_max_pending_gap_ns": [
+            244944250
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "tokio": {
+          "actors_per_second_median": 2261.240230634441,
+          "projected_actors_per_second_median": 1727.8686117009588,
+          "pooled_native_ready_p99_ns": 2361321625,
+          "projection_release_ns_median": 586883542.0,
+          "pooled_batch_projected_response_p99_ns": 4647376792,
+          "assigned_owner_max_pending_gap_ns": [
+            407726583
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "rayon": {
+          "actors_per_second_median": 2466.3531598082745,
+          "projected_actors_per_second_median": 2020.1285609273677,
+          "pooled_native_ready_p99_ns": 1653483958,
+          "projection_release_ns_median": 592566416.5,
+          "pooled_batch_projected_response_p99_ns": 3355792250,
+          "assigned_owner_max_pending_gap_ns": [
+            323495917
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2376.3354066727325,
+          "projected_actors_per_second_median": 1707.388717542056,
+          "pooled_native_ready_p99_ns": 2201009125,
+          "projection_release_ns_median": 611080771.0,
+          "pooled_batch_projected_response_p99_ns": 3549335334,
+          "assigned_owner_max_pending_gap_ns": [
+            283336709
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        10
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          10
+        ],
+        "tokio": [
+          10
+        ],
+        "rayon": [
+          10
+        ],
+        "rayon-blocking": [
+          10
+        ]
+      }
+    },
+    "dispatch-o1-w4-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 1,
+        "workers": 4,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 1581281583,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 42.3,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 800,
+            "cpu": 22.3,
+            "command": "/usr/libexec/spotlightknowledged.updater"
+          },
+          {
+            "pid": 4259,
+            "cpu": 72.7,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 17216,
+            "cpu": 60.2,
+            "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"
+          },
+          {
+            "pid": 19173,
+            "cpu": 11.2,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+          },
+          {
+            "pid": 20027,
+            "cpu": 22.3,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 21753,
+            "cpu": 15.1,
+            "command": "lean"
+          },
+          {
+            "pid": 21864,
+            "cpu": 16.4,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 22211,
+            "cpu": 6.4,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+          },
+          {
+            "pid": 88211,
+            "cpu": 20.4,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 1527.3491177450028,
+          "projected_actors_per_second_median": 1263.9918990129468,
+          "pooled_native_ready_p99_ns": 3352723542,
+          "projection_release_ns_median": 543244750.0,
+          "pooled_batch_projected_response_p99_ns": 4649835667,
+          "assigned_owner_max_pending_gap_ns": [
+            285162584
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 1584.0519906321274,
+          "projected_actors_per_second_median": 1410.7554728147431,
+          "pooled_native_ready_p99_ns": 2851477083,
+          "projection_release_ns_median": 459772333.0,
+          "pooled_batch_projected_response_p99_ns": 4606236666,
+          "assigned_owner_max_pending_gap_ns": [
+            354376084
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 1495.9598620040979,
+          "projected_actors_per_second_median": 1187.3472245598934,
+          "pooled_native_ready_p99_ns": 3336044166,
+          "projection_release_ns_median": 643093229.5,
+          "pooled_batch_projected_response_p99_ns": 4936139125,
+          "assigned_owner_max_pending_gap_ns": [
+            316508917
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 1561.8636128295948,
+          "projected_actors_per_second_median": 1336.0704315205621,
+          "pooled_native_ready_p99_ns": 3315578500,
+          "projection_release_ns_median": 523600896.0,
+          "pooled_batch_projected_response_p99_ns": 4717036625,
+          "assigned_owner_max_pending_gap_ns": [
+            297404875
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            0
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            17,
+            13
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        10
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          10
+        ],
+        "tokio": [
+          10
+        ],
+        "rayon": [
+          10
+        ],
+        "rayon-blocking": [
+          10
+        ]
+      }
+    },
+    "dispatch-o2-w1-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 2,
+        "workers": 1,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 2495422792,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 43.9,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 899,
+            "cpu": 58.5,
+            "command": "/usr/libexec/sysmond"
+          },
+          {
+            "pid": 4259,
+            "cpu": 77.5,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 28596,
+            "cpu": 67.6,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 28722,
+            "cpu": 72.4,
+            "command": "lean"
+          },
+          {
+            "pid": 28838,
+            "cpu": 30.0,
+            "command": "/opt/homebrew/opt/node/bin/node"
+          },
+          {
+            "pid": 28839,
+            "cpu": 28.7,
+            "command": "/opt/homebrew/opt/node/bin/node"
+          },
+          {
+            "pid": 28864,
+            "cpu": 74.9,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 28867,
+            "cpu": 74.2,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 28869,
+            "cpu": 39.6,
+            "command": "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python"
+          },
+          {
+            "pid": 88211,
+            "cpu": 62.1,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 97332,
+            "cpu": 61.8,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2310.097534684561,
+          "projected_actors_per_second_median": 1880.698459933175,
+          "pooled_native_ready_p99_ns": 1699142583,
+          "projection_release_ns_median": 590990042.0,
+          "pooled_batch_projected_response_p99_ns": 2981395917,
+          "assigned_owner_max_pending_gap_ns": [
+            339744667,
+            301428292
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            10,
+            9
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "tokio": {
+          "actors_per_second_median": 2162.296796718153,
+          "projected_actors_per_second_median": 1736.3936071093958,
+          "pooled_native_ready_p99_ns": 1752854167,
+          "projection_release_ns_median": 573818062.5,
+          "pooled_batch_projected_response_p99_ns": 4077737833,
+          "assigned_owner_max_pending_gap_ns": [
+            295651750,
+            284216958
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            12,
+            16
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon": {
+          "actors_per_second_median": 3020.198433034354,
+          "projected_actors_per_second_median": 2048.341359740882,
+          "pooled_native_ready_p99_ns": 1412368833,
+          "projection_release_ns_median": 564185896.0,
+          "pooled_batch_projected_response_p99_ns": 3333885792,
+          "assigned_owner_max_pending_gap_ns": [
+            264014042,
+            155226500
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            17,
+            10
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 1696.535214525853,
+          "projected_actors_per_second_median": 1308.876618411934,
+          "pooled_native_ready_p99_ns": 2637357542,
+          "projection_release_ns_median": 475577270.5,
+          "pooled_batch_projected_response_p99_ns": 3459607208,
+          "assigned_owner_max_pending_gap_ns": [
+            414291291,
+            405644708
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            1,
+            1
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            5,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 0
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        5
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          5
+        ],
+        "tokio": [
+          5
+        ],
+        "rayon": [
+          5
+        ],
+        "rayon-blocking": [
+          5
+        ]
+      }
+    },
+    "dispatch-o2-w1-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 2,
+        "workers": 1,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 2926425083,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 49.8,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 760,
+            "cpu": 21.4,
+            "command": "/System/Library/CoreServices/NotificationCenter.app/Contents/MacOS/NotificationCenter"
+          },
+          {
+            "pid": 800,
+            "cpu": 21.3,
+            "command": "/usr/libexec/spotlightknowledged.updater"
+          },
+          {
+            "pid": 899,
+            "cpu": 42.2,
+            "command": "/usr/libexec/sysmond"
+          },
+          {
+            "pid": 4259,
+            "cpu": 52.7,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 17216,
+            "cpu": 79.4,
+            "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"
+          },
+          {
+            "pid": 20027,
+            "cpu": 23.7,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 32233,
+            "cpu": 10.6,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+          },
+          {
+            "pid": 33363,
+            "cpu": 10.7,
+            "command": "lean"
+          },
+          {
+            "pid": 33426,
+            "cpu": 31.8,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 33430,
+            "cpu": 10.9,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 79295,
+            "cpu": 23.2,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2131.1289228452824,
+          "projected_actors_per_second_median": 1688.9543438763158,
+          "pooled_native_ready_p99_ns": 2217606667,
+          "projection_release_ns_median": 426974625.0,
+          "pooled_batch_projected_response_p99_ns": 4067818500,
+          "assigned_owner_max_pending_gap_ns": [
+            255110042,
+            232141750
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            12,
+            12
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 2126.388450815488,
+          "projected_actors_per_second_median": 1651.1705421430238,
+          "pooled_native_ready_p99_ns": 1742403958,
+          "projection_release_ns_median": 558401041.5,
+          "pooled_batch_projected_response_p99_ns": 3634147625,
+          "assigned_owner_max_pending_gap_ns": [
+            233381083,
+            290268333
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            11,
+            7
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 2084.9546701491427,
+          "projected_actors_per_second_median": 1701.860293191093,
+          "pooled_native_ready_p99_ns": 2054818708,
+          "projection_release_ns_median": 449195604.0,
+          "pooled_batch_projected_response_p99_ns": 3709802875,
+          "assigned_owner_max_pending_gap_ns": [
+            201852291,
+            204250250
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            6,
+            8
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 1547.0348924005768,
+          "projected_actors_per_second_median": 1346.603726332932,
+          "pooled_native_ready_p99_ns": 3307806791,
+          "projection_release_ns_median": 374151041.5,
+          "pooled_batch_projected_response_p99_ns": 4598112834,
+          "assigned_owner_max_pending_gap_ns": [
+            305673875,
+            316639208
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            1,
+            1
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        5
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          5
+        ],
+        "tokio": [
+          5
+        ],
+        "rayon": [
+          5
+        ],
+        "rayon-blocking": [
+          5
+        ]
+      }
+    },
+    "dispatch-o2-w2-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 2,
+        "workers": 2,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 2579100208,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 44.6,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 4259,
+            "cpu": 53.4,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 29152,
+            "cpu": 23.6,
+            "command": "/Library/Input Methods/QianwenIME.app/Contents/MacOS/QianwenIME"
+          },
+          {
+            "pid": 37221,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 37304,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 38084,
+            "cpu": 44.1,
+            "command": "/etc/profiles/per-user/guangtao/bin/git"
+          },
+          {
+            "pid": 38406,
+            "cpu": 20.8,
+            "command": "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python"
+          },
+          {
+            "pid": 38486,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 38678,
+            "cpu": 19.0,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 38680,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 38765,
+            "cpu": 21.2,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 38811,
+            "cpu": 101.4,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 38879,
+            "cpu": 17.2,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 38885,
+            "cpu": 18.6,
+            "command": "/Users/guangtao/.elan/toolchains/leanprover--lean4---v4.34.0/bin/lean"
+          },
+          {
+            "pid": 39055,
+            "cpu": 72.4,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 88211,
+            "cpu": 58.6,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 97332,
+            "cpu": 51.8,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2671.993514332471,
+          "projected_actors_per_second_median": 2072.3348017250305,
+          "pooled_native_ready_p99_ns": 1301225500,
+          "projection_release_ns_median": 515284208.0,
+          "pooled_batch_projected_response_p99_ns": 3409669542,
+          "assigned_owner_max_pending_gap_ns": [
+            273125583,
+            302191834
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            18,
+            25
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 0
+        },
+        "tokio": {
+          "actors_per_second_median": 2524.8217803987654,
+          "projected_actors_per_second_median": 1791.1509065003079,
+          "pooled_native_ready_p99_ns": 1312085250,
+          "projection_release_ns_median": 597262250.0,
+          "pooled_batch_projected_response_p99_ns": 2592319875,
+          "assigned_owner_max_pending_gap_ns": [
+            268070459,
+            285219625
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            15,
+            20
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "rayon": {
+          "actors_per_second_median": 2642.6164641259447,
+          "projected_actors_per_second_median": 1911.7851525800988,
+          "pooled_native_ready_p99_ns": 1705274750,
+          "projection_release_ns_median": 551989666.5,
+          "pooled_batch_projected_response_p99_ns": 2910774542,
+          "assigned_owner_max_pending_gap_ns": [
+            331882083,
+            319250000
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            28,
+            20
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2356.5697954629004,
+          "projected_actors_per_second_median": 1764.0284472464841,
+          "pooled_native_ready_p99_ns": 1967713333,
+          "projection_release_ns_median": 619034188.0,
+          "pooled_batch_projected_response_p99_ns": 3923570542,
+          "assigned_owner_max_pending_gap_ns": [
+            275045875,
+            323100250
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            2,
+            2
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        7
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          7
+        ],
+        "tokio": [
+          7
+        ],
+        "rayon": [
+          7
+        ],
+        "rayon-blocking": [
+          7
+        ]
+      }
+    },
+    "dispatch-o2-w2-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 2,
+        "workers": 2,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 2192859500,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 36.3,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 4259,
+            "cpu": 50.5,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 19638,
+            "cpu": 36.1,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 40028,
+            "cpu": 13.3,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+          },
+          {
+            "pid": 42859,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 43573,
+            "cpu": 13.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 44033,
+            "cpu": 14.4,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 44207,
+            "cpu": 13.5,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 44543,
+            "cpu": 96.3,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 44547,
+            "cpu": 65.9,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 90189,
+            "cpu": 34.6,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 1266.872318466827,
+          "projected_actors_per_second_median": 1075.3934823005088,
+          "pooled_native_ready_p99_ns": 2684911334,
+          "projection_release_ns_median": 562022042.0,
+          "pooled_batch_projected_response_p99_ns": 5278950500,
+          "assigned_owner_max_pending_gap_ns": [
+            281056750,
+            281470000
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            11,
+            14
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 1249.080546792317,
+          "projected_actors_per_second_median": 1089.4187583997764,
+          "pooled_native_ready_p99_ns": 2882568166,
+          "projection_release_ns_median": 583679125.0,
+          "pooled_batch_projected_response_p99_ns": 7644942875,
+          "assigned_owner_max_pending_gap_ns": [
+            414690792,
+            290281375
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            11,
+            10
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 1132.576032673811,
+          "projected_actors_per_second_median": 993.176615306835,
+          "pooled_native_ready_p99_ns": 2969746667,
+          "projection_release_ns_median": 494347833.0,
+          "pooled_batch_projected_response_p99_ns": 5746022750,
+          "assigned_owner_max_pending_gap_ns": [
+            350252333,
+            455348708
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            11,
+            14
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            17,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 1048.9157815486624,
+          "projected_actors_per_second_median": 928.8664101243328,
+          "pooled_native_ready_p99_ns": 3093113875,
+          "projection_release_ns_median": 451085354.0,
+          "pooled_batch_projected_response_p99_ns": 6040230042,
+          "assigned_owner_max_pending_gap_ns": [
+            354242875,
+            369652542
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            2,
+            2
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        7
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          7
+        ],
+        "tokio": [
+          7
+        ],
+        "rayon": [
+          7
+        ],
+        "rayon-blocking": [
+          7
+        ]
+      }
+    },
+    "dispatch-o2-w4-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 2,
+        "workers": 4,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 3057384625,
+        "host_activity": [
+          {
+            "pid": 4259,
+            "cpu": 95.6,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 43204,
+            "cpu": 32.9,
+            "command": "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python"
+          },
+          {
+            "pid": 47863,
+            "cpu": 0.3,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 54975,
+            "cpu": 27.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 57114,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 57185,
+            "cpu": 21.0,
+            "command": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+          },
+          {
+            "pid": 58584,
+            "cpu": 25.7,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 59215,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 59266,
+            "cpu": 34.6,
+            "command": "(lean)"
+          },
+          {
+            "pid": 59272,
+            "cpu": 22.6,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 59325,
+            "cpu": 36.0,
+            "command": "lean"
+          },
+          {
+            "pid": 59334,
+            "cpu": 19.6,
+            "command": "lean"
+          },
+          {
+            "pid": 59336,
+            "cpu": 22.5,
+            "command": "lean"
+          },
+          {
+            "pid": 59339,
+            "cpu": 36.9,
+            "command": "lean"
+          },
+          {
+            "pid": 59549,
+            "cpu": 27.8,
+            "command": "/opt/homebrew/opt/node/bin/node"
+          },
+          {
+            "pid": 59588,
+            "cpu": 5.2,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 59628,
+            "cpu": 4.8,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 77715,
+            "cpu": 28.4,
+            "command": "/Applications/NeteaseMusic.app/Contents/Frameworks/NeteaseMusic Helper (Renderer).app/Contents/MacOS/NeteaseMusic Helper (Renderer)"
+          },
+          {
+            "pid": 88211,
+            "cpu": 82.5,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 97332,
+            "cpu": 83.2,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2814.9672921461442,
+          "projected_actors_per_second_median": 2213.1787090918992,
+          "pooled_native_ready_p99_ns": 1076732292,
+          "projection_release_ns_median": 449822499.5,
+          "pooled_batch_projected_response_p99_ns": 2737396125,
+          "assigned_owner_max_pending_gap_ns": [
+            214252166,
+            256799375
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            18,
+            16
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 1
+        },
+        "tokio": {
+          "actors_per_second_median": 2476.19657160034,
+          "projected_actors_per_second_median": 1941.5718595097696,
+          "pooled_native_ready_p99_ns": 1362262458,
+          "projection_release_ns_median": 536314229.0,
+          "pooled_batch_projected_response_p99_ns": 2956775416,
+          "assigned_owner_max_pending_gap_ns": [
+            283702125,
+            283724916
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            18,
+            16
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon": {
+          "actors_per_second_median": 2579.0922211844218,
+          "projected_actors_per_second_median": 2144.959733951504,
+          "pooled_native_ready_p99_ns": 1415510125,
+          "projection_release_ns_median": 399764271.0,
+          "pooled_batch_projected_response_p99_ns": 3524877583,
+          "assigned_owner_max_pending_gap_ns": [
+            244587625,
+            291225375
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            17,
+            15
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2448.714051838338,
+          "projected_actors_per_second_median": 2045.9025161718205,
+          "pooled_native_ready_p99_ns": 1488658625,
+          "projection_release_ns_median": 422489645.5,
+          "pooled_batch_projected_response_p99_ns": 3529164417,
+          "assigned_owner_max_pending_gap_ns": [
+            289589291,
+            298411625
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            5,
+            4
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            3
+          ],
+          "rank_displacement_p99": 0
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        11
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          11
+        ],
+        "tokio": [
+          11
+        ],
+        "rayon": [
+          11
+        ],
+        "rayon-blocking": [
+          11
+        ]
+      }
+    },
+    "dispatch-o2-w4-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 2,
+        "workers": 4,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 2617527250,
+        "host_activity": [
+          {
+            "pid": 434,
+            "cpu": 38.4,
+            "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+          },
+          {
+            "pid": 4259,
+            "cpu": 91.6,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 16967,
+            "cpu": 23.3,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 47863,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 65682,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 73363,
+            "cpu": 22.2,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 76351,
+            "cpu": 15.6,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 76605,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 76656,
+            "cpu": 19.8,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 76992,
+            "cpu": 35.4,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 77014,
+            "cpu": 1.5,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 77069,
+            "cpu": 21.0,
+            "command": "(cc1)"
+          },
+          {
+            "pid": 77711,
+            "cpu": 31.6,
+            "command": "/Applications/NeteaseMusic.app/Contents/Frameworks/NeteaseMusic Helper (GPU).app/Contents/MacOS/NeteaseMusic Helper (GPU)"
+          },
+          {
+            "pid": 77715,
+            "cpu": 51.1,
+            "command": "/Applications/NeteaseMusic.app/Contents/Frameworks/NeteaseMusic Helper (Renderer).app/Contents/MacOS/NeteaseMusic Helper (Renderer)"
+          },
+          {
+            "pid": 88211,
+            "cpu": 66.9,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 97332,
+            "cpu": 70.9,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2521.6655706910997,
+          "projected_actors_per_second_median": 2240.1138298786514,
+          "pooled_native_ready_p99_ns": 1800163500,
+          "projection_release_ns_median": 274226812.5,
+          "pooled_batch_projected_response_p99_ns": 3398824084,
+          "assigned_owner_max_pending_gap_ns": [
+            255944042,
+            256341958
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            14,
+            15
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 2273.941640551171,
+          "projected_actors_per_second_median": 1842.2337849269236,
+          "pooled_native_ready_p99_ns": 1512048625,
+          "projection_release_ns_median": 406529979.0,
+          "pooled_batch_projected_response_p99_ns": 2983627292,
+          "assigned_owner_max_pending_gap_ns": [
+            207207333,
+            234945083
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            11,
+            11
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 2496.764835604179,
+          "projected_actors_per_second_median": 1977.2450111453525,
+          "pooled_native_ready_p99_ns": 1390599209,
+          "projection_release_ns_median": 441849937.5,
+          "pooled_batch_projected_response_p99_ns": 2993618333,
+          "assigned_owner_max_pending_gap_ns": [
+            185496667,
+            198767542
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            8,
+            10
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2710.4420507387285,
+          "projected_actors_per_second_median": 2122.5389021862757,
+          "pooled_native_ready_p99_ns": 1204605833,
+          "projection_release_ns_median": 351774833.5,
+          "pooled_batch_projected_response_p99_ns": 2566872709,
+          "assigned_owner_max_pending_gap_ns": [
+            183720834,
+            195643125
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            4,
+            5
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        11
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          11
+        ],
+        "tokio": [
+          11
+        ],
+        "rayon": [
+          11
+        ],
+        "rayon-blocking": [
+          11
+        ]
+      }
+    },
+    "dispatch-o4-w1-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 4,
+        "workers": 1,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 4110104000,
+        "host_activity": [
+          {
+            "pid": 899,
+            "cpu": 23.7,
+            "command": "/usr/libexec/sysmond"
+          },
+          {
+            "pid": 4259,
+            "cpu": 83.5,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 47863,
+            "cpu": 0.7,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 79093,
+            "cpu": 48.4,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 79295,
+            "cpu": 20.2,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 82766,
+            "cpu": 20.4,
+            "command": "/run/current-system/sw/bin/python3"
+          },
+          {
+            "pid": 82771,
+            "cpu": 22.9,
+            "command": "/Users/guangtao/.elan/toolchains/leanprover--lean4---v4.34.1/bin/lean"
+          },
+          {
+            "pid": 90189,
+            "cpu": 48.4,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 4199.854198775767,
+          "projected_actors_per_second_median": 2873.02980666624,
+          "pooled_native_ready_p99_ns": 703356416,
+          "projection_release_ns_median": 313413167.0,
+          "pooled_batch_projected_response_p99_ns": 1749660125,
+          "assigned_owner_max_pending_gap_ns": [
+            309389292,
+            206895416,
+            237564875,
+            271244875
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            34,
+            31,
+            54,
+            33
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            3,
+            3,
+            3,
+            6
+          ],
+          "rank_displacement_p99": 0
+        },
+        "tokio": {
+          "actors_per_second_median": 3719.68523642829,
+          "projected_actors_per_second_median": 3016.481998254203,
+          "pooled_native_ready_p99_ns": 702007500,
+          "projection_release_ns_median": 290350854.5,
+          "pooled_batch_projected_response_p99_ns": 1885046042,
+          "assigned_owner_max_pending_gap_ns": [
+            206328625,
+            265838958,
+            254156334,
+            281903583
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            31,
+            28,
+            35,
+            28
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon": {
+          "actors_per_second_median": 4503.928298220502,
+          "projected_actors_per_second_median": 3256.0719800065376,
+          "pooled_native_ready_p99_ns": 645176875,
+          "projection_release_ns_median": 319341562.5,
+          "pooled_batch_projected_response_p99_ns": 1709346250,
+          "assigned_owner_max_pending_gap_ns": [
+            148408875,
+            182731791,
+            175080333,
+            180108125
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            29,
+            43,
+            46,
+            29
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2693.979998334188,
+          "projected_actors_per_second_median": 2169.1324795235314,
+          "pooled_native_ready_p99_ns": 1186034291,
+          "projection_release_ns_median": 311393437.5,
+          "pooled_batch_projected_response_p99_ns": 2314844125,
+          "assigned_owner_max_pending_gap_ns": [
+            147141083,
+            152991167,
+            156829375,
+            163674417
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "rank_displacement_p99": 0
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        7
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          7
+        ],
+        "tokio": [
+          7
+        ],
+        "rayon": [
+          7
+        ],
+        "rayon-blocking": [
+          7
+        ]
+      }
+    },
+    "dispatch-o4-w1-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 4,
+        "workers": 1,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 4662505042,
+        "host_activity": [
+          {
+            "pid": 4259,
+            "cpu": 91.0,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 19638,
+            "cpu": 25.8,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 20180,
+            "cpu": 38.0,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 20314,
+            "cpu": 39.0,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 47863,
+            "cpu": 0.7,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 48689,
+            "cpu": 26.8,
+            "command": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent"
+          },
+          {
+            "pid": 79295,
+            "cpu": 24.9,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 82950,
+            "cpu": 12.7,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 85628,
+            "cpu": 45.7,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 85633,
+            "cpu": 49.4,
+            "command": "/usr/bin/java"
+          },
+          {
+            "pid": 85638,
+            "cpu": 8.9,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2435.5962849689645,
+          "projected_actors_per_second_median": 2073.9648788232807,
+          "pooled_native_ready_p99_ns": 1026360541,
+          "projection_release_ns_median": 246327104.5,
+          "pooled_batch_projected_response_p99_ns": 2187884167,
+          "assigned_owner_max_pending_gap_ns": [
+            227289167,
+            278130625,
+            275941959,
+            262695125
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            18,
+            19,
+            21,
+            33
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 2795.944507890708,
+          "projected_actors_per_second_median": 2314.6031892219894,
+          "pooled_native_ready_p99_ns": 985827542,
+          "projection_release_ns_median": 281787083.5,
+          "pooled_batch_projected_response_p99_ns": 2224796333,
+          "assigned_owner_max_pending_gap_ns": [
+            255805709,
+            258085209,
+            255384417,
+            258035000
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            23,
+            23,
+            23,
+            25
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 2865.123869466388,
+          "projected_actors_per_second_median": 2468.112798501066,
+          "pooled_native_ready_p99_ns": 1061157208,
+          "projection_release_ns_median": 230239958.5,
+          "pooled_batch_projected_response_p99_ns": 2219822542,
+          "assigned_owner_max_pending_gap_ns": [
+            323295750,
+            317767583,
+            357344375,
+            313751125
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            14,
+            23,
+            19,
+            25
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 1857.634326479511,
+          "projected_actors_per_second_median": 1721.4620889642915,
+          "pooled_native_ready_p99_ns": 2341670500,
+          "projection_release_ns_median": 206105125.0,
+          "pooled_batch_projected_response_p99_ns": 3528827917,
+          "assigned_owner_max_pending_gap_ns": [
+            286934250,
+            269486917,
+            302078333,
+            288266916
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        7
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          7
+        ],
+        "tokio": [
+          7
+        ],
+        "rayon": [
+          7
+        ],
+        "rayon-blocking": [
+          7
+        ]
+      }
+    },
+    "dispatch-o4-w2-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 4,
+        "workers": 2,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 4861041958,
+        "host_activity": [
+          {
+            "pid": 4259,
+            "cpu": 86.7,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 20180,
+            "cpu": 34.4,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 20314,
+            "cpu": 34.2,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 47863,
+            "cpu": 0.7,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 79295,
+            "cpu": 40.9,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 89998,
+            "cpu": 15.1,
+            "command": "lean"
+          },
+          {
+            "pid": 90008,
+            "cpu": 15.3,
+            "command": "lean"
+          },
+          {
+            "pid": 90054,
+            "cpu": 16.3,
+            "command": "lean"
+          },
+          {
+            "pid": 90090,
+            "cpu": 18.4,
+            "command": "lean"
+          },
+          {
+            "pid": 90319,
+            "cpu": 15.6,
+            "command": "lean"
+          },
+          {
+            "pid": 90885,
+            "cpu": 16.6,
+            "command": "lean"
+          },
+          {
+            "pid": 90886,
+            "cpu": 16.5,
+            "command": "lean"
+          },
+          {
+            "pid": 90890,
+            "cpu": 15.9,
+            "command": "lean"
+          },
+          {
+            "pid": 90906,
+            "cpu": 15.4,
+            "command": "lean"
+          },
+          {
+            "pid": 90918,
+            "cpu": 13.6,
+            "command": "lean"
+          },
+          {
+            "pid": 90949,
+            "cpu": 13.5,
+            "command": "lean"
+          },
+          {
+            "pid": 90967,
+            "cpu": 13.4,
+            "command": "lean"
+          },
+          {
+            "pid": 91006,
+            "cpu": 14.9,
+            "command": "lean"
+          },
+          {
+            "pid": 91041,
+            "cpu": 13.4,
+            "command": "lean"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 2567.9788267188133,
+          "projected_actors_per_second_median": 2182.469779820027,
+          "pooled_native_ready_p99_ns": 914883042,
+          "projection_release_ns_median": 299763854.5,
+          "pooled_batch_projected_response_p99_ns": 2384364000,
+          "assigned_owner_max_pending_gap_ns": [
+            253051166,
+            253414791,
+            281530292,
+            338927834
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            37,
+            27,
+            29,
+            31
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "tokio": {
+          "actors_per_second_median": 2447.7139659058294,
+          "projected_actors_per_second_median": 2001.516696098597,
+          "pooled_native_ready_p99_ns": 1038133000,
+          "projection_release_ns_median": 343356041.5,
+          "pooled_batch_projected_response_p99_ns": 2538207958,
+          "assigned_owner_max_pending_gap_ns": [
+            312327041,
+            233202875,
+            279745750,
+            237371334
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            29,
+            38,
+            32,
+            31
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            3,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon": {
+          "actors_per_second_median": 2966.3264077262766,
+          "projected_actors_per_second_median": 2266.7970278327107,
+          "pooled_native_ready_p99_ns": 920773458,
+          "projection_release_ns_median": 360957417.0,
+          "pooled_batch_projected_response_p99_ns": 2770656833,
+          "assigned_owner_max_pending_gap_ns": [
+            288404041,
+            250568375,
+            223408042,
+            251057125
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            39,
+            38,
+            36,
+            35
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            3,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 2130.728549874323,
+          "projected_actors_per_second_median": 1818.7797037927535,
+          "pooled_native_ready_p99_ns": 1230104000,
+          "projection_release_ns_median": 339744083.0,
+          "pooled_batch_projected_response_p99_ns": 2612064250,
+          "assigned_owner_max_pending_gap_ns": [
+            241923667,
+            220233708,
+            228247583,
+            232361667
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            3
+          ],
+          "rank_displacement_p99": 0
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        9
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          9
+        ],
+        "tokio": [
+          9
+        ],
+        "rayon": [
+          9
+        ],
+        "rayon-blocking": [
+          9
+        ]
+      }
+    },
+    "dispatch-o4-w2-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 4,
+        "workers": 2,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 4420129083,
+        "host_activity": [
+          {
+            "pid": 518,
+            "cpu": 49.0,
+            "command": "/usr/libexec/syspolicyd"
+          },
+          {
+            "pid": 4259,
+            "cpu": 71.5,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 88211,
+            "cpu": 43.6,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 93758,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 94876,
+            "cpu": 38.6,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 95760,
+            "cpu": 41.6,
+            "command": "lean"
+          },
+          {
+            "pid": 97332,
+            "cpu": 44.1,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 3764.818215710874,
+          "projected_actors_per_second_median": 2749.7815498748314,
+          "pooled_native_ready_p99_ns": 936846792,
+          "projection_release_ns_median": 321132208.0,
+          "pooled_batch_projected_response_p99_ns": 2361912042,
+          "assigned_owner_max_pending_gap_ns": [
+            261220166,
+            248191792,
+            303437375,
+            311798792
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            34,
+            23,
+            22,
+            30
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            15,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 3720.12409087781,
+          "projected_actors_per_second_median": 2940.2465356194734,
+          "pooled_native_ready_p99_ns": 803024041,
+          "projection_release_ns_median": 313301041.5,
+          "pooled_batch_projected_response_p99_ns": 2277404541,
+          "assigned_owner_max_pending_gap_ns": [
+            283156292,
+            228470583,
+            225053958,
+            230520958
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            18,
+            19,
+            24,
+            21
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 3893.996226921832,
+          "projected_actors_per_second_median": 3038.387369167477,
+          "pooled_native_ready_p99_ns": 799776834,
+          "projection_release_ns_median": 258056375.0,
+          "pooled_batch_projected_response_p99_ns": 1727644167,
+          "assigned_owner_max_pending_gap_ns": [
+            245322750,
+            237744250,
+            179377375,
+            274753916
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            17,
+            31,
+            26,
+            40
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 3143.4474842194427,
+          "projected_actors_per_second_median": 2834.8247645373926,
+          "pooled_native_ready_p99_ns": 1131648208,
+          "projection_release_ns_median": 263410479.5,
+          "pooled_batch_projected_response_p99_ns": 2239118959,
+          "assigned_owner_max_pending_gap_ns": [
+            300384375,
+            200539875,
+            219647500,
+            220737708
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            6,
+            6,
+            6,
+            6
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        9
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          9
+        ],
+        "tokio": [
+          9
+        ],
+        "rayon": [
+          9
+        ],
+        "rayon-blocking": [
+          9
+        ]
+      }
+    },
+    "dispatch-o4-w4-cpu": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 4,
+        "workers": 4,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": false,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 4662533208,
+        "host_activity": [
+          {
+            "pid": 418,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 477,
+            "cpu": 27.1,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 513,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 518,
+            "cpu": 48.6,
+            "command": "/usr/libexec/syspolicyd"
+          },
+          {
+            "pid": 553,
+            "cpu": 33.0,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 574,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"
+          },
+          {
+            "pid": 623,
+            "cpu": 26.2,
+            "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"
+          },
+          {
+            "pid": 800,
+            "cpu": 30.8,
+            "command": "/usr/libexec/spotlightknowledged.updater"
+          },
+          {
+            "pid": 4259,
+            "cpu": 92.8,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 19638,
+            "cpu": 22.3,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 20180,
+            "cpu": 21.9,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 79093,
+            "cpu": 21.7,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 88211,
+            "cpu": 25.1,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 90189,
+            "cpu": 23.5,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 93758,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 97332,
+            "cpu": 28.2,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 99998,
+            "cpu": 31.8,
+            "command": "lean"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 6389.044776150275,
+          "projected_actors_per_second_median": 3981.5956580579114,
+          "pooled_native_ready_p99_ns": 541895583,
+          "projection_release_ns_median": 291963729.0,
+          "pooled_batch_projected_response_p99_ns": 1502461500,
+          "assigned_owner_max_pending_gap_ns": [
+            279095584,
+            234403500,
+            229246208,
+            268287209
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            28,
+            23,
+            27,
+            25
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "tokio": {
+          "actors_per_second_median": 5861.5580525350715,
+          "projected_actors_per_second_median": 3974.7935020648956,
+          "pooled_native_ready_p99_ns": 528606250,
+          "projection_release_ns_median": 424084354.0,
+          "pooled_batch_projected_response_p99_ns": 1791278292,
+          "assigned_owner_max_pending_gap_ns": [
+            233169000,
+            218931209,
+            205772291,
+            229190667
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            40,
+            32,
+            32,
+            30
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            6,
+            3,
+            3,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon": {
+          "actors_per_second_median": 6049.205106778976,
+          "projected_actors_per_second_median": 3736.0542739637376,
+          "pooled_native_ready_p99_ns": 502440125,
+          "projection_release_ns_median": 378682895.5,
+          "pooled_batch_projected_response_p99_ns": 1576297084,
+          "assigned_owner_max_pending_gap_ns": [
+            139920542,
+            199870500,
+            163993209,
+            121527041
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            31,
+            26,
+            27,
+            29
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "rank_displacement_p99": 0
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 4724.630436165084,
+          "projected_actors_per_second_median": 3296.5591678110113,
+          "pooled_native_ready_p99_ns": 734153333,
+          "projection_release_ns_median": 349465771.0,
+          "pooled_batch_projected_response_p99_ns": 1729963792,
+          "assigned_owner_max_pending_gap_ns": [
+            232371416,
+            240254833,
+            201166750,
+            233122584
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            12,
+            12,
+            12,
+            12
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            3,
+            3,
+            5,
+            6
+          ],
+          "rank_displacement_p99": 0
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        13
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          13
+        ],
+        "tokio": [
+          13
+        ],
+        "rayon": [
+          13
+        ],
+        "rayon-blocking": [
+          13
+        ]
+      }
+    },
+    "dispatch-o4-w4-mixed": {
+      "configuration": {
+        "kind": "configuration",
+        "owners": 4,
+        "workers": 4,
+        "requests": 128,
+        "items": 32,
+        "quantum": 1,
+        "rounds": 16,
+        "require_quiet": false,
+        "mixed": true,
+        "timing_contract": "native-ready within 128-request windows; whole-batch-start to projected-and-released response",
+        "initialization_ns": 5428492667,
+        "host_activity": [
+          {
+            "pid": 518,
+            "cpu": 57.0,
+            "command": "/usr/libexec/syspolicyd"
+          },
+          {
+            "pid": 899,
+            "cpu": 59.5,
+            "command": "/usr/libexec/sysmond"
+          },
+          {
+            "pid": 4259,
+            "cpu": 91.6,
+            "command": "/Users/guangtao/.nix-profile/bin/devenv"
+          },
+          {
+            "pid": 4839,
+            "cpu": 11.7,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 5016,
+            "cpu": 10.8,
+            "command": "lean"
+          },
+          {
+            "pid": 5043,
+            "cpu": 13.2,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+          },
+          {
+            "pid": 19638,
+            "cpu": 22.9,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 20180,
+            "cpu": 22.9,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 33600,
+            "cpu": 20.5,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 77711,
+            "cpu": 23.7,
+            "command": "/Applications/NeteaseMusic.app/Contents/Frameworks/NeteaseMusic Helper (GPU).app/Contents/MacOS/NeteaseMusic Helper (GPU)"
+          },
+          {
+            "pid": 77715,
+            "cpu": 35.9,
+            "command": "/Applications/NeteaseMusic.app/Contents/Frameworks/NeteaseMusic Helper (Renderer).app/Contents/MacOS/NeteaseMusic Helper (Renderer)"
+          },
+          {
+            "pid": 79295,
+            "cpu": 21.5,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          },
+          {
+            "pid": 93758,
+            "cpu": 0.0,
+            "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+          },
+          {
+            "pid": 96280,
+            "cpu": 22.6,
+            "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+          }
+        ]
+      },
+      "summary": {
+        "direct": {
+          "actors_per_second_median": 6355.504313818268,
+          "projected_actors_per_second_median": 3930.289369043438,
+          "pooled_native_ready_p99_ns": 701363250,
+          "projection_release_ns_median": 229595916.0,
+          "pooled_batch_projected_response_p99_ns": 1558893334,
+          "assigned_owner_max_pending_gap_ns": [
+            130067208,
+            139222417,
+            160143750,
+            237788875
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            8,
+            10,
+            14,
+            10
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "tokio": {
+          "actors_per_second_median": 5959.704142877191,
+          "projected_actors_per_second_median": 4214.576720270519,
+          "pooled_native_ready_p99_ns": 1032811584,
+          "projection_release_ns_median": 211986416.0,
+          "pooled_batch_projected_response_p99_ns": 1504087375,
+          "assigned_owner_max_pending_gap_ns": [
+            249575458,
+            207931084,
+            151019667,
+            192873042
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            16,
+            22,
+            13,
+            18
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            14
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon": {
+          "actors_per_second_median": 6382.61289977812,
+          "projected_actors_per_second_median": 4356.874020407358,
+          "pooled_native_ready_p99_ns": 497904083,
+          "projection_release_ns_median": 184021979.0,
+          "pooled_batch_projected_response_p99_ns": 1370642208,
+          "assigned_owner_max_pending_gap_ns": [
+            93888333,
+            105421417,
+            95487917,
+            104161375
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            6,
+            17,
+            14,
+            9
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            19,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        },
+        "rayon-blocking": {
+          "actors_per_second_median": 5768.409487240528,
+          "projected_actors_per_second_median": 4939.306873050466,
+          "pooled_native_ready_p99_ns": 706223834,
+          "projection_release_ns_median": 151490000.0,
+          "pooled_batch_projected_response_p99_ns": 1517628834,
+          "assigned_owner_max_pending_gap_ns": [
+            147627000,
+            150936834,
+            146623417,
+            164975875
+          ],
+          "assigned_owner_max_other_completions_while_pending": [
+            9,
+            8,
+            8,
+            11
+          ],
+          "actor_worker_max_other_completions_while_pending": [
+            15,
+            15,
+            16,
+            13
+          ],
+          "rank_displacement_p99": 9
+        }
+      },
+      "quiet_snapshots": false,
+      "os_threads": [
+        13
+      ],
+      "os_threads_by_mode": {
+        "direct": [
+          13
+        ],
+        "tokio": [
+          13
+        ],
+        "rayon": [
+          13
+        ],
+        "rayon-blocking": [
+          13
+        ]
+      }
+    }
+  },
+  "macro_pooled": {
+    "macro-expand": {
+      "O0": {
+        "samples": 1024,
+        "ops_per_second": 2083.0221160315923,
+        "p99_ms": 55.748125,
+        "response_p99_ms": 81.498166
+      },
+      "O2": {
+        "samples": 1024,
+        "ops_per_second": 2388.1358144454766,
+        "p99_ms": 48.774667,
+        "response_p99_ms": 70.542167
+      }
+    },
+    "macro-eval": {
+      "O0": {
+        "samples": 1024,
+        "ops_per_second": 1846.5920505137888,
+        "p99_ms": 70.606209,
+        "response_p99_ms": 101.7605
+      },
+      "O2": {
+        "samples": 1024,
+        "ops_per_second": 2128.92733996106,
+        "p99_ms": 56.716708,
+        "response_p99_ms": 76.817584
+      }
+    }
+  }
+}

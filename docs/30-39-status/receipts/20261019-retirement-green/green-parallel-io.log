@@ -1,0 +1,26 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --green-io
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+    Finished `bench` profile [optimized] target(s) in 5.03s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+RESOURCE-SNAPSHOT phase=parallel-io-before epoch=0 resident=9256960 footprint=8225152 fds=3 threads=2 images=51 malloc-live=12224 malloc-reserved=12582912 malloc-blocks=203 gc=[] capacity=[] live=[] roots=[]
+RESOURCE-SNAPSHOT phase=parallel-io-active epoch=0 resident=68075520 footprint=44155336 fds=11 threads=6 images=55 malloc-live=27056800 malloc-reserved=67108864 malloc-blocks=558 gc=[] capacity=[] live=[] roots=[]
+GREEN-IO-COHORT cohort=0 owners=4 timers-per-owner=16 validated=4 ns=10125917
+GREEN-IO-COHORT cohort=1 owners=4 timers-per-owner=16 validated=4 ns=7319834
+GREEN-IO-COHORT cohort=2 owners=4 timers-per-owner=16 validated=4 ns=11252958
+GREEN-IO-COHORT cohort=3 owners=4 timers-per-owner=16 validated=4 ns=11042125
+GREEN-IO-COHORT cohort=4 owners=4 timers-per-owner=16 validated=4 ns=11233542
+GREEN-IO-COHORT cohort=5 owners=4 timers-per-owner=16 validated=4 ns=6116375
+GREEN-IO-COHORT cohort=6 owners=4 timers-per-owner=16 validated=4 ns=5141125
+GREEN-IO-COHORT cohort=7 owners=4 timers-per-owner=16 validated=4 ns=4106042
+GREEN-IO-COHORT cohort=8 owners=4 timers-per-owner=16 validated=4 ns=3031167
+GREEN-IO-COHORT cohort=9 owners=4 timers-per-owner=16 validated=4 ns=3956833
+GREEN-IO-COHORT cohort=10 owners=4 timers-per-owner=16 validated=4 ns=2598750
+GREEN-IO-COHORT cohort=11 owners=4 timers-per-owner=16 validated=4 ns=3233292
+GREEN-IO-COHORT cohort=12 owners=4 timers-per-owner=16 validated=4 ns=5359584
+GREEN-IO-COHORT cohort=13 owners=4 timers-per-owner=16 validated=4 ns=5639333
+GREEN-IO-COHORT cohort=14 owners=4 timers-per-owner=16 validated=4 ns=2879500
+GREEN-IO-COHORT cohort=15 owners=4 timers-per-owner=16 validated=4 ns=2811208
+RESOURCE-SNAPSHOT phase=parallel-io-after epoch=0 resident=71106560 footprint=46776776 fds=11 threads=6 images=55 malloc-live=26981728 malloc-reserved=67108864 malloc-blocks=518 gc=[] capacity=[] live=[] roots=[]
+RESOURCE-DRAIN joined=4 pending=0 roots=[0, 0, 0, 0] native-cleanup-ns=[93708, 60291, 42500, 106000] io-retired-bytes=[2048, 2048, 2048, 2048] files-removed=[true, true, true, true]
+RESOURCE-SNAPSHOT phase=parallel-io-drained epoch=0 resident=70959104 footprint=46547424 fds=3 threads=2 images=55 malloc-live=18112 malloc-reserved=67108864 malloc-blocks=224 gc=[] capacity=[] live=[] roots=[]
+GREEN-IO-CONTRACT owners=4 cohorts=16 timers=1024 roots=0 fd-thread-return=true extra-rust-workers=0

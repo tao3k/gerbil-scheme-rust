@@ -1,0 +1,78 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_library --locked -- --test
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+   Compiling gerbil-scheme-aot-build v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build-support/gerbil-scheme-aot-build)
+   Compiling gerbil-scheme-sys v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-sys)
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+error[E0364]: `LIFECYCLE` is private, and cannot be re-exported
+ --> crates/gerbil-scheme/src/instances/mod.rs:9:23
+  |
+9 | pub(super) use pool::{LIFECYCLE, Request};
+  |                       ^^^^^^^^^
+  |
+note: consider marking `LIFECYCLE` as `pub` in the imported module
+ --> crates/gerbil-scheme/src/instances/mod.rs:9:23
+  |
+9 | pub(super) use pool::{LIFECYCLE, Request};
+  |                       ^^^^^^^^^
+
+error[E0365]: `Request` is private, and cannot be re-exported
+ --> crates/gerbil-scheme/src/instances/mod.rs:9:34
+  |
+9 | pub(super) use pool::{LIFECYCLE, Request};
+  |                                  ^^^^^^^ re-export of private `Request`
+  |
+  = note: consider declaring type or module `Request` with `pub`
+
+error[E0432]: unresolved import `types`
+  --> crates/gerbil-scheme/src/instances/pool.rs:18:9
+   |
+18 | pub use types::{
+   |         ^^^^^
+   |
+help: a similar path exists
+   |
+18 | pub use super::types::{
+   |         +++++++
+
+Some errors have detailed explanations: E0364, E0365, E0432.
+For more information about an error, try `rustc --explain E0364`.
+error: could not compile `gerbil-scheme` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: failed to run custom build command for `gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)`
+
+Caused by:
+  process didn't exit successfully: `/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-qualification-2ab105f1ca98a380/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rerun-if-env-changed=GERBIL_HOME
+  cargo:rerun-if-env-changed=GERBIL_GSC
+  cargo:rerun-if-env-changed=GERBIL_GXI
+  cargo:rerun-if-changed=scheme/actors.ss
+  cargo:rerun-if-changed=scheme/instance-lifecycle.ss
+  cargo:rerun-if-changed=scheme/instance-json.ss
+  cargo:rerun-if-changed=scheme/utf8-controls.ss
+  cargo:rerun-if-changed=scheme/utf8-inline-control.ss
+  cargo:rerun-if-changed=scheme/utf8-buffer-control.ss
+  cargo:rerun-if-changed=scheme/utf8-baseline-control.ss
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/scheme
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build.ss
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/gerbil.pkg
+  ... compile scheme/utf8
+  ... compile scheme/program-build
+  ... compile scheme/python-package
+  ... compile scheme/runtime
+  ... compile scheme/python-runtime
+  *** ERROR IN __with-lock -- 
+  *** ERROR IN "crates/gerbil-scheme-qualification/scheme/instance-json.ss"@22.13-22.17
+  --- Syntax Error: Reference to unbound identifier
+  --- Context: 
+   at expand
+   at gerbil-scheme-rust/qualification/actors
+  ... form:   (%#ref sort)
+  ... detail: sort at "crates/gerbil-scheme-qualification/scheme/instance-json.ss"@22.13-22.17
+
+  --- stderr
+
+  thread 'main' (30075155) panicked at crates/gerbil-scheme-qualification/build.rs:103:6:
+  stage compiler-owned graph: "actor qualification compiler graph: exit status: 70; diagnostics streamed to parent stdout/stderr"
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: recipe `bridge-instance-library` failed on line 165 with exit code 101

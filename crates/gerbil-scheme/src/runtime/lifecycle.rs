@@ -112,7 +112,7 @@ unsafe extern "C" fn gerbil_i64_callback_trampoline(
 }
 
 impl GerbilRuntime {
-    /// Observe any native initialization attempt without entering Scheme,
+    /// Observe an ordinary linked-runtime initialization attempt without entering Scheme,
     /// including an attempt still in progress. This is not execution admission.
     #[must_use]
     pub fn has_been_initialized() -> bool {
@@ -184,6 +184,11 @@ impl GerbilRuntime {
             state => {
                 return Err(NativeError::InvalidLifecycleState { state });
             }
+        }
+
+        #[cfg(all(feature = "isolated-instances", target_os = "macos"))]
+        if !crate::instance_backend::claim_linked() {
+            return Err(NativeError::AlreadyInitialized);
         }
 
         // SAFETY: lifecycle operations are serialized by RUNTIME_LIFECYCLE and

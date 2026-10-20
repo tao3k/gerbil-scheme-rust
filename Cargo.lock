@@ -496,6 +496,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tokio",
 ]
 
 [[package]]
@@ -505,8 +506,10 @@ dependencies = [
  "divan",
  "gerbil-scheme",
  "gerbil-scheme-aot-build",
+ "gerbil-scheme-python",
  "gerbil-scheme-sys",
  "libc",
+ "serde_json",
  "simdutf8",
  "tokio",
 ]

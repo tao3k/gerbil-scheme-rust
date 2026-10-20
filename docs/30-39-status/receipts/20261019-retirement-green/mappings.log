@@ -1,0 +1,29 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --mappings
+    Finished `bench` profile [optimized] target(s) in 0.06s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+RESOURCE-SNAPSHOT phase=mapping-baseline epoch=0 resident=9289728 footprint=8225152 fds=3 threads=2 images=51 malloc-live=12224 malloc-reserved=12582912 malloc-blocks=203 gc=[] capacity=[] live=[] roots=[]
+TLS-CAPACITY phase=mapping-baseline available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=0 resident=16515072 footprint=15352192 fds=3 threads=2 images=52 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=393216 malloc-dirtied=376832 malloc-reusable=0 image-text-virtual=8388608 image-text-incore=8388608 image-data-virtual=7716864 image-data-incore=7569408 image-data-modified=7061504 owner-images=1 image-virtual=19054592 image-incore=18907136
+TLS-CAPACITY phase=mapping-loaded available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=1 resident=23609344 footprint=22430104 fds=3 threads=2 images=53 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=393216 malloc-dirtied=376832 malloc-reusable=0 image-text-virtual=16777216 image-text-incore=16777216 image-data-virtual=15433728 image-data-incore=15138816 image-data-modified=14123008 owner-images=2 image-virtual=38109184 image-incore=37814272
+TLS-CAPACITY phase=mapping-loaded available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=2 resident=30703616 footprint=29491608 fds=3 threads=2 images=54 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=393216 malloc-dirtied=376832 malloc-reusable=0 image-text-virtual=25165824 image-text-incore=25165824 image-data-virtual=23150592 image-data-incore=22708224 image-data-modified=21184512 owner-images=3 image-virtual=57163776 image-incore=56721408
+TLS-CAPACITY phase=mapping-loaded available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=3 resident=37797888 footprint=36569520 fds=3 threads=2 images=55 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=393216 malloc-dirtied=376832 malloc-reusable=0 image-text-virtual=33554432 image-text-incore=33554432 image-data-virtual=30867456 image-data-incore=30277632 image-data-modified=28246016 owner-images=4 image-virtual=76218368 image-incore=75628544
+TLS-CAPACITY phase=mapping-loaded available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=4 resident=44892160 footprint=43647432 fds=3 threads=2 images=56 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=393216 malloc-dirtied=376832 malloc-reusable=0 image-text-virtual=41943040 image-text-incore=41943040 image-data-virtual=38584320 image-data-incore=37847040 image-data-modified=35307520 owner-images=5 image-virtual=95272960 image-incore=94535680
+TLS-CAPACITY phase=mapping-loaded available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=5 resident=51986432 footprint=50708936 fds=3 threads=2 images=57 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=409600 malloc-dirtied=393216 malloc-reusable=0 image-text-virtual=50331648 image-text-incore=50331648 image-data-virtual=46301184 image-data-incore=45416448 image-data-modified=42369024 owner-images=6 image-virtual=114327552 image-incore=113442816
+TLS-CAPACITY phase=mapping-loaded available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=6 resident=59097088 footprint=57803232 fds=3 threads=2 images=58 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=409600 malloc-dirtied=393216 malloc-reusable=0 image-text-virtual=58720256 image-text-incore=58720256 image-data-virtual=54018048 image-data-incore=52985856 image-data-modified=49430528 owner-images=7 image-virtual=133382144 image-incore=132349952
+TLS-CAPACITY phase=mapping-loaded available=509
+RESOURCE-SNAPSHOT phase=mapping-loaded epoch=7 resident=66207744 footprint=64881120 fds=3 threads=2 images=59 malloc-live=13088 malloc-reserved=12582912 malloc-blocks=206 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=mapping-loaded malloc-virtual=17317888 malloc-resident=409600 malloc-dirtied=393216 malloc-reusable=0 image-text-virtual=67108864 image-text-incore=67108864 image-data-virtual=61734912 image-data-incore=60555264 image-data-modified=56492032 owner-images=8 image-virtual=152436736 image-incore=151257088
+TLS-CAPACITY phase=mapping-loaded available=509

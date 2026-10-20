@@ -1,0 +1,83 @@
+{
+  "o0_build": {
+    "exit": 0,
+    "seconds": 61.84,
+    "workers": 4,
+    "cache_assisted": true
+  },
+  "o1_initial_build": {
+    "exit": 124,
+    "seconds": 120.01,
+    "workers": 4
+  },
+  "o1_cache_assisted": {
+    "exit": 0,
+    "seconds": 42.98,
+    "workers": 8
+  },
+  "o1_fresh_object_control": {
+    "exit": 143,
+    "seconds": 36.33,
+    "status": "INTERRUPTED",
+    "reason": "User corrected final target to O2; this optional O1 control was stopped."
+  },
+  "o2_initial_build": {
+    "exit": 124,
+    "seconds": 120.04,
+    "workers": 8
+  },
+  "o2_cache_assisted_build": {
+    "exit": 124,
+    "seconds": 120.02,
+    "workers": 4
+  },
+  "strict_helper_clippy": {
+    "exit": 0,
+    "seconds": 94
+  },
+  "o1_full_scheme": {
+    "exit": 0,
+    "owners": 4,
+    "shutdown_roots": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "files_removed": true
+  },
+  "o1_installed_tests": {
+    "exit": 0,
+    "tests": 10,
+    "seconds": 7.233
+  },
+  "macro_o0_o1_order": [
+    "O0-first",
+    "O1-first",
+    "O1-second",
+    "O0-last"
+  ],
+  "macro_diagnostic": {
+    "exit": 0,
+    "measured_batches": 256,
+    "iterations_per_batch": 32,
+    "contaminated_batches": 256,
+    "performance_admitted": false
+  },
+  "macro_o0_o2": {
+    "status": "NOT_RUN",
+    "reason": "O2 native artifact has not completed within the build gate."
+  },
+  "quiet_dispatch": {
+    "exit": 75,
+    "status": "BLOCKED_HOST_BUSY",
+    "performance_admitted": false
+  },
+  "o2_runtime_capability": "NOT_RUN",
+  "o2_compiler_sample": {
+    "subject": "contract~10.o1.c",
+    "observations": 801,
+    "pass_reload_observations": 801,
+    "conclusion": "One short sample locates this compiler in reload/LRA; not proof of the cause of every slow object."
+  }
+}

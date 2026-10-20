@@ -59,6 +59,7 @@ pub fn stage_resources(
             .collect(),
         load_paths: vec![],
         files: BTreeMap::new(),
+        native_modules: BTreeMap::new(),
     };
     PackageManifest::from_json(&serde_json::to_vec(&declared)?)?;
     let mut manifest = PackageManifest {
@@ -66,6 +67,7 @@ pub fn stage_resources(
         roots: inventory_roots(trees)?,
         load_paths: load_paths.to_owned(),
         files: BTreeMap::new(),
+        native_modules: BTreeMap::new(),
     };
     // Validate all names before joining them to a destination or writing bytes.
     PackageManifest::from_json(&serde_json::to_vec(&manifest)?)?;
@@ -93,7 +95,7 @@ pub fn stage_resources(
     manifest.verify(&destination)?;
     Ok(manifest)
 }
-fn inventory_roots(trees: &[ResourceTree<'_>]) -> io::Result<Vec<String>> {
+pub(crate) fn inventory_roots(trees: &[ResourceTree<'_>]) -> io::Result<Vec<String>> {
     let mut roots = std::collections::BTreeSet::new();
     for tree in trees {
         let path = Path::new(tree.destination);
@@ -156,6 +158,7 @@ fn freeze_source_data(
         schema: raw.schema.clone(),
         roots: vec![root.to_owned()],
         load_paths: vec![],
+        native_modules: BTreeMap::new(),
         files: raw
             .files
             .iter()

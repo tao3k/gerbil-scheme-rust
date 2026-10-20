@@ -33,26 +33,29 @@ impl SchemeObjectRef<'_> {
     pub fn kind(self) -> Result<ObjectKind, NativeError> {
         // SAFETY: this reference borrows its owner root and cannot cross threads.
         let tag = unsafe { sys::gerbil_scheme_rust_object_kind(self.root.0, self.index) };
-        Ok(match tag {
-            0 => ObjectKind::Void,
-            1 => ObjectKind::Boolean,
-            2 => ObjectKind::ExactInteger,
-            3 => ObjectKind::String,
-            4 => ObjectKind::Nil,
-            5 => ObjectKind::Pair,
-            6 => ObjectKind::Vector,
-            7 => ObjectKind::GambitTable,
-            8 => ObjectKind::GerbilHashTable,
-            9 => ObjectKind::Character,
-            10 => ObjectKind::Flonum,
-            11 => ObjectKind::Bytevector,
-            12 => ObjectKind::Symbol,
-            13 => ObjectKind::Keyword,
-            14 => ObjectKind::Procedure,
-            15 => ObjectKind::Other,
-            _ => return Err(invalid("object kind")),
-        })
+        decode_kind(tag)
     }
+}
+pub(crate) fn decode_kind(tag: i32) -> Result<ObjectKind, NativeError> {
+    Ok(match tag {
+        0 => ObjectKind::Void,
+        1 => ObjectKind::Boolean,
+        2 => ObjectKind::ExactInteger,
+        3 => ObjectKind::String,
+        4 => ObjectKind::Nil,
+        5 => ObjectKind::Pair,
+        6 => ObjectKind::Vector,
+        7 => ObjectKind::GambitTable,
+        8 => ObjectKind::GerbilHashTable,
+        9 => ObjectKind::Character,
+        10 => ObjectKind::Flonum,
+        11 => ObjectKind::Bytevector,
+        12 => ObjectKind::Symbol,
+        13 => ObjectKind::Keyword,
+        14 => ObjectKind::Procedure,
+        15 => ObjectKind::Other,
+        _ => return Err(invalid("object kind")),
+    })
 }
 pub(super) fn invalid(operation: &'static str) -> NativeError {
     NativeError::Status {

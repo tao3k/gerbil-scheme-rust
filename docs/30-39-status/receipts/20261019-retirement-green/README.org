@@ -1,0 +1,72 @@
+#+title: Retirement and Green Scheduling Receipts
+
+* Successful current-boundary checks
+
+- =after-io-fix.log=: eight native retirements; copied paths removed and 2,048
+  native fdset bytes released per owner. Final malloc live data is 13,568 bytes.
+- =after-io-allocation-tree.log=: terminal fdset allocations no longer appear
+  in the reference tree after the native adapter repair.
+- =final-file-failure.log=: real permission-denied cleanup failure is surfaced;
+  native cleanup and I/O retirement succeed, =is_clean()= is false, and later
+  native admission works after control cleanup.
+- =final-before.log= and =final-after.log=: phase-zero and completed-setup fault
+  controls under ABI v3, with no known-clean copied paths retained.
+- =final-reuse.log=: 65,536 native typed tasks, all four owners cover injected
+  errors/panics; stable post-GC live data, root balance, I/O retirement and joins.
+- =final-preflight.log=: 136 rejected uninitialized images, then valid setup.
+- =green-final.log=: final native CPU batch/actor/yield comparisons, latency and
+  timer-wait controls, with all measured outputs checked.
+- =green-parallel-io.log=: four owners, 1,024 Scheme timer waits with forced GC;
+  fixed kernel-worker population and clean native retirement.
+- =final-core-clippy.log=, =final-qualification-clippy.log= and
+  =parallel-io-clippy.log=: strict all-target Rust checks.
+
+All successful native processes above were observed to exit naturally with
+status zero. Five-second gates were not widened. =validation.json= records the
+executed process/gate outcomes. Empty compiler-survey files mean no matching
+compiler/analysis process was observed at the survey instants, not continuous
+proof of an otherwise idle host.
+
+* Controls, earlier stages and failures
+
+- =before-file-fix-2.log=: eight original retained file paths and the native
+  allocation increment before retirement changes.
+- =before-file-fix.log=: the first diagnostic failed because /var and /private/var
+  aliases prevented an exact copy-prefix match; canonicalizing the prefix fixed it.
+- =after-file-fix.log=: copied paths removed before fdset ownership was repaired.
+- =allocator-control.log=: initial single-wave allocator-only control.
+- =allocator.log=: second-wave control reuses 496/512 exact allocation addresses.
+- =mappings.log=: eight mapped, uninitialized copies demonstrate image retention
+  separately from Scheme initialization; visible copies are removed.
+- =leaks-retirement.log=: zero unreachable leaks despite reachable terminal
+  fdset retention; this was not accepted as complete lifecycle reclamation.
+- =retained-allocation-tree.log=: identifies two allocations from
+  =___setup_io_pstate= in every finalized image, before the native repair.
+- =green.log=: early functional/CPU run potentially overlaps this task's
+  allocation analysis. It is excluded from performance conclusions. The final
+  timing run is separate and includes latency and I/O-wait controls.
+- Earlier =core-clippy.log=, =qualification-clippy*= and =final-clippy.log=
+  retain source-policy failures and their later passes. No lint was suppressed.
+- Earlier =file-failure.log=, =before.log= and =after.log= precede the ABI v3
+  native fdset repair; the =final-= variants qualify that repair.
+
+The old diagnostic field =image-resident= used mincore's in-core bit. It is not
+an additive task-RSS decomposition. Final logs rename that field =image-incore=;
+historical logs remain intact. MSL reference-tree sizes are allocator-rounded
+and differ from requested native buffer bytes.
+
+* Identity
+
+=manifest.json= identifies final working-tree sources, paired SDK headers,
+native image binaries, compiler build output and the final compiled benchmark.
+Historical stage logs precede some later source changes and must not be assigned
+the final source digest retroactively. The timed green functions/native workload
+were unchanged by the later addition of the untimed parallel-I/O contract; the
+final benchmark binary includes that additional entry. A later library comment
+only clarifies copied-file cleanup in the public receipt documentation.
+
+The fdset comparison establishes allocation ownership and path outcomes; no
+causal RSS speed/reclamation claim is made from two differently staged images.
+=fdset-ownership.txt= contains the paired header and native binary evidence,
+including the dormant emulated-TLS destructor initializer. No SDK source was
+modified. =ffi/runtime.c= still matches the earlier native-resource receipt.

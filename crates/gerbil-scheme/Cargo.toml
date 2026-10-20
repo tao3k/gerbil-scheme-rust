@@ -12,8 +12,11 @@ publish = false
 [dependencies]
 gerbil-scheme-sys.workspace = true
 simdutf8.workspace = true
+tokio = { workspace = true, optional = true, features = ["time"] }
 
 [features]
+isolated-instances = []
+tokio-dispatch = ["isolated-instances", "dep:tokio"]
 external-program = ["gerbil-scheme-sys/external-program"]
 
 [dev-dependencies]

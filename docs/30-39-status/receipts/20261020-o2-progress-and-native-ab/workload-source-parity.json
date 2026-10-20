@@ -1,0 +1,24 @@
+{
+  "identical": true,
+  "sources": {
+    "gerbil_ledger/_resources/sources/bridge/actor-batch.ss": "1f8ed2bf614477362aed8cff7c9e840f6c9b4766ed28273fafb85cecde4c5f1e",
+    "gerbil_ledger/_resources/sources/bridge/asp/abi-surface.ss": "e61e8782537ac9f97990c6664af42bf9f82a1b9b66fbea551b0b22ad4f63bd16",
+    "gerbil_ledger/_resources/sources/bridge/generated/runtime.scm": "c3cc544833d05998413b7383cdf90e9ae81ca4fb186579b05e309538479c84ea",
+    "gerbil_ledger/_resources/sources/bridge/generated/utf8.scm": "f5c12dfd5791adab2a32468216f3bf053a4ca743ef46e72c699fdbda60636529",
+    "gerbil_ledger/_resources/sources/bridge/program-build.ss": "e6ea25c30fd5bd8eabede4591359319f252ffe6a988a62c69c966dd16dd9d487",
+    "gerbil_ledger/_resources/sources/bridge/python-package.ss": "597ca95cd6f04e51e43f38f4758e3ba531085a1d307febe0aa6f1d28f06c5be1",
+    "gerbil_ledger/_resources/sources/bridge/python-runtime.ss": "dece0dd57a91f90feb23b1cdc9b591aa0d8a857e62ff4e5f9b3c7020cfb33b14",
+    "gerbil_ledger/_resources/sources/bridge/runtime-collections.ss": "510563b8689f9ad07e35710d2a0d0305f6bcbae881ab2a1ef370007b69c8db04",
+    "gerbil_ledger/_resources/sources/bridge/runtime-composites.ss": "760b1a6c23873328c37ca29eb20c5d8461607ba98fe8ada761ddd16f15579850",
+    "gerbil_ledger/_resources/sources/bridge/runtime-host.ss": "8b30e2c361be4cc7a9a6bc4d9fa817021d220bd3a0effb8110793841ab2742f8",
+    "gerbil_ledger/_resources/sources/bridge/runtime-object-kinds.ss": "c6cd7ca8a9211af2967b6cbc48aa1d8ef6ef58f699ec7dbb1652b6ec53e2a629",
+    "gerbil_ledger/_resources/sources/bridge/runtime-smp-test.ss": "62897f5e2456267e4152e06223e783aa7e73d31d85f9749cad9a50d838119788",
+    "gerbil_ledger/_resources/sources/bridge/runtime-test.ss": "c18149064bcc47bfb75a35ea536ca96dc758ea94a7bb4e536fddd3792c4c300a",
+    "gerbil_ledger/_resources/sources/bridge/runtime-vm-test.ss": "f1f8727f9ba4e5127c08ba7b88bef4bc386270eb54172a1044e64f7e3bfc00c3",
+    "gerbil_ledger/_resources/sources/bridge/runtime.ss": "aed2429c1429f6e909b2d3c686866928e65dfb24f248e15346970aff172e4fa3",
+    "gerbil_ledger/_resources/sources/bridge/utf8.ss": "3f610bf8f26939c09bcae0f3d1f5c60ca8cc8ea77ee49066cc6477e2581cc8da",
+    "gerbil_ledger/_resources/sources/ledger/ledger.ss": "acdc5feec74c7db5ea5dc9bc52a780a7f63a15749b82f076a9fcf924e588c4fb",
+    "gerbil_ledger/_resources/sources/ledger/plugin.ss": "7c1d713b4c0c5dc522091338e40ba9d48504747b99d8f992ac3b5c111f6050a7",
+    "gerbil_ledger/_resources/sources/ledger/rust-ledger.ss": "0ff29b98a4a46f5402ff55eed5adf79223b7c70cd06e6be1bcaa00ce24576f08"
+  }
+}

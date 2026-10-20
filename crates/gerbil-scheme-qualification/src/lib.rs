@@ -14,3 +14,21 @@ pub fn linked_program() -> gerbil_scheme::LinkedGerbilProgram {
     // compiler-owned program graph. Its main returns without running a loop.
     unsafe { gerbil_scheme::LinkedGerbilProgram::from_linker(___LNK_gerbil__actor__qualification) }
 }
+
+/// Build-owned private image used by the library-path qualification.
+#[cfg(feature = "instance-library")]
+#[must_use]
+pub fn owner_instance_image() -> &'static str {
+    env!("GERBIL_OWNER_INSTANCE_IMAGE")
+}
+
+/// Phase-specific native setup fault images, built by the same archive pipeline.
+#[cfg(feature = "instance-library")]
+#[must_use]
+pub fn owner_failure_image(after_native_setup: bool) -> &'static str {
+    if after_native_setup {
+        env!("GERBIL_OWNER_FAIL_AFTER_IMAGE")
+    } else {
+        env!("GERBIL_OWNER_FAIL_BEFORE_IMAGE")
+    }
+}

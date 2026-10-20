@@ -1,7 +1,7 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=8d66deeeaa53f0c56ba781a1b02591127c988858587d7650ae8e5ba540780cfa body-sha256=d61cfbec0be16ca14ef576f3236adfcc329f97d54f04f355a6b0b45e53e39a2f
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=be32b1f46e1c66bf75099554ddb9279a880eb22f8bcf89e8705637d4f305eaed body-sha256=d25db42c65f2a6b1d121d9f99f664cef20e189f48153eda177224593f467bb99
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1791993323)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1792411118)
   (begin
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))
@@ -37,8 +37,8 @@
          _%value754%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call
       (lambda (_%root746%_ _%procedure747%_)
-        (let ((__tmp5090 (lambda (_%_749%_) '0))
-              (__tmp5089
+        (let ((__tmp5333 (lambda (_%_749%_) '0))
+              (__tmp5332
                (lambda ()
                  (let ((_%value752%_
                         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
@@ -49,7 +49,7 @@
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
                         (_%procedure747%_ _%value752%_)))))))
           (declare (not safe))
-          (__with-catch __tmp5090 __tmp5089))))
+          (__with-catch __tmp5333 __tmp5332))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
       (lambda (_%value742%_)
         (let ((_%root-id744%_
@@ -810,7 +810,7 @@
       (lambda (_%value653%_ _%kind654%_)
         (let ((_%$e656%_ _%kind654%_))
           (if (or (eq? '0 _%$e656%_) (eq? '1 _%$e656%_))
-              (let ((_g5091_ (if (= _%kind654%_ '0)
+              (let ((_g5334_ (if (= _%kind654%_ '0)
                                  (values gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-rational?
                                          numerator
                                          denominator)
@@ -820,15 +820,15 @@
                   (let ((_%valid?662%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g5091_ 0)))
+                           (##values-ref _g5334_ 0)))
                         (_%left663%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g5091_ 1)))
+                           (##values-ref _g5334_ 1)))
                         (_%right664%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g5091_ 2))))
+                           (##values-ref _g5334_ 2))))
                     (let* ((_%items666%_
                             (if (vector? _%value653%_)
                                 _%value653%_

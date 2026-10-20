@@ -6,6 +6,9 @@
 //! Scheme values. The separate `Gerbil` toolchain API invokes a configured
 //! `gxi` explicitly; it is never a fallback for runtime initialization or calls.
 //! Both surfaces remain independent from downstream application semantics.
+//! With `isolated-instances` on Darwin, `instances::InstancePool` dispatches to
+//! fixed owners carrying complete native Scheme runtimes. Rust scheduling does
+//! not imply VM-independent execution or replace Scheme's green-thread scheduler.
 
 mod toolchain;
 pub use toolchain::{
@@ -40,3 +43,8 @@ pub use runtime::{
 };
 
 pub mod tool_environment;
+
+#[cfg(all(feature = "isolated-instances", target_os = "macos"))]
+mod instance_backend;
+#[cfg(all(feature = "isolated-instances", target_os = "macos"))]
+pub mod instances;

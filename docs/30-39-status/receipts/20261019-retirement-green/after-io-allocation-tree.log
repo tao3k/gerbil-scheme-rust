@@ -1,0 +1,280 @@
+leaks(17409) MallocStackLogging: could not tag MSL-related memory as no_footprint, so those pages will be included in process footprint - No such file or directory (2)
+leaks(17409) MallocStackLogging: recording malloc (and VM allocation) stacks using lite mode
+RESOURCE-SNAPSHOT phase=retirement-baseline epoch=0 resident=10846208 footprint=9732432 fds=4 threads=2 images=53 malloc-live=13760 malloc-reserved=12582912 malloc-blocks=207 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=baseline malloc-virtual=17301504 malloc-resident=884736 malloc-dirtied=884736 malloc-reusable=0 image-text-virtual=0 image-text-incore=0 image-data-virtual=0 image-data-incore=0 image-data-modified=0 owner-images=0 image-virtual=0 image-incore=0
+TLS-CAPACITY phase=baseline available=508
+RESOURCE-SNAPSHOT phase=retirement-live epoch=0 resident=62160896 footprint=55230920 fds=6 threads=3 images=54 malloc-live=78735648 malloc-reserved=113262592 malloc-blocks=338 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=117981184 malloc-resident=38584320 malloc-dirtied=38584320 malloc-reusable=0 image-text-virtual=8388608 image-text-incore=8388608 image-data-virtual=7716864 image-data-incore=7716864 image-data-modified=7405568 owner-images=1 image-virtual=19054592 image-incore=19054592
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[62458] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=0 resident=63700992 footprint=56787496 fds=4 threads=2 images=54 malloc-live=20144 malloc-reserved=138412032 malloc-blocks=227 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=177225728 malloc-resident=40124416 malloc-dirtied=40124416 malloc-reusable=0 image-text-virtual=8388608 image-text-incore=8388608 image-data-virtual=7716864 image-data-incore=7716864 image-data-modified=7405568 owner-images=1 image-virtual=19054592 image-incore=19054592
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=0 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=1 resident=78921728 footprint=66323008 fds=6 threads=3 images=55 malloc-live=78735904 malloc-reserved=171982848 malloc-blocks=340 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=177225728 malloc-resident=42188800 malloc-dirtied=42188800 malloc-reusable=0 image-text-virtual=16777216 image-text-incore=16777216 image-data-virtual=15433728 image-data-incore=15433728 image-data-modified=14811136 owner-images=2 image-virtual=38109184 image-incore=38109184
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[60291] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=1 resident=80117760 footprint=67519064 fds=4 threads=2 images=55 malloc-live=20192 malloc-reserved=184549376 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=223363072 malloc-resident=43417600 malloc-dirtied=43417600 malloc-reusable=0 image-text-virtual=16777216 image-text-incore=16777216 image-data-virtual=15433728 image-data-incore=15433728 image-data-modified=14811136 owner-images=2 image-virtual=38109184 image-incore=38109184
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=1 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=2 resident=93372416 footprint=75088496 fds=6 threads=3 images=56 malloc-live=78735952 malloc-reserved=218120192 malloc-blocks=341 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=223363072 malloc-resident=43515904 malloc-dirtied=43515904 malloc-reusable=0 image-text-virtual=25165824 image-text-incore=25165824 image-data-virtual=23150592 image-data-incore=23150592 image-data-modified=22216704 owner-images=3 image-virtual=57163776 image-incore=57163776
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[51167] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=2 resident=93339648 footprint=75039344 fds=4 threads=2 images=56 malloc-live=20192 malloc-reserved=184549376 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=223363072 malloc-resident=43515904 malloc-dirtied=43515904 malloc-reusable=0 image-text-virtual=25165824 image-text-incore=25165824 image-data-virtual=23150592 image-data-incore=23150592 image-data-modified=22216704 owner-images=3 image-virtual=57163776 image-incore=57163776
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=2 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=3 resident=106676224 footprint=82674288 fds=6 threads=3 images=57 malloc-live=78735952 malloc-reserved=218120192 malloc-blocks=341 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=223363072 malloc-resident=43696128 malloc-dirtied=43696128 malloc-reusable=0 image-text-virtual=33554432 image-text-incore=33554432 image-data-virtual=30867456 image-data-incore=30867456 image-data-modified=29622272 owner-images=4 image-virtual=76218368 image-incore=76218368
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[61791] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=3 resident=106659840 footprint=82641520 fds=4 threads=2 images=57 malloc-live=20192 malloc-reserved=184549376 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=223363072 malloc-resident=43712512 malloc-dirtied=43712512 malloc-reusable=0 image-text-virtual=33554432 image-text-incore=33554432 image-data-virtual=30867456 image-data-incore=30867456 image-data-modified=29622272 owner-images=4 image-virtual=76218368 image-incore=76218368
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=3 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=4 resident=121962496 footprint=92258952 fds=6 threads=3 images=58 malloc-live=78735952 malloc-reserved=230703104 malloc-blocks=341 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=235945984 malloc-resident=45858816 malloc-dirtied=45858816 malloc-reusable=0 image-text-virtual=41943040 image-text-incore=41943040 image-data-virtual=38584320 image-data-incore=38584320 image-data-modified=37027840 owner-images=5 image-virtual=95272960 image-incore=95272960
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[150250] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=4 resident=123305984 footprint=93618872 fds=4 threads=2 images=58 malloc-live=20192 malloc-reserved=247463936 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=286277632 malloc-resident=47235072 malloc-dirtied=47235072 malloc-reusable=0 image-text-virtual=41943040 image-text-incore=41943040 image-data-virtual=38584320 image-data-incore=38584320 image-data-modified=37027840 owner-images=5 image-virtual=95272960 image-incore=95272960
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=4 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=5 resident=136495104 footprint=101106360 fds=6 threads=3 images=59 malloc-live=78735952 malloc-reserved=281034752 malloc-blocks=341 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=286277632 malloc-resident=47267840 malloc-dirtied=47267840 malloc-reusable=0 image-text-virtual=50331648 image-text-incore=50331648 image-data-virtual=46301184 image-data-incore=46301184 image-data-modified=44433408 owner-images=6 image-virtual=114327552 image-incore=114327552
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[56167] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=5 resident=136462336 footprint=101057208 fds=4 threads=2 images=59 malloc-live=20192 malloc-reserved=247463936 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=286277632 malloc-resident=47267840 malloc-dirtied=47267840 malloc-reusable=0 image-text-virtual=50331648 image-text-incore=50331648 image-data-virtual=46301184 image-data-incore=46301184 image-data-modified=44433408 owner-images=6 image-virtual=114327552 image-incore=114327552
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=5 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=6 resident=149618688 footprint=108528336 fds=6 threads=3 images=60 malloc-live=78735952 malloc-reserved=281034752 malloc-blocks=341 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=286277632 malloc-resident=47267840 malloc-dirtied=47267840 malloc-reusable=0 image-text-virtual=58720256 image-text-incore=58720256 image-data-virtual=54018048 image-data-incore=54018048 image-data-modified=51838976 owner-images=7 image-virtual=133382144 image-incore=133382144
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[60334] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=6 resident=149585920 footprint=108479184 fds=4 threads=2 images=60 malloc-live=20192 malloc-reserved=247463936 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=286277632 malloc-resident=47267840 malloc-dirtied=47267840 malloc-reusable=0 image-text-virtual=58720256 image-text-incore=58720256 image-data-virtual=54018048 image-data-incore=54018048 image-data-modified=51838976 owner-images=7 image-virtual=133382144 image-incore=133382144
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=6 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=7 resident=162742272 footprint=115950312 fds=6 threads=3 images=61 malloc-live=78735952 malloc-reserved=281034752 malloc-blocks=341 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=286277632 malloc-resident=47267840 malloc-dirtied=47267840 malloc-reusable=0 image-text-virtual=67108864 image-text-incore=67108864 image-data-virtual=61734912 image-data-incore=61734912 image-data-modified=59244544 owner-images=8 image-virtual=152436736 image-incore=152436736
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[50750] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=7 resident=162955264 footprint=116146920 fds=4 threads=2 images=61 malloc-live=20192 malloc-reserved=255852544 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=294666240 malloc-resident=47513600 malloc-dirtied=47513600 malloc-reusable=0 image-text-virtual=67108864 image-text-incore=67108864 image-data-virtual=61734912 image-data-incore=61734912 image-data-modified=59244544 owner-images=8 image-virtual=152436736 image-incore=152436736
+TLS-CAPACITY phase=cleaned available=508
+RETIREMENT-FILES epoch=7 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-relief epoch=8 resident=162955264 footprint=116146920 fds=4 threads=2 images=61 malloc-live=15344 malloc-reserved=255852544 malloc-blocks=218 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=relief malloc-virtual=294666240 malloc-resident=47513600 malloc-dirtied=47513600 malloc-reusable=0 image-text-virtual=67108864 image-text-incore=67108864 image-data-virtual=61734912 image-data-incore=61734912 image-data-modified=59244544 owner-images=8 image-virtual=152436736 image-incore=152436736
+RETIREMENT-PRESSURE released=0
+Process 18207 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+    206 (524K) << TOTAL >>
+      1 (256K) libsystem_malloc.dylib __DATA __common: 'malloc_guarded_range_config' + 16 0x1f73ed828 --> VM: MALLOC metadata  0x101698000-0x1016d8000 [V=256K] rw-/rwx  DefaultMallocZone_0x101698000  dirty: 256K  swapped: 0K
+      2 (176K) libsystem_malloc.dylib __DATA_DIRTY __data: 'malloc_zones' 0x1f9ebd9b8 --> VM: MALLOC metadata  0x1016d8000-0x1016dc000 [V=16K] r--/rwx    dirty: 16K  swapped: 0K
+      + 1 (160K) VM: MALLOC metadata  0x10175c000-0x101784000 [V=160K] rw-/rwx  MallocStackLoggingLiteZone_0x10175c000 zone structure  dirty: 160K  swapped: 0K
+      1 (32.0K) libsystem_featureflags.dylib __DATA_DIRTY __bss: '_MergedGlobals' + 8 0x1f9ec1780 --> VM: shared memory  0x10082c000-0x100834000 [V=32K] r--/r--    dirty: 32K  swapped: 0K
+      6 (16.4K) libsystem_c.dylib __DATA_DIRTY __bss: '__atexit' 0x1f9ec4418 --> 48 bytes into VM: Kernel Alloc Once  0x100824000-0x10082c000 [V=32K] rw-/rwx    dirty: 16K  swapped: 0K
+      + 4 (368 bytes) <xpc_array_t 0x1018a51b0> [48]
+      + ! 3 (320 bytes) <xpc_array_t (Storage) 0x1018a51e0> [64]
+      + !   2 (256 bytes) <xpc_dictionary_t 0x1018a5910> [96]
+      + !     1 (160 bytes) <xpc_dictionary_t (Storage) 0x1018a5970> [160]
+      + 1 (64 bytes) <xpc_pipe_t 0x1018a5220> [64]
+      1 (16.0K) libsystem_malloc.dylib __DATA_DIRTY __bss: 'xzm_reclaim_buffer' 0x1f9ebda10 --> VM: Memory Tag 22  0x101c98000-0x105c9c000 [V=64.0M] rw-/rw-    dirty: 16K  swapped: 0K
+      1 (16.0K) libsystem_malloc.dylib __DATA __common: 'lite_zone' 0x1f73ed860 --> VM: Performance tool data  0x100834000-0x100838000 [V=16K] r--/rwx  MallocStackLoggingLiteZone_Wrapper_0x100834000 zone structure  dirty: 16K  swapped: 0K
+      19 (1.59K) libxpc.dylib __DATA_DIRTY __bss: '_environment' 0x1f9ebc7a0 --> <xpc_dictionary_t 0x1018a5260> [96]
+      + 3 (864 bytes) <xpc_dictionary_t (Storage) 0x1018a5650> [48]
+      + ! 2 (816 bytes) <xpc_string_t 0x1018a5620> [48]
+      + !   1 (768 bytes) <xpc_string_t (Storage) 0x1018a5320> [768]
+      + 6 (288 bytes) <xpc_dictionary_t (Storage) 0x1018a5760> [64]
+      + ! 3 (160 bytes) <xpc_dictionary_t (Storage) 0x1018a56f0> [48]
+      + ! : 2 (112 bytes) <xpc_string_t 0x1018a56c0> [48]
+      + ! :   1 (64 bytes) <xpc_string_t (Storage) 0x1018a5680> [64]
+      + ! 2 (64 bytes) <xpc_string_t 0x1018a5730> [48]
+      + !   1 (16 bytes) <xpc_string_t (Storage) 0x1018a5720> [16]
+      + 3 (160 bytes) <xpc_dictionary_t (Storage) 0x1018a5800> [64]
+      + ! 2 (96 bytes) <xpc_string_t 0x1018a57d0> [48]
+      + !   1 (48 bytes) <xpc_string_t (Storage) 0x1018a57a0> [48]
+      + 3 (112 bytes) <xpc_dictionary_t (Storage) 0x1018a52f0> [48]
+      + ! 2 (64 bytes) <xpc_string_t 0x1018a52c0> [48]
+      + !   1 (16 bytes) <xpc_string_t (Storage) 0x1018a46a0> [16]
+      + 3 (112 bytes) <xpc_dictionary_t (Storage) 0x1018a5880> [48]
+      +   2 (64 bytes) <xpc_string_t 0x1018a5850> [48]
+      +     1 (16 bytes) <xpc_string_t (Storage) 0x1018a5840> [16]
+      1 (1.50K) libobjc.A.dylib __DATA_DIRTY __bss: 'objc::unattachedCategories' 0x1f9eb5d10 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a4000> [1536]
+      1 (1.00K) libsystem_c.dylib __DATA_DIRTY __bss: 'basename.bname' 0x1f9ec2b98 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a5c40> [1024]
+      2 (720 bytes) instance_resources-dd5a606ec75fff84 __DATA __bss: '_MergedGlobals[]'
+      + 1 (640 bytes) instance_resources-dd5a606ec75fff84 __DATA __bss: '_MergedGlobals' + 16 0x1007e0f00 --> <malloc in _RNvNtNtNtNtNtCsg55jX0GwzBC_3std3sys3pal4unix14stack_overflow11thread_info16set_current_info 0x993034000> [640]
+      + 1 (80 bytes) instance_resources-dd5a606ec75fff84 __DATA __bss: '_MergedGlobals' + 64 0x1007e0f30 --> <pthread_mutex_t 0x993030000> [80]
+      3 (704 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'protocols()::protocol_map' 0x1f9eb5e28 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a46f0> [32]
+      + 1 (640 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a4820> [640]
+      + 1 (32 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a4790> [32]
+      7 (640 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists[]'
+      + 1 (128 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists' + 1024 0x1f9eb65c0 --> <memalign in id2data(objc_object*, SyncKind, usage) 0x992c18100> [128]
+      + 1 (128 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists' + 1216 0x1f9eb6680 --> <memalign in id2data(objc_object*, SyncKind, usage) 0x992c18080> [128]
+      + 1 (128 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists' + 3328 0x1f9eb6ec0 --> <memalign in id2data(objc_object*, SyncKind, usage) 0x992c18000> [128]
+      + 1 (64 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists' + 1408 0x1f9eb6740 --> <non-object in zone DefaultMallocZone_0x101698000 0x992c000c0> [64]
+      + 1 (64 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists' + 1472 0x1f9eb6780 --> <non-object in zone DefaultMallocZone_0x101698000 0x992c00080> [64]
+      + 1 (64 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists' + 2240 0x1f9eb6a80 --> <non-object in zone DefaultMallocZone_0x101698000 0x992c00040> [64]
+      + 1 (64 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'sDataLists' + 2304 0x1f9eb6ac0 --> <non-object in zone DefaultMallocZone_0x101698000 0x992c00000> [64]
+      4 (288 bytes) dyld __DATA_DIRTY __common: '_main_thread[]'
+      + 1 (160 bytes) dyld __DATA_DIRTY __common: '_main_thread' + 2288 0x1f9ebaa70 --> <malloc in dyld::ThreadLocalVariables::instantiateVariable(dyld::ThreadLocalVariables::Thunk const&) 0x992c04000> [160]
+      + 3 (128 bytes) dyld __DATA_DIRTY __common: '_main_thread' + 544 0x1f9eba3a0 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a5bf0> [80]
+      +   2 (48 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a5b30> [16]
+      +     1 (32 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x9930009e0> [32]
+      1 (128 bytes) libsystem_trace.dylib __DATA_DIRTY __data: 'os_state_blocks' + 40 0x1f9ebc9c0 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a5b60> [128]
+      3 (112 bytes) libobjc.A.dylib __DATA_DIRTY __common: 'gdb_objc_realized_classes' 0x1f9eb82b0 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a4640> [32]
+      + 1 (48 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a4760> [48]
+      + 1 (32 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a46d0> [32]
+      3 (112 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'prototypes' 0x1f9eb5fc0 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a4680> [32]
+      + 2 (80 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a4710> [48]
+      +   1 (32 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a4740> [32]
+      3 (112 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'prototypes (.1)' 0x1f9eb5f48 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a4660> [32]
+      + 1 (48 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a47f0> [48]
+      + 1 (32 bytes) <non-object in zone DefaultMallocZone_0x101698000 0x1018a46b0> [32]
+      2 (112 bytes) libsystem_c.dylib __DATA_DIRTY __common: '__env_owned' 0x1f9ec44d0 --> <malloc in _owned_ptr_alloc 0x993024000> [32]
+      + 1 (80 bytes) <malloc in _owned_ptr_alloc 0x993028000> [80]
+      1 (96 bytes) libxpc.dylib __DATA_DIRTY __bss: '_initial_images' 0x1f9ebc7a8 --> <xpc_dictionary_t 0x1018a58b0> [96]
+      2 (80 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_semaphore[]'
+      + 1 (48 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_semaphore' + 16 0x1f9ebdcf8 --> <Class.methodCache._buckets (bucket_t) 0x993050090> [48]
+      + 1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_semaphore' + 32 0x1f9ebdd08 --> <Class.data (class_rw_t) 0x9930005a0> [32]
+      2 (80 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_dictionary[]'
+      + 1 (48 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_dictionary' + 16 0x1f9ebc130 --> <Class.methodCache._buckets (bucket_t) 0x993050060> [48]
+      + 1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_dictionary' + 32 0x1f9ebc140 --> <Class.data (class_rw_t) 0x1018a4f90> [32]
+      2 (80 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_NSObject' + 32 0x1f9eb1ef8 --> <Class.data (class_rw_t) 0x1018a47d0> [32]
+      + 1 (48 bytes) <Class.data.extended (class_rw_ext_t) 0x1018a4ac0> [48]
+      1 (80 bytes) instance_resources-dd5a606ec75fff84 __DATA __common: '_RNvNvNtNtCsg55jX0GwzBC_3std2io5stdio6stderr8INSTANCE' 0x1007e0ea8 --> <pthread_mutex_t 0x9930300f0> [80]
+      1 (80 bytes) instance_resources-dd5a606ec75fff84 __DATA __common: 'gerbil_scheme::instances::pool::LIFECYCLE::hdf75565a5985e111' 0x1007e0e60 --> <pthread_mutex_t 0x993030280> [80]
+      1 (80 bytes) instance_resources-dd5a606ec75fff84 __DATA __common: 'gerbil_scheme::instance_backend::BACKEND::hae4db741faf96814' 0x1007e0e50 --> <pthread_mutex_t 0x993030140> [80]
+      2 (64 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_object[]'
+      + 1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_object' + 16 0x1f9ebe4d8 --> <Class.methodCache._buckets (bucket_t) 0x1018a5b40> [32]
+      + 1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_object' + 32 0x1f9ebe4e8 --> <Class.data (class_rw_t) 0x1018a4bd0> [32]
+      1 (64 bytes) libobjc.A.dylib __DATA_DIRTY __bss: 'dataSegmentsRanges' + 16 0x1f9eb6180 --> <non-object in zone DefaultMallocZone_0x101698000 0x1018a4600> [64]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_data_empty' + 32 0x1f9ebeab0 --> <Class.data (class_rw_t) 0x9930009c0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_data' + 32 0x1f9ebea88 --> <Class.data (class_rw_t) 0x9930009a0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_voucher' + 32 0x1f9ebe9c0 --> <Class.data (class_rw_t) 0x993000940> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_object' + 32 0x1f9ebe998 --> <Class.data (class_rw_t) 0x1018a4bf0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_disk' + 32 0x1f9ebe970 --> <Class.data (class_rw_t) 0x993000900> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_operation' + 32 0x1f9ebe948 --> <Class.data (class_rw_t) 0x9930008c0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_io' + 32 0x1f9ebe920 --> <Class.data (class_rw_t) 0x993000880> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_mach_msg' + 32 0x1f9ebe8f8 --> <Class.data (class_rw_t) 0x993000840> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_mach' + 32 0x1f9ebe8d0 --> <Class.data (class_rw_t) 0x9930004c0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_channel' + 32 0x1f9ebe8a8 --> <Class.data (class_rw_t) 0x993000440> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_source' + 32 0x1f9ebe880 --> <Class.data (class_rw_t) 0x993000480> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_attr' + 32 0x1f9ebe858 --> <Class.data (class_rw_t) 0x993000800> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_mgr' + 32 0x1f9ebe830 --> <Class.data (class_rw_t) 0x9930007c0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_runloop' + 32 0x1f9ebe808 --> <Class.data (class_rw_t) 0x993000580> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_main' + 32 0x1f9ebe7e0 --> <Class.data (class_rw_t) 0x9930006c0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_pthread_root' + 32 0x1f9ebe7b8 --> <Class.data (class_rw_t) 0x993000740> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_global' + 32 0x1f9ebe790 --> <Class.data (class_rw_t) 0x993000700> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_cooperative' + 32 0x1f9ebe768 --> <Class.data (class_rw_t) 0x993000780> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_concurrent' + 32 0x1f9ebe740 --> <Class.data (class_rw_t) 0x993000680> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_serial' + 32 0x1f9ebe718 --> <Class.data (class_rw_t) 0x993000560> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue_serial_executor' + 32 0x1f9ebe6f0 --> <Class.data (class_rw_t) 0x993000540> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_workloop' + 32 0x1f9ebe6c8 --> <Class.data (class_rw_t) 0x993000640> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_queue' + 32 0x1f9ebe6a0 --> <Class.data (class_rw_t) 0x993000400> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_group' + 32 0x1f9ebe678 --> <Class.data (class_rw_t) 0x993000600> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_semaphore' + 32 0x1f9ebe650 --> <Class.data (class_rw_t) 0x9930005c0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_dispatch_object' + 32 0x1f9ebe628 --> <Class.data (class_rw_t) 0x9930003e0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_data_empty' + 32 0x1f9ebe600 --> <Class.data (class_rw_t) 0x993000960> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_data' + 32 0x1f9ebe5d8 --> <Class.data (class_rw_t) 0x993000980> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_voucher' + 32 0x1f9ebe510 --> <Class.data (class_rw_t) 0x993000920> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_disk' + 32 0x1f9ebe498 --> <Class.data (class_rw_t) 0x9930008e0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_operation' + 32 0x1f9ebe448 --> <Class.data (class_rw_t) 0x9930008a0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_io' + 32 0x1f9ebe3f8 --> <Class.data (class_rw_t) 0x993000860> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_mach_msg' + 32 0x1f9ebe3a8 --> <Class.data (class_rw_t) 0x993000820> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_mach' + 32 0x1f9ebe340 --> <Class.data (class_rw_t) 0x9930004a0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_channel' + 32 0x1f9ebe2d8 --> <Class.data (class_rw_t) 0x993000420> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_source' + 32 0x1f9ebe270 --> <Class.data (class_rw_t) 0x993000460> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_attr' + 32 0x1f9ebe220 --> <Class.data (class_rw_t) 0x9930007e0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_mgr' + 32 0x1f9ebe1b8 --> <Class.data (class_rw_t) 0x9930007a0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_runloop' + 32 0x1f9ebe150 --> <Class.data (class_rw_t) 0x9930004e0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_main' + 32 0x1f9ebe0e8 --> <Class.data (class_rw_t) 0x9930006a0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_pthread_root' + 32 0x1f9ebe080 --> <Class.data (class_rw_t) 0x993000720> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_global' + 32 0x1f9ebe018 --> <Class.data (class_rw_t) 0x9930006e0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_cooperative' + 32 0x1f9ebdfb0 --> <Class.data (class_rw_t) 0x993000760> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_concurrent' + 32 0x1f9ebdf48 --> <Class.data (class_rw_t) 0x993000660> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_serial' + 32 0x1f9ebdee0 --> <Class.data (class_rw_t) 0x993000500> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue_serial_executor' + 32 0x1f9ebde78 --> <Class.data (class_rw_t) 0x993000520> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_workloop' + 32 0x1f9ebde10 --> <Class.data (class_rw_t) 0x993000620> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_queue' + 32 0x1f9ebdda8 --> <Class.data (class_rw_t) 0x9930003a0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_group' + 32 0x1f9ebdd58 --> <Class.data (class_rw_t) 0x9930005e0> [32]
+      1 (32 bytes) libdispatch.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_dispatch_object' + 32 0x1f9ebdce0 --> <Class.data (class_rw_t) 0x9930003c0> [32]
+      1 (32 bytes) libsystem_trace.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_os_log' + 32 0x1f9ebc930 --> <Class.data (class_rw_t) 0x9930001a0> [32]
+      1 (32 bytes) libsystem_trace.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_os_activity' + 32 0x1f9ebc908 --> <Class.data (class_rw_t) 0x9930001e0> [32]
+      1 (32 bytes) libsystem_trace.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_os_activity' + 32 0x1f9ebc8e0 --> <Class.data (class_rw_t) 0x993000200> [32]
+      1 (32 bytes) libsystem_trace.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_os_log' + 32 0x1f9ebc8b8 --> <Class.data (class_rw_t) 0x9930001c0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_string_cache' + 32 0x1f9ebc5c8 --> <Class.data (class_rw_t) 0x993000100> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_string_cache' + 32 0x1f9ebc5a0 --> <Class.data (class_rw_t) 0x9930000e0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_rich_error' + 32 0x1f9ebc578 --> <Class.data (class_rw_t) 0x9930000c0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_rich_error' + 32 0x1f9ebc550 --> <Class.data (class_rw_t) 0x9930000a0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_mach_send_once' + 32 0x1f9ebc528 --> <Class.data (class_rw_t) 0x993000080> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_mach_send_once' + 32 0x1f9ebc500 --> <Class.data (class_rw_t) 0x993000060> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_file_transfer' + 32 0x1f9ebc4d8 --> <Class.data (class_rw_t) 0x993000040> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_file_transfer' + 32 0x1f9ebc4b0 --> <Class.data (class_rw_t) 0x993000020> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_activity' + 32 0x1f9ebc488 --> <Class.data (class_rw_t) 0x993000000> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_activity' + 32 0x1f9ebc460 --> <Class.data (class_rw_t) 0x1018a5190> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_service_instance' + 32 0x1f9ebc438 --> <Class.data (class_rw_t) 0x1018a5170> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_service_instance' + 32 0x1f9ebc410 --> <Class.data (class_rw_t) 0x1018a5150> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_service' + 32 0x1f9ebc3e8 --> <Class.data (class_rw_t) 0x1018a4c70> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_service' + 32 0x1f9ebc3c0 --> <Class.data (class_rw_t) 0x1018a4c50> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_bundle' + 32 0x1f9ebc398 --> <Class.data (class_rw_t) 0x1018a5130> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_bundle' + 32 0x1f9ebc370 --> <Class.data (class_rw_t) 0x1018a5110> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_mach_recv' + 32 0x1f9ebc348 --> <Class.data (class_rw_t) 0x1018a50f0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_mach_recv' + 32 0x1f9ebc320 --> <Class.data (class_rw_t) 0x1018a50d0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_pipe' + 32 0x1f9ebc2f8 --> <Class.data (class_rw_t) 0x1018a50b0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_pipe' + 32 0x1f9ebc2d0 --> <Class.data (class_rw_t) 0x1018a5090> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_serializer' + 32 0x1f9ebc2a8 --> <Class.data (class_rw_t) 0x1018a5070> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_serializer' + 32 0x1f9ebc280 --> <Class.data (class_rw_t) 0x1018a5050> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_endpoint' + 32 0x1f9ebc258 --> <Class.data (class_rw_t) 0x1018a5030> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_endpoint' + 32 0x1f9ebc230 --> <Class.data (class_rw_t) 0x1018a5010> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_connection' + 32 0x1f9ebc208 --> <Class.data (class_rw_t) 0x1018a4c30> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_connection' + 32 0x1f9ebc1e0 --> <Class.data (class_rw_t) 0x1018a4b90> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_error' + 32 0x1f9ebc1b8 --> <Class.data (class_rw_t) 0x1018a4ff0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_error' + 32 0x1f9ebc190 --> <Class.data (class_rw_t) 0x1018a4fd0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_dictionary' + 32 0x1f9ebc168 --> <Class.data (class_rw_t) 0x1018a4fb0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_array' + 32 0x1f9ebc118 --> <Class.data (class_rw_t) 0x1018a4f70> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_array' + 32 0x1f9ebc0f0 --> <Class.data (class_rw_t) 0x1018a4f50> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_mach_send' + 32 0x1f9ebc0c8 --> <Class.data (class_rw_t) 0x1018a4f30> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_mach_send' + 32 0x1f9ebc0a0 --> <Class.data (class_rw_t) 0x1018a4f10> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_shmem' + 32 0x1f9ebc078 --> <Class.data (class_rw_t) 0x1018a4ef0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_shmem' + 32 0x1f9ebc050 --> <Class.data (class_rw_t) 0x1018a4ed0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_fd' + 32 0x1f9ebc028 --> <Class.data (class_rw_t) 0x1018a4eb0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_fd' + 32 0x1f9ebc000 --> <Class.data (class_rw_t) 0x1018a4e90> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_uuid' + 32 0x1f9ebbfd8 --> <Class.data (class_rw_t) 0x1018a4e70> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_uuid' + 32 0x1f9ebbfb0 --> <Class.data (class_rw_t) 0x1018a4e50> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_string' + 32 0x1f9ebbf88 --> <Class.data (class_rw_t) 0x1018a4e30> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_string' + 32 0x1f9ebbf60 --> <Class.data (class_rw_t) 0x1018a4e10> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_data' + 32 0x1f9ebbf38 --> <Class.data (class_rw_t) 0x1018a4df0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_data' + 32 0x1f9ebbf10 --> <Class.data (class_rw_t) 0x1018a4dd0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_date' + 32 0x1f9ebbee8 --> <Class.data (class_rw_t) 0x1018a4db0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_date' + 32 0x1f9ebbec0 --> <Class.data (class_rw_t) 0x1018a4d90> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_pointer' + 32 0x1f9ebbe98 --> <Class.data (class_rw_t) 0x1018a4d70> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_pointer' + 32 0x1f9ebbe70 --> <Class.data (class_rw_t) 0x1018a4d50> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_double' + 32 0x1f9ebbe48 --> <Class.data (class_rw_t) 0x1018a4d30> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_double' + 32 0x1f9ebbe20 --> <Class.data (class_rw_t) 0x1018a4d10> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_uint64' + 32 0x1f9ebbdf8 --> <Class.data (class_rw_t) 0x993000180> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_uint64' + 32 0x1f9ebbdd0 --> <Class.data (class_rw_t) 0x993000160> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_int64' + 32 0x1f9ebbda8 --> <Class.data (class_rw_t) 0x993000140> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_int64' + 32 0x1f9ebbd80 --> <Class.data (class_rw_t) 0x993000120> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_bool' + 32 0x1f9ebbd58 --> <Class.data (class_rw_t) 0x1018a4cf0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_bool' + 32 0x1f9ebbd30 --> <Class.data (class_rw_t) 0x1018a4cd0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_null' + 32 0x1f9ebbd08 --> <Class.data (class_rw_t) 0x1018a4cb0> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: '_xpc_type_null' + 32 0x1f9ebbce0 --> <Class.data (class_rw_t) 0x1018a4c90> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_OS_xpc_object' + 32 0x1f9ebbcb8 --> <Class.data (class_rw_t) 0x1018a4c10> [32]
+      1 (32 bytes) libxpc.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_OS_xpc_object' + 32 0x1f9ebbc90 --> <Class.data (class_rw_t) 0x1018a4bb0> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: '_NSConcreteGlobalBlock' + 32 0x1f9ebbc50 --> <Class.data (class_rw_t) 0x993000320> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: '_NSConcreteMallocBlock' + 32 0x1f9ebbc28 --> <Class.data (class_rw_t) 0x993000260> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: '_NSConcreteStackBlock' + 32 0x1f9ebbc00 --> <Class.data (class_rw_t) 0x993000220> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___NSAutoBlock__' + 32 0x1f9ebbbd8 --> <Class.data (class_rw_t) 0x9930002c0> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___NSBlockVariable__' + 32 0x1f9ebbbb0 --> <Class.data (class_rw_t) 0x993000380> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___NSFinalizingBlock__' + 32 0x1f9ebbb88 --> <Class.data (class_rw_t) 0x993000300> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___NSGlobalBlock__' + 32 0x1f9ebbb60 --> <Class.data (class_rw_t) 0x993000340> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___NSMallocBlock__' + 32 0x1f9ebbb38 --> <Class.data (class_rw_t) 0x993000280> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___NSStackBlock__' + 32 0x1f9ebbb10 --> <Class.data (class_rw_t) 0x993000240> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: '_NSConcreteAutoBlock' + 32 0x1f9ebbae8 --> <Class.data (class_rw_t) 0x9930002a0> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: '_NSConcreteFinalizingBlock' + 32 0x1f9ebbac0 --> <Class.data (class_rw_t) 0x9930002e0> [32]
+      1 (32 bytes) libsystem_blocks.dylib __DATA_DIRTY __objc_data: '_NSConcreteWeakBlockVariable' + 32 0x1f9ebba98 --> <Class.data (class_rw_t) 0x993000360> [32]
+      1 (32 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_NSObject' + 32 0x1f9eb1ed0 --> <Class.data (class_rw_t) 0x1018a4aa0> [32]
+      1 (32 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$_Protocol' + 32 0x1f9eb1ea8 --> <Class.data (class_rw_t) 0x1018a4b10> [32]
+      1 (32 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$___IncompleteProtocol' + 32 0x1f9eb1e80 --> <Class.data (class_rw_t) 0x1018a47b0> [32]
+      1 (32 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_CLASS_$___NSUnrecognizedTaggedPointer' + 32 0x1f9eb1e58 --> <Class.data (class_rw_t) 0x1018a4b50> [32]
+      1 (32 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$_Protocol' + 32 0x1f9eb1e30 --> <Class.data (class_rw_t) 0x1018a4b30> [32]
+      1 (32 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___IncompleteProtocol' + 32 0x1f9eb1e08 --> <Class.data (class_rw_t) 0x1018a4af0> [32]
+      1 (32 bytes) libobjc.A.dylib __DATA_DIRTY __objc_data: 'OBJC_METACLASS_$___NSUnrecognizedTaggedPointer' + 32 0x1f9eb1de0 --> <Class.data (class_rw_t) 0x1018a4b70> [32]
+

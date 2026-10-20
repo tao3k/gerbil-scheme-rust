@@ -11,6 +11,8 @@ pub use gambit_program::{
 };
 mod compiler;
 mod header;
+mod instance;
+pub use instance::{NativeInstanceImageRequest, build_native_instance_image};
 mod package_launcher;
 mod program;
 mod toolchain;
@@ -40,3 +42,6 @@ pub use program::run_native_process;
 #[path = "../../../crates/gerbil-scheme/src/tool_environment.rs"]
 mod tool_environment;
 pub use tool_environment::{GerbilNativeToolEnvironment, configure_gerbil_native_tool_command};
+
+mod module_bundles;
+pub use module_bundles::{NativeModuleBundle, build_native_module_bundles};

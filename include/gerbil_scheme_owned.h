@@ -9,8 +9,14 @@ extern "C" {
 #define GERBIL_OWNED_ABI_VERSION 1u
 #define GERBIL_OWNED_ABI_ID "gerbil-owned/v1"
 #define GERBIL_OWNED_NO_VM 1u
-/* Provider declaration, not proof: callbacks and release must not initialize,
- * enter, or depend on a Scheme VM. Admission also checks the exact producer. */
+#define GERBIL_OWNED_SCHEME_VM 2u
+/* Exactly one runtime declaration, not combinable feature bits or proof:
+ * NO_VM: callbacks/release do not initialize, enter or depend on Scheme.
+ * SCHEME_VM: callbacks/release run on the live Scheme runtime's fixed owner.
+ * The producer or admitted scope must retain that VM, captures and code through
+ * every callback and release. A VM-dependent result needs its own lifetime
+ * protection independently of the callable/state; copied results may use NO_VM.
+ * Neither flag initializes a runtime, schedules work or authorizes fallback. */
 enum GerbilOwnedKind {
   GERBIL_OWNED_NULL = 0, GERBIL_OWNED_BOOL = 1, GERBIL_OWNED_INTEGER = 2,
   GERBIL_OWNED_REAL = 3, GERBIL_OWNED_TEXT = 4, GERBIL_OWNED_BYTES = 5,
@@ -63,7 +69,8 @@ typedef struct GerbilOwnedState {
  * callable/state owner. Closing an owner never silently revives it.
  * No exception, longjmp, Rust panic or reentrant owner call may cross this ABI.
  * One owner thread creates, calls and releases each context. Algorithms may
- * have independent owners on parallel host threads; this does not imply VM use.
+ * have independent owners on parallel host threads. SCHEME_VM does not admit
+ * concurrent entry to one VM or transfer of rooted handles between owners.
  * Every non-null release field has this same ABI even on version rejection;
  * consuming adapters release it exactly once. */
 #ifdef __cplusplus

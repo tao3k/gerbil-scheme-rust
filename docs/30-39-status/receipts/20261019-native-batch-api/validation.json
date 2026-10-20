@@ -1,0 +1,61 @@
+{
+  "scope": "Final uncommitted working tree; commands completed naturally, no remote CI claim.",
+  "final_commands": {
+    "release build with separated order entry": {
+      "exit": 0,
+      "log": "build-entry-fix.log"
+    },
+    "release binary --smoke": {
+      "exit": 0,
+      "log": "smoke-final.log"
+    },
+    "release binary --orders": {
+      "exit": 0,
+      "log": "orders-final.log",
+      "timed_samples": 160,
+      "timed_orders_validated": 163840
+    },
+    "strict Clippy core+qualification all targets instance-library": {
+      "exit": 0,
+      "log": "clippy-current.log"
+    },
+    "generated Scheme provenance check sys default native graph": {
+      "exit": 0,
+      "log": "generated-check.log"
+    },
+    "native root lifetime compile-fail doctest": {
+      "exit": 0,
+      "passed": 1,
+      "log": "root-doctest.log"
+    }
+  },
+  "negative_commands": {
+    "strict initial Clippy": {
+      "exit": 101,
+      "log": "clippy.log"
+    },
+    "rank instrumentation permutation failure": {
+      "exit": 101,
+      "log": "orders-rank-failure.log",
+      "cleanup": "unverified"
+    },
+    "generic vector fixture regression": {
+      "exit": 101,
+      "log": "smoke-vector-failure.log",
+      "cleanup": "unverified"
+    },
+    "loaded run": {
+      "exit": 0,
+      "log": "orders-loaded.log",
+      "performance_admission": "excluded: external compilers in after snapshot"
+    }
+  },
+  "gates": {
+    "startup_response_shutdown_progress_seconds": 5,
+    "timed_queues_capacity": 128,
+    "semantic_items_per_cohort": 128,
+    "sdk_rebuilt": false,
+    "smp_changed": false,
+    "p99_non_regression": false
+  }
+}

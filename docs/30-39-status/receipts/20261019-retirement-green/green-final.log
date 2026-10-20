@@ -1,0 +1,516 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --green
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+    Finished `bench` profile [optimized] target(s) in 21.50s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+RESOURCE-SNAPSHOT phase=green-before-actors epoch=1 resident=24084480 footprint=17219944 fds=5 threads=3 images=52 malloc-live=6778592 malloc-reserved=25165824 malloc-blocks=302 gc=[] capacity=[] live=[] roots=[]
+GREEN-CONTRACT owners=1 actors-per-owner=4 native-processors=1 caught-actor-errors=4 successful-after-error=true roots=0
+RESOURCE-SNAPSHOT phase=green-after-actors epoch=1 resident=25116672 footprint=17973632 fds=5 threads=3 images=52 malloc-live=6759888 malloc-reserved=33554432 malloc-blocks=293 gc=[] capacity=[] live=[] roots=[]
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-one-actor-one ns=1973375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-actor-one ns=132000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-actors-four ns=195667 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-actors-four-yield1 ns=211459 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-sequential ns=120459 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-sequential ns=124417 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-actors-four-yield1 ns=226750 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-actors-four ns=140625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-batch32-actor-one ns=172166 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=0 case=ffi-one-actor-one ns=2399250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-one-actor-one ns=2139500 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-actor-one ns=196708 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-actors-four ns=252333 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-actors-four-yield1 ns=237875 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-sequential ns=174708 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-sequential ns=131000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-actors-four-yield1 ns=224042 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-actors-four ns=137375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-batch32-actor-one ns=135625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=1 case=ffi-one-actor-one ns=1744958 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-one-actor-one ns=2074416 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-actor-one ns=179250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-actors-four ns=227750 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-actors-four-yield1 ns=179417 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-sequential ns=526417 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-sequential ns=188458 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-actors-four-yield1 ns=232916 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-actors-four ns=154375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-batch32-actor-one ns=136667 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=2 case=ffi-one-actor-one ns=1760833 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-one-actor-one ns=1923709 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-actor-one ns=359667 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-actors-four ns=222125 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-actors-four-yield1 ns=235125 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-sequential ns=145833 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-sequential ns=181000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-actors-four-yield1 ns=278917 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-actors-four ns=198000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-batch32-actor-one ns=183958 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=3 case=ffi-one-actor-one ns=2338041 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-one-actor-one ns=1775875 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-actor-one ns=173041 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-actors-four ns=130375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-actors-four-yield1 ns=184459 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-sequential ns=88791 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-sequential ns=107125 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-actors-four-yield1 ns=207875 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-actors-four ns=181959 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-batch32-actor-one ns=172542 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=4 case=ffi-one-actor-one ns=2228500 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-one-actor-one ns=2060250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-actor-one ns=135417 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-actors-four ns=143917 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-actors-four-yield1 ns=739459 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-sequential ns=102375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-sequential ns=134667 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-actors-four-yield1 ns=195042 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-actors-four ns=251250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-batch32-actor-one ns=135083 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=5 case=ffi-one-actor-one ns=1615709 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-one-actor-one ns=1739625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-actor-one ns=118875 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-actors-four ns=160958 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-actors-four-yield1 ns=192042 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-sequential ns=86333 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-sequential ns=88583 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-actors-four-yield1 ns=194333 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-actors-four ns=141833 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-batch32-actor-one ns=119709 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=6 case=ffi-one-actor-one ns=3032417 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-one-actor-one ns=1968833 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-actor-one ns=170958 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-actors-four ns=194917 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-actors-four-yield1 ns=213333 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-sequential ns=128167 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-sequential ns=97583 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-actors-four-yield1 ns=210917 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-actors-four ns=142541 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-batch32-actor-one ns=136625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=7 case=ffi-one-actor-one ns=1489084 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-one-actor-one ns=1628125 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-actor-one ns=159250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-actors-four ns=144959 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-actors-four-yield1 ns=515125 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-sequential ns=134708 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-sequential ns=137417 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-actors-four-yield1 ns=211291 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-actors-four ns=175666 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-batch32-actor-one ns=182959 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=8 case=ffi-one-actor-one ns=1759292 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-one-actor-one ns=2000333 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-actor-one ns=171125 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-actors-four ns=206625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-actors-four-yield1 ns=194042 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-sequential ns=93375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-sequential ns=77250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-actors-four-yield1 ns=190708 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-actors-four ns=128959 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-batch32-actor-one ns=157459 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=512 block=9 case=ffi-one-actor-one ns=2154792 first-peer-progress-min=0
+GREEN-RESULT owners=1 jobs=512 case=ffi-one-actor-one samples=20 median-ns=1971104 max-ns=3032417 ffi-per-sample=512 equal-admitted-items=128 enqueue-projection-p95-ns=656792
+GREEN-RESULT owners=1 jobs=512 case=ffi-batch32-actor-one samples=20 median-ns=165104 max-ns=359667 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=40417
+GREEN-RESULT owners=1 jobs=512 case=ffi-batch32-actors-four samples=20 median-ns=168312 max-ns=252333 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=46125
+GREEN-RESULT owners=1 jobs=512 case=ffi-batch32-actors-four-yield1 samples=20 median-ns=211375 max-ns=739459 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=54625
+GREEN-RESULT owners=1 jobs=512 case=ffi-batch32-sequential samples=20 median-ns=126292 max-ns=526417 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=31375
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-one-actor-one ns=13598916 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-actor-one ns=1510625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-actors-four ns=1403708 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-actors-four-yield1 ns=1886917 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-sequential ns=888250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-sequential ns=1219375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-actors-four-yield1 ns=1574000 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-actors-four ns=1480167 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-batch32-actor-one ns=1328834 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=0 case=ffi-one-actor-one ns=14691625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-one-actor-one ns=14549375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-actor-one ns=1177458 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-actors-four ns=1553042 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-actors-four-yield1 ns=1587917 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-sequential ns=1270167 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-sequential ns=862500 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-actors-four-yield1 ns=1625083 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-actors-four ns=1418209 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-batch32-actor-one ns=1139000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=1 case=ffi-one-actor-one ns=17253792 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-one-actor-one ns=47097208 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-actor-one ns=35155500 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-actors-four ns=36950333 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-actors-four-yield1 ns=4263792 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-sequential ns=3156875 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-sequential ns=1063958 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-actors-four-yield1 ns=2034250 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-actors-four ns=3414750 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-batch32-actor-one ns=2129042 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=2 case=ffi-one-actor-one ns=16795041 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-one-actor-one ns=14106792 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-actor-one ns=1188208 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-actors-four ns=1649750 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-actors-four-yield1 ns=1789459 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-sequential ns=1261250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-sequential ns=900541 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-actors-four-yield1 ns=1708375 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-actors-four ns=1708000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-batch32-actor-one ns=1197584 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=3 case=ffi-one-actor-one ns=13810750 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-one-actor-one ns=12450167 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-actor-one ns=1280375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-actors-four ns=1719834 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-actors-four-yield1 ns=1942458 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-sequential ns=1370166 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-sequential ns=759667 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-actors-four-yield1 ns=2022083 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-actors-four ns=1308875 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-batch32-actor-one ns=1116292 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=4 case=ffi-one-actor-one ns=12576583 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-one-actor-one ns=14088000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-actor-one ns=1190584 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-actors-four ns=1764167 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-actors-four-yield1 ns=1786417 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-sequential ns=847417 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-sequential ns=1007542 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-actors-four-yield1 ns=1973000 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-actors-four ns=1288750 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-batch32-actor-one ns=1339084 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=5 case=ffi-one-actor-one ns=13696125 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-one-actor-one ns=14259416 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-actor-one ns=1504042 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-actors-four ns=1829583 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-actors-four-yield1 ns=2052042 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-sequential ns=965958 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-sequential ns=975458 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-actors-four-yield1 ns=1950333 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-actors-four ns=1436333 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-batch32-actor-one ns=1799708 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=6 case=ffi-one-actor-one ns=14001125 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-one-actor-one ns=14239625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-actor-one ns=1682750 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-actors-four ns=1502208 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-actors-four-yield1 ns=2002083 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-sequential ns=966541 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-sequential ns=845583 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-actors-four-yield1 ns=1960416 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-actors-four ns=1808333 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-batch32-actor-one ns=1104709 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=7 case=ffi-one-actor-one ns=15575000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-one-actor-one ns=14416625 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-actor-one ns=1177708 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-actors-four ns=1309084 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-actors-four-yield1 ns=2525541 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-sequential ns=1177208 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-sequential ns=868542 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-actors-four-yield1 ns=1566292 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-actors-four ns=1654541 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-batch32-actor-one ns=1072083 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=8 case=ffi-one-actor-one ns=13562000 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-one-actor-one ns=13799792 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-actor-one ns=1145333 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-actors-four ns=1644375 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-actors-four-yield1 ns=1584250 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-sequential ns=1174250 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-sequential ns=878833 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-actors-four-yield1 ns=1701584 first-peer-progress-min=8
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-actors-four ns=1631958 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-batch32-actor-one ns=1326916 first-peer-progress-min=0
+GREEN-SAMPLE owners=1 jobs=4096 block=9 case=ffi-one-actor-one ns=14139541 first-peer-progress-min=0
+GREEN-RESULT owners=1 jobs=4096 case=ffi-one-actor-one samples=20 median-ns=14123166 max-ns=47097208 ffi-per-sample=4096 equal-admitted-items=128 enqueue-projection-p95-ns=633208
+GREEN-RESULT owners=1 jobs=4096 case=ffi-batch32-actor-one samples=20 median-ns=1238979 max-ns=35155500 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=52875
+GREEN-RESULT owners=1 jobs=4096 case=ffi-batch32-actors-four samples=20 median-ns=1638166 max-ns=36950333 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=67500
+GREEN-RESULT owners=1 jobs=4096 case=ffi-batch32-actors-four-yield1 samples=20 median-ns=1914687 max-ns=4263792 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=59583
+GREEN-RESULT owners=1 jobs=4096 case=ffi-batch32-sequential samples=20 median-ns=970999 max-ns=3156875 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=25250
+GREEN-TIMER block=0 owners=1 target-owner=0 concurrent=0 timers=16 ns=19786000 validated=true
+GREEN-TIMER block=0 owners=1 target-owner=0 concurrent=1 timers=16 ns=1277375 validated=true
+GREEN-TIMER block=0 owners=1 target-owner=0 concurrent=1 timers=16 ns=1287875 validated=true
+GREEN-TIMER block=0 owners=1 target-owner=0 concurrent=0 timers=16 ns=19729625 validated=true
+GREEN-TIMER block=1 owners=1 target-owner=0 concurrent=0 timers=16 ns=19944458 validated=true
+GREEN-TIMER block=1 owners=1 target-owner=0 concurrent=1 timers=16 ns=1307583 validated=true
+GREEN-TIMER block=1 owners=1 target-owner=0 concurrent=1 timers=16 ns=1302958 validated=true
+GREEN-TIMER block=1 owners=1 target-owner=0 concurrent=0 timers=16 ns=20073709 validated=true
+GREEN-TIMER block=2 owners=1 target-owner=0 concurrent=0 timers=16 ns=19690125 validated=true
+GREEN-TIMER block=2 owners=1 target-owner=0 concurrent=1 timers=16 ns=1323791 validated=true
+GREEN-TIMER block=2 owners=1 target-owner=0 concurrent=1 timers=16 ns=1298292 validated=true
+GREEN-TIMER block=2 owners=1 target-owner=0 concurrent=0 timers=16 ns=19618708 validated=true
+GREEN-TIMER block=3 owners=1 target-owner=0 concurrent=0 timers=16 ns=19695375 validated=true
+GREEN-TIMER block=3 owners=1 target-owner=0 concurrent=1 timers=16 ns=1300584 validated=true
+GREEN-TIMER block=3 owners=1 target-owner=0 concurrent=1 timers=16 ns=1622500 validated=true
+GREEN-TIMER block=3 owners=1 target-owner=0 concurrent=0 timers=16 ns=19974417 validated=true
+GREEN-TIMER block=4 owners=1 target-owner=0 concurrent=0 timers=16 ns=19453250 validated=true
+GREEN-TIMER block=4 owners=1 target-owner=0 concurrent=1 timers=16 ns=1341250 validated=true
+GREEN-TIMER block=4 owners=1 target-owner=0 concurrent=1 timers=16 ns=1314083 validated=true
+GREEN-TIMER block=4 owners=1 target-owner=0 concurrent=0 timers=16 ns=39317583 validated=true
+GREEN-TIMER block=5 owners=1 target-owner=0 concurrent=0 timers=16 ns=63262000 validated=true
+GREEN-TIMER block=5 owners=1 target-owner=0 concurrent=1 timers=16 ns=1400417 validated=true
+GREEN-TIMER block=5 owners=1 target-owner=0 concurrent=1 timers=16 ns=1425250 validated=true
+GREEN-TIMER block=5 owners=1 target-owner=0 concurrent=0 timers=16 ns=21096125 validated=true
+GREEN-TIMER block=6 owners=1 target-owner=0 concurrent=0 timers=16 ns=21941041 validated=true
+GREEN-TIMER block=6 owners=1 target-owner=0 concurrent=1 timers=16 ns=1488291 validated=true
+GREEN-TIMER block=6 owners=1 target-owner=0 concurrent=1 timers=16 ns=1781291 validated=true
+GREEN-TIMER block=6 owners=1 target-owner=0 concurrent=0 timers=16 ns=26836917 validated=true
+GREEN-TIMER block=7 owners=1 target-owner=0 concurrent=0 timers=16 ns=20697250 validated=true
+GREEN-TIMER block=7 owners=1 target-owner=0 concurrent=1 timers=16 ns=1657667 validated=true
+GREEN-TIMER block=7 owners=1 target-owner=0 concurrent=1 timers=16 ns=2056709 validated=true
+GREEN-TIMER block=7 owners=1 target-owner=0 concurrent=0 timers=16 ns=19746792 validated=true
+GREEN-TIMER block=8 owners=1 target-owner=0 concurrent=0 timers=16 ns=19765750 validated=true
+GREEN-TIMER block=8 owners=1 target-owner=0 concurrent=1 timers=16 ns=1329833 validated=true
+GREEN-TIMER block=8 owners=1 target-owner=0 concurrent=1 timers=16 ns=1306583 validated=true
+GREEN-TIMER block=8 owners=1 target-owner=0 concurrent=0 timers=16 ns=19594541 validated=true
+GREEN-TIMER block=9 owners=1 target-owner=0 concurrent=0 timers=16 ns=20745708 validated=true
+GREEN-TIMER block=9 owners=1 target-owner=0 concurrent=1 timers=16 ns=1308708 validated=true
+GREEN-TIMER block=9 owners=1 target-owner=0 concurrent=1 timers=16 ns=1280000 validated=true
+GREEN-TIMER block=9 owners=1 target-owner=0 concurrent=0 timers=16 ns=19940542 validated=true
+GREEN-TIMER-RESULT owners=1 target-owner=0 concurrent=0 samples=20 median-ns=19942500 extra-rust-workers=0
+GREEN-TIMER-RESULT owners=1 target-owner=0 concurrent=1 samples=20 median-ns=1318937 extra-rust-workers=0
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[57458] io-retired-bytes=[2048] files-removed=[true]
+RESOURCE-SNAPSHOT phase=green-before-actors epoch=4 resident=88834048 footprint=58966496 fds=11 threads=6 images=56 malloc-live=27071264 malloc-reserved=62914560 malloc-blocks=560 gc=[] capacity=[] live=[] roots=[]
+GREEN-CONTRACT owners=4 actors-per-owner=4 native-processors=1 caught-actor-errors=16 successful-after-error=true roots=0
+RESOURCE-SNAPSHOT phase=green-after-actors epoch=4 resident=91275264 footprint=60817888 fds=11 threads=6 images=56 malloc-live=26996192 malloc-reserved=62914560 malloc-blocks=520 gc=[] capacity=[] live=[] roots=[]
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-one-actor-one ns=3452500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-actor-one ns=423666 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-actors-four ns=307792 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-actors-four-yield1 ns=465042 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-sequential ns=174583 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-sequential ns=426875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-actors-four-yield1 ns=449750 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-actors-four ns=266625 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-batch32-actor-one ns=163625 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=0 case=ffi-one-actor-one ns=1837750 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-one-actor-one ns=2962958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-actor-one ns=197541 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-actors-four ns=434792 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-actors-four-yield1 ns=1006292 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-sequential ns=217542 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-sequential ns=857500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-actors-four-yield1 ns=413584 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-actors-four ns=229416 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-batch32-actor-one ns=369584 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=1 case=ffi-one-actor-one ns=1948291 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-one-actor-one ns=1456875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-actor-one ns=781334 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-actors-four ns=837459 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-actors-four-yield1 ns=684083 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-sequential ns=143500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-sequential ns=453334 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-actors-four-yield1 ns=2234875 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-actors-four ns=534083 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-batch32-actor-one ns=184542 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=2 case=ffi-one-actor-one ns=1840542 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-one-actor-one ns=1965917 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-actor-one ns=402833 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-actors-four ns=292083 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-actors-four-yield1 ns=928083 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-sequential ns=259500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-sequential ns=108083 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-actors-four-yield1 ns=164084 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-actors-four ns=148459 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-batch32-actor-one ns=132875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=3 case=ffi-one-actor-one ns=1342791 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-one-actor-one ns=4430000 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-actor-one ns=13376750 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-actors-four ns=610125 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-actors-four-yield1 ns=565041 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-sequential ns=149958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-sequential ns=173375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-actors-four-yield1 ns=391375 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-actors-four ns=279583 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-batch32-actor-one ns=1263125 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=4 case=ffi-one-actor-one ns=2073167 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-one-actor-one ns=1554750 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-actor-one ns=337292 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-actors-four ns=261375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-actors-four-yield1 ns=261583 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-sequential ns=181958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-sequential ns=201959 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-actors-four-yield1 ns=1091667 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-actors-four ns=202084 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-batch32-actor-one ns=124208 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=5 case=ffi-one-actor-one ns=1079375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-one-actor-one ns=1029125 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-actor-one ns=142958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-actors-four ns=118208 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-actors-four-yield1 ns=155416 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-sequential ns=143708 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-sequential ns=140833 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-actors-four-yield1 ns=164583 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-actors-four ns=145084 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-batch32-actor-one ns=141666 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=6 case=ffi-one-actor-one ns=746166 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-one-actor-one ns=1498292 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-actor-one ns=144458 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-actors-four ns=159125 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-actors-four-yield1 ns=144834 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-sequential ns=92333 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-sequential ns=103458 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-actors-four-yield1 ns=150125 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-actors-four ns=109208 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-batch32-actor-one ns=151542 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=7 case=ffi-one-actor-one ns=754667 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-one-actor-one ns=848500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-actor-one ns=131042 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-actors-four ns=142417 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-actors-four-yield1 ns=262000 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-sequential ns=93250 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-sequential ns=71959 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-actors-four-yield1 ns=844916 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-actors-four ns=115458 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-batch32-actor-one ns=118250 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=8 case=ffi-one-actor-one ns=871667 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-one-actor-one ns=631000 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-actor-one ns=98000 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-actors-four ns=102959 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-actors-four-yield1 ns=131709 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-sequential ns=87125 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-sequential ns=93584 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-actors-four-yield1 ns=147167 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-actors-four ns=120584 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-batch32-actor-one ns=143375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=512 block=9 case=ffi-one-actor-one ns=786667 first-peer-progress-min=0
+GREEN-RESULT owners=4 jobs=512 case=ffi-one-actor-one samples=20 median-ns=1477583 max-ns=4430000 ffi-per-sample=512 equal-admitted-items=128 enqueue-projection-p95-ns=553875
+GREEN-RESULT owners=4 jobs=512 case=ffi-batch32-actor-one samples=20 median-ns=157583 max-ns=13376750 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=196917
+GREEN-RESULT owners=4 jobs=512 case=ffi-batch32-actors-four samples=20 median-ns=215750 max-ns=837459 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=96625
+GREEN-RESULT owners=4 jobs=512 case=ffi-batch32-actors-four-yield1 samples=20 median-ns=402479 max-ns=2234875 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=183792
+GREEN-RESULT owners=4 jobs=512 case=ffi-batch32-sequential samples=20 median-ns=146833 max-ns=857500 ffi-per-sample=16 equal-admitted-items=128 enqueue-projection-p95-ns=78875
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-one-actor-one ns=9820584 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-actor-one ns=1413333 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-actors-four ns=1978500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-actors-four-yield1 ns=1492583 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-sequential ns=743625 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-sequential ns=728750 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-actors-four-yield1 ns=1406209 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-actors-four ns=1109041 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-batch32-actor-one ns=1124334 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=0 case=ffi-one-actor-one ns=7076958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-one-actor-one ns=6063542 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-actor-one ns=1302667 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-actors-four ns=1069625 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-actors-four-yield1 ns=1049000 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-sequential ns=796750 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-sequential ns=1035333 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-actors-four-yield1 ns=1733584 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-actors-four ns=859917 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-batch32-actor-one ns=854750 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=1 case=ffi-one-actor-one ns=5367625 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-one-actor-one ns=5142208 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-actor-one ns=602125 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-actors-four ns=726833 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-actors-four-yield1 ns=1295084 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-sequential ns=812459 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-sequential ns=827500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-actors-four-yield1 ns=1156959 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-actors-four ns=633209 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-batch32-actor-one ns=984875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=2 case=ffi-one-actor-one ns=5866250 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-one-actor-one ns=6774583 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-actor-one ns=845375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-actors-four ns=990084 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-actors-four-yield1 ns=823917 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-sequential ns=592916 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-sequential ns=509958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-actors-four-yield1 ns=785333 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-actors-four ns=1022083 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-batch32-actor-one ns=1056916 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=3 case=ffi-one-actor-one ns=6195208 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-one-actor-one ns=6271459 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-actor-one ns=1318834 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-actors-four ns=1970375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-actors-four-yield1 ns=2222458 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-sequential ns=1574583 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-sequential ns=1570459 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-actors-four-yield1 ns=2829375 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-actors-four ns=1892666 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-batch32-actor-one ns=1964250 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=4 case=ffi-one-actor-one ns=12070917 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-one-actor-one ns=6721625 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-actor-one ns=993667 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-actors-four ns=1092291 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-actors-four-yield1 ns=2489500 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-sequential ns=1640208 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-sequential ns=884584 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-actors-four-yield1 ns=1702916 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-actors-four ns=852875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-batch32-actor-one ns=819958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=5 case=ffi-one-actor-one ns=7768292 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-one-actor-one ns=8039292 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-actor-one ns=1105875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-actors-four ns=2397000 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-actors-four-yield1 ns=2010958 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-sequential ns=1455500 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-sequential ns=1353584 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-actors-four-yield1 ns=3052708 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-actors-four ns=2125042 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-batch32-actor-one ns=7594583 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=6 case=ffi-one-actor-one ns=86070042 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-one-actor-one ns=15449083 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-actor-one ns=2930083 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-actors-four ns=2893333 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-actors-four-yield1 ns=4303958 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-sequential ns=1709375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-sequential ns=1827875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-actors-four-yield1 ns=4333833 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-actors-four ns=2071125 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-batch32-actor-one ns=1684958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=7 case=ffi-one-actor-one ns=13999875 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-one-actor-one ns=25161709 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-actor-one ns=6939000 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-actors-four ns=9627958 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-actors-four-yield1 ns=5356666 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-sequential ns=2562708 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-sequential ns=3411625 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-actors-four-yield1 ns=2798541 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-actors-four ns=2246666 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-batch32-actor-one ns=2000375 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=8 case=ffi-one-actor-one ns=13077834 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-one-actor-one ns=13919542 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-actor-one ns=1939917 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-actors-four ns=1748917 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-actors-four-yield1 ns=2292334 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-sequential ns=1236084 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-sequential ns=1518209 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-actors-four-yield1 ns=2809333 first-peer-progress-min=8
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-actors-four ns=3264791 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-batch32-actor-one ns=1873416 first-peer-progress-min=0
+GREEN-SAMPLE owners=4 jobs=4096 block=9 case=ffi-one-actor-one ns=12159666 first-peer-progress-min=0
+GREEN-RESULT owners=4 jobs=4096 case=ffi-one-actor-one samples=20 median-ns=7903792 max-ns=86070042 ffi-per-sample=4096 equal-admitted-items=128 enqueue-projection-p95-ns=574000
+GREEN-RESULT owners=4 jobs=4096 case=ffi-batch32-actor-one samples=20 median-ns=1310750 max-ns=7594583 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=63125
+GREEN-RESULT owners=4 jobs=4096 case=ffi-batch32-actors-four samples=20 median-ns=1820791 max-ns=9627958 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=61667
+GREEN-RESULT owners=4 jobs=4096 case=ffi-batch32-actors-four-yield1 samples=20 median-ns=2116708 max-ns=5356666 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=80834
+GREEN-RESULT owners=4 jobs=4096 case=ffi-batch32-sequential samples=20 median-ns=1294834 max-ns=3411625 ffi-per-sample=128 equal-admitted-items=128 enqueue-projection-p95-ns=42084
+GREEN-TIMER block=0 owners=4 target-owner=0 concurrent=0 timers=16 ns=20156459 validated=true
+GREEN-TIMER block=0 owners=4 target-owner=0 concurrent=1 timers=16 ns=1309792 validated=true
+GREEN-TIMER block=0 owners=4 target-owner=0 concurrent=1 timers=16 ns=1307917 validated=true
+GREEN-TIMER block=0 owners=4 target-owner=0 concurrent=0 timers=16 ns=19994208 validated=true
+GREEN-TIMER block=1 owners=4 target-owner=0 concurrent=0 timers=16 ns=19935541 validated=true
+GREEN-TIMER block=1 owners=4 target-owner=0 concurrent=1 timers=16 ns=1326042 validated=true
+GREEN-TIMER block=1 owners=4 target-owner=0 concurrent=1 timers=16 ns=1311916 validated=true
+GREEN-TIMER block=1 owners=4 target-owner=0 concurrent=0 timers=16 ns=20182583 validated=true
+GREEN-TIMER block=2 owners=4 target-owner=0 concurrent=0 timers=16 ns=19868625 validated=true
+GREEN-TIMER block=2 owners=4 target-owner=0 concurrent=1 timers=16 ns=1315833 validated=true
+GREEN-TIMER block=2 owners=4 target-owner=0 concurrent=1 timers=16 ns=1316542 validated=true
+GREEN-TIMER block=2 owners=4 target-owner=0 concurrent=0 timers=16 ns=19953833 validated=true
+GREEN-TIMER block=3 owners=4 target-owner=0 concurrent=0 timers=16 ns=20185750 validated=true
+GREEN-TIMER block=3 owners=4 target-owner=0 concurrent=1 timers=16 ns=1312291 validated=true
+GREEN-TIMER block=3 owners=4 target-owner=0 concurrent=1 timers=16 ns=1314334 validated=true
+GREEN-TIMER block=3 owners=4 target-owner=0 concurrent=0 timers=16 ns=20001959 validated=true
+GREEN-TIMER block=4 owners=4 target-owner=0 concurrent=0 timers=16 ns=21511750 validated=true
+GREEN-TIMER block=4 owners=4 target-owner=0 concurrent=1 timers=16 ns=2151750 validated=true
+GREEN-TIMER block=4 owners=4 target-owner=0 concurrent=1 timers=16 ns=1915791 validated=true
+GREEN-TIMER block=4 owners=4 target-owner=0 concurrent=0 timers=16 ns=22814000 validated=true
+GREEN-TIMER block=5 owners=4 target-owner=0 concurrent=0 timers=16 ns=19682250 validated=true
+GREEN-TIMER block=5 owners=4 target-owner=0 concurrent=1 timers=16 ns=1327834 validated=true
+GREEN-TIMER block=5 owners=4 target-owner=0 concurrent=1 timers=16 ns=1740916 validated=true
+GREEN-TIMER block=5 owners=4 target-owner=0 concurrent=0 timers=16 ns=20223125 validated=true
+GREEN-TIMER block=6 owners=4 target-owner=0 concurrent=0 timers=16 ns=19976250 validated=true
+GREEN-TIMER block=6 owners=4 target-owner=0 concurrent=1 timers=16 ns=1306583 validated=true
+GREEN-TIMER block=6 owners=4 target-owner=0 concurrent=1 timers=16 ns=1305917 validated=true
+GREEN-TIMER block=6 owners=4 target-owner=0 concurrent=0 timers=16 ns=19939958 validated=true
+GREEN-TIMER block=7 owners=4 target-owner=0 concurrent=0 timers=16 ns=20273833 validated=true
+GREEN-TIMER block=7 owners=4 target-owner=0 concurrent=1 timers=16 ns=1333417 validated=true
+GREEN-TIMER block=7 owners=4 target-owner=0 concurrent=1 timers=16 ns=1306291 validated=true
+GREEN-TIMER block=7 owners=4 target-owner=0 concurrent=0 timers=16 ns=20206458 validated=true
+GREEN-TIMER block=8 owners=4 target-owner=0 concurrent=0 timers=16 ns=20081958 validated=true
+GREEN-TIMER block=8 owners=4 target-owner=0 concurrent=1 timers=16 ns=1292750 validated=true
+GREEN-TIMER block=8 owners=4 target-owner=0 concurrent=1 timers=16 ns=1356917 validated=true
+GREEN-TIMER block=8 owners=4 target-owner=0 concurrent=0 timers=16 ns=20245417 validated=true
+GREEN-TIMER block=9 owners=4 target-owner=0 concurrent=0 timers=16 ns=20579417 validated=true
+GREEN-TIMER block=9 owners=4 target-owner=0 concurrent=1 timers=16 ns=1300167 validated=true
+GREEN-TIMER block=9 owners=4 target-owner=0 concurrent=1 timers=16 ns=1294375 validated=true
+GREEN-TIMER block=9 owners=4 target-owner=0 concurrent=0 timers=16 ns=19553166 validated=true
+GREEN-TIMER-RESULT owners=4 target-owner=0 concurrent=0 samples=20 median-ns=20119208 extra-rust-workers=0
+GREEN-TIMER-RESULT owners=4 target-owner=0 concurrent=1 samples=20 median-ns=1313312 extra-rust-workers=0
+RESOURCE-DRAIN joined=4 pending=0 roots=[0, 0, 0, 0] native-cleanup-ns=[46250, 84583, 38167, 34042] io-retired-bytes=[2048, 2048, 2048, 2048] files-removed=[true, true, true, true]

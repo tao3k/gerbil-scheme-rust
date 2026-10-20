@@ -1,0 +1,313 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_library --locked -- 
+    Finished `bench` profile [optimized] target(s) in 0.16s
+     Running benches/instance_library.rs (target/release/deps/instance_library-c22679cf2d89b56f)
+LIBRARY-CLEANUP owner=0 roots=0 collections=18 cleanup-ns=41292
+LIBRARY-CLEANUP owner=0 roots=0 collections=18 cleanup-ns=38083
+LIBRARY-CLEANUP owner=0 roots=0 collections=1 cleanup-ns=102083
+LIBRARY-CONTRACT continuations=PASS gc=PASS dynamic-wind=PASS dynamic-binding=PASS thread-identity=PASS survivor=PASS cleanup-with-saved-continuation=PASS
+LIBRARY-CLEANUP owner=0 roots=0 collections=1 cleanup-ns=34375
+LIBRARY-CLEANUP owner=0 roots=0 collections=1 cleanup-ns=72125
+LIBRARY-CONTRACT queue-full=PASS timeout-not-cancellation=PASS drain-pending=PASS rejected-call-root-balance=PASS oversized-reply=PASS abandoned-ticket=PASS missing-export-before-setup=PASS mixed-backend-rejected=PASS
+LIBRARY-CLEANUP owner=0 roots=0 collections=1 cleanup-ns=57834
+LIBRARY-CLEANUP owner=3 roots=0 collections=1 cleanup-ns=31750
+LIBRARY-CLEANUP owner=1 roots=0 collections=1 cleanup-ns=31666
+LIBRARY-CLEANUP owner=2 roots=0 collections=1 cleanup-ns=30625
+LIBRARY-CONTRACT rust-callers=4 dispatcher-send-sync=PASS close-all-clones=PASS
+LIBRARY-SETUP a-ns=501410833 b-ns=2062055000
+LIBRARY-OWNER owner=0 state=0x11763fa40 processors=1 setup-ns=501060208
+LIBRARY-OWNER owner=0 state=0x118857a40 processors=1 setup-ns=531572375
+LIBRARY-OWNER owner=1 state=0x119a6fa40 processors=1 setup-ns=518651792
+LIBRARY-OWNER owner=2 state=0x11ac87a40 processors=1 setup-ns=507475958
+LIBRARY-OWNER owner=3 state=0x11be9fa40 processors=1 setup-ns=502879333
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=4477708 validated=8
+LIBRARY-BLOCK rows=64 block=0 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=2127167 validated=8
+LIBRARY-BLOCK rows=64 block=0 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=2006333 validated=8
+LIBRARY-BLOCK rows=64 block=0 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=4070625 validated=8
+LIBRARY-BLOCK rows=64 block=0 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=4032708 validated=8
+LIBRARY-BLOCK rows=64 block=1 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=2682709 validated=8
+LIBRARY-BLOCK rows=64 block=1 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=2756125 validated=8
+LIBRARY-BLOCK rows=64 block=1 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=5668500 validated=8
+LIBRARY-BLOCK rows=64 block=1 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=5179208 validated=8
+LIBRARY-BLOCK rows=64 block=2 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=14037541 validated=8
+LIBRARY-BLOCK rows=64 block=2 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=5984542 validated=8
+LIBRARY-BLOCK rows=64 block=2 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=5961042 validated=8
+LIBRARY-BLOCK rows=64 block=2 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=4569542 validated=8
+LIBRARY-BLOCK rows=64 block=3 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=3933708 validated=8
+LIBRARY-BLOCK rows=64 block=3 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=2837833 validated=8
+LIBRARY-BLOCK rows=64 block=3 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=4171958 validated=8
+LIBRARY-BLOCK rows=64 block=3 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=7026333 validated=8
+LIBRARY-BLOCK rows=64 block=4 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=4689875 validated=8
+LIBRARY-BLOCK rows=64 block=4 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=3657333 validated=8
+LIBRARY-BLOCK rows=64 block=4 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=4086750 validated=8
+LIBRARY-BLOCK rows=64 block=4 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=6310541 validated=8
+LIBRARY-BLOCK rows=64 block=5 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1779500 validated=8
+LIBRARY-BLOCK rows=64 block=5 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=2140334 validated=8
+LIBRARY-BLOCK rows=64 block=5 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=5586083 validated=8
+LIBRARY-BLOCK rows=64 block=5 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=5029625 validated=8
+LIBRARY-BLOCK rows=64 block=6 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1899292 validated=8
+LIBRARY-BLOCK rows=64 block=6 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1929291 validated=8
+LIBRARY-BLOCK rows=64 block=6 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=3432542 validated=8
+LIBRARY-BLOCK rows=64 block=6 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=3270667 validated=8
+LIBRARY-BLOCK rows=64 block=7 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1827250 validated=8
+LIBRARY-BLOCK rows=64 block=7 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1876042 validated=8
+LIBRARY-BLOCK rows=64 block=7 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=3133334 validated=8
+LIBRARY-BLOCK rows=64 block=7 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=3839000 validated=8
+LIBRARY-BLOCK rows=64 block=8 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1997500 validated=8
+LIBRARY-BLOCK rows=64 block=8 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1681459 validated=8
+LIBRARY-BLOCK rows=64 block=8 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=3270459 validated=8
+LIBRARY-BLOCK rows=64 block=8 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=3254666 validated=8
+LIBRARY-BLOCK rows=64 block=9 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1835000 validated=8
+LIBRARY-BLOCK rows=64 block=9 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=64 requests=8 ns=1528750 validated=8
+LIBRARY-BLOCK rows=64 block=9 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=64 requests=8 ns=3132667 validated=8
+LIBRARY-BLOCK rows=64 block=9 variant=0
+LIBRARY-RESULT rows-per-request=64 requests=8 samples-per-variant=20 a-median-ns=4129354 b-median-ns=2066750 workload=native-scheme-json-aggregate forced-gc-per-request=true
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19315791 validated=8
+LIBRARY-BLOCK rows=1024 block=0 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=9795375 validated=8
+LIBRARY-BLOCK rows=1024 block=0 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=8886875 validated=8
+LIBRARY-BLOCK rows=1024 block=0 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=21228625 validated=8
+LIBRARY-BLOCK rows=1024 block=0 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=21430875 validated=8
+LIBRARY-BLOCK rows=1024 block=1 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=9307083 validated=8
+LIBRARY-BLOCK rows=1024 block=1 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=9383625 validated=8
+LIBRARY-BLOCK rows=1024 block=1 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=27651083 validated=8
+LIBRARY-BLOCK rows=1024 block=1 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=26017250 validated=8
+LIBRARY-BLOCK rows=1024 block=2 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=11788125 validated=8
+LIBRARY-BLOCK rows=1024 block=2 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=12451625 validated=8
+LIBRARY-BLOCK rows=1024 block=2 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=21139334 validated=8
+LIBRARY-BLOCK rows=1024 block=2 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19177167 validated=8
+LIBRARY-BLOCK rows=1024 block=3 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=11310792 validated=8
+LIBRARY-BLOCK rows=1024 block=3 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=10834084 validated=8
+LIBRARY-BLOCK rows=1024 block=3 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=20612625 validated=8
+LIBRARY-BLOCK rows=1024 block=3 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19683750 validated=8
+LIBRARY-BLOCK rows=1024 block=4 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=8664250 validated=8
+LIBRARY-BLOCK rows=1024 block=4 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=7900167 validated=8
+LIBRARY-BLOCK rows=1024 block=4 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=20053500 validated=8
+LIBRARY-BLOCK rows=1024 block=4 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=18958500 validated=8
+LIBRARY-BLOCK rows=1024 block=5 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=10992708 validated=8
+LIBRARY-BLOCK rows=1024 block=5 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=9064958 validated=8
+LIBRARY-BLOCK rows=1024 block=5 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=28000833 validated=8
+LIBRARY-BLOCK rows=1024 block=5 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=22673292 validated=8
+LIBRARY-BLOCK rows=1024 block=6 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=9908042 validated=8
+LIBRARY-BLOCK rows=1024 block=6 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=8790250 validated=8
+LIBRARY-BLOCK rows=1024 block=6 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19935458 validated=8
+LIBRARY-BLOCK rows=1024 block=6 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19092125 validated=8
+LIBRARY-BLOCK rows=1024 block=7 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=8055667 validated=8
+LIBRARY-BLOCK rows=1024 block=7 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=7770000 validated=8
+LIBRARY-BLOCK rows=1024 block=7 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=20657250 validated=8
+LIBRARY-BLOCK rows=1024 block=7 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19660708 validated=8
+LIBRARY-BLOCK rows=1024 block=8 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=7895875 validated=8
+LIBRARY-BLOCK rows=1024 block=8 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=8186458 validated=8
+LIBRARY-BLOCK rows=1024 block=8 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19324417 validated=8
+LIBRARY-BLOCK rows=1024 block=8 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19668375 validated=8
+LIBRARY-BLOCK rows=1024 block=9 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=7545333 validated=8
+LIBRARY-BLOCK rows=1024 block=9 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=6738000 validated=8
+LIBRARY-BLOCK rows=1024 block=9 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19559750 validated=8
+LIBRARY-BLOCK rows=1024 block=9 variant=0
+LIBRARY-RESULT rows-per-request=1024 requests=8 samples-per-variant=20 a-median-ns=19994479 b-median-ns=8975916 workload=native-scheme-json-aggregate forced-gc-per-request=true
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=149375041 validated=8
+LIBRARY-BLOCK rows=8192 block=0 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=56599083 validated=8
+LIBRARY-BLOCK rows=8192 block=0 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=59688625 validated=8
+LIBRARY-BLOCK rows=8192 block=0 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=132031750 validated=8
+LIBRARY-BLOCK rows=8192 block=0 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=135128458 validated=8
+LIBRARY-BLOCK rows=8192 block=1 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=45351625 validated=8
+LIBRARY-BLOCK rows=8192 block=1 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=64774916 validated=8
+LIBRARY-BLOCK rows=8192 block=1 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=138151375 validated=8
+LIBRARY-BLOCK rows=8192 block=1 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=138908750 validated=8
+LIBRARY-BLOCK rows=8192 block=2 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=59725458 validated=8
+LIBRARY-BLOCK rows=8192 block=2 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=44602292 validated=8
+LIBRARY-BLOCK rows=8192 block=2 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=134728542 validated=8
+LIBRARY-BLOCK rows=8192 block=2 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=164459083 validated=8
+LIBRARY-BLOCK rows=8192 block=3 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=51238042 validated=8
+LIBRARY-BLOCK rows=8192 block=3 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=57410667 validated=8
+LIBRARY-BLOCK rows=8192 block=3 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=133952709 validated=8
+LIBRARY-BLOCK rows=8192 block=3 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=151622875 validated=8
+LIBRARY-BLOCK rows=8192 block=4 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=45089583 validated=8
+LIBRARY-BLOCK rows=8192 block=4 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=42767084 validated=8
+LIBRARY-BLOCK rows=8192 block=4 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=135636125 validated=8
+LIBRARY-BLOCK rows=8192 block=4 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=142529250 validated=8
+LIBRARY-BLOCK rows=8192 block=5 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=41531708 validated=8
+LIBRARY-BLOCK rows=8192 block=5 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=44103375 validated=8
+LIBRARY-BLOCK rows=8192 block=5 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=137453750 validated=8
+LIBRARY-BLOCK rows=8192 block=5 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=172617416 validated=8
+LIBRARY-BLOCK rows=8192 block=6 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=56061791 validated=8
+LIBRARY-BLOCK rows=8192 block=6 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=50449333 validated=8
+LIBRARY-BLOCK rows=8192 block=6 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=134478959 validated=8
+LIBRARY-BLOCK rows=8192 block=6 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=135973334 validated=8
+LIBRARY-BLOCK rows=8192 block=7 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=44917250 validated=8
+LIBRARY-BLOCK rows=8192 block=7 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=42191208 validated=8
+LIBRARY-BLOCK rows=8192 block=7 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=143370791 validated=8
+LIBRARY-BLOCK rows=8192 block=7 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=135173584 validated=8
+LIBRARY-BLOCK rows=8192 block=8 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=54271334 validated=8
+LIBRARY-BLOCK rows=8192 block=8 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=54472042 validated=8
+LIBRARY-BLOCK rows=8192 block=8 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=146927834 validated=8
+LIBRARY-BLOCK rows=8192 block=8 variant=0
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=149089666 validated=8
+LIBRARY-BLOCK rows=8192 block=9 variant=0
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=60652916 validated=8
+LIBRARY-BLOCK rows=8192 block=9 variant=1
+LIBRARY-SAMPLE variant=1 rows-per-request=8192 requests=8 ns=66271209 validated=8
+LIBRARY-BLOCK rows=8192 block=9 variant=1
+LIBRARY-SAMPLE variant=0 rows-per-request=8192 requests=8 ns=153459291 validated=8
+LIBRARY-BLOCK rows=8192 block=9 variant=0
+LIBRARY-RESULT rows-per-request=8192 requests=8 samples-per-variant=20 a-median-ns=138530062 b-median-ns=52754688 workload=native-scheme-json-aggregate forced-gc-per-request=true
+LIBRARY-CLEANUP owner=0 roots=0 collections=1012 cleanup-ns=87458
+LIBRARY-CLEANUP owner=0 roots=0 collections=258 cleanup-ns=100666
+LIBRARY-CLEANUP owner=2 roots=0 collections=258 cleanup-ns=62875
+LIBRARY-CLEANUP owner=1 roots=0 collections=258 cleanup-ns=69791
+LIBRARY-CLEANUP owner=3 roots=0 collections=258 cleanup-ns=50292
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=21795750 validated=8
+LIBRARY-CLEANUP owner=0 roots=0 collections=18 cleanup-ns=38041
+LIBRARY-COLD owners=1 setup-ns=588216959 first-batch-ns=21795750 teardown-ns=1538708 total-ns=611561250 image-unload=false
+LIBRARY-COLD-PROCESS owners=1 wall-ns=629025875
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=10065041 validated=8
+LIBRARY-CLEANUP owner=0 roots=0 collections=6 cleanup-ns=47542
+LIBRARY-CLEANUP owner=1 roots=0 collections=6 cleanup-ns=33208
+LIBRARY-CLEANUP owner=2 roots=0 collections=6 cleanup-ns=29875
+LIBRARY-CLEANUP owner=3 roots=0 collections=6 cleanup-ns=36375
+LIBRARY-COLD owners=4 setup-ns=2067162333 first-batch-ns=10065041 teardown-ns=1561750 total-ns=2078797875 image-unload=false
+LIBRARY-COLD-PROCESS owners=4 wall-ns=2091809417
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=6630375 validated=8
+LIBRARY-CLEANUP owner=1 roots=0 collections=6 cleanup-ns=54167
+LIBRARY-CLEANUP owner=0 roots=0 collections=6 cleanup-ns=43625
+LIBRARY-CLEANUP owner=2 roots=0 collections=6 cleanup-ns=34666
+LIBRARY-CLEANUP owner=3 roots=0 collections=6 cleanup-ns=37833
+LIBRARY-COLD owners=4 setup-ns=2106420083 first-batch-ns=6630375 teardown-ns=1570041 total-ns=2114631250 image-unload=false
+LIBRARY-COLD-PROCESS owners=4 wall-ns=2128727333
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19566584 validated=8
+LIBRARY-CLEANUP owner=0 roots=0 collections=18 cleanup-ns=40250
+LIBRARY-COLD owners=1 setup-ns=516611292 first-batch-ns=19566584 teardown-ns=1531667 total-ns=537721584 image-unload=false
+LIBRARY-COLD-PROCESS owners=1 wall-ns=547451875
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=19420583 validated=8
+LIBRARY-CLEANUP owner=0 roots=0 collections=18 cleanup-ns=46458
+LIBRARY-COLD owners=1 setup-ns=503976084 first-batch-ns=19420583 teardown-ns=1532417 total-ns=524957875 image-unload=false
+LIBRARY-COLD-PROCESS owners=1 wall-ns=535673709
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=6920083 validated=8
+LIBRARY-CLEANUP owner=0 roots=0 collections=6 cleanup-ns=35834
+LIBRARY-CLEANUP owner=1 roots=0 collections=6 cleanup-ns=32792
+LIBRARY-CLEANUP owner=2 roots=0 collections=6 cleanup-ns=28166
+LIBRARY-CLEANUP owner=3 roots=0 collections=6 cleanup-ns=24459
+LIBRARY-COLD owners=4 setup-ns=2188673833 first-batch-ns=6920083 teardown-ns=1560375 total-ns=2197161459 image-unload=false
+LIBRARY-COLD-PROCESS owners=4 wall-ns=2206994125
+LIBRARY-SAMPLE variant=1 rows-per-request=1024 requests=8 ns=8855084 validated=8
+LIBRARY-CLEANUP owner=1 roots=0 collections=6 cleanup-ns=35958
+LIBRARY-CLEANUP owner=0 roots=0 collections=6 cleanup-ns=41166
+LIBRARY-CLEANUP owner=3 roots=0 collections=6 cleanup-ns=29250
+LIBRARY-CLEANUP owner=2 roots=0 collections=6 cleanup-ns=26959
+LIBRARY-COLD owners=4 setup-ns=1994851166 first-batch-ns=8855084 teardown-ns=1557167 total-ns=2005271791 image-unload=false
+LIBRARY-COLD-PROCESS owners=4 wall-ns=2013455750
+LIBRARY-SAMPLE variant=0 rows-per-request=1024 requests=8 ns=20691792 validated=8
+LIBRARY-CLEANUP owner=0 roots=0 collections=18 cleanup-ns=38625
+LIBRARY-COLD owners=1 setup-ns=499428833 first-batch-ns=20691792 teardown-ns=1549250 total-ns=521677709 image-unload=false
+LIBRARY-COLD-PROCESS owners=1 wall-ns=534058834

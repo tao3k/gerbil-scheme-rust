@@ -1,0 +1,19 @@
+     Locking 6 packages to latest Rust 1.95.0 compatible versions
+      Adding crossbeam-deque v0.8.8
+      Adding crossbeam-epoch v0.9.21
+      Adding crossbeam-utils v0.8.23
+      Adding either v1.18.0
+      Adding rayon v1.12.0
+      Adding rayon-core v1.13.0
+🍹 Building a mixed python/rust project
+🐍 Found CPython 3.14 at /opt/homebrew/opt/python@3.14/bin/python3.14
+🔗 Found pyo3 bindings with abi3-py3.10 support
+💻 Using `MACOSX_DEPLOYMENT_TARGET=11.0` for aarch64-apple-darwin by default
+   Compiling crossbeam-utils v0.8.23
+   Compiling crossbeam-epoch v0.9.21
+   Compiling crossbeam-deque v0.8.8
+   Compiling rayon-core v1.13.0
+   Compiling either v1.18.0
+   Compiling rayon v1.12.0
+   Compiling gerbil-scheme-python v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-python)
+   Compiling gerbil-python-ledger v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/examples/python-ledger)

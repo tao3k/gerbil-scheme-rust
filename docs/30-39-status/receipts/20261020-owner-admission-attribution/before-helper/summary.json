@@ -1,0 +1,1115 @@
+{
+  "mixed-primary": {
+    "summary": {
+      "window-128": {
+        "samples": 16,
+        "actors_per_second_median": 4143.583011983519,
+        "response_p99_ns": 1882355542,
+        "native_ready_p99_ns": 757132209,
+        "projection_release_ns_median": 54710146.0,
+        "probe_count": 512,
+        "probe_p99_ns": 1216055833,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          1196863916,
+          1302605041,
+          1155718500,
+          1041776791
+        ],
+        "owner_max_pending_gap_ns": [
+          222582917,
+          219362833,
+          135877625,
+          189119334
+        ],
+        "owner_max_other_completions_while_pending": [
+          15,
+          19,
+          24,
+          20
+        ],
+        "actor_max_other_completions_while_pending": [
+          15,
+          19,
+          16,
+          13
+        ],
+        "client_lateness_ns_median": 323084625,
+        "client_lateness_ns_p99": 951616625,
+        "short_service_ns_p99": 960596916
+      },
+      "window-16": {
+        "samples": 16,
+        "actors_per_second_median": 4017.0069192305186,
+        "response_p99_ns": 1503277750,
+        "native_ready_p99_ns": 680990542,
+        "projection_release_ns_median": 63118500.0,
+        "probe_count": 512,
+        "probe_p99_ns": 684387875,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          684900917,
+          683064208,
+          684387875,
+          682588500
+        ],
+        "owner_max_pending_gap_ns": [
+          162138000,
+          163458292,
+          145512041,
+          147967541
+        ],
+        "owner_max_other_completions_while_pending": [
+          11,
+          9,
+          12,
+          14
+        ],
+        "actor_max_other_completions_while_pending": [
+          15,
+          19,
+          16,
+          13
+        ],
+        "client_lateness_ns_median": 333892292,
+        "client_lateness_ns_p99": 681187208,
+        "short_service_ns_p99": 119672541
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "admission_ab": true,
+      "owner_trace": false,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 16,
+      "requests": 128,
+      "cpu": false,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4430691552,
+        4442455264,
+        4454218976,
+        4465982688
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 46.0,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 961,
+          "cpu": 35.1,
+          "command": "/Applications/Zen.app/Contents/MacOS/gpu-helper.app/Contents/MacOS/Zen GPU Helper"
+        },
+        {
+          "pid": 20027,
+          "cpu": 32.1,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 33600,
+          "cpu": 23.6,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 51693,
+          "cpu": 32.7,
+          "command": "/System/Library/ExtensionKit/Extensions/Storage.appex/Contents/MacOS/Storage"
+        },
+        {
+          "pid": 82942,
+          "cpu": 54.0,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+        },
+        {
+          "pid": 83241,
+          "cpu": 0.0,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+        },
+        {
+          "pid": 83342,
+          "cpu": 56.0,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"
+        },
+        {
+          "pid": 83588,
+          "cpu": 37.9,
+          "command": "lean"
+        },
+        {
+          "pid": 83615,
+          "cpu": 31.8,
+          "command": "(ps)"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission; admission A/B uses identical owner-batched projection and 128-request deadline/ready clock, with 128 versus 16 in-flight turns; bulk API timer includes projection and release",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    },
+    "paired": {
+      "actors_per_second": {
+        "median_ratio": 0.9469164276261126,
+        "descriptive_interval": [
+          0.6078772452286914,
+          1.2787735684169268
+        ],
+        "pairs": 16
+      },
+      "response_p99_ns": {
+        "median_ratio": 1.0563939113284277,
+        "descriptive_interval": [
+          0.791151309886806,
+          1.6450728849774567
+        ],
+        "pairs": 16
+      },
+      "native_ready_p99_ns": {
+        "median_ratio": 1.1876914009407291,
+        "descriptive_interval": [
+          0.9025995149568629,
+          1.669430550020316
+        ],
+        "pairs": 16
+      },
+      "projection_release_ns": {
+        "median_ratio": 0.9086802395861777,
+        "descriptive_interval": [
+          0.6918165882538332,
+          1.3564643274587882
+        ],
+        "pairs": 16
+      }
+    }
+  },
+  "cpu-primary": {
+    "summary": {
+      "window-128": {
+        "samples": 16,
+        "actors_per_second_median": 5547.766279883075,
+        "response_p99_ns": 1470567958,
+        "native_ready_p99_ns": 502561375,
+        "projection_release_ns_median": 35916271.0,
+        "probe_count": 512,
+        "probe_p99_ns": 908274375,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          900814583,
+          887217125,
+          958472166,
+          903535542
+        ],
+        "owner_max_pending_gap_ns": [
+          178261875,
+          178978709,
+          239242709,
+          255841417
+        ],
+        "owner_max_other_completions_while_pending": [
+          17,
+          22,
+          55,
+          36
+        ],
+        "actor_max_other_completions_while_pending": [
+          6,
+          3,
+          3,
+          6
+        ],
+        "client_lateness_ns_median": 237761458,
+        "client_lateness_ns_p99": 879985083,
+        "short_service_ns_p99": 551104500
+      },
+      "window-16": {
+        "samples": 16,
+        "actors_per_second_median": 5560.765638564359,
+        "response_p99_ns": 1384661625,
+        "native_ready_p99_ns": 602590167,
+        "projection_release_ns_median": 33177062.5,
+        "probe_count": 512,
+        "probe_p99_ns": 702672750,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          702167583,
+          702672750,
+          702778125,
+          702228625
+        ],
+        "owner_max_pending_gap_ns": [
+          150595667,
+          170497792,
+          171324042,
+          185197917
+        ],
+        "owner_max_other_completions_while_pending": [
+          14,
+          14,
+          10,
+          18
+        ],
+        "actor_max_other_completions_while_pending": [
+          3,
+          3,
+          3,
+          3
+        ],
+        "client_lateness_ns_median": 185639583,
+        "client_lateness_ns_p99": 700301042,
+        "short_service_ns_p99": 85722208
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "admission_ab": true,
+      "owner_trace": false,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 16,
+      "requests": 128,
+      "cpu": true,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4423826656,
+        4435590368,
+        4447354080,
+        4459117792
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 37.8,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 441,
+          "cpu": 21.7,
+          "command": "/usr/libexec/runningboardd"
+        },
+        {
+          "pid": 694,
+          "cpu": 22.8,
+          "command": "/Applications/Zen.app/Contents/MacOS/zen"
+        },
+        {
+          "pid": 899,
+          "cpu": 76.3,
+          "command": "/usr/libexec/sysmond"
+        },
+        {
+          "pid": 961,
+          "cpu": 45.5,
+          "command": "/Applications/Zen.app/Contents/MacOS/gpu-helper.app/Contents/MacOS/Zen GPU Helper"
+        },
+        {
+          "pid": 20180,
+          "cpu": 20.7,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 33600,
+          "cpu": 23.1,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 45342,
+          "cpu": 43.6,
+          "command": "/Applications/Zen.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container"
+        },
+        {
+          "pid": 51693,
+          "cpu": 47.5,
+          "command": "/System/Library/ExtensionKit/Extensions/Storage.appex/Contents/MacOS/Storage"
+        },
+        {
+          "pid": 82942,
+          "cpu": 51.7,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+        },
+        {
+          "pid": 83648,
+          "cpu": 58.9,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+        },
+        {
+          "pid": 84520,
+          "cpu": 37.5,
+          "command": "lean"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission; admission A/B uses identical owner-batched projection and 128-request deadline/ready clock, with 128 versus 16 in-flight turns; bulk API timer includes projection and release",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    },
+    "paired": {
+      "actors_per_second": {
+        "median_ratio": 1.0654876455807518,
+        "descriptive_interval": [
+          0.5017553522658899,
+          2.3265762402941554
+        ],
+        "pairs": 16
+      },
+      "response_p99_ns": {
+        "median_ratio": 1.0390796958495536,
+        "descriptive_interval": [
+          0.4298153160866732,
+          1.9930268070911583
+        ],
+        "pairs": 16
+      },
+      "native_ready_p99_ns": {
+        "median_ratio": 1.2134031449294342,
+        "descriptive_interval": [
+          0.8349682190787728,
+          2.3524431412374045
+        ],
+        "pairs": 16
+      },
+      "projection_release_ns": {
+        "median_ratio": 0.8938756304237223,
+        "descriptive_interval": [
+          0.5329456348542246,
+          1.4132111230422368
+        ],
+        "pairs": 16
+      }
+    }
+  },
+  "mixed-trace": {
+    "summary": {
+      "window-128": {
+        "samples": 4,
+        "actors_per_second_median": 4413.521902322119,
+        "response_p99_ns": 1062877750,
+        "native_ready_p99_ns": 615393292,
+        "projection_release_ns_median": 47192916.5,
+        "probe_count": 128,
+        "probe_p99_ns": 912311916,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          911726541,
+          926123458,
+          882036875,
+          885574000
+        ],
+        "owner_max_pending_gap_ns": [
+          128300750,
+          175905292,
+          145765000,
+          127621208
+        ],
+        "owner_max_other_completions_while_pending": [
+          9,
+          11,
+          10,
+          6
+        ],
+        "actor_max_other_completions_while_pending": [
+          12,
+          19,
+          16,
+          7
+        ],
+        "owner_phases": {
+          "batch-call": {
+            "count": 512,
+            "queue_ns_median": 169781833,
+            "queue_ns_p99": 579747167,
+            "execution_ns_median": 8863292,
+            "execution_ns_p99": 106258958,
+            "execution_ns_max": 175900250,
+            "encoding_ns_total": 3799138076,
+            "scheme_ns_total": 3310108299,
+            "execution_ns_total": 7277239745,
+            "gc_real_seconds": 0.6716234683990479,
+            "thread_cpu_seconds": 1.9513447059999995,
+            "collections": 655.0
+          },
+          "call": {
+            "count": 128,
+            "queue_ns_median": 124500,
+            "queue_ns_p99": 4687792,
+            "execution_ns_median": 7291,
+            "execution_ns_p99": 139500,
+            "execution_ns_max": 437541,
+            "encoding_ns_total": 1998918,
+            "scheme_ns_total": 310002,
+            "execution_ns_total": 2856332,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0022508790000004275,
+            "collections": 0.0
+          },
+          "inspect": {
+            "count": 128,
+            "queue_ns_median": 111583,
+            "queue_ns_p99": 346298583,
+            "execution_ns_median": 4958,
+            "execution_ns_p99": 42125,
+            "execution_ns_max": 69375,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 1026585,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0009345339999992097,
+            "collections": 0.0
+          },
+          "projection-turn": {
+            "count": 16,
+            "queue_ns_median": 507166,
+            "queue_ns_p99": 6857250,
+            "execution_ns_median": 15301292,
+            "execution_ns_p99": 58703084,
+            "execution_ns_max": 58703084,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 315996541,
+            "gc_real_seconds": 0.07445287704467773,
+            "thread_cpu_seconds": 0.18104220599999998,
+            "collections": 80.0
+          },
+          "release": {
+            "count": 128,
+            "queue_ns_median": 60041,
+            "queue_ns_p99": 380100625,
+            "execution_ns_median": 1625,
+            "execution_ns_p99": 13958,
+            "execution_ns_max": 35709,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 359874,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.00027554099999982373,
+            "collections": 0.0
+          },
+          "release-turn": {
+            "count": 16,
+            "queue_ns_median": 329208,
+            "queue_ns_p99": 22881792,
+            "execution_ns_median": 150792,
+            "execution_ns_p99": 591666,
+            "execution_ns_max": 591666,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 3416916,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0008946229999999833,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {
+            "batch-call": 0,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 4629083
+          },
+          "inspect": {
+            "batch-call": 346133006,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 2220916
+          },
+          "release": {
+            "batch-call": 378694290,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 6096625
+          }
+        },
+        "client_lateness_ns_median": 245104833,
+        "client_lateness_ns_p99": 521521291,
+        "short_service_ns_p99": 411912875
+      },
+      "window-16": {
+        "samples": 4,
+        "actors_per_second_median": 5616.484999903564,
+        "response_p99_ns": 1080418084,
+        "native_ready_p99_ns": 524448250,
+        "projection_release_ns_median": 36635020.5,
+        "probe_count": 128,
+        "probe_p99_ns": 463681250,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          463681250,
+          463770959,
+          462996542,
+          463455000
+        ],
+        "owner_max_pending_gap_ns": [
+          73333625,
+          67689500,
+          56886583,
+          67390125
+        ],
+        "owner_max_other_completions_while_pending": [
+          8,
+          13,
+          9,
+          9
+        ],
+        "actor_max_other_completions_while_pending": [
+          15,
+          15,
+          16,
+          13
+        ],
+        "owner_phases": {
+          "batch-call": {
+            "count": 512,
+            "queue_ns_median": 15274542,
+            "queue_ns_p99": 79261000,
+            "execution_ns_median": 8001084,
+            "execution_ns_p99": 47053584,
+            "execution_ns_max": 73328916,
+            "encoding_ns_total": 2710023623,
+            "scheme_ns_total": 2717956881,
+            "execution_ns_total": 5518012799,
+            "gc_real_seconds": 0.4517998695373535,
+            "thread_cpu_seconds": 1.9062402100000004,
+            "collections": 656.0
+          },
+          "call": {
+            "count": 128,
+            "queue_ns_median": 530042,
+            "queue_ns_p99": 32806250,
+            "execution_ns_median": 7542,
+            "execution_ns_p99": 369667,
+            "execution_ns_max": 534959,
+            "encoding_ns_total": 2874447,
+            "scheme_ns_total": 302883,
+            "execution_ns_total": 3331244,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.002143248999999736,
+            "collections": 0.0
+          },
+          "inspect": {
+            "count": 128,
+            "queue_ns_median": 370125,
+            "queue_ns_p99": 40435125,
+            "execution_ns_median": 4333,
+            "execution_ns_p99": 34125,
+            "execution_ns_max": 40500,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 969042,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0009105019999995356,
+            "collections": 0.0
+          },
+          "projection-turn": {
+            "count": 16,
+            "queue_ns_median": 763125,
+            "queue_ns_p99": 3097125,
+            "execution_ns_median": 17266417,
+            "execution_ns_p99": 24748084,
+            "execution_ns_max": 24748084,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 275258292,
+            "gc_real_seconds": 0.05059671401977539,
+            "thread_cpu_seconds": 0.17639762599999997,
+            "collections": 80.0
+          },
+          "release": {
+            "count": 128,
+            "queue_ns_median": 86708,
+            "queue_ns_p99": 57221709,
+            "execution_ns_median": 1875,
+            "execution_ns_p99": 30875,
+            "execution_ns_max": 40208,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 375787,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.00027983099999939753,
+            "collections": 0.0
+          },
+          "release-turn": {
+            "count": 16,
+            "queue_ns_median": 1160000,
+            "queue_ns_p99": 14786958,
+            "execution_ns_median": 21041,
+            "execution_ns_p99": 294125,
+            "execution_ns_max": 294125,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 616959,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.00033279099999994344,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {
+            "batch-call": 32773416,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 3153501
+          },
+          "inspect": {
+            "batch-call": 39555835,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 1916125
+          },
+          "release": {
+            "batch-call": 56721709,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 1420750
+          }
+        },
+        "client_lateness_ns_median": 213207083,
+        "client_lateness_ns_p99": 460372042,
+        "short_service_ns_p99": 118257250
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "admission_ab": true,
+      "owner_trace": true,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 4,
+      "requests": 128,
+      "cpu": false,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4456725728,
+        4468489440,
+        4480253152,
+        4492016864
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 44.0,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 7475,
+          "cpu": 20.6,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 17036,
+          "cpu": 36.8,
+          "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+        },
+        {
+          "pid": 22534,
+          "cpu": 26.8,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 33600,
+          "cpu": 31.5,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 34190,
+          "cpu": 33.4,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 79295,
+          "cpu": 24.3,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 82942,
+          "cpu": 59.1,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+        },
+        {
+          "pid": 83691,
+          "cpu": 30.4,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 85273,
+          "cpu": 71.5,
+          "command": "lean"
+        },
+        {
+          "pid": 85884,
+          "cpu": 29.6,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission; admission A/B uses identical owner-batched projection and 128-request deadline/ready clock, with 128 versus 16 in-flight turns; bulk API timer includes projection and release",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    },
+    "paired": {
+      "actors_per_second": {
+        "median_ratio": 1.3805717612302946,
+        "descriptive_interval": [
+          0.7091529994088646,
+          1.5183363097809424
+        ],
+        "pairs": 4
+      },
+      "response_p99_ns": {
+        "median_ratio": 0.725455266020013,
+        "descriptive_interval": [
+          0.6586122837363311,
+          1.4101341139348724
+        ],
+        "pairs": 4
+      },
+      "native_ready_p99_ns": {
+        "median_ratio": 0.9193073561015446,
+        "descriptive_interval": [
+          0.3600680374976116,
+          1.4070315669076134
+        ],
+        "pairs": 4
+      },
+      "projection_release_ns": {
+        "median_ratio": 0.9947244794873805,
+        "descriptive_interval": [
+          0.32758931857314455,
+          2.243397985931831
+        ],
+        "pairs": 4
+      }
+    }
+  },
+  "mixed-diagnostic": {
+    "summary": {
+      "scalar": {
+        "samples": 4,
+        "actors_per_second_median": 4953.00691825153,
+        "response_p99_ns": 1316020292,
+        "native_ready_p99_ns": 581426500,
+        "projection_release_ns_median": 390139667.0,
+        "probe_count": 128,
+        "probe_p99_ns": 743153834,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          655258917,
+          756919292,
+          743153834,
+          662583292
+        ],
+        "owner_max_pending_gap_ns": [
+          84328125,
+          131196167,
+          128405708,
+          87440042
+        ],
+        "owner_max_other_completions_while_pending": [
+          13,
+          30,
+          30,
+          13
+        ],
+        "actor_max_other_completions_while_pending": [
+          9,
+          15,
+          16,
+          13
+        ],
+        "owner_phases": {
+          "call": {
+            "count": 640,
+            "queue_ns_median": 108102333,
+            "queue_ns_p99": 587099125,
+            "execution_ns_median": 6242042,
+            "execution_ns_p99": 87436375,
+            "execution_ns_max": 131188708,
+            "encoding_ns_total": 2208919655,
+            "scheme_ns_total": 3005882426,
+            "execution_ns_total": 5251391123,
+            "gc_real_seconds": 0.3988480567932129,
+            "thread_cpu_seconds": 1.820682416,
+            "collections": 651.0
+          },
+          "inspect": {
+            "count": 640,
+            "queue_ns_median": 92667,
+            "queue_ns_p99": 585583417,
+            "execution_ns_median": 209958,
+            "execution_ns_p99": 2426916,
+            "execution_ns_max": 18086666,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 244667706,
+            "gc_real_seconds": 0.037369489669799805,
+            "thread_cpu_seconds": 0.15884828300000176,
+            "collections": 77.0
+          },
+          "release": {
+            "count": 640,
+            "queue_ns_median": 112208,
+            "queue_ns_p99": 331786416,
+            "execution_ns_median": 2459,
+            "execution_ns_p99": 233375,
+            "execution_ns_max": 1650750,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 8255587,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.002545588000004706,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {},
+          "inspect": {},
+          "release": {}
+        },
+        "client_lateness_ns_median": 69105792,
+        "client_lateness_ns_p99": 176362541,
+        "short_service_ns_p99": 616708625
+      },
+      "owner-batch": {
+        "samples": 4,
+        "actors_per_second_median": 4023.0467221342124,
+        "response_p99_ns": 1058376000,
+        "native_ready_p99_ns": 482805584,
+        "projection_release_ns_median": 32293583.5,
+        "probe_count": 128,
+        "probe_p99_ns": 1002487334,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          791104000,
+          1002487334,
+          1024433042,
+          968473292
+        ],
+        "owner_max_pending_gap_ns": [
+          85861584,
+          188015208,
+          195633750,
+          165510000
+        ],
+        "owner_max_other_completions_while_pending": [
+          12,
+          8,
+          19,
+          8
+        ],
+        "actor_max_other_completions_while_pending": [
+          9,
+          19,
+          16,
+          7
+        ],
+        "owner_phases": {
+          "call": {
+            "count": 640,
+            "queue_ns_median": 131205208,
+            "queue_ns_p99": 479469833,
+            "execution_ns_median": 6615750,
+            "execution_ns_p99": 104971875,
+            "execution_ns_max": 195628958,
+            "encoding_ns_total": 3158968334,
+            "scheme_ns_total": 2857983510,
+            "execution_ns_total": 6074724297,
+            "gc_real_seconds": 0.3571493625640869,
+            "thread_cpu_seconds": 1.871228846000001,
+            "collections": 653.0
+          },
+          "inspect": {
+            "count": 128,
+            "queue_ns_median": 1047500,
+            "queue_ns_p99": 578554208,
+            "execution_ns_median": 3333,
+            "execution_ns_p99": 1352583,
+            "execution_ns_max": 1874667,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 5455044,
+            "gc_real_seconds": 0.001432180404663086,
+            "thread_cpu_seconds": 0.0020879939999999264,
+            "collections": 2.0
+          },
+          "projection-turn": {
+            "count": 16,
+            "queue_ns_median": 1039167,
+            "queue_ns_p99": 22534167,
+            "execution_ns_median": 12782792,
+            "execution_ns_p99": 21579417,
+            "execution_ns_max": 21579417,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 219019294,
+            "gc_real_seconds": 0.03845477104187012,
+            "thread_cpu_seconds": 0.1675179200000001,
+            "collections": 77.0
+          },
+          "release": {
+            "count": 128,
+            "queue_ns_median": 420000,
+            "queue_ns_p99": 18605833,
+            "execution_ns_median": 1416,
+            "execution_ns_p99": 20916,
+            "execution_ns_max": 134667,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 435834,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.000257830999999209,
+            "collections": 0.0
+          },
+          "release-turn": {
+            "count": 16,
+            "queue_ns_median": 964875,
+            "queue_ns_p99": 12165958,
+            "execution_ns_median": 21375,
+            "execution_ns_p99": 185917,
+            "execution_ns_max": 185917,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 632332,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0004202090000002823,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {},
+          "inspect": {},
+          "release": {}
+        },
+        "client_lateness_ns_median": 479340084,
+        "client_lateness_ns_p99": 647337500,
+        "short_service_ns_p99": 630600417
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "owner_trace": true,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 4,
+      "requests": 128,
+      "cpu": false,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4467588320,
+        4479352032,
+        4491115744,
+        4502879456
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 44.5,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 899,
+          "cpu": 37.6,
+          "command": "/usr/libexec/sysmond"
+        },
+        {
+          "pid": 961,
+          "cpu": 24.3,
+          "command": "/Applications/Zen.app/Contents/MacOS/gpu-helper.app/Contents/MacOS/Zen GPU Helper"
+        },
+        {
+          "pid": 19638,
+          "cpu": 44.3,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 20180,
+          "cpu": 45.4,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 20314,
+          "cpu": 47.5,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 63906,
+          "cpu": 36.5,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+        },
+        {
+          "pid": 63909,
+          "cpu": 1.0,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+        },
+        {
+          "pid": 64469,
+          "cpu": 36.4,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission in both arms; bulk API start through projected/released response; scalar emits per-result completion, owner-batch completes all at bulk return",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    }
+  }
+}

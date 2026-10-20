@@ -1,0 +1,5 @@
+{"status": "PASS", "stage": "hygienic-dsl", "owner": 0, "ns": 1041791250}
+{"status": "PASS", "stage": "hygienic-dsl", "owner": 1, "ns": 996604458}
+{"status": "PASS", "stage": "hygienic-dsl", "owner": 2, "ns": 1074100459}
+{"status": "PASS", "stage": "hygienic-dsl", "owner": 3, "ns": 1184696375}
+{"status": "PASS", "stage": "shutdown", "roots": [0, 0, 0, 0], "files_removed": true}

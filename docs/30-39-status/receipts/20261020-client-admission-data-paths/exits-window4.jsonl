@@ -1,0 +1,4 @@
+{"name": "q-window4-mixed", "exit": 0, "seconds": 45.3625956249889}
+{"name": "q-policy4-mixed", "exit": 0, "seconds": 41.24736337503418}
+{"name": "q-policy4-cpu", "exit": 0, "seconds": 38.943126207974274}
+{"name": "q-policy4-trace", "exit": 0, "seconds": 19.78114783402998}

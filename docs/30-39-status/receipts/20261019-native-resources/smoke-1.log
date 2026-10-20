@@ -1,0 +1,42 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --smoke
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+error: failed to run custom build command for `gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)`
+
+Caused by:
+  process didn't exit successfully: `/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/target/release/build/gerbil-scheme-93b8d73e0ea44024/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/Cargo.toml
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/ffi.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/objects/main.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/tokio_transport.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/benches/types.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/build.rs
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/tests
+  cargo:rerun-if-changed=/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/tests/unit/targets
+
+  --- stderr
+
+  thread 'main' (30259216) panicked at build-support/gerbil-scheme-rust-project-harness/src/build_gate/downstream.rs:197:13:
+  [RUST-AGENT-OWNER-GRAPH-009] Info: Owner dependency cycle crosses branches
+  @ /Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme/src/instances/image.rs:2:1
+  fix: break the cycle by moving the shared contract behind one owner boundary
+  line: 2 | use super::{InstanceError, IsolatedProgram, OwnerReceipt, native_api::NativeApi};
+  Help: Owner dependency cycle crosses src/instances/image.rs -> src/instances/native_api.rs -> src/instances/image.rs.
+  Contract: Keep owner dependency edges acyclic so agents can follow the reasoning tree without circular repair ownership.
+
+  [rust-harness-agent-guidance]
+  gate: gerbil-scheme-rust
+  trigger: cargo test runs the member build.rs before tests; keep rust-lang-project-harness under [build-dependencies].
+  repair:
+  - keep build.rs thin and call assert_rust_project_harness_downstream_policy_from_env.
+  - in a workspace, put common policy in the root harness/ module tree.
+  - construct RustProjectHarnessWorkspacePolicy once, then derive members with member_crate or member_crate_with_config.
+  - add crate-local owners, receipts, waivers, or report obligations in the member override only.
+  - rerun cargo test after updating policy or evidence.
+
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+warning: build failed, waiting for other jobs to finish...
+error: recipe `bridge-instance-resources` failed on line 169 with exit code 101

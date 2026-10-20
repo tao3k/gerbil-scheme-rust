@@ -13,3 +13,6 @@ pub use values::{
     SchemeObjectRef,
 };
 use values::{invalid, own};
+
+#[cfg(all(feature = "isolated-instances", target_os = "macos"))]
+pub(crate) use values::decode_kind;

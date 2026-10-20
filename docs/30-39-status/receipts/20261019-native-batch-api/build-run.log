@@ -1,0 +1,188 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --orders
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+   Compiling gerbil-scheme-sys v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-sys)
+    Finished `bench` profile [optimized] target(s) in 26.08s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+ORDERS-SETUP owners=1 ns=515919791
+ORDERS-CONTRACT bounds=true exception-workers=all recovery=true roots=0
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=1 quantum=0 jobs=1024 ns=18124208 p95-ns=2692917 p99-ns=2982542 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=8 quantum=1 jobs=1024 ns=7277791 p95-ns=1648916 p99-ns=1778708 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=32 quantum=0 jobs=1024 ns=6126625 p95-ns=867083 p99-ns=885667 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=32 quantum=1 jobs=1024 ns=5566792 p95-ns=819250 p99-ns=937666 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=32 quantum=1 jobs=1024 ns=5042625 p95-ns=694208 p99-ns=702292 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=32 quantum=0 jobs=1024 ns=4982000 p95-ns=702666 p99-ns=797000 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=8 quantum=1 jobs=1024 ns=5412042 p95-ns=720042 p99-ns=751416 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=0 batch=1 quantum=0 jobs=1024 ns=10033625 p95-ns=1216417 p99-ns=1352209 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=1 quantum=0 jobs=1024 ns=12061292 p95-ns=1451417 p99-ns=1581583 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=8 quantum=1 jobs=1024 ns=6967500 p95-ns=1157250 p99-ns=1264542 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=32 quantum=0 jobs=1024 ns=5144333 p95-ns=736917 p99-ns=753916 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=32 quantum=1 jobs=1024 ns=10701334 p95-ns=1948416 p99-ns=1960166 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=32 quantum=1 jobs=1024 ns=7149042 p95-ns=1185334 p99-ns=1603583 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=32 quantum=0 jobs=1024 ns=8831042 p95-ns=1484958 p99-ns=1784417 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=8 quantum=1 jobs=1024 ns=6640625 p95-ns=1035417 p99-ns=1170125 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=1 batch=1 quantum=0 jobs=1024 ns=12535875 p95-ns=1762667 p99-ns=2316708 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=1 quantum=0 jobs=1024 ns=9680958 p95-ns=1146625 p99-ns=1210000 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=8 quantum=1 jobs=1024 ns=5623250 p95-ns=731041 p99-ns=762458 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=32 quantum=0 jobs=1024 ns=4880917 p95-ns=727375 p99-ns=769458 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=32 quantum=1 jobs=1024 ns=5467875 p95-ns=765375 p99-ns=775166 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=32 quantum=1 jobs=1024 ns=5079250 p95-ns=745541 p99-ns=756917 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=32 quantum=0 jobs=1024 ns=4894708 p95-ns=728041 p99-ns=731916 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=8 quantum=1 jobs=1024 ns=5541000 p95-ns=731459 p99-ns=768334 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=2 batch=1 quantum=0 jobs=1024 ns=10142625 p95-ns=1216833 p99-ns=1329167 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=1 quantum=0 jobs=1024 ns=10906875 p95-ns=1299625 p99-ns=1387792 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=8 quantum=1 jobs=1024 ns=5325375 p95-ns=728917 p99-ns=768041 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=32 quantum=0 jobs=1024 ns=5056042 p95-ns=699084 p99-ns=702834 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=32 quantum=1 jobs=1024 ns=4854750 p95-ns=704458 p99-ns=724667 peer-min=6
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=32 quantum=1 jobs=1024 ns=5485542 p95-ns=797250 p99-ns=835167 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=32 quantum=0 jobs=1024 ns=5022375 p95-ns=746042 p99-ns=782958 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=8 quantum=1 jobs=1024 ns=5505750 p95-ns=713333 p99-ns=750042 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=3 batch=1 quantum=0 jobs=1024 ns=10773625 p95-ns=1311541 p99-ns=1433542 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=1 quantum=0 jobs=1024 ns=9496959 p95-ns=1110417 p99-ns=1172542 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=8 quantum=1 jobs=1024 ns=5769041 p95-ns=793333 p99-ns=910917 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=32 quantum=0 jobs=1024 ns=4827417 p95-ns=710750 p99-ns=717459 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=32 quantum=1 jobs=1024 ns=5390750 p95-ns=809791 p99-ns=821792 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=32 quantum=1 jobs=1024 ns=4909084 p95-ns=708375 p99-ns=725083 peer-min=7
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=32 quantum=0 jobs=1024 ns=5354334 p95-ns=799792 p99-ns=818292 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=8 quantum=1 jobs=1024 ns=5563417 p95-ns=753167 p99-ns=842792 peer-min=1
+ORDERS-SAMPLE owners=1 mixed=false block=4 batch=1 quantum=0 jobs=1024 ns=11079833 p95-ns=1298084 p99-ns=1465417 peer-min=0
+ORDERS-RESULT owners=1 mixed=false batch=1 quantum=0 samples=10 jobs=1024 median-ns=10773625 p95-ns=1490500 p99-ns=2551584 probe-p99-ns=2669417 peer-min=0
+ORDERS-RESULT owners=1 mixed=false batch=8 quantum=1 samples=10 jobs=1024 median-ns=5563417 p95-ns=789334 p99-ns=1298375 probe-p99-ns=1298375 peer-min=1
+ORDERS-RESULT owners=1 mixed=false batch=32 quantum=0 samples=10 jobs=1024 median-ns=5022375 p95-ns=818292 p99-ns=1204833 probe-p99-ns=1204833 peer-min=0
+ORDERS-RESULT owners=1 mixed=false batch=32 quantum=1 samples=10 jobs=1024 median-ns=5390750 p95-ns=1134250 p99-ns=1921666 probe-p99-ns=1921666 peer-min=6
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=1 quantum=0 jobs=1024 ns=216086292 p95-ns=33105667 p99-ns=40066083 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=8 quantum=1 jobs=1024 ns=162072417 p95-ns=19956542 p99-ns=20499666 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=32 quantum=0 jobs=1024 ns=161760167 p95-ns=20375250 p99-ns=20459875 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=32 quantum=1 jobs=1024 ns=161565375 p95-ns=20459541 p99-ns=20475542 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=32 quantum=1 jobs=1024 ns=162398000 p95-ns=20666375 p99-ns=21069959 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=32 quantum=0 jobs=1024 ns=177947042 p95-ns=24326416 p99-ns=30699958 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=8 quantum=1 jobs=1024 ns=310718042 p95-ns=68925958 p99-ns=99253083 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=0 batch=1 quantum=0 jobs=1024 ns=168669209 p95-ns=20787167 p99-ns=21232291 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=1 quantum=0 jobs=1024 ns=169496959 p95-ns=21011458 p99-ns=21247583 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=8 quantum=1 jobs=1024 ns=163454208 p95-ns=20182916 p99-ns=20463875 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=32 quantum=0 jobs=1024 ns=166538500 p95-ns=21439041 p99-ns=22085166 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=32 quantum=1 jobs=1024 ns=160993250 p95-ns=20293541 p99-ns=20390417 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=32 quantum=1 jobs=1024 ns=311376417 p95-ns=83740542 p99-ns=88916875 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=32 quantum=0 jobs=1024 ns=162533125 p95-ns=20492208 p99-ns=20673167 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=8 quantum=1 jobs=1024 ns=163515667 p95-ns=20130042 p99-ns=20726375 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=1 batch=1 quantum=0 jobs=1024 ns=170464459 p95-ns=21158250 p99-ns=21312750 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=1 quantum=0 jobs=1024 ns=185003542 p95-ns=22133417 p99-ns=25640708 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=8 quantum=1 jobs=1024 ns=164935667 p95-ns=20322584 p99-ns=20755459 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=32 quantum=0 jobs=1024 ns=231172833 p95-ns=49872959 p99-ns=67975750 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=32 quantum=1 jobs=1024 ns=166169583 p95-ns=20562708 p99-ns=24444083 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=32 quantum=1 jobs=1024 ns=162324542 p95-ns=20547000 p99-ns=20608125 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=32 quantum=0 jobs=1024 ns=161724917 p95-ns=20551375 p99-ns=20593875 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=8 quantum=1 jobs=1024 ns=182318459 p95-ns=23781750 p99-ns=28935917 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=2 batch=1 quantum=0 jobs=1024 ns=179230375 p95-ns=21782417 p99-ns=23211083 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=1 quantum=0 jobs=1024 ns=179017000 p95-ns=21699625 p99-ns=23720292 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=8 quantum=1 jobs=1024 ns=180441208 p95-ns=23935208 p99-ns=35739958 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=32 quantum=0 jobs=1024 ns=162485208 p95-ns=20513292 p99-ns=20647500 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=32 quantum=1 jobs=1024 ns=161940833 p95-ns=20544834 p99-ns=20602791 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=32 quantum=1 jobs=1024 ns=164460166 p95-ns=20710875 p99-ns=21057875 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=32 quantum=0 jobs=1024 ns=191171417 p95-ns=25730291 p99-ns=28301500 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=8 quantum=1 jobs=1024 ns=167642000 p95-ns=20397375 p99-ns=21364917 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=3 batch=1 quantum=0 jobs=1024 ns=179432750 p95-ns=21453792 p99-ns=24224500 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=1 quantum=0 jobs=1024 ns=169818375 p95-ns=20949000 p99-ns=21362916 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=8 quantum=1 jobs=1024 ns=162594125 p95-ns=20010458 p99-ns=20542334 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=32 quantum=0 jobs=1024 ns=168116667 p95-ns=22490166 p99-ns=22544542 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=32 quantum=1 jobs=1024 ns=203198541 p95-ns=34913875 p99-ns=42181250 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=32 quantum=1 jobs=1024 ns=199770416 p95-ns=30419708 p99-ns=34732000 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=32 quantum=0 jobs=1024 ns=164660042 p95-ns=20726292 p99-ns=21880959 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=8 quantum=1 jobs=1024 ns=163491791 p95-ns=20065584 p99-ns=20670458 peer-min=0
+ORDERS-SAMPLE owners=1 mixed=true block=4 batch=1 quantum=0 jobs=1024 ns=173158375 p95-ns=21223833 p99-ns=21783667 peer-min=0
+ORDERS-RESULT owners=1 mixed=true batch=1 quantum=0 samples=10 jobs=1024 median-ns=173158375 p95-ns=21520334 p99-ns=26826584 probe-p99-ns=28900375 peer-min=0
+ORDERS-RESULT owners=1 mixed=true batch=8 quantum=1 samples=10 jobs=1024 median-ns=163515667 p95-ns=20774000 p99-ns=62950167 probe-p99-ns=62950167 peer-min=0
+ORDERS-RESULT owners=1 mixed=true batch=32 quantum=0 samples=10 jobs=1024 median-ns=164660042 p95-ns=22288167 p99-ns=34830084 probe-p99-ns=34830084 peer-min=0
+ORDERS-RESULT owners=1 mixed=true batch=32 quantum=1 samples=10 jobs=1024 median-ns=162398000 p95-ns=26490875 p99-ns=67123834 probe-p99-ns=67123834 peer-min=0
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[35958] io-retired-bytes=[2048] files-removed=[true]
+ORDERS-SETUP owners=4 ns=2718790625
+ORDERS-CONTRACT bounds=true exception-workers=all recovery=true roots=0
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=1 quantum=0 jobs=1024 ns=9131375 p95-ns=1555125 p99-ns=1596125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=8 quantum=1 jobs=1024 ns=5473916 p95-ns=1202750 p99-ns=1211375 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=32 quantum=0 jobs=1024 ns=5072208 p95-ns=1273958 p99-ns=1283125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=32 quantum=1 jobs=1024 ns=4639500 p95-ns=1307750 p99-ns=1322167 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=32 quantum=1 jobs=1024 ns=4581041 p95-ns=1270834 p99-ns=1275542 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=32 quantum=0 jobs=1024 ns=4747250 p95-ns=1138583 p99-ns=1509125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=8 quantum=1 jobs=1024 ns=4956041 p95-ns=1179500 p99-ns=1194167 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=0 batch=1 quantum=0 jobs=1024 ns=9063833 p95-ns=1657000 p99-ns=1685708 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=1 quantum=0 jobs=1024 ns=7624417 p95-ns=1463459 p99-ns=1501084 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=8 quantum=1 jobs=1024 ns=3943375 p95-ns=983959 p99-ns=1043875 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=32 quantum=0 jobs=1024 ns=3429167 p95-ns=914917 p99-ns=1022500 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=32 quantum=1 jobs=1024 ns=3589166 p95-ns=1130917 p99-ns=1134625 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=32 quantum=1 jobs=1024 ns=3533667 p95-ns=1007375 p99-ns=1116750 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=32 quantum=0 jobs=1024 ns=3734334 p95-ns=892583 p99-ns=900000 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=8 quantum=1 jobs=1024 ns=5524291 p95-ns=1294625 p99-ns=1302833 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=1 batch=1 quantum=0 jobs=1024 ns=7870666 p95-ns=1700500 p99-ns=1750834 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=1 quantum=0 jobs=1024 ns=8436917 p95-ns=1599750 p99-ns=1611667 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=8 quantum=1 jobs=1024 ns=5314875 p95-ns=1024833 p99-ns=1131250 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=32 quantum=0 jobs=1024 ns=6289167 p95-ns=1260250 p99-ns=1624167 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=32 quantum=1 jobs=1024 ns=5417250 p95-ns=1325625 p99-ns=1328959 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=32 quantum=1 jobs=1024 ns=4351083 p95-ns=1091792 p99-ns=1097084 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=32 quantum=0 jobs=1024 ns=3784542 p95-ns=1175292 p99-ns=1181875 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=8 quantum=1 jobs=1024 ns=5092333 p95-ns=1400708 p99-ns=1405000 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=2 batch=1 quantum=0 jobs=1024 ns=10147750 p95-ns=1738417 p99-ns=1859042 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=1 quantum=0 jobs=1024 ns=10946208 p95-ns=2632042 p99-ns=2799750 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=8 quantum=1 jobs=1024 ns=4989834 p95-ns=1426500 p99-ns=1431916 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=32 quantum=0 jobs=1024 ns=5433250 p95-ns=1641000 p99-ns=1649541 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=32 quantum=1 jobs=1024 ns=4916750 p95-ns=1045125 p99-ns=1055000 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=32 quantum=1 jobs=1024 ns=4590042 p95-ns=1157083 p99-ns=1309708 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=32 quantum=0 jobs=1024 ns=7167375 p95-ns=2729542 p99-ns=2738709 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=8 quantum=1 jobs=1024 ns=5985292 p95-ns=1359375 p99-ns=1367417 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=3 batch=1 quantum=0 jobs=1024 ns=9614500 p95-ns=2056875 p99-ns=2094958 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=1 quantum=0 jobs=1024 ns=7629750 p95-ns=1588333 p99-ns=1615500 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=8 quantum=1 jobs=1024 ns=3872334 p95-ns=1147084 p99-ns=1153125 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=32 quantum=0 jobs=1024 ns=3119708 p95-ns=928417 p99-ns=931459 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=32 quantum=1 jobs=1024 ns=3824375 p95-ns=1122917 p99-ns=1128250 peer-min=6
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=32 quantum=1 jobs=1024 ns=4177667 p95-ns=1510416 p99-ns=1513916 peer-min=7
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=32 quantum=0 jobs=1024 ns=3302709 p95-ns=866250 p99-ns=897833 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=8 quantum=1 jobs=1024 ns=2940500 p95-ns=835625 p99-ns=841125 peer-min=1
+ORDERS-SAMPLE owners=4 mixed=false block=4 batch=1 quantum=0 jobs=1024 ns=8983000 p95-ns=2247708 p99-ns=2264208 peer-min=0
+ORDERS-RESULT owners=4 mixed=false batch=1 quantum=0 samples=10 jobs=1024 median-ns=8983000 p95-ns=1691000 p99-ns=2421542 probe-p99-ns=2445750 peer-min=0
+ORDERS-RESULT owners=4 mixed=false batch=8 quantum=1 samples=10 jobs=1024 median-ns=4989834 p95-ns=1225708 p99-ns=1418625 probe-p99-ns=1418625 peer-min=1
+ORDERS-RESULT owners=4 mixed=false batch=32 quantum=0 samples=10 jobs=1024 median-ns=3784542 p95-ns=1181875 p99-ns=2591292 probe-p99-ns=2591292 peer-min=0
+ORDERS-RESULT owners=4 mixed=false batch=32 quantum=1 samples=10 jobs=1024 median-ns=4351083 p95-ns=1245417 p99-ns=1501875 probe-p99-ns=1501875 peer-min=6
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=1 quantum=0 jobs=1024 ns=50701041 p95-ns=6957583 p99-ns=7004333 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=8 quantum=1 jobs=1024 ns=44306500 p95-ns=5917333 p99-ns=5949000 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=32 quantum=0 jobs=1024 ns=43351750 p95-ns=6136959 p99-ns=6144375 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=32 quantum=1 jobs=1024 ns=41502250 p95-ns=5201334 p99-ns=5361125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=32 quantum=1 jobs=1024 ns=41704459 p95-ns=5294959 p99-ns=5298709 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=32 quantum=0 jobs=1024 ns=42334083 p95-ns=5941208 p99-ns=5946000 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=8 quantum=1 jobs=1024 ns=43519209 p95-ns=5870459 p99-ns=5877292 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=0 batch=1 quantum=0 jobs=1024 ns=50500042 p95-ns=7702375 p99-ns=9110625 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=1 quantum=0 jobs=1024 ns=50056500 p95-ns=8089375 p99-ns=9653709 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=8 quantum=1 jobs=1024 ns=42896834 p95-ns=6007500 p99-ns=6019125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=32 quantum=0 jobs=1024 ns=43583375 p95-ns=6670834 p99-ns=6675042 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=32 quantum=1 jobs=1024 ns=69450875 p95-ns=14911042 p99-ns=14922125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=32 quantum=1 jobs=1024 ns=59193583 p95-ns=9631542 p99-ns=9636167 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=32 quantum=0 jobs=1024 ns=47869125 p95-ns=6692125 p99-ns=6695791 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=8 quantum=1 jobs=1024 ns=44153500 p95-ns=6071875 p99-ns=6355125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=1 batch=1 quantum=0 jobs=1024 ns=48310458 p95-ns=6383791 p99-ns=6437125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=1 quantum=0 jobs=1024 ns=50428166 p95-ns=6792042 p99-ns=6840958 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=8 quantum=1 jobs=1024 ns=89861666 p95-ns=24641250 p99-ns=24653084 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=32 quantum=0 jobs=1024 ns=60821084 p95-ns=10364875 p99-ns=10372083 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=32 quantum=1 jobs=1024 ns=42161500 p95-ns=5913834 p99-ns=5916542 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=32 quantum=1 jobs=1024 ns=42013291 p95-ns=5213250 p99-ns=5465542 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=32 quantum=0 jobs=1024 ns=42941875 p95-ns=6070000 p99-ns=6076542 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=8 quantum=1 jobs=1024 ns=45819125 p95-ns=6972333 p99-ns=6987542 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=2 batch=1 quantum=0 jobs=1024 ns=53679667 p95-ns=7375500 p99-ns=7724292 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=1 quantum=0 jobs=1024 ns=45438167 p95-ns=6070709 p99-ns=6274667 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=8 quantum=1 jobs=1024 ns=41539500 p95-ns=5240792 p99-ns=5248458 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=32 quantum=0 jobs=1024 ns=42489375 p95-ns=5675625 p99-ns=5678500 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=32 quantum=1 jobs=1024 ns=67270375 p95-ns=16612542 p99-ns=16615583 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=32 quantum=1 jobs=1024 ns=50099667 p95-ns=11145000 p99-ns=11159916 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=32 quantum=0 jobs=1024 ns=42160709 p95-ns=5796000 p99-ns=5799208 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=8 quantum=1 jobs=1024 ns=42342833 p95-ns=5865292 p99-ns=5873667 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=3 batch=1 quantum=0 jobs=1024 ns=46247916 p95-ns=6351666 p99-ns=6391208 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=1 quantum=0 jobs=1024 ns=46259250 p95-ns=6296000 p99-ns=6316792 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=8 quantum=1 jobs=1024 ns=42555125 p95-ns=5348292 p99-ns=5363250 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=32 quantum=0 jobs=1024 ns=42550834 p95-ns=5944250 p99-ns=5947750 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=32 quantum=1 jobs=1024 ns=41453709 p95-ns=5217958 p99-ns=5223959 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=32 quantum=1 jobs=1024 ns=44169000 p95-ns=6972375 p99-ns=7048958 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=32 quantum=0 jobs=1024 ns=46182958 p95-ns=7279833 p99-ns=7289125 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=8 quantum=1 jobs=1024 ns=43318042 p95-ns=5986875 p99-ns=5992417 peer-min=0
+ORDERS-SAMPLE owners=4 mixed=true block=4 batch=1 quantum=0 jobs=1024 ns=48585416 p95-ns=6698458 p99-ns=6733250 peer-min=0
+ORDERS-RESULT owners=4 mixed=true batch=1 quantum=0 samples=10 jobs=1024 median-ns=48585416 p95-ns=7005750 p99-ns=8087667 probe-p99-ns=9115125 peer-min=0
+ORDERS-RESULT owners=4 mixed=true batch=8 quantum=1 samples=10 jobs=1024 median-ns=43318042 p95-ns=8834417 p99-ns=24618709 probe-p99-ns=24618709 peer-min=0
+ORDERS-RESULT owners=4 mixed=true batch=32 quantum=0 samples=10 jobs=1024 median-ns=42941875 p95-ns=6995750 p99-ns=10337917 probe-p99-ns=10337917 peer-min=0
+ORDERS-RESULT owners=4 mixed=true batch=32 quantum=1 samples=10 jobs=1024 median-ns=42161500 p95-ns=10315792 p99-ns=16600750 probe-p99-ns=16600750 peer-min=0
+RESOURCE-DRAIN joined=4 pending=0 roots=[0, 0, 0, 0] native-cleanup-ns=[79500, 526750, 31417, 29584] io-retired-bytes=[2048, 2048, 2048, 2048] files-removed=[true, true, true, true]

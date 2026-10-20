@@ -1,0 +1,289 @@
+Analysis of sampling cc1 (pid 88700) every 1 millisecond
+Process:         cc1 [88700]
+Path:            /opt/homebrew/*/cc1
+Load Address:    0x10268c000
+Identifier:      cc1
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  gcc-16 [88699]
+Target Type:     live task
+
+Date/Time:       2026-10-19 23:42:45.142 +0800
+Launch Time:     2026-10-19 23:41:34.015 +0800
+OS Version:      macOS 26.6.1 (25G76)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         597.4M
+Physical footprint (peak):  3.0G
+Idle exit:                  untracked
+----
+
+Call graph:
+    801 Thread_32090277   DispatchQueue_1: com.apple.main-thread  (serial)
+      801 start  (in dyld) + 6992  [0x18d0b04e4]
+        801 main  (in cc1) + 52  [0x103dd20b4]
+          801 toplev::main(int, char**)  (in cc1) + 4988  [0x103dd199c]
+            801 compile_file()  (in cc1) + 540  [0x10378d11c]
+              801 symbol_table::finalize_compilation_unit()  (in cc1) + 180  [0x1030e75a4]
+                801 symbol_table::compile() (.part.0)  (in cc1) + 2824  [0x1030e4f2c]
+                  801 cgraph_node::expand()  (in cc1) + 336  [0x1030e3850]
+                    801 execute_pass_list(function*, opt_pass*)  (in cc1) + 40  [0x1036487a8]
+                      801 execute_pass_list_1(opt_pass*)  (in cc1) + 68  [0x103648734]
+                        801 execute_pass_list_1(opt_pass*)  (in cc1) + 52  [0x103648724]
+                          801 execute_one_pass(opt_pass*)  (in cc1) + 564  [0x103647db8]
+                            801 (anonymous namespace)::pass_reload::execute(function*)  (in cc1) + 268  [0x1034e46f0]
+                              370 lra(__sFILE*, int)  (in cc1) + 1384  [0x103542db0]
+                              + 370 lra_create_live_ranges(bool, bool)  (in cc1) + 20  [0x103564c20]
+                              +   170 lra_create_live_ranges_1(bool, bool)  (in cc1) + 5332,2808,...  [0x1035635a0,0x103562bc4,...]
+                              +   33 lra_create_live_ranges_1(bool, bool)  (in cc1) + 3876  [0x103562ff0]
+                              +   ! 33 mark_pseudo_live(int)  (in cc1) + 88,76,...  [0x103561584,0x103561578,...]
+                              +   20 lra_create_live_ranges_1(bool, bool)  (in cc1) + 3868  [0x103562fe8]
+                              +   ! 20 update_pseudo_point(int, int, point_type)  (in cc1) + 48,108,...  [0x1035618f4,0x103561930,...]
+                              +   16 lra_create_live_ranges_1(bool, bool)  (in cc1) + 7316  [0x103563d60]
+                              +   ! 13 mark_pseudo_dead(int)  (in cc1) + 116  [0x103561384]
+                              +   ! : 12 sparseset_clear_bit(sparseset_def*, unsigned int)  (in cc1) + 52,96  [0x103773d98,0x103773dc4]
+                              +   ! : 1 mark_pseudo_dead(int)  (in cc1) + 168  [0x1035613b8]
+                              +   ! 3 mark_pseudo_dead(int)  (in cc1) + 52,64,...  [0x103561344,0x103561350,...]
+                              +   12 lra_create_live_ranges_1(bool, bool)  (in cc1) + 1668  [0x103562750]
+                              +   ! 12 lra_update_biggest_mode(int, machine_mode)  (in cc1) + 72,124  [0x1035499a8,0x1035499dc]
+                              +   12 lra_create_live_ranges_1(bool, bool)  (in cc1) + 2560  [0x103562acc]
+                              +   ! 12 sparseset_and_compl(sparseset_def*, sparseset_def*, sparseset_def*)  (in cc1) + 164,48,...  [0x103774124,0x1037740b0,...]
+                              +   9 lra_create_live_ranges_1(bool, bool)  (in cc1) + 1192  [0x103562574]
+                              +   ! 9 optimize_function_for_size_p(function*)  (in cc1) + 12  [0x10366ddf0]
+                              +   9 lra_create_live_ranges_1(bool, bool)  (in cc1) + 1904  [0x10356283c]
+                              +   ! 9 update_pseudo_point(int, int, point_type)  (in cc1) + 24,96  [0x1035618dc,0x103561924]
+                              +   9 lra_create_live_ranges_1(bool, bool)  (in cc1) + 2428  [0x103562a48]
+                              +   ! 9 check_pseudos_live_through_calls(int, function_abi const&)  (in cc1) + 44,16  [0x10356169c,0x103561680]
+                              +   9 lra_create_live_ranges_1(bool, bool)  (in cc1) + 3952  [0x10356303c]
+                              +   ! 3 mark_regno_dead(int, machine_mode)  (in cc1) + 120  [0x103561444]
+                              +   ! : 3 mark_pseudo_dead(int)  (in cc1) + 116  [0x103561384]
+                              +   ! :   2 sparseset_clear_bit(sparseset_def*, unsigned int)  (in cc1) + 92  [0x103773dc0]
+                              +   ! :   1 mark_pseudo_dead(int)  (in cc1) + 140  [0x10356139c]
+                              +   ! 3 mark_regno_dead(int, machine_mode)  (in cc1) + 136  [0x103561454]
+                              +   ! 2 bitmap_set_bit(bitmap_head*, int)  (in cc1) + 140  [0x10305b054]
+                              +   ! 1 mark_regno_dead(int, machine_mode)  (in cc1) + 136  [0x103561454]
+                              +   !   1 bitmap_clear_bit(bitmap_head*, int)  (in cc1) + 80  [0x10305ae10]
+                              +   8 lra_create_live_ranges_1(bool, bool)  (in cc1) + 6204  [0x103563908]
+                              +   ! 8 update_pseudo_point(int, int, point_type)  (in cc1) + 48  [0x1035618f4]
+                              +   8 lra_create_live_ranges_1(bool, bool)  (in cc1) + 6316  [0x103563978]
+                              +   ! 8 insn_callee_abi(rtx_insn const*)  (in cc1) + 116  [0x10326f638]
+                              +   !   8 fndecl_abi(tree_node const*)  (in cc1) + 80  [0x10326f530]
+                              +   !     8 aarch64_fntype_abi(tree_node const*)  (in cc1) + 264  [0x103b6b828]
+                              +   !       6 aarch64_takes_arguments_in_sve_regs_p(tree_node const*)  (in cc1) + 284  [0x103b6a99c]
+                              +   !       : 6 aarch64_function_arg_advance(cumulative_args_t, function_arg_info const&)  (in cc1) + 36  [0x103b79e0c]
+                              +   !       :   6 aarch64_layout_arg(cumulative_args_t, function_arg_info const&)  (in cc1) + 140  [0x103b7914c]
+                              +   !       :     6 aarch64_function_arg_alignment(machine_mode, tree_node const*, unsigned int*, unsigned int*, unsigned int*) (.part.0)  (in cc1) + 124  [0x103b5fe04]
+                              +   !       2 aarch64_takes_arguments_in_sve_regs_p(tree_node const*)  (in cc1) + 232  [0x103b6a968]
+                              +   !         2 apply_pass_by_reference_rules(CUMULATIVE_ARGS*, function_arg_info&)  (in cc1) + 24  [0x10308083c]
+                              +   !           2 pass_by_reference(CUMULATIVE_ARGS*, function_arg_info)  (in cc1) + 92  [0x10308075c]
+                              +   !             2 aarch64_pass_by_reference(cumulative_args_t, function_arg_info const&)  (in cc1) + 372  [0x103b6bd54]
+                              +   !               2 aarch64_pass_by_reference_1(CUMULATIVE_ARGS*, function_arg_info const&)  (in cc1) + 104  [0x103b6bb54]
+                              +   !                 2 aarch64_vfp_is_call_or_return_candidate(machine_mode, tree_node const*, machine_mode*, int*, bool*, bool)  (in cc1) + 140  [0x103b6b1d0]
+                              +   8 mark_regno_live(int, machine_mode)  (in cc1) + 124  [0x1035618bc]
+                              +   6 lra_create_live_ranges_1(bool, bool)  (in cc1) + 7308  [0x103563d58]
+                              +   ! 6 update_pseudo_point(int, int, point_type)  (in cc1) + 60,48,...  [0x103561900,0x1035618f4,...]
+                              +   5 lra_create_live_ranges_1(bool, bool)  (in cc1) + 940  [0x103562478]
+                              +   ! 5 reg_set_to_hard_reg_set(HARD_REG_SET*, bitmap_head const*)  (in cc1) + 148,60  [0x1036d3b98,0x1036d3b40]
+                              +   5 lra_create_live_ranges_1(bool, bool)  (in cc1) + 1916  [0x103562848]
+                              +   ! 5 mark_regno_dead(int, machine_mode)  (in cc1) + 120  [0x103561444]
+                              +   !   5 mark_pseudo_dead(int)  (in cc1) + 96  [0x103561370]
+                              +   5 lra_create_live_ranges_1(bool, bool)  (in cc1) + 9616  [0x10356465c]
+                              +   ! 5 check_pseudos_live_through_calls(int, function_abi const&)  (in cc1) + 44  [0x10356169c]
+                              +   4 lra_create_live_ranges_1(bool, bool)  (in cc1) + 1172  [0x103562560]
+                              +   ! 3 bitmap_clear(bitmap_head*)  (in cc1) + 12  [0x10305a978]
+                              +   ! 1 bitmap_elt_clear_from(bitmap_head*, bitmap_element*)  (in cc1) + 200  [0x10305a838]
+                              +   4 lra_create_live_ranges_1(bool, bool)  (in cc1) + 1720  [0x103562784]
+                              +   ! 4 non_conflicting_reg_copy_p(rtx_insn*)  (in cc1) + 80,24  [0x10351d35c,0x10351d324]
+                              +   4 lra_create_live_ranges_1(bool, bool)  (in cc1) + 2468  [0x103562a70]
+                              +   ! 4 update_pseudo_point(int, int, point_type)  (in cc1) + 92  [0x103561920]
+                              +   4 lra_create_live_ranges_1(bool, bool)  (in cc1) + 4012  [0x103563078]
+                              +   ! 3 make_hard_regno_dead(int)  (in cc1) + 320,16  [0x10356122c,0x1035610fc]
+                              +   ! 1 mark_regno_live(int, machine_mode)  (in cc1) + 108  [0x1035618ac]
+                              +   !   1 mark_pseudo_live(int)  (in cc1) + 20  [0x103561540]
+                              +   3 lra_create_live_ranges_1(bool, bool)  (in cc1) + 2416  [0x103562a3c]
+                              +   ! 3 bitmap_set_bit(bitmap_head*, int)  (in cc1) + 248,604,...  [0x10305b0c0,0x10305b224,...]
+                              +   2 lra_create_live_ranges_1(bool, bool)  (in cc1) + 2016  [0x1035628ac]
+                              +   ! 2 sparseset_copy(sparseset_def*, sparseset_def*)  (in cc1) + 16  [0x103773e20]
+                              +   2 lra_create_live_ranges_1(bool, bool)  (in cc1) + 7780  [0x103563f30]
+                              +   ! 2 xcalloc  (in cc1) + 48  [0x103db1f70]
+                              +   !   2 _xzm_malloc_large_huge  (in libsystem_malloc.dylib) + 464  [0x18d297458]
+                              +   !     2 xzm_segment_group_alloc_chunk  (in libsystem_malloc.dylib) + 1260  [0x18d2808e8]
+                              +   !       2 _xzm_segment_group_clear_chunk  (in libsystem_malloc.dylib) + 44  [0x18d2803a8]
+                              +   !         2 madvise  (in libsystem_kernel.dylib) + 8  [0x18d43a9b0]
+                              +   1 lra_create_live_ranges_1(bool, bool)  (in cc1) + 4088  [0x1035630c4]
+                              +   ! 1 next_program_point(int&, int)  (in cc1) + 284  [0x10356105c]
+                              +   1 lra_create_live_ranges_1(bool, bool)  (in cc1) + 4996  [0x103563450]
+                              +   ! 1 regnos_in_sparseset_p(sparseset_def*, int, machine_mode)  (in cc1) + 88  [0x1035612b8]
+                              +   1 sparseset_and_compl(sparseset_def*, sparseset_def*, sparseset_def*)  (in cc1) + 68  [0x1037740c4]
+                              253 lra(__sFILE*, int)  (in cc1) + 1928  [0x103542fd0]
+                              + 219 lra_final_code_change()  (in cc1) + 144  [0x103569ab0]
+                              + ! 120 df_ref_change_reg_with_loc(rtx_def*, unsigned int)  (in cc1) + 84  [0x10314b238]
+                              + ! : 89 df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1) + 236  [0x1031449bc]
+                              + ! : | 86 df_set_bb_dirty(basic_block_def*)  (in cc1) + 80  [0x10313997c]
+                              + ! : | + 86 bitmap_set_bit(bitmap_head*, int)  (in cc1) + 56,88,...  [0x10305b000,0x10305b020,...]
+                              + ! : | 3 df_set_bb_dirty(basic_block_def*)  (in cc1) + 88,132  [0x103139984,0x1031399b0]
+                              + ! : 31 df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1) + 124,232,...  [0x10314494c,0x1031449b8,...]
+                              + ! 64 df_ref_change_reg_with_loc(rtx_def*, unsigned int)  (in cc1) + 112  [0x10314b254]
+                              + ! : 32 df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1) + 124,232,...  [0x10314494c,0x1031449b8,...]
+                              + ! : 30 df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1) + 236  [0x1031449bc]
+                              + ! : | 23 df_set_bb_dirty(basic_block_def*)  (in cc1) + 80  [0x10313997c]
+                              + ! : | + 23 bitmap_set_bit(bitmap_head*, int)  (in cc1) + 56,148,...  [0x10305b000,0x10305b05c,...]
+                              + ! : | 7 df_set_bb_dirty(basic_block_def*)  (in cc1) + 16,64,...  [0x10313993c,0x10313996c,...]
+                              + ! : 2 df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1) + 416  [0x103144a70]
+                              + ! :   2 df_ref_compare(df_ref_d*, df_ref_d*)  (in cc1) + 16  [0x103144410]
+                              + ! 32 df_ref_change_reg_with_loc(rtx_def*, unsigned int)  (in cc1) + 140  [0x10314b270]
+                              + ! : 24 df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1) + 236  [0x1031449bc]
+                              + ! : | 24 df_set_bb_dirty(basic_block_def*)  (in cc1) + 80  [0x10313997c]
+                              + ! : |   24 bitmap_set_bit(bitmap_head*, int)  (in cc1) + 148,56  [0x10305b05c,0x10305b000]
+                              + ! : 8 df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1) + 88,232  [0x103144928,0x1031449b8]
+                              + ! 2 df_ref_change_reg_with_loc(rtx_def*, unsigned int)  (in cc1) + 24,132  [0x10314b1fc,0x10314b268]
+                              + ! 1 set_mode_and_regno(rtx_def*, machine_mode, unsigned int)  (in cc1) + 48  [0x1031cbed0]
+                              + 26 lra_final_code_change()  (in cc1) + 104,72,...  [0x103569a88,0x103569a68,...]
+                              + 6 lra_final_code_change()  (in cc1) + 500  [0x103569c14]
+                              + ! 3 alter_subregs(rtx_def**, bool)  (in cc1) + 24,40,...  [0x103568064,0x103568074,...]
+                              + ! 2 alter_subregs(rtx_def**, bool)  (in cc1) + 232  [0x103568134]
+                              + ! : 2 alter_subreg(rtx_def**, bool)  (in cc1) + 120  [0x103222200]
+                              + ! :   1 simplify_context::simplify_subreg(machine_mode, rtx_def*, machine_mode, poly_int<2u, unsigned long long>)  (in cc1) + 4264  [0x103770ca8]
+                              + ! :   | 1 simplify_subreg_regno(unsigned int, machine_mode, poly_int<2u, unsigned long long>, machine_mode, bool)  (in cc1) + 196  [0x103719a08]
+                              + ! :   |   1 aarch64_hard_regno_mode_ok(unsigned int, machine_mode)  (in cc1) + 0  [0x103b68e10]
+                              + ! :   1 simplify_context::simplify_subreg(machine_mode, rtx_def*, machine_mode, poly_int<2u, unsigned long long>)  (in cc1) + 5492  [0x103771174]
+                              + ! :     1 gen_rtx_REG_offset(rtx_def*, machine_mode, unsigned int, poly_int<2u, long long>)  (in cc1) + 128  [0x1031d68e8]
+                              + ! :       1 update_reg_offset(rtx_def*, rtx_def*, poly_int<2u, long long>) (.isra.0)  (in cc1) + 52  [0x1031d6420]
+                              + ! :         1 get_reg_attrs(tree_node*, poly_int<2u, long long>)  (in cc1) + 152  [0x1031d5d78]
+                              + ! 1 alter_subregs(rtx_def**, bool)  (in cc1) + 168  [0x1035680f4]
+                              + !   1 alter_subregs(rtx_def**, bool)  (in cc1) + 168  [0x1035680f4]
+                              + !     1 alter_subregs(rtx_def**, bool)  (in cc1) + 116  [0x1035680c0]
+                              + 2 lra_final_code_change()  (in cc1) + 108  [0x103569a8c]
+                              +   1 resize_reg_info()  (in cc1) + 64  [0x1036d4c00]
+                              +   : 1 max_reg_num()  (in cc1) + 4  [0x1031ccd64]
+                              +   1 resize_reg_info()  (in cc1) + 64  [0x1036d4c00]
+                              80 lra(__sFILE*, int)  (in cc1) + 1408  [0x103542dc8]
+                              + 45 lra_assign(bool&)  (in cc1) + 11832  [0x1035489fc]
+                              + ! 21 update_lives(int, bool)  (in cc1) + 220  [0x103544348]
+                              + ! : 21 bitmap_set_bit(bitmap_head*, int)  (in cc1) + 140,44,...  [0x10305b054,0x10305aff4,...]
+                              + ! 19 update_lives(int, bool)  (in cc1) + 112,196,...  [0x1035442dc,0x103544330,...]
+                              + ! 5 update_lives(int, bool)  (in cc1) + 228  [0x103544350]
+                              + !   5 insert_in_live_range_start_chain(int)  (in cc1) + 44,32  [0x103543f4c,0x103543f40]
+                              + 27 lra_assign(bool&)  (in cc1) + 676,704,...  [0x103545e68,0x103545e84,...]
+                              + 3 lra_assign(bool&)  (in cc1) + 428  [0x103545d70]
+                              + ! 3 resize_reg_info()  (in cc1) + 48,56,...  [0x1036d4bf0,0x1036d4bf8,...]
+                              + 3 lra_assign(bool&)  (in cc1) + 536  [0x103545ddc]
+                              + ! 3 init_regno_assign_info()  (in cc1) + 84  [0x103544104]
+                              + 1 lra_assign(bool&)  (in cc1) + 436  [0x103545d78]
+                              + ! 1 reg_allocno_class(int)  (in cc1) + 12  [0x1036d4b6c]
+                              + 1 lra_assign(bool&)  (in cc1) + 2292  [0x1035464b8]
+                              +   1 init_live_reload_and_inheritance_pseudos()  (in cc1) + 112  [0x103544650]
+                              45 lra(__sFILE*, int)  (in cc1) + 1144  [0x103542cc0]
+                              + 45 lra_eliminate(bool, bool)  (in cc1) + 872  [0x103560ae8]
+                              +   45 update_reg_eliminate(bitmap_head*) (.constprop.0)  (in cc1) + 1196  [0x10355e218]
+                              +     41 spill_pseudos(HARD_REG_SET, int*)  (in cc1) + 412,500,...  [0x10355da1c,0x10355da74,...]
+                              +     4 spill_pseudos(HARD_REG_SET, int*)  (in cc1) + 512  [0x10355da80]
+                              +       4 bitmap_bit_p(bitmap_head const*, int)  (in cc1) + 0  [0x10305b32c]
+                              40 lra(__sFILE*, int)  (in cc1) + 1128  [0x103542cb0]
+                              + 21 lra_constraints(bool)  (in cc1) + 408  [0x10355c67c]
+                              + ! 21 lra_eliminate(bool, bool)  (in cc1) + 872  [0x103560ae8]
+                              + !   21 update_reg_eliminate(bitmap_head*) (.constprop.0)  (in cc1) + 1196  [0x10355e218]
+                              + !     14 spill_pseudos(HARD_REG_SET, int*)  (in cc1) + 424,412,...  [0x10355da28,0x10355da1c,...]
+                              + !     4 spill_pseudos(HARD_REG_SET, int*)  (in cc1) + 440  [0x10355da38]
+                              + !     : 4 max_reg_num()  (in cc1) + 4  [0x1031ccd64]
+                              + !     3 spill_pseudos(HARD_REG_SET, int*)  (in cc1) + 512  [0x10355da80]
+                              + !       3 bitmap_bit_p(bitmap_head const*, int)  (in cc1) + 304  [0x10305b45c]
+                              + 12 lra_constraints(bool)  (in cc1) + 500,232,...  [0x10355c6d8,0x10355c5cc,...]
+                              + 6 lra_constraints(bool)  (in cc1) + 580  [0x10355c728]
+                              + ! 6 resize_reg_info()  (in cc1) + 64,0,...  [0x1036d4c00,0x1036d4bc0,...]
+                              + 1 lra_constraints(bool)  (in cc1) + 828  [0x10355c820]
+                              +   1 simplify_replace_fn_rtx(rtx_def*, rtx_def const*, rtx_def* (*)(rtx_def*, rtx_def const*, void*), void*)  (in cc1) + 1244  [0x1037730bc]
+                              +     1 simplify_replace_fn_rtx(rtx_def*, rtx_def const*, rtx_def* (*)(rtx_def*, rtx_def const*, void*), void*)  (in cc1) + 68  [0x103772c24]
+                              13 lra(__sFILE*, int)  (in cc1) + 1232  [0x103542d18]
+                                12 lra_need_for_spills_p()  (in cc1) + 76,116  [0x103568a90,0x103568ab8]
+                                1 lra_need_for_spills_p()  (in cc1) + 120  [0x103568abc]
+                                  1 resize_reg_info()  (in cc1) + 64  [0x1036d4c00]
+
+Total number in stack (recursive counted multiple, when >=5):
+        6       bitmap_set_bit(bitmap_head*, int)  (in cc1) + 0  [0x10305afc8]
+        5       update_pseudo_point(int, int, point_type)  (in cc1) + 0  [0x1035618c4]
+
+Sort by top of stack, same collapsed (when >= 5):
+        lra_create_live_ranges_1(bool, bool)  (in cc1)        170
+        bitmap_set_bit(bitmap_head*, int)  (in cc1)        159
+        df_ref_change_reg_with_loc_1(df_reg_info*, df_reg_info*, unsigned int, rtx_def*)  (in cc1)        71
+        spill_pseudos(HARD_REG_SET, int*)  (in cc1)        55
+        update_pseudo_point(int, int, point_type)  (in cc1)        47
+        mark_pseudo_live(int)  (in cc1)        34
+        lra_assign(bool&)  (in cc1)        27
+        lra_final_code_change()  (in cc1)        26
+        update_lives(int, bool)  (in cc1)        19
+        check_pseudos_live_through_calls(int, function_abi const&)  (in cc1)        14
+        sparseset_clear_bit(sparseset_def*, unsigned int)  (in cc1)        14
+        sparseset_and_compl(sparseset_def*, sparseset_def*, sparseset_def*)  (in cc1)        13
+        lra_constraints(bool)  (in cc1)        12
+        lra_need_for_spills_p()  (in cc1)        12
+        lra_update_biggest_mode(int, machine_mode)  (in cc1)        12
+        resize_reg_info()  (in cc1)        11
+        df_set_bb_dirty(basic_block_def*)  (in cc1)        10
+        mark_pseudo_dead(int)  (in cc1)        10
+        optimize_function_for_size_p(function*)  (in cc1)        9
+        mark_regno_live(int, machine_mode)  (in cc1)        8
+        bitmap_bit_p(bitmap_head const*, int)  (in cc1)        7
+        aarch64_function_arg_alignment(machine_mode, tree_node const*, unsigned int*, unsigned int*, unsigned int*) (.part.0)  (in cc1)        6
+        insert_in_live_range_start_chain(int)  (in cc1)        5
+        max_reg_num()  (in cc1)        5
+        reg_set_to_hard_reg_set(HARD_REG_SET*, bitmap_head const*)  (in cc1)        5
+
+Binary Images:
+       0x10268c000 -        0x1046dbf67 +cc1 (0) <BFC09450-89B4-3826-81FF-142A515B8D06> /opt/homebrew/*/cc1
+       0x1057f0000 -        0x105804c6f +libmpc.3.dylib (0) <7014B9F8-7F59-3CC8-BFA7-980ED9ACC414> /opt/homebrew/*/libmpc.3.dylib
+       0x10588c000 -        0x1058e3ff7 +libmpfr.6.dylib (0) <0CA9354E-CA18-3723-8E0E-10D24DEF18C8> /opt/homebrew/*/libmpfr.6.dylib
+       0x10594c000 -        0x105a5d13f +libisl.23.dylib (0) <CF96D728-0DBD-3458-8068-11A8FCA2E0A2> /opt/homebrew/*/libisl.23.dylib
+       0x105ad4000 -        0x105b2bfff +libgmp.10.dylib (0) <F6A7B957-4314-3EA5-AC52-39A649BD3A58> /opt/homebrew/*/libgmp.10.dylib
+       0x105ccc000 -        0x105d5344f +libzstd.1.5.7.dylib (0) <1CE1197A-4A2B-3036-984E-95599210332B> /opt/homebrew/*/libzstd.1.5.7.dylib
+       0x18d008000 -        0x18d05ab4b  libobjc.A.dylib (951.7) <40277974-D20C-3EC8-B25C-43AE30D8CC60> /usr/lib/libobjc.A.dylib
+       0x18d05b000 -        0x18d08fd58  libdyld.dylib (1387) <634959D0-592E-349C-B549-B91F2FF09858> /usr/lib/system/libdyld.dylib
+       0x18d090000 -        0x18d1434ff  dyld (1.0.0 - 1387) <DF42DD9D-AD11-33A7-8849-9AD5DF30A274> /usr/lib/dyld
+       0x18d144000 -        0x18d147228  libsystem_blocks.dylib (96) <A712B95E-BCEE-3F12-9F9B-58E6C2060E53> /usr/lib/system/libsystem_blocks.dylib
+       0x18d148000 -        0x18d19c55f  libxpc.dylib (3102.160.5) <40BBE226-77D4-332E-9DA8-F0B5BACFB86D> /usr/lib/system/libxpc.dylib
+       0x18d19d000 -        0x18d1bd9ff  libsystem_trace.dylib (1861.160.4) <E043667E-AD01-3228-837F-A381F32F2B30> /usr/lib/system/libsystem_trace.dylib
+       0x18d1be000 -        0x18d26c5f7  libcorecrypto.dylib (1922.160.10) <D54389FC-4078-370D-A863-9FEF16E00DFD> /usr/lib/system/libcorecrypto.dylib
+       0x18d26d000 -        0x18d2bd257  libsystem_malloc.dylib (812.160.5) <971CDCFE-4D20-300E-A1D6-EC8672FDD258> /usr/lib/system/libsystem_malloc.dylib
+       0x18d2be000 -        0x18d30523f  libdispatch.dylib (1542.160.2) <243E06A0-7BFF-3C3F-8A9B-D7732729B361> /usr/lib/system/libdispatch.dylib
+       0x18d306000 -        0x18d308ffb  libsystem_featureflags.dylib (103) <5E7CDBD5-44AB-34C0-A0F5-FC72F6116CDC> /usr/lib/system/libsystem_featureflags.dylib
+       0x18d309000 -        0x18d38a1e7  libsystem_c.dylib (1752.160.4) <FDC4E366-5C14-3A1E-BC35-D933D28CDCF3> /usr/lib/system/libsystem_c.dylib
+       0x18d38b000 -        0x18d41bae7  libc++.1.dylib (2100.43) <C6DC2145-7B94-3E01-ADE5-96A6C2D078BC> /usr/lib/libc++.1.dylib
+       0x18d41c000 -        0x18d43675f  libc++abi.dylib (2100.43) <DDE77B06-5E25-380B-85B7-BA1A27D09021> /usr/lib/libc++abi.dylib
+       0x18d437000 -        0x18d4742e7  libsystem_kernel.dylib (12377.161.13) <7CFB3A10-ADB2-32C4-99B5-922A111B3224> /usr/lib/system/libsystem_kernel.dylib
+       0x18d475000 -        0x18d481b3b  libsystem_pthread.dylib (539.100.4) <12342372-0084-37A5-9EA6-2E4DC940C685> /usr/lib/system/libsystem_pthread.dylib
+       0x18d482000 -        0x18d48a963  libsystem_platform.dylib (375.120.2) <4C6BD0FE-25F2-38D8-BE5C-24DAC1DEDCFB> /usr/lib/system/libsystem_platform.dylib
+       0x18d48b000 -        0x18d4ba6eb  libsystem_info.dylib (600) <7402662E-F235-3F48-BB65-F64C8CF0F2BB> /usr/lib/system/libsystem_info.dylib
+       0x191458000 -        0x191461e5f  libsystem_darwin.dylib (1752.160.4) <A095E4FE-0EE1-34DF-B00A-7D349FBC55E0> /usr/lib/system/libsystem_darwin.dylib
+       0x1918c3000 -        0x1918d51b6  libsystem_notify.dylib (348.160.3) <F9B1BAFF-4D09-3A1F-839B-189C21EB5FBB> /usr/lib/system/libsystem_notify.dylib
+       0x193b94000 -        0x193baef7b  libsystem_networkextension.dylib (2226.160.6) <01D14A9E-16DC-372C-8AA8-CC7AD39E797F> /usr/lib/system/libsystem_networkextension.dylib
+       0x193c31000 -        0x193c48fdf  libsystem_asl.dylib (406) <FF57F6FA-F3A1-343D-815D-57B769D31445> /usr/lib/system/libsystem_asl.dylib
+       0x1957ea000 -        0x1957f2387  libsystem_symptoms.dylib (2169.160.3) <CE07A0DF-31B6-3528-B7CE-91CAD89AA519> /usr/lib/system/libsystem_symptoms.dylib
+       0x199a8f000 -        0x199ac75b7  libsystem_containermanager.dylib (725.160.3) <2E14025A-52C2-361D-8A8F-5DD45825A2C9> /usr/lib/system/libsystem_containermanager.dylib
+       0x19aea1000 -        0x19aea55d7  libsystem_configuration.dylib (1405.160.3) <A14ED142-2F56-33A6-A23C-EEB8417DC90E> /usr/lib/system/libsystem_configuration.dylib
+       0x19aea6000 -        0x19aeac99f  libsystem_sandbox.dylib (2680.160.6) <6592D3CE-38C6-3C08-9EA5-75D64F37993F> /usr/lib/system/libsystem_sandbox.dylib
+       0x19c501000 -        0x19c5041fb  libquarantine.dylib (196.160.2) <78C5B827-8152-358D-90E9-B02F02A68B17> /usr/lib/system/libquarantine.dylib
+       0x19cca0000 -        0x19cca6d03  libsystem_coreservices.dylib (191.5.1) <F335DA14-69E8-336E-85A3-11EE239255F0> /usr/lib/system/libsystem_coreservices.dylib
+       0x19d220000 -        0x19d22ed97  libz.1.dylib (100.120.1) <03BEB01C-EE74-3952-80FC-D2B7CF9C798D> /usr/lib/libz.1.dylib
+       0x19d22f000 -        0x19d26ca77  libsystem_m.dylib (3312.100.1) <3739A40F-2C17-3503-92D6-098141E56E89> /usr/lib/system/libsystem_m.dylib
+       0x19d26d000 -        0x19d26dc9b  libcharset.1.dylib (115.120.2) <7704B548-DB2D-3468-B301-82E8F026DDCE> /usr/lib/libcharset.1.dylib
+       0x19d26e000 -        0x19d271527  libmacho.dylib (1387) <3E43AF47-AD89-3BB4-82B9-A9533F4334DF> /usr/lib/system/libmacho.dylib
+       0x19d28b000 -        0x19d2983a7  libcommonCrypto.dylib (600035) <72D94140-1281-3886-971B-37C810403C03> /usr/lib/system/libcommonCrypto.dylib
+       0x19d299000 -        0x19d2a2ca3  libunwind.dylib (2100.2) <B21A1015-83D4-31D8-BA41-88688962D9A6> /usr/lib/system/libunwind.dylib
+       0x19d2ab000 -        0x19d2b5bef  libcopyfile.dylib (240.160.2.0.1) <58F425CF-7D4F-34FD-9620-706A2A7F8BDC> /usr/lib/system/libcopyfile.dylib
+       0x19d2b6000 -        0x19d2b9987  libcompiler_rt.dylib (103.3) <D60A9B54-A909-3FD5-93B9-3F38BE0A2BE8> /usr/lib/system/libcompiler_rt.dylib
+       0x19d2ba000 -        0x19d2be78b  libsystem_collections.dylib (1752.160.4) <BDA28F78-F479-3C22-B9C7-4ABCB6801592> /usr/lib/system/libsystem_collections.dylib
+       0x19d2bf000 -        0x19d2c24cf  libsystem_secinit.dylib (168.100.7) <C85AF062-AA9B-35BB-904C-C055B2C21602> /usr/lib/system/libsystem_secinit.dylib
+       0x19d2c3000 -        0x19d2c5bf7  libremovefile.dylib (85.100.6) <DA9C2B48-7A9C-32EA-888D-6C7AEB5250E6> /usr/lib/system/libremovefile.dylib
+       0x19d2c6000 -        0x19d2c6f27  libkeymgr.dylib (31) <18EFA1CE-C535-3EAC-BC2C-7955593B7382> /usr/lib/system/libkeymgr.dylib
+       0x19d2c7000 -        0x19d2cfe37  libsystem_dnssd.dylib (2881.160.4) <2C4C3043-008E-3BD8-BC29-AB9AD235DBA9> /usr/lib/system/libsystem_dnssd.dylib
+       0x19d2d0000 -        0x19d2d509b  libcache.dylib (95) <EA7C2E0B-52BF-3D45-9A33-38F54A535452> /usr/lib/system/libcache.dylib
+       0x19d2d6000 -        0x19d2d7ce3  libSystem.B.dylib (1356) <4CC4CAD6-45A6-361E-9343-DE636A0B5C02> /usr/lib/libSystem.B.dylib
+       0x19d310000 -        0x19d3172bb  libiconv.2.dylib (115.120.2) <2D429111-B58B-365E-8D8D-68DA82D20589> /usr/lib/libiconv.2.dylib
+       0x29127f000 -        0x291286349  libRosetta.dylib (367.9) <F41D814B-FE1F-311A-A778-5F0699628188> /usr/lib/libRosetta.dylib
+       0x292e92000 -        0x292e95a4b  libsystem_darwindirectory.dylib (122) <6C03D78B-BFAB-3C7A-B713-50881791EE08> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x292e96000 -        0x292ea039b  libsystem_eligibility.dylib (319.160.17) <A279E124-8499-3FFC-A788-655070028F97> /usr/lib/system/libsystem_eligibility.dylib
+       0x292ea1000 -        0x292ea888b  libsystem_sanitizers.dylib (26.1) <C92FAEE5-DAED-3340-96B3-0C42B005ADF9> /usr/lib/system/libsystem_sanitizers.dylib
+       0x292ea9000 -        0x292ea9bb7  libsystem_trial.dylib (474.2.18.2) <2FF186A6-F448-38CD-9A30-8B5B1AEFCA10> /usr/lib/system/libsystem_trial.dylib

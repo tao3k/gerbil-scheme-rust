@@ -1,0 +1,17 @@
+cargo clippy: 1 errors, 0 warnings
+═══════════════════════════════════════
+
+Errors:
+  error: this expression creates a reference which is immediately dereferenced by the compiler
+     --> crates/gerbil-scheme-qualification/benches/instance_resources/green.rs:181:28
+      |
+  181 |         timer_waits(&pool, &progress);
+      |                            ^^^^^^^^^ help: change this to: `progress`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+      = note: `-D clippy::needless-borrow` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+  this expression creates a reference which is immediately dereferenced by the compiler (1x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/green.rs:181:28
+[full output: ~/Library/Application Support/rtk/tee/1792409800_cargo_clippy.log]

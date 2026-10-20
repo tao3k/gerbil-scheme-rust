@@ -1,7 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Benchmark-only exports. Rust owns foreign entry; Gerbil owns actor execution.
 package: gerbil-scheme-rust/qualification
-(import :gerbil-scheme-rust/scheme/runtime "utf8-controls")
+(import :gerbil-scheme-rust/scheme/actor-batch :gerbil-scheme-rust/scheme/runtime :std/encoding/json "utf8-controls")
 (export main)
 
 (def (main . _) (void))
@@ -19,6 +19,12 @@ package: gerbil-scheme-rust/qualification
 (def last-processor-count 0)
 (def last-active-processors 0)
 (def instance-marker 0)
+(include "instance-lifecycle.ss")
+(include "instance-json.ss")
+(include "instance-green.ss")
+(include "instance-actor-control.ss")
+(include "instance-orders.ss")
+(include "instance-native.ss")
 
 ;; Diagnostic-only synchronous callback from inside Scheme. The host owns the
 ;; context for the entire call; no Scheme object or context escapes its VM.
@@ -115,3 +121,9 @@ package: gerbil-scheme-rust/qualification
     (unsigned-int32 unsigned-int32 unsigned-int32 unsigned-int32 unsigned-int32) int64
     "gerbil_actor_qualification_batch" "extern"
     (gerbil-scheme-rust/qualification/actors#checked-actor-batch processors actors jobs rounds fail?)))
+
+(begin-foreign
+  (c-define (instance-qualification-lifecycle operation owner)
+    (unsigned-int32 unsigned-int32) int64
+    "gerbil_instance_qualification_lifecycle" "extern"
+    (gerbil-scheme-rust/qualification/actors#instance-lifecycle operation owner)))

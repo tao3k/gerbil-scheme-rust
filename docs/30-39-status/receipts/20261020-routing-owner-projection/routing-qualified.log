@@ -1,0 +1,14 @@
+"/private/tmp/gerbil-routing-batch-20261020/venv/bin/python" examples/python-ledger/tests/test_owner_routing.py -v
+test_bulk_order_duplicates_types_and_idempotent_retirement (__main__.OwnerRoutingTests.test_bulk_order_duplicates_types_and_idempotent_retirement) ... ok
+test_concurrent_stateless_callers_and_bulk_collection (__main__.OwnerRoutingTests.test_concurrent_stateless_callers_and_bulk_collection) ... ok
+test_foreign_library_validation_does_not_consume_local_values (__main__.OwnerRoutingTests.test_foreign_library_validation_does_not_consume_local_values) ... ok
+test_projection_and_release_across_native_windows (__main__.OwnerRoutingTests.test_projection_and_release_across_native_windows) ... ok
+test_projection_failure_keeps_graphs_procedures_and_continuations (__main__.OwnerRoutingTests.test_projection_failure_keeps_graphs_procedures_and_continuations) ... ok
+test_references_require_affinity_and_reject_before_stateful_batch (__main__.OwnerRoutingTests.test_references_require_affinity_and_reject_before_stateful_batch) ... ok
+test_stateful_sessions_keep_vm_state_and_default_call_owner (__main__.OwnerRoutingTests.test_stateful_sessions_keep_vm_state_and_default_call_owner) ... ok
+test_stateless_cursor_spans_individual_and_batch_calls (__main__.OwnerRoutingTests.test_stateless_cursor_spans_individual_and_batch_calls) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 8.026s
+
+OK

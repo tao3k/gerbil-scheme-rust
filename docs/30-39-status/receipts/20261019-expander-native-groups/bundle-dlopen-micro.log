@@ -1,0 +1,4 @@
+before /opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/lib/gerbil/core/mop~1.o1
+after 507917
+before /private/tmp/gerbil-expander-20261019/mop-fresh.o1
+after 414017958

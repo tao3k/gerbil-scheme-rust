@@ -1,0 +1,74 @@
+{
+  "('false', 1, 0)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 5304584,
+    "orders_per_second": 193040.58527492447,
+    "p99_ns": 1819333,
+    "p95_ns": 819666,
+    "peer_min": 0
+  },
+  "('false', 1, 1)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 4887958,
+    "orders_per_second": 209494.43509948326,
+    "p99_ns": 1062458,
+    "p95_ns": 672917,
+    "peer_min": 0
+  },
+  "('false', 32, 0)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 3913583,
+    "orders_per_second": 261652.8127805134,
+    "p99_ns": 4417458,
+    "p95_ns": 2206958,
+    "peer_min": 7
+  },
+  "('false', 32, 1)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 3785875,
+    "orders_per_second": 270479.0834351372,
+    "p99_ns": 4415416,
+    "p95_ns": 2241084,
+    "peer_min": 6
+  },
+  "('true', 1, 0)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 54903792,
+    "orders_per_second": 18650.8064871002,
+    "p99_ns": 13412750,
+    "p95_ns": 7037625,
+    "peer_min": 0
+  },
+  "('true', 1, 1)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 54548041,
+    "orders_per_second": 18772.443175365363,
+    "p99_ns": 13640084,
+    "p95_ns": 7007459,
+    "peer_min": 0
+  },
+  "('true', 32, 0)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 22434792,
+    "orders_per_second": 45643.3917461771,
+    "p99_ns": 7497125,
+    "p95_ns": 4234083,
+    "peer_min": 2
+  },
+  "('true', 32, 1)": {
+    "samples": 20,
+    "orders": 20480,
+    "median_ns": 22444584,
+    "orders_per_second": 45623.478697578,
+    "p99_ns": 8648708,
+    "p95_ns": 5577875,
+    "peer_min": 2
+  }
+}

@@ -35,6 +35,12 @@ fn main() {
     println!("cargo:rerun-if-env-changed=GERBIL_GSC");
     println!("cargo:rerun-if-env-changed=GERBIL_GXI");
     println!("cargo:rerun-if-changed=scheme/actors.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-lifecycle.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-json.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-native.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-green.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-orders.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-actor-control.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-controls.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-inline-control.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-buffer-control.ss");
@@ -114,7 +120,9 @@ fn main() {
     if instance_probe {
         instances::build(&package, &out, &gsc, &receipt);
     }
-    if actor_aot {
+    // The library gate also exercises rejection of the ordinary linked entry.
+    // Supply its existing program graph; it remains uninitialized in image mode.
+    if actor_aot || env::var_os("CARGO_FEATURE_INSTANCE_LIBRARY").is_some() {
         for directive in receipt.cargo_directives {
             println!("{}", directive.line());
         }

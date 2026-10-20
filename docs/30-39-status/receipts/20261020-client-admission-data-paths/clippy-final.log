@@ -1,0 +1,20 @@
+    Checking gerbil-scheme-python v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-python)
+error: these match arms have identical bodies
+   --> crates/gerbil-scheme-python/src/runtime.rs:98:13
+    |
+ 98 |             Self::Shared(_) => false,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+105 |             _ => false,
+    |             ^^^^^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#match_same_arms
+    = note: `-D clippy::match-same-arms` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::match_same_arms)]`
+help: otherwise remove the non-wildcard arm
+    |
+ 98 -             Self::Shared(_) => false,
+    |
+
+error: could not compile `gerbil-scheme-python` (lib) due to 1 previous error

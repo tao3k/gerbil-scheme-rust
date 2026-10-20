@@ -88,31 +88,36 @@ impl ScalarBatch {
                 code: status as i32,
             });
         }
-        let decode = |value: &GerbilScalarProjection| {
-            Ok(match value.tag {
-                1 => SchemeScalar::Boolean(value.bits != 0),
-                2 => SchemeScalar::Fixnum(
-                    isize::try_from(i64::from_ne_bytes(value.bits.to_ne_bytes()))
-                        .map_err(|_| error())?,
-                ),
-                3 => SchemeScalar::Char(
-                    char::from_u32(u32::try_from(value.bits).map_err(|_| error())?)
-                        .ok_or_else(error)?,
-                ),
-                4 => SchemeScalar::Flonum(f64::from_bits(value.bits)),
-                _ => return Err(error()),
-            })
-        };
         // Validate before publishing, including ABI drift and invalid chars.
         self.projected
             .iter()
-            .try_for_each(|v| decode(v).map(|_| ()))?;
+            .try_for_each(|v| decode_scalar_projection(v).map(|_| ()))?;
         output.clear();
         output.extend(
             self.projected
                 .iter()
-                .map(|v| decode(v).expect("validated scalar")),
+                .map(|v| decode_scalar_projection(v).expect("validated scalar")),
         );
         Ok(())
     }
+}
+
+pub(crate) fn decode_scalar_projection(
+    value: &GerbilScalarProjection,
+) -> Result<SchemeScalar, NativeError> {
+    let error = || NativeError::Status {
+        operation: "gerbil_scheme_rust_scalar_batch",
+        code: GerbilStatus::InvalidValue as i32,
+    };
+    Ok(match value.tag {
+        1 => SchemeScalar::Boolean(value.bits != 0),
+        2 => SchemeScalar::Fixnum(
+            isize::try_from(i64::from_ne_bytes(value.bits.to_ne_bytes())).map_err(|_| error())?,
+        ),
+        3 => SchemeScalar::Char(
+            char::from_u32(u32::try_from(value.bits).map_err(|_| error())?).ok_or_else(error)?,
+        ),
+        4 => SchemeScalar::Flonum(f64::from_bits(value.bits)),
+        _ => return Err(error()),
+    })
 }

@@ -1,0 +1,141 @@
+#+title: Library-Owned Native Scheme Instances: JSON and Lifecycle Qualification
+#+date: 2026-10-19
+
+* Identity and execution path
+
+Repository =tao3k/gerbil-scheme-rust=, branch =codex/typed-fold-aot=,
+base HEAD =bb71bbb5ad91bbaef2035979319514c7ced4c4ca=. The dirty checkout includes concurrent unrelated
+work. The receipt identifies the tested source files and native image by SHA-256;
+base HEAD alone is not the tested tree. The host is recorded in the JSON receipt.
+
+The tested entry is now =gerbil_scheme::instances::InstancePool= with cloneable
+=InstanceDispatcher=, behind the explicit Darwin =isolated-instances= feature.
+The benchmark uses these library calls, not its old benchmark-only image pool.
+Rust owns dispatch and byte transfer. Native Scheme owns JSON parsing/writing,
+exact-integer validation, table aggregation, sorting, heap allocation, forced
+GC, closures, continuations, dynamic binding and exceptions.
+
+See [[file:../instance-runtime.org][the API and native image contract]] and [[file:receipts/20261019-instance-library/receipt.json][the complete identity/sample manifest]].
+The image reuses the production C single-processor lifecycle including host-I/O
+restoration, compiled by the existing compiler-owned program archive builder.
+The qualification executable also links its ordinary host graph for the negative
+backend-entry control. That host runtime is not initialized. No SDK flags or
+external runtime sources were changed, and no Scheme algorithm was lowered to Rust.
+
+* Real Scheme workload and matched results
+
+Each batch contains eight complete order-summary requests. Rows contain category,
+quantity, unit price and a Unicode label. Native Scheme parses JSON bytes,
+collects while the parsed tree is live, validates rows, aggregates integer totals
+by category, counts characters, sorts keys and serializes JSON bytes. The Rust
+oracle is used only to assert exact totals, row/character counts and every group.
+
+A has one fixed owner/instance. B has four. Both receive the same eight inputs
+per load, so total input rows and application work are equal. A executes requests
+sequentially; B dispatches them across four independent single-processor instances.
+Each measured request forces GC in either variant. Five distinct GSTATE addresses
+and one actual processor per instance are asserted across the live A/B pools.
+
+Ten ABBA blocks per load give 20 complete samples per variant, 120 measured
+batches, and 960 individually checked measured responses. Medians average the
+two middle samples. Timings include request cloning, bounded admission, native
+input conversion, Scheme work and GC, result copy/root release, host response
+wait and oracle validation. Corpus construction and pool initialization are outside
+these steady-state samples. Each pool is warmed with one complete batch per load.
+
+| Rows per request | A median ms | B median ms | A/B |
+|------------------+-------------+-------------+-----|
+| 64 | 4.129354 | 2.066750 | 1.998 |
+| 1,024 | 19.994479 | 8.975916 | 2.228 |
+| 8,192 | 138.530062 | 52.754688 | 2.626 |
+
+These are local end-to-end results for this Scheme request handler, not a claim
+for other applications or arbitrary continuation throughput. Threads have stable
+OS-thread identity; CPU-core affinity is not imposed. Raw samples retain scheduling
+outliers. Development smoke timings, including runs overlapping compiler activity,
+are retained separately and excluded from this table.
+
+* Initialization and destruction costs
+
+Eight fresh child processes run two ABBA blocks: four samples with one owner and
+four with four owners. Every child uses eight identical 1,024-row requests and
+checks all results. A fresh process resets native lifecycle/image residency; this
+is not a cold-filesystem or compiler-build measurement. Corpus construction occurs
+before the child's measured span. The process wall cost is recorded separately.
+
+| Owners | Setup median ms | First batch median ms | Cleanup/join median ms | Total median ms |
+|--------+-----------------+-----------------------+------------------------+-----------------|
+| 1 | 510.293688 | 20.129188 | 1.535562 | 531.339729 |
+| 4 | 2086.791208 | 7.887583 | 1.561063 | 2096.714562 |
+
+Setup includes image copies, thread creation, dynamic loading, ABI/symbol checks,
+native setup and observed owner readiness. Per-owner setup times are also retained.
+Teardown closes admission, drains accepted work, performs owner-local native cleanup
+and joins owners. It includes the API's bounded join polling; the raw log also
+records native cleanup time alone. Independent phase medians need not sum to the
+total median. Every completed cleanup receipt has zero external transfer roots and
+status zero. GC counts are recorded separately; image residency is not live-heap size.
+
+* Executed contracts
+
+- Save a Scheme continuation, return through the real library byte/root call path,
+  force repeated GC and resume it twice on its original owner. Verify retained
+  vector contents, Scheme thread identity, dynamic parameters, dynamic-wind
+  balance and the Scheme exception path.
+- Clean up and join one instance while another retains its continuation; resume
+  that survivor and compute again. Also clean up a VM still holding a saved
+  continuation in Scheme globals. This does not prove finalizer or leak freedom.
+- Reject ordinary linked runtime initialization after selecting image mode.
+- Use four concurrent Rust callers through Send + Sync dispatcher clones; reject
+  every clone after the owning pool closes admission.
+- Reject a full finite queue, invalid owner, invalid owner count and oversized
+  request before admission. Reject oversized replies while releasing transfer roots.
+- Observe a request timeout and a shutdown deadline while Scheme is still live.
+  The first shutdown reports one pending/unjoined owner with no cleanup receipt.
+  Later observe both accepted results and a complete clean shutdown. Timeout is
+  not cancellation; no active VM is destroyed from the host thread.
+- Drop a result ticket while its accepted Scheme delay runs. Later queued work
+  completes and the final transfer-root count remains zero.
+- Reject malformed JSON as a Scheme exception, then call the same owner again;
+  input/result roots are balanced on rejection and conversion failure too.
+- Reject a missing export before native setup. Startup errors retain the cause
+  and observed cleanup/join state. Partial native setup rollback is not qualified.
+
+The native gate retains its five-second real-progress/startup/response checks.
+Fresh child execution has a stricter four-second kill/reap gate. Neither is
+extended to manufacture a passing run. Image code is retained until process exit.
+Dropping a busy pool detaches owners and does not certify completed cleanup;
+explicit shutdown is required for clean receipts.
+
+* Verification and evidence
+
+#+begin_src sh
+just bridge-instance-library --test
+just bridge-instance-library
+cargo clippy -p gerbil-scheme --features external-program,isolated-instances \
+  --lib --release --locked -- -D warnings
+cargo clippy -p gerbil-scheme-qualification --features instance-library \
+  --bench instance_library --release --locked -- -D warnings
+cargo test -p gerbil-scheme --features isolated-instances \
+  --test runtime_lifecycle --release --locked -- --nocapture
+#+end_src
+
+The completed native smoke, full matched/fresh-process qualification, strict library
+and qualification Clippy gates, and ordinary linked-runtime lifecycle regression
+passed. The ordinary regression reported one passed test and one preexisting
+ignored benchmark; the ignored benchmark is not claimed as executed. Source layout policy findings were fixed in source without suppression.
+The lockfile adds only the qualification crate's existing serde_json dependency;
+no dependency version changed.
+
+- [[file:receipts/20261019-instance-library/final.log][Complete final native log]]
+- [[file:receipts/20261019-instance-library/receipt.json][Source/image identities, all checked samples, cold costs and cleanup observations]]
+- [[file:receipts/20261019-instance-library/activity.log][One-second native/compiler activity observations]]
+- [[file:receipts/20261019-instance-library/excluded-overlap.log][Excluded full run overlapping another native test]]
+- Development compile and queue-test failures are preserved alongside that receipt;
+  they are not relabeled as accepted runtime or timing evidence.
+
+Darwin image/native ABI qualification remains experimental. Hot unload, process
+crash containment, partial native setup rollback, leak freedom, sanitizers, general
+signal/timer coexistence, portability and remote CI remain unqualified. The library
+does not admit moving Scheme objects/continuations between owners or escaping
+retired foreign frames. Existing concurrent example/typed-IR work was not modified.

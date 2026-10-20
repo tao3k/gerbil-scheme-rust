@@ -1,0 +1,67 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --retirement
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+    Finished `bench` profile [optimized] target(s) in 19.85s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+RESOURCE-SNAPSHOT phase=retirement-baseline epoch=0 resident=9273344 footprint=8208744 fds=3 threads=2 images=51 malloc-live=12224 malloc-reserved=12582912 malloc-blocks=203 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=baseline malloc-virtual=16760832 malloc-resident=393216 malloc-dirtied=393216 malloc-reusable=0 image-text-virtual=0 image-text-incore=0 image-data-virtual=0 image-data-incore=0 image-data-modified=0 owner-images=0 image-virtual=0 image-incore=0
+TLS-CAPACITY phase=baseline available=509
+RESOURCE-SNAPSHOT phase=retirement-live epoch=0 resident=59228160 footprint=52298184 fds=5 threads=3 images=52 malloc-live=78666560 malloc-reserved=113262592 malloc-blocks=334 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=117440512 malloc-resident=36913152 malloc-dirtied=36913152 malloc-reusable=0 image-text-virtual=8388608 image-text-incore=8388608 image-data-virtual=7716864 image-data-incore=7716864 image-data-modified=7405568 owner-images=1 image-virtual=19054592 image-incore=19054592
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[105500]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=0 resident=60080128 footprint=53150224 fds=3 threads=2 images=52 malloc-live=19616 malloc-reserved=134217728 malloc-blocks=225 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=171966464 malloc-resident=37748736 malloc-dirtied=37748736 malloc-reusable=0 image-text-virtual=8388608 image-text-incore=8388608 image-data-virtual=7716864 image-data-incore=7716864 image-data-modified=7405568 owner-images=1 image-virtual=19054592 image-incore=19054592
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=0 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=1 resident=73465856 footprint=60850728 fds=5 threads=3 images=53 malloc-live=78668736 malloc-reserved=167788544 malloc-blocks=338 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=171966464 malloc-resident=37994496 malloc-dirtied=37994496 malloc-reusable=0 image-text-virtual=16777216 image-text-incore=16777216 image-data-virtual=15433728 image-data-incore=15433728 image-data-modified=14811136 owner-images=2 image-virtual=38109184 image-incore=38109184
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[39083]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=1 resident=73465856 footprint=60834344 fds=3 threads=2 images=53 malloc-live=21696 malloc-reserved=134217728 malloc-blocks=228 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=171966464 malloc-resident=38010880 malloc-dirtied=38010880 malloc-reusable=0 image-text-virtual=16777216 image-text-incore=16777216 image-data-virtual=15433728 image-data-incore=15433728 image-data-modified=14811136 owner-images=2 image-virtual=38109184 image-incore=38109184
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=1 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=2 resident=86818816 footprint=68485672 fds=5 threads=3 images=54 malloc-live=78670816 malloc-reserved=167788544 malloc-blocks=341 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=171966464 malloc-resident=38223872 malloc-dirtied=38223872 malloc-reusable=0 image-text-virtual=25165824 image-text-incore=25165824 image-data-virtual=23150592 image-data-incore=23150592 image-data-modified=22216704 owner-images=3 image-virtual=57163776 image-incore=57163776
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[34708]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=2 resident=86835200 footprint=68485672 fds=3 threads=2 images=54 malloc-live=23744 malloc-reserved=134217728 malloc-blocks=230 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=171966464 malloc-resident=38256640 malloc-dirtied=38256640 malloc-reusable=0 image-text-virtual=25165824 image-text-incore=25165824 image-data-virtual=23150592 image-data-incore=23150592 image-data-modified=22216704 owner-images=3 image-virtual=57163776 image-incore=57163776
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=2 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=3 resident=102776832 footprint=78774896 fds=5 threads=3 images=55 malloc-live=78672864 malloc-reserved=226508800 malloc-blocks=343 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=231211008 malloc-resident=41058304 malloc-dirtied=41058304 malloc-reusable=0 image-text-virtual=33554432 image-text-incore=33554432 image-data-virtual=30867456 image-data-incore=30867456 image-data-modified=29622272 owner-images=4 image-virtual=76218368 image-incore=76218368
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[39375]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=3 resident=103579648 footprint=79594144 fds=3 threads=2 images=55 malloc-live=25792 malloc-reserved=247463936 malloc-blocks=232 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=285736960 malloc-resident=41877504 malloc-dirtied=41877504 malloc-reusable=0 image-text-virtual=33554432 image-text-incore=33554432 image-data-virtual=30867456 image-data-incore=30867456 image-data-modified=29622272 owner-images=4 image-virtual=76218368 image-incore=76218368
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=3 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=4 resident=116981760 footprint=87311032 fds=5 threads=3 images=56 malloc-live=78674912 malloc-reserved=281034752 malloc-blocks=345 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=285736960 malloc-resident=42139648 malloc-dirtied=42139648 malloc-reusable=0 image-text-virtual=41943040 image-text-incore=41943040 image-data-virtual=38584320 image-data-incore=38584320 image-data-modified=37027840 owner-images=5 image-virtual=95272960 image-incore=95272960
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[37500]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=4 resident=116981760 footprint=87294648 fds=3 threads=2 images=56 malloc-live=27840 malloc-reserved=247463936 malloc-blocks=234 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=285736960 malloc-resident=42172416 malloc-dirtied=42172416 malloc-reusable=0 image-text-virtual=41943040 image-text-incore=41943040 image-data-virtual=38584320 image-data-incore=38584320 image-data-modified=37027840 owner-images=5 image-virtual=95272960 image-incore=95272960
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=4 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=5 resident=130220032 footprint=94831288 fds=5 threads=3 images=57 malloc-live=78676960 malloc-reserved=285229056 malloc-blocks=347 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=289931264 malloc-resident=42254336 malloc-dirtied=42254336 malloc-reusable=0 image-text-virtual=50331648 image-text-incore=50331648 image-data-virtual=46301184 image-data-incore=46301184 image-data-modified=44433408 owner-images=6 image-virtual=114327552 image-incore=114327552
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[36750]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=5 resident=130203648 footprint=94798520 fds=3 threads=2 images=57 malloc-live=29888 malloc-reserved=251658240 malloc-blocks=236 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=289931264 malloc-resident=42254336 malloc-dirtied=42254336 malloc-reusable=0 image-text-virtual=50331648 image-text-incore=50331648 image-data-virtual=46301184 image-data-incore=46301184 image-data-modified=44433408 owner-images=6 image-virtual=114327552 image-incore=114327552
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=5 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=6 resident=143392768 footprint=102302416 fds=5 threads=3 images=58 malloc-live=78679008 malloc-reserved=285229056 malloc-blocks=349 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=289931264 malloc-resident=42303488 malloc-dirtied=42303488 malloc-reusable=0 image-text-virtual=58720256 image-text-incore=58720256 image-data-virtual=54018048 image-data-incore=54018048 image-data-modified=51838976 owner-images=7 image-virtual=133382144 image-incore=133382144
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[40250]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=6 resident=143376384 footprint=102269648 fds=3 threads=2 images=58 malloc-live=31936 malloc-reserved=251658240 malloc-blocks=238 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=289931264 malloc-resident=42303488 malloc-dirtied=42303488 malloc-reusable=0 image-text-virtual=58720256 image-text-incore=58720256 image-data-virtual=54018048 image-data-incore=54018048 image-data-modified=51838976 owner-images=7 image-virtual=133382144 image-incore=133382144
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=6 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-live epoch=7 resident=156516352 footprint=109724392 fds=5 threads=3 images=59 malloc-live=78681056 malloc-reserved=285229056 malloc-blocks=351 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=live malloc-virtual=289931264 malloc-resident=42303488 malloc-dirtied=42303488 malloc-reusable=0 image-text-virtual=67108864 image-text-incore=67108864 image-data-virtual=61734912 image-data-incore=61734912 image-data-modified=59244544 owner-images=8 image-virtual=152436736 image-incore=152436736
+RESOURCE-DRAIN joined=1 pending=0 roots=[0] native-cleanup-ns=[33584]
+RESOURCE-SNAPSHOT phase=retirement-cleaned epoch=7 resident=156499968 footprint=109691624 fds=3 threads=2 images=59 malloc-live=33984 malloc-reserved=251658240 malloc-blocks=240 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=cleaned malloc-virtual=289931264 malloc-resident=42303488 malloc-dirtied=42303488 malloc-reusable=0 image-text-virtual=67108864 image-text-incore=67108864 image-data-virtual=61734912 image-data-incore=61734912 image-data-modified=59244544 owner-images=8 image-virtual=152436736 image-incore=152436736
+TLS-CAPACITY phase=cleaned available=509
+RETIREMENT-FILES epoch=7 files=0 directory-exists=false
+RESOURCE-SNAPSHOT phase=retirement-relief epoch=8 resident=156499968 footprint=109691624 fds=3 threads=2 images=59 malloc-live=29952 malloc-reserved=251658240 malloc-blocks=230 gc=[] capacity=[] live=[] roots=[]
+REGIONS phase=relief malloc-virtual=289931264 malloc-resident=42303488 malloc-dirtied=42303488 malloc-reusable=0 image-text-virtual=67108864 image-text-incore=67108864 image-data-virtual=61734912 image-data-incore=61734912 image-data-modified=59244544 owner-images=8 image-virtual=152436736 image-incore=152436736
+RETIREMENT-PRESSURE released=0

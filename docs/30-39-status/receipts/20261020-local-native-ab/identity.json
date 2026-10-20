@@ -1,0 +1,35 @@
+{
+  "base_head": "bb71bbb5ad91bbaef2035979319514c7ced4c4ca",
+  "branch": "codex/typed-fold-aot",
+  "dirty": true,
+  "artifacts": {
+    "O0": {
+      "wheel": "/private/tmp/gerbil-module-opt-20261019/wheels-O0/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl",
+      "wheel_sha256": "6d99da0fce11d5042beadaec49118e369add32a8af0b5d9057e09d87d8460812",
+      "installed_core": "/private/tmp/gerbil-module-opt-20261019/venv-O0/lib/python3.14/site-packages/gerbil_ledger/_core.abi3.so",
+      "installed_core_sha256": "8871b29ba6c728d196715a7c7e76545c1f16efa3833d48a4798cb6c07e23e352",
+      "matches_wheel": true
+    },
+    "O2": {
+      "wheel": "/private/tmp/gerbil-o2-progress-20261019/wheels-O2/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl",
+      "wheel_sha256": "d1832ed263e0d218173129e28aa7f75700116eda03ae50986ddddb21f3d74715",
+      "installed_core": "/private/tmp/gerbil-o2-progress-20261019/venv-O2/lib/python3.14/site-packages/gerbil_ledger/_core.abi3.so",
+      "installed_core_sha256": "06602e3ceff5b1f057786206e098d2c3c43dee308e478e6e171bf6a668ee12d4",
+      "matches_wheel": true
+    }
+  },
+  "benchmark_sha256": {
+    "examples/python-ledger/tests/bench_macro_expansion.py": "cba260ddd23b4e5b8ed5d4b4c32888ab7fe740fe6eb968795307112f84d419a7",
+    "examples/python-ledger/tests/bench_owner_dispatch.py": "5a3cb12a3b2c74869fb3acc2f556e25c596d16d4689c7bee72c9767119395fb5",
+    "examples/python-ledger/tests/benchmark_host.py": "5651b940ffd97b27fac32dda0478e88d2bfe380c2810235e15a5309dcf2fcbbf",
+    "examples/python-ledger/tests/benchmark_metrics.py": "f4f0dc961969d65e40d76ed978d11f313c47e079851b5c383857af808d5cf9f6"
+  },
+  "runtime_changes_in_this_followup": false,
+  "current_head": "bb71bbb5ad91bbaef2035979319514c7ced4c4ca",
+  "host_gate": "User explicitly authorized immediate local execution without quiet admission gate; host observations retained.",
+  "started": 1792467554.9927459,
+  "system": "Darwin Mac.lan 25.6.0 Darwin Kernel Version 25.6.0: Sat Jul 11 15:25:34 PDT 2026; root:xnu-12377.161.13~4/RELEASE_ARM64_T6020 arm64 arm Darwin",
+  "logical_cpus": "12",
+  "finished": 1792471274.979285,
+  "installed_artifacts_unchanged_after_capture": true
+}

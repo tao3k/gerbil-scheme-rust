@@ -2,8 +2,8 @@
 
 ## Scope
 
-This is a transport and lifecycle contract for **existing, independently compiled
-algorithm exports**. It is not an interpreter, algorithm registry or new backend
+This is a transport and lifecycle contract for **compiled algorithm exports
+with explicit runtime requirements**. It is not an interpreter, algorithm registry or new backend
 for arbitrary Scheme. Rust does not implement the producer's closure body or
 component transition. The producer supplies actual C-compatible function pointers.
 
@@ -12,6 +12,33 @@ Add `rust-backend` only when Python conversion is required. `owned-values` conta
 the shared data types without Python. Neither combination enables `gerbil-scheme`
 or `gerbil-scheme-sys`. The feature name does not prove an external producer is
 VM-independent; exact producer source and artifact admission remain necessary.
+The adapter has no implicit Scheme dependency; a Scheme-hosting application
+must explicitly supply its runtime/program and fixed owner.
+
+## Runtime Declarations
+
+ABI v1 keeps its layouts and now admits exactly one of these declarations:
+
+| Declaration | Required lifetime and execution contract |
+| --- | --- |
+| `GERBIL_OWNED_NO_VM` / Rust `NO_VM` (1) | Call/release are independent of Scheme. Owned transport copies published by Rust still use this declaration. |
+| `GERBIL_OWNED_SCHEME_VM` / Rust `SCHEME_VM` (2) | Call/release run on the live VM's fixed owner. The producer or admitted scope keeps the VM, rooted captures and executable code valid until every dependent callback/result has released. |
+
+Zero, combined flags and unknown declarations are rejected. A flag is a
+provider declaration, not a VM lease, automatic setup or evidence of safe entry.
+The unsafe constructor's caller must establish the full lifetime, including
+release on rejected admission. A VM-dependent result needs independent VM
+protection if it outlives the callable; a copied, independent result can use
+`NO_VM`. Existing non-Send owner handles retain their affinity. Shared-VM parallel
+entry, cross-owner root transfer and implicit provider fallback are not admitted.
+
+The real `InstancePool` qualification mode `--owned-vm` constructs this callable
+inside each of four fixed native owner tasks, closes all aliases before that
+task returns, and uses the actual native type/GC/continuation ABI. No borrowed
+session or Scheme root escapes. This scoped admission is not a general
+persistent cross-task callable lease, an installed Python provider migration or
+permission for arbitrary foreign pointers. See
+[the owner-tail and runtime correction receipt](30-39-status/30.09-owner-wakeup-gc-and-runtime-contract.org).
 
 ## Ownership
 
@@ -36,10 +63,10 @@ be created and used on independent host threads if the producer supports that.
 This is not a Scheme multi-VM claim.
 
 The unsafe admission boundary requires valid foreign memory and function pointers,
-no unwinding/longjmp across C, no VM entry, and executable code retained until the
-last result/context release. A dynamic-library handle must outlive *all* callbacks
+no unwinding/longjmp across C, execution satisfying the declared runtime needs,
+and executable code retained until the last result/context release. A dynamic-library handle must outlive *all* callbacks
 and values. Release remains ABI-compatible on rejected versions. An untrusted
-pointer or lying `NO_VM` declaration is not made safe by bounds validation.
+pointer or false runtime declaration is not made safe by bounds validation.
 
 Unsupported result projection reports an error while retaining the actual foreign
 result until its owner drops. It does not rerun execution, fall back to another
@@ -83,6 +110,7 @@ within the same 120-second cap. Final Clippy with warnings denied passed in
 The consumer archive is `evidence/library/c-abi-053/`, with an explicit partial
 source inventory and no wheel/consumer/publication admission.
 
-An existing ASCENT rich-DSL entry still uses `___setup`. This ABI does not remove
-that requirement. Actual VM-independent algorithm exports and installed consumer
-acceptance remain open; neither a C fixture nor typed Rust IR closes that gap.
+An existing ASCENT rich-DSL entry still uses `___setup`; declaring `SCHEME_VM`
+records that requirement instead of requiring its removal. Its actual provider
+must still establish the fixed-owner runtime lifetime. Installed consumer
+acceptance remains open; neither a C fixture nor typed Rust IR closes that gap.

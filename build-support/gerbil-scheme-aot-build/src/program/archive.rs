@@ -598,7 +598,7 @@ fn compile_program_module(
     )
 }
 
-fn compile_native_object(
+pub(crate) fn compile_native_object(
     gsc: &Path,
     source: &Path,
     object: &Path,
@@ -619,7 +619,13 @@ fn compile_native_object(
     } else {
         cc_options.to_owned()
     };
+    // Allocation-only diagnostics must not invalidate code-generation caches.
+    // They expose real compiler progress when a large optimized function takes
+    // longer than the initial observation window, without changing GSC options.
+    println!("cargo:rerun-if-env-changed=GERBIL_BUILD_OBJECT_PROGRESS");
     let gcc_progress = native_progress_enabled() && gcc;
+    let allocation_progress = gcc_progress
+        || (gcc && std::env::var("GERBIL_BUILD_OBJECT_PROGRESS").as_deref() == Ok("1"));
     let cc_options = if gcc_progress {
         format!("{cc_options} -save-temps=obj -Q -fopt-info-all")
     } else {
@@ -640,8 +646,11 @@ fn compile_native_object(
     // Diagnostic dumps do not change optimizer or ABI inputs. Keep existing
     // verified object identities, and observe real file growth during register
     // allocation without forwarding the full IRA/LRA trace through Cargo.
-    let cc_options = if gcc_progress {
-        format!("{cc_options} {}", gcc_allocation_diagnostics(object)?)
+    let cc_options = if allocation_progress {
+        format!(
+            "{cc_options} -save-temps=obj {}",
+            gcc_allocation_diagnostics(object)?
+        )
     } else {
         cc_options
     };
@@ -650,7 +659,7 @@ fn compile_native_object(
         .args(["-obj", "-cc-options", &cc_options, "-o"])
         .arg(object)
         .arg(source);
-    if gcc_progress {
+    if allocation_progress {
         observe_program_archive_operation(observer, operation, || {
             run_with_compiler_artifacts(&mut command, operation.operation, object)
         })?;
@@ -669,7 +678,7 @@ fn compile_native_object(
     }
 }
 
-fn native_input_fingerprint(
+pub(crate) fn native_input_fingerprint(
     compiler: &Path,
     domain: &str,
     options: &str,
@@ -757,7 +766,7 @@ fn native_output_fingerprint_path(output: &Path) -> PathBuf {
     PathBuf::from(path)
 }
 
-fn cached_native_output(output: &Path, fingerprint: &str) -> Result<bool, String> {
+pub(crate) fn cached_native_output(output: &Path, fingerprint: &str) -> Result<bool, String> {
     if !output.is_file() {
         return Ok(false);
     }
@@ -772,7 +781,10 @@ fn cached_native_output(output: &Path, fingerprint: &str) -> Result<bool, String
     }
 }
 
-fn publish_native_output_fingerprint(output: &Path, fingerprint: &str) -> Result<(), String> {
+pub(crate) fn publish_native_output_fingerprint(
+    output: &Path,
+    fingerprint: &str,
+) -> Result<(), String> {
     let stamp = native_output_fingerprint_path(output);
     fs::write(&stamp, fingerprint).map_err(|error| {
         format!(
@@ -797,7 +809,7 @@ fn observe_cached(
     });
 }
 
-fn native_build_parallelism(job_count: usize) -> usize {
+pub(crate) fn native_build_parallelism(job_count: usize) -> usize {
     let configured = std::env::var("GERBIL_BUILD_CORES")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())

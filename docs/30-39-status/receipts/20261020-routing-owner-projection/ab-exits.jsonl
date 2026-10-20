@@ -1,0 +1,6 @@
+{"label": "cpu-alone", "exit": 0, "seconds": 35.48541188240051, "command": ["just", "--", "bridge-python-projection-ab", "/private/tmp/gerbil-routing-batch-20261020/venv/bin/python", "--rounds", "16", "--cpu"]}
+{"label": "mixed-alone", "exit": 0, "seconds": 47.37576484680176, "command": ["just", "--", "bridge-python-projection-ab", "/private/tmp/gerbil-routing-batch-20261020/venv/bin/python", "--rounds", "16"]}
+{"label": "cpu-probes", "exit": 0, "seconds": 41.716439962387085, "command": ["just", "--", "bridge-python-projection-ab", "/private/tmp/gerbil-routing-batch-20261020/venv/bin/python", "--rounds", "16", "--cpu", "--probes"]}
+{"label": "mixed-probes", "exit": 0, "seconds": 44.379504919052124, "command": ["just", "--", "bridge-python-projection-ab", "/private/tmp/gerbil-routing-batch-20261020/venv/bin/python", "--rounds", "16", "--probes"]}
+{"label": "cpu-scheduled", "exit": 0, "seconds": 54.752882957458496, "command": ["just", "--", "bridge-python-projection-ab", "/private/tmp/gerbil-routing-batch-20261020/venv/bin/python", "--rounds", "16", "--cpu", "--scheduled-probes"]}
+{"label": "mixed-scheduled", "exit": 0, "seconds": 41.78763699531555, "command": ["just", "--", "bridge-python-projection-ab", "/private/tmp/gerbil-routing-batch-20261020/venv/bin/python", "--rounds", "16", "--scheduled-probes"]}

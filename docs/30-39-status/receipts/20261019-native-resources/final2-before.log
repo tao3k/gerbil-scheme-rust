@@ -1,0 +1,7 @@
+env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- --before
+   Compiling gerbil-scheme-qualification v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-qualification)
+    Finished `bench` profile [optimized] target(s) in 16.58s
+     Running benches/instance_resources.rs (target/release/deps/instance_resources-dd5a606ec75fff84)
+RESOURCE-SNAPSHOT phase=init-baseline epoch=0 resident=9224192 footprint=8176000 fds=3 threads=2 images=51 malloc-live=12224 malloc-reserved=8388608 malloc-blocks=203 gc=[] capacity=[] live=[] roots=[]
+RESOURCE-SNAPSHOT phase=init-failed-drained epoch=0 resident=24018944 footprint=17269144 fds=3 threads=2 images=52 malloc-live=16016 malloc-reserved=29360128 malloc-blocks=221 gc=[] capacity=[] live=[] roots=[]
+RESOURCE-INIT after=false status=61 phase=0 rollback=None joined=2 pending=0 initialized-peers-cleaned=1 retained-files=1 retry=REJECTED

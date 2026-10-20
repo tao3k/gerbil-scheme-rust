@@ -1,6 +1,42 @@
 # Hybrid Compilation And Runtime Ownership
 
-## Architecture Decision - 2026-10-16
+## Current Runtime Contract - 2026-10-19
+
+The Scheme execution backend is **Rust dispatch -> fixed OS owner -> complete
+Gerbil/Gambit runtime -> native Scheme execution**. Each owner retains its VM
+across requests. Rust routes owned inputs/results across instances and manages
+admission and shutdown. Scheme owns closures, continuations, dynamic bindings,
+exceptions, GC and the actor/green-thread scheduler inside each instance.
+Rust does not schedule individual Scheme green threads.
+
+**“Rust backend” does not mean “no Scheme VM”.** A C ABI, a Rust worker or a
+packaged shared library does not remove the Scheme runtime. The normal Scheme
+build remains Gerbil -> Gambit C -> native library; Scheme-to-Rust lowering is
+not a prerequisite and cannot replace this full execution contract.
+
+The implemented entry is the experimental Darwin
+[`InstancePool`](../crates/gerbil-scheme/src/instances/pool.rs), with
+[`submit_native_on`](../crates/gerbil-scheme/src/instances/native_dispatch.rs)
+and [`submit_numeric_batch_on`](../crates/gerbil-scheme/src/instances/batch.rs).
+Native types are constructed and rooted on the selected owner. Scheme executes
+the application, including cooperative actor waits, before owned results return.
+See [runtime/lifecycle limits](instance-runtime.org) and
+[the measured qualification](30-39-status/30.08-native-batch-tail-attribution.org).
+This is not shared-VM SMP or a claim of general crash isolation/hot unloading.
+
+The installed ledger example now defaults to Rust dispatch with four real
+fixed-owner Scheme runtimes. It uses native types and ordinary native compilation,
+not its historical typed Rust lowering. See [the measured integration](30-39-status/30.10-python-native-owner-integration.org).
+Its subsequent grouped-native-module package passes the tested full-expander
+and shutdown cases; see [the repair and four-mode benchmark matrix](30-39-status/30.11-expander-startup-and-dispatch-benchmarks.org). The earlier Tokio regression remains a historical observation. The separate Python ASCENT example still
+uses its finite Rust kernel provider; it does not establish complete Scheme
+execution. Missing providers fail explicitly without fallback.
+The completed O2 wheel and actual O0/O2 macro comparison are recorded in
+[the progress-supervised qualification](30-39-status/30.13-progress-supervised-o2-qualification.org).
+The tested Scheme capabilities pass; noisy timing negatives remain and
+quiet-host performance admission is still pending.
+
+## Native Compilation Boundary
 
 ### Primary Integration Path: Compiled C ABI
 
@@ -17,10 +53,10 @@ default substitute for missing C exports. A compiler test or generated Rust
 closure does not qualify the C ABI callable/state contract.
 
 When an existing export requires Scheme objects, GC or VM initialization, record
-that actual requirement. Do not pretend a VM-rooted export is independent. Add
-the reusable ABI/ownership capability upstream and qualify a genuinely independent
-algorithm export; until then the consumer capability remains open. Do not silently
-rewrite the algorithm, initialize a VM or call another backend to hide the gap.
+that actual requirement and host the required runtime explicitly. Do not pretend
+a VM-rooted export is independent. Reuse the owner-bound ABI rather than remove
+Scheme capabilities to satisfy an obsolete VM-independence requirement. Provider
+selection and initialization must be explicit; unsupported entry remains an error.
 
 **A Rust execution host does not require rewriting Scheme algorithms in Rust.**
 The intended architecture preserves Scheme-authored algorithms and DSL semantics,
@@ -29,10 +65,10 @@ host scheduling, owned transport, handles and lifecycle to Rust. Python is a
 consumer interface, not a language implementation or a compiler workflow.
 
 This decision clarifies the earlier [Rust runtime transition](rust-runtime-transition.md).
-It does not reverse the active restriction against entering the unqualified
-Scheme VM path. It also does not declare every Scheme export VM-independent.
-Hybrid compilation is an intentional architecture, **not a deviation from the
-Rust-host decision**. Future changes and reviews must use this distinction.
+It supersedes the earlier blanket VM-independent runtime requirement. The
+unqualified shared-runtime multi-VM entry remains a failed route; the explicit
+private-image owner backend has its own bounded native evidence. A Rust host
+and a complete Scheme VM are compatible parts of the same execution path.
 
 ## Why Hybrid Compilation
 
@@ -41,7 +77,7 @@ Rust-host decision**. Future changes and reviews must use this distinction.
 - Reuse `gerbil-scheme-rust` for typed lowering, ABI conversions and packaging;
   do not repeat these mechanisms in ASCENT or other downstream libraries.
 - Let Rust supply ownership, scheduling and parallel execution where qualified,
-  without making Scheme VM availability a prerequisite for independent kernels.
+  while retaining the required Scheme runtime for Scheme execution.
 - Keep applications installable from a wheel. Maintainers build the library;
   downstream Python callers do not supply an SDK, module compiler or build tree.
 - Preserve source-to-artifact provenance so generated code remains auditable.
@@ -52,7 +88,7 @@ C ABI/FFI for an external algorithm boundary, with whole-value or batched transf
 appropriate. Measure the complete matched path, including conversion, validation,
 allocation and teardown; do not infer a speedup from the language choice.
 
-## Three Different Execution Paths
+## Execution Paths Must Name Their Runtime
 
 | Path | Algorithm origin and execution | Scheme VM requirement |
 | --- | --- | --- |
@@ -63,8 +99,8 @@ allocation and teardown; do not infer a speedup from the language choice.
 These paths describe implementation choices, not automatic runtime fallback.
 Cargo features determine which providers are built. An explicit provider choice
 must not silently enter another provider after a missing capability or failure.
-The active VM-independent path must not initialize Scheme through a hidden FFI
-call. An independently compiled C algorithm export is a contract category, not
+Only a provider explicitly advertised and qualified as VM-independent must
+exclude Scheme initialization. That is not a condition on the Scheme backend. An independently compiled C algorithm export is a contract category, not
 a claim that this repository already supplies every such export.
 
 ## Existing Implementations And Limits
@@ -83,17 +119,21 @@ a claim that this repository already supplies every such export.
 - The optional `c-abi` feature exposes
   [`gerbil_scheme_owned.h`](../include/gerbil_scheme_owned.h) and
   [owner-thread adapters](../crates/gerbil-scheme-python/src/c_abi.rs). It reuses
-  those owned values without acquiring Python or a Scheme runtime. Producers own
-  captures, algorithms, state transitions and result allocations; Rust validates
-  transport and manages release. See the [contract and qualification](owned-c-abi.md).
+  those owned values without acquiring Python or implicitly initializing a
+  Scheme runtime. `NO_VM` and `SCHEME_VM` explicitly distinguish callback runtime
+  needs. A Scheme provider/caller retains the required live VM on its fixed owner;
+  the flag does not acquire that lifetime. Producers own captures, algorithms,
+  state transitions and result allocations; Rust validates transport and release. See the [contract and qualification](owned-c-abi.md).
 - [`gerbil-scheme-rust-ir`](../build-support/gerbil-scheme-rust-ir/src/compiler.rs)
   lowers typed build-time function IR and validates emitted Rust syntax. It does
   not parse arbitrary Scheme source or prove source-level semantic equivalence.
   Source-level purity and call admission remain the producer's responsibility.
-- The [ledger Scheme producer](../examples/python-ledger/scheme/rust-ledger.ss)
-  and its [build integration](../examples/python-ledger/build.rs) demonstrate
-  Scheme-authored summation lowered into the installed Rust provider. This is a
-  real precompiled algorithm route, not a general Scheme interpreter.
+- The [ledger Scheme producer](../examples/python-ledger/scheme/ledger.ss)
+  and its [build integration](../examples/python-ledger/build.rs) now use the
+  ordinary Gerbil/Gambit native graph and fixed-owner Scheme runtimes. The old
+  `scheme/rust-ledger.ss` file is historical subset input, outside this default
+  execution path. Installed full-expander cases now pass with grouped native modules; portable
+    packaging and optimal phase-code performance remain open.
 
 ASCENT likewise has a maintainer-side producer at `program/rust-execution.ss`
 in its own repository. That example must not become an ASCENT-specific compiler
@@ -135,8 +175,9 @@ A documentation decision or compiler contract test does not close the runtime
 or downstream migration. For each new capability, bind the source revision and
 complete source inventory to the generated code, library and wheel. Qualify
 installed wheels with both ASCENT and an independent Scheme-authored library,
-without downstream SDK/compiler access or Scheme VM entry on the independent
-path. Check full answers, closure capture, component-state isolation, higher-order
+without downstream SDK/compiler access. For the full Scheme path, verify the
+packaged VM is actually initialized, reused and retired on its owner. Only an
+explicitly independent kernel has a no-Scheme-entry gate. Check full answers, closure capture, component-state isolation, higher-order
 composition, source withdrawal, close/invalidation and teardown as applicable.
 
 Keep all failed builds, timeouts, missing-source and unsupported-capability

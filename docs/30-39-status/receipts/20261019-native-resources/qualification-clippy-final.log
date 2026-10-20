@@ -1,0 +1,38 @@
+cargo clippy: 3 errors, 0 warnings
+═══════════════════════════════════════
+
+Errors:
+  error: manual implementation of `midpoint` which can overflow
+    --> crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:63:40
+     |
+  63 |         let median = |values: &[u128]| (values[9] + values[10]) / 2;
+     |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `u128::midpoint` instead: `u128::midpoint(values[9], values[10])`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_midpoint
+     = note: `-D clippy::manual-midpoint` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::manual_midpoint)]`
+
+  error: manual implementation of `.is_multiple_of()`
+     --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:220:32
+      |
+  220 | ...                   if index % 128 == 0 {
+      |                          ^^^^^^^^^^^^^^^^ help: replace with: `index.is_multiple_of(128)`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_is_multiple_of
+      = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+  error: manual implementation of `.is_multiple_of()`
+     --> crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:224:32
+      |
+  224 | ...                   if index % 16 == 0 {
+      |                          ^^^^^^^^^^^^^^^ help: replace with: `index.is_multiple_of(16)`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_is_multiple_of
+
+  manual implementation of `.is_multiple_of()` (2x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:220:32
+    crates/gerbil-scheme-qualification/benches/instance_resources/reuse.rs:224:32
+  manual implementation of `midpoint` which can overflow (1x)
+    crates/gerbil-scheme-qualification/benches/instance_resources/ab.rs:63:40
+[full output: ~/Library/Application Support/rtk/tee/1792408391_cargo_clippy.log]

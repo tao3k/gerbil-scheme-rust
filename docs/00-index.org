@@ -3,6 +3,8 @@
 
 * 10--19 Design and contracts
 
+- [[file:hybrid-execution.md][Hybrid compilation and runtime ownership: decision, rationale and limits]]
+- [[file:owned-c-abi.md][Owned C ABI: independent compiled algorithms, values, callables and state]]
 - [[file:10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][10.01 Gerbil Scheme Rust Bindings RFC]]
 - [[file:10-19-design/10.02-gerbil-aot-ffi-performance-rfc.org][10.02 Gerbil AOT FFI Performance RFC]]
 
@@ -17,6 +19,35 @@
 
 - [[file:20-29-roadmap/20.01-bindings-bootstrap-plan.org][20.01 Bindings Bootstrap And Delivery Plan]]
 - [[file:20-29-roadmap/20.02-marlin-consumer-migration-plan.org][20.02 Marlin Consumer Migration Plan]]
+
+* 30--39 Native runtime status
+
+- [[file:30-39-status/30.19-owner-resident-payload-baseline.org][30.19 Owner-resident Scheme payload baseline and projection attribution]]
+
+- [[file:30-39-status/30.18-client-admission-and-native-data-paths.org][30.18 Client admission and native Scheme data paths]]
+
+- [[file:30-39-status/30.17-bounded-owner-admission-and-attribution.org][30.17 Bounded owner admission and mixed-load attribution]]
+
+- [[file:30-39-status/30.16-routing-and-owner-batch-projection.org][30.16 Stateful routing and owner-batched native projection]]
+
+- [[file:30-39-status/30.15-local-native-ab.org][30.15 Local O0/O2 and owner dispatch results, tails and fairness]]
+
+- [[file:30-39-status/30.14-quiet-host-tail-and-fairness-protocol.org][30.14 Quiet-host tails, completion fairness and staged capture protocol]]
+
+- [[file:30-39-status/30.13-progress-supervised-o2-qualification.org][30.13 Progress-supervised O2 qualification and matched native workloads]]
+
+- [[file:30-39-status/30.12-dynamic-module-optimization-ab.org][30.12 Dynamic module O0/O2 A/B and quiet-host admission]]
+
+- [[file:30-39-status/30.11-expander-startup-and-dispatch-benchmarks.org][30.11 Expander startup repair and direct/Tokio/Rayon benchmark matrix]]
+
+- [[file:30-39-status/30.10-python-native-owner-integration.org][30.10 Installed Python native owners, lifecycle and negative dispatch A/B]]
+
+- [[file:30-39-status/30.08-native-batch-tail-attribution.org][30.08 Native batch phase attribution and minimal Scheme scheduling repair]]
+
+- [[file:30-39-status/30.07-native-batch-actor-api.org][30.07 Native batch API, Scheme mailbox actors and matched order qualification]]
+- [[file:instance-runtime.org][Native instance API and lifecycle contract]]
+
+- [[file:30-39-status/30.09-owner-wakeup-gc-and-runtime-contract.org][30.09 Owner wakeup, native GC timing and explicit Scheme VM runtime contract]]
 
 * Documentation contract
 

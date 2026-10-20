@@ -1,0 +1,48 @@
+   Compiling gerbil-scheme-python v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-python)
+    Finished `test` profile [optimized + debuginfo] target(s) in 2.24s
+     Running tests/integration_test.rs (target/debug/deps/integration_test-3c57378307d2d730)
+
+running 27 tests
+test package::duplicate_json_resources_are_rejected ... ok
+test package::changed_same_length_resource_is_rejected ... ok
+test package::existing_destination_is_not_overwritten ... ok
+test package::grouped_native_inventory_keeps_metadata_and_rejects_group_tampering ... FAILED
+test package::copy_rejects_broken_alias_without_writing_outside_package ... ok
+test package::individual_inputs_have_complete_owned_parent_inventories ... ok
+test package::loader_inventory_excludes_debug_symbols_not_loadable_modules ... ok
+test package::official_closure_rejects_missing_duplicate_and_foreign_inputs ... ok
+test package::overlapping_and_duplicate_roots_are_rejected ... ok
+test package::manifest_ancestor_membership_is_component_based ... ok
+test package::copy_preserves_conflicting_candidate_and_rechecks_origin ... ok
+test package::missing_and_extra_files_are_not_hidden ... ok
+test package::relocatable_complete_inventory_does_not_consult_origin ... ok
+test package::native_module_aliases_reject_escape_missing_target_and_shadowing ... ok
+test package::staging_does_not_follow_source_symlinks ... ok
+test package::schema_and_digest_validation_are_closed ... ok
+test package::generated_publication_rejects_unowned_or_modified_output ... ok
+test package::symlinked_files_and_parent_directories_are_rejected ... ok
+test package::unsafe_paths_are_rejected_before_staging ... ok
+test package::root_transition_rejects_ancestor_ownership_changes ... ok
+test package::generated_publication_removes_only_verified_obsolete_roots ... ok
+test package::root_transition_rejects_changed_previous_inventory ... ok
+test package::source_inventory_publishes_verified_files_without_build_tools ... ok
+test package::root_transition_rejects_unowned_collision_without_removing_old_roots ... ok
+test package::generated_publication_updates_only_verified_owned_roots ... ok
+test package::frozen_source_inventory_is_inert_under_installer_byte_compilation ... ok
+test package::parallel_inventory_keeps_complete_nested_resources_and_fails_closed ... ok
+
+failures:
+
+---- package::grouped_native_inventory_keeps_metadata_and_rejects_group_tampering stdout ----
+
+thread 'package::grouped_native_inventory_keeps_metadata_and_rejects_group_tampering' (31899520) panicked at crates/gerbil-scheme-python/tests/integration/package.rs:682:6:
+called `Result::unwrap()` on an `Err` value: Os { code: 21, kind: IsADirectory, message: "Is a directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    package::grouped_native_inventory_keeps_metadata_and_rejects_group_tampering
+
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.37s
+
+error: test failed, to rerun pass `-p gerbil-scheme-python --test integration_test`

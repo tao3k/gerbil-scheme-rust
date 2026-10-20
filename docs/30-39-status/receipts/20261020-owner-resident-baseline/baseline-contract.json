@@ -1,0 +1,41 @@
+{
+  "schema": "owner-native-payload-baseline-v1",
+  "head": "bb71bbb5ad91bbaef2035979319514c7ced4c4ca",
+  "checkout_dirty": true,
+  "artifacts": {
+    "harness": {
+      "path": "/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/examples/python-ledger/tests/bench_owner_payload.py",
+      "sha256": "73fed80d69032a93443339e73686fc98c79e82ffc64303b51d9ce873158c7236"
+    },
+    "extension": {
+      "path": "/private/tmp/gerbil-client-admission-20261020/venv/lib/python3.14/site-packages/gerbil_ledger/_core.abi3.so",
+      "sha256": "44746c0252c0900303ffadd9e2767687cbe1858225025e42dceef004af40b71c"
+    }
+  },
+  "historical_capture": "../20261020-client-admission-data-paths/q-native-payload.jsonl",
+  "historical_measurements": {
+    "throughput_ratio": 21.18,
+    "short_p99_ms": 79.402
+  },
+  "performance_policy": "Descriptive paired measurements; no fixed speedup or latency acceptance threshold; retain regressions.",
+  "invariants": [
+    "four unchanged VM identities",
+    "owner-affine native handles only",
+    "128 results per arm",
+    "32 Actor items per result",
+    "same read-only graph contents",
+    "exact values and ranks",
+    "8 items per Scheme worker per result",
+    "8 short probes per owner per arm",
+    "payload survives explicit GC",
+    "shutdown roots all zero",
+    "runtime files removed"
+  ],
+  "limits": [
+    "Not intrinsic Gambit speedup",
+    "Not one-to-four VM scaling",
+    "Not fresh or mutable input speedup",
+    "Not equal saturation duration",
+    "Not crash isolation or RSS leak freedom"
+  ]
+}

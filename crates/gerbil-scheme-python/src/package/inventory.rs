@@ -25,6 +25,9 @@ pub struct PackageManifest {
     pub load_paths: Vec<String>,
     #[serde(deserialize_with = "unique_files")]
     pub files: BTreeMap<String, PackageResource>,
+    /// Logical native paths materialized only inside an owner's private namespace.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub native_modules: BTreeMap<String, String>,
 }
 
 fn unique_files<'de, D: serde::Deserializer<'de>>(
@@ -127,6 +130,16 @@ impl PackageManifest {
             let path = relative(name)?;
             if !loads.insert(path) || !path.ancestors().any(|parent| roots.contains(parent)) {
                 return Err(invalid("undeclared or duplicate load path"));
+            }
+        }
+        for (name, target) in &self.native_modules {
+            let path = relative(name)?;
+            relative(target)?;
+            if self.files.contains_key(name)
+                || !self.files.contains_key(target)
+                || !self.load_paths.iter().any(|root| path.starts_with(root))
+            {
+                return Err(invalid("invalid native module alias"));
             }
         }
         for (name, resource) in &self.files {

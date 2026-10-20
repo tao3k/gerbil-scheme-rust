@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
-//! Thin owner-thread adapters for independent compiled C ABI algorithm exports.
-//! No Scheme initialization, source evaluation, algorithm registry or fallback.
+//! Owner-thread adapters for compiled C ABI exports with explicit runtime needs.
+//! The caller/producer retains any required Scheme VM; no implicit initialization
+//! or fallback occurs. Independent copied values may still declare `NO_VM`.
 use crate::{OwnedValue, ValueLimits};
 use num_bigint::{BigInt, Sign};
 use std::{
@@ -17,6 +18,9 @@ pub const ABI_VERSION: u32 = 1;
 pub const ABI_ID: &str = "gerbil-owned/v1";
 /// Producer declaration that callbacks do not depend on a Scheme VM, not proof.
 pub const NO_VM: u32 = 1;
+/// Callbacks require a live, fixed-owner Scheme runtime through final release.
+/// A declaration is not a runtime lease or proof of safe entry.
+pub const SCHEME_VM: u32 = 2;
 /// Repository-relative public header defining these exact layouts.
 pub const HEADER_PATH: &str = "include/gerbil_scheme_owned.h";
 /// Exact header bytes packaged with this crate's compiled ABI definitions.
@@ -47,8 +51,13 @@ pub unsafe fn read_input(input: *const View, limits: ValueLimits) -> Result<Owne
 pub fn publish_value(value: &OwnedValue) -> Result<RawValue, Error> {
     let storage = Box::new(Encoded::new(value, 0, &mut 0)?);
     let view = storage.view;
-    Ok(RawValue { abi_version: ABI_VERSION, flags: NO_VM,
-        context: Box::into_raw(storage).cast(), view, release: Some(release_published_value) })
+    Ok(RawValue {
+        abi_version: ABI_VERSION,
+        flags: NO_VM,
+        context: Box::into_raw(storage).cast(),
+        view,
+        release: Some(release_published_value),
+    })
 }
 
 /// Measure the actual borrowed ABI view and byte spans before a producer call.
@@ -58,10 +67,14 @@ pub fn publish_value(value: &OwnedValue) -> Result<RawValue, Error> {
 pub fn request_size(value: &OwnedValue) -> Result<usize, Error> {
     fn size(value: &Encoded) -> Result<usize, Error> {
         value.children.iter().try_fold(
-            std::mem::size_of::<View>().checked_add(value.bytes.len())
+            std::mem::size_of::<View>()
+                .checked_add(value.bytes.len())
                 .ok_or(Error::Invalid("input size overflow"))?,
-            |total, child| total.checked_add(size(child)?)
-                .ok_or(Error::Invalid("input size overflow")),
+            |total, child| {
+                total
+                    .checked_add(size(child)?)
+                    .ok_or(Error::Invalid("input size overflow"))
+            },
         )
     }
     size(&Encoded::new(value, 0, &mut 0)?)
@@ -147,7 +160,7 @@ impl fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 fn header(version: u32, flags: u32) -> Result<(), Error> {
-    if version != ABI_VERSION || flags != NO_VM {
+    if version != ABI_VERSION || !matches!(flags, NO_VM | SCHEME_VM) {
         Err(Error::Abi)
     } else {
         Ok(())
@@ -223,6 +236,8 @@ impl ForeignValue {
     /// # Safety
     /// Consumes one provider result. All reachable spans must be readable,
     /// aligned and immutable until release, whose ABI is valid even on rejection.
+    /// A `SCHEME_VM` result also retains its VM/code through final release on
+    /// this owner; see `ForeignCallable::from_raw` for the runtime contract.
     /// # Errors
     /// Rejects a mismatched ABI declaration or absent release callback.
     pub unsafe fn from_raw(raw: RawValue) -> Result<Self, Error> {
@@ -290,9 +305,12 @@ impl ForeignCallable {
     }
     /// # Safety
     /// Consumes the context. Function code must outlive all owners and calls;
-    /// callbacks must satisfy `gerbil_scheme_owned.h`, never enter a Scheme VM,
-    /// never unwind, and run/release only on this owner thread. The provider's
-    /// declaration alone is not verification of these requirements.
+    /// callbacks must satisfy `gerbil_scheme_owned.h`, never unwind, and run and
+    /// release only on this owner thread. `NO_VM` forbids Scheme dependency;
+    /// `SCHEME_VM` requires the producer or admitted scope to retain the live VM
+    /// and rooted captures through all calls and releases, including rejection.
+    /// VM-dependent outputs need independent lifetime protection. The flag does
+    /// not acquire that protection, initialize a VM or verify these requirements.
     /// # Errors
     /// Rejects mismatched ABI declarations or absent call/release callbacks.
     pub unsafe fn from_raw(mut raw: RawCallable) -> Result<Self, Error> {
@@ -356,8 +374,8 @@ impl ForeignState {
         unsafe { Self::from_raw(raw) }
     }
     /// # Safety
-    /// Same owner/code/no-VM requirements as `ForeignCallable::from_raw`. Snapshot
-    /// results must be independent; replace is transactional on every failure.
+    /// Same owner/code/declared-runtime contract as `ForeignCallable::from_raw`.
+    /// Snapshot results are independent; replace is transactional on every failure.
     /// # Errors
     /// Rejects mismatched ABI declarations or absent lifecycle/state callbacks.
     pub unsafe fn from_raw(mut raw: RawState) -> Result<Self, Error> {

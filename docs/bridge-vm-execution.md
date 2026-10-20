@@ -12,7 +12,10 @@ semantics, not the same mutable Scheme heap:
    retains its checked owner boundary; Scheme schedules actors internally.
 
 The second alternative remains provisional pending SDK repair and qualification.
-Neither alternative is currently admitted by the bridge as a new executor.
+The default bridge does not automatically select either alternative. An explicit
+experimental Darwin image backend is now available through `InstancePool`; see
+[the library API and lifecycle contract](instance-runtime.org). Portability,
+hot unloading and general production failure handling remain unqualified.
 Do not add a selectable executor that silently delegates to the existing single
 owner and reports that serialization as independent-VM parallelism.
 
@@ -195,3 +198,62 @@ at the first scenario. That rejection is not replaced by image-pool evidence.
 The new switching protocol model passed typecheck, three deterministic tests
 and 1,000 traces of at most 50 steps; external lifecycle qualification remains
 an assumption and no symbolic proof was claimed.
+
+
+## Fixed-owner Scheme lifecycle receipt (2026-10-19)
+
+The [native instance lifecycle and matched A/B receipt](30-39-status/30.03-instance-owner-qualification.org)
+records executed continuation, GC, dynamic binding, cleanup and surviving-instance
+checks, plus 20 ABBA samples per variant/load. Each private runtime now explicitly
+requests and verifies one processor. This remains the private-image diagnostic;
+production `GerbilRuntime` ownership and admission are unchanged.
+
+
+## Library integration and native Scheme JSON receipt (2026-10-19)
+
+The opt-in `gerbil-scheme/isolated-instances` feature now exposes fixed native
+owners and a cloneable `InstanceDispatcher` in the library itself. The
+[library-path qualification](30-39-status/30.04-instance-library-qualification.org)
+executes SDK JSON parsing/writing and Scheme aggregation through that API,
+checks continuation and queue/drain contracts, and records equal-load ABBA and
+fresh-process initialization/cleanup costs. All Scheme execution and retained
+state remain in their owner-local native runtime.
+
+## Native typed calls and resource boundaries (2026-10-19)
+
+The [native typed qualification](30-39-status/30.05-native-instance-resources.org)
+uses the existing Scheme type/root ABI through `submit_native_on`, without JSON.
+It records initialization fault injection, 65,536 reused-owner tasks with Scheme
+exceptions and Rust panics, a deliberate Scheme heap retention control, and
+replacement costs. Fixed pool reuse reaches a stable post-GC live plateau;
+initialized images and copied files remain retained after shutdown, and RSS
+reclamation is not established. See the [runtime API](instance-runtime.org) for
+the owner-local root lifetime and phase-aware initialization contracts.
+
+
+## Terminal retirement and Scheme-owned scheduling (2026-10-19)
+
+The [retirement and green scheduling receipt](30-39-status/30.06-instance-retirement-and-green-scheduling.org)
+separates allocator retention from loaded images and fixes two terminal resource
+issues: copied image paths after known cleanup, and SDK fdset scratch buffers
+left in finalized image state. ABI v3 reports both native I/O bytes retired and
+filesystem cleanup errors. Native code remains mapped; copied-path deletion is
+not hot unloading or a promise of backing-store reclamation.
+
+Rust routes typed work to fixed owners. Scheme schedules persistent local
+mailbox actors and green threads inside each owner. Qualification measures
+batching, actor count, explicit yielding, queue-to-projection latency, timer
+wait overlap, and four-instance I/O with forced collection. The native compiler,
+collector and Scheme execution semantics remain in place.
+
+
+The [public native batch API qualification](30-39-status/30.07-native-batch-actor-api.org)
+connects bounded native numeric batches to a reusable Scheme mailbox service.
+It measures matched order aggregation workloads, owner completion tails and
+intra-Scheme fairness. Rust routes instances; Scheme schedules green workers.
+
+
+The [tail attribution and paired same-VM A/B](30-39-status/30.08-native-batch-tail-attribution.org)
+separates owner dispatch, native construction/GC, Scheme execution and result
+projection. It retains a small Scheme scheduling repair and documents the
+rejected coordinator-reuse experiment and the remaining p99 boundary.

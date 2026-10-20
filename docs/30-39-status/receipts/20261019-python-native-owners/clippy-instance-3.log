@@ -1,0 +1,244 @@
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+    Checking gerbil-scheme-python v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-python)
+error: this argument is passed by value, but not consumed in the function body
+  --> crates/gerbil-scheme-python/src/instance_batch.rs:12:17
+   |
+12 |         inputs: Vec<Input>,
+   |                 ^^^^^^^^^^ help: consider changing the type to: `&[Input]`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_pass_by_value
+   = note: `-D clippy::needless-pass-by-value` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::needless_pass_by_value)]`
+
+error: casting `u64` to `usize` may truncate the value on targets with 32-bit wide pointers
+   --> crates/gerbil-scheme-python/src/instance_values.rs:192:39
+    |
+192 |             Scalar::Integer(value) => value.bits().div_ceil(8) as usize,
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#cast_possible_truncation
+    = note: `-D clippy::cast-possible-truncation` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_possible_truncation)]`
+help: ... or use `try_from` and handle the error accordingly
+    |
+192 -             Scalar::Integer(value) => value.bits().div_ceil(8) as usize,
+192 +             Scalar::Integer(value) => usize::try_from(value.bits().div_ceil(8)),
+    |
+
+error: item in documentation is missing backticks
+  --> crates/gerbil-scheme-python/src/instance_admission.rs:27:34
+   |
+27 |     /// The packaged image obeys IsolatedProgram's private runtime ABI; every
+   |                                  ^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#doc_markdown
+   = note: `-D clippy::doc-markdown` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+help: try
+   |
+27 -     /// The packaged image obeys IsolatedProgram's private runtime ABI; every
+27 +     /// The packaged image obeys `IsolatedProgram`'s private runtime ABI; every
+   |
+
+error: these match arms have identical bodies
+   --> crates/gerbil-scheme-python/src/instance_runtime.rs:131:13
+    |
+131 |             Command::Inspect(id, _) | Command::Apply(id, _) | Command::Release(id) => Some(*id),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+132 |             Command::Identical(id, _) => Some(*id),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#match_same_arms
+    = note: `-D clippy::match-same-arms` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::match_same_arms)]`
+help: otherwise merge the patterns into a single arm
+    |
+131 -             Command::Inspect(id, _) | Command::Apply(id, _) | Command::Release(id) => Some(*id),
+132 -             Command::Identical(id, _) => Some(*id),
+131 +             Command::Inspect(id, _) | Command::Apply(id, _) | Command::Release(id) | Command::Identical(id, _) => Some(*id),
+    |
+
+error: this argument (8 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
+   --> crates/gerbil-scheme-python/src/runtime.rs:213:28
+    |
+213 |     fn multiple_vm_storage(&self) -> bool {
+    |                            ^^^^^ help: consider passing by value instead: `self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#trivially_copy_pass_by_ref
+    = note: `-D clippy::trivially-copy-pass-by-ref` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::trivially_copy_pass_by_ref)]`
+
+error: this argument (8 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
+   --> crates/gerbil-scheme-python/src/runtime.rs:218:27
+    |
+218 |     fn thread_local_entry(&self) -> bool {
+    |                           ^^^^^ help: consider passing by value instead: `self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#trivially_copy_pass_by_ref
+
+error: this argument (8 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
+   --> crates/gerbil-scheme-python/src/runtime.rs:224:23
+    |
+224 |     fn max_processors(&self) -> u32 {
+    |                       ^^^^^ help: consider passing by value instead: `self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#trivially_copy_pass_by_ref
+
+error: unused `self` argument
+   --> crates/gerbil-scheme-python/src/runtime.rs:229:24
+    |
+229 |     fn execution_model(&self) -> &'static str {
+    |                        ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unused_self
+    = note: `-D clippy::unused-self` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unused_self)]`
+
+error: this argument (8 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
+   --> crates/gerbil-scheme-python/src/runtime.rs:229:24
+    |
+229 |     fn execution_model(&self) -> &'static str {
+    |                        ^^^^^ help: consider passing by value instead: `self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#trivially_copy_pass_by_ref
+
+error: unused `self` argument
+   --> crates/gerbil-scheme-python/src/runtime.rs:238:33
+    |
+238 |     fn independent_vm_execution(&self) -> bool {
+    |                                 ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unused_self
+
+error: this argument (8 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
+   --> crates/gerbil-scheme-python/src/runtime.rs:238:33
+    |
+238 |     fn independent_vm_execution(&self) -> bool {
+    |                                 ^^^^^ help: consider passing by value instead: `self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#trivially_copy_pass_by_ref
+
+error: this argument is passed by value, but not consumed in the function body
+   --> crates/gerbil-scheme-python/src/runtime.rs:576:42
+    |
+576 | fn token(service: &Arc<Service>, output: Output) -> PyResult<PythonValue> {
+    |                                          ^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_pass_by_value
+help: consider taking a reference instead
+    |
+576 | fn token(service: &Arc<Service>, output: &Output) -> PyResult<PythonValue> {
+    |                                          +
+
+error: this function has too many lines (105/100)
+   --> crates/gerbil-scheme-python/src/runtime.rs:706:1
+    |
+706 | / fn owner(
+707 | |     program: PythonProgram,
+708 | |     paths: &[String],
+709 | |     requests: mpsc::Receiver<Request>,
+710 | |     ready: mpsc::SyncSender<Answer<()>>,
+711 | | ) {
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_lines
+    = note: `-D clippy::too-many-lines` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::too_many_lines)]`
+
+error: this argument is passed by value, but not consumed in the function body
+   --> crates/gerbil-scheme-python/src/runtime.rs:710:12
+    |
+710 |     ready: mpsc::SyncSender<Answer<()>>,
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_pass_by_value
+help: consider taking a reference instead
+    |
+710 |     ready: &mpsc::SyncSender<Answer<()>>,
+    |            +
+
+error: redundant closure
+   --> crates/gerbil-scheme-python/src/runtime.rs:722:54
+    |
+722 |             .map(|p| runtime.string_from_utf8(p).map(|v| v.into_object()))
+    |                                                      ^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `gerbil_scheme::RootedSchemeString::into_object`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#redundant_closure_for_method_calls
+    = note: `-D clippy::redundant-closure-for-method-calls` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure_for_method_calls)]`
+
+error: this could be rewritten as `let...else`
+   --> crates/gerbil-scheme-python/src/runtime.rs:741:5
+    |
+741 | /     let export = match unsafe { runtime.bind_object_export(program.dispatch) } {
+742 | |         Ok(v) => v,
+743 | |         Err(_) => return,
+744 | |     };
+    | |______^ help: consider writing: `let Ok(export) = (unsafe { runtime.bind_object_export(program.dispatch) }) else { return };`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_let_else
+    = note: `-D clippy::manual-let-else` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_let_else)]`
+
+error: this could be rewritten as `let...else`
+   --> crates/gerbil-scheme-python/src/runtime.rs:746:5
+    |
+746 | /     let apply = match unsafe { runtime.bind_object_export(program.apply) } {
+747 | |         Ok(v) => v,
+748 | |         Err(_) => return,
+749 | |     };
+    | |______^ help: consider writing: `let Ok(apply) = (unsafe { runtime.bind_object_export(program.apply) }) else { return };`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_let_else
+
+error: this argument is passed by value, but not consumed in the function body
+   --> crates/gerbil-scheme-python/src/runtime.rs:824:12
+    |
+824 |     reply: mpsc::SyncSender<Answer<Output>>,
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_pass_by_value
+help: consider taking a reference instead
+    |
+824 |     reply: &mpsc::SyncSender<Answer<Output>>,
+    |            +
+
+error: redundant closure
+   --> crates/gerbil-scheme-python/src/runtime.rs:864:59
+    |
+864 |         Input::Text(v) => runtime.string_from_utf8(v).map(|v| v.into_object()),
+    |                                                           ^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `gerbil_scheme::RootedSchemeString::into_object`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#redundant_closure_for_method_calls
+
+error: redundant closure
+   --> crates/gerbil-scheme-python/src/runtime.rs:865:65
+    |
+865 |         Input::Bytes(v) => runtime.bytevector_from_bytes(v).map(|v| v.into_object()),
+    |                                                                 ^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `gerbil_scheme::RootedSchemeBytevector::into_object`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#redundant_closure_for_method_calls
+
+error: redundant closure
+   --> crates/gerbil-scheme-python/src/runtime.rs:880:22
+    |
+880 |                 .map(|v| v.into_object())
+    |                      ^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `gerbil_scheme::RootedSchemeCollection::into_object`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#redundant_closure_for_method_calls
+
+error: consider adding a `;` to the last statement for consistent formatting
+   --> crates/gerbil-scheme-python/src/runtime.rs:961:17
+    |
+961 |                 root.copy_table_entries(&mut snapshot)?
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add a `;` here: `root.copy_table_entries(&mut snapshot)?;`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#semicolon_if_nothing_returned
+    = note: `-D clippy::semicolon-if-nothing-returned` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::semicolon_if_nothing_returned)]`
+
+error: could not compile `gerbil-scheme-python` (lib) due to 22 previous errors

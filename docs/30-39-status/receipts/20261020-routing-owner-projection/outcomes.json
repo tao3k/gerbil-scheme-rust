@@ -1,0 +1,20 @@
+{
+  "qualified_wheel": "7b4db88b02d2f1105a2b73b344da03bc1951870873a67050e8ca2f8cfb419b2f",
+  "routing_tests": 8,
+  "existing_native_tests": 10,
+  "offline_metric_tests": 5,
+  "full_expander_all_four_owners": true,
+  "strict_clippy": "PASS",
+  "captures_completed": 6,
+  "all_capture_exits_zero": true,
+  "measured_main_requests": 24576,
+  "measured_actor_work_items": 786432,
+  "scheduled_measured_probes": 2048,
+  "scheduled_cohorts_exact": true,
+  "scheduled_cohorts_do_not_overlap": true,
+  "native_images_and_scheme_sources_unchanged": true,
+  "native_deadline_seconds": 5,
+  "resource_cleanup": "clean native roots and private directories in every final capture",
+  "performance_admission": "boundary phase improvement observed; end-to-end throughput/tail and short-request fairness are not universally improved",
+  "negative_results_retained": true
+}

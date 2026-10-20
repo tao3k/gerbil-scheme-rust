@@ -8,8 +8,11 @@ publish = false
 [features]
 actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tokio", "dep:simdutf8"]
 instance-probe = ["dep:divan", "dep:tokio"]
+instance-library = ["instance-probe", "dep:gerbil-scheme", "gerbil-scheme/isolated-instances", "dep:serde_json", "dep:gerbil-scheme-python"]
 
 [dependencies]
+gerbil-scheme-python = { path = "../gerbil-scheme-python", default-features = false, features = ["c-abi"], optional = true }
+serde_json = { workspace = true, optional = true }
 gerbil-scheme = { workspace = true, optional = true, features = ["external-program"] }
 gerbil-scheme-sys = { workspace = true, optional = true, features = ["external-program"] }
 divan = { workspace = true, optional = true }
@@ -36,6 +39,21 @@ required-features = ["actor-aot"]
 name = "instances"
 harness = false
 required-features = ["instance-probe"]
+
+[[bench]]
+name = "instance_lifecycle"
+harness = false
+required-features = ["instance-probe"]
+
+[[bench]]
+name = "instance_library"
+harness = false
+required-features = ["instance-library"]
+
+[[bench]]
+name = "instance_resources"
+harness = false
+required-features = ["instance-library"]
 
 [lints]
 workspace = true

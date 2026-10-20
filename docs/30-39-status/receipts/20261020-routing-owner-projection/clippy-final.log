@@ -1,0 +1,7 @@
+   Compiling gerbil-scheme-rust-project-harness v0.1.2 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build-support/gerbil-scheme-rust-project-harness)
+   Compiling gerbil-scheme-rust-project-harness-policy v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build-support/gerbil-scheme-rust-project-harness-policy)
+   Compiling gerbil-scheme-aot-build v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/build-support/gerbil-scheme-aot-build)
+   Compiling gerbil-scheme v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme)
+   Compiling gerbil-scheme-sys v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-sys)
+    Checking gerbil-scheme-python v0.1.0 (/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/crates/gerbil-scheme-python)
+    Finished `release` profile [optimized] target(s) in 3m 59s

@@ -1,0 +1,259 @@
+#+title: Native Instance Retirement and Scheme Green Scheduling
+#+date: 2026-10-19
+
+* Checkout and execution boundary
+
+This local working-tree qualification is based on
+=bb71bbb5ad91bbaef2035979319514c7ced4c4ca=, branch =codex/typed-fold-aot=.
+Despite that historical branch name, this execution route compiles Scheme to
+native C through the existing Gerbil/Cargo/Just graph. It uses the paired
+Homebrew SDK =1cfb032.patch618d76f9eb72= without rebuilding or modifying that SDK.
+Rust schedules fixed owners and projects existing native types; Scheme owns
+its execution, collector, continuations, mailbox actors and green scheduler.
+
+The code change is confined to the experimental image lifecycle and its
+qualification. The production =ffi/runtime.c= implementation is unchanged.
+Unrelated Python/compiler work in this checkout is preserved. This report is
+local evidence, not a published commit, release or remote CI result.
+
+* Resource classification
+
+| Resource | Observed ownership | Disposition |
+|----------+--------------------+-------------|
+| Copied image paths and empty directories after known cleanup | Library-owned temporary resources | Removed; deletion errors are explicit receipt failures |
+| Two native fdset scratch buffers per initialized owner | Still reachable from finalized SDK pstate; no later VM reuse is admitted | Terminal lifecycle leak repaired with the paired native allocator |
+| Most large malloc residency after free | Reused by a second allocator-only wave | Allocator retention, not outstanding Scheme objects |
+| Initialized native image mappings and static data | Retained by the current no-unload lifecycle contract | Still mapped; repeated pool replacement remains unbounded |
+| Unknown partial initialization / failed native cleanup | Ownership and hook state not qualified | Mapping and copy retained; admission poisoned |
+
+The image row is a conservative lifecycle requirement of this backend, not
+proof that every Gambit application intrinsically requires permanent mappings.
+The current contract does not establish complete retirement of process signal,
+TLS destructor, dynamically loaded module and external native callback state
+for every supported application. Unloading under that uncertainty would exceed
+the validated boundary. Fixed pools should be reused for their process lifetime.
+
+** Copied paths
+
+Before the repair, eight sequential pools left eight visible image copies.
+After known cleanup, the library removes each copy and then its empty parent.
+No initialized =dlopen= reference is closed. Unlinking a path is not hot unload,
+and mapped files can retain backing storage after their directory entries are
+removed; this is not a claim of equivalent physical disk-space reclamation.
+
+=OwnerShutdown= reports =image_file_removed= and =image_file_error=. A real
+permission fault produced native cleanup status zero, roots zero and a joined
+owner, but file removal failed with =EACCES=. =is_clean()= correctly returned
+false. Restoring directory permissions allowed control cleanup; a subsequent
+native pool still initialized and executed correctly. A filesystem failure
+does not masquerade as a native failure or poison valid native admission.
+
+** Terminal fdset allocation gap
+
+The system allocation reference tree identified two allocations per retired
+image, rooted from =___gstate0=, with allocation stacks in
+=___setup_io_pstate=. The paired SDK header names them =os.fdset.readfds= and
+=os.fdset.writefds=. Its disassembled cleanup closes the self-pipe without
+retiring these buffers. The header and binary evidence are included in the
+receipt directory; the repair uses typed SDK fields, not byte offsets.
+
+The image-only cleanup adapter takes ownership of all non-null fdset scratch
+buffers at a quiescent one-processor boundary, nulls their SDK fields and resets
+capacity, runs production cleanup, then releases the owned buffers with
+=___FREE_MEM=. The buffers are not Scheme heap objects. No finalized Scheme
+heap is accessed. ABI v3 resolves this cleanup and a plain adapter byte counter
+before initialization. Custom image providers must honor their paired SDK's
+ownership protocol; the Rust loader cannot infer an arbitrary native layout.
+
+In the tested SDK, the adapter retires 2,048 requested bytes per owner. After
+eight retirements, the repeated native malloc live increment disappears:
+post-cleanup live bytes stay at 18,112 from the second pool onward, then fall to
+13,568 after pool/control bookkeeping is dropped. Before the fdset repair the
+corresponding final value was 29,952: a 16,384-byte difference, matching eight
+times 2,048. The allocation reference tree no longer contains these pstate
+buffers. Instrumented tools report rounded allocation sizes; those are distinct
+from the adapter's requested-byte counter.
+
+The ordinary =leaks= heuristic initially reported zero unreachable leaks even
+while those buffers were retained. A reachable allocation can still be a
+terminal ownership leak when its VM has finalized and cannot reuse it. The
+reference tree and lifecycle protocol were necessary to identify this gap.
+
+** Allocator retention control
+
+A fresh process initializes no Scheme VM and touches 128 MiB through four Rust
+workers. After freeing all blocks and joining, current RSS remains about
+144 MiB while live allocation falls to approximately 21 KiB, including the
+benchmark's address records. A second 128 MiB wave reuses 496 of 512 exact
+allocation addresses. Reserved bytes grow only from 150,994,944 to 155,189,248;
+current RSS reaches approximately 148.5 MB. This demonstrates substantial
+reusable allocator capacity without Scheme initialization. It is not evidence
+of outstanding Scheme roots or an unbounded leak.
+
+The test-only =malloc_zone_pressure_relief(NULL, 0)= releases zero bytes in
+these runs. The [[https://github.com/apple-oss-distributions/libmalloc/blob/main/include/malloc/malloc.h][Apple allocator API contract]] specifies best-effort relief across
+zones, not guaranteed RSS return. Production allocator policy is unchanged.
+
+** Mappings and measurement limits
+
+Eight retained copies loaded without initializing Scheme already raise RSS to
+66,207,744 bytes while malloc live bytes remain 13,088. Their mapped virtual
+size is 152,436,736 bytes. Thus image mapping/static state retention exists
+independently of a live Scheme heap. The initialized retirement run retains
+eight mappings too, with RSS 157,384,704 bytes; fixing the small fdset leak does
+not imply a large RSS drop. Replacing pools indefinitely still accumulates
+mappings. The library does not yet admit hot unloading.
+
+Mach allocator-region statistics, =mincore= in-core pages, modified image pages,
+current task RSS and physical footprint are distinct observations. Image
+in-core counts include backing pages and must not be added to malloc-region
+counts as a decomposition of task RSS. The first diagnostic used the misleading
+field name =image-resident=; final logs use =image-incore=. Historical logs were
+not rewritten.
+
+Available TLS-key capacity stayed at 509 across eight retirements in the tested
+workload. The image also contains an emulated-TLS initializer that can register
+an image-local destructor. Stable capacity in an unexercised TLS path is not
+proof of a general callback retirement/unload protocol. This qualification
+makes no such claim.
+
+* Two scheduling levels
+
+| Layer | Owns | Scheduling unit |
+|-------+------+-----------------|
+| Rust | Bounded admission, fixed OS owners, typed messages and replies | A native entry / bounded turn assigned to one VM |
+| Scheme | Actor state, mailboxes, green threads, continuations and collection | Scheme threads within that VM |
+
+A Scheme actor is carried by the Scheme scheduler; Rust does not schedule or
+migrate its stack. State stays owner-affine. Messages between owners must cross
+the native projection boundary as independently owned values.
+
+The present API enters Scheme synchronously. A Scheme =thread-yield!= lets
+another Scheme actor run, but it cannot dequeue a Rust request while that
+foreign entry is still active. The qualification keeps mailbox actors alive
+between calls, sends a bounded turn to them, drains all acknowledgements even
+on errors, then returns. Waiting forever for the next external Rust message
+inside a turn would block ingress. Count bounds are not hard time preemption
+for arbitrary Scheme code.
+
+The local mailbox actors reuse =spawn=, =thread-send=, =thread-receive= and
+=thread-join!=. The SDK's =LocalActor= route uses the same mailbox primitive.
+This is not a complete =:std/actor= envelope/remote-transport benchmark or a
+new public general actor-address API. No Rust actor execution engine was added.
+
+* Matched CPU qualification
+
+The five cases execute identical logical checksum jobs and validate every
+result. Each cohort admits 128 semantic items in every variant, with Rust queue
+capacity explicitly 128. This prevents batching from silently receiving a
+larger admitted item population. Scheme batches contain at most 32 messages;
+the comparison keeps four persistent Scheme workers available per owner and
+varies active workers, batching and explicit yield frequency.
+
+Each case has one warmup and 20 measured samples per size/owner population,
+in ten balanced forward/reverse blocks. Owner populations run in separate
+sequential groups; these groups are not a balanced owner-count scaling A/B.
+The final timing run followed this task's compiler work and used no concurrent
+allocation-analysis process. Before/after compiler surveys were empty. The
+machine was not a controlled benchmark host, and samples retain visible tails.
+The earlier exploratory overlap run is preserved and excluded from conclusions.
+
+The following table reports 4,096 jobs, one owner, 64 checksum rounds per job:
+
+| Native call / Scheme execution | Batch median ms | Enqueue-to-projection p95 us |
+|--------------------------------+-----------------+-----------------------------|
+| One item per FFI, one active actor | 14.123166 | 633.208 |
+| 32 items per FFI, one active actor | 1.238979 | 52.875 |
+| 32 items per FFI, four active actors, no explicit yield | 1.638166 | 67.500 |
+| 32 items per FFI, four active actors, yield every item | 1.914687 | 59.583 |
+| 32 items per FFI, direct Scheme sequential control | 0.970999 | 25.250 |
+
+Batching the same one-actor workload improves the observed batch median by
+about 11.4x here, reducing FFI turns from 4,096 to 128. Four-owner results and
+all raw samples remain in the receipts; within that group the analogous
+batching observation is about 6.0x. These are workload-specific observations,
+not universal speedups or a claim that every task should use one actor.
+
+More active actors add overhead for this small CPU workload; green threads
+cannot provide CPU parallelism within one single-processor VM. At four active
+actors, explicit per-item yielding increases the batch median but changes the
+minimum peer progress at first actor completion from zero to eight jobs. This
+is measured intra-Scheme progress fairness, not Rust queue priority fairness.
+
+Latency is measured from host enqueue to completion of owned native result
+projection; it excludes waiting to fill a batch. End-to-end application latency
+must also include that fill time. Finite sample tails and the five-second
+watchdog are not hard latency guarantees or cancellation semantics.
+
+* Waiting workloads and four-instance I/O
+
+Sixteen native Scheme threads each request a 1 ms timer wait and compute the
+same checksum. One-owner serial versus overlapping waits use ABBA, 20 samples
+per variant, with complete result checks:
+
+| One owner, sixteen requested waits | Median ms |
+|-----------------------------------+-----------|
+| Serial | 19.942500 |
+| Scheme green threads overlap waits | 1.318937 |
+
+The approximately 15.1x difference is overlap of waits, not additional Rust
+workers or CPU parallelism inside the VM. OS delivery and scheduling remain
+part of these local measurements. In the four-owner pool's owner-zero control,
+the corresponding medians are 20.119208 and 1.313312 ms.
+
+A separate native contract runs sixteen cohorts concurrently across four
+owners: 1,024 green timer waits total. Every call collects before execution and
+again while its result is rooted, and validates its checksum. No additional OS
+workers appear. All four owners clean and join, all roots return to zero, file
+descriptors and kernel threads return to baseline, and each adapter reports
+2,048 retired I/O bytes with its copied file removed. This is a finite timer/
+collection interleaving check, not every possible I/O or signal scenario.
+
+* Practical direction
+
+- Reuse a bounded fixed VM population and persistent Scheme actor state.
+- Amortize native entry with bounded native-type message batches. Select a
+  count and time target from application latency requirements; 32 is a measured
+  case, not a universal default.
+- For CPU work, use a small active worker population per VM and distribute
+  sufficiently coarse independent turns between owners for cross-core work.
+- For waiting work, keep concurrency in Scheme so its scheduler can overlap
+  waits without one Rust thread per logical actor.
+- Make cooperative yield frequency a fairness/throughput tradeoff; it does not
+  grant the outer Rust queue progress until the current entry returns.
+- Keep actor identity owner-affine and cross-owner traffic typed and owned.
+  General actor routing, adaptive batching and async response APIs are future
+  library work, not implemented claims in this receipt.
+
+* Validation and reproduction
+
+#+begin_src sh
+just bridge-instance-resources --retirement
+just bridge-instance-resources --allocator
+just bridge-instance-resources --mappings
+just bridge-instance-resources --file-failure
+just bridge-instance-resources --before
+just bridge-instance-resources --after
+just bridge-instance-resources --reuse
+just bridge-instance-resources --preflight
+just bridge-instance-resources --green
+just bridge-instance-resources --green-io
+#+end_src
+
+The native ABI v3 full reuse run again completes 65,536 tasks: 61,440 successes,
+3,584 Scheme task errors and 512 caught Rust job panics. Every owner receives
+896 Scheme errors and 128 Rust panics. Root counts return to zero, post-warmup
+GC-live data stays stable, and all owners report cleanup, I/O-buffer retirement,
+copy removal and join. The 128 MiB retained-object control remains detectable
+and clears after releasing Scheme-global references. Stage-zero and
+completed-setup fault controls remove every known-clean copy; unknown partial
+setup rollback remains unqualified. Missing-export preflight rejects 136 loads
+and subsequently initializes a valid pool.
+
+Strict Clippy passes for the library and qualification crate with all targets.
+The original five-second startup, response, shutdown and genuine-progress
+watchdog bounds are unchanged. Raw successful, failed and excluded receipts,
+SDK header/binary evidence, and working-tree source/image digests are under
+[[file:receipts/20261019-retirement-green/][the receipt directory]]. Historical JSON and native qualification logs are
+preserved separately. No remote CI, portable backend, full unload, general
+actor-protocol or unbounded leak-freedom claim is made.

@@ -1,0 +1,302 @@
+#+TITLE: Owner-affine sessions and native batch projection
+#+STARTUP: overview
+
+* Routing contract
+
+The Rust backend executes complete native Scheme runtimes on fixed owner
+threads. Rust distributes work across those instances. Scheme owns business
+execution, expansion, Actors, green threads, GC and continuations. The native
+Gerbil/Gambit/C compilation chain and its O2 setting are unchanged.
+
+| API | Contract |
+|-----+----------|
+| library.call(request) | Default stateful session on owner 0 |
+| library.value(value) | Construct a native value on owner 0 |
+| library.call_stateless(request) | Caller-declared owner-independent task; reserve the next owner |
+| library.call_many(requests, dispatch=...) | Caller-declared owner-independent tasks; reserve a contiguous round-robin range |
+| library.session(owner) | Explicit owner-affinity handle; no new VM or private namespace |
+| session.call(request) / session.value(value) | Execute or construct on the pinned owner |
+| session.call_many(requests) | Enqueue in input order on the pinned owner and return results in input order |
+| library.call_on(owner, request) | Explicit pinned call |
+| value.owner | Checked owner metadata; not a native pointer |
+| value.apply(...) / elements() / to_python() / close() | Retain existing owner-bound native object semantics |
+
+Individual and batch stateless calls share a per-library atomic round-robin
+cursor. Pinned calls do not move that cursor. A stateless request cannot contain
+an owner-bound Scheme reference anywhere in its typed input graph. This check
+uses parsed native input variants, with no business-operation name heuristics.
+The library does not prove that arbitrary Scheme code is stateless: independence
+from VM-local state is the caller's scheduling declaration. No accepted task is
+automatically retried.
+
+Sessions on the same owner share its Scheme module state. A session is an
+affinity handle, not an isolated Scheme environment or a transaction. Scheme
+objects/Actors can own application session state within that VM. Handles,
+closures and continuations keep their original VM and remain callable through
+that owner. Root references do not migrate between VMs.
+
+A pinned batch validates every input reference before submitting any item.
+Foreign-owner reference rejection therefore does not execute an earlier item
+in that batch. Once work is accepted, a Scheme exception is not a transaction
+rollback: later accepted items may execute. Concurrent callers may interleave
+at queue admission; each pinned batch preserves its own submission order.
+An observation timeout does not forcibly cancel accepted Scheme execution.
+
+#+begin_src python
+library = gerbil_ledger.open_library(owners=4, dispatch_workers=2)
+session = library.session(2)
+value = session.call(("procedure",))
+answer = value.apply(41)                 # stays on owner 2
+assert answer.to_python() == 42
+library.release_many([answer, value])
+
+roots = library.call_many([("echo", i) for i in range(128)], dispatch="direct")
+values = library.project_many(roots, release=True)
+assert values == list(range(128))
+library.close()
+#+end_src
+
+* Owner-batched projection and release
+
+=project_many(values, release=False)= accepts native handles from this library,
+partitions them by actual owner, projects there and restores input result order.
+Repeated input handles produce repeated projected outputs. Existing native
+scalar/list/vector/table/big-integer conversion rules and bounds remain in use;
+JSON is not a runtime transport.
+
+=release_many(values)= deduplicates retained token identities and releases on
+their owners. Already closed handles and handles retired by library shutdown
+are harmless; a foreign library or invalid Python argument is rejected before
+native submission. Both APIs accept at most 4096 input handles. Native work is
+split into windows of at most 128 handles and partitioned by owner within each
+window. This bounds turn size without changing Scheme scheduling or native
+operation deadlines.
+
+For =project_many(..., release=True)= the steps are:
+
+1. Validate all input handles and owners.
+2. Complete all owner-local projections.
+3. Construct all Python results successfully.
+4. Release retained tokens in owner batches and invalidate their wrappers.
+
+Unsupported/cyclic projection, invalid handles or Python materialization
+failure does not consume any input roots. Cyclic/shared native objects,
+procedures and continuations can remain rooted and be used through the existing
+native APIs. Batch projection is optional and does not restrict Scheme objects.
+Retirement is not atomic across owners: a submission, native or delivery error
+in the release phase may retire a subset. Idempotent retry or explicit library
+shutdown completes cleanup. A release timeout is not a cancellation guarantee.
+
+For 128 handles evenly distributed across four owners, the former caller loop
+performs 128 projection and 128 release requests. The new two-phase path submits
+four owner projection jobs and four owner release jobs. The initial Scheme
+computation remains identical. This is a structural round-trip reduction, not
+an assumed throughput or latency improvement.
+
+Batching can hold an owner longer and change service to short competing
+requests. It also retains intermediate projected data until materialization;
+no zero-copy or reduced-RSS claim is made. Per-value APIs remain available.
+
+* Native verification and matched measurement
+
+The focused installed tests cover cursor continuity, concurrent callers,
+stateful affinity and submission order, nested reference rejection, foreign
+libraries, duplicate values, bounds, idempotent release and error preservation.
+Projection failure is followed by GC and successful use of cyclic identity,
+rooted procedures and multi-shot continuations. Existing complete-runtime
+regression and full-expander probes are separate checks.
+
+The A/B uses one library and unchanged live VM identities for both arms:
+
+- Scalar arm: per-value native projection and release.
+- Owner-batch arm: =project_many(roots, release=True)=.
+- Same native Actor input, direct admission, 128 requests, 32 Actor work items
+  per request, quantum 1, four Scheme Actor workers per VM.
+- Two warmup rounds and 16 measured paired rounds in balanced AB/BA/BA/AB order.
+- CPU and mixed Scheme cooperative-wait workloads, with and without short
+  competing owner-pinned echo probes.
+
+The native computation, owner assignment and Scheme semantics remain the same.
+Owner metadata observation is recorded separately and included identically in
+both full-response timers. Scalar result completion is observed after each
+individual release; the batch API delivers all results at bulk return. These
+are bulk API response metrics, not streaming or open-loop request p99.
+
+The fairness probes keep at most one echo outstanding per owner and wait 20ms
+between requests by default. They record total latency, completion counts per
+owner and the phase in which they started. A probe starting in projection can
+span later work; that label does not isolate projection cost. Probe populations
+can differ when a faster arm has a shorter observation interval. Counts and raw
+samples remain visible; this is a finite closed-loop interference diagnostic,
+not proof of starvation freedom or a production arrival-rate SLO.
+
+#+begin_src sh
+just -- bridge-python-owner-routing-tests /path/to/installed/python
+just -- bridge-python-projection-ab /path/to/installed/python --rounds 16 --cpu
+just -- bridge-python-projection-ab /path/to/installed/python --rounds 16
+just -- bridge-python-projection-ab /path/to/installed/python --rounds 16 --cpu --probes
+just -- bridge-python-projection-ab /path/to/installed/python --rounds 16 --probes
+#+end_src
+
+Host activity is observed and retained without blocking the local run, following
+the user's instruction. No other process is paused. Same-VM pairing controls
+artifact and initialization differences, but does not remove host variability.
+Raw negative results, failures and incomplete attempts remain part of the record.
+
+* Fixed scheduled competing requests
+
+The first four captures retain the closed-loop probe population limitation
+described above. Two additional captures use the same main workload with
+identical fixed competing request cohorts in both arms. Each main batch has
+eight echo requests per owner, scheduled at 0,20,...,140ms relative to its API
+start, for 32 total short requests. A persistent Python executor provides 32
+test client threads. These are callers, not additional Scheme VM processors.
+
+Latency is measured from planned arrival, including client wakeup/GIL and
+admission lateness. All short requests are observed, and every cohort drains
+before the next arm starts. Thus each arm has 512 measured short requests,
+128 per owner. A separate validation checks every due-time/latency equation,
+the exact cohort identities and the absence of inter-arm carryover. This is
+a finite scheduled in-process client workload, not a production network SLO.
+
+#+begin_src sh
+just -- bridge-python-projection-ab /path/to/installed/python --rounds 16 --cpu --scheduled-probes
+just -- bridge-python-projection-ab /path/to/installed/python --rounds 16 --scheduled-probes
+#+end_src
+
+* Measured native results
+
+All six final captures completed with exit 0 and unchanged per-process VM
+identities. The exact final wheel passed eight routing/bulk-value tests, ten
+existing full-runtime tests, the four-owner full-expander qualification and
+clean shutdown. Five offline fairness metric tests pass separately. Strict
+bridge Clippy passes with warnings denied after the two initial style findings
+were fixed by extracting contract validation and correcting a statement. No
+lint suppression or native timeout relaxation was introduced.
+
+The 19 packaged Scheme sources and all four native images (main runtime and
+three module bundles) are byte-identical to the preceding qualified O2 wheel.
+Only the Rust host bridge changed. All 160 dynamic module objects were reused
+from the normal build cache. The installed extension matches its wheel hash.
+
+** Main request throughput and response tails
+
+Rates count Actor work items, not newly created Actor instances. Each main
+sample has 128 native requests and 4096 work items. All six captures together
+contain 24576 measured main requests and 786432 measured work items. Each
+case/arm has 16 measured bulk samples; its 2048 per-result timings share those
+16 batches and are not independent arrival samples.
+
+| Case | Scalar items/s | Batch items/s | Throughput change | Scalar projection/release ms | Batch projection/release ms | Scalar response p99 ms | Batch response p99 ms |
+|------+----------------+---------------+-------------------+------------------------------+-----------------------------+------------------------+-----------------------|
+| cpu-alone | 5035.8 | 6778.5 | +34.6% | 317.31 | 29.35 | 1364.89 | 1138.32 |
+| mixed-alone | 3582.1 | 4458.9 | +24.5% | 299.56 | 56.94 | 1712.79 | 1657.95 |
+| cpu-probes | 3677.7 | 6111.5 | +66.2% | 309.86 | 44.12 | 1735.57 | 994.41 |
+| mixed-probes | 3826.8 | 5098.5 | +33.2% | 253.80 | 43.22 | 2089.47 | 1540.63 |
+| cpu-scheduled | 4208.2 | 4101.6 | -2.5% | 239.51 | 65.54 | 2407.44 | 1767.67 |
+| mixed-scheduled | 4767.2 | 4504.0 | -5.5% | 184.24 | 44.65 | 1301.16 | 1486.68 |
+
+Projection/release median duration is lower in all six captures (72.6% to
+90.7% lower by ratios of medians). Each within-process paired-round interval
+for this phase ratio lies below 1.0. This supports the boundary-cost improvement
+for this workload. End-to-end capacity and tail non-regression do not follow
+automatically: native admission/construction/execution and GC also contribute.
+
+** Competing-request observations, including negatives
+
+Closed-loop latency starts at actual call entry. Scheduled latency starts at
+the planned arrival and includes client scheduling lateness. Do not compare
+the two probe protocols as an intervention; compare arms within each capture.
+
+| Case | Scalar probe samples | Batch probe samples | Scalar probe p99 ms | Batch probe p99 ms |
+|------+----------------------+---------------------+---------------------+--------------------|
+| cpu-probes | 995 | 375 | 453.68 | 467.40 |
+| mixed-probes | 822 | 201 | 521.25 | 667.31 |
+| cpu-scheduled | 512 | 512 | 1600.64 | 953.53 |
+| mixed-scheduled | 512 | 512 | 870.76 | 1161.97 |
+
+The original mixed closed-loop negative remains: 521.25ms to 667.31ms, with
+822 versus 201 measured probes. Unequal populations limit its interpretation.
+The fixed scheduled mixed cohort also has a negative observation: main
+throughput is 5.5% lower, main response p99 rises from 1301.16ms to 1486.68ms,
+and short-request p99 rises from 870.76ms to 1161.97ms. The fixed CPU cohort
+has 2.5% lower main throughput even though its projection phase and observed
+response tails are faster. These results are retained, not reclassified as passes.
+
+In the fixed mixed capture, native-ready timing already differs before the
+current projection phase: the paired native-ready p99 ratio is 1.221, with a
+descriptive interval [1.063,1.889]. The timings do not isolate the cause of that
+difference. In particular, all short-request tail changes cannot be attributed
+solely to the duration of the current owner projection job.
+
+** Owner and Actor finite fairness
+
+The table records maximum intervening completions while assigned work remains.
+Completed groups are not charged for later work. Counts and temporal owner
+gaps remain in the JSON summary; equal final coverage alone is not fairness.
+
+| Case | Scalar owner gap | Batch owner gap | Scalar Actor-worker gap | Batch Actor-worker gap |
+|------+------------------+-----------------+-------------------------+------------------------|
+| cpu-alone | 39 | 38 | 3 | 6 |
+| mixed-alone | 29 | 21 | 19 | 19 |
+| cpu-probes | 52 | 47 | 6 | 6 |
+| mixed-probes | 28 | 14 | 19 | 19 |
+| cpu-scheduled | 27 | 39 | 3 | 6 |
+| mixed-scheduled | 23 | 26 | 19 | 19 |
+
+For fixed scheduled cohorts, each owner receives and completes 128 short
+requests per arm. Per-owner tails still matter even when these counts match:
+
+| Case | Owner | Scalar scheduled p99 ms | Batch scheduled p99 ms |
+|------+-------+-------------------------+------------------------|
+| cpu-scheduled | 0 | 1600.61 | 949.78 |
+| cpu-scheduled | 1 | 1600.64 | 953.84 |
+| cpu-scheduled | 2 | 1600.69 | 953.53 |
+| cpu-scheduled | 3 | 1600.49 | 953.48 |
+| mixed-scheduled | 0 | 851.04 | 939.51 |
+| mixed-scheduled | 1 | 866.11 | 975.16 |
+| mixed-scheduled | 2 | 896.18 | 959.21 |
+| mixed-scheduled | 3 | 851.40 | 1240.58 |
+
+** Paired uncertainty
+
+Each ratio compares batch/scalar in the same measured round. The descriptive
+95% interval resamples 16 complete paired rounds 4000 times with seed 20261020.
+Ratios of independently computed medians in the main table can differ from
+the median of paired ratios here. The intervals condition on one process,
+assume exchangeable rounds, and do not establish independent host replication
+or a production tail guarantee.
+
+| Case | Paired throughput ratio [95%] | Paired projection/release ratio [95%] | Paired response p99 ratio [95%] |
+|------+-------------------------------+--------------------------------------+---------------------------------|
+| cpu-alone | 1.781 [0.722, 2.534] | 0.113 [0.079, 0.308] | 0.562 [0.397, 1.387] |
+| mixed-alone | 1.292 [0.919, 1.536] | 0.226 [0.140, 0.388] | 0.775 [0.647, 1.133] |
+| cpu-probes | 1.782 [1.368, 2.292] | 0.178 [0.119, 0.351] | 0.565 [0.436, 0.732] |
+| mixed-probes | 1.444 [1.016, 1.742] | 0.140 [0.105, 0.263] | 0.696 [0.574, 0.984] |
+| cpu-scheduled | 0.910 [0.692, 1.598] | 0.278 [0.172, 0.678] | 1.105 [0.626, 1.438] |
+| mixed-scheduled | 0.824 [0.681, 1.353] | 0.225 [0.119, 0.721] | 1.215 [0.744, 1.469] |
+
+* Scope and next decision
+
+The session and stateless-routing contracts are connected to the real library
+API. Owner-batched projection/retirement reduces measured boundary cost while
+preserving native Scheme execution. Callers select this batch API explicitly;
+opaque-object and per-value APIs remain valid. The current data does not justify
+a blanket low-latency recommendation or default dispatch/thread-count change.
+
+Before claiming short-request tail non-regression, separate native admission,
+input construction/execution/GC and owner-turn occupancy under the fixed
+competing workload. A bounded projection-turn budget is a candidate to test,
+not a fix established by this capture. Multi-request Scheme Actor ingress,
+real external-I/O wakeups, streaming completion and hard cancellation remain
+outside this change. No SMP runtime source or other task was modified.
+
+* Receipts
+
+[[file:receipts/20261020-routing-owner-projection/identity-closed-loop.json][Initial capture artifact/source identity]],
+[[file:receipts/20261020-routing-owner-projection/identity-scheduled.json][fixed-cohort artifact/source identity]],
+[[file:receipts/20261020-routing-owner-projection/ab-exits.jsonl][all final capture commands/exits]],
+[[file:receipts/20261020-routing-owner-projection/ab-summary.json][summaries and complete paired ratios]], and
+[[file:receipts/20261020-routing-owner-projection/outcomes.json][qualification outcomes]] accompany all raw captures. The two harness snapshots
+identify the source used before/after adding the fixed scheduled cohort. Earlier
+small smoke captures and superseded-wheel checks remain diagnostic receipts.

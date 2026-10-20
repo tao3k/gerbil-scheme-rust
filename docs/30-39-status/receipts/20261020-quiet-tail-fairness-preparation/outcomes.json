@@ -1,0 +1,27 @@
+{
+  "quiet_preflight": {
+    "exit": 75,
+    "status": "HOST_BUSY",
+    "scheme_performance_workload_started": false
+  },
+  "new_quiet_macro_ab": "NOT_RUN",
+  "new_dispatch_matrix": "NOT_RUN",
+  "metric_unit_tests": {
+    "passed": 4,
+    "failed": 0
+  },
+  "historical_native_timing_replay": {
+    "cohorts": 20,
+    "new_performance_run": false
+  },
+  "recorded_busy_admission_replay": {
+    "entrypoints": 2,
+    "exits": [
+      75,
+      75
+    ],
+    "native_initialization_attempted": false
+  },
+  "pending": "User-supplied idle supported host or a genuinely quiet local host",
+  "changed_benchmark_semantics": "Projection/release measured before validation/fairness analysis; native 128-request window clocks retained."
+}

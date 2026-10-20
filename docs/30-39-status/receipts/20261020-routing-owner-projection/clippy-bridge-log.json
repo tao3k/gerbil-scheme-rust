@@ -1,0 +1,6 @@
+{
+  "path": "/private/tmp/gerbil-routing-batch-20261020/clippy-bridge.log",
+  "sha256": "6860a6fb97110c33ee980c4cfc5fbde9b5248807b6b0dd49d77357c54853bbe2",
+  "status": "INCOMPLETE_REDUNDANT_ATTEMPT",
+  "detail": "Verbose dependency build/check was stopped after the correct owning-workspace check had reported its two style findings. The final strict bridge check passed. Full verbose log remains in the temporary evidence directory."
+}

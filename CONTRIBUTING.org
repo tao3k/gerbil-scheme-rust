@@ -8,6 +8,13 @@ Contributions must preserve the bindings-only boundary described by
 Application runtimes, policy schemas, graph semantics, and downstream adapter
 logic belong in their owning repositories.
 
+Before changing Python providers, callable exports, closure/state support or
+typed compiler lowering, read
+[[file:docs/hybrid-execution.md][Hybrid compilation and runtime ownership]].
+Prefer existing compiled Scheme/C algorithm exports and upstream ABI types.
+Rust host ownership does not justify porting all Scheme algorithms by hand;
+VM-rooted exports and VM-independent generated kernels have distinct contracts.
+
 * License
 
 Unless explicitly stated otherwise, any contribution intentionally submitted

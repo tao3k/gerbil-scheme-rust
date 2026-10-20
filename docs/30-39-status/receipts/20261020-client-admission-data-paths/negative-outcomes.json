@@ -1,0 +1,49 @@
+{
+  "defaults": "No default owner count, dispatcher or admission window changed.",
+  "build_failures": [
+    {
+      "file": "clippy.log",
+      "reason": "Conflicting multiple PyO3 pymethods implementations; fixed by delegating through the existing method block"
+    },
+    {
+      "file": "clippy-final.log",
+      "reason": "Redundant match arm; removed without suppression"
+    }
+  ],
+  "performance": [
+    {
+      "case": "pipeline16-mixed",
+      "artifact": "global-only pipeline",
+      "status": "Short p99 regression retained; replaced by per-owner-bounded implementation"
+    },
+    {
+      "case": "q-pipeline16-mixed",
+      "status": "Owner-bounded pipeline still regresses short p99"
+    },
+    {
+      "case": "q-pipeline16-cpu",
+      "status": "Throughput gain with short-tail regression"
+    },
+    {
+      "case": "q-policy4-mixed",
+      "status": "Short p99 gain with throughput and main-tail cost"
+    },
+    {
+      "case": "q-policy4-cpu",
+      "status": "Short p99 and throughput regressions"
+    },
+    {
+      "case": "q-window4-mixed",
+      "status": "Fixed-window pipeline does not establish a universal throughput/tail win"
+    }
+  ],
+  "scalar": {
+    "original_exit": 1,
+    "original_error": "scalar-syntax-failure.stderr",
+    "original_source": "failed-scalar-source.txt",
+    "scope": "Metric output syntax; failure before VM startup",
+    "corrected_exit": 0,
+    "corrected_data": "q-scalar-corrected.jsonl"
+  },
+  "acceptance": "Prepared input reuse and owner-local native data path measured; experimental scheduling controls are not admitted as default replacements."
+}

@@ -1,0 +1,29 @@
+import concurrent.futures,ctypes,json,os,shutil,struct,time
+from pathlib import Path
+source=Path('/private/tmp/gerbil-python-vm/venv/lib/python3.14/site-packages/gerbil_ledger/_resources/runtime')
+out=Path('/private/tmp/gerbil-expander-20261019/validated-runtime');out.mkdir()
+start=time.perf_counter_ns();native=[]
+for path in sorted(source.rglob('*')):
+ if not path.is_file():continue
+ target=out/path.relative_to(source);target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,target)
+ data=target.read_bytes()
+ if len(data)>=32 and data[:4]==b'\xcf\xfa\xed\xfe' and struct.unpack_from('<I',data,12)[0]==8:native.append(target)
+class Signature(ctypes.Structure):_fields_=[('start',ctypes.c_int64),('blob',ctypes.c_void_p),('size',ctypes.c_size_t)]
+class Validation(ctypes.Structure):_fields_=[('start',ctypes.c_int64),('size',ctypes.c_size_t),('message',ctypes.c_void_p)]
+lib=ctypes.CDLL(None,use_errno=True);lib.fcntl.argtypes=[ctypes.c_int,ctypes.c_int];lib.fcntl.restype=ctypes.c_int
+
+def validate(path):
+ data=path.read_bytes();offset=32
+ for _ in range(struct.unpack_from('<I',data,16)[0]):
+  cmd,size=struct.unpack_from('<II',data,offset)
+  if cmd==0x1d:signature_offset,signature_size=struct.unpack_from('<II',data,offset+8);break
+  offset+=size
+ fd=os.open(path,os.O_RDONLY);sig=Signature(0,signature_offset,signature_size);message=ctypes.create_string_buffer(1024);val=Validation(0,1024,ctypes.addressof(message))
+ try:
+  for operation,argument in [(97,sig),(98,val)]:
+   if lib.fcntl(fd,operation,ctypes.byref(argument))<0:raise OSError(ctypes.get_errno(),message.value)
+ finally:os.close(fd)
+ return 1
+with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
+ count=sum(pool.map(validate,native))
+print(json.dumps(dict(validated=count,workers=32,copy_and_validate_ns=time.perf_counter_ns()-start)),flush=True)

@@ -9,6 +9,7 @@
   '("scheme/utf8"
     (gxc: "scheme/runtime" (extra-inputs: ("scheme/runtime-collections.ss"
       "scheme/runtime-object-kinds.ss" "scheme/runtime-composites.ss")))
+    "scheme/actor-batch"
     "scheme/program-build"
     "scheme/python-runtime"
     "scheme/python-package")

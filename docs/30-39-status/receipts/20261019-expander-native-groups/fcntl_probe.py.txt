@@ -1,0 +1,17 @@
+import ctypes,os,struct,time,shutil
+from pathlib import Path
+source=Path('/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/lib/gerbil/core/mop~1.o1')
+path=Path('/private/tmp/gerbil-expander-20261019/mop-fcntl-correct-abi.o1');shutil.copyfile(source,path)
+data=path.read_bytes();ncmds=struct.unpack_from('<I',data,16)[0];offset=32
+for _ in range(ncmds):
+ cmd,size=struct.unpack_from('<II',data,offset)
+ if cmd==0x1d:signature_offset,signature_size=struct.unpack_from('<II',data,offset+8);break
+ offset+=size
+class Signature(ctypes.Structure):_fields_=[('start',ctypes.c_int64),('blob',ctypes.c_void_p),('size',ctypes.c_size_t)]
+class Validation(ctypes.Structure):_fields_=[('start',ctypes.c_int64),('size',ctypes.c_size_t),('message',ctypes.c_void_p)]
+lib=ctypes.CDLL(None,use_errno=True);lib.fcntl.argtypes=[ctypes.c_int,ctypes.c_int];lib.fcntl.restype=ctypes.c_int
+fd=os.open(path,os.O_RDONLY);sig=Signature(0,signature_offset,signature_size);message=ctypes.create_string_buffer(1024);val=Validation(0,1024,ctypes.addressof(message))
+for operation,argument in [(97,sig),(98,val)]:
+ start=time.perf_counter_ns();ret=lib.fcntl(fd,operation,ctypes.byref(argument));print('fcntl',operation,ret,ctypes.get_errno(),time.perf_counter_ns()-start,message.value,flush=True)
+os.close(fd)
+start=time.perf_counter_ns();handle=ctypes.CDLL(str(path),mode=2|4);print('dlopen',time.perf_counter_ns()-start,flush=True)

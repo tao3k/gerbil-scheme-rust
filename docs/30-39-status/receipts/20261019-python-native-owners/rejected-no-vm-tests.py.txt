@@ -1,0 +1,93 @@
+"""Installed Rust execution; no Scheme initialization, compiler or SDK config."""
+import concurrent.futures
+from pathlib import Path
+import unittest
+
+import gerbil_ledger
+from gerbil_ledger._core import available_backends, scheme_initialization_attempted
+
+
+class RustBackendTests(unittest.TestCase):
+    def assert_no_scheme_entry(self):
+        self.assertIs(scheme_initialization_attempted(),
+                      False if "scheme" in available_backends() else None)
+
+    def setUp(self):
+        self.assert_no_scheme_entry()
+        self.library = gerbil_ledger.open_library(backend="rust")
+
+    def tearDown(self):
+        self.library.close()
+        self.assert_no_scheme_entry()
+
+    def call(self, *request):
+        value = self.library.call(request)
+        try:
+            return value.to_python()
+        finally:
+            value.close()
+
+    def test_backend_selection_is_explicit_and_closed(self):
+        self.assertEqual(self.library.backend, "rust")
+        with self.assertRaises(TypeError):
+            gerbil_ledger.open_library()
+        for backend in ("auto", "tokio", "Rust", "unknown"):
+            with self.assertRaises(ValueError):
+                gerbil_ledger.open_library(backend=backend)
+
+    def test_uncompiled_provider_and_runtime_resources_are_absent(self):
+        if "scheme" not in available_backends():
+            with self.assertRaises(ValueError):
+                gerbil_ledger.open_library(backend="scheme")
+            root = Path(gerbil_ledger.__file__).parent / "_resources"
+            self.assertFalse(any(path.is_file() for path in (root / "runtime").rglob("*")))
+            self.assertFalse(any(path.suffix.startswith(".o") for path in root.rglob("*")))
+
+    def test_scheme_defined_typed_fold_executes_with_bigints(self):
+        values = [2**160, -(2**140), 17]
+        for count, value in enumerate(values, 1):
+            self.assertEqual(self.call("append", value), count)
+        self.assertEqual(self.call("total"), sum(values))
+        self.assertEqual(self.call("entries"), values)
+
+    def test_unsupported_dsl_is_not_sent_to_scheme(self):
+        with self.assertRaises(NotImplementedError):
+            self.library.call(("dsl", "(let ((x 21)) (+ x x))"))
+        self.assertEqual(self.call("total"), 0)
+        self.assert_no_scheme_entry()
+
+    def test_independent_rust_owners_and_concurrent_updates(self):
+        other = gerbil_ledger.open_library(backend="rust")
+        try:
+            def append(value):
+                return self.call("append", value)
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                self.assertEqual(sorted(pool.map(append, range(32))), list(range(1, 33)))
+            self.assertEqual(self.call("total"), sum(range(32)))
+            value = other.call(("total",))
+            self.assertEqual(value.to_python(), 0)
+            value.close()
+            self.library.close()
+            value = other.call(("echo", "other owner remains live"))
+            self.assertEqual(value.to_python(), "other owner remains live")
+            value.close()
+        finally:
+            other.close()
+
+    def test_release_and_owner_close_invalidate_values(self):
+        value = self.library.call(("total",))
+        value.close()
+        value.close()
+        with self.assertRaises(ValueError):
+            value.to_python()
+        retained = self.library.call(("total",))
+        self.library.close()
+        self.library.close()
+        with self.assertRaises(RuntimeError):
+            retained.to_python()
+        retained.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

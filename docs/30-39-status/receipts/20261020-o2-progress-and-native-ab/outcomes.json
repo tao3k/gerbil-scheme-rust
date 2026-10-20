@@ -1,0 +1,92 @@
+{
+  "o2_build": {
+    "exit": 0,
+    "wall_seconds": 347.17,
+    "ceiling_seconds": 600,
+    "authorization": "User allowed longer builds conditional on real progress.",
+    "dynamic_objects": 160,
+    "cached_objects": 91,
+    "new_objects": 69,
+    "clean_build_timing": false
+  },
+  "progress": {
+    "completed_objects": [
+      91,
+      92,
+      99,
+      123,
+      129,
+      138,
+      148,
+      151,
+      160
+    ],
+    "compiler_sample_retry": "The previously slow process completed before a new sample could attach; its native object exists."
+  },
+  "full_scheme": {
+    "exit": 0,
+    "owners": 4,
+    "shutdown_roots": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "private_directory_removed": true
+  },
+  "installed_tests": {
+    "exit": 0,
+    "tests": 10,
+    "seconds": 5.928
+  },
+  "diagnostic_test_first_compile": {
+    "exit": 124,
+    "status": "INCOMPLETE_COMPILATION",
+    "budget_seconds": 120
+  },
+  "diagnostic_broad_scope": {
+    "exit": 101,
+    "wall_seconds": 176.88,
+    "passed": 14,
+    "configuration_failures": 1,
+    "reason": "Unrelated opt-in linker test selected without GERBIL_LINKER_DIAGNOSTIC_SOURCE."
+  },
+  "diagnostic_owned_scope": {
+    "exit": 0,
+    "passed": 14,
+    "test_seconds": 6.17,
+    "actual_gcc_object_byte_parity": true
+  },
+  "strict_clippy": {
+    "exit": 0,
+    "seconds": 2.4
+  },
+  "macro_ab": {
+    "order": [
+      "O0-first",
+      "O2-first",
+      "O2-second",
+      "O0-last"
+    ],
+    "exits": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "measured_batches": 256,
+    "contaminated_batches": 256,
+    "performance_admitted": false,
+    "negative_result": "Second O2 pure expansion has lower throughput and worse tails than both O0 cohorts."
+  },
+  "quiet_dispatch": {
+    "exit": 75,
+    "status": "BLOCKED_HOST_BUSY",
+    "owners": 4,
+    "workers": 2,
+    "topology_sweep": "NOT_RUN",
+    "performance_admitted": false
+  },
+  "native_call_timeout_seconds": 5,
+  "remote_ci": "NOT_RUN"
+}

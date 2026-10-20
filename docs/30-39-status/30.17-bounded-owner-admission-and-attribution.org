@@ -1,0 +1,239 @@
+#+TITLE: Bounded owner admission and mixed-load tail attribution
+#+STARTUP: overview
+
+* Performance architecture
+
+A high-performance embedding library needs explicit execution, ownership,
+admission and observation contracts. A thread count alone does not define
+concurrency or performance. Each owner retains a complete native Scheme runtime;
+Rust assigns owned requests to owners. Scheme retains expansion, application
+execution, Actors, green threads, dynamic state, GC and continuations. The
+Gerbil/Gambit/C O2 compilation path is unchanged.
+
+| Boundary | Responsibility | Current limit |
+|----------+----------------+---------------|
+| Python caller | Construct typed requests and consume typed results | GIL/client wakeup and conversion can delay admission |
+| Rust admission | Stateless round-robin or explicit session affinity | Finite owner queues; queue-full is a rejection, with no automatic retry |
+| Owner OS thread | Enter exactly its own native runtime | One complete foreign request runs before the next request starts |
+| Scheme runtime | Execute full Scheme and schedule its Actors/green threads | Actor cooperation within one request does not multiplex separate foreign requests |
+| Result boundary | Keep native graphs rooted or explicitly project owned values | Large projection turns can occupy an owner; bulk projection is opt-in |
+| Lifetime boundary | Drain accepted work, release roots and retire resources | Observation timeout is not cancellation; instances are not native crash containment |
+
+Stateful sessions remain owner-affine and share that owner's VM state. A
+stateless declaration does not prove purity. Native references cannot be routed
+to a different VM. No Scheme code is translated to Rust for this scheduling path.
+
+* Minimal candidate
+
+=call_many(requests, dispatch="direct", admission_window=16)= and
+=call_many_profiled(..., admission_window=16)= allow fewer compute requests to
+enter owner queues before the caller observes the current turn. The accepted
+range is 1..128. The default remains 128 pending broader qualification.
+
+The original groups of 128 inputs retain their five-second observation deadline
+and completion clock. Smaller turns do not restart this deadline. Results keep
+input order and round-robin owner assignment across non-divisible turn sizes,
+128-request boundaries and successive calls. Direct, Tokio, Rayon and
+Rayon-blocking all use the same admission bound. Fixed owner threads still execute
+the Scheme code. Session batch behavior remains as documented in 30.16.
+
+This is a per-call in-flight bound, not global admission fairness, a priority
+scheduler, a transaction or hard cancellation. Multiple concurrent batch callers
+can still fill an owner queue. A long individual Scheme request remains
+non-preemptible from Rust. Scheme Actor quantum and foreign admission window are
+separate controls.
+
+* Opt-in owner attribution
+
+=set_owner_profiling(True)= enables a bounded trace (16,384 spans per drain).
+=owner_profile()= returns owned JSON diagnostics and clears the trace. JSON is
+used only for diagnostic records; requests/results retain native type transport.
+Dropped spans are reported explicitly. Toggle profiling after outstanding work
+drains. Primary performance runs disable tracing; collector snapshots and trace
+storage are skipped on the disabled path.
+
+Each span records owner, typed command origin, preparation/start/end timestamps,
+call-stage offsets, failure status and optional cumulative native diagnostic
+deltas. Batch calls have an explicit =batch-call= label, rather than being
+classified by an application operation name. Call-stage offsets separate input
+construction from Scheme invocation. Diagnostics include GC real seconds,
+owner-thread CPU seconds, root-count change and collection-count change. Missing
+native diagnostics remain absent, never fabricated zeroes.
+
+Preparation-to-start includes Rust admission/handoff and OS scheduling; for
+ordinary Python requests it also includes the Tokio hop. It is not an exact
+measurement solely of time resident in the owner channel. Same-owner span
+intersections expose which native jobs occupied that interval. Scheme-call wall
+time includes green-thread sleep and OS descheduling; it is not CPU time. GC
+real time is a subset of the observed native work, not an extra additive stage.
+The diagnostic endpoints exclude the recorder lock and reply publication.
+
+* Initial attribution and negative controls
+
+The first four-round mixed capture compares scalar projection with owner-batched
+projection on the same four live VMs. Native-call preparation-to-start p99 was
+587 ms and 479 ms respectively; native execution p99 was 87 ms and 105 ms.
+Owner-batched projection turns had a median of 12.8 ms and maximum of 21.6 ms.
+This supports testing smaller compute admission turns before assuming projection
+occupancy is the sole bottleneck. It does not prove projection cannot affect
+other loads or that GC is irrelevant.
+
+The same diagnostic capture retains negative results: owner batching reduced
+projection crossings but median throughput fell from 4,953 to 4,023 Actor items/s
+and scheduled short-request p99 rose from 743 to 1,002 ms. Client admission
+lateness was also substantial. All four owner short-request counts were equal.
+A four-round traced capture is attribution evidence, not a general capacity claim.
+
+* Final artifact results
+
+Final wheel SHA-256: =82c93fd9c348b639b26cf6bf1818498ba4c54ee986fe877e89b721b4c75ee16e=. Installed extension bytes match the wheel. All 78 packaged resources, including the runtime image and three module bundles, match the previous O2 wheel byte for byte.
+
+These are the final lint-clean wheel results. Earlier pre-helper results are retained separately and are not pooled. Throughput is the median full API Actor-items/s. Main p99 is the pooled batch response observation; 128 results in one bulk response are correlated. Short p99 is measured from each planned arrival, including client lateness.
+
+| Workload | Admission turn | Actor items/s | Main response p99 ms | Short response p99 ms |
+|----------+----------------+---------------+----------------------+-----------------------|
+| Mixed | 128 | 4549.6 | 1384.30 | 819.49 |
+| Mixed | 16 | 4373.2 | 1263.02 | 583.58 |
+| CPU | 128 | 2737.4 | 2034.99 | 1629.18 |
+| CPU | 16 | 2386.5 | 2152.43 | 1162.25 |
+
+Relative to turn 128, turn 16 changes the ratios of summary statistics as follows:
+
+- Mixed: throughput -3.88%, main p99 -8.76%, short p99 -28.79%.
+- CPU: throughput -12.82%, main p99 +5.77%, short p99 -28.66%.
+
+The CPU throughput/main-tail regression is a retained negative. The default remains 128. The smaller turn is an explicit trade-off control, not an admitted universal speedup or a proven optimum. The final traced mixed run also regressed short p99 (917.52 -> 1160.85 ms), unlike the primary runs.
+
+** Pairing and uncertainty
+
+| Workload | Metric | Median paired ratio (16 / 128) | Descriptive 95% interval |
+|----------+--------+--------------------------------+--------------------------|
+| Mixed | Throughput | 0.887 | 0.822 .. 1.144 |
+| Mixed | Main p99 | 1.127 | 0.861 .. 1.216 |
+| Mixed | Native-ready p99 | 0.978 | 0.788 .. 1.516 |
+| CPU | Throughput | 0.942 | 0.757 .. 1.093 |
+| CPU | Main p99 | 1.065 | 0.915 .. 1.364 |
+| CPU | Native-ready p99 | 1.129 | 0.924 .. 1.438 |
+
+Intervals resample 16 paired rounds (4,000 deterministic bootstrap draws). They are descriptive for this finite local capture, not independent-host replication or an equivalence proof. The median paired ratio is not the ratio of marginal medians; pooled p99 can improve while a typical paired batch regresses. The intervals do not support a stable overall throughput or main-tail improvement.
+
+** Fairness observations
+
+Each primary arm completed exactly 512 short requests: 128 on each owner. Each main batch assigned 32 requests to each owner and produced equal aggregate Actor worker counts. Counts establish finite balance only. Per-owner planned-arrival short p99 values are:
+
+| Workload | Turn | Owner 0 ms | Owner 1 ms | Owner 2 ms | Owner 3 ms |
+|----------+------+------------+------------+------------+------------|
+| Mixed | 128 | 782.44 | 859.52 | 848.94 | 760.50 |
+| Mixed | 16 | 590.45 | 583.58 | 582.38 | 582.17 |
+| CPU | 128 | 1130.69 | 1583.63 | 1699.29 | 1629.18 |
+| CPU | 16 | 1162.25 | 1162.72 | 1161.58 | 1161.64 |
+
+Mixed-load per-owner tails all improved in this capture. CPU owner 0 worsened slightly while the other three improved. Equal counts and these finite tails do not prove starvation freedom, bounded response time or fairness under sustained concurrent admission.
+
+** What the owner spans establish
+
+The retained pre-helper trace found short native =inspect= and =release= preparation-to-start p99 of 346/380 ms at turn 128 versus 40/57 ms at turn 16. Same-owner interval intersections attributed approximately 346/379 ms to intervening batch computations, rather than projection computation. This establishes a queue-occupancy failure mode when short work enters during the compute backlog.
+
+The final trace observed a different arrival regime: short inspect/release waits were only a few milliseconds in both arms, because client lateness dominated. Batch-computation queue p99 still fell from about 770 to 168 ms, but short planned-arrival p99 worsened. A smaller owner queue cannot fix lateness before admission. Neither the pre-helper trace nor the final trace alone explains every capture.
+
+| Final mixed trace | Turn 128 | Turn 16 |
+|-------------------+----------+---------|
+| Batch queue p99 ms | 769.663 | 168.202 |
+| Batch execution p99 ms | 197.779 | 144.970 |
+| Short inspect queue p99 ms | 2.653 | 2.303 |
+| Short inspect execution p99 ms | 0.037 | 0.047 |
+| Short release queue p99 ms | 1.784 | 2.107 |
+| Bulk projection execution median ms | 24.135 | 33.504 |
+| Bulk projection execution p99 ms | 112.740 | 93.485 |
+| Client lateness p99 ms | 912.458 | 1156.099 |
+| Short planned-arrival p99 ms | 917.520 | 1160.847 |
+
+Across 512 measured batch jobs per arm in the final trace:
+
+| Aggregate native observation | Turn 128 | Turn 16 |
+|------------------------------+----------+---------|
+| Input construction wall s | 5.614 | 4.782 |
+| Scheme call wall s | 5.896 | 4.967 |
+| Whole job wall s | 11.686 | 9.958 |
+| Owner thread CPU s | 1.840 | 1.903 |
+| Collector real s | 0.910 | 0.987 |
+| GC collection count | 656.000 | 670.000 |
+
+Native construction and Scheme call both consume substantial wall time. GC is measurable, but its overlapping cumulative real time does not establish that GC alone caused the tail. Thread CPU is much smaller than summed job wall time; cooperative waits and OS scheduling are included in wall measurements. This candidate does not reduce the required Scheme work or claim collector optimization. Bulk projection remains measurable but is not a demonstrated universal explanation for short-request p99.
+
+* Final qualification and evidence
+
+- Native installed routing/projection suite: 10/10, including all four dispatch modes, non-divisible turns, original 128-request boundaries, foreign handles and retained graphs/procedures/continuations.
+- Existing native backend suite: 10/10, including GC, exceptions, multishot continuations and independent module state.
+- Full expander/hygienic macro qualification on all four owners: pass; roots [0,0,0,0], copied resource directory removed.
+- Separate original-deadline Actor qualification: one owner, 128 requested, only a strict subset accepted/completed before observation timeout; recovery marker, roots [0] and directory removal pass. Observation includes drain/cleanup overhead and is not a new timeout setting.
+- Fairness metric unit checks: 5/5; these do not establish native correctness.
+- Strict bridge Clippy with -D warnings: pass. No build or lint job launched by this task ran concurrently with the primary captures.
+
+The durable evidence is under [[file:receipts/20261020-owner-admission-attribution/identity.json][artifact identity]], [[file:receipts/20261020-owner-admission-attribution/summary.json][full metrics and paired intervals]], [[file:receipts/20261020-owner-admission-attribution/exits.jsonl][run exits]], [[file:receipts/20261020-owner-admission-attribution/receipt-negative.json][retained negative manifest]] and [[file:receipts/20261020-owner-admission-attribution/sha256.json][receipt hashes]]. The source remains in a dirty checkout at the recorded head; no repository-wide CI, release, long-duration leak freedom or portable-backend acceptance is claimed.
+
+* Remaining architecture work
+
+1. Measure and reduce repeated typed input construction and root registration.
+   Reuse immutable host descriptions or batch native constructors only where
+   identity, exceptions, byte limits and GC rooting stay equivalent. Do not
+   replace Scheme evaluation with a Rust evaluator.
+2. Treat Python conversion/GIL admission lateness, Rust admission, native execution,
+   native result projection and Python materialization as separate budgets.
+   A low owner queue time cannot establish a low end-to-end p99.
+3. Keep a throughput/tail trade-off surface across admission turn, owner count,
+   Actor quantum and workload shape. Select defaults only with matched controls;
+   a finite request-count balance is not starvation freedom under sustained load.
+4. Qualify an explicit Scheme ingress/event protocol before claiming concurrent
+   external requests or Rust I/O completions can run as green tasks inside one VM.
+   This candidate changes queue admission only. Native GC is measured over a
+   complete job; attribution of each GC pause to encoding versus Scheme execution
+   still needs more detailed collector snapshots.
+
+* Qualification exclusions and retained failures
+
+Early deadline workloads were rejected with a native-root error. One used an
+unqualified interpreted sleep name; raw =##thread-sleep!= experiments were
+inconsistent between standalone and reused fixtures, including after explicit
+expander warmup. They remain unqualified, and this work does not establish their
+root cause. A separate Actor attempt used 1000 items and violated the existing
+256-item Actor bound; it was an invalid test workload. None counts as a deadline
+pass. The final deadline gate uses valid compiled Actor requests on one owner,
+with 256 items and the existing cooperative sleep. No native Scheme source or
+image was changed to make it pass. See the retained negative manifest and logs.
+
+The first strict lint failed the function-size bound. The unchanged Tokio branch
+was extracted into its own helper without a suppression. The pre-helper binary,
+source snapshot, complete A/B and identity remain retained. Final qualification
+uses a separate wheel; these results are not silently combined.
+
+* Reproduction
+
+Use an installed O2 wheel built by the existing native project build and its
+actual virtual-environment interpreter. The example commands below use =PYTHON=
+as that interpreter path; they do not select another compiler or evaluator.
+
+#+begin_src sh
+just bridge-python-owner-routing-tests "$PYTHON"
+just bridge-python-owner-deadline "$PYTHON"
+just bridge-python-owner-tests "$PYTHON"
+just bridge-python-owner-full "$PYTHON"
+just bridge-python-projection-ab "$PYTHON" --scheduled-probes --admission-ab --rounds 16
+just bridge-python-projection-ab "$PYTHON" --scheduled-probes --admission-ab --rounds 16 --cpu
+just bridge-python-projection-ab "$PYTHON" --scheduled-probes --admission-ab --rounds 4 --owner-trace
+#+end_src
+
+Primary comparisons use four live VMs, 128 requests, 32 Actor items per request,
+48 line pairs per item, Actor quantum 1, four Scheme workers per VM, two warmup
+rounds and 16 balanced paired rounds. Both arms use direct compute admission and
+the same owner-batched projection/release. Each arm schedules eight short native
+Echo requests per owner at offsets 0,20,...,140 ms. All 32 probes drain before
+the next arm. The separate trace capture uses four paired rounds.
+
+The client uses 32 Python load threads. Scheduled latency includes client
+wakeup/GIL/admission lateness. It is a finite in-process response measurement,
+not a network capacity test, a sustained saturation proof or a Rust-only client
+benchmark. The mixed workload uses Scheme cooperative sleep, not a qualified
+external Rust I/O completion protocol. Host observations are retained and no
+unrelated work is stopped. Primary measurements run without our build or lint
+jobs; local host activity is not claimed to be a quiet-machine guarantee.

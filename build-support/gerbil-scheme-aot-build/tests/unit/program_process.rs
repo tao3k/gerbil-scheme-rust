@@ -397,3 +397,41 @@ fn actual_gcc_allocation_dump_progress_completes() {
     }
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+#[ignore = "requires explicitly selected native GCC"]
+fn allocation_diagnostics_preserve_optimized_object_bytes() {
+    let compiler =
+        std::env::var_os("GERBIL_ALLOCATION_DIAGNOSTIC_CC").expect("explicit diagnostic GCC");
+    let root = artifact_fixture("diagnostic-object-parity");
+    let source = root.join("fixture.c");
+    std::fs::write(&source, "unsigned long fold(const unsigned long *p, unsigned long n) { unsigned long s=0; for (unsigned long i=0;i<n;++i) s=(s*33)^p[i]; return s; }\n").unwrap();
+    let baseline = root.join("baseline.o");
+    let object = root.join("observed.o");
+    let status = Command::new(&compiler)
+        .args(["-O2", "-fno-gcse-lm", "-c"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&baseline)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let mut command = Command::new(&compiler);
+    command.args(["-O2", "-fno-gcse-lm", "-save-temps=obj"]);
+    for extension in ["ira", "reload"] {
+        command.arg(format!(
+            "-fdump-rtl-{extension}-details={}",
+            object.with_extension(extension).display()
+        ));
+    }
+    command.arg("-c").arg(&source).arg("-o").arg(&object);
+    super::run_with_compiler_artifacts(&mut command, "observe optimized object", &object).unwrap();
+    assert_eq!(
+        std::fs::read(&baseline).unwrap(),
+        std::fs::read(&object).unwrap()
+    );
+    for path in super::compiler_artifact_paths(&object) {
+        assert!(!path.exists());
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}

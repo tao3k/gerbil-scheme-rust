@@ -1,0 +1,1130 @@
+{
+  "mixed-primary": {
+    "summary": {
+      "window-128": {
+        "samples": 16,
+        "actors_per_second_median": 4549.634341189556,
+        "response_p99_ns": 1384300292,
+        "native_ready_p99_ns": 583243667,
+        "projection_release_ns_median": 52967562.5,
+        "probe_count": 512,
+        "probe_p99_ns": 819494084,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          782436875,
+          859520084,
+          848943292,
+          760495709
+        ],
+        "owner_max_pending_gap_ns": [
+          184035292,
+          168719666,
+          182115833,
+          166958084
+        ],
+        "owner_max_other_completions_while_pending": [
+          24,
+          13,
+          17,
+          13
+        ],
+        "actor_max_other_completions_while_pending": [
+          15,
+          15,
+          16,
+          13
+        ],
+        "client_lateness_ns_median": 202250042,
+        "client_lateness_ns_p99": 728831417,
+        "short_service_ns_p99": 665457750
+      },
+      "window-16": {
+        "samples": 16,
+        "actors_per_second_median": 4373.240751626308,
+        "response_p99_ns": 1263016000,
+        "native_ready_p99_ns": 753404708,
+        "projection_release_ns_median": 48234417.0,
+        "probe_count": 512,
+        "probe_p99_ns": 583584625,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          590453709,
+          583584625,
+          582385000,
+          582173625
+        ],
+        "owner_max_pending_gap_ns": [
+          218790916,
+          182145292,
+          202435667,
+          189289625
+        ],
+        "owner_max_other_completions_while_pending": [
+          10,
+          8,
+          10,
+          10
+        ],
+        "actor_max_other_completions_while_pending": [
+          15,
+          15,
+          16,
+          13
+        ],
+        "client_lateness_ns_median": 232310958,
+        "client_lateness_ns_p99": 559583583,
+        "short_service_ns_p99": 122227416
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "admission_ab": true,
+      "owner_trace": false,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 16,
+      "requests": 128,
+      "cpu": false,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4433771744,
+        4445535456,
+        4457299168,
+        4469062880
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 48.7,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 899,
+          "cpu": 72.3,
+          "command": "/usr/libexec/sysmond"
+        },
+        {
+          "pid": 961,
+          "cpu": 27.7,
+          "command": "/Applications/Zen.app/Contents/MacOS/gpu-helper.app/Contents/MacOS/Zen GPU Helper"
+        },
+        {
+          "pid": 20027,
+          "cpu": 39.7,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 45342,
+          "cpu": 21.6,
+          "command": "/Applications/Zen.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container"
+        },
+        {
+          "pid": 51693,
+          "cpu": 29.6,
+          "command": "/System/Library/ExtensionKit/Extensions/Storage.appex/Contents/MacOS/Storage"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission; admission A/B uses identical owner-batched projection and 128-request deadline/ready clock, with 128 versus 16 in-flight turns; bulk API timer includes projection and release",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    },
+    "paired": {
+      "actors_per_second": {
+        "median_ratio": 0.8871308413514505,
+        "descriptive_interval": [
+          0.822251114387476,
+          1.1435646819514333
+        ],
+        "pairs": 16
+      },
+      "response_p99_ns": {
+        "median_ratio": 1.1272295478396357,
+        "descriptive_interval": [
+          0.8613068665841481,
+          1.216174535775822
+        ],
+        "pairs": 16
+      },
+      "native_ready_p99_ns": {
+        "median_ratio": 0.9782484335641464,
+        "descriptive_interval": [
+          0.7879686714613845,
+          1.515564693620441
+        ],
+        "pairs": 16
+      },
+      "projection_release_ns": {
+        "median_ratio": 0.7681590586511429,
+        "descriptive_interval": [
+          0.6198292707595969,
+          1.7760454414691031
+        ],
+        "pairs": 16
+      }
+    }
+  },
+  "cpu-primary": {
+    "summary": {
+      "window-128": {
+        "samples": 16,
+        "actors_per_second_median": 2737.376995957169,
+        "response_p99_ns": 2034992208,
+        "native_ready_p99_ns": 828767416,
+        "projection_release_ns_median": 74360708.0,
+        "probe_count": 512,
+        "probe_p99_ns": 1629176708,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          1130689792,
+          1583627750,
+          1699285916,
+          1629176708
+        ],
+        "owner_max_pending_gap_ns": [
+          224235833,
+          180173958,
+          218637750,
+          162618208
+        ],
+        "owner_max_other_completions_while_pending": [
+          18,
+          23,
+          21,
+          21
+        ],
+        "actor_max_other_completions_while_pending": [
+          3,
+          6,
+          5,
+          3
+        ],
+        "client_lateness_ns_median": 521033375,
+        "client_lateness_ns_p99": 1102551000,
+        "short_service_ns_p99": 702888166
+      },
+      "window-16": {
+        "samples": 16,
+        "actors_per_second_median": 2386.512319235327,
+        "response_p99_ns": 2152430750,
+        "native_ready_p99_ns": 916143708,
+        "projection_release_ns_median": 88477021.0,
+        "probe_count": 512,
+        "probe_p99_ns": 1162247416,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          128,
+          128,
+          128,
+          128
+        ],
+        "probe_p99_ns_by_owner": [
+          1162247416,
+          1162716000,
+          1161576500,
+          1161638208
+        ],
+        "owner_max_pending_gap_ns": [
+          213789083,
+          226470417,
+          230955375,
+          207707209
+        ],
+        "owner_max_other_completions_while_pending": [
+          14,
+          17,
+          17,
+          13
+        ],
+        "actor_max_other_completions_while_pending": [
+          6,
+          3,
+          6,
+          3
+        ],
+        "client_lateness_ns_median": 696226500,
+        "client_lateness_ns_p99": 1154489833,
+        "short_service_ns_p99": 86658959
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "admission_ab": true,
+      "owner_trace": false,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 16,
+      "requests": 128,
+      "cpu": true,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4431543520,
+        4443307232,
+        4455070944,
+        4466834656
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 49.0,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 680,
+          "cpu": 21.2,
+          "command": "/Applications/Ghostty.app/Contents/MacOS/ghostty"
+        },
+        {
+          "pid": 899,
+          "cpu": 26.2,
+          "command": "/usr/libexec/sysmond"
+        },
+        {
+          "pid": 961,
+          "cpu": 24.1,
+          "command": "/Applications/Zen.app/Contents/MacOS/gpu-helper.app/Contents/MacOS/Zen GPU Helper"
+        },
+        {
+          "pid": 19638,
+          "cpu": 23.6,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 33600,
+          "cpu": 21.7,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 45342,
+          "cpu": 22.9,
+          "command": "/Applications/Zen.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container"
+        },
+        {
+          "pid": 51693,
+          "cpu": 31.1,
+          "command": "/System/Library/ExtensionKit/Extensions/Storage.appex/Contents/MacOS/Storage"
+        },
+        {
+          "pid": 79093,
+          "cpu": 26.5,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission; admission A/B uses identical owner-batched projection and 128-request deadline/ready clock, with 128 versus 16 in-flight turns; bulk API timer includes projection and release",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    },
+    "paired": {
+      "actors_per_second": {
+        "median_ratio": 0.942218335947609,
+        "descriptive_interval": [
+          0.7566686606319717,
+          1.0930168622769425
+        ],
+        "pairs": 16
+      },
+      "response_p99_ns": {
+        "median_ratio": 1.06460404647403,
+        "descriptive_interval": [
+          0.9148979631032663,
+          1.3638745483838495
+        ],
+        "pairs": 16
+      },
+      "native_ready_p99_ns": {
+        "median_ratio": 1.1289273228992078,
+        "descriptive_interval": [
+          0.9236190576822197,
+          1.438452058387365
+        ],
+        "pairs": 16
+      },
+      "projection_release_ns": {
+        "median_ratio": 1.2747604930282694,
+        "descriptive_interval": [
+          0.46623747317508146,
+          1.795938831890621
+        ],
+        "pairs": 16
+      }
+    }
+  },
+  "mixed-trace": {
+    "summary": {
+      "window-128": {
+        "samples": 4,
+        "actors_per_second_median": 2239.7441360856324,
+        "response_p99_ns": 1952653959,
+        "native_ready_p99_ns": 788884375,
+        "projection_release_ns_median": 132856500.0,
+        "probe_count": 128,
+        "probe_p99_ns": 917520334,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          917023209,
+          917599584,
+          917520334,
+          917491667
+        ],
+        "owner_max_pending_gap_ns": [
+          197786125,
+          282620958,
+          231596167,
+          259212333
+        ],
+        "owner_max_other_completions_while_pending": [
+          28,
+          22,
+          18,
+          26
+        ],
+        "actor_max_other_completions_while_pending": [
+          15,
+          15,
+          16,
+          13
+        ],
+        "owner_phases": {
+          "batch-call": {
+            "count": 512,
+            "queue_ns_median": 188158750,
+            "queue_ns_p99": 769663500,
+            "execution_ns_median": 9213583,
+            "execution_ns_p99": 197779125,
+            "execution_ns_max": 282617458,
+            "encoding_ns_total": 5614295450,
+            "scheme_ns_total": 5896103384,
+            "execution_ns_total": 11686089870,
+            "gc_real_seconds": 0.9102456569671631,
+            "thread_cpu_seconds": 1.839841348000001,
+            "collections": 656.0
+          },
+          "call": {
+            "count": 128,
+            "queue_ns_median": 658458,
+            "queue_ns_p99": 6498625,
+            "execution_ns_median": 7834,
+            "execution_ns_p99": 166833,
+            "execution_ns_max": 321708,
+            "encoding_ns_total": 1859005,
+            "scheme_ns_total": 778825,
+            "execution_ns_total": 2912328,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.002116292000000186,
+            "collections": 0.0
+          },
+          "inspect": {
+            "count": 128,
+            "queue_ns_median": 505083,
+            "queue_ns_p99": 2652792,
+            "execution_ns_median": 4417,
+            "execution_ns_p99": 37167,
+            "execution_ns_max": 71542,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 897663,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0007968300000006368,
+            "collections": 0.0
+          },
+          "projection-turn": {
+            "count": 16,
+            "queue_ns_median": 4091625,
+            "queue_ns_p99": 93468250,
+            "execution_ns_median": 24135208,
+            "execution_ns_p99": 112739708,
+            "execution_ns_max": 112739708,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 523547708,
+            "gc_real_seconds": 0.0533602237701416,
+            "thread_cpu_seconds": 0.17071416800000028,
+            "collections": 80.0
+          },
+          "release": {
+            "count": 128,
+            "queue_ns_median": 431000,
+            "queue_ns_p99": 1784333,
+            "execution_ns_median": 1208,
+            "execution_ns_p99": 10667,
+            "execution_ns_max": 20250,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 231251,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.00017992099999941669,
+            "collections": 0.0
+          },
+          "release-turn": {
+            "count": 16,
+            "queue_ns_median": 4177583,
+            "queue_ns_p99": 23601500,
+            "execution_ns_median": 36209,
+            "execution_ns_p99": 61238041,
+            "execution_ns_max": 61238041,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 65916876,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0005976660000001077,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {
+            "batch-call": 0,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 6498625
+          },
+          "inspect": {
+            "batch-call": 0,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 2624917
+          },
+          "release": {
+            "batch-call": 0,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 1783584
+          }
+        },
+        "client_lateness_ns_median": 761891000,
+        "client_lateness_ns_p99": 912457750,
+        "short_service_ns_p99": 13738542
+      },
+      "window-16": {
+        "samples": 4,
+        "actors_per_second_median": 2230.158453607698,
+        "response_p99_ns": 2154890584,
+        "native_ready_p99_ns": 812348417,
+        "projection_release_ns_median": 95222708.0,
+        "probe_count": 128,
+        "probe_p99_ns": 1160847125,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          1160840417,
+          1160800375,
+          1160847125,
+          1160875125
+        ],
+        "owner_max_pending_gap_ns": [
+          164121125,
+          154370750,
+          159020417,
+          156666667
+        ],
+        "owner_max_other_completions_while_pending": [
+          9,
+          9,
+          10,
+          15
+        ],
+        "actor_max_other_completions_while_pending": [
+          15,
+          15,
+          16,
+          13
+        ],
+        "owner_phases": {
+          "batch-call": {
+            "count": 512,
+            "queue_ns_median": 19383959,
+            "queue_ns_p99": 168202291,
+            "execution_ns_median": 9479875,
+            "execution_ns_p99": 144969542,
+            "execution_ns_max": 159012250,
+            "encoding_ns_total": 4782142143,
+            "scheme_ns_total": 4967370236,
+            "execution_ns_total": 9958399964,
+            "gc_real_seconds": 0.9866437911987305,
+            "thread_cpu_seconds": 1.903332572000001,
+            "collections": 670.0
+          },
+          "call": {
+            "count": 128,
+            "queue_ns_median": 416875,
+            "queue_ns_p99": 1710250,
+            "execution_ns_median": 7458,
+            "execution_ns_p99": 325666,
+            "execution_ns_max": 440000,
+            "encoding_ns_total": 2830252,
+            "scheme_ns_total": 664295,
+            "execution_ns_total": 3653873,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0023409100000009175,
+            "collections": 0.0
+          },
+          "inspect": {
+            "count": 128,
+            "queue_ns_median": 277917,
+            "queue_ns_p99": 2302500,
+            "execution_ns_median": 4791,
+            "execution_ns_p99": 47000,
+            "execution_ns_max": 70667,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 983458,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0008760450000000475,
+            "collections": 0.0
+          },
+          "projection-turn": {
+            "count": 16,
+            "queue_ns_median": 631250,
+            "queue_ns_p99": 4537458,
+            "execution_ns_median": 33504291,
+            "execution_ns_p99": 93485458,
+            "execution_ns_max": 93485458,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 546215747,
+            "gc_real_seconds": 0.23468518257141113,
+            "thread_cpu_seconds": 0.16004800200000036,
+            "collections": 78.0
+          },
+          "release": {
+            "count": 128,
+            "queue_ns_median": 150917,
+            "queue_ns_p99": 2107250,
+            "execution_ns_median": 1583,
+            "execution_ns_p99": 12417,
+            "execution_ns_max": 26750,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 320912,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0002686250000004664,
+            "collections": 0.0
+          },
+          "release-turn": {
+            "count": 16,
+            "queue_ns_median": 15138291,
+            "queue_ns_p99": 52505959,
+            "execution_ns_median": 46125,
+            "execution_ns_p99": 1546709,
+            "execution_ns_max": 1546709,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 4174793,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0006312079999999387,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {
+            "batch-call": 0,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 1710250
+          },
+          "inspect": {
+            "batch-call": 0,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 2258083
+          },
+          "release": {
+            "batch-call": 0,
+            "projection-turn": 0,
+            "release-turn": 0,
+            "unattributed": 2103541
+          }
+        },
+        "client_lateness_ns_median": 835960417,
+        "client_lateness_ns_p99": 1156099084,
+        "short_service_ns_p99": 10210333
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "admission_ab": true,
+      "owner_trace": true,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 4,
+      "requests": 128,
+      "cpu": false,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4491623648,
+        4503387360,
+        4515151072,
+        4526914784
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 50.0,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 899,
+          "cpu": 21.4,
+          "command": "/usr/libexec/sysmond"
+        },
+        {
+          "pid": 961,
+          "cpu": 31.0,
+          "command": "/Applications/Zen.app/Contents/MacOS/gpu-helper.app/Contents/MacOS/Zen GPU Helper"
+        },
+        {
+          "pid": 17217,
+          "cpu": 28.3,
+          "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        },
+        {
+          "pid": 19638,
+          "cpu": 30.4,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 45342,
+          "cpu": 24.6,
+          "command": "/Applications/Zen.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container"
+        },
+        {
+          "pid": 94563,
+          "cpu": 9.5,
+          "command": "lean"
+        },
+        {
+          "pid": 94748,
+          "cpu": 10.4,
+          "command": "lean"
+        },
+        {
+          "pid": 94803,
+          "cpu": 8.6,
+          "command": "lean"
+        },
+        {
+          "pid": 94828,
+          "cpu": 12.4,
+          "command": "lean"
+        },
+        {
+          "pid": 94849,
+          "cpu": 12.4,
+          "command": "lean"
+        },
+        {
+          "pid": 94854,
+          "cpu": 9.0,
+          "command": "lean"
+        },
+        {
+          "pid": 94855,
+          "cpu": 9.9,
+          "command": "lean"
+        },
+        {
+          "pid": 94857,
+          "cpu": 9.3,
+          "command": "lean"
+        },
+        {
+          "pid": 94862,
+          "cpu": 8.1,
+          "command": "lean"
+        },
+        {
+          "pid": 94913,
+          "cpu": 8.7,
+          "command": "lean"
+        },
+        {
+          "pid": 94932,
+          "cpu": 9.3,
+          "command": "lean"
+        },
+        {
+          "pid": 94968,
+          "cpu": 9.6,
+          "command": "lean"
+        },
+        {
+          "pid": 94988,
+          "cpu": 8.5,
+          "command": "lean"
+        },
+        {
+          "pid": 94995,
+          "cpu": 8.2,
+          "command": "lean"
+        },
+        {
+          "pid": 94998,
+          "cpu": 8.0,
+          "command": "lean"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission; admission A/B uses identical owner-batched projection and 128-request deadline/ready clock, with 128 versus 16 in-flight turns; bulk API timer includes projection and release",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    },
+    "paired": {
+      "actors_per_second": {
+        "median_ratio": 0.9957271998711902,
+        "descriptive_interval": [
+          0.7381714062368849,
+          1.26668607731521
+        ],
+        "pairs": 4
+      },
+      "response_p99_ns": {
+        "median_ratio": 1.0042905533157462,
+        "descriptive_interval": [
+          0.7894618423785963,
+          1.3547015616950158
+        ],
+        "pairs": 4
+      },
+      "native_ready_p99_ns": {
+        "median_ratio": 1.0175029868762904,
+        "descriptive_interval": [
+          0.893214912905936,
+          1.0671250932869016
+        ],
+        "pairs": 4
+      },
+      "projection_release_ns": {
+        "median_ratio": 0.7154357484732572,
+        "descriptive_interval": [
+          0.42670499294787306,
+          1.0785664528635668
+        ],
+        "pairs": 4
+      }
+    }
+  },
+  "mixed-diagnostic": {
+    "summary": {
+      "scalar": {
+        "samples": 4,
+        "actors_per_second_median": 4953.00691825153,
+        "response_p99_ns": 1316020292,
+        "native_ready_p99_ns": 581426500,
+        "projection_release_ns_median": 390139667.0,
+        "probe_count": 128,
+        "probe_p99_ns": 743153834,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          655258917,
+          756919292,
+          743153834,
+          662583292
+        ],
+        "owner_max_pending_gap_ns": [
+          84328125,
+          131196167,
+          128405708,
+          87440042
+        ],
+        "owner_max_other_completions_while_pending": [
+          13,
+          30,
+          30,
+          13
+        ],
+        "actor_max_other_completions_while_pending": [
+          9,
+          15,
+          16,
+          13
+        ],
+        "owner_phases": {
+          "call": {
+            "count": 640,
+            "queue_ns_median": 108102333,
+            "queue_ns_p99": 587099125,
+            "execution_ns_median": 6242042,
+            "execution_ns_p99": 87436375,
+            "execution_ns_max": 131188708,
+            "encoding_ns_total": 2208919655,
+            "scheme_ns_total": 3005882426,
+            "execution_ns_total": 5251391123,
+            "gc_real_seconds": 0.3988480567932129,
+            "thread_cpu_seconds": 1.820682416,
+            "collections": 651.0
+          },
+          "inspect": {
+            "count": 640,
+            "queue_ns_median": 92667,
+            "queue_ns_p99": 585583417,
+            "execution_ns_median": 209958,
+            "execution_ns_p99": 2426916,
+            "execution_ns_max": 18086666,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 244667706,
+            "gc_real_seconds": 0.037369489669799805,
+            "thread_cpu_seconds": 0.15884828300000176,
+            "collections": 77.0
+          },
+          "release": {
+            "count": 640,
+            "queue_ns_median": 112208,
+            "queue_ns_p99": 331786416,
+            "execution_ns_median": 2459,
+            "execution_ns_p99": 233375,
+            "execution_ns_max": 1650750,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 8255587,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.002545588000004706,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {},
+          "inspect": {},
+          "release": {}
+        },
+        "client_lateness_ns_median": 69105792,
+        "client_lateness_ns_p99": 176362541,
+        "short_service_ns_p99": 616708625
+      },
+      "owner-batch": {
+        "samples": 4,
+        "actors_per_second_median": 4023.0467221342124,
+        "response_p99_ns": 1058376000,
+        "native_ready_p99_ns": 482805584,
+        "projection_release_ns_median": 32293583.5,
+        "probe_count": 128,
+        "probe_p99_ns": 1002487334,
+        "projection_probe_count": 0,
+        "projection_probe_p99_ns": null,
+        "probe_counts_by_owner": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "probe_p99_ns_by_owner": [
+          791104000,
+          1002487334,
+          1024433042,
+          968473292
+        ],
+        "owner_max_pending_gap_ns": [
+          85861584,
+          188015208,
+          195633750,
+          165510000
+        ],
+        "owner_max_other_completions_while_pending": [
+          12,
+          8,
+          19,
+          8
+        ],
+        "actor_max_other_completions_while_pending": [
+          9,
+          19,
+          16,
+          7
+        ],
+        "owner_phases": {
+          "call": {
+            "count": 640,
+            "queue_ns_median": 131205208,
+            "queue_ns_p99": 479469833,
+            "execution_ns_median": 6615750,
+            "execution_ns_p99": 104971875,
+            "execution_ns_max": 195628958,
+            "encoding_ns_total": 3158968334,
+            "scheme_ns_total": 2857983510,
+            "execution_ns_total": 6074724297,
+            "gc_real_seconds": 0.3571493625640869,
+            "thread_cpu_seconds": 1.871228846000001,
+            "collections": 653.0
+          },
+          "inspect": {
+            "count": 128,
+            "queue_ns_median": 1047500,
+            "queue_ns_p99": 578554208,
+            "execution_ns_median": 3333,
+            "execution_ns_p99": 1352583,
+            "execution_ns_max": 1874667,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 5455044,
+            "gc_real_seconds": 0.001432180404663086,
+            "thread_cpu_seconds": 0.0020879939999999264,
+            "collections": 2.0
+          },
+          "projection-turn": {
+            "count": 16,
+            "queue_ns_median": 1039167,
+            "queue_ns_p99": 22534167,
+            "execution_ns_median": 12782792,
+            "execution_ns_p99": 21579417,
+            "execution_ns_max": 21579417,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 219019294,
+            "gc_real_seconds": 0.03845477104187012,
+            "thread_cpu_seconds": 0.1675179200000001,
+            "collections": 77.0
+          },
+          "release": {
+            "count": 128,
+            "queue_ns_median": 420000,
+            "queue_ns_p99": 18605833,
+            "execution_ns_median": 1416,
+            "execution_ns_p99": 20916,
+            "execution_ns_max": 134667,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 435834,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.000257830999999209,
+            "collections": 0.0
+          },
+          "release-turn": {
+            "count": 16,
+            "queue_ns_median": 964875,
+            "queue_ns_p99": 12165958,
+            "execution_ns_median": 21375,
+            "execution_ns_p99": 185917,
+            "execution_ns_max": 185917,
+            "encoding_ns_total": 0,
+            "scheme_ns_total": 0,
+            "execution_ns_total": 632332,
+            "gc_real_seconds": 0.0,
+            "thread_cpu_seconds": 0.0004202090000002823,
+            "collections": 0.0
+          }
+        },
+        "short_owner_exposure_ns_p99_by_operation": {
+          "call": {},
+          "inspect": {},
+          "release": {}
+        },
+        "client_lateness_ns_median": 479340084,
+        "client_lateness_ns_p99": 647337500,
+        "short_service_ns_p99": 630600417
+      }
+    },
+    "configuration": {
+      "kind": "configuration",
+      "owner_trace": true,
+      "owners": 4,
+      "workers": 2,
+      "rounds": 4,
+      "requests": 128,
+      "cpu": false,
+      "probes": false,
+      "scheduled_probes": true,
+      "probe_count": 8,
+      "probe_interval_ms": 20,
+      "states": [
+        4467588320,
+        4479352032,
+        4491115744,
+        4502879456
+      ],
+      "host_activity": [
+        {
+          "pid": 434,
+          "cpu": 44.5,
+          "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        },
+        {
+          "pid": 899,
+          "cpu": 37.6,
+          "command": "/usr/libexec/sysmond"
+        },
+        {
+          "pid": 961,
+          "cpu": 24.3,
+          "command": "/Applications/Zen.app/Contents/MacOS/gpu-helper.app/Contents/MacOS/Zen GPU Helper"
+        },
+        {
+          "pid": 19638,
+          "cpu": 44.3,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 20180,
+          "cpu": 45.4,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 20314,
+          "cpu": 47.5,
+          "command": "/etc/profiles/per-user/guangtao/bin/zellij"
+        },
+        {
+          "pid": 63906,
+          "cpu": 36.5,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxtest"
+        },
+        {
+          "pid": 63909,
+          "cpu": 1.0,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+        },
+        {
+          "pid": 64469,
+          "cpu": 36.4,
+          "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gerbil"
+        }
+      ],
+      "timing_contract": "same live VMs and direct stateless admission in both arms; bulk API start through projected/released response; scalar emits per-result completion, owner-batch completes all at bulk return",
+      "probes_contract": "fixed equal request cohort and due offsets; latency includes client wakeup/GIL lateness; cohort fully drains before next arm"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "base_head": "bb71bbb5ad91bbaef2035979319514c7ced4c4ca",
+  "branch": "codex/typed-fold-aot",
+  "dirty": true,
+  "python": "Python 3.14.7",
+  "gcc": "16.2.0",
+  "sdk": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current",
+  "sdk_sha256": {
+    "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/include/gambit.h": "8257ff05aadb634e2ef2532f7e1a21608a828c4adae35cf88276b78e7efff1e5",
+    "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gambuild-C": "f9e3bc752ee38d7ad83d9c84049322029538a445cc431fa37995e09be0514ced",
+    "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc": "dd32a1694062deb4175641bbfe51c23f2d9d9efa5770fe5b1a2f75d68557984e"
+  },
+  "source_sha256": {
+    "build-support/gerbil-scheme-aot-build/src/program/archive.rs": "dc916721fcf7b4bd332de56ff2a95a0b43b07025f1b44ba5f4b2b53690c522d0",
+    "build-support/gerbil-scheme-aot-build/src/program/process.rs": "97b75dc3a2eb2204bba675065739e1fe0de258a5654810ebae4b5045a0cf0268",
+    "build-support/gerbil-scheme-aot-build/src/module_bundles.rs": "a8b84af1eb958b0eb9178611b1e49c6874fd2bf07486c725db3fcacd7f776a5d",
+    "build-support/gerbil-scheme-aot-build/tests/unit/program_process.rs": "3dae56468d7de2875f0e5f29e15dfa0a983b152d6bc9eaf9adb66dfbb7ec156e",
+    "examples/python-ledger/scheme/ledger.ss": "acdc5feec74c7db5ea5dc9bc52a780a7f63a15749b82f076a9fcf924e588c4fb",
+    "examples/python-ledger/tests/bench_macro_expansion.py": "c42f3418057657885750394c42b3d301b23ba7357263744288eefc9c90c35166",
+    "examples/python-ledger/tests/bench_owner_dispatch.py": "a08c6db0c11f1cce2bc601f118ec717f262987de24779d6bc5d978f966df8c4e",
+    "examples/python-ledger/tests/benchmark_host.py": "5651b940ffd97b27fac32dda0478e88d2bfe380c2810235e15a5309dcf2fcbbf",
+    "examples/python-ledger/tests/qualify_full_scheme.py": "fe40090008b36ba57cb54f26b384fa83ad77794dad4c69a5d28cda3402ce82aa",
+    "examples/python-ledger/tests/test_rust_backend.py": "f7ba569bed7108b2e2bdf698edc9563c8f31785ddb475c3fc232f06757dc2eaf"
+  },
+  "wheel_sha256": {
+    "/private/tmp/gerbil-o2-progress-20261019/wheels-O2/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl": "d1832ed263e0d218173129e28aa7f75700116eda03ae50986ddddb21f3d74715",
+    "/private/tmp/gerbil-module-opt-20261019/wheels-O0/gerbil_ledger-0.1.0-cp310-abi3-macosx_11_0_arm64.whl": "6d99da0fce11d5042beadaec49118e369add32a8af0b5d9057e09d87d8460812"
+  },
+  "source_parity": true,
+  "native_optimization": "-O2; existing -fno-gcse-lm unchanged",
+  "diagnostic_flags": "-save-temps=obj -fdump-rtl-ira-details -fdump-rtl-reload-details",
+  "new_optimization_passes_disabled": []
+}

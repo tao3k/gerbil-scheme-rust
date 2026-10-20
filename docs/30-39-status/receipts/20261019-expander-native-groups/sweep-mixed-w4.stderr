@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/examples/python-ledger/tests/bench_owner_dispatch.py", line 71, in <module>
+    if __name__=="__main__":run()
+                            ~~~^^
+  File "/Users/guangtao/ghq/github.com/tao3k/gerbil-scheme-rust/examples/python-ledger/tests/bench_owner_dispatch.py", line 53, in run
+    rank_displacement_p99=percentile(displacement,.99),worker_counts=worker_counts,jain_worker_fairness=oldest_worker_share,compiler_activity_before=active_before,compiler_activity_after=host(),os_threads=max(0,len(subprocess.check_output(["/bin/ps","-M","-p",str(os.getpid())],text=True).splitlines())-1))
+                                                                                                                                                                                                                                                                        ^^
+UnboundLocalError: cannot access local variable 'os' where it is not associated with a value

@@ -1,0 +1,874 @@
+{"kind": "configuration", "owners": 4, "workers": 2, "rounds": 4, "requests": 16, "cpu": true, "probes": true, "probe_interval_ms": 20, "states": [4459920608, 4471684320, 4483448032, 4495211744], "host_activity": [{"pid": 365, "cpu": 37.3, "command": "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"}, {"pid": 434, "cpu": 41.5, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 666, "cpu": 25.9, "command": "/usr/libexec/trustd"}, {"pid": 2635, "cpu": 24.3, "command": "/System/Library/PrivateFrameworks/XprotectFramework.framework/Versions/A/XPCServices/XprotectService.xpc/Contents/MacOS/XprotectService"}, {"pid": 4259, "cpu": 86.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17217, "cpu": 43.2, "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"}, {"pid": 51742, "cpu": 31.7, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 2.6, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 8.7, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 59575, "cpu": 22.5, "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"}, {"pid": 79295, "cpu": 27.8, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 90189, "cpu": 26.1, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "timing_contract": "same live VMs and direct stateless admission in both arms; bulk API start through projected/released response; scalar emits per-result completion, owner-batch completes all at bulk return", "probes_contract": "one outstanding echo per owner, 20ms think interval by default; closed-loop fairness diagnostic, not open-loop request p99"}
+{"kind": "sample", "arm": "scalar", "round": 0, "warmup": true, "start_ns": 300804267411875, "end_ns": 300804490063291, "dispatch_api_ns": 107920041, "owner_metadata_ns": 7417, "projection_release_ns": 114723958, "response_ns": [116894125, 118132916, 119706958, 120747708, 125605875, 127015375, 129591500, 131074458, 131776791, 132184291, 132494000, 133587666, 168475541, 199830875, 208466541, 222646791], "native_ready_ns": [11937875, 9971709, 9494292, 8154167, 17912792, 13278834, 17313584, 14794709, 23059417, 16365834, 20609000, 29384834, 83588292, 19335584, 25688209, 31986334], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 2299.558696720797, "native_ready_p99_ns": 83588292, "response_p99_ns": 222646791, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [4, 2, 5, 7], "assigned_owner_max_pending_gap_ns": [60528875, 9971709, 9494292, 14590125]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 1, "cpu": 31.3, "command": "/sbin/launchd"}, {"pid": 434, "cpu": 42.4, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 27.4, "command": "/usr/libexec/syspolicyd"}, {"pid": 666, "cpu": 27.4, "command": "/usr/libexec/trustd"}, {"pid": 4259, "cpu": 64.9, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 302.0, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 17217, "cpu": 24.9, "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 3.1, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 4.3, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}], "host_activity_after": [{"pid": 434, "cpu": 45.1, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 22.1, "command": "/usr/libexec/syspolicyd"}, {"pid": 666, "cpu": 20.4, "command": "/usr/libexec/trustd"}, {"pid": 4259, "cpu": 79.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 102.4, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 17217, "cpu": 36.4, "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"}, {"pid": 51742, "cpu": 45.8, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 8.6, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 8.0, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}]}
+{"kind": "sample", "arm": "owner-batch", "round": 0, "warmup": true, "start_ns": 300805164440458, "end_ns": 300805272653541, "dispatch_api_ns": 102627208, "owner_metadata_ns": 4959, "projection_release_ns": 5580916, "response_ns": [108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917, 108206917], "native_ready_ns": [11839083, 12871667, 12568958, 14272375, 17496208, 18458375, 25474083, 18840500, 22303833, 27423292, 28421542, 25556583, 45887417, 30620917, 45823167, 42047667], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 4731.405721062397, "native_ready_p99_ns": 45887417, "response_p99_ns": 108206917, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [7, 4, 6, 3], "assigned_owner_max_pending_gap_ns": [23583584, 12871667, 17401625, 16491084]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 44.8, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 666, "cpu": 24.7, "command": "/usr/libexec/trustd"}, {"pid": 2635, "cpu": 28.3, "command": "/System/Library/PrivateFrameworks/XprotectFramework.framework/Versions/A/XPCServices/XprotectService.xpc/Contents/MacOS/XprotectService"}, {"pid": 4259, "cpu": 81.5, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 45.5, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 20180, "cpu": 43.2, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20314, "cpu": 30.2, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51703, "cpu": 23.1, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 74.4, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 2.1, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 5.5, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 59675, "cpu": 21.8, "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node"}, {"pid": 96280, "cpu": 43.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 43.8, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 32.2, "command": "/usr/libexec/syspolicyd"}, {"pid": 899, "cpu": 77.8, "command": "/usr/libexec/sysmond"}, {"pid": 4259, "cpu": 81.0, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 25.6, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51703, "cpu": 22.0, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 74.2, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 7.5, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 6.8, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 88211, "cpu": 22.3, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 97332, "cpu": 25.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}]}
+{"kind": "sample", "arm": "owner-batch", "round": 1, "warmup": true, "start_ns": 300805495771541, "end_ns": 300805603718416, "dispatch_api_ns": 104793042, "owner_metadata_ns": 19958, "projection_release_ns": 3133875, "response_ns": [107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709, 107939709], "native_ready_ns": [4559791, 5173833, 7118125, 7507333, 7527500, 12380083, 10115416, 13922875, 11659041, 19203208, 16627833, 23920791, 18585708, 25033291, 19868416, 27225375], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 4743.073849984078, "native_ready_p99_ns": 27225375, "response_p99_ns": 107939709, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [3, 5, 3, 4], "assigned_owner_max_pending_gap_ns": [6926667, 7206250, 7118125, 9997916]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 44.5, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 24.8, "command": "/usr/libexec/syspolicyd"}, {"pid": 899, "cpu": 83.9, "command": "/usr/libexec/sysmond"}, {"pid": 4259, "cpu": 81.0, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 25.6, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51703, "cpu": 22.0, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 74.2, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 7.5, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 6.8, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 97332, "cpu": 25.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}], "host_activity_after": [{"pid": 434, "cpu": 44.9, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 899, "cpu": 78.4, "command": "/usr/libexec/sysmond"}, {"pid": 4259, "cpu": 81.7, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 49.3, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 17217, "cpu": 20.7, "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"}, {"pid": 51703, "cpu": 23.3, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 80.4, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 2.8, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 8.8, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79295, "cpu": 25.9, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 90189, "cpu": 27.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}]}
+{"kind": "sample", "arm": "scalar", "round": 1, "warmup": true, "start_ns": 300805891539291, "end_ns": 300805981316291, "dispatch_api_ns": 64246709, "owner_metadata_ns": 11708, "projection_release_ns": 25518583, "response_ns": [65764375, 66923334, 67245125, 68701500, 69427584, 70156375, 71060917, 72582334, 73091875, 73602709, 74328917, 75256459, 81337000, 82542459, 86942584, 89776084], "native_ready_ns": [10475542, 14056958, 9952000, 10138333, 14499625, 20174708, 13789000, 13303167, 19029458, 24796708, 21199292, 16498208, 22459708, 28161000, 24329042, 32361292], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 5703.0197043786275, "native_ready_p99_ns": 32361292, "response_p99_ns": 89776084, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [3, 5, 5, 7], "assigned_owner_max_pending_gap_ns": [10475542, 14056958, 9952000, 15863084]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 44.4, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 899, "cpu": 48.9, "command": "/usr/libexec/sysmond"}, {"pid": 4259, "cpu": 82.9, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 36.7, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51703, "cpu": 28.0, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 85.4, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 1.7, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 8.5, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79295, "cpu": 30.9, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 90189, "cpu": 33.2, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 44.9, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 2635, "cpu": 23.2, "command": "/System/Library/PrivateFrameworks/XprotectFramework.framework/Versions/A/XPCServices/XprotectService.xpc/Contents/MacOS/XprotectService"}, {"pid": 4259, "cpu": 85.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 20.4, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 20180, "cpu": 21.0, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51703, "cpu": 31.1, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 87.7, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 11.4, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 12.6, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 59717, "cpu": 23.6, "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"}, {"pid": 96280, "cpu": 28.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}]}
+{"kind": "sample", "arm": "owner-batch", "round": 2, "warmup": false, "start_ns": 300806191403958, "end_ns": 300806269721708, "dispatch_api_ns": 70407542, "owner_metadata_ns": 7625, "projection_release_ns": 7902583, "response_ns": [78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458, 78309458], "native_ready_ns": [4910458, 7140416, 8979625, 8690958, 8676666, 15208791, 16489500, 16035708, 12133250, 19509166, 19305208, 25761250, 26283500, 26370708, 22371666, 28393083], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 6537.47075216027, "native_ready_p99_ns": 28393083, "response_p99_ns": 78309458, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [7, 4, 4, 4], "assigned_owner_max_pending_gap_ns": [14150250, 8068375, 8979625, 9725542]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 47.6, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 4259, "cpu": 85.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 19638, "cpu": 20.8, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20027, "cpu": 20.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20180, "cpu": 36.2, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 33600, "cpu": 20.5, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51703, "cpu": 39.3, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 89.2, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 10.2, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 11.2, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 96280, "cpu": 40.1, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 42.9, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 21.1, "command": "/usr/libexec/syspolicyd"}, {"pid": 4259, "cpu": 82.9, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 21.4, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 19638, "cpu": 27.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20027, "cpu": 29.6, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20314, "cpu": 37.6, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 33600, "cpu": 26.9, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51703, "cpu": 32.5, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 83.8, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 13.9, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 9.8, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79093, "cpu": 20.8, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 96280, "cpu": 25.0, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}]}
+{"kind": "sample", "arm": "scalar", "round": 2, "warmup": false, "start_ns": 300806516357083, "end_ns": 300806739837125, "dispatch_api_ns": 56506083, "owner_metadata_ns": 11459, "projection_release_ns": 166962500, "response_ns": [57897833, 58905958, 60150292, 61190792, 64133833, 67658417, 71874083, 73209500, 73565000, 84604708, 129692333, 130325167, 131447208, 199091375, 213495542, 223475333], "native_ready_ns": [8755291, 6266666, 6236500, 5534333, 12389791, 10946875, 9669625, 8616375, 18884666, 31062041, 27575666, 13414666, 22674500, 37319166, 31114125, 19372291], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 2291.0323240408197, "native_ready_p99_ns": 37319166, "response_p99_ns": 223475333, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [4, 6, 6, 4], "assigned_owner_max_pending_gap_ns": [8755291, 20115166, 17906041, 5957625]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 45.5, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 34.0, "command": "/usr/libexec/syspolicyd"}, {"pid": 4259, "cpu": 83.7, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 20314, "cpu": 23.5, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51703, "cpu": 25.2, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/StorageManagementService"}, {"pid": 51742, "cpu": 84.0, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 14.1, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 12.7, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 59722, "cpu": 22.2, "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"}, {"pid": 79093, "cpu": 30.8, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 44.0, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 30.6, "command": "/usr/libexec/syspolicyd"}, {"pid": 4259, "cpu": 84.7, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 51742, "cpu": 95.3, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 22.6, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 31.5, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79295, "cpu": 25.6, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 88211, "cpu": 22.6, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 90189, "cpu": 29.0, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 97332, "cpu": 20.1, "command": "/Users/guangtao/.nix-profile/bin/devenv"}]}
+{"kind": "sample", "arm": "scalar", "round": 3, "warmup": false, "start_ns": 300806981158000, "end_ns": 300807101030208, "dispatch_api_ns": 67723583, "owner_metadata_ns": 10125, "projection_release_ns": 52138500, "response_ns": [69061041, 70255375, 71076333, 74466750, 78072791, 80438791, 99191708, 106743375, 109428083, 110769583, 116253458, 116634458, 117669958, 118616333, 119392583, 119871583], "native_ready_ns": [11220875, 7540333, 13396291, 11421791, 14993250, 11768750, 18213333, 18506833, 22897333, 18143291, 21648625, 23191416, 25912291, 21427250, 27921500, 26623125], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 4271.215226134818, "native_ready_p99_ns": 27921500, "response_p99_ns": 119871583, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [5, 2, 4, 5], "assigned_owner_max_pending_gap_ns": [11220875, 7540333, 13396291, 11421791]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 46.9, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 34.6, "command": "/usr/libexec/syspolicyd"}, {"pid": 4259, "cpu": 83.8, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 36.5, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51742, "cpu": 103.3, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 16.3, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 19.6, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79295, "cpu": 36.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 90189, "cpu": 38.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 44.3, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 34.5, "command": "/usr/libexec/syspolicyd"}, {"pid": 4259, "cpu": 83.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 22.8, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51742, "cpu": 103.8, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 30.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 36.8, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 88211, "cpu": 31.3, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 97332, "cpu": 35.1, "command": "/Users/guangtao/.nix-profile/bin/devenv"}]}
+{"kind": "sample", "arm": "owner-batch", "round": 3, "warmup": false, "start_ns": 300807570016541, "end_ns": 300807674623958, "dispatch_api_ns": 82395709, "owner_metadata_ns": 10708, "projection_release_ns": 22201000, "response_ns": [104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500, 104163500], "native_ready_ns": [7173791, 14533083, 12959375, 31400458, 21658958, 28499416, 15774875, 34174958, 32756833, 57093250, 33650083, 40067708, 36740666, 66558291, 52118875, 51690958], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 4894.49041648739, "native_ready_p99_ns": 66558291, "response_p99_ns": 104163500, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [3, 8, 4, 6], "assigned_owner_max_pending_gap_ns": [14485167, 28593834, 18468792, 31400458]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 43.1, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 35.1, "command": "/usr/libexec/syspolicyd"}, {"pid": 4259, "cpu": 82.3, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 20.9, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 20180, "cpu": 23.9, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51742, "cpu": 105.1, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 28.1, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 27.7, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 88211, "cpu": 29.7, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 96280, "cpu": 20.4, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 97332, "cpu": 29.8, "command": "/Users/guangtao/.nix-profile/bin/devenv"}], "host_activity_after": [{"pid": 434, "cpu": 43.2, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 23.5, "command": "/usr/libexec/syspolicyd"}, {"pid": 1184, "cpu": 74.0, "command": "/Applications/Zen.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container"}, {"pid": 4259, "cpu": 83.4, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 19638, "cpu": 24.5, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20027, "cpu": 25.6, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20180, "cpu": 20.6, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20314, "cpu": 32.4, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 33600, "cpu": 24.9, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51742, "cpu": 96.4, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 13.2, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 11.4, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79093, "cpu": 24.1, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 88211, "cpu": 23.9, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 96280, "cpu": 23.5, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 97332, "cpu": 21.1, "command": "/Users/guangtao/.nix-profile/bin/devenv"}]}
+{"kind": "sample", "arm": "scalar", "round": 4, "warmup": false, "start_ns": 300808169710083, "end_ns": 300808282023166, "dispatch_api_ns": 84278583, "owner_metadata_ns": 11209, "projection_release_ns": 28023291, "response_ns": [86586333, 87940833, 89871083, 92716875, 93579417, 94401292, 94977875, 95993458, 98157042, 98961292, 99475625, 101357542, 103824708, 104418917, 109652125, 112312250], "native_ready_ns": [6009750, 10989417, 5848334, 6929209, 13528625, 16055250, 13457209, 10863625, 16901750, 21966334, 20415334, 14725917, 26507459, 33290542, 23323834, 25005750], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 4558.685295817229, "native_ready_p99_ns": 33290542, "response_p99_ns": 112312250, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [4, 4, 4, 5], "assigned_owner_max_pending_gap_ns": [9605709, 11324208, 7608875, 10279833]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 42.0, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 518, "cpu": 23.2, "command": "/usr/libexec/syspolicyd"}, {"pid": 1184, "cpu": 34.7, "command": "/Applications/Zen.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container"}, {"pid": 4259, "cpu": 84.1, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 20314, "cpu": 20.2, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51742, "cpu": 105.6, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 12.6, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 13.3, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79093, "cpu": 21.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 47.6, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 4259, "cpu": 79.8, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 72.9, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 17217, "cpu": 26.7, "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"}, {"pid": 51742, "cpu": 111.8, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 9.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 8.9, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79295, "cpu": 34.4, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 90189, "cpu": 36.5, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}]}
+{"kind": "sample", "arm": "owner-batch", "round": 4, "warmup": false, "start_ns": 300808698435791, "end_ns": 300808760744625, "dispatch_api_ns": 53763167, "owner_metadata_ns": 17917, "projection_release_ns": 8527750, "response_ns": [62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667, 62301667], "native_ready_ns": [5383916, 6569166, 8080750, 5856708, 14753333, 14649708, 15232791, 12177791, 28054875, 19695458, 20249333, 20852000, 32662583, 23659458, 24535583, 25013750], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 8217.133384328778, "native_ready_p99_ns": 32662583, "response_p99_ns": 62301667, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [7, 2, 3, 5], "assigned_owner_max_pending_gap_ns": [13301542, 8080542, 8080750, 8674209]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 47.9, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 4259, "cpu": 78.9, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 101.6, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51742, "cpu": 108.4, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 11.6, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 16.2, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 96280, "cpu": 27.4, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 44.8, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 4259, "cpu": 78.8, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 84.2, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 19638, "cpu": 23.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20027, "cpu": 24.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20180, "cpu": 31.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20314, "cpu": 22.8, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 33600, "cpu": 27.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51742, "cpu": 93.3, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 6.6, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 6.6, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 96280, "cpu": 31.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}]}
+{"kind": "sample", "arm": "owner-batch", "round": 5, "warmup": false, "start_ns": 300809548830041, "end_ns": 300809833813875, "dispatch_api_ns": 279012167, "owner_metadata_ns": 88458, "projection_release_ns": 5883209, "response_ns": [284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542, 284975542], "native_ready_ns": [122138750, 107565084, 120687209, 116404000, 126897292, 129740959, 125565875, 130151209, 169530375, 132719834, 165213667, 136273959, 172765417, 137390334, 171467459, 139317792], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 1796.5931358759108, "native_ready_p99_ns": 172765417, "response_p99_ns": 284975542, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [7, 5, 7, 5], "assigned_owner_max_pending_gap_ns": [122138750, 107565084, 120687209, 116404000]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 47.4, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 4259, "cpu": 58.9, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17036, "cpu": 42.2, "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"}, {"pid": 17216, "cpu": 512.8, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51742, "cpu": 23.7, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 7.8, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 4.6, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79295, "cpu": 22.2, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 90189, "cpu": 27.8, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 43.4, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 4259, "cpu": 71.8, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17036, "cpu": 39.2, "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"}, {"pid": 17216, "cpu": 194.6, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 19638, "cpu": 28.0, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20027, "cpu": 30.7, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 20180, "cpu": 31.8, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 33600, "cpu": 32.4, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 51742, "cpu": 22.0, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 7.1, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 6.4, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 59785, "cpu": 28.1, "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node"}, {"pid": 96280, "cpu": 30.5, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}]}
+{"kind": "sample", "arm": "scalar", "round": 5, "warmup": false, "start_ns": 300810575768458, "end_ns": 300810685145083, "dispatch_api_ns": 65246958, "owner_metadata_ns": 10542, "projection_release_ns": 44119125, "response_ns": [65690208, 67433125, 68262750, 77365417, 77666625, 89126958, 93845875, 95455292, 96258708, 98535250, 98837708, 99950083, 103476000, 105115333, 108586250, 109375750], "native_ready_ns": [11584750, 15367625, 9549458, 7972583, 20275458, 19199083, 21161625, 11294917, 23626458, 36529208, 25247542, 18821875, 28123708, 39269292, 29474292, 37759708], "owners": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3], "actors_per_second": 4681.0733097679695, "native_ready_p99_ns": 39269292, "response_p99_ns": 109375750, "owner_fairness": {"assigned_owner_counts": [4, 4, 4, 4], "assigned_owner_max_other_completions_while_pending": [3, 6, 6, 8], "assigned_owner_max_pending_gap_ns": [11584750, 17330125, 11612167, 18937833]}, "actor_max_other_completions_while_pending": [3, 3, 3, 3], "worker_counts": [128, 128, 128, 128], "host_activity_before": [{"pid": 434, "cpu": 42.2, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 899, "cpu": 59.9, "command": "/usr/libexec/sysmond"}, {"pid": 4259, "cpu": 77.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 128.6, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 48648, "cpu": 24.7, "command": "/Applications/Cockpit Tools.app/Contents/MacOS/cockpit-tools"}, {"pid": 51742, "cpu": 70.0, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 5.5, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 5.0, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79093, "cpu": 28.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}], "host_activity_after": [{"pid": 434, "cpu": 41.6, "command": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"}, {"pid": 899, "cpu": 87.9, "command": "/usr/libexec/sysmond"}, {"pid": 4259, "cpu": 80.2, "command": "/Users/guangtao/.nix-profile/bin/devenv"}, {"pid": 17216, "cpu": 61.6, "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.80/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)"}, {"pid": 51742, "cpu": 107.1, "command": "/System/Library/PrivateFrameworks/StorageManagement.framework/PlugIns/ApplicationsStorageExtension.appex/Contents/MacOS/ApplicationsStorageExtension"}, {"pid": 58628, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 58904, "cpu": 13.4, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gxi"}, {"pid": 59424, "cpu": 0.0, "command": "/opt/homebrew/Cellar/gerbil-scheme@0.19/0.19.20261009110849.1cfb032.patch618d76f9eb72/current/bin/gsc"}, {"pid": 59471, "cpu": 9.1, "command": "/opt/homebrew/Cellar/gcc/16.2.0/bin/../libexec/gcc/aarch64-apple-darwin25/16/cc1"}, {"pid": 79295, "cpu": 32.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}, {"pid": 90189, "cpu": 35.3, "command": "/etc/profiles/per-user/guangtao/bin/zellij"}]}
+{"kind": "probe", "owner": 0, "start_ns": 300803830819500, "end_ns": 300803851453958, "ns": 20634458}
+{"kind": "probe", "owner": 1, "start_ns": 300803844495958, "end_ns": 300803853391791, "ns": 8895833}
+{"kind": "probe", "owner": 2, "start_ns": 300803847321208, "end_ns": 300803859553125, "ns": 12231917}
+{"kind": "probe", "owner": 3, "start_ns": 300803862762541, "end_ns": 300803864510291, "ns": 1747750}
+{"kind": "probe", "owner": 2, "start_ns": 300803891545083, "end_ns": 300803929213250, "ns": 37668167}
+{"kind": "probe", "owner": 3, "start_ns": 300803890702875, "end_ns": 300803931388458, "ns": 40685583}
+{"kind": "probe", "owner": 1, "start_ns": 300803891528458, "end_ns": 300803931413541, "ns": 39885083}
+{"kind": "probe", "owner": 0, "start_ns": 300803890550541, "end_ns": 300803933708666, "ns": 43158125}
+{"kind": "probe", "owner": 2, "start_ns": 300803954821833, "end_ns": 300803962661333, "ns": 7839500}
+{"kind": "probe", "owner": 3, "start_ns": 300803958825416, "end_ns": 300803962795208, "ns": 3969792}
+{"kind": "probe", "owner": 1, "start_ns": 300803958894416, "end_ns": 300803963042625, "ns": 4148209}
+{"kind": "probe", "owner": 0, "start_ns": 300803959537291, "end_ns": 300803963104041, "ns": 3566750}
+{"kind": "probe", "owner": 3, "start_ns": 300803984679083, "end_ns": 300803997444291, "ns": 12765208}
+{"kind": "probe", "owner": 0, "start_ns": 300803984956583, "end_ns": 300803997461875, "ns": 12505292}
+{"kind": "probe", "owner": 1, "start_ns": 300803984832833, "end_ns": 300803997466250, "ns": 12633417}
+{"kind": "probe", "owner": 2, "start_ns": 300803987900333, "end_ns": 300803997511333, "ns": 9611000}
+{"kind": "probe", "owner": 0, "start_ns": 300804020365625, "end_ns": 300804024170916, "ns": 3805291}
+{"kind": "probe", "owner": 2, "start_ns": 300804019536458, "end_ns": 300804024466000, "ns": 4929542}
+{"kind": "probe", "owner": 1, "start_ns": 300804019506541, "end_ns": 300804024487125, "ns": 4980584}
+{"kind": "probe", "owner": 3, "start_ns": 300804019461375, "end_ns": 300804024507875, "ns": 5046500}
+{"kind": "probe", "owner": 3, "start_ns": 300804047101583, "end_ns": 300804050716625, "ns": 3615042}
+{"kind": "probe", "owner": 0, "start_ns": 300804045508375, "end_ns": 300804050789708, "ns": 5281333}
+{"kind": "probe", "owner": 2, "start_ns": 300804045462500, "end_ns": 300804051601208, "ns": 6138708}
+{"kind": "probe", "owner": 1, "start_ns": 300804047133833, "end_ns": 300804052175916, "ns": 5042083}
+{"kind": "probe", "owner": 3, "start_ns": 300804071776291, "end_ns": 300804074511166, "ns": 2734875}
+{"kind": "probe", "owner": 2, "start_ns": 300804073593375, "end_ns": 300804074527250, "ns": 933875}
+{"kind": "probe", "owner": 1, "start_ns": 300804074223750, "end_ns": 300804074559000, "ns": 335250}
+{"kind": "probe", "owner": 0, "start_ns": 300804073243250, "end_ns": 300804074564625, "ns": 1321375}
+{"kind": "probe", "owner": 3, "start_ns": 300804099415333, "end_ns": 300804100799291, "ns": 1383958}
+{"kind": "probe", "owner": 0, "start_ns": 300804099447791, "end_ns": 300804100857416, "ns": 1409625}
+{"kind": "probe", "owner": 1, "start_ns": 300804099830458, "end_ns": 300804101091750, "ns": 1261292}
+{"kind": "probe", "owner": 2, "start_ns": 300804100062083, "end_ns": 300804101153208, "ns": 1091125}
+{"kind": "probe", "owner": 0, "start_ns": 300804121406958, "end_ns": 300804122807666, "ns": 1400708}
+{"kind": "probe", "owner": 3, "start_ns": 300804121582000, "end_ns": 300804122846458, "ns": 1264458}
+{"kind": "probe", "owner": 2, "start_ns": 300804125131833, "end_ns": 300804125617458, "ns": 485625}
+{"kind": "probe", "owner": 1, "start_ns": 300804126756750, "end_ns": 300804134832041, "ns": 8075291}
+{"kind": "probe", "owner": 2, "start_ns": 300804146141125, "end_ns": 300804147068500, "ns": 927375}
+{"kind": "probe", "owner": 0, "start_ns": 300804146315375, "end_ns": 300804147081666, "ns": 766291}
+{"kind": "probe", "owner": 3, "start_ns": 300804146346125, "end_ns": 300804147094250, "ns": 748125}
+{"kind": "probe", "owner": 1, "start_ns": 300804160090208, "end_ns": 300804162477041, "ns": 2386833}
+{"kind": "probe", "owner": 2, "start_ns": 300804170195708, "end_ns": 300804171755208, "ns": 1559500}
+{"kind": "probe", "owner": 0, "start_ns": 300804170304000, "end_ns": 300804171770208, "ns": 1466208}
+{"kind": "probe", "owner": 3, "start_ns": 300804170353166, "end_ns": 300804171833500, "ns": 1480334}
+{"kind": "probe", "owner": 1, "start_ns": 300804182857750, "end_ns": 300804183510750, "ns": 653000}
+{"kind": "probe", "owner": 2, "start_ns": 300804197409375, "end_ns": 300804216861083, "ns": 19451708}
+{"kind": "probe", "owner": 0, "start_ns": 300804197478416, "end_ns": 300804216882666, "ns": 19404250}
+{"kind": "probe", "owner": 3, "start_ns": 300804197742750, "end_ns": 300804216887458, "ns": 19144708}
+{"kind": "probe", "owner": 1, "start_ns": 300804204494541, "end_ns": 300804217877041, "ns": 13382500}
+{"kind": "probe", "owner": 1, "start_ns": 300804240550791, "end_ns": 300804245756041, "ns": 5205250}
+{"kind": "probe", "owner": 2, "start_ns": 300804239889541, "end_ns": 300804245836083, "ns": 5946542}
+{"kind": "probe", "owner": 0, "start_ns": 300804240379791, "end_ns": 300804245892416, "ns": 5512625}
+{"kind": "probe", "owner": 3, "start_ns": 300804240517333, "end_ns": 300804245899208, "ns": 5381875}
+{"kind": "probe", "owner": 0, "start_ns": 300804288901083, "end_ns": 300804290858791, "ns": 1957708, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300804289380833, "end_ns": 300804290945000, "ns": 1564167, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300804289841958, "end_ns": 300804291136083, "ns": 1294125, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300804290197875, "end_ns": 300804291637000, "ns": 1439125, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300804312766500, "end_ns": 300804316557083, "ns": 3790583, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300804311202458, "end_ns": 300804316591458, "ns": 5389000, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300804315233500, "end_ns": 300804324249750, "ns": 9016250, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300804341964083, "end_ns": 300804344957625, "ns": 2993542, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300804341990708, "end_ns": 300804345023583, "ns": 3032875, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300804349378333, "end_ns": 300804354824666, "ns": 5446333, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300804367312791, "end_ns": 300804368317250, "ns": 1004459, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300804368616625, "end_ns": 300804369423250, "ns": 806625, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300804375362666, "end_ns": 300804375688625, "ns": 325959, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300804311326583, "end_ns": 300804381331166, "ns": 70004583, "arm": "scalar", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300804388885750, "end_ns": 300804390620916, "ns": 1735166, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300804391473791, "end_ns": 300804392616375, "ns": 1142584, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300804400423333, "end_ns": 300804400936083, "ns": 512750, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300804411297958, "end_ns": 300804413186541, "ns": 1888583, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300804413802250, "end_ns": 300804415771833, "ns": 1969583, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300804421264958, "end_ns": 300804424794791, "ns": 3529833, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300804434362208, "end_ns": 300804447015958, "ns": 12653750, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300804438656125, "end_ns": 300804457205583, "ns": 18549458, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300804451404833, "end_ns": 300804457744333, "ns": 6339500, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300804407094500, "end_ns": 300804465674291, "ns": 58579791, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300804470202000, "end_ns": 300804471164416, "ns": 962416, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300804479318833, "end_ns": 300804480512458, "ns": 1193625, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300804482525291, "end_ns": 300804484026916, "ns": 1501625, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300804497660625, "end_ns": 300804498594166, "ns": 933541}
+{"kind": "probe", "owner": 0, "start_ns": 300804486370833, "end_ns": 300804499121083, "ns": 12750250, "arm": "scalar", "round": 0, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300804502148000, "end_ns": 300804514882375, "ns": 12734375}
+{"kind": "probe", "owner": 3, "start_ns": 300804508391750, "end_ns": 300804517495625, "ns": 9103875}
+{"kind": "probe", "owner": 1, "start_ns": 300804524410083, "end_ns": 300804530550916, "ns": 6140833}
+{"kind": "probe", "owner": 0, "start_ns": 300804524475541, "end_ns": 300804530878791, "ns": 6403250}
+{"kind": "probe", "owner": 3, "start_ns": 300804538470875, "end_ns": 300804540321750, "ns": 1850875}
+{"kind": "probe", "owner": 2, "start_ns": 300804538624416, "end_ns": 300804541104791, "ns": 2480375}
+{"kind": "probe", "owner": 1, "start_ns": 300804551050791, "end_ns": 300804554315125, "ns": 3264334}
+{"kind": "probe", "owner": 0, "start_ns": 300804555180833, "end_ns": 300804557433083, "ns": 2252250}
+{"kind": "probe", "owner": 2, "start_ns": 300804561545291, "end_ns": 300804563572166, "ns": 2026875}
+{"kind": "probe", "owner": 3, "start_ns": 300804562058500, "end_ns": 300804564214083, "ns": 2155583}
+{"kind": "probe", "owner": 0, "start_ns": 300804578163625, "end_ns": 300804578851583, "ns": 687958}
+{"kind": "probe", "owner": 1, "start_ns": 300804578315791, "end_ns": 300804579223000, "ns": 907209}
+{"kind": "probe", "owner": 3, "start_ns": 300804584618625, "end_ns": 300804586588125, "ns": 1969500}
+{"kind": "probe", "owner": 2, "start_ns": 300804584165416, "end_ns": 300804586689833, "ns": 2524417}
+{"kind": "probe", "owner": 1, "start_ns": 300804599572750, "end_ns": 300804624368958, "ns": 24796208}
+{"kind": "probe", "owner": 0, "start_ns": 300804600340208, "end_ns": 300804624759291, "ns": 24419083}
+{"kind": "probe", "owner": 2, "start_ns": 300804609115708, "end_ns": 300804624975291, "ns": 15859583}
+{"kind": "probe", "owner": 3, "start_ns": 300804610354083, "end_ns": 300804625062125, "ns": 14708042}
+{"kind": "probe", "owner": 1, "start_ns": 300804644685958, "end_ns": 300804656377125, "ns": 11691167}
+{"kind": "probe", "owner": 2, "start_ns": 300804645039666, "end_ns": 300804657879208, "ns": 12839542}
+{"kind": "probe", "owner": 0, "start_ns": 300804645413458, "end_ns": 300804658459750, "ns": 13046292}
+{"kind": "probe", "owner": 3, "start_ns": 300804646015125, "end_ns": 300804658820250, "ns": 12805125}
+{"kind": "probe", "owner": 1, "start_ns": 300804677303791, "end_ns": 300804680598208, "ns": 3294417}
+{"kind": "probe", "owner": 2, "start_ns": 300804678205208, "end_ns": 300804683447875, "ns": 5242667}
+{"kind": "probe", "owner": 0, "start_ns": 300804680566750, "end_ns": 300804684696583, "ns": 4129833}
+{"kind": "probe", "owner": 3, "start_ns": 300804681360583, "end_ns": 300804684783875, "ns": 3423292}
+{"kind": "probe", "owner": 1, "start_ns": 300804703034500, "end_ns": 300804705502541, "ns": 2468041}
+{"kind": "probe", "owner": 3, "start_ns": 300804704951375, "end_ns": 300804708854833, "ns": 3903458}
+{"kind": "probe", "owner": 0, "start_ns": 300804704910458, "end_ns": 300804708909875, "ns": 3999417}
+{"kind": "probe", "owner": 2, "start_ns": 300804707918791, "end_ns": 300804710778583, "ns": 2859792}
+{"kind": "probe", "owner": 1, "start_ns": 300804726096375, "end_ns": 300804727579958, "ns": 1483583}
+{"kind": "probe", "owner": 0, "start_ns": 300804729175708, "end_ns": 300804734353416, "ns": 5177708}
+{"kind": "probe", "owner": 3, "start_ns": 300804731575708, "end_ns": 300804735378375, "ns": 3802667}
+{"kind": "probe", "owner": 2, "start_ns": 300804735066416, "end_ns": 300804736483833, "ns": 1417417}
+{"kind": "probe", "owner": 1, "start_ns": 300804752303625, "end_ns": 300804754245625, "ns": 1942000}
+{"kind": "probe", "owner": 2, "start_ns": 300804758164958, "end_ns": 300804759339625, "ns": 1174667}
+{"kind": "probe", "owner": 0, "start_ns": 300804759332166, "end_ns": 300804767236958, "ns": 7904792}
+{"kind": "probe", "owner": 3, "start_ns": 300804760723750, "end_ns": 300804771967541, "ns": 11243791}
+{"kind": "probe", "owner": 1, "start_ns": 300804780369583, "end_ns": 300804784571458, "ns": 4201875}
+{"kind": "probe", "owner": 2, "start_ns": 300804781858750, "end_ns": 300804785426791, "ns": 3568041}
+{"kind": "probe", "owner": 0, "start_ns": 300804788921083, "end_ns": 300804790590875, "ns": 1669792}
+{"kind": "probe", "owner": 3, "start_ns": 300804795146958, "end_ns": 300804797034458, "ns": 1887500}
+{"kind": "probe", "owner": 2, "start_ns": 300804806229333, "end_ns": 300804806844500, "ns": 615167}
+{"kind": "probe", "owner": 1, "start_ns": 300804811226541, "end_ns": 300804823339333, "ns": 12112792}
+{"kind": "probe", "owner": 0, "start_ns": 300804814523041, "end_ns": 300804823764750, "ns": 9241709}
+{"kind": "probe", "owner": 3, "start_ns": 300804820984041, "end_ns": 300804824105416, "ns": 3121375}
+{"kind": "probe", "owner": 2, "start_ns": 300804828979708, "end_ns": 300804831716291, "ns": 2736583}
+{"kind": "probe", "owner": 1, "start_ns": 300804846488375, "end_ns": 300804879386708, "ns": 32898333}
+{"kind": "probe", "owner": 3, "start_ns": 300804844155875, "end_ns": 300804879559833, "ns": 35403958}
+{"kind": "probe", "owner": 2, "start_ns": 300804853755916, "end_ns": 300804884140625, "ns": 30384709}
+{"kind": "probe", "owner": 0, "start_ns": 300804853633125, "end_ns": 300804885737166, "ns": 32104041}
+{"kind": "probe", "owner": 1, "start_ns": 300804900145458, "end_ns": 300804906929416, "ns": 6783958}
+{"kind": "probe", "owner": 3, "start_ns": 300804904223541, "end_ns": 300804906943458, "ns": 2719917}
+{"kind": "probe", "owner": 2, "start_ns": 300804905953250, "end_ns": 300804906946375, "ns": 993125}
+{"kind": "probe", "owner": 0, "start_ns": 300804909260541, "end_ns": 300804916498958, "ns": 7238417}
+{"kind": "probe", "owner": 2, "start_ns": 300804932286375, "end_ns": 300804935546583, "ns": 3260208}
+{"kind": "probe", "owner": 1, "start_ns": 300804931997791, "end_ns": 300804935713250, "ns": 3715459}
+{"kind": "probe", "owner": 3, "start_ns": 300804932393208, "end_ns": 300804935751250, "ns": 3358042}
+{"kind": "probe", "owner": 0, "start_ns": 300804938742500, "end_ns": 300804940975666, "ns": 2233166}
+{"kind": "probe", "owner": 2, "start_ns": 300804955932250, "end_ns": 300804956986375, "ns": 1054125}
+{"kind": "probe", "owner": 3, "start_ns": 300804958485791, "end_ns": 300804960241541, "ns": 1755750}
+{"kind": "probe", "owner": 1, "start_ns": 300804959895125, "end_ns": 300804961135208, "ns": 1240083}
+{"kind": "probe", "owner": 0, "start_ns": 300804962155583, "end_ns": 300804964410833, "ns": 2255250}
+{"kind": "probe", "owner": 2, "start_ns": 300804978123958, "end_ns": 300804979483166, "ns": 1359208}
+{"kind": "probe", "owner": 3, "start_ns": 300804981489875, "end_ns": 300804982971041, "ns": 1481166}
+{"kind": "probe", "owner": 1, "start_ns": 300804985758708, "end_ns": 300804988359000, "ns": 2600292}
+{"kind": "probe", "owner": 0, "start_ns": 300804985787500, "end_ns": 300804988519458, "ns": 2731958}
+{"kind": "probe", "owner": 2, "start_ns": 300805000112958, "end_ns": 300805002359208, "ns": 2246250}
+{"kind": "probe", "owner": 3, "start_ns": 300805005069833, "end_ns": 300805019116958, "ns": 14047125}
+{"kind": "probe", "owner": 1, "start_ns": 300805016567333, "end_ns": 300805020567416, "ns": 4000083}
+{"kind": "probe", "owner": 0, "start_ns": 300805016621250, "end_ns": 300805020810625, "ns": 4189375}
+{"kind": "probe", "owner": 2, "start_ns": 300805028089000, "end_ns": 300805031012416, "ns": 2923416}
+{"kind": "probe", "owner": 3, "start_ns": 300805039825625, "end_ns": 300805041006083, "ns": 1180458}
+{"kind": "probe", "owner": 0, "start_ns": 300805041121791, "end_ns": 300805042283875, "ns": 1162084}
+{"kind": "probe", "owner": 1, "start_ns": 300805040889916, "end_ns": 300805042350833, "ns": 1460917}
+{"kind": "probe", "owner": 2, "start_ns": 300805057390083, "end_ns": 300805063548083, "ns": 6158000}
+{"kind": "probe", "owner": 3, "start_ns": 300805062382583, "end_ns": 300805064619500, "ns": 2236917}
+{"kind": "probe", "owner": 1, "start_ns": 300805065058125, "end_ns": 300805066267541, "ns": 1209416}
+{"kind": "probe", "owner": 0, "start_ns": 300805064635333, "end_ns": 300805066281541, "ns": 1646208}
+{"kind": "probe", "owner": 2, "start_ns": 300805083767250, "end_ns": 300805084766208, "ns": 998958}
+{"kind": "probe", "owner": 3, "start_ns": 300805085471708, "end_ns": 300805090710000, "ns": 5238292}
+{"kind": "probe", "owner": 1, "start_ns": 300805086411875, "end_ns": 300805091308291, "ns": 4896416}
+{"kind": "probe", "owner": 0, "start_ns": 300805089392750, "end_ns": 300805091725750, "ns": 2333000}
+{"kind": "probe", "owner": 2, "start_ns": 300805105575500, "end_ns": 300805107384916, "ns": 1809416}
+{"kind": "probe", "owner": 3, "start_ns": 300805111105250, "end_ns": 300805112226083, "ns": 1120833}
+{"kind": "probe", "owner": 1, "start_ns": 300805115441625, "end_ns": 300805124258833, "ns": 8817208}
+{"kind": "probe", "owner": 0, "start_ns": 300805115534083, "end_ns": 300805124466000, "ns": 8931917}
+{"kind": "probe", "owner": 2, "start_ns": 300805131904833, "end_ns": 300805135628750, "ns": 3723917}
+{"kind": "probe", "owner": 3, "start_ns": 300805132810041, "end_ns": 300805136110166, "ns": 3300125}
+{"kind": "probe", "owner": 1, "start_ns": 300805144621333, "end_ns": 300805155311958, "ns": 10690625}
+{"kind": "probe", "owner": 0, "start_ns": 300805152990583, "end_ns": 300805155550250, "ns": 2559667}
+{"kind": "probe", "owner": 2, "start_ns": 300805159008208, "end_ns": 300805160374833, "ns": 1366625}
+{"kind": "probe", "owner": 3, "start_ns": 300805159792541, "end_ns": 300805160430125, "ns": 637584}
+{"kind": "probe", "owner": 3, "start_ns": 300805208196708, "end_ns": 300805209628083, "ns": 1431375, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300805208483416, "end_ns": 300805209648833, "ns": 1165417, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300805208623166, "end_ns": 300805209652833, "ns": 1029667, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300805208788333, "end_ns": 300805209679625, "ns": 891292, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300805232702916, "end_ns": 300805254458916, "ns": 21756000, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300805232680708, "end_ns": 300805254490791, "ns": 21810083, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300805232725000, "end_ns": 300805267694541, "ns": 34969541, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300805232709291, "end_ns": 300805268335583, "ns": 35626292, "arm": "owner-batch", "round": 0, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300805276111166, "end_ns": 300805278623541, "ns": 2512375}
+{"kind": "probe", "owner": 3, "start_ns": 300805276371916, "end_ns": 300805280089250, "ns": 3717334}
+{"kind": "probe", "owner": 0, "start_ns": 300805288534041, "end_ns": 300805290473791, "ns": 1939750}
+{"kind": "probe", "owner": 2, "start_ns": 300805292777041, "end_ns": 300805299135125, "ns": 6358084}
+{"kind": "probe", "owner": 3, "start_ns": 300805303384416, "end_ns": 300805305912625, "ns": 2528209}
+{"kind": "probe", "owner": 1, "start_ns": 300805304467083, "end_ns": 300805305967041, "ns": 1499958}
+{"kind": "probe", "owner": 0, "start_ns": 300805314103041, "end_ns": 300805316111375, "ns": 2008334}
+{"kind": "probe", "owner": 2, "start_ns": 300805319764166, "end_ns": 300805321148125, "ns": 1383959}
+{"kind": "probe", "owner": 0, "start_ns": 300805337205708, "end_ns": 300805339535291, "ns": 2329583}
+{"kind": "probe", "owner": 3, "start_ns": 300805333257791, "end_ns": 300805340792875, "ns": 7535084}
+{"kind": "probe", "owner": 1, "start_ns": 300805336149000, "end_ns": 300805342715916, "ns": 6566916}
+{"kind": "probe", "owner": 2, "start_ns": 300805342380375, "end_ns": 300805359529458, "ns": 17149083}
+{"kind": "probe", "owner": 3, "start_ns": 300805361308958, "end_ns": 300805362164791, "ns": 855833}
+{"kind": "probe", "owner": 0, "start_ns": 300805363233458, "end_ns": 300805365503375, "ns": 2269917}
+{"kind": "probe", "owner": 1, "start_ns": 300805364114541, "end_ns": 300805377569500, "ns": 13454959}
+{"kind": "probe", "owner": 2, "start_ns": 300805379890291, "end_ns": 300805383273250, "ns": 3382959}
+{"kind": "probe", "owner": 0, "start_ns": 300805385754250, "end_ns": 300805386956000, "ns": 1201750}
+{"kind": "probe", "owner": 3, "start_ns": 300805382470083, "end_ns": 300805387491416, "ns": 5021333}
+{"kind": "probe", "owner": 1, "start_ns": 300805402082541, "end_ns": 300805415608083, "ns": 13525542}
+{"kind": "probe", "owner": 0, "start_ns": 300805411326500, "end_ns": 300805417002458, "ns": 5675958}
+{"kind": "probe", "owner": 2, "start_ns": 300805408483708, "end_ns": 300805417160333, "ns": 8676625}
+{"kind": "probe", "owner": 3, "start_ns": 300805408165500, "end_ns": 300805418029416, "ns": 9863916}
+{"kind": "probe", "owner": 1, "start_ns": 300805437404333, "end_ns": 300805441223041, "ns": 3818708}
+{"kind": "probe", "owner": 0, "start_ns": 300805437569333, "end_ns": 300805442072208, "ns": 4502875}
+{"kind": "probe", "owner": 3, "start_ns": 300805438564541, "end_ns": 300805445370166, "ns": 6805625}
+{"kind": "probe", "owner": 2, "start_ns": 300805438964833, "end_ns": 300805445442875, "ns": 6478042}
+{"kind": "probe", "owner": 1, "start_ns": 300805463900625, "end_ns": 300805465109666, "ns": 1209041}
+{"kind": "probe", "owner": 0, "start_ns": 300805467139666, "end_ns": 300805470338041, "ns": 3198375}
+{"kind": "probe", "owner": 3, "start_ns": 300805467060166, "end_ns": 300805471825250, "ns": 4765084}
+{"kind": "probe", "owner": 2, "start_ns": 300805467643666, "end_ns": 300805473006750, "ns": 5363084}
+{"kind": "probe", "owner": 1, "start_ns": 300805486502166, "end_ns": 300805486904333, "ns": 402167}
+{"kind": "probe", "owner": 0, "start_ns": 300805492839000, "end_ns": 300805493526125, "ns": 687125}
+{"kind": "probe", "owner": 3, "start_ns": 300805492910875, "end_ns": 300805494770833, "ns": 1859958}
+{"kind": "probe", "owner": 3, "start_ns": 300805568293625, "end_ns": 300805571688000, "ns": 3394375, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300805568363166, "end_ns": 300805571867916, "ns": 3504750, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300805568720125, "end_ns": 300805572024250, "ns": 3304125, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300805568869750, "end_ns": 300805572091958, "ns": 3222208, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300805593105083, "end_ns": 300805594571416, "ns": 1466333, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300805595961958, "end_ns": 300805596487666, "ns": 525708, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300805594719125, "end_ns": 300805598314583, "ns": 3595458, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300805595334250, "end_ns": 300805606394000, "ns": 11059750, "arm": "owner-batch", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300805617217708, "end_ns": 300805621333208, "ns": 4115500}
+{"kind": "probe", "owner": 2, "start_ns": 300805617342958, "end_ns": 300805621724375, "ns": 4381417}
+{"kind": "probe", "owner": 1, "start_ns": 300805619582125, "end_ns": 300805622111208, "ns": 2529083}
+{"kind": "probe", "owner": 3, "start_ns": 300805628673583, "end_ns": 300805634657958, "ns": 5984375}
+{"kind": "probe", "owner": 0, "start_ns": 300805642990416, "end_ns": 300805644592083, "ns": 1601667}
+{"kind": "probe", "owner": 1, "start_ns": 300805644631500, "end_ns": 300805645162916, "ns": 531416}
+{"kind": "probe", "owner": 2, "start_ns": 300805647013250, "end_ns": 300805648866083, "ns": 1852833}
+{"kind": "probe", "owner": 3, "start_ns": 300805656283000, "end_ns": 300805670519166, "ns": 14236166}
+{"kind": "probe", "owner": 1, "start_ns": 300805665675291, "end_ns": 300805671224833, "ns": 5549542}
+{"kind": "probe", "owner": 0, "start_ns": 300805665708625, "end_ns": 300805671434333, "ns": 5725708}
+{"kind": "probe", "owner": 2, "start_ns": 300805671877000, "end_ns": 300805672846750, "ns": 969750}
+{"kind": "probe", "owner": 3, "start_ns": 300805692463833, "end_ns": 300805717450166, "ns": 24986333}
+{"kind": "probe", "owner": 2, "start_ns": 300805693046875, "end_ns": 300805718949708, "ns": 25902833}
+{"kind": "probe", "owner": 0, "start_ns": 300805692265333, "end_ns": 300805719178291, "ns": 26912958}
+{"kind": "probe", "owner": 1, "start_ns": 300805693237041, "end_ns": 300805719711125, "ns": 26474084}
+{"kind": "probe", "owner": 3, "start_ns": 300805738076416, "end_ns": 300805746081916, "ns": 8005500}
+{"kind": "probe", "owner": 0, "start_ns": 300805739895291, "end_ns": 300805746544375, "ns": 6649084}
+{"kind": "probe", "owner": 2, "start_ns": 300805739131208, "end_ns": 300805748266375, "ns": 9135167}
+{"kind": "probe", "owner": 1, "start_ns": 300805744810125, "end_ns": 300805752742291, "ns": 7932166}
+{"kind": "probe", "owner": 2, "start_ns": 300805768907625, "end_ns": 300805774638916, "ns": 5731291}
+{"kind": "probe", "owner": 3, "start_ns": 300805768302041, "end_ns": 300805775144750, "ns": 6842709}
+{"kind": "probe", "owner": 0, "start_ns": 300805768887916, "end_ns": 300805777055458, "ns": 8167542}
+{"kind": "probe", "owner": 1, "start_ns": 300805774231000, "end_ns": 300805780490833, "ns": 6259833}
+{"kind": "probe", "owner": 2, "start_ns": 300805795162916, "end_ns": 300805796050333, "ns": 887417}
+{"kind": "probe", "owner": 3, "start_ns": 300805797601625, "end_ns": 300805798564875, "ns": 963250}
+{"kind": "probe", "owner": 0, "start_ns": 300805802684500, "end_ns": 300805804968375, "ns": 2283875}
+{"kind": "probe", "owner": 1, "start_ns": 300805803799375, "end_ns": 300805806745666, "ns": 2946291}
+{"kind": "probe", "owner": 2, "start_ns": 300805816565875, "end_ns": 300805817221250, "ns": 655375}
+{"kind": "probe", "owner": 3, "start_ns": 300805819103750, "end_ns": 300805823601625, "ns": 4497875}
+{"kind": "probe", "owner": 0, "start_ns": 300805825269166, "end_ns": 300805828135833, "ns": 2866667}
+{"kind": "probe", "owner": 1, "start_ns": 300805827152541, "end_ns": 300805829369291, "ns": 2216750}
+{"kind": "probe", "owner": 2, "start_ns": 300805837897333, "end_ns": 300805838722583, "ns": 825250}
+{"kind": "probe", "owner": 3, "start_ns": 300805844004333, "end_ns": 300805844578958, "ns": 574625}
+{"kind": "probe", "owner": 1, "start_ns": 300805851009000, "end_ns": 300805855557750, "ns": 4548750}
+{"kind": "probe", "owner": 0, "start_ns": 300805850773833, "end_ns": 300805856117291, "ns": 5343458}
+{"kind": "probe", "owner": 2, "start_ns": 300805862014375, "end_ns": 300805863419208, "ns": 1404833}
+{"kind": "probe", "owner": 3, "start_ns": 300805868355250, "end_ns": 300805869386333, "ns": 1031083}
+{"kind": "probe", "owner": 1, "start_ns": 300805877239500, "end_ns": 300805878025333, "ns": 785833}
+{"kind": "probe", "owner": 0, "start_ns": 300805876536791, "end_ns": 300805878196791, "ns": 1660000}
+{"kind": "probe", "owner": 2, "start_ns": 300805888583416, "end_ns": 300805889079083, "ns": 495667}
+{"kind": "probe", "owner": 0, "start_ns": 300805912132375, "end_ns": 300805913482166, "ns": 1349791, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300805912194291, "end_ns": 300805913848583, "ns": 1654292, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300805912351750, "end_ns": 300805913906916, "ns": 1555166, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300805912267875, "end_ns": 300805913965375, "ns": 1697500, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300805938854875, "end_ns": 300805946205583, "ns": 7350708, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300805936889958, "end_ns": 300805947797750, "ns": 10907792, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300805938866500, "end_ns": 300805950440375, "ns": 11573875, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300805936002875, "end_ns": 300805956064041, "ns": 20061166, "arm": "scalar", "round": 1, "warmup": true, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300805969544291, "end_ns": 300805972186000, "ns": 2641709, "arm": "scalar", "round": 1, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300805969602583, "end_ns": 300805972259916, "ns": 2657333, "arm": "scalar", "round": 1, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300805971163041, "end_ns": 300805972615375, "ns": 1452334, "arm": "scalar", "round": 1, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300805977718583, "end_ns": 300805981055958, "ns": 3337375, "arm": "scalar", "round": 1, "warmup": true, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300805992864458, "end_ns": 300805993968333, "ns": 1103875}
+{"kind": "probe", "owner": 1, "start_ns": 300805993218583, "end_ns": 300805993989166, "ns": 770583}
+{"kind": "probe", "owner": 0, "start_ns": 300805992951291, "end_ns": 300805993999583, "ns": 1048292}
+{"kind": "probe", "owner": 3, "start_ns": 300806004056833, "end_ns": 300806007746875, "ns": 3690042}
+{"kind": "probe", "owner": 2, "start_ns": 300806016987166, "end_ns": 300806018140583, "ns": 1153417}
+{"kind": "probe", "owner": 0, "start_ns": 300806015621958, "end_ns": 300806018169250, "ns": 2547292}
+{"kind": "probe", "owner": 1, "start_ns": 300806017091041, "end_ns": 300806018256791, "ns": 1165750}
+{"kind": "probe", "owner": 3, "start_ns": 300806028992958, "end_ns": 300806039529333, "ns": 10536375}
+{"kind": "probe", "owner": 2, "start_ns": 300806038791375, "end_ns": 300806049512500, "ns": 10721125}
+{"kind": "probe", "owner": 1, "start_ns": 300806041526166, "end_ns": 300806050378166, "ns": 8852000}
+{"kind": "probe", "owner": 0, "start_ns": 300806039177208, "end_ns": 300806051584875, "ns": 12407667}
+{"kind": "probe", "owner": 3, "start_ns": 300806061466166, "end_ns": 300806066473666, "ns": 5007500}
+{"kind": "probe", "owner": 0, "start_ns": 300806071746791, "end_ns": 300806072788500, "ns": 1041709}
+{"kind": "probe", "owner": 2, "start_ns": 300806069922208, "end_ns": 300806072815333, "ns": 2893125}
+{"kind": "probe", "owner": 1, "start_ns": 300806070700250, "end_ns": 300806073117000, "ns": 2416750}
+{"kind": "probe", "owner": 3, "start_ns": 300806086905458, "end_ns": 300806088364458, "ns": 1459000}
+{"kind": "probe", "owner": 0, "start_ns": 300806095046375, "end_ns": 300806101155916, "ns": 6109541}
+{"kind": "probe", "owner": 1, "start_ns": 300806095143458, "end_ns": 300806102124250, "ns": 6980792}
+{"kind": "probe", "owner": 2, "start_ns": 300806095093541, "end_ns": 300806102157333, "ns": 7063792}
+{"kind": "probe", "owner": 3, "start_ns": 300806109435625, "end_ns": 300806118114208, "ns": 8678583}
+{"kind": "probe", "owner": 2, "start_ns": 300806123773083, "end_ns": 300806129709541, "ns": 5936458}
+{"kind": "probe", "owner": 1, "start_ns": 300806122332333, "end_ns": 300806130402375, "ns": 8070042}
+{"kind": "probe", "owner": 0, "start_ns": 300806123625416, "end_ns": 300806130976958, "ns": 7351542}
+{"kind": "probe", "owner": 3, "start_ns": 300806141477791, "end_ns": 300806145916125, "ns": 4438334}
+{"kind": "probe", "owner": 2, "start_ns": 300806150056708, "end_ns": 300806154609666, "ns": 4552958}
+{"kind": "probe", "owner": 1, "start_ns": 300806151335916, "end_ns": 300806155058958, "ns": 3723042}
+{"kind": "probe", "owner": 0, "start_ns": 300806152763208, "end_ns": 300806155198958, "ns": 2435750}
+{"kind": "probe", "owner": 3, "start_ns": 300806169641500, "end_ns": 300806170042583, "ns": 401083}
+{"kind": "probe", "owner": 2, "start_ns": 300806176897250, "end_ns": 300806180394958, "ns": 3497708}
+{"kind": "probe", "owner": 1, "start_ns": 300806179712625, "end_ns": 300806181810375, "ns": 2097750}
+{"kind": "probe", "owner": 0, "start_ns": 300806179159708, "end_ns": 300806181878708, "ns": 2719000}
+{"kind": "probe", "owner": 3, "start_ns": 300806228204125, "end_ns": 300806230155833, "ns": 1951708, "arm": "owner-batch", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300806228242000, "end_ns": 300806231443666, "ns": 3201666, "arm": "owner-batch", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300806228281375, "end_ns": 300806251606458, "ns": 23325083, "arm": "owner-batch", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300806228374875, "end_ns": 300806255082083, "ns": 26707208, "arm": "owner-batch", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300806251780250, "end_ns": 300806258036541, "ns": 6256291, "arm": "owner-batch", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300806251632666, "end_ns": 300806261893916, "ns": 10261250, "arm": "owner-batch", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300806272371791, "end_ns": 300806279208041, "ns": 6836250}
+{"kind": "probe", "owner": 0, "start_ns": 300806277061583, "end_ns": 300806281968625, "ns": 4907042}
+{"kind": "probe", "owner": 1, "start_ns": 300806280122125, "end_ns": 300806285196916, "ns": 5074791}
+{"kind": "probe", "owner": 3, "start_ns": 300806283258458, "end_ns": 300806286491375, "ns": 3232917}
+{"kind": "probe", "owner": 2, "start_ns": 300806300177958, "end_ns": 300806302101125, "ns": 1923167}
+{"kind": "probe", "owner": 0, "start_ns": 300806302597625, "end_ns": 300806304418291, "ns": 1820666}
+{"kind": "probe", "owner": 1, "start_ns": 300806308024666, "end_ns": 300806308358583, "ns": 333917}
+{"kind": "probe", "owner": 3, "start_ns": 300806311534000, "end_ns": 300806313034083, "ns": 1500083}
+{"kind": "probe", "owner": 2, "start_ns": 300806325863875, "end_ns": 300806330377958, "ns": 4514083}
+{"kind": "probe", "owner": 1, "start_ns": 300806328640083, "end_ns": 300806330935958, "ns": 2295875}
+{"kind": "probe", "owner": 0, "start_ns": 300806326328291, "end_ns": 300806331299125, "ns": 4970834}
+{"kind": "probe", "owner": 3, "start_ns": 300806333576833, "end_ns": 300806336118750, "ns": 2541917}
+{"kind": "probe", "owner": 0, "start_ns": 300806351598875, "end_ns": 300806352586583, "ns": 987708}
+{"kind": "probe", "owner": 2, "start_ns": 300806350551875, "end_ns": 300806352647416, "ns": 2095541}
+{"kind": "probe", "owner": 1, "start_ns": 300806356144708, "end_ns": 300806358105583, "ns": 1960875}
+{"kind": "probe", "owner": 3, "start_ns": 300806356916083, "end_ns": 300806358114708, "ns": 1198625}
+{"kind": "probe", "owner": 0, "start_ns": 300806372892500, "end_ns": 300806373841375, "ns": 948875}
+{"kind": "probe", "owner": 2, "start_ns": 300806373602583, "end_ns": 300806374580000, "ns": 977417}
+{"kind": "probe", "owner": 1, "start_ns": 300806384590125, "end_ns": 300806388300208, "ns": 3710083}
+{"kind": "probe", "owner": 3, "start_ns": 300806386147833, "end_ns": 300806388409541, "ns": 2261708}
+{"kind": "probe", "owner": 0, "start_ns": 300806394526000, "end_ns": 300806395307708, "ns": 781708}
+{"kind": "probe", "owner": 2, "start_ns": 300806394968500, "end_ns": 300806395371000, "ns": 402500}
+{"kind": "probe", "owner": 3, "start_ns": 300806412007458, "end_ns": 300806420357833, "ns": 8350375}
+{"kind": "probe", "owner": 1, "start_ns": 300806412134375, "end_ns": 300806420880833, "ns": 8746458}
+{"kind": "probe", "owner": 2, "start_ns": 300806425279291, "end_ns": 300806455972791, "ns": 30693500}
+{"kind": "probe", "owner": 0, "start_ns": 300806425077875, "end_ns": 300806459229708, "ns": 34151833}
+{"kind": "probe", "owner": 1, "start_ns": 300806445168250, "end_ns": 300806467079875, "ns": 21911625}
+{"kind": "probe", "owner": 3, "start_ns": 300806445152375, "end_ns": 300806470763250, "ns": 25610875}
+{"kind": "probe", "owner": 2, "start_ns": 300806479434250, "end_ns": 300806507037500, "ns": 27603250}
+{"kind": "probe", "owner": 0, "start_ns": 300806483126208, "end_ns": 300806512602583, "ns": 29476375}
+{"kind": "probe", "owner": 3, "start_ns": 300806494657041, "end_ns": 300806533286500, "ns": 38629459}
+{"kind": "probe", "owner": 1, "start_ns": 300806491094625, "end_ns": 300806534549750, "ns": 43455125}
+{"kind": "probe", "owner": 0, "start_ns": 300806533506750, "end_ns": 300806559033375, "ns": 25526625, "arm": "scalar", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300806557097333, "end_ns": 300806560220875, "ns": 3123542, "arm": "scalar", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300806534186333, "end_ns": 300806569476583, "ns": 35290250, "arm": "scalar", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300806557453666, "end_ns": 300806575237250, "ns": 17783584, "arm": "scalar", "round": 2, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300806579202458, "end_ns": 300806581083916, "ns": 1881458, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300806585028375, "end_ns": 300806585842291, "ns": 813916, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300806604483041, "end_ns": 300806609133583, "ns": 4650542, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300806608831083, "end_ns": 300806612651000, "ns": 3819917, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300806590825916, "end_ns": 300806621666333, "ns": 30840417, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300806597011541, "end_ns": 300806630428000, "ns": 33416459, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300806630396250, "end_ns": 300806632265750, "ns": 1869500, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300806633860958, "end_ns": 300806635748875, "ns": 1887917, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300806646345083, "end_ns": 300806650175041, "ns": 3829958, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300806661988250, "end_ns": 300806704482625, "ns": 42494375, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300806662473791, "end_ns": 300806708052666, "ns": 45578875, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300806677972333, "end_ns": 300806717853541, "ns": 39881208, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300806661206750, "end_ns": 300806721722041, "ns": 60515291, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300806728134583, "end_ns": 300806743241750, "ns": 15107167, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300806737927625, "end_ns": 300806744851625, "ns": 6924000, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300806727243041, "end_ns": 300806746480583, "ns": 19237542, "arm": "scalar", "round": 2, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300806745838125, "end_ns": 300806751087291, "ns": 5249166}
+{"kind": "probe", "owner": 2, "start_ns": 300806769592750, "end_ns": 300806783244291, "ns": 13651541}
+{"kind": "probe", "owner": 3, "start_ns": 300806769262916, "end_ns": 300806785718208, "ns": 16455292}
+{"kind": "probe", "owner": 1, "start_ns": 300806773788875, "end_ns": 300806785766541, "ns": 11977666}
+{"kind": "probe", "owner": 0, "start_ns": 300806773101833, "end_ns": 300806785783000, "ns": 12681167}
+{"kind": "probe", "owner": 2, "start_ns": 300806804803708, "end_ns": 300806806206083, "ns": 1402375}
+{"kind": "probe", "owner": 1, "start_ns": 300806806131125, "end_ns": 300806806457291, "ns": 326166}
+{"kind": "probe", "owner": 3, "start_ns": 300806805959666, "end_ns": 300806806465208, "ns": 505542}
+{"kind": "probe", "owner": 0, "start_ns": 300806806083958, "end_ns": 300806806507875, "ns": 423917}
+{"kind": "probe", "owner": 2, "start_ns": 300806826905583, "end_ns": 300806830830125, "ns": 3924542}
+{"kind": "probe", "owner": 1, "start_ns": 300806827489833, "end_ns": 300806831072333, "ns": 3582500}
+{"kind": "probe", "owner": 3, "start_ns": 300806828208916, "end_ns": 300806831085250, "ns": 2876334}
+{"kind": "probe", "owner": 0, "start_ns": 300806827448666, "end_ns": 300806831120750, "ns": 3672084}
+{"kind": "probe", "owner": 2, "start_ns": 300806852877541, "end_ns": 300806856688541, "ns": 3811000}
+{"kind": "probe", "owner": 1, "start_ns": 300806853479000, "end_ns": 300806856706500, "ns": 3227500}
+{"kind": "probe", "owner": 0, "start_ns": 300806851225583, "end_ns": 300806856806083, "ns": 5580500}
+{"kind": "probe", "owner": 3, "start_ns": 300806853620875, "end_ns": 300806857105916, "ns": 3485041}
+{"kind": "probe", "owner": 3, "start_ns": 300806882324333, "end_ns": 300806884846750, "ns": 2522417}
+{"kind": "probe", "owner": 0, "start_ns": 300806880548625, "end_ns": 300806885243000, "ns": 4694375}
+{"kind": "probe", "owner": 2, "start_ns": 300806882217791, "end_ns": 300806886266416, "ns": 4048625}
+{"kind": "probe", "owner": 1, "start_ns": 300806882298750, "end_ns": 300806886288583, "ns": 3989833}
+{"kind": "probe", "owner": 3, "start_ns": 300806909191083, "end_ns": 300806929929083, "ns": 20738000}
+{"kind": "probe", "owner": 1, "start_ns": 300806909938125, "end_ns": 300806933305208, "ns": 23367083}
+{"kind": "probe", "owner": 0, "start_ns": 300806912161791, "end_ns": 300806937505208, "ns": 25343417}
+{"kind": "probe", "owner": 2, "start_ns": 300806913284541, "end_ns": 300806941955625, "ns": 28671084}
+{"kind": "probe", "owner": 3, "start_ns": 300806950766208, "end_ns": 300806970635500, "ns": 19869292}
+{"kind": "probe", "owner": 1, "start_ns": 300806957964166, "end_ns": 300806977549125, "ns": 19584959}
+{"kind": "probe", "owner": 0, "start_ns": 300806963191916, "end_ns": 300806978851541, "ns": 15659625}
+{"kind": "probe", "owner": 2, "start_ns": 300806964163166, "end_ns": 300806979741208, "ns": 15578042}
+{"kind": "probe", "owner": 1, "start_ns": 300807019006250, "end_ns": 300807045679708, "ns": 26673458, "arm": "scalar", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300807019094125, "end_ns": 300807045974833, "ns": 26880708, "arm": "scalar", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300807018799000, "end_ns": 300807046909666, "ns": 28110666, "arm": "scalar", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300807019967333, "end_ns": 300807051435791, "ns": 31468458, "arm": "scalar", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300807067317791, "end_ns": 300807068021958, "ns": 704167, "arm": "scalar", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300807068567458, "end_ns": 300807069573208, "ns": 1005750, "arm": "scalar", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300807070945125, "end_ns": 300807071294333, "ns": 349208, "arm": "scalar", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300807089902083, "end_ns": 300807092204875, "ns": 2302792, "arm": "scalar", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300807093481583, "end_ns": 300807094809666, "ns": 1328083, "arm": "scalar", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300807072006250, "end_ns": 300807094912250, "ns": 22906000, "arm": "scalar", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300807094388500, "end_ns": 300807095672875, "ns": 1284375, "arm": "scalar", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300807117730833, "end_ns": 300807138369000, "ns": 20638167}
+{"kind": "probe", "owner": 0, "start_ns": 300807116992166, "end_ns": 300807138663000, "ns": 21670834}
+{"kind": "probe", "owner": 3, "start_ns": 300807124575166, "end_ns": 300807138679833, "ns": 14104667}
+{"kind": "probe", "owner": 2, "start_ns": 300807124176916, "end_ns": 300807152304000, "ns": 28127084}
+{"kind": "probe", "owner": 0, "start_ns": 300807158808041, "end_ns": 300807160679041, "ns": 1871000}
+{"kind": "probe", "owner": 3, "start_ns": 300807158829500, "end_ns": 300807160855125, "ns": 2025625}
+{"kind": "probe", "owner": 1, "start_ns": 300807160384041, "end_ns": 300807161312541, "ns": 928500}
+{"kind": "probe", "owner": 2, "start_ns": 300807176745375, "end_ns": 300807177671416, "ns": 926041}
+{"kind": "probe", "owner": 0, "start_ns": 300807185670208, "end_ns": 300807188382541, "ns": 2712333}
+{"kind": "probe", "owner": 3, "start_ns": 300807184948000, "end_ns": 300807188486666, "ns": 3538666}
+{"kind": "probe", "owner": 1, "start_ns": 300807185744250, "end_ns": 300807188507375, "ns": 2763125}
+{"kind": "probe", "owner": 2, "start_ns": 300807201936416, "end_ns": 300807204201375, "ns": 2264959}
+{"kind": "probe", "owner": 3, "start_ns": 300807209878333, "end_ns": 300807213939083, "ns": 4060750}
+{"kind": "probe", "owner": 0, "start_ns": 300807210032583, "end_ns": 300807214704666, "ns": 4672083}
+{"kind": "probe", "owner": 1, "start_ns": 300807210604041, "end_ns": 300807215974541, "ns": 5370500}
+{"kind": "probe", "owner": 2, "start_ns": 300807225720666, "end_ns": 300807229537291, "ns": 3816625}
+{"kind": "probe", "owner": 3, "start_ns": 300807234398958, "end_ns": 300807238106041, "ns": 3707083}
+{"kind": "probe", "owner": 0, "start_ns": 300807234937750, "end_ns": 300807239154541, "ns": 4216791}
+{"kind": "probe", "owner": 1, "start_ns": 300807237009583, "end_ns": 300807242199000, "ns": 5189417}
+{"kind": "probe", "owner": 2, "start_ns": 300807254366250, "end_ns": 300807257287791, "ns": 2921541}
+{"kind": "probe", "owner": 3, "start_ns": 300807258673666, "end_ns": 300807260939791, "ns": 2266125}
+{"kind": "probe", "owner": 0, "start_ns": 300807259374375, "end_ns": 300807261964666, "ns": 2590291}
+{"kind": "probe", "owner": 1, "start_ns": 300807267035916, "end_ns": 300807269145875, "ns": 2109959}
+{"kind": "probe", "owner": 2, "start_ns": 300807280758500, "end_ns": 300807290078166, "ns": 9319666}
+{"kind": "probe", "owner": 0, "start_ns": 300807283599583, "end_ns": 300807292841500, "ns": 9241917}
+{"kind": "probe", "owner": 3, "start_ns": 300807286509125, "end_ns": 300807294444875, "ns": 7935750}
+{"kind": "probe", "owner": 1, "start_ns": 300807293252166, "end_ns": 300807296264666, "ns": 3012500}
+{"kind": "probe", "owner": 2, "start_ns": 300807313656000, "end_ns": 300807321825583, "ns": 8169583}
+{"kind": "probe", "owner": 1, "start_ns": 300807317489458, "end_ns": 300807326331083, "ns": 8841625}
+{"kind": "probe", "owner": 0, "start_ns": 300807317906125, "end_ns": 300807328190833, "ns": 10284708}
+{"kind": "probe", "owner": 3, "start_ns": 300807319979041, "end_ns": 300807329885625, "ns": 9906584}
+{"kind": "probe", "owner": 2, "start_ns": 300807349517541, "end_ns": 300807355549125, "ns": 6031584}
+{"kind": "probe", "owner": 1, "start_ns": 300807347284208, "end_ns": 300807356955500, "ns": 9671292}
+{"kind": "probe", "owner": 3, "start_ns": 300807350854041, "end_ns": 300807356973666, "ns": 6119625}
+{"kind": "probe", "owner": 0, "start_ns": 300807350143625, "end_ns": 300807357480958, "ns": 7337333}
+{"kind": "probe", "owner": 1, "start_ns": 300807378588791, "end_ns": 300807384862041, "ns": 6273250}
+{"kind": "probe", "owner": 3, "start_ns": 300807378521916, "end_ns": 300807385212375, "ns": 6690459}
+{"kind": "probe", "owner": 0, "start_ns": 300807379742541, "end_ns": 300807385239500, "ns": 5496959}
+{"kind": "probe", "owner": 2, "start_ns": 300807378322875, "end_ns": 300807385458041, "ns": 7135166}
+{"kind": "probe", "owner": 1, "start_ns": 300807405048000, "end_ns": 300807407060583, "ns": 2012583}
+{"kind": "probe", "owner": 3, "start_ns": 300807406050041, "end_ns": 300807407191458, "ns": 1141417}
+{"kind": "probe", "owner": 2, "start_ns": 300807412544958, "end_ns": 300807417431791, "ns": 4886833}
+{"kind": "probe", "owner": 0, "start_ns": 300807412566833, "end_ns": 300807418788958, "ns": 6222125}
+{"kind": "probe", "owner": 3, "start_ns": 300807428872250, "end_ns": 300807433399500, "ns": 4527250}
+{"kind": "probe", "owner": 1, "start_ns": 300807429291500, "end_ns": 300807436028375, "ns": 6736875}
+{"kind": "probe", "owner": 2, "start_ns": 300807441655500, "end_ns": 300807445126333, "ns": 3470833}
+{"kind": "probe", "owner": 0, "start_ns": 300807441928291, "end_ns": 300807445135958, "ns": 3207667}
+{"kind": "probe", "owner": 3, "start_ns": 300807455323750, "end_ns": 300807463243208, "ns": 7919458}
+{"kind": "probe", "owner": 1, "start_ns": 300807458286875, "end_ns": 300807463905250, "ns": 5618375}
+{"kind": "probe", "owner": 2, "start_ns": 300807467770541, "end_ns": 300807471887666, "ns": 4117125}
+{"kind": "probe", "owner": 0, "start_ns": 300807467817250, "end_ns": 300807472012708, "ns": 4195458}
+{"kind": "probe", "owner": 3, "start_ns": 300807484831750, "end_ns": 300807485610083, "ns": 778333}
+{"kind": "probe", "owner": 1, "start_ns": 300807487373333, "end_ns": 300807491168916, "ns": 3795583}
+{"kind": "probe", "owner": 0, "start_ns": 300807492319833, "end_ns": 300807499253541, "ns": 6933708}
+{"kind": "probe", "owner": 2, "start_ns": 300807492414875, "end_ns": 300807499541125, "ns": 7126250}
+{"kind": "probe", "owner": 3, "start_ns": 300807507064666, "end_ns": 300807508462375, "ns": 1397709}
+{"kind": "probe", "owner": 1, "start_ns": 300807516533875, "end_ns": 300807517027125, "ns": 493250}
+{"kind": "probe", "owner": 2, "start_ns": 300807521220250, "end_ns": 300807525243958, "ns": 4023708}
+{"kind": "probe", "owner": 0, "start_ns": 300807523955750, "end_ns": 300807529490750, "ns": 5535000}
+{"kind": "probe", "owner": 3, "start_ns": 300807530716083, "end_ns": 300807536312333, "ns": 5596250}
+{"kind": "probe", "owner": 1, "start_ns": 300807539936708, "end_ns": 300807540416416, "ns": 479708}
+{"kind": "probe", "owner": 2, "start_ns": 300807554024416, "end_ns": 300807560804875, "ns": 6780459}
+{"kind": "probe", "owner": 0, "start_ns": 300807555544958, "end_ns": 300807561024791, "ns": 5479833}
+{"kind": "probe", "owner": 3, "start_ns": 300807560776833, "end_ns": 300807562847500, "ns": 2070667}
+{"kind": "probe", "owner": 1, "start_ns": 300807561337666, "end_ns": 300807563478958, "ns": 2141292}
+{"kind": "probe", "owner": 0, "start_ns": 300807585703208, "end_ns": 300807620905375, "ns": 35202167, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300807584472083, "end_ns": 300807636332541, "ns": 51860458, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300807591427916, "end_ns": 300807642325416, "ns": 50897500, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300807641851333, "end_ns": 300807642376250, "ns": 524917, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300807597143666, "end_ns": 300807651345500, "ns": 54201834, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300807657781916, "end_ns": 300807669373708, "ns": 11591792, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300807662766375, "end_ns": 300807670835458, "ns": 8069083, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300807673047000, "end_ns": 300807679581583, "ns": 6534583, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300807662815458, "end_ns": 300807680593416, "ns": 17777958, "arm": "owner-batch", "round": 3, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300807695289083, "end_ns": 300807703847208, "ns": 8558125}
+{"kind": "probe", "owner": 2, "start_ns": 300807689588875, "end_ns": 300807719997791, "ns": 30408916}
+{"kind": "probe", "owner": 1, "start_ns": 300807700100291, "end_ns": 300807720957916, "ns": 20857625}
+{"kind": "probe", "owner": 0, "start_ns": 300807702910166, "end_ns": 300807721657041, "ns": 18746875}
+{"kind": "probe", "owner": 3, "start_ns": 300807728830583, "end_ns": 300807732673625, "ns": 3843042}
+{"kind": "probe", "owner": 1, "start_ns": 300807745243750, "end_ns": 300807750619791, "ns": 5376041}
+{"kind": "probe", "owner": 0, "start_ns": 300807743572625, "end_ns": 300807750959500, "ns": 7386875}
+{"kind": "probe", "owner": 2, "start_ns": 300807743832666, "end_ns": 300807752716083, "ns": 8883417}
+{"kind": "probe", "owner": 3, "start_ns": 300807752946333, "end_ns": 300807753976583, "ns": 1030250}
+{"kind": "probe", "owner": 3, "start_ns": 300807777178291, "end_ns": 300807779262083, "ns": 2083792}
+{"kind": "probe", "owner": 1, "start_ns": 300807773105083, "end_ns": 300807779522333, "ns": 6417250}
+{"kind": "probe", "owner": 0, "start_ns": 300807776014291, "end_ns": 300807780386166, "ns": 4371875}
+{"kind": "probe", "owner": 2, "start_ns": 300807777038583, "end_ns": 300807780470166, "ns": 3431583}
+{"kind": "probe", "owner": 3, "start_ns": 300807799643791, "end_ns": 300807813709333, "ns": 14065542}
+{"kind": "probe", "owner": 1, "start_ns": 300807805519458, "end_ns": 300807820068250, "ns": 14548792}
+{"kind": "probe", "owner": 2, "start_ns": 300807808632958, "end_ns": 300807821298125, "ns": 12665167}
+{"kind": "probe", "owner": 0, "start_ns": 300807808093791, "end_ns": 300807822303416, "ns": 14209625}
+{"kind": "probe", "owner": 3, "start_ns": 300807838499375, "end_ns": 300807841715958, "ns": 3216583}
+{"kind": "probe", "owner": 0, "start_ns": 300807842695458, "end_ns": 300807845508333, "ns": 2812875}
+{"kind": "probe", "owner": 1, "start_ns": 300807843396541, "end_ns": 300807845894208, "ns": 2497667}
+{"kind": "probe", "owner": 2, "start_ns": 300807844287250, "end_ns": 300807845910541, "ns": 1623291}
+{"kind": "probe", "owner": 3, "start_ns": 300807863258833, "end_ns": 300807863919083, "ns": 660250}
+{"kind": "probe", "owner": 0, "start_ns": 300807865989791, "end_ns": 300807867796791, "ns": 1807000}
+{"kind": "probe", "owner": 2, "start_ns": 300807866065791, "end_ns": 300807867988875, "ns": 1923084}
+{"kind": "probe", "owner": 1, "start_ns": 300807866044708, "end_ns": 300807868026458, "ns": 1981750}
+{"kind": "probe", "owner": 3, "start_ns": 300807886308583, "end_ns": 300807886559916, "ns": 251333}
+{"kind": "probe", "owner": 1, "start_ns": 300807891519500, "end_ns": 300807893729750, "ns": 2210250}
+{"kind": "probe", "owner": 0, "start_ns": 300807892190208, "end_ns": 300807893753750, "ns": 1563542}
+{"kind": "probe", "owner": 2, "start_ns": 300807893250125, "end_ns": 300807894355333, "ns": 1105208}
+{"kind": "probe", "owner": 3, "start_ns": 300807907357625, "end_ns": 300807907511541, "ns": 153916}
+{"kind": "probe", "owner": 0, "start_ns": 300807918936958, "end_ns": 300807920527583, "ns": 1590625}
+{"kind": "probe", "owner": 1, "start_ns": 300807919069083, "end_ns": 300807921053833, "ns": 1984750}
+{"kind": "probe", "owner": 2, "start_ns": 300807918995875, "end_ns": 300807921141208, "ns": 2145333}
+{"kind": "probe", "owner": 3, "start_ns": 300807927726291, "end_ns": 300807929090750, "ns": 1364459}
+{"kind": "probe", "owner": 1, "start_ns": 300807941919625, "end_ns": 300807942033416, "ns": 113791}
+{"kind": "probe", "owner": 0, "start_ns": 300807947042583, "end_ns": 300807953148708, "ns": 6106125}
+{"kind": "probe", "owner": 2, "start_ns": 300807947093625, "end_ns": 300807954122458, "ns": 7028833}
+{"kind": "probe", "owner": 3, "start_ns": 300807954137583, "end_ns": 300807955360375, "ns": 1222792}
+{"kind": "probe", "owner": 1, "start_ns": 300807962815166, "end_ns": 300807966024416, "ns": 3209250}
+{"kind": "probe", "owner": 0, "start_ns": 300807973839541, "end_ns": 300807974641375, "ns": 801834}
+{"kind": "probe", "owner": 2, "start_ns": 300807974431833, "end_ns": 300807975239916, "ns": 808083}
+{"kind": "probe", "owner": 3, "start_ns": 300807977659250, "end_ns": 300807978016500, "ns": 357250}
+{"kind": "probe", "owner": 1, "start_ns": 300807987176000, "end_ns": 300807988806791, "ns": 1630791}
+{"kind": "probe", "owner": 2, "start_ns": 300807996780666, "end_ns": 300807997681625, "ns": 900959}
+{"kind": "probe", "owner": 3, "start_ns": 300807998417666, "end_ns": 300807999497291, "ns": 1079625}
+{"kind": "probe", "owner": 0, "start_ns": 300807999706125, "end_ns": 300808000236458, "ns": 530333}
+{"kind": "probe", "owner": 1, "start_ns": 300808013515666, "end_ns": 300808014667583, "ns": 1151917}
+{"kind": "probe", "owner": 0, "start_ns": 300808020364541, "end_ns": 300808025777375, "ns": 5412834}
+{"kind": "probe", "owner": 2, "start_ns": 300808018275875, "end_ns": 300808027652708, "ns": 9376833}
+{"kind": "probe", "owner": 3, "start_ns": 300808020352625, "end_ns": 300808028970416, "ns": 8617791}
+{"kind": "probe", "owner": 1, "start_ns": 300808035119500, "end_ns": 300808035527291, "ns": 407791}
+{"kind": "probe", "owner": 0, "start_ns": 300808045832666, "end_ns": 300808054684500, "ns": 8851834}
+{"kind": "probe", "owner": 2, "start_ns": 300808052029583, "end_ns": 300808054922375, "ns": 2892792}
+{"kind": "probe", "owner": 3, "start_ns": 300808052073375, "end_ns": 300808054957041, "ns": 2883666}
+{"kind": "probe", "owner": 1, "start_ns": 300808057064166, "end_ns": 300808059031916, "ns": 1967750}
+{"kind": "probe", "owner": 0, "start_ns": 300808076107041, "end_ns": 300808077028875, "ns": 921834}
+{"kind": "probe", "owner": 2, "start_ns": 300808076222125, "end_ns": 300808077042875, "ns": 820750}
+{"kind": "probe", "owner": 3, "start_ns": 300808076315000, "end_ns": 300808077056833, "ns": 741833}
+{"kind": "probe", "owner": 1, "start_ns": 300808079326416, "end_ns": 300808080805791, "ns": 1479375}
+{"kind": "probe", "owner": 2, "start_ns": 300808097265250, "end_ns": 300808098150166, "ns": 884916}
+{"kind": "probe", "owner": 3, "start_ns": 300808097526125, "end_ns": 300808098165083, "ns": 638958}
+{"kind": "probe", "owner": 0, "start_ns": 300808103603000, "end_ns": 300808111406416, "ns": 7803416}
+{"kind": "probe", "owner": 1, "start_ns": 300808106236708, "end_ns": 300808112608791, "ns": 6372083}
+{"kind": "probe", "owner": 2, "start_ns": 300808124867750, "end_ns": 300808129485083, "ns": 4617333}
+{"kind": "probe", "owner": 3, "start_ns": 300808124938541, "end_ns": 300808129963708, "ns": 5025167}
+{"kind": "probe", "owner": 0, "start_ns": 300808131711875, "end_ns": 300808136482666, "ns": 4770791}
+{"kind": "probe", "owner": 1, "start_ns": 300808132710458, "end_ns": 300808136591750, "ns": 3881292}
+{"kind": "probe", "owner": 2, "start_ns": 300808149849791, "end_ns": 300808154676291, "ns": 4826500}
+{"kind": "probe", "owner": 3, "start_ns": 300808152091958, "end_ns": 300808155073833, "ns": 2981875}
+{"kind": "probe", "owner": 0, "start_ns": 300808156680416, "end_ns": 300808158217666, "ns": 1537250}
+{"kind": "probe", "owner": 1, "start_ns": 300808161502666, "end_ns": 300808162063208, "ns": 560542}
+{"kind": "probe", "owner": 2, "start_ns": 300808215421958, "end_ns": 300808218009750, "ns": 2587792, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300808215388041, "end_ns": 300808219180291, "ns": 3792250, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300808215665916, "end_ns": 300808219268375, "ns": 3602459, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300808215255125, "end_ns": 300808219290458, "ns": 4035333, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300808238145083, "end_ns": 300808243409416, "ns": 5264333, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300808239784958, "end_ns": 300808246649833, "ns": 6864875, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300808242986250, "end_ns": 300808246698166, "ns": 3711916, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300808240285750, "end_ns": 300808256263958, "ns": 15978208, "arm": "scalar", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300808263741416, "end_ns": 300808264674416, "ns": 933000, "arm": "scalar", "round": 4, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300808267328958, "end_ns": 300808268764625, "ns": 1435667, "arm": "scalar", "round": 4, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300808267408208, "end_ns": 300808268782083, "ns": 1373875, "arm": "scalar", "round": 4, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300808278864125, "end_ns": 300808281996958, "ns": 3132833, "arm": "scalar", "round": 4, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300808289580875, "end_ns": 300808290164166, "ns": 583291}
+{"kind": "probe", "owner": 2, "start_ns": 300808286272541, "end_ns": 300808294784916, "ns": 8512375}
+{"kind": "probe", "owner": 0, "start_ns": 300808289648875, "end_ns": 300808294794083, "ns": 5145208}
+{"kind": "probe", "owner": 1, "start_ns": 300808304187000, "end_ns": 300808305235333, "ns": 1048333}
+{"kind": "probe", "owner": 3, "start_ns": 300808312189541, "end_ns": 300808312731708, "ns": 542167}
+{"kind": "probe", "owner": 2, "start_ns": 300808315671708, "end_ns": 300808315916750, "ns": 245042}
+{"kind": "probe", "owner": 0, "start_ns": 300808315708291, "end_ns": 300808316285833, "ns": 577542}
+{"kind": "probe", "owner": 1, "start_ns": 300808327741416, "end_ns": 300808327866833, "ns": 125417}
+{"kind": "probe", "owner": 3, "start_ns": 300808334512958, "end_ns": 300808337162833, "ns": 2649875}
+{"kind": "probe", "owner": 0, "start_ns": 300808336716166, "end_ns": 300808337608666, "ns": 892500}
+{"kind": "probe", "owner": 2, "start_ns": 300808336359375, "end_ns": 300808337764750, "ns": 1405375}
+{"kind": "probe", "owner": 1, "start_ns": 300808349226583, "end_ns": 300808353460000, "ns": 4233417}
+{"kind": "probe", "owner": 3, "start_ns": 300808359413833, "end_ns": 300808361289791, "ns": 1875958}
+{"kind": "probe", "owner": 0, "start_ns": 300808359466250, "end_ns": 300808361428583, "ns": 1962333}
+{"kind": "probe", "owner": 2, "start_ns": 300808360357125, "end_ns": 300808361482458, "ns": 1125333}
+{"kind": "probe", "owner": 1, "start_ns": 300808374757500, "end_ns": 300808377961666, "ns": 3204166}
+{"kind": "probe", "owner": 3, "start_ns": 300808386374458, "end_ns": 300808387308541, "ns": 934083}
+{"kind": "probe", "owner": 2, "start_ns": 300808386294250, "end_ns": 300808387527625, "ns": 1233375}
+{"kind": "probe", "owner": 0, "start_ns": 300808386552250, "end_ns": 300808387552416, "ns": 1000166}
+{"kind": "probe", "owner": 1, "start_ns": 300808402420791, "end_ns": 300808402989958, "ns": 569167}
+{"kind": "probe", "owner": 3, "start_ns": 300808408412416, "end_ns": 300808412480416, "ns": 4068000}
+{"kind": "probe", "owner": 0, "start_ns": 300808408747958, "end_ns": 300808412563541, "ns": 3815583}
+{"kind": "probe", "owner": 2, "start_ns": 300808408707250, "end_ns": 300808412609125, "ns": 3901875}
+{"kind": "probe", "owner": 1, "start_ns": 300808425959708, "end_ns": 300808428356916, "ns": 2397208}
+{"kind": "probe", "owner": 2, "start_ns": 300808432904708, "end_ns": 300808435244375, "ns": 2339667}
+{"kind": "probe", "owner": 0, "start_ns": 300808432863333, "end_ns": 300808435263083, "ns": 2399750}
+{"kind": "probe", "owner": 3, "start_ns": 300808433420250, "end_ns": 300808435284375, "ns": 1864125}
+{"kind": "probe", "owner": 1, "start_ns": 300808452156666, "end_ns": 300808467207583, "ns": 15050917}
+{"kind": "probe", "owner": 2, "start_ns": 300808460867416, "end_ns": 300808470681625, "ns": 9814209}
+{"kind": "probe", "owner": 0, "start_ns": 300808460977125, "end_ns": 300808471094958, "ns": 10117833}
+{"kind": "probe", "owner": 3, "start_ns": 300808461090041, "end_ns": 300808471379791, "ns": 10289750}
+{"kind": "probe", "owner": 1, "start_ns": 300808492545000, "end_ns": 300808494606791, "ns": 2061791}
+{"kind": "probe", "owner": 3, "start_ns": 300808493168750, "end_ns": 300808494733666, "ns": 1564916}
+{"kind": "probe", "owner": 2, "start_ns": 300808493320916, "end_ns": 300808494758458, "ns": 1437542}
+{"kind": "probe", "owner": 0, "start_ns": 300808495752708, "end_ns": 300808498451125, "ns": 2698417}
+{"kind": "probe", "owner": 3, "start_ns": 300808516386166, "end_ns": 300808522396125, "ns": 6009959}
+{"kind": "probe", "owner": 2, "start_ns": 300808518271500, "end_ns": 300808528781166, "ns": 10509666}
+{"kind": "probe", "owner": 1, "start_ns": 300808517688083, "end_ns": 300808529120083, "ns": 11432000}
+{"kind": "probe", "owner": 0, "start_ns": 300808525368333, "end_ns": 300808533455375, "ns": 8087042}
+{"kind": "probe", "owner": 2, "start_ns": 300808552539625, "end_ns": 300808563967125, "ns": 11427500}
+{"kind": "probe", "owner": 3, "start_ns": 300808548373291, "end_ns": 300808564137250, "ns": 15763959}
+{"kind": "probe", "owner": 1, "start_ns": 300808553997708, "end_ns": 300808564711291, "ns": 10713583}
+{"kind": "probe", "owner": 0, "start_ns": 300808558931750, "end_ns": 300808565033250, "ns": 6101500}
+{"kind": "probe", "owner": 0, "start_ns": 300808589705625, "end_ns": 300808601091958, "ns": 11386333}
+{"kind": "probe", "owner": 3, "start_ns": 300808587139583, "end_ns": 300808602297458, "ns": 15157875}
+{"kind": "probe", "owner": 2, "start_ns": 300808586001166, "end_ns": 300808603059458, "ns": 17058292}
+{"kind": "probe", "owner": 1, "start_ns": 300808589357041, "end_ns": 300808603937083, "ns": 14580042}
+{"kind": "probe", "owner": 0, "start_ns": 300808625511083, "end_ns": 300808633441666, "ns": 7930583}
+{"kind": "probe", "owner": 3, "start_ns": 300808623690166, "end_ns": 300808633473041, "ns": 9782875}
+{"kind": "probe", "owner": 1, "start_ns": 300808629914125, "end_ns": 300808633542833, "ns": 3628708}
+{"kind": "probe", "owner": 2, "start_ns": 300808628840583, "end_ns": 300808633570041, "ns": 4729458}
+{"kind": "probe", "owner": 0, "start_ns": 300808653530541, "end_ns": 300808655245708, "ns": 1715167}
+{"kind": "probe", "owner": 3, "start_ns": 300808653576166, "end_ns": 300808655529791, "ns": 1953625}
+{"kind": "probe", "owner": 2, "start_ns": 300808654487791, "end_ns": 300808655590083, "ns": 1102292}
+{"kind": "probe", "owner": 1, "start_ns": 300808655926208, "end_ns": 300808659236625, "ns": 3310417}
+{"kind": "probe", "owner": 2, "start_ns": 300808676012833, "end_ns": 300808679484458, "ns": 3471625}
+{"kind": "probe", "owner": 0, "start_ns": 300808678160375, "end_ns": 300808681527416, "ns": 3367041}
+{"kind": "probe", "owner": 3, "start_ns": 300808679412166, "end_ns": 300808682131875, "ns": 2719709}
+{"kind": "probe", "owner": 1, "start_ns": 300808681444958, "end_ns": 300808682643166, "ns": 1198208}
+{"kind": "probe", "owner": 1, "start_ns": 300808718120416, "end_ns": 300808745872166, "ns": 27751750, "arm": "owner-batch", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300808717462708, "end_ns": 300808745910750, "ns": 28448042, "arm": "owner-batch", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300808718210666, "end_ns": 300808745931750, "ns": 27721084, "arm": "owner-batch", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300808718239875, "end_ns": 300808758498166, "ns": 40258291, "arm": "owner-batch", "round": 4, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300808766460625, "end_ns": 300808768864541, "ns": 2403916}
+{"kind": "probe", "owner": 2, "start_ns": 300808770451333, "end_ns": 300808771833083, "ns": 1381750}
+{"kind": "probe", "owner": 3, "start_ns": 300808770782333, "end_ns": 300808771851291, "ns": 1068958}
+{"kind": "probe", "owner": 2, "start_ns": 300808792478166, "end_ns": 300808804325166, "ns": 11847000}
+{"kind": "probe", "owner": 3, "start_ns": 300808792684083, "end_ns": 300808816740500, "ns": 24056417}
+{"kind": "probe", "owner": 0, "start_ns": 300808781398291, "end_ns": 300808824347791, "ns": 42949500}
+{"kind": "probe", "owner": 1, "start_ns": 300808791334250, "end_ns": 300808824579666, "ns": 33245416}
+{"kind": "probe", "owner": 2, "start_ns": 300808826171083, "end_ns": 300808830720708, "ns": 4549625}
+{"kind": "probe", "owner": 3, "start_ns": 300808836820291, "end_ns": 300808839261916, "ns": 2441625}
+{"kind": "probe", "owner": 1, "start_ns": 300808847088416, "end_ns": 300808850144000, "ns": 3055584}
+{"kind": "probe", "owner": 0, "start_ns": 300808847145375, "end_ns": 300808850686000, "ns": 3540625}
+{"kind": "probe", "owner": 2, "start_ns": 300808851174375, "end_ns": 300808852278083, "ns": 1103708}
+{"kind": "probe", "owner": 3, "start_ns": 300808864314250, "end_ns": 300808866098708, "ns": 1784458}
+{"kind": "probe", "owner": 2, "start_ns": 300808873277083, "end_ns": 300808878590208, "ns": 5313125}
+{"kind": "probe", "owner": 1, "start_ns": 300808871537916, "end_ns": 300808878626375, "ns": 7088459}
+{"kind": "probe", "owner": 0, "start_ns": 300808872815500, "end_ns": 300808917675458, "ns": 44859958}
+{"kind": "probe", "owner": 2, "start_ns": 300808909347291, "end_ns": 300808952411625, "ns": 43064334}
+{"kind": "probe", "owner": 1, "start_ns": 300808909585541, "end_ns": 300808962521916, "ns": 52936375}
+{"kind": "probe", "owner": 3, "start_ns": 300808917801583, "end_ns": 300809051320333, "ns": 133518750}
+{"kind": "probe", "owner": 2, "start_ns": 300808990275916, "end_ns": 300809077332083, "ns": 87056167}
+{"kind": "probe", "owner": 1, "start_ns": 300809000460166, "end_ns": 300809077797416, "ns": 77337250}
+{"kind": "probe", "owner": 0, "start_ns": 300808948627000, "end_ns": 300809077892208, "ns": 129265208}
+{"kind": "probe", "owner": 2, "start_ns": 300809108156125, "end_ns": 300809199579708, "ns": 91423583}
+{"kind": "probe", "owner": 3, "start_ns": 300809098773833, "end_ns": 300809199999250, "ns": 101225417}
+{"kind": "probe", "owner": 1, "start_ns": 300809108556875, "end_ns": 300809206229541, "ns": 97672666}
+{"kind": "probe", "owner": 0, "start_ns": 300809108807375, "end_ns": 300809206285166, "ns": 97477791}
+{"kind": "probe", "owner": 3, "start_ns": 300809230321250, "end_ns": 300809312461041, "ns": 82139791}
+{"kind": "probe", "owner": 1, "start_ns": 300809242421916, "end_ns": 300809312718958, "ns": 70297042}
+{"kind": "probe", "owner": 0, "start_ns": 300809242450708, "end_ns": 300809313337083, "ns": 70886375}
+{"kind": "probe", "owner": 2, "start_ns": 300809229825416, "end_ns": 300809317816125, "ns": 87990709}
+{"kind": "probe", "owner": 1, "start_ns": 300809337698916, "end_ns": 300809361348041, "ns": 23649125}
+{"kind": "probe", "owner": 2, "start_ns": 300809342753125, "end_ns": 300809361418750, "ns": 18665625}
+{"kind": "probe", "owner": 0, "start_ns": 300809341404958, "end_ns": 300809361424500, "ns": 20019542}
+{"kind": "probe", "owner": 3, "start_ns": 300809335710291, "end_ns": 300809361428541, "ns": 25718250}
+{"kind": "probe", "owner": 2, "start_ns": 300809384141958, "end_ns": 300809386743375, "ns": 2601417}
+{"kind": "probe", "owner": 1, "start_ns": 300809384113375, "end_ns": 300809386887333, "ns": 2773958}
+{"kind": "probe", "owner": 0, "start_ns": 300809384148000, "end_ns": 300809389353541, "ns": 5205541}
+{"kind": "probe", "owner": 3, "start_ns": 300809384153666, "end_ns": 300809389379250, "ns": 5225584}
+{"kind": "probe", "owner": 2, "start_ns": 300809410745416, "end_ns": 300809425534833, "ns": 14789417}
+{"kind": "probe", "owner": 3, "start_ns": 300809413436375, "end_ns": 300809426083125, "ns": 12646750}
+{"kind": "probe", "owner": 1, "start_ns": 300809411702458, "end_ns": 300809426095083, "ns": 14392625}
+{"kind": "probe", "owner": 0, "start_ns": 300809413414000, "end_ns": 300809426198125, "ns": 12784125}
+{"kind": "probe", "owner": 0, "start_ns": 300809447915083, "end_ns": 300809454677625, "ns": 6762542}
+{"kind": "probe", "owner": 2, "start_ns": 300809448040583, "end_ns": 300809455258166, "ns": 7217583}
+{"kind": "probe", "owner": 3, "start_ns": 300809448211625, "end_ns": 300809455450500, "ns": 7238875}
+{"kind": "probe", "owner": 1, "start_ns": 300809448719166, "end_ns": 300809455484666, "ns": 6765500}
+{"kind": "probe", "owner": 2, "start_ns": 300809475924208, "end_ns": 300809478922166, "ns": 2997958}
+{"kind": "probe", "owner": 0, "start_ns": 300809476256125, "end_ns": 300809479586500, "ns": 3330375}
+{"kind": "probe", "owner": 3, "start_ns": 300809478566625, "end_ns": 300809479900458, "ns": 1333833}
+{"kind": "probe", "owner": 1, "start_ns": 300809478583958, "end_ns": 300809480168958, "ns": 1585000}
+{"kind": "probe", "owner": 2, "start_ns": 300809499847583, "end_ns": 300809500121166, "ns": 273583}
+{"kind": "probe", "owner": 1, "start_ns": 300809511878500, "end_ns": 300809530695291, "ns": 18816791}
+{"kind": "probe", "owner": 0, "start_ns": 300809513789291, "end_ns": 300809531565625, "ns": 17776334}
+{"kind": "probe", "owner": 3, "start_ns": 300809513359208, "end_ns": 300809531621250, "ns": 18262042}
+{"kind": "probe", "owner": 2, "start_ns": 300809520484916, "end_ns": 300809531954458, "ns": 11469542}
+{"kind": "probe", "owner": 3, "start_ns": 300809592538291, "end_ns": 300809604543875, "ns": 12005584, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300809594308125, "end_ns": 300809604656583, "ns": 10348458, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809594660958, "end_ns": 300809604711208, "ns": 10050250, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300809589984666, "end_ns": 300809604786416, "ns": 14801750, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300809635081333, "end_ns": 300809644153083, "ns": 9071750, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809635372000, "end_ns": 300809644421833, "ns": 9049833, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300809635410666, "end_ns": 300809644522541, "ns": 9111875, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300809637711916, "end_ns": 300809645950875, "ns": 8238959, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809666013375, "end_ns": 300809670699916, "ns": 4686541, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300809666098375, "end_ns": 300809671038250, "ns": 4939875, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300809668324291, "end_ns": 300809671065833, "ns": 2741542, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300809668869625, "end_ns": 300809671197291, "ns": 2327666, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809692070541, "end_ns": 300809695730791, "ns": 3660250, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300809692577833, "end_ns": 300809697005958, "ns": 4428125, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300809692481208, "end_ns": 300809697221125, "ns": 4739917, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300809694303958, "end_ns": 300809697959708, "ns": 3655750, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809718949000, "end_ns": 300809725411333, "ns": 6462333, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300809717583666, "end_ns": 300809725579083, "ns": 7995417, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300809720385833, "end_ns": 300809725615208, "ns": 5229375, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300809722593708, "end_ns": 300809726050708, "ns": 3457000, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809748157041, "end_ns": 300809791336916, "ns": 43179875, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300809748186791, "end_ns": 300809796801458, "ns": 48614667, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809813560541, "end_ns": 300809816143375, "ns": 2582834, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300809819332458, "end_ns": 300809820793833, "ns": 1461375, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 2, "start_ns": 300809751556875, "end_ns": 300809825405000, "ns": 73848125, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300809751234916, "end_ns": 300809828044750, "ns": 76809834, "arm": "owner-batch", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300809837879041, "end_ns": 300809839275291, "ns": 1396250}
+{"kind": "probe", "owner": 3, "start_ns": 300809843626333, "end_ns": 300809852084583, "ns": 8458250}
+{"kind": "probe", "owner": 2, "start_ns": 300809850537791, "end_ns": 300809852222333, "ns": 1684542}
+{"kind": "probe", "owner": 0, "start_ns": 300809852651958, "end_ns": 300809854002166, "ns": 1350208}
+{"kind": "probe", "owner": 1, "start_ns": 300809861692250, "end_ns": 300809874218541, "ns": 12526291}
+{"kind": "probe", "owner": 3, "start_ns": 300809875226708, "end_ns": 300809878400666, "ns": 3173958}
+{"kind": "probe", "owner": 2, "start_ns": 300809875302833, "end_ns": 300809879875541, "ns": 4572708}
+{"kind": "probe", "owner": 0, "start_ns": 300809877120208, "end_ns": 300809880251208, "ns": 3131000}
+{"kind": "probe", "owner": 1, "start_ns": 300809894377291, "end_ns": 300809899374125, "ns": 4996834}
+{"kind": "probe", "owner": 3, "start_ns": 300809898575375, "end_ns": 300809901560875, "ns": 2985500}
+{"kind": "probe", "owner": 2, "start_ns": 300809900900458, "end_ns": 300809906550500, "ns": 5650042}
+{"kind": "probe", "owner": 0, "start_ns": 300809902444375, "end_ns": 300809920561083, "ns": 18116708}
+{"kind": "probe", "owner": 1, "start_ns": 300809921175666, "end_ns": 300809967405500, "ns": 46229834}
+{"kind": "probe", "owner": 0, "start_ns": 300809941751916, "end_ns": 300809970370666, "ns": 28618750}
+{"kind": "probe", "owner": 3, "start_ns": 300809925292041, "end_ns": 300809973499750, "ns": 48207709}
+{"kind": "probe", "owner": 2, "start_ns": 300809931608625, "end_ns": 300809976005833, "ns": 44397208}
+{"kind": "probe", "owner": 1, "start_ns": 300809993209041, "end_ns": 300809995627250, "ns": 2418209}
+{"kind": "probe", "owner": 0, "start_ns": 300809991284000, "end_ns": 300809995736750, "ns": 4452750}
+{"kind": "probe", "owner": 2, "start_ns": 300809997258458, "end_ns": 300810001927333, "ns": 4668875}
+{"kind": "probe", "owner": 3, "start_ns": 300809999362791, "end_ns": 300810002083500, "ns": 2720709}
+{"kind": "probe", "owner": 0, "start_ns": 300810018719333, "end_ns": 300810020403250, "ns": 1683917}
+{"kind": "probe", "owner": 1, "start_ns": 300810020040583, "end_ns": 300810020435416, "ns": 394833}
+{"kind": "probe", "owner": 2, "start_ns": 300810023488875, "end_ns": 300810026168458, "ns": 2679583}
+{"kind": "probe", "owner": 3, "start_ns": 300810024252000, "end_ns": 300810026463791, "ns": 2211791}
+{"kind": "probe", "owner": 0, "start_ns": 300810041284541, "end_ns": 300810044935291, "ns": 3650750}
+{"kind": "probe", "owner": 2, "start_ns": 300810046617750, "end_ns": 300810049959791, "ns": 3342041}
+{"kind": "probe", "owner": 1, "start_ns": 300810041401958, "end_ns": 300810050204708, "ns": 8802750}
+{"kind": "probe", "owner": 3, "start_ns": 300810051082583, "end_ns": 300810051586791, "ns": 504208}
+{"kind": "probe", "owner": 0, "start_ns": 300810069155583, "end_ns": 300810080867208, "ns": 11711625}
+{"kind": "probe", "owner": 1, "start_ns": 300810075913458, "end_ns": 300810088446125, "ns": 12532667}
+{"kind": "probe", "owner": 2, "start_ns": 300810071263500, "end_ns": 300810092163708, "ns": 20900208}
+{"kind": "probe", "owner": 3, "start_ns": 300810078204708, "end_ns": 300810092396791, "ns": 14192083}
+{"kind": "probe", "owner": 0, "start_ns": 300810101356708, "end_ns": 300810112285041, "ns": 10928333}
+{"kind": "probe", "owner": 2, "start_ns": 300810113743500, "end_ns": 300810117069583, "ns": 3326083}
+{"kind": "probe", "owner": 3, "start_ns": 300810116203875, "end_ns": 300810117094583, "ns": 890708}
+{"kind": "probe", "owner": 1, "start_ns": 300810113510916, "end_ns": 300810126074916, "ns": 12564000}
+{"kind": "probe", "owner": 0, "start_ns": 300810136245958, "end_ns": 300810145781333, "ns": 9535375}
+{"kind": "probe", "owner": 3, "start_ns": 300810138105291, "end_ns": 300810154479791, "ns": 16374500}
+{"kind": "probe", "owner": 2, "start_ns": 300810137637750, "end_ns": 300810156419833, "ns": 18782083}
+{"kind": "probe", "owner": 1, "start_ns": 300810155221916, "end_ns": 300810161385708, "ns": 6163792}
+{"kind": "probe", "owner": 0, "start_ns": 300810170819083, "end_ns": 300810172503541, "ns": 1684458}
+{"kind": "probe", "owner": 3, "start_ns": 300810177814250, "end_ns": 300810182057708, "ns": 4243458}
+{"kind": "probe", "owner": 2, "start_ns": 300810182304416, "end_ns": 300810194314500, "ns": 12010084}
+{"kind": "probe", "owner": 1, "start_ns": 300810186036250, "end_ns": 300810195635541, "ns": 9599291}
+{"kind": "probe", "owner": 0, "start_ns": 300810193197041, "end_ns": 300810196121541, "ns": 2924500}
+{"kind": "probe", "owner": 3, "start_ns": 300810206109375, "end_ns": 300810221348625, "ns": 15239250}
+{"kind": "probe", "owner": 2, "start_ns": 300810218817333, "end_ns": 300810223220833, "ns": 4403500}
+{"kind": "probe", "owner": 0, "start_ns": 300810218863875, "end_ns": 300810223257083, "ns": 4393208}
+{"kind": "probe", "owner": 1, "start_ns": 300810220383625, "end_ns": 300810223263708, "ns": 2880083}
+{"kind": "probe", "owner": 3, "start_ns": 300810247415791, "end_ns": 300810264305416, "ns": 16889625}
+{"kind": "probe", "owner": 2, "start_ns": 300810250601875, "end_ns": 300810268122625, "ns": 17520750}
+{"kind": "probe", "owner": 1, "start_ns": 300810250795500, "end_ns": 300810268929583, "ns": 18134083}
+{"kind": "probe", "owner": 0, "start_ns": 300810250771416, "end_ns": 300810269694875, "ns": 18923459}
+{"kind": "probe", "owner": 3, "start_ns": 300810289479416, "end_ns": 300810296388708, "ns": 6909292}
+{"kind": "probe", "owner": 0, "start_ns": 300810294781250, "end_ns": 300810297177083, "ns": 2395833}
+{"kind": "probe", "owner": 2, "start_ns": 300810294208916, "end_ns": 300810297194583, "ns": 2985667}
+{"kind": "probe", "owner": 1, "start_ns": 300810294992250, "end_ns": 300810297231083, "ns": 2238833}
+{"kind": "probe", "owner": 0, "start_ns": 300810318056791, "end_ns": 300810318886916, "ns": 830125}
+{"kind": "probe", "owner": 3, "start_ns": 300810321335375, "end_ns": 300810324985250, "ns": 3649875}
+{"kind": "probe", "owner": 2, "start_ns": 300810322609000, "end_ns": 300810325687625, "ns": 3078625}
+{"kind": "probe", "owner": 1, "start_ns": 300810322918166, "end_ns": 300810325869250, "ns": 2951084}
+{"kind": "probe", "owner": 0, "start_ns": 300810340985666, "end_ns": 300810343019041, "ns": 2033375}
+{"kind": "probe", "owner": 3, "start_ns": 300810347193166, "end_ns": 300810347841708, "ns": 648542}
+{"kind": "probe", "owner": 1, "start_ns": 300810351169291, "end_ns": 300810352584083, "ns": 1414792}
+{"kind": "probe", "owner": 2, "start_ns": 300810351130750, "end_ns": 300810352771916, "ns": 1641166}
+{"kind": "probe", "owner": 0, "start_ns": 300810365809583, "end_ns": 300810366964041, "ns": 1154458}
+{"kind": "probe", "owner": 3, "start_ns": 300810372899666, "end_ns": 300810373740833, "ns": 841167}
+{"kind": "probe", "owner": 1, "start_ns": 300810373625625, "end_ns": 300810373976083, "ns": 350458}
+{"kind": "probe", "owner": 2, "start_ns": 300810377649416, "end_ns": 300810378953125, "ns": 1303709}
+{"kind": "probe", "owner": 0, "start_ns": 300810387471958, "end_ns": 300810387600125, "ns": 128167}
+{"kind": "probe", "owner": 1, "start_ns": 300810396925333, "end_ns": 300810400903625, "ns": 3978292}
+{"kind": "probe", "owner": 3, "start_ns": 300810397827583, "end_ns": 300810404248875, "ns": 6421292}
+{"kind": "probe", "owner": 2, "start_ns": 300810400998625, "end_ns": 300810404988125, "ns": 3989500}
+{"kind": "probe", "owner": 0, "start_ns": 300810409065958, "end_ns": 300810416596583, "ns": 7530625}
+{"kind": "probe", "owner": 1, "start_ns": 300810423033708, "end_ns": 300810423328541, "ns": 294833}
+{"kind": "probe", "owner": 3, "start_ns": 300810427076000, "end_ns": 300810430207041, "ns": 3131041}
+{"kind": "probe", "owner": 2, "start_ns": 300810427183333, "end_ns": 300810430682208, "ns": 3498875}
+{"kind": "probe", "owner": 0, "start_ns": 300810440545041, "end_ns": 300810442416291, "ns": 1871250}
+{"kind": "probe", "owner": 1, "start_ns": 300810447804541, "end_ns": 300810449389791, "ns": 1585250}
+{"kind": "probe", "owner": 2, "start_ns": 300810451367916, "end_ns": 300810452877666, "ns": 1509750}
+{"kind": "probe", "owner": 3, "start_ns": 300810452997791, "end_ns": 300810453518458, "ns": 520667}
+{"kind": "probe", "owner": 0, "start_ns": 300810465417166, "end_ns": 300810466481625, "ns": 1064459}
+{"kind": "probe", "owner": 1, "start_ns": 300810473152666, "end_ns": 300810475203666, "ns": 2051000}
+{"kind": "probe", "owner": 2, "start_ns": 300810474546083, "end_ns": 300810475596458, "ns": 1050375}
+{"kind": "probe", "owner": 3, "start_ns": 300810474566500, "end_ns": 300810475605541, "ns": 1039041}
+{"kind": "probe", "owner": 0, "start_ns": 300810489323625, "end_ns": 300810497905750, "ns": 8582125}
+{"kind": "probe", "owner": 1, "start_ns": 300810497868166, "end_ns": 300810504764583, "ns": 6896417}
+{"kind": "probe", "owner": 3, "start_ns": 300810498719208, "end_ns": 300810504818333, "ns": 6099125}
+{"kind": "probe", "owner": 2, "start_ns": 300810498689541, "end_ns": 300810504886583, "ns": 6197042}
+{"kind": "probe", "owner": 0, "start_ns": 300810521920416, "end_ns": 300810524940916, "ns": 3020500}
+{"kind": "probe", "owner": 2, "start_ns": 300810526187458, "end_ns": 300810527316666, "ns": 1129208}
+{"kind": "probe", "owner": 1, "start_ns": 300810527078250, "end_ns": 300810529525250, "ns": 2447000}
+{"kind": "probe", "owner": 3, "start_ns": 300810527208875, "end_ns": 300810529536958, "ns": 2328083}
+{"kind": "probe", "owner": 0, "start_ns": 300810546025291, "end_ns": 300810546694000, "ns": 668709}
+{"kind": "probe", "owner": 2, "start_ns": 300810550026000, "end_ns": 300810552892250, "ns": 2866250}
+{"kind": "probe", "owner": 1, "start_ns": 300810550827416, "end_ns": 300810553291000, "ns": 2463584}
+{"kind": "probe", "owner": 3, "start_ns": 300810550843000, "end_ns": 300810553496125, "ns": 2653125}
+{"kind": "probe", "owner": 0, "start_ns": 300810566773791, "end_ns": 300810567843291, "ns": 1069500}
+{"kind": "probe", "owner": 2, "start_ns": 300810600509375, "end_ns": 300810632609750, "ns": 32100375, "arm": "scalar", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300810600435000, "end_ns": 300810634353208, "ns": 33918208, "arm": "scalar", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 3, "start_ns": 300810601036875, "end_ns": 300810638811250, "ns": 37774375, "arm": "scalar", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 1, "start_ns": 300810601157500, "end_ns": 300810641339375, "ns": 40181875, "arm": "scalar", "round": 5, "warmup": false, "stage": "execute"}
+{"kind": "probe", "owner": 0, "start_ns": 300810658091083, "end_ns": 300810659033541, "ns": 942458, "arm": "scalar", "round": 5, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300810655685708, "end_ns": 300810668665791, "ns": 12980083, "arm": "scalar", "round": 5, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 3, "start_ns": 300810658924375, "end_ns": 300810669383750, "ns": 10459375, "arm": "scalar", "round": 5, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 1, "start_ns": 300810661696583, "end_ns": 300810669694875, "ns": 7998292, "arm": "scalar", "round": 5, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 0, "start_ns": 300810679809000, "end_ns": 300810680796458, "ns": 987458, "arm": "scalar", "round": 5, "warmup": false, "stage": "project"}
+{"kind": "probe", "owner": 2, "start_ns": 300810689573416, "end_ns": 300810696423041, "ns": 6849625}
+{"kind": "probe", "owner": 1, "start_ns": 300810689847875, "end_ns": 300810696504583, "ns": 6656708}
+{"kind": "probe", "owner": 3, "start_ns": 300810693235500, "end_ns": 300810699686833, "ns": 6451333}
+{"kind": "probe", "owner": 0, "start_ns": 300810707451666, "end_ns": 300810713906083, "ns": 6454417}
+{"kind": "probe", "owner": 1, "start_ns": 300810722160750, "end_ns": 300810731523833, "ns": 9363083}
+{"kind": "probe", "owner": 2, "start_ns": 300810722123208, "end_ns": 300810733427333, "ns": 11304125}
+{"kind": "probe", "owner": 3, "start_ns": 300810723787833, "end_ns": 300810733709125, "ns": 9921292}
+{"kind": "probe", "owner": 0, "start_ns": 300810737728375, "end_ns": 300810740827208, "ns": 3098833}
+{"kind": "probe", "owner": 1, "start_ns": 300810755380166, "end_ns": 300810756246000, "ns": 865834}
+{"kind": "probe", "owner": 2, "start_ns": 300810756583875, "end_ns": 300810757752500, "ns": 1168625}
+{"kind": "probe", "owner": 3, "start_ns": 300810758787208, "end_ns": 300810760595666, "ns": 1808458}
+{"kind": "probe", "owner": 0, "start_ns": 300810765992666, "end_ns": 300810767035041, "ns": 1042375}
+{"kind": "probe", "owner": 2, "start_ns": 300810779121333, "end_ns": 300810781855833, "ns": 2734500}
+{"kind": "probe", "owner": 1, "start_ns": 300810779926916, "end_ns": 300810781891250, "ns": 1964334}
+{"kind": "probe", "owner": 3, "start_ns": 300810784630500, "end_ns": 300810785501625, "ns": 871125}
+{"kind": "probe", "owner": 0, "start_ns": 300810787182416, "end_ns": 300810798348208, "ns": 11165792}
+{"kind": "probe", "owner": 1, "start_ns": 300810803256375, "end_ns": 300810805544375, "ns": 2288000}
+{"kind": "probe", "owner": 2, "start_ns": 300810806033583, "end_ns": 300810808006458, "ns": 1972875}
+{"kind": "probe", "owner": 3, "start_ns": 300810806315500, "end_ns": 300810808957125, "ns": 2641625}
+{"kind": "probe", "owner": 0, "start_ns": 300810820195333, "end_ns": 300810822044750, "ns": 1849417}
+{"kind": "probe", "owner": 2, "start_ns": 300810828541083, "end_ns": 300810831398666, "ns": 2857583}
+{"kind": "probe", "owner": 3, "start_ns": 300810829679750, "end_ns": 300810831750625, "ns": 2070875}
+{"kind": "probe", "owner": 1, "start_ns": 300810830591833, "end_ns": 300810832086041, "ns": 1494208}
+{"kind": "probe", "owner": 0, "start_ns": 300810846819166, "end_ns": 300810853308208, "ns": 6489042}
+{"kind": "probe", "owner": 2, "start_ns": 300810852749500, "end_ns": 300810856343916, "ns": 3594416}
+{"kind": "probe", "owner": 1, "start_ns": 300810852164166, "end_ns": 300810856395666, "ns": 4231500}
+{"kind": "probe", "owner": 3, "start_ns": 300810853206000, "end_ns": 300810856693416, "ns": 3487416}
+{"kind": "probe", "owner": 0, "start_ns": 300810876492583, "end_ns": 300810878602458, "ns": 2109875}
+{"kind": "probe", "owner": 3, "start_ns": 300810877913750, "end_ns": 300810879577166, "ns": 1663416}
+{"kind": "probe", "owner": 2, "start_ns": 300810880288750, "end_ns": 300810882257750, "ns": 1969000}
+{"kind": "probe", "owner": 1, "start_ns": 300810881315375, "end_ns": 300810882667208, "ns": 1351833}
+{"kind": "probe", "owner": 3, "start_ns": 300810901703791, "end_ns": 300810902749208, "ns": 1045417}
+{"kind": "probe", "owner": 0, "start_ns": 300810901254583, "end_ns": 300810902786125, "ns": 1531542}
+{"kind": "probe", "owner": 2, "start_ns": 300810903789416, "end_ns": 300810904351583, "ns": 562167}
+{"kind": "probe", "owner": 1, "start_ns": 300810906940500, "end_ns": 300810908228416, "ns": 1287916}
+{"kind": "probe", "owner": 0, "start_ns": 300810923037375, "end_ns": 300810927300041, "ns": 4262666}
+{"kind": "probe", "owner": 3, "start_ns": 300810922987958, "end_ns": 300810927751000, "ns": 4763042}
+{"kind": "probe", "owner": 1, "start_ns": 300810928954208, "end_ns": 300810929602916, "ns": 648708}
+{"kind": "probe", "owner": 2, "start_ns": 300810928107458, "end_ns": 300810931841708, "ns": 3734250}
+{"kind": "probe", "owner": 1, "start_ns": 300810951864833, "end_ns": 300810968478750, "ns": 16613917}
+{"kind": "probe", "owner": 3, "start_ns": 300810952205500, "end_ns": 300810968509416, "ns": 16303916}
+{"kind": "probe", "owner": 0, "start_ns": 300810951981000, "end_ns": 300810969012416, "ns": 17031416}
+{"kind": "probe", "owner": 2, "start_ns": 300810953864375, "end_ns": 300810969934333, "ns": 16069958}
+{"kind": "probe", "owner": 0, "start_ns": 300810990483791, "end_ns": 300810997119125, "ns": 6635334}
+{"kind": "probe", "owner": 1, "start_ns": 300810989497541, "end_ns": 300810997505166, "ns": 8007625}
+{"kind": "probe", "owner": 3, "start_ns": 300810990559333, "end_ns": 300810997548541, "ns": 6989208}
+{"kind": "probe", "owner": 2, "start_ns": 300810994628750, "end_ns": 300810997921125, "ns": 3292375}
+{"kind": "gc", "usage": [[75.0, 6329760.0, 529328.0, 0.0], [76.0, 6329760.0, 529312.0, 0.0], [75.0, 6329760.0, 529312.0, 0.0], [76.0, 6329760.0, 529312.0, 0.0]]}
+{"kind": "summary", "summary": {"scalar": {"samples": 4, "actors_per_second_median": 4414.950260976024, "response_p99_ns": 223475333, "native_ready_p99_ns": 39269292, "projection_release_ns_median": 48128812.5, "probe_count": 52, "probe_p99_ns": 60515291, "projection_probe_count": 32, "projection_probe_p99_ns": 60515291, "probe_counts_by_owner": [15, 11, 12, 14], "probe_p99_ns_by_owner": [42494375, 60515291, 39881208, 45578875], "owner_max_pending_gap_ns": [11584750, 20115166, 17906041, 18937833], "owner_max_other_completions_while_pending": [5, 6, 6, 8], "actor_max_other_completions_while_pending": [3, 3, 3, 3]}, "owner-batch": {"samples": 4, "actors_per_second_median": 5715.98058432383, "response_p99_ns": 284975542, "native_ready_p99_ns": 172765417, "projection_release_ns_median": 8215166.5, "probe_count": 45, "probe_p99_ns": 76809834, "projection_probe_count": 4, "projection_probe_p99_ns": 17777958, "probe_counts_by_owner": [11, 12, 10, 12], "probe_p99_ns_by_owner": [76809834, 54201834, 73848125, 50897500], "owner_max_pending_gap_ns": [122138750, 107565084, 120687209, 116404000], "owner_max_other_completions_while_pending": [7, 8, 7, 6], "actor_max_other_completions_while_pending": [3, 3, 3, 3]}}, "roots": [0, 0, 0, 0], "states": [4459920608, 4471684320, 4483448032, 4495211744], "probe_failures": []}

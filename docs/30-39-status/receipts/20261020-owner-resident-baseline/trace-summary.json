@@ -1,0 +1,80 @@
+{
+  "fresh": {
+    "spans": {
+      "batch-call": {
+        "count": 512,
+        "wall_median_ms": 4.445958,
+        "wait_median_ms": 97.4853955
+      },
+      "call": {
+        "count": 128,
+        "wall_median_ms": 0.004583,
+        "wait_median_ms": 96.651542
+      },
+      "inspect": {
+        "count": 128,
+        "wall_median_ms": 0.004229,
+        "wait_median_ms": 4.301709
+      },
+      "projection-turn": {
+        "count": 16,
+        "wall_median_ms": 11.8993335,
+        "wait_median_ms": 1.0895625
+      },
+      "release": {
+        "count": 128,
+        "wall_median_ms": 0.001458,
+        "wait_median_ms": 3.2864165
+      },
+      "release-turn": {
+        "count": 16,
+        "wall_median_ms": 0.020625,
+        "wait_median_ms": 0.3563125
+      }
+    },
+    "phase_medians_ms": {
+      "projection_envelope_ms": 25.319521,
+      "release_envelope_ms": 1.854271,
+      "between_envelopes_ms": 6.255771
+    }
+  },
+  "native": {
+    "spans": {
+      "batch-call": {
+        "count": 512,
+        "wall_median_ms": 0.018916,
+        "wait_median_ms": 5.7233335
+      },
+      "call": {
+        "count": 128,
+        "wall_median_ms": 0.0220205,
+        "wait_median_ms": 0.9502295
+      },
+      "inspect": {
+        "count": 128,
+        "wall_median_ms": 0.0105,
+        "wait_median_ms": 0.286729
+      },
+      "projection-turn": {
+        "count": 16,
+        "wall_median_ms": 12.047146,
+        "wait_median_ms": 0.308479
+      },
+      "release": {
+        "count": 128,
+        "wall_median_ms": 0.002771,
+        "wait_median_ms": 0.1287705
+      },
+      "release-turn": {
+        "count": 16,
+        "wall_median_ms": 0.076354,
+        "wait_median_ms": 0.2002495
+      }
+    },
+    "phase_medians_ms": {
+      "projection_envelope_ms": 23.561895999999997,
+      "release_envelope_ms": 0.768625,
+      "between_envelopes_ms": 6.0891455
+    }
+  }
+}

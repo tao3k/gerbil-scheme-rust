@@ -3,8 +3,12 @@
 mod budget;
 #[path = "support/orders.rs"]
 mod corpus;
+#[path = "scheme_service/entry.rs"]
+mod entry;
 #[path = "scheme_service/measurement.rs"]
 mod measurement;
+#[path = "scheme_service/native_wait.rs"]
+mod native_wait;
 #[path = "scheme_service/observation.rs"]
 mod observation;
 #[path = "scheme_service/workload.rs"]
@@ -130,6 +134,7 @@ fn main() {
         || s == "--class-route-ab"
         || s == "--short-service-ab"
         || s == "--phase-observation"
+        || s == "--ingress-ab"
         || s == "--budget-ab"
         || s == "--feed-ab"));
     let (progress, events) = mpsc::channel();
@@ -150,7 +155,8 @@ fn main() {
         args.iter()
             .filter(|s| matches!(
                 s.as_str(),
-                "--budget-ab"
+                "--ingress-ab"
+                    | "--budget-ab"
                     | "--feed-ab"
                     | "--split-layout-ab"
                     | "--short-layout-only"
@@ -160,7 +166,9 @@ fn main() {
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--budget-ab") {
+    let comparison = if args.iter().any(|s| s == "--ingress-ab") {
+        Comparison::Ingress
+    } else if args.iter().any(|s| s == "--budget-ab") {
         Comparison::Budget
     } else if args.iter().any(|s| s == "--feed-ab") {
         Comparison::Feed

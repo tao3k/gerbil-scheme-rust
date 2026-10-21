@@ -54,3 +54,22 @@ pub(super) fn snapshot(
             "contended_grants":row.contended_grants})
     }).collect::<Vec<_>>())
 }
+
+pub(super) fn wake(pool: &InstancePool, direct: bool) {
+    use gerbil_scheme::instances::SchemeServiceWake;
+    let mode = if direct {
+        SchemeServiceWake::NativePort
+    } else {
+        SchemeServiceWake::Watcher
+    };
+    let tickets: Vec<_> = (0..4)
+        .map(|owner| {
+            pool.dispatcher()
+                .configure_scheme_service_wake_on(owner, mode)
+                .unwrap()
+        })
+        .collect();
+    for ticket in tickets {
+        ticket.wait(GATE).unwrap();
+    }
+}

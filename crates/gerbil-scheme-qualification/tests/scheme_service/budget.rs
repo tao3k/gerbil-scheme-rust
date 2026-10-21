@@ -6,6 +6,17 @@ pub(super) fn configure(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&
         Err(InstanceError::InvalidConfig(_))
     ));
     for owner in 0..4 {
+        for mode in [
+            gerbil_scheme::instances::SchemeServiceWake::NativePort,
+            gerbil_scheme::instances::SchemeServiceWake::Watcher,
+            gerbil_scheme::instances::SchemeServiceWake::NativePort,
+        ] {
+            dispatch
+                .configure_scheme_service_wake_on(owner, mode)
+                .unwrap()
+                .wait(GATE)
+                .unwrap();
+        }
         let before = dispatch
             .scheme_service_budget_on(owner)
             .unwrap()
@@ -18,6 +29,14 @@ pub(super) fn configure(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&
             .wait(GATE)
             .unwrap();
     }
+    let deadline = command(dispatch, 0, 15);
+    assert!(
+        deadline[0] >= 500_000,
+        "native host deadline did not wait: {deadline:?}"
+    );
+    progress
+        .send("native port reader transfer and host deadline passed")
+        .unwrap();
     let contract = command(dispatch, 0, 13);
     assert_eq!(&contract[..4], &[0, 1, 2, 3]);
     assert_eq!(&contract[4..], &[2, 2, 0, 1, 1, 2, 0, 0, 0]);

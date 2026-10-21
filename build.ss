@@ -11,7 +11,7 @@
       "scheme/runtime-object-kinds.ss" "scheme/runtime-composites.ss")))
     "scheme/service-budget"
     "scheme/actor-batch"
-    "scheme/async-service"
+    (gxc: "scheme/async-service" (extra-inputs: ("scheme/service-port-wake.ss")))
     "scheme/program-build"
     "scheme/python-runtime"
     "scheme/python-package")

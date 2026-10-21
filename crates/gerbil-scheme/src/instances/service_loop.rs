@@ -12,6 +12,18 @@ use std::{
     sync::{atomic::Ordering, mpsc},
     time::Instant,
 };
+fn dequeue(requests: &mpsc::Receiver<Request>, wake: &Wake) -> Result<Request, mpsc::TryRecvError> {
+    let request = requests.try_recv()?;
+    if let Work::Service(job) = &request.work {
+        if let Some(trace) = job.entry_trace() {
+            trace.mark(super::SchemeServiceEntryPhase::Dequeued);
+            if let Some(monitor) = wake.observation.get() {
+                trace.owner(monitor);
+            }
+        }
+    }
+    Ok(request)
+}
 struct Pending {
     job: Box<dyn Job>,
     _permit: Option<super::capacity::CapacityPermit>,
@@ -76,7 +88,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=3)
+        || !matches!(initialized[1], 1..=4)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -110,6 +122,11 @@ struct Pump<'a> {
 }
 impl Pump<'_> {
     fn receive(&mut self, request: Request) -> Result<(), InstanceError> {
+        if let Work::Service(job) = &request.work {
+            if let Some(trace) = job.entry_trace() {
+                trace.mark(super::SchemeServiceEntryPhase::OwnerTurn);
+            }
+        }
         request.started.store(true, Ordering::Release);
         match request.work {
             Work::Service(mut job) => match observed(
@@ -158,6 +175,10 @@ impl Pump<'_> {
         Ok(())
     }
     fn collect(&mut self) -> Result<(), InstanceError> {
+        if self.wake.direct.load(Ordering::Acquire) && self.jobs.is_empty() {
+            return Ok(());
+        }
+
         for raw in observed(
             self.image,
             self.wake,
@@ -194,7 +215,7 @@ impl Pump<'_> {
             if index + 1 == maximum {
                 return self.collect();
             }
-            match requests.try_recv() {
+            match dequeue(requests, self.wake) {
                 Ok(next) if matches!(&next.work, Work::Service(_)) => request = next,
                 Ok(next) => {
                     self.collect()?;
@@ -213,7 +234,7 @@ impl Pump<'_> {
         use super::batch_stream_runner::ProducerStep;
         let mut draining = false;
         loop {
-            let incoming = requests.try_recv().ok();
+            let incoming = dequeue(requests, self.wake).ok();
             let feed_limit = wake.feed_limit.load(Ordering::Acquire);
             if feed_limit > 1
                 && incoming
@@ -234,7 +255,7 @@ impl Pump<'_> {
                 continue;
             }
             self.collect()?;
-            if let Some(request) = incoming.or_else(|| requests.try_recv().ok()) {
+            if let Some(request) = incoming.or_else(|| dequeue(requests, self.wake).ok()) {
                 self.receive(request)?;
                 continue;
             }
@@ -252,7 +273,7 @@ impl Pump<'_> {
             // Clear/coalesce, then recheck. An enqueue before clear is visible in
             // the inbox; one after recheck publishes a fresh native pipe byte.
             wake.arm();
-            match requests.try_recv() {
+            match dequeue(requests, self.wake) {
                 Ok(request) => {
                     self.receive(request)?;
                     continue;
@@ -328,7 +349,7 @@ pub(super) fn run(
         if let Some(mut producer) = pump.producer {
             producer.reject(error.clone());
         }
-        while let Ok(request) = requests.try_recv() {
+        while let Ok(request) = dequeue(requests, wake) {
             if let Work::Service(job) = request.work {
                 job.fail(error.clone());
             }

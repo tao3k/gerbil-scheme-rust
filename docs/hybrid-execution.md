@@ -292,3 +292,20 @@ sizes and active state. A resumed wait obtains another grant: grant counts are
 not completed-order counts. Dynamic extents balance leases on exceptions and
 continuation exits/reentry. Closing requires drained workers, leases and waiters.
 See [native policy qualification and negative results](30-39-status/30.38-cooperative-scheme-units-and-class-fairness.org).
+
+
+### Owner ingress and native input port (explicit opt-in)
+
+ABI v4 adds `configure_scheme_service_wake_on(owner, SchemeServiceWake::NativePort)`.
+The ticket confirms Scheme's idle reader transfer before Rust changes transport
+state. `Watcher` remains the default. Scheme completions and host publication
+notify the same native input port; Gambit retains IO/timer and green-thread
+scheduling. The candidate skips empty host completion collection but does not
+replace Scheme execution or introduce Rust scheduling inside an instance.
+
+An explicit `SchemeServiceEntryTrace` on an individual request provides paired
+caller/owner timestamps, notification outcome and bounded phase-history overlap.
+History loss is reported; enclosing CPU/GC counters are not overlap CPU time.
+No entry clocks run for unobserved requests. The directed `--ingress-ab` bench
+keeps budget one in both arms, same VMs, native work, route, feed and collection.
+See [attribution, native controls and all results](30-39-status/30.39-owner-entry-attribution-and-native-port-wake.org).

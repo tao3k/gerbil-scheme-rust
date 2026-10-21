@@ -259,3 +259,15 @@ controls cover two-class contention, exceptions, GC, multi-shot continuations
 through disable/re-enable and close. The model source remains unchanged; this
 correspondence is not a mechanically proved implementation refinement. Unwrapped
 Scheme, GC and OS pauses remain outside the cooperative fairness claim.
+
+### Native input port candidate
+
+The existing publish/recheck/notification and root conservation model is reused
+for ABI v4 native-port wake. The real API changes mode only after jobs and unit
+leases drain, joins the old watcher before root-thread port ownership, and
+returns a native receipt before Rust enables its empty-collection shortcut.
+Four-VM tests switch both ways, check actual host deadlines, and retain GC,
+continuation, failure and close controls. The current finite model does not
+mechanically prove port buffering, reader transfer, elapsed deadlines or OS
+scheduling; native controls remain separate required evidence. Defaults retain
+the watcher bridge and disabled cooperative budget.

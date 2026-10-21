@@ -72,3 +72,22 @@ mod service_feed;
 mod service_budget;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_budget::SchemeCooperativeBudgetObservation;
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_entry;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_entry::{
+    SchemeServiceEntryObservation, SchemeServiceEntryPhase, SchemeServiceEntryTrace,
+};
+#[cfg(feature = "tokio-dispatch")]
+pub use service_wake::SchemeWakeDelivery;
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_history;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_history::SchemeServiceOwnerSpan;
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_port;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_port::SchemeServiceWake;

@@ -143,6 +143,10 @@ impl SchemeServiceRouter {
         timeout: Duration,
     ) -> Result<RoutedSchemeTicket<M::Output>, InstanceError> {
         let started = Instant::now();
+        let trace = message.entry_trace();
+        if let Some(trace) = &trace {
+            trace.mark(crate::instances::SchemeServiceEntryPhase::Route);
+        }
         if timeout.is_zero() {
             return Err(InstanceError::Timeout);
         }
@@ -171,6 +175,9 @@ impl SchemeServiceRouter {
             .await
             .map_err(|_| InstanceError::Timeout)?
             .map_err(|_| InstanceError::Closed)?;
+        if let Some(trace) = &trace {
+            trace.mark(crate::instances::SchemeServiceEntryPhase::ClassReady);
+        }
         let request = charge::RoutedRequest {
             message,
             units,

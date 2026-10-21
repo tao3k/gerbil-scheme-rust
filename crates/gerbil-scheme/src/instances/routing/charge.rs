@@ -97,6 +97,9 @@ pub(super) struct RoutedRequest<M> {
 }
 impl<M: SchemeServiceRequest> SchemeServiceRequest for RoutedRequest<M> {
     type Output = M::Output;
+    fn entry_trace(&self) -> Option<Arc<crate::instances::SchemeServiceEntryTrace>> {
+        self.message.entry_trace()
+    }
     fn work_units(&self) -> usize {
         self.units
     }

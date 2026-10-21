@@ -39,6 +39,7 @@ struct Phase {
 #[derive(Debug, Default)]
 pub(super) struct Monitor {
     phases: [Phase; 4],
+    pub(super) history: super::service_history::History,
 }
 fn nanos(seconds: f64) -> Option<u64> {
     Duration::try_from_secs_f64(seconds)
@@ -58,9 +59,10 @@ impl Monitor {
         let before = read();
         let value = action();
         let after = read();
+        let finished = Instant::now();
         let row = &self.phases[phase as usize];
         row.wall.fetch_add(
-            u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
+            u64::try_from(finished.duration_since(started).as_nanos()).unwrap_or(u64::MAX),
             Ordering::Relaxed,
         );
         row.calls.fetch_add(1, Ordering::Relaxed);
@@ -71,6 +73,7 @@ impl Monitor {
                 nanos((b[0] - a[0]) + (b[1] - a[1]))?,
             ])
         });
+        self.history.record(phase, started, finished, delta);
         if let Some([cpu, gc_real, gc_cpu]) = delta {
             row.cpu.fetch_add(cpu, Ordering::Relaxed);
             row.gc_real.fetch_add(gc_real, Ordering::Relaxed);

@@ -130,6 +130,16 @@ impl InstanceDispatcher {
             return Err(error);
         }
         let wake = sender.wake.clone();
+        #[cfg(feature = "tokio-dispatch")]
+        let trace = if let super::pool::Work::Service(job) = &request.work {
+            job.entry_trace().map(Arc::clone)
+        } else {
+            None
+        };
+        #[cfg(feature = "tokio-dispatch")]
+        if let Some(trace) = &trace {
+            trace.mark(super::SchemeServiceEntryPhase::Published);
+        }
         let result = sender.sender.try_send(request);
         #[cfg(feature = "tokio-dispatch")]
         if result.is_ok() {
@@ -138,6 +148,9 @@ impl InstanceDispatcher {
         // Request destruction may return a semaphore credit and wake a caller.
         // Never invoke foreign wakers under the admission/close fence.
         drop(senders);
+        #[cfg(feature = "tokio-dispatch")]
+        super::service_entry::notify(wake, result.is_ok(), trace);
+        #[cfg(not(feature = "tokio-dispatch"))]
         super::service_wake::notify_enqueued(wake, result.is_ok());
         result.map_err(|error| match error {
             mpsc::TrySendError::Full(_) => InstanceError::QueueFull,

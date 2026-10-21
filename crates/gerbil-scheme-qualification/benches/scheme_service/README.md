@@ -175,3 +175,29 @@ registered cooperative unit waiters; host entry, uncooperative handlers, GC and
 OS scheduling are separate and can still dominate request p99. State/continuation
 ownership and existing output/progress/cleanup checks remain required. Keep the
 negative captures and source identities; see status report 30.38.
+
+## Owner entry and native port wake
+
+```text
+just bridge-scheme-service-benchmark --budget-ab --phase-observation
+just bridge-scheme-service-benchmark --ingress-ab
+```
+
+The diagnostic observer pairs caller/owner timestamps for class readiness,
+native capacity, publication, wake write, dequeue, owner turn and construction.
+Only explicitly observed requests read these clocks. A bounded 256-interval
+owner history reports overlap with completed native phases and flags lost
+history. Full enclosing CPU/GC counters are not clipped to request overlap.
+The native select trace uses a separately calibrated monotonic clock; its
+calibration uncertainty is retained. Observed runs diagnose costs and are not
+unobserved performance acceptance.
+
+The ingress pair uses budget one in both arms, identical native work, short
+queues, class routing, FIFO collection and feed one. Its candidate explicitly
+selects `SchemeServiceWake::NativePort`: Scheme directly waits on the existing
+input port for host input and Scheme completion notifications. It also omits
+empty completion collection when no host service jobs remain. These are coupled
+protocol changes, not independently attributed speedups. The watcher bridge
+remains the default; mode changes require an idle service and join its old
+reader before transferring ownership. Gambit retains IO, timers, Actors,
+continuations and green-thread scheduling. No Rust green scheduler is added.

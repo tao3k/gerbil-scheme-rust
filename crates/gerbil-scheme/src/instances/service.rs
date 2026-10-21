@@ -18,6 +18,11 @@ use tokio::sync::oneshot;
 /// No continuation may escape a foreign frame or finalize the owning runtime.
 pub trait SchemeServiceRequest: Send + 'static {
     type Output: Send + 'static;
+    /// Optional caller/owner entry timing, disabled by default. Diagnostic only.
+    fn entry_trace(&self) -> Option<Arc<super::SchemeServiceEntryTrace>> {
+        None
+    }
+
     /// Pin a stateful session/continuation to a persistent Scheme service Actor.
     /// Independent requests use the available Scheme workers by default.
     fn lane(&self) -> Option<SchemeServiceLane> {
@@ -88,6 +93,7 @@ impl InstanceDispatcher {
         message: M,
         timeout: Duration,
     ) -> Result<AsyncInstanceTicket<M::Output>, InstanceError> {
+        let trace = message.entry_trace();
         let lane = message.lane();
         let short = message.short_service();
         let units = message.work_units();
@@ -122,6 +128,9 @@ impl InstanceDispatcher {
             }
         }
         let reservation = self.reserve_owner(owner, timeout, units).await?;
+        if let Some(trace) = &trace {
+            trace.mark(super::SchemeServiceEntryPhase::CapacityReady);
+        }
         let (send, response) = oneshot::channel();
         let request = Request {
             started: Arc::new(AtomicBool::new(false)),
@@ -132,6 +141,7 @@ impl InstanceDispatcher {
                 send,
                 lane,
                 short,
+                trace,
                 submitted: false,
             })),
         };
@@ -143,6 +153,7 @@ impl InstanceDispatcher {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub(super) struct JobId(pub i64);
 pub(super) trait Job: Send {
+    fn entry_trace(&self) -> Option<&Arc<super::SchemeServiceEntryTrace>>;
     fn short_service(&self) -> bool;
     fn start(
         &mut self,
@@ -166,8 +177,12 @@ struct TypedJob<M: SchemeServiceRequest> {
     submitted: bool,
     lane: Option<SchemeServiceLane>,
     short: bool,
+    trace: Option<Arc<super::SchemeServiceEntryTrace>>,
 }
 impl<M: SchemeServiceRequest> Job for TypedJob<M> {
+    fn entry_trace(&self) -> Option<&Arc<super::SchemeServiceEntryTrace>> {
+        self.trace.as_ref()
+    }
     fn short_service(&self) -> bool {
         self.short
     }
@@ -186,6 +201,9 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
             input,
             output,
             |session| {
+                if let Some(trace) = &self.trace {
+                    trace.mark(super::SchemeServiceEntryPhase::Construct);
+                }
                 let value = self.message.construct(session)?;
                 let lane = self.lane.map_or(-1, |lane| i64::try_from(lane.0).unwrap());
                 let header = [1, lane, 1];

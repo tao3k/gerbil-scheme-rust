@@ -40,6 +40,7 @@ pub(super) struct Reply {
     pub constructed: Instant,
     pub projection: Instant,
     pub diagnostics: Option<[[f64; 6]; 3]>,
+    pub entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
 }
 struct Orders {
     request: NumericServiceBatch<i64>,
@@ -48,10 +49,14 @@ struct Orders {
     short_mode: ShortMode,
     construction_before: Option<[f64; 6]>,
     construction_after: Option<[f64; 6]>,
+    entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
     _bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 }
 impl SchemeServiceRequest for Orders {
     type Output = Reply;
+    fn entry_trace(&self) -> Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>> {
+        self.entry.clone()
+    }
     fn short_service(&self) -> bool {
         self.short_mode.dedicated()
     }
@@ -106,6 +111,7 @@ impl SchemeServiceRequest for Orders {
             constructed: self.constructed.unwrap(),
             projection,
             diagnostics,
+            entry: self.entry,
         })
     }
 }
@@ -122,6 +128,9 @@ fn orders(
         entered: None,
         constructed: None,
         short_mode,
+        entry: short_mode
+            .observed()
+            .then(|| Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default())),
         construction_before: None,
         construction_after: None,
         _bulk_permit: bulk_permit,
@@ -257,6 +266,7 @@ pub(super) struct Probes {
     pub pending: Vec<u128>,
     pub projection: Vec<u128>,
     pub completed: Vec<Instant>,
+    pub entry: Vec<Option<serde_json::Value>>,
 }
 pub(super) async fn probes(
     dispatch: InstanceDispatcher,
@@ -277,10 +287,12 @@ pub(super) async fn probes(
         pending: Vec::new(),
         projection: Vec::new(),
         completed: Vec::new(),
+        entry: Vec::new(),
     };
     for id in 0..count {
         let scheduled = released + Duration::from_micros(u64::try_from(id * 500).unwrap());
         tokio::time::sleep_until(tokio::time::Instant::from_std(scheduled)).await;
+        let anchor = short_mode.observed().then(super::native_wait::anchor);
         let start = Instant::now();
         let mut input = corpus::order(100_000 + id, false);
         input.truncate(14);
@@ -338,6 +350,9 @@ pub(super) async fn probes(
         values
             .projection
             .push(completed.duration_since(reply.projection).as_nanos());
+        values
+            .entry
+            .push(super::entry::receipt(&reply, start, anchor.as_ref()));
         values.diagnostics.push(reply.diagnostics);
         values.completed.push(completed);
     }

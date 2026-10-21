@@ -13,6 +13,14 @@ use std::{
 // This module is compiled only by the Darwin isolated-instances backend.
 #[cfg(feature = "tokio-dispatch")]
 use std::sync::atomic::AtomicUsize;
+/// Native pipe notification result; coalescing is not evidence of a lost wake.
+#[derive(Clone, Copy, Debug)]
+pub enum SchemeWakeDelivery {
+    Coalesced,
+    Written,
+    Full,
+    Failed,
+}
 const DARWIN_F_SETNOSIGPIPE: libc::c_int = 73;
 #[derive(Debug)]
 pub(super) struct Wake {
@@ -25,6 +33,8 @@ pub(super) struct Wake {
     pub service_version: AtomicUsize,
     #[cfg(feature = "tokio-dispatch")]
     pub feed_limit: AtomicUsize,
+    #[cfg(feature = "tokio-dispatch")]
+    pub direct: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
     pub observation: std::sync::OnceLock<Arc<super::service_metrics::Monitor>>,
     pending: AtomicBool,
@@ -75,6 +85,8 @@ impl Wake {
                 #[cfg(feature = "tokio-dispatch")]
                 feed_limit: AtomicUsize::new(1),
                 #[cfg(feature = "tokio-dispatch")]
+                direct: AtomicBool::new(false),
+                #[cfg(feature = "tokio-dispatch")]
                 observation: std::sync::OnceLock::new(),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
@@ -82,9 +94,9 @@ impl Wake {
             }),
         ))
     }
-    pub fn notify(&self) {
+    pub fn notify(&self) -> SchemeWakeDelivery {
         if self.pending.swap(true, Ordering::AcqRel) {
-            return;
+            return SchemeWakeDelivery::Coalesced;
         }
         let mut writer = self
             .writer
@@ -92,12 +104,14 @@ impl Wake {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         loop {
             match writer.write(&[1]) {
-                Ok(1) => return,
+                Ok(1) => return SchemeWakeDelivery::Written,
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => return,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    return SchemeWakeDelivery::Full;
+                }
                 _ => {
                     self.failed.store(true, Ordering::Release);
-                    return;
+                    return SchemeWakeDelivery::Failed;
                 }
             }
         }

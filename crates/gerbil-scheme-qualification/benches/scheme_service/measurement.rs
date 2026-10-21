@@ -25,6 +25,7 @@ pub(super) enum Comparison {
     ShortService,
     Feed,
     Budget,
+    Ingress,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -35,6 +36,7 @@ impl Comparison {
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
+            Self::Ingress => "same cooperative budget/native work; watcher versus native port wake",
             Self::Budget => {
                 "same short queues/router/native work/feed; Scheme cooperative budget disabled versus one"
             }
@@ -61,9 +63,15 @@ impl Strategy {
         Self {
             short_mode: if matches!(
                 comparison,
-                Comparison::ShortService | Comparison::Feed | Comparison::Budget
-            ) && (arm || matches!(comparison, Comparison::Feed | Comparison::Budget))
-            {
+                Comparison::ShortService
+                    | Comparison::Feed
+                    | Comparison::Budget
+                    | Comparison::Ingress
+            ) && (arm
+                || matches!(
+                    comparison,
+                    Comparison::Feed | Comparison::Budget | Comparison::Ingress
+                )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
                 comparison,
@@ -77,7 +85,10 @@ impl Strategy {
             ready_completion: comparison == Comparison::Combined && arm,
             class_routing: matches!(
                 comparison,
-                Comparison::ShortService | Comparison::Feed | Comparison::Budget
+                Comparison::ShortService
+                    | Comparison::Feed
+                    | Comparison::Budget
+                    | Comparison::Ingress
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -111,17 +122,11 @@ pub(super) fn run(
     } else {
         None
     };
-    if comparison == Comparison::Feed {
-        for owner in 0..4 {
-            pool.dispatcher()
-                .configure_scheme_service_feed_on(owner, if arm { 4 } else { 1 })
-                .unwrap();
-        }
-    }
-    if comparison == Comparison::Budget {
-        super::budget::configure(pool, arm);
-    }
+    configure(pool, comparison, arm);
     let before = observation.then(|| super::observation::snapshot(pool));
+    if observation {
+        super::native_wait::begin(pool);
+    }
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -164,13 +169,22 @@ pub(super) fn run(
         asynchronous,
         strategy,
     );
+    if observation {
+        value["native_wait_events"] = super::native_wait::finish(pool, inputs);
+    }
     if let Some(before) = before {
         value["owner_phases"] =
             super::observation::delta(&before, &super::observation::snapshot(pool));
     }
-    if comparison == Comparison::Budget {
-        value["scheme_budget"] = json!(usize::from(arm));
-        value["scheme_budget_counters"] = super::budget::snapshot(pool, arm, inputs, probes);
+    if matches!(comparison, Comparison::Budget | Comparison::Ingress) {
+        value["scheme_budget"] = json!(usize::from(arm || comparison == Comparison::Ingress));
+        value["native_port_wake"] = json!(comparison == Comparison::Ingress && arm);
+        value["scheme_budget_counters"] = super::budget::snapshot(
+            pool,
+            arm || comparison == Comparison::Ingress,
+            inputs,
+            probes,
+        );
     }
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
@@ -178,6 +192,22 @@ pub(super) fn run(
         1
     });
     value
+}
+fn configure(pool: &InstancePool, comparison: Comparison, arm: bool) {
+    if comparison == Comparison::Feed {
+        for owner in 0..4 {
+            pool.dispatcher()
+                .configure_scheme_service_feed_on(owner, if arm { 4 } else { 1 })
+                .unwrap();
+        }
+    }
+    if comparison == Comparison::Budget {
+        super::budget::configure(pool, arm);
+    }
+    if comparison == Comparison::Ingress {
+        super::budget::configure(pool, true);
+        super::budget::wake(pool, arm);
+    }
 }
 fn summarize(
     rows: Vec<gerbil_scheme_python::owner_dispatch::OwnerResult<workload::Reply>>,
@@ -257,7 +287,7 @@ fn summarize(
     json!({"orders":count,"asynchronous":asynchronous,"short_layout":strategy.short_mode.native(),"ready_completion":strategy.ready_completion,"class_routing":strategy.class_routing,"short_service":strategy.short_mode.dedicated(),"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
         "bulk_owner_native_ns":owner_native_ns,"bulk_service_ns":service,"bulk_construct_ns":construct,
         "bulk_pending_before_projection_ns":pending,"bulk_projection_retirement_ns":projection,
-        "probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
+        "probe_entry":probe.entry,"probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
         "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer})
 }

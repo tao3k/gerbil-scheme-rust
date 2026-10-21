@@ -5,9 +5,15 @@ struct PriorityRequest {
     short: bool,
     units: usize,
     affine: bool,
+    trace: Option<std::sync::Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
 }
 impl SchemeServiceRequest for PriorityRequest {
     type Output = Vec<i64>;
+    fn entry_trace(
+        &self,
+    ) -> Option<std::sync::Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>> {
+        self.trace.clone()
+    }
     fn short_service(&self) -> bool {
         self.short
     }
@@ -53,6 +59,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     ));
     dispatch.observe_scheme_service_on(0).unwrap();
     configure_feed(&dispatch);
+    let trace = std::sync::Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default());
     runtime.block_on(async {
         for (units, affine) in [(2, false), (1, true)] {
             let invalid = PriorityRequest {
@@ -60,6 +67,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
                 short: true,
                 units,
                 affine,
+                trace: None,
             };
             assert!(matches!(
                 dispatch
@@ -80,6 +88,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
                             short,
                             units: 1,
                             affine: false,
+                            trace: (id == 1).then(|| std::sync::Arc::clone(&trace)),
                         },
                         GATE,
                     )
@@ -120,6 +129,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         );
     });
     check_observation(&dispatch);
+    check_entry(&trace);
     let shutdown = pool.shutdown(GATE);
     assert!(shutdown.is_clean(), "{shutdown:?}");
     assert_eq!(shutdown.joined, 1);
@@ -174,9 +184,29 @@ fn configure_feed(dispatch: &InstanceDispatcher) {
 fn reject_active_budget(dispatch: &InstanceDispatcher) {
     assert!(
         dispatch
+            .configure_scheme_service_wake_on(
+                0,
+                gerbil_scheme::instances::SchemeServiceWake::NativePort
+            )
+            .unwrap()
+            .wait(GATE)
+            .is_err()
+    );
+    assert!(
+        dispatch
             .configure_scheme_service_budget_on(0, 0)
             .unwrap()
             .wait(GATE)
             .is_err()
     );
+}
+
+fn check_entry(trace: &gerbil_scheme::instances::SchemeServiceEntryTrace) {
+    let row = trace.snapshot();
+    let chain: Vec<_> = [2, 3, 6, 7, 8]
+        .map(|index| row.marks[index].unwrap())
+        .to_vec();
+    assert!(chain.windows(2).all(|pair| pair[0] <= pair[1]));
+    assert!(row.wake.is_some() && !row.history_lost);
+    assert!(row.marks[4].unwrap() <= row.marks[5].unwrap());
 }

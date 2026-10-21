@@ -239,3 +239,9 @@ AB/BA for ten samples per arm/load, 8,192 native orders and 64 native short prob
 Startup is untimed; the native five-second progress gate stays unchanged. Raw
 logs, binaries, source archives, disassembly and rejected prototypes stay outside
 Git. New-head CI remains independent from local checks.
+
+The existing native CI job explicitly runs the real-pipe controls with the Tokio
+feature and both unobserved/observed notification benchmark smoke modes. No job,
+thread matrix or timeout is added. Both exact CI smoke commands passed locally with four joins, zero roots and
+removed copied files. These receipts check the actual CI argument path and
+cleanup; they are not performance samples.

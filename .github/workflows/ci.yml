@@ -147,6 +147,9 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --feed-ab
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --feed-ab --phase-observation
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --budget-ab
+          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --notification-ab
+          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --notification-ab --phase-observation
+          cargo test -p gerbil-scheme --features tokio-dispatch --lib service_wake::tests --locked
           cargo test -p gerbil-scheme-qualification --features instance-dispatch --test owner_capacity --test owner_dispatch_faults --test owner_producer --test scheme_service --locked
       - name: Native owner Rust lint
         run: |

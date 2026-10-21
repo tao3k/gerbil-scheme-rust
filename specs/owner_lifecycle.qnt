@@ -14,6 +14,7 @@ module owner_lifecycle {
     unsafeCodeRelease: bool,
     capacityLimit: int, capacityHeld: Set[int], reserved: Set[int],
     workLimit: int, workHeld: Set[int],
+    producers: Set[int], staged: Set[int], producerJobs: Set[int],
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
@@ -26,6 +27,7 @@ module owner_lifecycle {
     unsafeCodeRelease: false,
     capacityLimit: JOBS.size(), capacityHeld: Set(), reserved: Set(),
     workLimit: JOBS.size() + 7, workHeld: Set(),
+    producers: Set(), staged: Set(), producerJobs: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
   // Job 1 is a batch of eight; the other requests have unit cost.
@@ -53,7 +55,7 @@ module owner_lifecycle {
     s' = { ...s, workHeld: s.workHeld.exclude(Set(r)) }
   }
   action configureWork(limit: int): bool = all {
-    s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, limit > 0,
+    s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, s.producers.size() == 0, limit > 0,
     s' = { ...s, workLimit: limit }
   }
   action reserve(r: int): bool = all {
@@ -63,20 +65,43 @@ module owner_lifecycle {
   }
   action admitReserved(r: int): bool = all {
     s.phase == "open", s.reserved.contains(r),
-    s' = { ...s, accepted: s.accepted.union(Set(r)), reserved: s.reserved.exclude(Set(r)) }
+    s' = { ...s, accepted: s.accepted.union(Set(r)), staged: s.staged.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)) }
   }
   action releaseReservation(r: int): bool = all {
     s.reserved.contains(r),
     s' = { ...s, reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)) }
   }
   action configureCapacity(limit: int): bool = all {
-    s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, limit > 0,
+    s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, s.producers.size() == 0, limit > 0,
     s' = { ...s, capacityLimit: limit }
   }
   action admit(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
-    s' = { ...s, accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
+    s' = { ...s, accepted: s.accepted.union(Set(r)), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
+  }
+  action registerProducer(owner: int): bool = all {
+    s.phase == "open", Set(1, 2).contains(owner), not(s.producers.contains(owner)),
+    s' = { ...s, producers: s.producers.union(Set(owner)) }
+  }
+  action stage(r: int): bool = all {
+    s.phase == "open", JOBS.contains(r), s.producers.contains(ASSIGNED.get(r)),
+    not(s.accepted.contains(r)), not(s.staged.contains(r)), not(s.workHeld.contains(r)),
+    s' = { ...s, staged: s.staged.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)) }
+  }
+  action cancelProducer(owner: int): bool = all {
+    s.phase == "closing", s.producers.contains(owner),
+    all {
+      val pending = s.staged.filter(job => ASSIGNED.get(job) == owner)
+      s' = { ...s, staged: s.staged.exclude(pending), producerJobs: s.producerJobs.exclude(pending),
+        reserved: s.reserved.exclude(pending), capacityHeld: s.capacityHeld.exclude(pending), workHeld: s.workHeld.exclude(pending) }
+    }
+  }
+  action finishProducer(owner: int): bool = all {
+    Set("open", "closing").contains(s.phase), s.producers.contains(owner),
+    s.producerJobs.filter(job => ASSIGNED.get(job) == owner).subseteq(s.completed),
+    s' = { ...s, producers: s.producers.exclude(Set(owner)),
+      producerJobs: s.producerJobs.filter(job => ASSIGNED.get(job) != owner) }
   }
   // Completion is an externally validated owner action, not Rust computation.
   action complete(r: int): bool = all {
@@ -90,7 +115,7 @@ module owner_lifecycle {
     s.accepted.contains(r), not(s.timedOut.contains(r)),
     s' = { ...s, timedOut: s.timedOut.union(Set(r)) }
   }
-  val canJoin = s.phase == "closing" and s.accepted.subseteq(s.completed)
+  val canJoin = s.phase == "closing" and s.accepted.subseteq(s.completed) and s.producers.size() == 0
   def canPublish(r: int): bool = s.phase == "open" and s.ready.contains(r)
   def canUse(r: int, owner: int): bool = and {
     s.phase == "open", s.registry.contains(r), s.roots.contains(r),
@@ -165,9 +190,13 @@ module owner_lifecycle {
     any { admit(r), complete(r), observeTimeout(r), publish(r), use(r, owner),
       release(r, owner), createExecutor, close, join, clearRegistry, retire,
       codeLease(r), releaseCodeLease(r), authorizeCodeRelease, quarantineCode, releaseCode,
+      registerProducer(owner), stage(r), cancelProducer(owner), finishProducer(owner),
       reserveWork(r), reserveSlot(r), cancelWork(r), configureWork(8), configureWork(9), reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
   }
   val safety = and {
+    s.producers.subseteq(Set(1, 2)), s.staged.subseteq(s.producerJobs), s.producerJobs.subseteq(JOBS),
+    s.producerJobs.subseteq(s.staged.union(s.accepted)), s.staged.intersect(s.accepted).size() == 0,
+    s.producerJobs.forall(job => s.producers.contains(ASSIGNED.get(job))),
     s.workLimit > 0, s.workHeld.subseteq(JOBS), s.capacityHeld.subseteq(s.workHeld),
     s.workHeld.intersect(s.completed).size() == 0,
     Set(1, 2).forall(owner => workUsed(owner) <= s.workLimit),
@@ -181,7 +210,7 @@ module owner_lifecycle {
     not(s.latePublication), not(s.lateExecutor), not(s.foreignUse),
     implies(s.phase == "open", s.registry.subseteq(s.roots)),
     implies(Set("joined", "closed").contains(s.phase), and {
-      s.accepted.subseteq(s.completed), s.roots.size() == 0 }),
+      s.accepted.subseteq(s.completed), s.roots.size() == 0, s.producers.size() == 0 }),
     implies(s.phase == "closed", and { s.executor == "retired",
       not(s.filesPresent), s.registry.size() == 0 }),
     s.codeLeases.subseteq(JOBS), not(s.unsafeCodeRelease),
@@ -190,6 +219,11 @@ module owner_lifecycle {
       s.codeLeases.size() == 0, not(s.codeQuarantined) })
   }
 
+  action unsafeProducerExit(owner: int): bool = all {
+    s.producers.contains(owner), s.producerJobs.filter(job => ASSIGNED.get(job) == owner).size() > 0,
+    s' = { ...s, producers: s.producers.exclude(Set(owner)) }
+  }
+  action unsafeProducerExitStep = { nondet owner = Set(1, 2).oneOf(); any { step, unsafeProducerExit(owner) } }
   action unsafeCreditReturn(r: int): bool = all {
     s.accepted.contains(r), not(s.completed.contains(r)), s.timedOut.contains(r),
     s' = { ...s, capacityHeld: s.capacityHeld.exclude(Set(r)) }
@@ -207,6 +241,18 @@ module owner_lifecycle {
   }
   action unsafeForeignStep = any { step, unsafeForeignUse }
 
+  run producerNativeRefillTest = init.then(configureWork(8)).then(registerProducer(1)).then(stage(1)).then(stage(3)).then(admit(1))
+    .then(all { assert(not(hasCapacity(3))), assert(safety), stutter }).then(complete(1)).then(admit(3)).then(complete(3))
+    .then(finishProducer(1)).then(all { assert(s.producers.size() == 0), assert(safety), stutter })
+  run producerCloseRejectsUnadmittedTest = init.then(configureWork(8)).then(registerProducer(1)).then(stage(1)).then(stage(3)).then(admit(1))
+    .then(observeTimeout(1)).then(close).then(cancelProducer(1))
+    .then(all { assert(s.workHeld.contains(1)), assert(not(s.accepted.contains(3))), assert(safety), stutter })
+    .then(complete(1)).then(finishProducer(1)).then(join).then(all { assert(safety), stutter })
+  run producerPartialWorkCloseTest = init.then(configureWork(8)).then(registerProducer(1)).then(stage(1)).then(reserveWork(1))
+    .then(close).then(cancelProducer(1)).then(finishProducer(1)).then(join)
+    .then(all { assert(s.workHeld.size() == 0), assert(s.accepted.size() == 0), assert(safety), stutter })
+  run earlyProducerExitMutationTest = init.then(registerProducer(1)).then(stage(1)).then(unsafeProducerExit(1))
+    .then(all { assert(not(safety)), stutter })
   run workAndSlotsAreIndependentTest = init.then(configureCapacity(4)).then(configureWork(8)).then(admit(1))
     .then(all { assert(hasSlot(3)), assert(not(hasWork(3))), assert(safety), stutter })
     .then(observeTimeout(1)).then(all { assert(workUsed(1) == 8), assert(safety), stutter })

@@ -29,6 +29,7 @@ pub(super) async fn bulk(
     dispatch: InstanceDispatcher,
     inputs: Arc<Vec<Vec<i64>>>,
     batch: usize,
+    producer: bool,
     released: Instant,
 ) -> Bulk {
     let jobs = inputs
@@ -36,32 +37,36 @@ pub(super) async fn bulk(
         .enumerate()
         .map(|(index, items)| (index * batch / 32 % 4, items.to_vec()))
         .collect();
-    let outputs = owner_flow_backpressured(
-        jobs,
-        FlowControl {
-            budget: WindowBudget {
-                released,
-                timeout: GATE,
+    let outputs = if producer {
+        super::producer::run(dispatch, jobs, released).await
+    } else {
+        owner_flow_backpressured(
+            jobs,
+            FlowControl {
+                budget: WindowBudget {
+                    released,
+                    timeout: GATE,
+                },
+                maximum_in_flight: 128,
             },
-            maximum_in_flight: 128,
-        },
-        move |owner, items| {
-            let dispatch = dispatch.clone();
-            async move {
-                dispatch
-                    .submit_numeric_batch_profiled_backpressured(
-                        items,
-                        BatchAdmission {
-                            owner,
-                            yield_every: 1,
-                            timeout: GATE.saturating_sub(released.elapsed()),
-                        },
-                    )
-                    .await
-            }
-        },
-    )
-    .await;
+            move |owner, items| {
+                let dispatch = dispatch.clone();
+                async move {
+                    dispatch
+                        .submit_numeric_batch_profiled_backpressured(
+                            items,
+                            BatchAdmission {
+                                owner,
+                                yield_every: 1,
+                                timeout: GATE.saturating_sub(released.elapsed()),
+                            },
+                        )
+                        .await
+                }
+            },
+        )
+        .await
+    };
     let mut clocks = vec![Vec::new(); 4];
     let mut actor_peer_min = None;
     let mut service = Vec::new();

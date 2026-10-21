@@ -98,28 +98,39 @@ impl InstanceDispatcher {
             #[cfg(feature = "tokio-dispatch")]
             work_units: 1,
             work: Work::Native(Box::new(move |image| {
-                let first = image.next_retained.get();
-                let session = NativeSession {
-                    image,
-                    maximum_input,
-                    maximum_output,
-                    transferred: Cell::new(0),
-                };
-                let value = if crate::instance_backend::images_ready() {
-                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| job(&session)))
-                        .unwrap_or(Err(InstanceError::TaskPanicked))
-                } else {
-                    Err(InstanceError::Closed)
-                };
-                if value.is_err() {
-                    image.rollback_retained(first);
-                }
-                let value = image.balanced().and(value);
-                if !deliver((value, Instant::now())) {
-                    // An abandoned reply must not retain newly created owner roots.
-                    image.rollback_retained(first);
-                }
+                run_native(image, maximum_input, maximum_output, job, deliver);
             })),
         }
+    }
+}
+
+/// Shared execution/rollback path for ordinary requests and owner-local turns.
+pub(super) fn run_native<R>(
+    image: &super::image::Image,
+    maximum_input: usize,
+    maximum_output: usize,
+    job: impl FnOnce(&NativeSession<'_>) -> Result<R, InstanceError>,
+    deliver: impl FnOnce(super::types::Completed<R>) -> bool,
+) {
+    let first = image.next_retained.get();
+    let session = NativeSession {
+        image,
+        maximum_input,
+        maximum_output,
+        transferred: Cell::new(0),
+    };
+    let value = if crate::instance_backend::images_ready() {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| job(&session)))
+            .unwrap_or(Err(InstanceError::TaskPanicked))
+    } else {
+        Err(InstanceError::Closed)
+    };
+    if value.is_err() {
+        image.rollback_retained(first);
+    }
+    let value = image.balanced().and(value);
+    if !deliver((value, Instant::now())) {
+        // An abandoned reply must not retain newly created owner roots.
+        image.rollback_retained(first);
     }
 }

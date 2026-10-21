@@ -261,3 +261,12 @@ lifecycle, Quint, Ubuntu Cargo bindings and Ubuntu Bazel bindings. The macOS Car
 and Bazel gates are still running; Scheme SMP is explicitly skipped. This pending
 state is not an exact-head remote pass. Publication of the follow-up must not
 cancel the predecessor run; the follow-up then requires its own exact-head CI.
+
+
+* Follow-up: bounded producer on the native owner
+
+The predecessor =53d1dc7= subsequently completed all six active CI jobs; =66b3a1a=
+was then pushed to PR #18 and has its own exact-head CI run. This report's results
+and earlier pending-CI observation remain historical receipts.
+[[file:30.30-bounded-native-owner-producer.org][30.30]] holds batch/work/slot limits fixed while removing per-turn host replenishment.
+It retains this report's CPU regressions and adds its own negatives and failure.

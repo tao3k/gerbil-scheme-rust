@@ -81,5 +81,9 @@ required-features = ["instance-dispatch"]
 name = "owner_dispatch_faults"
 required-features = ["instance-dispatch"]
 
+[[test]]
+name = "owner_producer"
+required-features = ["instance-dispatch"]
+
 [lints]
 workspace = true

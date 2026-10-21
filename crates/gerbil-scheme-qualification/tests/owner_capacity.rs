@@ -27,6 +27,7 @@ fn drained(dispatch: &InstanceDispatcher, limit: usize) {
             owner.limit == limit
                 && owner.available == limit
                 && owner.work_available == owner.work_limit
+                && owner.producer_available == 1
         }) {
             return;
         }

@@ -40,12 +40,20 @@ pub(super) enum Work {
         response: mpsc::Sender<super::types::Completed<InstanceReply>>,
     },
     Native(Box<dyn FnOnce(&Image) + Send>),
+    #[cfg(feature = "tokio-dispatch")]
+    Producer(Box<dyn super::batch_stream_runner::Producer>),
+    #[cfg(feature = "tokio-dispatch")]
+    Wake,
 }
 impl std::fmt::Debug for Work {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Bytes { .. } => "ByteRequest",
             Self::Native(_) => "NativeTypeJob",
+            #[cfg(feature = "tokio-dispatch")]
+            Self::Producer(_) => "BoundedBatchProducer",
+            #[cfg(feature = "tokio-dispatch")]
+            Self::Wake => "OwnerWake",
         })
     }
 }
@@ -193,26 +201,7 @@ impl InstancePool {
                     }
                 };
                 let _ = ready.send(Ok(image.receipt.clone()));
-                for request in requests {
-                    // Retain the optional shared credit through execution, delivery
-                    // and abandoned-reply rollback, not just queue removal.
-                    #[cfg(feature = "tokio-dispatch")]
-                    let _capacity = request.capacity;
-                    request.started.store(true, Ordering::Release);
-                    match request.work {
-                        Work::Native(job) => job(&image),
-                        Work::Bytes { bytes, response } => {
-                            let value = if crate::instance_backend::images_ready() {
-                                image
-                                    .invoke(&bytes, config.maximum_reply_bytes)
-                                    .map(|bytes| InstanceReply { owner, bytes })
-                            } else {
-                                Err(InstanceError::Closed)
-                            };
-                            let _ = response.send((value, Instant::now()));
-                        }
-                    }
-                }
+                super::owner_loop::run(&image, &requests, config.maximum_reply_bytes);
                 let receipt = {
                     let _guard = LIFECYCLE
                         .lock()

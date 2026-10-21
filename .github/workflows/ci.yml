@@ -136,11 +136,11 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --profile --grouped-ab
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --focused-flow
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_capacity --profile dev --locked -- --test
-          cargo test -p gerbil-scheme-qualification --features instance-dispatch --test owner_capacity --test owner_dispatch_faults --locked
+          cargo test -p gerbil-scheme-qualification --features instance-dispatch --test owner_capacity --test owner_dispatch_faults --test owner_producer --locked
       - name: Native owner Rust lint
         run: |
           cargo clippy -p gerbil-scheme --features external-program,isolated-instances,tokio-dispatch --lib --locked -- -D warnings
-          cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --test owner_dispatch_faults --test owner_capacity --locked -- -D warnings
+          cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
 
   # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
   # execution inside a VM. Restore this job only with a qualified SDK release.

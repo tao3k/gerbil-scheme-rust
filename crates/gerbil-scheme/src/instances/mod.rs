@@ -23,7 +23,14 @@ mod native_dispatch;
 mod object_api;
 mod objects;
 pub use native::{NativeRoot, NativeSession};
+#[cfg(feature = "tokio-dispatch")]
+mod batch_stream;
+#[cfg(feature = "tokio-dispatch")]
+mod batch_stream_runner;
+mod owner_loop;
 mod pool;
+#[cfg(feature = "tokio-dispatch")]
+pub use batch_stream::{BatchStreamRow, NumericBatchStreamTicket, ProfiledBatchStreamTicket};
 mod preflight;
 mod retained;
 pub use retained::RetainedValue;

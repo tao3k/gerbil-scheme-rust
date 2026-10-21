@@ -8,11 +8,12 @@ just bridge-owner-capacity-benchmark
 ```
 
 This focused bench retains four identical native Scheme VM states and two Tokio
-workers. The current AB/BA pair fixes request slots at four and native batch size
-at eight, changing only the per-owner declared item budget from 32 to eight. CPU
-and mixed cooperative Scheme waits use the same 48-line invoice corpus. This adds
-no thread/VM matrix and changes no production defaults. Historical request-capacity
-and batch-1/batch-8 pairs remain in status report 30.28 and their external captures.
+workers. The current AB/BA pair fixes request slots at four, native batch size
+and declared item budget at eight. It compares per-batch caller replenishment
+with an explicit producer registered on the native owner. CPU and mixed cooperative
+Scheme waits use the same 48-line invoice corpus. This adds no thread/VM matrix
+and changes no production defaults. Historical request-capacity and batch-size
+pairs remain in report 30.28; work-budget pairs and CPU regressions remain in 30.29.
 
 Each full sample offers 8,192 independent bulk orders and 64 four-line short
 probes scheduled every 500 microseconds. Smoke uses 256 and 8. Probes are one
@@ -77,9 +78,33 @@ external sample captures; summary p99 fields are derived from the same rows.
 
 Whole native turns remain non-preemptible to the Rust owner queue. Scheme Actor
 yields run other Scheme threads but cannot service another Rust entry mid-call.
-The candidate permits at most eight outstanding declared items per owner and
+Both arms permit at most eight reserved/accepted declared items per owner and
 rejects a larger indivisible batch; it does not silently split a batch or weaken
 exception/drain semantics. Eight bounded handlers imply a finite service boundary
 only if the application independently bounds each handler, GC and host scheduling.
 Arbitrary Scheme retains its complete capability and has no automatic wall-clock
 bound. Observed service p99 is a measurement, not an enforced deadline.
+
+
+The producer arm stages at most 128 original batches per cursor, bounded by this
+pool's native queue capacity. One registered producer per owner holds a separate
+metadata permit; each actual turn acquires the same work/slot credits. Staged Rust
+input is unadmitted work. Aggregate input/output bytes use existing transfer limits.
+For 8,192 orders the control makes 1,024 batch admissions; the producer makes eight
+cursor registrations (two per owner), still executing all 1,024 original Scheme
+calls with unchanged item counts/quantum. No batch splitting or fusion occurs.
+Both arms clone payloads inside the sample; producer grouping/reindexing and final
+row collection/independent oracle are included in elapsed timing.
+
+`owner_producer` identifies the arm. Per-turn bulk dispatch markers start at the
+first credit attempt, after any caller/cursor backlog waiting; those markers are
+not total bulk latency from sample release. Full native offsets retain release-to-
+completion clocks. Probe APIs and clocks are identical across arms. Common-window
+outside-service gaps are reconstructed from every bulk/probe entry/completion pair,
+excluding probe-only tails after bulk completion. Gaps include delivery, credit
+return, inbox/handoff and host scheduling; they are not pure Tokio CPU time.
+
+Report 30.30 preserves an initial full-run startup watchdog failure with no measured
+samples and `cleanup=UNVERIFIED`, plus separately sampled current/predecessor smoke
+controls. Do not overwrite or relabel that failure when collecting successful
+initialized-VM cohorts. It is not evidence that the startup defect was repaired.

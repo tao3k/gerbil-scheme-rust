@@ -3,6 +3,8 @@
 mod corpus;
 #[path = "owner_capacity/measurement.rs"]
 mod measurement;
+#[path = "owner_capacity/producer.rs"]
+mod producer;
 #[path = "owner_capacity/workload.rs"]
 mod workload;
 use gerbil_scheme::instances::{
@@ -15,17 +17,19 @@ use std::{
     time::Duration,
 };
 const GATE: Duration = Duration::from_secs(5);
-// One targeted pair: identical batch-8 workload, independent item budget.
+// One targeted pair: identical batch-8/work-8 workload, caller refill versus native owner producer.
 const PAIRS: [[Case; 2]; 1] = [[
     Case {
         capacity: 4,
-        work: 32,
+        work: 8,
         batch: 8,
+        producer: false,
     },
     Case {
         capacity: 4,
         work: 8,
         batch: 8,
+        producer: true,
     },
 ]];
 fn batch_contracts(
@@ -119,7 +123,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         "{}",
         json!({"event": "capacity_configuration", "states": states, "owners": 4,
         "rust_workers": 2, "bulk_invocation_credit": 128, "probe_interval_us": 500,
-        "case_scope": "one batch-8 work-budget pair; same VM, no automatic default promotion"})
+        "case_scope": "one batch-8 producer pair at work budget 8; same VM, no automatic default promotion"})
     );
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)

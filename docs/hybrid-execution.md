@@ -91,3 +91,33 @@ Observed service spans include native construction, Scheme/GC, projection and ro
 retirement; `submit_numeric_batch_profiled_backpressured` exposes the existing
 phase markers after weighted admission. No batch splitting, evaluator restriction
 or host preemption is introduced. See the [targeted batch-8 qualification](30-39-status/30.29-independent-work-budget-and-batch-service.org).
+
+
+## Explicit bounded producer on a native owner
+
+`submit_numeric_batch_stream_backpressured` and its profiled counterpart stage a
+bounded sequence of explicitly independent numeric batches on one fixed owner.
+The producer advances one original Scheme call per native return, checking the
+inbox and separately acquiring the same request/work credits for every turn. It
+removes a Tokio replenishment round trip per batch; Scheme still owns execution,
+Actors, green threads, continuations and GC. Arbitrary stateful/dependent calls
+retain the ordinary owner-pinned APIs and their ordering contract.
+
+A separate registration permit limits each owner to one producer. Staged turns
+cannot exceed the native queue capacity, and the existing transfer bounds apply
+in aggregate to input/output. Staged input is Rust-owned pending work, not accepted
+Scheme work. Completed numeric rows hold only bounded owned Rust data. Every
+turn releases native credits after the common execution/projection/root-retirement
+path; the final cursor result does not retain native roots.
+
+The admission budget is also the start deadline for unadmitted turns, measured
+from API entry. Close/deadline rejects unadmitted turns with no native completion
+clock. Entered calls drain normally; one batch's Scheme error does not cancel
+later explicitly independent batches. A receiver timeout never preempts Scheme.
+Waiting registration futures retain no owner-channel sender, so native close does
+not depend on rescheduling those external futures. Pending credit acquisition
+uses semaphore wakers and the blocking owner inbox/deadline, not periodic polling.
+
+This API is opt-in. The matched work-eight pipeline experiment, gains, fairness
+regressions and unresolved startup failure are recorded in
+[status report 30.30](30-39-status/30.30-bounded-native-owner-producer.org).

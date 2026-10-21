@@ -20,7 +20,7 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 | `admit`, `close` | `InstanceService::runtime`, closed flag, native pool admission |
 | `reserve`, `admitReserved`, `releaseReservation`, `configureCapacity` | `instances/capacity.rs`: shared owner reservations, the existing admission fence and quiescent reconfiguration |
 | `capacityHeld` | Optional permit on `pool::Request`, retained through native execution, delivery and abandoned-reply rollback |
-| `complete` | `instances/native_dispatch.rs::native_request_units`, fixed-owner completion |
+| `complete` | `instances/native_dispatch.rs::run_native`, fixed-owner completion |
 | `observeTimeout` | Ticket observation/draining; accepted Scheme work is not cancelled |
 | `publish` | `instance_runtime.rs::Registry::insert`, closed check under values lock |
 | `createExecutor` | `instance_batch.rs::rayon_pool`, closed check under pool lock |
@@ -57,10 +57,10 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 The safety predicate checks closed-state retirement, ownership, result/root
 conservation constraints and absence of late publication, late executor creation
 or foreign handle use. Shared credits additionally conserve reservations plus
-accepted work that has not completed, with a per-owner capacity bound. Six
+accepted work that has not completed, with a per-owner capacity bound. Seven
 mutations deliberately remove one boundary each: late publication, late executor
 creation, early join, foreign handle use, unsafe code release and early credit
-return on observation timeout. The code-lease extension also permits cloning an existing
+return on observation timeout, plus premature producer retirement. The code-lease extension also permits cloning an existing
 lease after join, but cannot create a first lease after code release.
 
 The model treats each owner code group as one resource. It does not model OS
@@ -73,7 +73,7 @@ or dependency failures cannot satisfy a negative control.
 
 The small domain has three requests and two owners; the wide domain has five
 requests and two owners. These are exploration parameters, not runtime limits.
-Each has nineteen deterministic scenarios and 1,000 sampled traces of at most 64
+Each has twenty-three deterministic scenarios and 1,000 sampled traces of at most 64
 transitions. A 12-transition symbolic check is a separate command. Neither finite
 simulation nor bounded symbolic checking is an unbounded theorem, implementation
 refinement, fairness proof or throughput result. Stuttering is allowed; arbitrary
@@ -145,3 +145,24 @@ retirement. Scheme-internal yields allow peer green threads to run; they do not
 service another Rust queue entry. Limiting the batch's item count bounds the number
 of handlers in a turn, not arbitrary handler duration. Hard wall-clock preemption
 is not introduced, and continuations, exceptions and drain semantics are unchanged.
+
+
+## Bounded native owner producer extension
+
+The same model now tracks one registered producer per owner, staged Rust input and
+producer-owned job identities. Staging does not accept native work or take work
+credits. Each original batch must still reserve the existing work/slot resources
+and cross the close fence. `producerNativeRefillTest` accepts consecutive original
+turns at the same work bound without a host-scheduler transition between them.
+The implementation only advances whole native calls after a foreign return; it
+contains no Scheme evaluator or Scheme Actor/green-thread scheduler.
+
+Close cancels unadmitted staged turns and their partial reservations. Accepted
+native work retains its credits through actual completion. The producer registration
+must retire before join or reconfiguration; the new premature-producer-exit mutation
+violates that invariant. Both domains have 23 deterministic scenarios and the
+integration gate requires seven actual invariant counterexamples. The finite
+abstraction does not model partial Tokio allocations, inbox wakers, output byte
+limits or native startup. Those remain direct source/native controls, including
+close while a host registration future remains deliberately unpolled. No symbolic,
+starvation-freedom, GC implementation or cold-start reliability theorem is added.

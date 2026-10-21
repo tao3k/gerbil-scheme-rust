@@ -8,15 +8,18 @@ pub(super) struct Case {
     pub capacity: usize,
     pub batch: usize,
     pub work: usize,
+    pub producer: bool,
 }
 pub(super) fn idle(pool: &InstancePool) {
     let started = Instant::now();
     loop {
         let snapshots = pool.dispatcher().owner_capacity();
         if snapshots.len() == 4
-            && snapshots
-                .iter()
-                .all(|s| s.available == s.limit && s.work_available == s.work_limit)
+            && snapshots.iter().all(|s| {
+                s.available == s.limit
+                    && s.work_available == s.work_limit
+                    && s.producer_available == 1
+            })
         {
             return;
         }
@@ -41,7 +44,13 @@ pub(super) fn run(
     let probe_dispatch = pool.dispatcher();
     let (bulk, probe) = runtime.block_on(async {
         // One task per producer, never one per native request. Scheme stays on owners.
-        let bulk = runtime.spawn(workload::bulk(dispatch, bulk_inputs, case.batch, released));
+        let bulk = runtime.spawn(workload::bulk(
+            dispatch,
+            bulk_inputs,
+            case.batch,
+            case.producer,
+            released,
+        ));
         let probe = runtime.spawn(workload::probes(probe_dispatch, probes, released));
         let bulk = bulk.await.unwrap();
         let probe = probe.await.unwrap().unwrap();
@@ -111,7 +120,7 @@ pub(super) fn run(
         "bulk_scheme_ns": bulk.scheme, "bulk_collections": bulk.collections,
         "probe_service_ns": probe.service, "probe_queue_and_admission_ns": probe.queue,
         "probe_scheme_ns": probe.scheme,
-        "work_budget": case.work, "actor_peer_min": bulk.actor_peer_min, "capacity": case.capacity, "batch": case.batch})
+        "owner_producer": case.producer, "work_budget": case.work, "actor_peer_min": bulk.actor_peer_min, "capacity": case.capacity, "batch": case.batch})
 }
 fn series(samples: &[Value], field: &str) -> Vec<u128> {
     samples
@@ -154,7 +163,7 @@ pub(super) fn emit(samples: &[Value], pair: usize, arm: usize, mixed: bool) {
         "bulk_scheme_p99_ns": quantile(samples, "bulk_scheme_ns"),
         "probe_service_p99_ns": quantile(samples, "probe_service_ns"),
         "probe_queue_and_admission_p99_ns": quantile(samples, "probe_queue_and_admission_ns"),
-        "work_budget": samples[0]["work_budget"], "samples": samples.len(), "capacity": samples[0]["capacity"], "batch": samples[0]["batch"],
+        "owner_producer": samples[0]["owner_producer"], "work_budget": samples[0]["work_budget"], "samples": samples.len(), "capacity": samples[0]["capacity"], "batch": samples[0]["batch"],
         "bulk_orders": orders, "probe_orders": probes, "median_ns": elapsed,
         "median_bulk_ns": bulk_elapsed, "bulk_orders_per_second": u32::try_from(orders).map(f64::from).unwrap() / seconds(bulk_elapsed),
         "complete_orders_per_second": u32::try_from(orders + probes).map(f64::from).unwrap() / seconds(elapsed),

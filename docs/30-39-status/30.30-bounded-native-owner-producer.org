@@ -1,0 +1,248 @@
+#+TITLE: Bounded production on the native owner and Scheme pipeline qualification
+#+STARTUP: overview
+
+* Published baseline and scope
+
+The predecessor =53d1dc705683d3b42f0eeaaa8a71085cc9a62d14= completed all six active
+CI jobs in run =39546119880=; Scheme SMP was explicitly skipped. The verified
+work-budget commit =66b3a1aef2d02fcd7d6e79828205ff1cf8aa3470= was then pushed to
+[[https://github.com/tao3k/gerbil-scheme-rust/pull/18][PR #18]] and has its own exact-head run =39548823079=. Its result is separate
+from this local producer qualification and must not be transferred to a later commit.
+
+[[file:30.29-independent-work-budget-and-batch-service.org][30.29]] retains CPU-bound throughput losses of 36.7% and 7.6% when work 32 is reduced
+to eight. A full batch then exhausts all eight work credits, so each following
+batch waits for a Rust producer to resume on Tokio, reserve and enqueue. This
+refinement removes that per-turn host replenishment requirement while preserving
+the same work-eight and request-slot-four limits. No production default changes.
+
+* Actual library protocol
+
+The opt-in =submit_numeric_batch_stream_backpressured= and profiled counterpart
+register a bounded sequence of explicitly independent original numeric batches
+on a fixed native owner. The owner advances one complete native call at a time.
+It checks its inbox at every foreign-return boundary. Scheme still owns evaluation,
+Actors, green threads, continuations and GC; the Rust owner pump does not schedule
+Scheme threads, reenter an active Scheme call or translate Scheme into Rust.
+
+| Resource | Bound and meaning |
+|----------+-------------------|
+| Native request slots | Existing configured bound, four in this qualifier; each actual turn separately acquires a slot |
+| Native work credits | Existing declared item budget, eight in both arms; includes partial reservations and accepted work |
+| Producer registration | One cursor per owner, including an acquired registration not yet queued |
+| Staged Rust input | At most native queue capacity batches per cursor, 128 here, and aggregate existing input-byte limit |
+| Completed Rust rows | Aggregate existing output-byte limit; no native Scheme roots are exported |
+
+Registration is not blanket native acceptance of all staged work. Every original
+batch separately acquires the same work-then-slot permit pair and crosses the
+existing admission/close fence. The native call uses the same =run_native= execution,
+exception catch, retained-root rollback and balance check as ordinary requests.
+The turn's owned result is placed in a bounded Rust accumulator before returning
+its native credits. The final cursor reply retains only owned numeric Rust data.
+
+The producer preserves its input order. Ordinary queued requests retain their FIFO
+order; independent producer turns may interleave between them. Stateful/dependent
+multi-call work uses the ordinary owner-pinned APIs. No generic call or batch is
+silently split, fused or made reorderable by the new API.
+
+A queued short work reservation shares FIFO semaphore credits with the producer.
+The producer does not reserve its following batch while the current Scheme call
+is active. At the boundary it returns credits, checks the inbox and attempts the
+next original turn. Already queued short reservations participate first. The
+work bound constrains native reserved/accepted units, not all external caller
+futures or a universal multi-client latency SLO. Arbitrary Scheme handlers still
+have no automatic wall-clock service bound.
+
+** Waiting, deadlines and retirement
+
+Semaphore-only acquisition is polled on the fixed owner without entering a Tokio
+runtime. If blocked, its waker posts a bounded inbox notification. The owner waits
+on its inbox until notification or the real deadline; there is no periodic polling,
+spin loop or artificial progress heartbeat. Tokio still handles cross-instance
+submission/collection and occasional cursor registration boundaries.
+
+The admission duration starts when the async API executes and bounds registration
+and the start of every unadmitted turn. Entered Scheme work drains without host
+preemption, even after receiver timeout/abandonment. Individual Scheme failures
+retain complete whole-batch acknowledgement/drain and do not cancel later explicitly
+independent batches. Rejected turns have no native completion clock.
+
+Close rejects unadmitted staged turns and closes both credit resources and producer
+registration. A waiting external registration future holds no owner-channel sender.
+Owners can therefore exit without waiting for Tokio to repoll those futures.
+Quiescent reconfiguration also waits for producer registration to retire. Wakers,
+semaphore returns, failed queue payloads and cursor destruction run outside the
+admission mutex. The default and non-Tokio paths remain available.
+
+* Directed same-VM experiment
+
+One pair only: caller replenishment versus the native owner producer. Both arms
+use four identical VM states, two Tokio workers, request slots four, item budget
+eight, batch eight and Scheme cooperative quantum one. Both use the existing native
+profiled batch implementation and the same independent invoice oracle.
+
+Each full sample has 8,192 independent 48-line bulk orders and 64 four-line probes
+at a nominal 500-microsecond interval. The control makes 1,024 batch admissions;
+the candidate makes eight cursor registrations, two per owner, still executing
+all 1,024 original Scheme calls. No handler work, batch count or native type
+construction/projection is removed. Payload cloning, candidate grouping/reindexing,
+result collection and independent Rust verification are included in sample time.
+
+A 256-order warmup precedes each arm. Five forward/reverse blocks give ten samples
+per arm. The probes use the same closed-loop API in both arms and retain their
+original scheduled timestamps. Scheduled latency includes inherited wake lateness;
+actual-entry latency is also reported. Per-turn bulk dispatch starts at its first
+credit attempt, after caller/cursor backlog waiting, so it is not total bulk latency.
+All native offsets from sample release are retained separately.
+
+Reconfiguration waits for slots, work and producer metadata to return; the VM state
+identities are unchanged across arms. The five-second startup/progress/observation
+gates are unchanged. The host has concurrent work; these paired receipts do not
+certify quiet-host performance or independent open-loop arrivals.
+
+* Initialization failure remains separate
+
+The first full capture, =producer-a.jsonl=, exits 70 before any measured samples:
+=CAPACITY-BENCH-STALL last=owner initialized cleanup=UNVERIFIED=. The original failed
+process was not sampled, so its exact blocking branch remains unresolved. It is
+not discarded, converted into a performance sample or called a repaired startup.
+
+Separate sampled smoke captures of the current and frozen predecessor executables
+both complete under the original gates. Current startup stacks show dyld loading
+and already initialized owners parked in their inboxes, before any producer is
+registered. These observations localize the repeated diagnostic route but do not
+establish the root cause of the original timeout. No timeout was widened.
+
+After the failed process had exited, a single matching temporary directory in its
+capture interval contained three generated image copies. Process death, file names,
+current-user ownership and all frozen image SHA-256 values were checked before
+removing those copies and that generated directory. This post-exit file cleanup
+is recorded separately; the failed native cleanup receipt remains =UNVERIFIED=.
+Successful later cohorts qualify already initialized VMs, not cold-start reliability.
+
+* Native and model controls
+
+The real =owner_capacity=, =owner_dispatch_faults= and new =owner_producer= targets
+pass. The producer target validates registration/turn/input/output bounds, finite
+unadmitted-turn deadlines, abandoned receivers, reconfiguration rejection, Scheme
+batch error/drain followed by recovery, and a queued short call preceding the
+first producer turn. It captures a continuation, forces GC, executes producer
+turns, then resumes that continuation twice and completes dynamic-wind cleanup
+with the existing 23/107/109/31 oracle. Close joins all four owners with zero roots
+and removed copied files while a host registration future is deliberately unpolled.
+
+The existing real =instance_resources --smoke= capability gate also passes on the
+changed shared execution path: six reuse epochs of 128 jobs yield 720 successes,
+42 expected Scheme errors and six injected Rust panics. It exercises native type,
+continuation and GC controls, then joins four owners with zero roots, removed files
+and returned file/thread counts. This smoke run does not separately qualify macro/DSL
+or general procedure evaluation. Its existing code-image
+retention policy reports four retained images; this is not a new unload or long-RSS
+acceptance result.
+
+Core Tokio and non-Tokio strict lints and the affected benchmark/native-test lints
+pass. The reused =owner_lifecycle.qnt= tracks registered producers, staged Rust
+inputs and accepted turns under the original credit invariants. Both finite domains
+pass 23 scenarios, 1,000 sampled traces/domain of at most 64 transitions, and seven
+actual mutation counterexamples. Partial Tokio allocation, inbox wake mechanics,
+bytes, native startup and Scheme GC remain native/source checks. No unbounded,
+symbolic, optimality or starvation-freedom theorem is claimed.
+
+* Matched results and negatives
+
+Full cohorts B and C each retain 40 samples, four summaries, four real Scheme
+batch error/recovery controls and clean four-owner shutdown with zero roots and
+removed copied files. They share the same frozen executable and native image.
+The failed A capture and sampled diagnostic runs remain outside these results.
+Times are milliseconds; rates count bulk orders per second. Each arm has ten samples.
+
+| Cohort/load | Caller -> producer bulk rate | Rate change | Scheduled probe p99 | Actual-entry probe p99 |
+|-------------+-------------------------------+-------------+---------------------+------------------------|
+| B / CPU | 414396 -> 584150 | +41.0% | 15.851 -> 2.872 | 1.185 -> 0.496 |
+| B / mixed | 23915 -> 23904 | -0.0% | 137.665 -> 55.397 | 4.333 -> 3.719 |
+| C / CPU | 301606 -> 414823 | +37.5% | 70.028 -> 60.964 | 4.375 -> 4.232 |
+| C / mixed | 16596 -> 18820 | +13.4% | 251.229 -> 161.474 | 18.687 -> 9.332 |
+
+CPU-bound bulk throughput improves in both cohorts with the same work-eight budget;
+actual-entry probe p99 improves in both. Mixed throughput is flat in B and higher
+in C; its scheduled/actual-entry probe tails improve in both. These are conditional
+paired receipts on a shared host, not a promoted default or a transferred claim
+against the different historical executable in 30.29. Completed-work throughput is
+the primary performance outcome. Higher CPU utilization alone is not a regression;
+these captures do not attribute CPU time per arm and therefore do not establish
+CPU cost per completed order. Probe tails and owner progress remain separate
+observations alongside throughput.
+
+** Measured pipeline gap
+
+Reconstruct every owner's bulk/probe entry and native-completion intervals, then
+restrict to the common bulk-active window: latest first bulk entry through earliest
+last bulk completion. The outside-service gaps include result recording/delivery,
+credit return, inbox/handoff and host scheduling; they are not pure Tokio CPU time.
+Probe-only tails after bulk completion are excluded. All reconstructed intervals
+are non-overlapping on their fixed owner.
+
+| Cohort/load | Median gap fraction, caller -> producer | Gap p99, caller -> producer |
+|-------------+-----------------------------------------+-----------------------------|
+| B / CPU | 20.98% -> 3.58% | 0.164 -> 0.020 |
+| B / mixed | 1.34% -> 0.30% | 1.083 -> 0.041 |
+| C / CPU | 25.53% -> 7.01% | 1.073 -> 0.040 |
+| C / mixed | 19.01% -> 0.74% | 5.732 -> 0.267 |
+
+The gap reduction appears in both loads/cohorts and directly supports the proposed
+pipeline mechanism. It does not assign every gap to a single Tokio or OS cause.
+The producer retains a host registration boundary between bounded cursors, so it
+does not claim to remove all host coordination or impose a Scheme service deadline.
+
+** Retained native-service and fairness negatives
+
+| Cohort/load | Bulk service p99 | Observed service max | Scheme span p99 | GC-count totals |
+|-------------+------------------+----------------------+-----------------+-----------------|
+| B / CPU | 0.444 -> 0.401 | 1.474 -> 1.238 | 0.083 -> 0.312 | 438 -> 417 |
+| B / mixed | 2.464 -> 3.750 | 7.609 -> 8.137 | 2.413 -> 3.649 | 405 -> 426 |
+| C / CPU | 0.787 -> 0.605 | 11.825 -> 4.988 | 0.158 -> 0.335 | 430 -> 417 |
+| C / mixed | 5.216 -> 5.879 | 14.175 -> 29.700 | 4.861 -> 5.582 | 416 -> 422 |
+
+Mixed bulk service p99 worsens in both cohorts despite improved short-request
+waiting. Do not reinterpret the throughput gain as faster execution/GC of every
+Scheme turn, or hide the increased observed service tails. Native image and handler
+work are unchanged; these captures alone do not attribute the regression to GC,
+Scheme sleep scheduling or host preemption. Service maxima remain observed receipts,
+not hard bounds. The CPU regressions in 30.29 also remain unchanged and published.
+
+| Cohort/load | Minimum owner progress at first owner finish | Minimum probes completing during bulk | Scheme Actor peer minimum |
+|-------------+----------------------------------------------+----------------------------------------+---------------------------|
+| B / CPU | 1720 -> 1464 of 2048 | 34 -> 24 of 64 | 1 -> 1 |
+| B / mixed | 2008 -> 1984 of 2048 | 64 -> 64 of 64 | 0 -> 0 |
+| C / CPU | 1224 -> 960 of 2048 | 47 -> 14 of 64 | 0 -> 0 |
+| C / mixed | 1872 -> 1888 of 2048 | 64 -> 64 of 64 | 0 -> 0 |
+
+CPU owner progress regresses in both cohorts; mixed B also regresses. Faster CPU
+bulk completion reduces probe overlap, especially C's producer arm. Both mixed
+arms retain all 64 probes during bulk. Internal Actor minima do not improve.
+No uniform owner fairness or Scheme-thread starvation-freedom claim is admitted.
+The protocol stays explicit and unpromoted; the mixed service regression and
+unresolved cold-start failure remain concrete follow-up work.
+
+* Artifact identity and portable reproduction
+
+Use the unchanged native Cargo/SDK compilation recipe from the repository root:
+
+#+begin_example
+just bridge-owner-capacity-benchmark --test
+just bridge-owner-capacity-benchmark
+#+end_example
+
+The frozen Rust executable SHA-256 is
+=8b4414aa43bfc5728e7a5065d5d2098c335628ea517815f08a6d6cbd9f19c324=.
+The native image SHA-256 remains
+=772e86e8bda56ca1fa523bd5c4023b61b191137243ac9e34a6bb40c7f0a09437=,
+byte-identical to the work-budget predecessor. Scheme still compiles through
+Gerbil -> Gambit C -> native O2. No SDK patch, Bash driver or SMP work occurs.
+
+External evidence names are =producer-manifest.json=, =producer-final-build.jsonl=,
+=producer-native.log=, =producer-model.log=, =producer-b.jsonl=, =producer-c.jsonl=,
+and =producer-summary.json=. Failed =producer-a=, startup samples and post-exit
+file cleanup retain their own identities. Raw logs, stacks, images and binaries
+remain outside Git. JSON is diagnostic output, not the Scheme payload interface.
+No installed Python performance, new memory soak, quiet-host SLO or universal
+cold-start/native-lifecycle acceptance is claimed by this focused experiment.

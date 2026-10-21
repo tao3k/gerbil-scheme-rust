@@ -15,6 +15,8 @@ pub struct OwnerCapacitySnapshot {
     pub work_limit: Option<usize>,
     /// Work credits include reservations waiting for a request slot.
     pub work_available: Option<usize>,
+    /// One permits no registered owner-local producer; zero means one is live.
+    pub producer_available: usize,
 }
 /// Explicit native Scheme batch routing and finite capacity-wait budget.
 #[derive(Clone, Copy, Debug)]
@@ -33,15 +35,17 @@ pub(super) struct Capacity {
     pub slots: Arc<Semaphore>,
     pub work: Option<Arc<Semaphore>>,
     pub work_limit: usize,
+    pub producer: Arc<Semaphore>,
 }
 impl Capacity {
     pub fn close(&self) {
         self.slots.close();
+        self.producer.close();
         if let Some(work) = &self.work {
             work.close();
         }
     }
-    fn units(&self, units: usize) -> Result<u32, InstanceError> {
+    pub(super) fn units(&self, units: usize) -> Result<u32, InstanceError> {
         let units = u32::try_from(units)
             .map_err(|_| InstanceError::InvalidConfig("work units overflow"))?;
         if units == 0 || (self.work.is_some() && units as usize > self.work_limit) {
@@ -186,29 +190,7 @@ impl InstanceDispatcher {
                     ))?,
             )
         };
-        let units = capacity.units(units)?;
-        // Consistent work-before-slot ordering: no waiter holds a slot while
-        // waiting for work. Cancellation/timeout drops partial work ownership.
-        let acquire = async {
-            let work = match &capacity.work {
-                Some(work) => Some(
-                    Arc::clone(work)
-                        .acquire_many_owned(units)
-                        .await
-                        .map_err(|_| InstanceError::Closed)?,
-                ),
-                None => None,
-            };
-            let slot = Arc::clone(&capacity.slots)
-                .acquire_owned()
-                .await
-                .map_err(|_| InstanceError::Closed)?;
-            Ok::<_, InstanceError>(CapacityPermit {
-                capacity: Arc::clone(&capacity),
-                slot: Some(slot),
-                work,
-            })
-        };
+        let acquire = acquire_pair(capacity, units);
         let permit = tokio::time::timeout(timeout, acquire)
             .await
             .map_err(|_| InstanceError::Timeout)??;
@@ -218,6 +200,32 @@ impl InstanceDispatcher {
         }
         Ok(ReservedOwner { owner, permit })
     }
+}
+
+/// Semaphore-only acquisition: safe to poll on a native owner without entering Tokio.
+pub(super) async fn acquire_pair(
+    capacity: Arc<Capacity>,
+    units: usize,
+) -> Result<CapacityPermit, InstanceError> {
+    let units = capacity.units(units)?;
+    let work = match &capacity.work {
+        Some(work) => Some(
+            Arc::clone(work)
+                .acquire_many_owned(units)
+                .await
+                .map_err(|_| InstanceError::Closed)?,
+        ),
+        None => None,
+    };
+    let slot = Arc::clone(&capacity.slots)
+        .acquire_owned()
+        .await
+        .map_err(|_| InstanceError::Closed)?;
+    Ok(CapacityPermit {
+        capacity,
+        slot: Some(slot),
+        work,
+    })
 }
 
 fn configure(
@@ -235,7 +243,8 @@ fn configure(
     }
     if senders.owners.iter().any(|owner| {
         owner.capacity.as_ref().is_some_and(|capacity| {
-            capacity.slots.available_permits() != owner.capacity_limit
+            capacity.producer.available_permits() != 1
+                || capacity.slots.available_permits() != owner.capacity_limit
                 || capacity
                     .work
                     .as_ref()
@@ -252,6 +261,7 @@ fn configure(
             slots: Arc::new(Semaphore::new(maximum_in_flight)),
             work: maximum_work.map(|n| Arc::new(Semaphore::new(n))),
             work_limit: maximum_work.unwrap_or(0),
+            producer: Arc::new(Semaphore::new(1)),
         })));
         owner.capacity_limit = maximum_in_flight;
     }
@@ -277,6 +287,7 @@ fn snapshot(senders: &super::dispatch::Senders) -> Vec<OwnerCapacitySnapshot> {
                     available: capacity.slots.available_permits(),
                     work_limit: capacity.work.as_ref().map(|_| capacity.work_limit),
                     work_available: capacity.work.as_ref().map(|work| work.available_permits()),
+                    producer_available: capacity.producer.available_permits(),
                 })
         })
         .collect()

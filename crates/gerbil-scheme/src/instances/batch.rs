@@ -79,11 +79,17 @@ pub(super) fn validate<T>(
             "native batch item/quantum bound",
         ));
     }
-    let bytes = items.iter().try_fold((items.len() + 3) * 8, |sum, item| {
-        sum.checked_add(std::mem::size_of_val(item.as_slice()))
-    });
+    let bytes = input_size(items);
     if bytes.is_none_or(|bytes| bytes > maximum) {
         return Err(InstanceError::InvalidConfig("native batch input bound"));
     }
     Ok(())
+}
+
+pub(super) fn input_size<T>(items: &[Vec<T>]) -> Option<usize> {
+    items
+        .iter()
+        .try_fold((items.len() + 3).checked_mul(8)?, |sum, item| {
+            sum.checked_add(std::mem::size_of_val(item.as_slice()))
+        })
 }

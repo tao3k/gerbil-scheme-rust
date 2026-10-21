@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 /// One asynchronous owner result. A timeout does not cancel accepted Scheme work.
 #[derive(Debug)]
 pub struct AsyncInstanceTicket<R> {
-    response: tokio::sync::oneshot::Receiver<super::types::Completed<R>>,
+    pub(super) response: tokio::sync::oneshot::Receiver<super::types::Completed<R>>,
 }
 impl<R> AsyncInstanceTicket<R> {
     /// Wait with a finite delivery budget, returning the native completion timestamp.

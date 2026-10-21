@@ -1,7 +1,7 @@
-;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=00ecc9512d2bf6c8142658315c49e69458c44076bad3bcdf6e2f0083f2a0b463 body-sha256=4eb190036a66b93bf014b910ee342cfa4ac86f0231713e05b7b4883bd6182008
+;; gerbil-scheme-rust.generated-scm-provenance.v1 input-sha256=fa15a6168c798d36633007c36cc78c11afe0db190b237c920846e73aed101929 body-sha256=04d92db15c039e23462b63a21dcecc3c69c57ae623449ee902a1a0333a907978
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1792493758)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1792563480)
   (begin
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))
@@ -222,7 +222,11 @@
       gerbil-rs-numeric-span
       gerbil-rs-numeric-create
       gerbil-rs-numeric-size
-      gerbil-rs-numeric-copy))
+      gerbil-rs-numeric-copy
+      gerbil-rs-numeric-value
+      gerbil-rs-numeric-batch-create
+      gerbil-rs-numeric-row-pointer
+      gerbil-rs-numeric-row-size))
     (namespace
      ("gerbil-scheme-rust/scheme/runtime#"
       gerbil-rs-identifier-create
@@ -370,6 +374,28 @@
         int32)
        int64
        "___SCMOBJ ___temp;\nvoid *body = 0; ___U64 count = 0, width = 0;\n#define GRS_NUMERIC(K,T,W) case K: if (!___##T##VECTORP(___arg1)) ___return(-1); count=___##T##VECTORSIZE(___arg1); width=W; body=___BODY_AS(___arg1,___t##T##VECTOR); break\nswitch (___arg2) {\n  GRS_NUMERIC(0,U16,2); GRS_NUMERIC(1,U32,4); GRS_NUMERIC(2,U64,8);\n  GRS_NUMERIC(3,F32,4); GRS_NUMERIC(4,F64,8);\n  GRS_NUMERIC(5,S16,2); GRS_NUMERIC(6,S32,4); GRS_NUMERIC(7,S64,8);\n  GRS_NUMERIC(8,S8,1);\n  default: ___return(-1);\n}\n#undef GRS_NUMERIC\nif (___arg6 == 2) ___return(count);\nif (___arg4 > count || ___arg5 > count-___arg4 ||\n    ___arg5 > SIZE_MAX/width || (___arg5 && !___arg3)) ___return(-1);\nif (___arg5) {\n  unsigned char *start = (unsigned char*)body + ___arg4*width;\n  unsigned char *destination, *source;\n  if (___arg6 == 0) { destination=___arg3; source=start; }\n  else if (___arg6 == 1) { destination=start; source=___arg3; }\n  else ___return(-1);\n  /* Constant-size copies allow unaligned spans without aliasing casts. */\n  ___U64 bytes=___arg5*width, offset=0;\n  for (; bytes-offset >= 8; offset+=8) {\n    ___U64 word; memcpy(&word,source+offset,8); memcpy(destination+offset,&word,8);\n  }\n  for (; offset < bytes; offset++) destination[offset]=source[offset];\n}\n___return(0);"))
+    (define (gerbil-rs-numeric-value kind bytes size)
+      (let ((value (case kind
+                     ((0) (make-u16vector size))
+                     ((1) (make-u32vector size))
+                     ((2) (make-u64vector size))
+                     ((3) (make-f32vector size))
+                     ((4) (make-f64vector size))
+                     ((5) (make-s16vector size))
+                     ((6) (make-s32vector size))
+                     ((7) (make-s64vector size))
+                     ((8) (make-s8vector size))
+                     (else #f))))
+        (and value
+             (= 0
+                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+                 value
+                 kind
+                 bytes
+                 0
+                 size
+                 1))
+             value)))
     (c-define
      (gerbil-rs-numeric-create kind bytes size)
      (int32 (pointer unsigned-int8) unsigned-int64)
@@ -379,29 +405,56 @@
      (with-exception-catcher
       (lambda (_exception) 0)
       (lambda ()
-        (let ((value (case kind
-                       ((0) (make-u16vector size))
-                       ((1) (make-u32vector size))
-                       ((2) (make-u64vector size))
-                       ((3) (make-f32vector size))
-                       ((4) (make-f64vector size))
-                       ((5) (make-s16vector size))
-                       ((6) (make-s32vector size))
-                       ((7) (make-s64vector size))
-                       ((8) (make-s8vector size))
-                       (else #f))))
-          (if (and value
-                   (= 0
-                      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
-                       value
-                       kind
-                       bytes
-                       0
-                       size
-                       1)))
+        (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-value
+                      kind
+                      bytes
+                      size)))
+          (if value
               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
                value)
               0)))))
+    (define gerbil-rs-numeric-row-pointer
+      (c-lambda
+       ((pointer void) unsigned-int64)
+       (pointer unsigned-int8)
+       "___return(((unsigned char * const *)___arg1)[___arg2]);"))
+    (define gerbil-rs-numeric-row-size
+      (c-lambda
+       ((pointer unsigned-int64) unsigned-int64)
+       unsigned-int64
+       "___return(___arg1[___arg2]);"))
+    (c-define
+     (gerbil-rs-numeric-batch-create kind pointers sizes count quantum)
+     (int32 (pointer void)
+            (pointer unsigned-int64)
+            unsigned-int64
+            unsigned-int64)
+     int64
+     "gerbil_scheme_rust_numeric_batch_create"
+     "extern"
+     (with-exception-catcher
+      (lambda (_exception) 0)
+      (lambda ()
+        (if (not (and (<= 0 kind 8) (<= 1 count 256) (<= 0 quantum 256)))
+            0
+            (let ((input (make-vector count)))
+              (let loop ((index 0))
+                (if (= index count)
+                    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+                     (vector (make-s64vector 1 quantum) input))
+                    (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-value
+                                  kind
+                                  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-pointer
+                                   pointers
+                                   index)
+                                  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-size
+                                   sizes
+                                   index))))
+                      (if value
+                          (begin
+                            (vector-set! input index value)
+                            (loop (+ index 1)))
+                          0)))))))))
     (c-define
      (gerbil-rs-numeric-size root index kind)
      (int64 int64 int32)

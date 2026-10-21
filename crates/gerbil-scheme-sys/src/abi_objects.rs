@@ -57,6 +57,17 @@ unsafe extern "C" {
     /// element bytes, disjoint from Scheme storage. Positive root transfers ownership.
     pub fn gerbil_scheme_rust_numeric_create(kind: i32, bytes: *const u8, len: u64) -> i64;
     /// # Safety
+    /// Fixed owner; readable arrays of count pointers/lengths and matching numeric
+    /// spans (kind 0..8). Count 1..256, quantum 0..256. Copies synchronously into
+    /// actual Scheme vectors; only the complete envelope transfers a strong root.
+    pub fn gerbil_scheme_rust_numeric_batch_create(
+        kind: i32,
+        pointers: *const *const u8,
+        lengths: *const u64,
+        count: u64,
+        quantum: u64,
+    ) -> i64;
+    /// # Safety
     /// Live owner/root; index -1 selects root, otherwise its snapshot slot.
     pub fn gerbil_scheme_rust_numeric_size(root: i64, index: i64, kind: i32) -> i64;
     /// # Safety

@@ -9,6 +9,7 @@ pub(super) struct Case {
     pub batch: usize,
     pub work: usize,
     pub producer: bool,
+    pub transfer_control: Option<bool>,
 }
 pub(super) fn idle(pool: &InstancePool) {
     let started = Instant::now();
@@ -49,6 +50,7 @@ pub(super) fn run(
             bulk_inputs,
             case.batch,
             case.producer,
+            case.transfer_control,
             released,
         ));
         let probe = runtime.spawn(workload::probes(probe_dispatch, probes, released));
@@ -118,6 +120,9 @@ pub(super) fn run(
         "bulk_completed_at_last_probe": bulk_before_last_probe, "probes_completed_during_bulk": probe_before_bulk_end,
         "bulk_service_ns": bulk.service, "bulk_queue_and_admission_ns": bulk.queue,
         "bulk_scheme_ns": bulk.scheme, "bulk_collections": bulk.collections,
+        "bulk_phases_ns": bulk.phases, "bulk_diagnostics": bulk.diagnostics,
+        "bulk_producer_offered_ns": bulk.producer_offered_ns,
+        "transfer_control": case.transfer_control, "native_batch_constructor": bulk.native_constructor_calls > 0, "native_batch_constructor_calls": bulk.native_constructor_calls,
         "probe_service_ns": probe.service, "probe_queue_and_admission_ns": probe.queue,
         "probe_scheme_ns": probe.scheme,
         "owner_producer": case.producer, "work_budget": case.work, "actor_peer_min": bulk.actor_peer_min, "capacity": case.capacity, "batch": case.batch})
@@ -163,7 +168,7 @@ pub(super) fn emit(samples: &[Value], pair: usize, arm: usize, mixed: bool) {
         "bulk_scheme_p99_ns": quantile(samples, "bulk_scheme_ns"),
         "probe_service_p99_ns": quantile(samples, "probe_service_ns"),
         "probe_queue_and_admission_p99_ns": quantile(samples, "probe_queue_and_admission_ns"),
-        "owner_producer": samples[0]["owner_producer"], "work_budget": samples[0]["work_budget"], "samples": samples.len(), "capacity": samples[0]["capacity"], "batch": samples[0]["batch"],
+        "native_batch_constructor": samples[0]["native_batch_constructor"], "transfer_control": samples[0]["transfer_control"], "owner_producer": samples[0]["owner_producer"], "work_budget": samples[0]["work_budget"], "samples": samples.len(), "capacity": samples[0]["capacity"], "batch": samples[0]["batch"],
         "bulk_orders": orders, "probe_orders": probes, "median_ns": elapsed,
         "median_bulk_ns": bulk_elapsed, "bulk_orders_per_second": u32::try_from(orders).map(f64::from).unwrap() / seconds(bulk_elapsed),
         "complete_orders_per_second": u32::try_from(orders + probes).map(f64::from).unwrap() / seconds(elapsed),

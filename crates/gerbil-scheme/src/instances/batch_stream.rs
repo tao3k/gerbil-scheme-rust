@@ -16,6 +16,9 @@ pub struct BatchStreamRow<R> {
     pub value: Result<R, InstanceError>,
     /// Some only after the shared native execution/balance path returns.
     pub completed: Option<Instant>,
+    /// This cursor was offered to its fixed owner's inbox before turn admission.
+    /// Shared by its rows; does not imply that any staged turn was accepted.
+    pub offered: Instant,
 }
 /// Unprofiled owner-local numeric producer result.
 pub type NumericBatchStreamTicket<T> = AsyncInstanceTicket<Vec<BatchStreamRow<Vec<Vec<T>>>>>;
@@ -54,7 +57,9 @@ impl InstanceDispatcher {
         self.batch_stream(
             batches,
             admission,
-            |session, items, quantum, _| super::batch::execute(session, items, quantum, |_| {}),
+            |session, items, quantum, _| {
+                super::batch::execute_native(session, items, quantum, |_| {})
+            },
             |values| bytes(values),
         )
         .await
@@ -75,7 +80,7 @@ impl InstanceDispatcher {
         self.batch_stream(
             batches,
             admission,
-            super::batch_trace::execute_profiled,
+            super::batch_trace::execute_profiled_native,
             |result| bytes(&result.values),
         )
         .await

@@ -246,3 +246,12 @@ file cleanup retain their own identities. Raw logs, stacks, images and binaries
 remain outside Git. JSON is diagnostic output, not the Scheme payload interface.
 No installed Python performance, new memory soak, quiet-host SLO or universal
 cold-start/native-lifecycle acceptance is claimed by this focused experiment.
+
+
+* Native construction follow-up
+
+The producer commit =2ca8dea= completed all six active CI jobs in run =39552435474=;
+SMP remained explicitly skipped. [[file:30.31-native-batch-construction-and-owner-skew.org][30.31]] records the later native input-construction
+refinement, source-bound same-VM controls and remaining owner/mixed-tail limits.
+The historical executable, image, negative results and startup failure above remain
+unchanged; later qualification is not transferred to them.

@@ -50,12 +50,42 @@ pub(super) fn execute<T: NumericElement>(
     observe(BatchPhase::Constructed);
     let output = session.call(&envelope)?;
     observe(BatchPhase::Executed);
+    let values = project(session, &output, items.len())?;
+    observe(BatchPhase::Projected);
+    Ok(values)
+}
+/// Opt-in owner producers use the native bulk constructor when their image
+/// supports it. Older ABI-v3 images keep the existing rooted native path.
+pub(super) fn execute_native<T: NumericElement>(
+    session: &NativeSession<'_>,
+    items: &[Vec<T>],
+    yield_every: usize,
+    mut observe: impl FnMut(BatchPhase),
+) -> Result<Vec<Vec<T>>, InstanceError> {
+    if session.image.native.numeric_batch_create.is_none() {
+        return execute(session, items, yield_every, observe);
+    }
+    let envelope = session.numeric_batch_envelope(items, yield_every)?;
+    observe(BatchPhase::ConstructedTogether);
+    let output = session.call(&envelope)?;
+    observe(BatchPhase::Executed);
+    let values = project(session, &output, items.len())?;
+    observe(BatchPhase::Projected);
+    Ok(values)
+}
+fn project<T: NumericElement>(
+    session: &NativeSession<'_>,
+    output: &super::NativeRoot<'_>,
+    count: usize,
+) -> Result<Vec<Vec<T>>, InstanceError> {
     let mut total = 0_usize;
-    let values = (0..items.len())
+    (0..count)
         .map(|index| {
-            let item = session.vector_element(&output, index)?;
-            let values =
-                session.copy_numeric_bounded::<T>(&item, session.maximum_output - total)?;
+            let values = session.copy_numeric_element_bounded::<T>(
+                output,
+                index,
+                session.maximum_output - total,
+            )?;
             total = total
                 .checked_add(std::mem::size_of_val(values.as_slice()))
                 .ok_or(InstanceError::InvalidConfig("native batch output overflow"))?;
@@ -64,9 +94,7 @@ pub(super) fn execute<T: NumericElement>(
             }
             Ok(values)
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    observe(BatchPhase::Projected);
-    Ok(values)
+        .collect::<Result<Vec<_>, _>>()
 }
 
 pub(super) fn validate<T>(

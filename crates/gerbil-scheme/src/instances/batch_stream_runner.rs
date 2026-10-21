@@ -44,6 +44,7 @@ pub(super) struct BatchProducer<T, R> {
     rows: Vec<BatchStreamRow<R>>,
     acquiring: Option<Acquiring>,
     dispatched: Instant,
+    offered: Instant,
     waker: Waker,
     deadline: Instant,
     quantum: usize,
@@ -70,6 +71,7 @@ impl<T, R> BatchProducer<T, R> {
             deadline,
             waker,
         } = registration;
+        let offered = Instant::now();
         Self {
             admission: Arc::downgrade(&dispatch.admission),
             owner: admission.owner,
@@ -78,7 +80,8 @@ impl<T, R> BatchProducer<T, R> {
             rows: Vec::with_capacity(batches.len()),
             batches: batches.into(),
             acquiring: None,
-            dispatched: Instant::now(),
+            dispatched: offered,
+            offered,
             waker,
             deadline,
             quantum: admission.yield_every,
@@ -142,6 +145,7 @@ where
             self.rows.push(BatchStreamRow {
                 value: Err(error.clone()),
                 completed: None,
+                offered: self.offered,
             });
         }
         self.finish();
@@ -202,6 +206,7 @@ where
         self.rows.push(BatchStreamRow {
             value,
             completed: Some(at),
+            offered: self.offered,
         });
         // Release before considering another turn; pending short callers share FIFO credits.
         drop(permit);

@@ -5,6 +5,8 @@ mod corpus;
 mod measurement;
 #[path = "owner_capacity/producer.rs"]
 mod producer;
+#[path = "owner_capacity/transfer.rs"]
+mod transfer;
 #[path = "owner_capacity/workload.rs"]
 mod workload;
 use gerbil_scheme::instances::{
@@ -24,12 +26,30 @@ const PAIRS: [[Case; 2]; 1] = [[
         work: 8,
         batch: 8,
         producer: false,
+        transfer_control: None,
     },
     Case {
         capacity: 4,
         work: 8,
         batch: 8,
         producer: true,
+        transfer_control: None,
+    },
+]];
+const TRANSFER_PAIRS: [[Case; 2]; 1] = [[
+    Case {
+        capacity: 4,
+        work: 8,
+        batch: 8,
+        producer: false,
+        transfer_control: Some(false),
+    },
+    Case {
+        capacity: 4,
+        work: 8,
+        batch: 8,
+        producer: false,
+        transfer_control: Some(true),
     },
 ]];
 fn batch_contracts(
@@ -94,7 +114,7 @@ fn batch_contracts(
     }
     measurement::idle(pool);
 }
-fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
+fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, transfer: bool) {
     // SAFETY: the existing Cargo graph owns the unchanged Scheme native batch ABI.
     let program = unsafe {
         IsolatedProgram::from_image(
@@ -123,7 +143,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         "{}",
         json!({"event": "capacity_configuration", "states": states, "owners": 4,
         "rust_workers": 2, "bulk_invocation_credit": 128, "probe_interval_us": 500,
-        "case_scope": "one batch-8 producer pair at work budget 8; same VM, no automatic default promotion"})
+        "case_scope": if transfer { "one bulk-native/rooted transfer pair; same VM and typed Scheme work" } else { "one batch-8 producer pair at work budget 8; same VM, no automatic default promotion" }})
     );
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -139,7 +159,14 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
                 .map(|id| corpus::order(id, mixed))
                 .collect::<Vec<_>>(),
         );
-        compare(&pool, &runtime, &inputs, (probes, smoke, mixed), progress);
+        compare(
+            &pool,
+            &runtime,
+            &inputs,
+            (probes, smoke, mixed),
+            if transfer { &TRANSFER_PAIRS } else { &PAIRS },
+            progress,
+        );
         assert_eq!(
             states,
             pool.owners().iter().map(|o| o.state).collect::<Vec<_>>()
@@ -181,9 +208,10 @@ fn compare(
     runtime: &tokio::runtime::Runtime,
     inputs: &Arc<Vec<Vec<i64>>>,
     (probes, smoke, mixed): (usize, bool, bool),
+    pairs: &[[Case; 2]],
     progress: &mpsc::Sender<&'static str>,
 ) {
-    for (pair, cases) in PAIRS.iter().enumerate() {
+    for (pair, cases) in pairs.iter().enumerate() {
         let warm = Arc::new(inputs[..256.min(inputs.len())].to_vec());
         for &case in cases {
             measurement::run(pool, runtime, &warm, 8, case);
@@ -213,7 +241,10 @@ fn compare(
 }
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    assert!(args.iter().all(|s| s == "--test" || s == "--bench"));
+    assert!(
+        args.iter()
+            .all(|s| s == "--test" || s == "--bench" || s == "--transfer-ab")
+    );
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
         let mut last = "start";
@@ -228,7 +259,11 @@ fn main() {
             }
         }
     });
-    run(&progress, args.iter().any(|s| s == "--test"));
+    run(
+        &progress,
+        args.iter().any(|s| s == "--test"),
+        args.iter().any(|s| s == "--transfer-ab"),
+    );
     drop(progress);
     watchdog.join().unwrap();
 }

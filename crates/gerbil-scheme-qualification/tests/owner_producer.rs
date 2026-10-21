@@ -72,6 +72,53 @@ fn blocked(
     (ticket, release)
 }
 fn controls(dispatch: &InstanceDispatcher, runtime: &tokio::runtime::Runtime) {
+    dispatch
+        .submit_native_on(0, |session| {
+            let child = session.numeric_vector(&[0_u64; 1024])?;
+            let parent = session.vector(&[&child])?;
+            drop(child);
+            session.collect()?;
+            let roots = session.usage()?[3];
+            assert!(matches!(
+                session.numeric_batch_envelope(&vec![vec![0_u64; 1024]; 3], 1),
+                Err(InstanceError::InvalidConfig(_))
+            ));
+            assert!(matches!(
+                session.numeric_batch_envelope::<u64>(&vec![Vec::new(); 257], 1),
+                Err(InstanceError::InvalidConfig(_))
+            ));
+
+            assert!(matches!(
+                session.copy_numeric_element::<u64>(&parent, 0),
+                Err(InstanceError::InvalidConfig("native output bound"))
+            ));
+            assert!(matches!(
+                session.copy_numeric_element::<i64>(&parent, 0),
+                Err(InstanceError::Native { .. })
+            ));
+            assert_eq!(session.usage()?[3].to_bits(), roots.to_bits());
+            let mut bad = batch(100);
+            bad[0][3] = -1;
+            let envelope = session.numeric_batch_envelope(&bad, 1)?;
+            session.collect()?;
+            assert!(matches!(
+                session.call(&envelope),
+                Err(InstanceError::Scheme(_))
+            ));
+            drop(envelope);
+            assert_eq!(session.usage()?[3].to_bits(), roots.to_bits());
+            let envelope = session.numeric_batch_envelope(&batch(200), 1)?;
+            session.collect()?;
+            let output = session.call(&envelope)?;
+            let rows = (0..8)
+                .map(|index| session.copy_numeric_element(&output, index))
+                .collect::<Result<Vec<_>, _>>()?;
+            verify(&rows, 200);
+            Ok(())
+        })
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
     for turns in [Vec::new(), vec![batch(1); 129], vec![vec![vec![1_i64]; 9]]] {
         assert!(matches!(
             runtime.block_on(
@@ -135,8 +182,24 @@ fn recovery_and_gc(dispatch: &InstanceDispatcher, runtime: &tokio::runtime::Runt
     assert_eq!(value, [23]);
     let (rows, _) = runtime.block_on(stream.wait_completed(GATE)).unwrap();
     assert_eq!(rows.len(), 3);
+    assert!(
+        rows.iter()
+            .all(|row| row.offered == rows[0].offered && row.offered <= row.completed.unwrap())
+    );
     assert!(short_completed <= rows[0].completed.unwrap());
     verify(&rows[0].value.as_ref().unwrap().values, 10);
+    let timeline = rows[0].value.as_ref().unwrap().timeline;
+    assert!(timeline.native_constructor);
+    assert_eq!(timeline.items_constructed, timeline.constructed);
+    assert_eq!(
+        timeline.diagnostics[2].unwrap()[4].to_bits(),
+        1_f64.to_bits()
+    );
+    assert_eq!(
+        timeline.diagnostics_after_retirement.unwrap()[4].to_bits(),
+        0_f64.to_bits()
+    );
+
     assert!(
         matches!(&rows[1].value,Err(InstanceError::Scheme(message)) if message.contains("Scheme actor batch handler failed"))
     );

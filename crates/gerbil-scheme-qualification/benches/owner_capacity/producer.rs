@@ -7,11 +7,15 @@ use gerbil_scheme_python::{
 };
 use std::time::Instant;
 type Job = (usize, Vec<Vec<i64>>);
+pub(super) struct Produced {
+    pub rows: Vec<OwnerResult<ProfiledBatch<i64>>>,
+    pub offered: Vec<Instant>,
+}
 pub(super) async fn run(
     dispatch: InstanceDispatcher,
     jobs: Vec<Job>,
     released: Instant,
-) -> Vec<OwnerResult<ProfiledBatch<i64>>> {
+) -> Produced {
     let count = jobs.len();
     let mut owners: [Vec<(usize, Vec<Vec<i64>>)>; 4] = std::array::from_fn(|_| Vec::new());
     for (index, (owner, items)) in jobs.into_iter().enumerate() {
@@ -59,10 +63,12 @@ pub(super) async fn run(
     .await;
     let mut outputs: Vec<Option<OwnerResult<ProfiledBatch<i64>>>> =
         (0..count).map(|_| None).collect();
+    let mut offered = vec![None; count];
     for (positions, row) in indices.into_iter().zip(rows) {
         let (batches, _) = row.expect("native producer must complete");
         assert_eq!(positions.len(), batches.len());
         for (index, batch) in positions.into_iter().zip(batches) {
+            offered[index] = Some(batch.offered);
             outputs[index] = Some(
                 batch
                     .value
@@ -70,5 +76,8 @@ pub(super) async fn run(
             );
         }
     }
-    outputs.into_iter().map(Option::unwrap).collect()
+    Produced {
+        rows: outputs.into_iter().map(Option::unwrap).collect(),
+        offered: offered.into_iter().map(Option::unwrap).collect(),
+    }
 }

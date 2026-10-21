@@ -14,6 +14,10 @@ pub(super) struct Bulk {
     pub queue: Vec<u128>,
     pub scheme: Vec<u128>,
     pub collections: Vec<u64>,
+    pub phases: Vec<[u128; 6]>,
+    pub diagnostics: Vec<[[f64; 6]; 6]>,
+    pub native_constructor_calls: usize,
+    pub producer_offered_ns: Vec<u128>,
 }
 pub(super) struct Probe {
     pub native: Vec<u128>,
@@ -30,6 +34,7 @@ pub(super) async fn bulk(
     inputs: Arc<Vec<Vec<i64>>>,
     batch: usize,
     producer: bool,
+    transfer_control: Option<bool>,
     released: Instant,
 ) -> Bulk {
     let jobs = inputs
@@ -37,8 +42,32 @@ pub(super) async fn bulk(
         .enumerate()
         .map(|(index, items)| (index * batch / 32 % 4, items.to_vec()))
         .collect();
-    let outputs = if producer {
-        super::producer::run(dispatch, jobs, released).await
+    let mut producer_offered = Vec::new();
+    let outputs = if let Some(native_constructor) = transfer_control {
+        owner_flow_backpressured(
+            jobs,
+            FlowControl {
+                budget: WindowBudget {
+                    released,
+                    timeout: GATE,
+                },
+                maximum_in_flight: 128,
+            },
+            move |owner, items| {
+                super::transfer::submit(
+                    dispatch.clone(),
+                    owner,
+                    items,
+                    native_constructor,
+                    GATE.saturating_sub(released.elapsed()),
+                )
+            },
+        )
+        .await
+    } else if producer {
+        let response = super::producer::run(dispatch, jobs, released).await;
+        producer_offered = response.offered;
+        response.rows
     } else {
         owner_flow_backpressured(
             jobs,
@@ -67,15 +96,32 @@ pub(super) async fn bulk(
         )
         .await
     };
+    collect_bulk(outputs, producer_offered, &inputs, batch, released)
+}
+fn collect_bulk(
+    outputs: Vec<
+        gerbil_scheme_python::owner_dispatch::OwnerResult<
+            gerbil_scheme::instances::ProfiledBatch<i64>,
+        >,
+    >,
+    producer_offered: Vec<Instant>,
+    inputs: &[Vec<i64>],
+    batch: usize,
+    released: Instant,
+) -> Bulk {
     let mut clocks = vec![Vec::new(); 4];
     let mut actor_peer_min = None;
     let mut service = Vec::new();
     let mut queue = Vec::new();
     let mut scheme = Vec::new();
     let mut collections = Vec::new();
+    let mut phases = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut native_constructor_calls = 0;
     for (chunk, row) in outputs.into_iter().enumerate() {
         let (values, completed) = row.expect("native bulk request must complete");
         let timeline = values.timeline;
+        native_constructor_calls += usize::from(timeline.native_constructor);
         service.push(completed.duration_since(timeline.entered).as_nanos());
         queue.push(
             timeline
@@ -89,7 +135,35 @@ pub(super) async fn bulk(
                 .duration_since(timeline.constructed)
                 .as_nanos(),
         );
-        collections.push(timeline.collections[3].saturating_sub(timeline.collections[0]));
+        collections.push(
+            timeline
+                .collections_after_retirement
+                .saturating_sub(timeline.collections[0]),
+        );
+        let marks = [
+            timeline.entered,
+            timeline.items_constructed,
+            timeline.constructed,
+            timeline.executed,
+            timeline.projected,
+            timeline.retired,
+            completed,
+        ];
+        assert!(marks.windows(2).all(|pair| pair[0] <= pair[1]));
+        phases.push(std::array::from_fn(|i| {
+            marks[i + 1].duration_since(marks[i]).as_nanos()
+        }));
+        let mut counters = [[0.0; 6]; 6];
+        for (index, value) in timeline
+            .diagnostics
+            .into_iter()
+            .chain([timeline.diagnostics_after_retirement])
+            .enumerate()
+        {
+            counters[index] =
+                value.expect("native phase diagnostics are required for this qualifier");
+        }
+        diagnostics.push(counters);
         let values = values.values;
         assert_eq!(values.len(), batch);
         for (offset, value) in values.iter().enumerate() {
@@ -109,6 +183,13 @@ pub(super) async fn bulk(
         queue,
         scheme,
         collections,
+        phases,
+        diagnostics,
+        native_constructor_calls,
+        producer_offered_ns: producer_offered
+            .into_iter()
+            .map(|at| at.duration_since(released).as_nanos())
+            .collect(),
     }
 }
 pub(super) async fn probes(

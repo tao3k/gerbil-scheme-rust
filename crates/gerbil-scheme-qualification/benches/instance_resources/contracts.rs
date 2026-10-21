@@ -4,7 +4,7 @@ use gerbil_scheme::{
     instances::{InstanceError, InstancePool},
 };
 use std::fmt::Debug;
-fn family<T>(pool: &InstancePool, input: Vec<T>, progress: &Progress) -> Vec<T>
+fn family<T>(pool: &InstancePool, input: Vec<T>, progress: &Progress) -> (Vec<T>, Vec<T>, Vec<T>)
 where
     T: NumericElement + Send + Debug + 'static,
 {
@@ -13,7 +13,52 @@ where
         .submit_native_on(0, move |session| {
             let input = session.numeric_vector(&input)?;
             let result = session.call(&input)?;
-            session.copy_numeric::<T>(&result)
+            let direct = session.copy_numeric::<T>(&result)?;
+            let empty = session.numeric_vector::<T>(&[])?;
+            let boolean = session.scalar(SchemeScalar::Boolean(false))?;
+            let parent = session.vector(&[&result, &empty, &boolean])?;
+            drop(boolean);
+            drop(empty);
+            drop(result);
+            drop(input);
+            session.collect()?;
+            let roots = session.usage()?[3];
+            let indexed = session.copy_numeric_element::<T>(&parent, 0)?;
+            assert!(session.copy_numeric_element::<T>(&parent, 1)?.is_empty());
+            assert!(matches!(
+                session.copy_numeric_element::<T>(&parent, 2),
+                Err(InstanceError::Native { .. })
+            ));
+            assert!(matches!(
+                session.copy_numeric_element::<T>(&parent, 3),
+                Err(InstanceError::Native { .. })
+            ));
+            assert!(matches!(
+                session.copy_numeric_element::<T>(&parent, usize::MAX),
+                Err(InstanceError::InvalidConfig(_))
+            ));
+            assert_eq!(session.usage()?[3].to_bits(), roots.to_bits());
+            let before = session.usage()?[3];
+            let envelope = session.numeric_batch_envelope(&[indexed.clone(), Vec::new()], 1)?;
+            assert_eq!(session.usage()?[3].to_bits(), (before + 1.0).to_bits());
+            session.collect()?;
+            let returned = session.call(&envelope)?; // Actual Scheme echo forces another GC.
+            drop(envelope);
+            session.collect()?;
+            let quantum = session.vector_element(&returned, 0)?;
+            assert_eq!(session.copy_numeric::<i64>(&quantum)?, [1]);
+            let children = session.vector_element(&returned, 1)?;
+            let bulk = session.copy_numeric_element::<T>(&children, 0)?;
+            assert!(session.copy_numeric_element::<T>(&children, 1)?.is_empty());
+            assert!(matches!(
+                session.numeric_batch_envelope::<T>(&[], 1),
+                Err(InstanceError::InvalidConfig(_))
+            ));
+            assert!(matches!(
+                session.numeric_batch_envelope(std::slice::from_ref(&indexed), 257),
+                Err(InstanceError::InvalidConfig(_))
+            ));
+            Ok((direct, indexed, bulk))
         })
         .unwrap()
         .wait(GATE)
@@ -25,7 +70,10 @@ pub(super) fn types(pool: &InstancePool, progress: &Progress) {
     macro_rules! check {
         ($values:expr) => {{
             let values = $values;
-            assert_eq!(family(pool, values.clone(), progress), values);
+            let (direct, indexed, bulk) = family(pool, values.clone(), progress);
+            assert_eq!(direct, values);
+            assert_eq!(indexed, values);
+            assert_eq!(bulk, values);
         }};
     }
     check!(vec![0_u16, u16::MAX]);
@@ -36,17 +84,21 @@ pub(super) fn types(pool: &InstancePool, progress: &Progress) {
     check!(vec![-7_i64, i64::MIN, i64::MAX]);
     check!(vec![i8::MIN, i8::MAX]);
     let a = vec![-0.0_f32, f32::from_bits(0x7fc0_1234)];
-    let b = family(pool, a.clone(), progress);
-    assert_eq!(
-        a.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
-        b.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
-    );
+    let (direct, indexed, bulk) = family(pool, a.clone(), progress);
+    for b in [direct, indexed, bulk] {
+        assert_eq!(
+            a.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            b.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
+        );
+    }
     let a = vec![-0.0_f64, f64::from_bits(0x7ff8_0000_0000_1234)];
-    let b = family(pool, a.clone(), progress);
-    assert_eq!(
-        a.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
-        b.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
-    );
+    let (direct, indexed, bulk) = family(pool, a.clone(), progress);
+    for b in [direct, indexed, bulk] {
+        assert_eq!(
+            a.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            b.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
+        );
+    }
     let result = pool
         .dispatcher()
         .submit_native_on(0, |session| {
@@ -85,7 +137,7 @@ pub(super) fn types(pool: &InstancePool, progress: &Progress) {
         "observed native scalar/string/mixed-vector roundtrip",
     );
     eprintln!(
-        "RESOURCE-TYPES numeric-families=9 scalar-families=4 unicode=true nul=true mixed-vector=true nan-payload=true signed-zero=true json=false"
+        "RESOURCE-TYPES numeric-families=9 scalar-families=4 unicode=true nul=true mixed-vector=true nan-payload=true signed-zero=true indexed-copy=true parent-only-root=true indexed-rejections=true native-batch-constructor=true single-envelope-root=true json=false"
     );
 }
 pub(super) fn preflight(observer: &Observer, progress: &Progress) {

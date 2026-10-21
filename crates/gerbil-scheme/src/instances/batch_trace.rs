@@ -78,19 +78,42 @@ pub(super) fn execute_profiled<T: NumericElement>(
     yield_every: usize,
     dispatched: Instant,
 ) -> Result<ProfiledBatch<T>, InstanceError> {
+    execute_profiled_impl(session, items, yield_every, dispatched, false)
+}
+#[cfg(feature = "tokio-dispatch")]
+pub(super) fn execute_profiled_native<T: NumericElement>(
+    session: &NativeSession<'_>,
+    items: &[Vec<T>],
+    yield_every: usize,
+    dispatched: Instant,
+) -> Result<ProfiledBatch<T>, InstanceError> {
+    execute_profiled_impl(session, items, yield_every, dispatched, true)
+}
+fn execute_profiled_impl<T: NumericElement>(
+    session: &NativeSession<'_>,
+    items: &[Vec<T>],
+    yield_every: usize,
+    dispatched: Instant,
+    native: bool,
+) -> Result<ProfiledBatch<T>, InstanceError> {
+    let native = native && session.image.native.numeric_batch_create.is_some();
     let collections = session.image.collection_count();
     let entered = Instant::now();
     let mut timeline = BatchTimeline {
         dispatched,
         entered,
+        native_constructor: native,
         items_constructed: entered,
         constructed: entered,
         executed: entered,
         projected: entered,
+        retired: entered,
+        collections_after_retirement: collections,
+        diagnostics_after_retirement: None,
         collections: [collections; 4],
         diagnostics: [session.diagnostics(); 5],
     };
-    let values = execute(session, items, yield_every, |phase| {
+    let mut observe = |phase| {
         let now = Instant::now();
         match phase {
             BatchPhase::ItemsConstructed => {
@@ -101,6 +124,14 @@ pub(super) fn execute_profiled<T: NumericElement>(
                 timeline.constructed = now;
                 timeline.collections[1] = session.image.collection_count();
                 timeline.diagnostics[2] = session.diagnostics();
+            }
+            BatchPhase::ConstructedTogether => {
+                timeline.items_constructed = now;
+                timeline.constructed = now;
+                timeline.collections[1] = session.gc_collections();
+                let diagnostics = session.diagnostics();
+                timeline.diagnostics[1] = diagnostics;
+                timeline.diagnostics[2] = diagnostics;
             }
             BatchPhase::Executed => {
                 timeline.executed = now;
@@ -113,6 +144,14 @@ pub(super) fn execute_profiled<T: NumericElement>(
                 timeline.diagnostics[4] = session.diagnostics();
             }
         }
-    })?;
+    };
+    let values = if native {
+        super::batch::execute_native(session, items, yield_every, &mut observe)?
+    } else {
+        execute(session, items, yield_every, &mut observe)?
+    };
+    timeline.retired = Instant::now();
+    timeline.collections_after_retirement = session.gc_collections();
+    timeline.diagnostics_after_retirement = session.diagnostics();
     Ok(ProfiledBatch { values, timeline })
 }

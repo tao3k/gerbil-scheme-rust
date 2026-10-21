@@ -108,3 +108,40 @@ Report 30.30 preserves an initial full-run startup watchdog failure with no meas
 samples and `cleanup=UNVERIFIED`, plus separately sampled current/predecessor smoke
 controls. Do not overwrite or relabel that failure when collecting successful
 initialized-VM cohorts. It is not evidence that the startup defect was repaired.
+
+
+## Directed native input-construction control
+
+```text
+just bridge-owner-capacity-benchmark --test --transfer-ab
+just bridge-owner-capacity-benchmark --transfer-ab
+```
+
+This selects one constructor-only pair instead of the pipeline pair. Both arms
+use the same four VMs, two Tokio workers, weighted admission, original batches,
+Scheme handler and independent child-root result projection. Only input import
+changes: individual rooted vectors/envelope versus one native Scheme entry that
+copies the same nine-family numeric payloads and publishes one envelope root.
+The default pipeline pair uses that constructor only inside its explicitly enabled
+owner producer. Ordinary caller APIs and production/Python defaults do not change.
+
+`native_batch_constructor_calls` records actual constructor use, not merely a
+requested benchmark flag (1,024 per full candidate sample, zero in controls).
+`bulk_phases_ns` retains item/combined construction, envelope, Scheme, projection,
+root retirement and balance/completion. Combined construction has equal item and
+envelope boundary timestamps. `bulk_diagnostics` retains cumulative collector,
+owner CPU and root counters including after root retirement. Owner CPU excludes
+Tokio/Python/GIL and host blocking time. These same-turn observations must not be
+replaced with differences between unrelated p99 values.
+
+`bulk_producer_offered_ns` holds the original cursor offer for each original batch;
+multiple rows share one cursor timestamp. Offer precedes the enqueue attempt and
+does not imply native acceptance. Use the first turn of each cursor to separate
+host offer delay from later native entry; shared credits/queued short requests can
+legitimately delay entry. A finite run cannot prove uniform owner fairness.
+
+The withdrawn direct-index projection experiment is not selectable. Projection
+retains a stable selected child root because Scheme may mutate its parent between
+foreign entries. Report 30.31 retains that semantic rejection, the safe matched
+results, initialization failure and mixed tail/progress negatives. Do not transfer
+unqualified candidate speedups to the constructor-only version.

@@ -121,3 +121,27 @@ uses semaphore wakers and the blocking owner inbox/deadline, not periodic pollin
 This API is opt-in. The matched work-eight pipeline experiment, gains, fairness
 regressions and unresolved startup failure are recorded in
 [status report 30.30](30-39-status/30.30-bounded-native-owner-producer.org).
+
+
+## Native construction inside explicit owner producers
+
+The explicit numeric batch-stream APIs use a single-entry Scheme constructor when
+its image exports `gerbil_scheme_rust_numeric_batch_create`. All numeric child
+vectors and the quantum/envelope are constructed and protected by Scheme; only
+the complete envelope transfers an external strong root. At batch eight this
+reduces input root registrations from eleven to one. The older native image path
+retains its existing rooted Scheme implementation. Ordinary batch APIs and Python
+backend selection retain their current behavior.
+
+`NativeSession::numeric_batch_envelope` exposes this opt-in typed construction
+with the existing count, quantum and aggregate input bounds. It reports missing
+image support explicitly. `copy_numeric_element` retains an independent selected
+child root across numeric sizing/copy, preserving identity if a mutable parent
+slot changes; protecting the parent alone would not suffice.
+
+Profiled turns now distinguish combined construction, projection and root
+retirement, with optional GC/owner-CPU counters. `BatchStreamRow::offered` records
+the cursor offer before enqueue, not native acceptance of staged turns. No
+unprofiled per-turn clocks or Scheme-thread scheduler are introduced. See
+[30.31 native construction and owner skew](30-39-status/30.31-native-batch-construction-and-owner-skew.org)
+for the directed controls, withdrawn candidate and retained tail/fairness negatives.

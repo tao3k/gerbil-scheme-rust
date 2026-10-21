@@ -122,6 +122,7 @@ const INSTANCE_EXPORTS: &[&str] = &[
     "gerbil_scheme_rust_root_bytevector_copy_raw",
     "gerbil_scheme_rust_root_release_raw",
     "gerbil_scheme_rust_numeric_create",
+    "gerbil_scheme_rust_numeric_batch_create",
     "gerbil_scheme_rust_numeric_size",
     "gerbil_scheme_rust_numeric_copy",
     "gerbil_scheme_rust_scalar_object",

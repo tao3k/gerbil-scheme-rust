@@ -111,6 +111,42 @@ impl<'owner> NativeSession<'owner> {
             (self.image.native.numeric_create)(T::KIND, values.as_ptr().cast(), values.len() as u64)
         })
     }
+    /// Construct a complete native Actor-batch envelope in one Scheme entry.
+    /// Scheme owns construction and GC of all child values; only the parent gets
+    /// an external strong root. Numeric payloads are copied with the existing ABI.
+    /// # Errors
+    /// Rejects unavailable image support, item/quantum/transfer bounds and native errors.
+    pub fn numeric_batch_envelope<T: NumericElement>(
+        &self,
+        items: &[Vec<T>],
+        yield_every: usize,
+    ) -> Result<NativeRoot<'owner>, InstanceError> {
+        super::batch::validate(items, yield_every, self.maximum_input)?;
+        let create = self
+            .image
+            .native
+            .numeric_batch_create
+            .ok_or(InstanceError::InvalidConfig(
+                "native numeric batch constructor unavailable",
+            ))?;
+        self.input(
+            super::batch::input_size(items)
+                .ok_or(InstanceError::InvalidConfig("native batch input overflow"))?,
+        )?;
+        let pointers: Vec<*const u8> = items.iter().map(|item| item.as_ptr().cast()).collect();
+        let lengths: Vec<u64> = items.iter().map(|item| item.len() as u64).collect();
+        // SAFETY: sealed numeric layouts, checked counts/bytes and complete native
+        // spans remain live for this synchronous copy. Scheme retains no Rust pointer.
+        self.own(unsafe {
+            create(
+                T::KIND,
+                pointers.as_ptr(),
+                lengths.as_ptr(),
+                items.len() as u64,
+                yield_every as u64,
+            )
+        })
+    }
     /// Construct bool, fixnum, char or flonum using the existing native scalar ABI.
     /// # Errors
     /// Rejects failed construction or transfer bounds.
@@ -166,6 +202,11 @@ impl<'owner> NativeSession<'owner> {
             "native GC",
         )
     }
+    /// Read this fixed owner's cumulative native collection count.
+    #[must_use]
+    pub fn gc_collections(&self) -> u64 {
+        self.image.collection_count()
+    }
     /// Read GC count, heap capacity bytes, SDK post-GC live metric and root count.
     /// # Errors
     /// Rejects an unavailable native snapshot.
@@ -202,9 +243,42 @@ impl<'owner> NativeSession<'owner> {
         value: &NativeRoot<'_>,
         maximum: usize,
     ) -> Result<Vec<T>, InstanceError> {
+        self.copy_numeric_at_bounded(value, -1, maximum)
+    }
+    /// Copy a numeric-vector slot through a temporary independent child root.
+    /// The selected identity stays fixed if Scheme later replaces the parent slot.
+    /// # Errors
+    /// Rejects foreign roots, index overflow, wrong shapes/types and output bounds.
+    pub fn copy_numeric_element<T: NumericElement>(
+        &self,
+        value: &NativeRoot<'_>,
+        index: usize,
+    ) -> Result<Vec<T>, InstanceError> {
+        self.copy_numeric_element_bounded(value, index, self.maximum_output)
+    }
+    pub(super) fn copy_numeric_element_bounded<T: NumericElement>(
+        &self,
+        value: &NativeRoot<'_>,
+        index: usize,
+        maximum: usize,
+    ) -> Result<Vec<T>, InstanceError> {
+        i64::try_from(index)
+            .map_err(|_| InstanceError::InvalidConfig("native numeric index overflow"))?;
+        // A mutable parent may change slots between foreign calls. Hold this
+        // selected child independently across sizing/allocation/copy, as before.
+        let child = self.vector_element(value, index)?;
+        self.copy_numeric_bounded(&child, maximum)
+    }
+    fn copy_numeric_at_bounded<T: NumericElement>(
+        &self,
+        value: &NativeRoot<'_>,
+        index: i64,
+        maximum: usize,
+    ) -> Result<Vec<T>, InstanceError> {
         self.local(value)?;
-        // SAFETY: the root remains live on this owner, same existing numeric ABI.
-        let size = unsafe { (self.image.native.numeric_size)(value.root, -1, T::KIND) };
+        // SAFETY: parent/root stays strong on this owner. The audited ABI validates
+        // the vector slot and kind; each nonallocating copy exposes no Scheme pointer.
+        let size = unsafe { (self.image.native.numeric_size)(value.root, index, T::KIND) };
         let size = usize::try_from(size).map_err(|_| InstanceError::Native {
             operation: "native numeric type",
             code: size,
@@ -225,7 +299,7 @@ impl<'owner> NativeSession<'owner> {
             unsafe {
                 (self.image.native.numeric_copy)(
                     value.root,
-                    -1,
+                    index,
                     T::KIND,
                     output.as_mut_ptr().cast(),
                     0,

@@ -376,12 +376,17 @@ fn close_waiters(pool: &mut InstancePool, runtime: &tokio::runtime::Runtime) {
 fn shared_credits_survive_timeout_and_close_and_serialize_waiters() {
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
-        while events.recv_timeout(GATE).is_ok() {}
-        if matches!(events.try_recv(), Err(mpsc::TryRecvError::Disconnected)) {
-            return;
+        let mut last = "start";
+        loop {
+            match events.recv_timeout(GATE) {
+                Ok(stage) => last = stage,
+                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    eprintln!("CAPACITY-STALL last={last} cleanup=UNVERIFIED");
+                    std::process::exit(70);
+                }
+            }
         }
-        eprintln!("CAPACITY-STALL cleanup=UNVERIFIED");
-        std::process::exit(70);
     });
     // SAFETY: Cargo owns the unchanged native root ABI and Scheme fixture.
     let program = unsafe {
@@ -400,7 +405,10 @@ fn shared_credits_survive_timeout_and_close_and_serialize_waiters() {
             maximum_reply_bytes: 16 * 1024 * 1024,
             startup_timeout: GATE,
         },
-        |_| progress.send(()).unwrap(),
+        |owner| {
+            eprintln!("CAPACITY-OWNER-READY owner={}", owner.owner);
+            progress.send("owner initialized").unwrap();
+        },
     )
     .unwrap();
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -417,14 +425,15 @@ fn shared_credits_survive_timeout_and_close_and_serialize_waiters() {
         );
     }
     conservation(&pool, &runtime);
+    progress.send("capacity conservation completed").unwrap();
     work_budgets(&pool, &runtime);
-    progress.send(()).unwrap();
+    progress.send("work budgets completed").unwrap();
     fifo(&pool, &runtime);
-    progress.send(()).unwrap();
+    progress.send("FIFO completed").unwrap();
     continuations(&pool, &runtime);
-    progress.send(()).unwrap();
+    progress.send("continuations and GC completed").unwrap();
     close_waiters(&mut pool, &runtime);
-    progress.send(()).unwrap();
+    progress.send("close and native joins completed").unwrap();
     drop(runtime);
     drop(progress);
     watchdog.join().unwrap();

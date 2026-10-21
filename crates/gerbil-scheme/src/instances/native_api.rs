@@ -3,12 +3,14 @@ use super::{InstanceError, preflight::symbol};
 use gerbil_scheme_sys::GerbilScalarProjection;
 use std::ffi::c_void;
 
+type NumericBatchCreate = unsafe extern "C" fn(i32, *const *const u8, *const u64, u64, u64) -> i64;
 #[derive(Debug)]
 pub(super) struct NativeApi {
     pub setup_diagnostic: Option<unsafe extern "C" fn(*mut i64) -> i32>,
     pub call_error: Option<unsafe extern "C" fn() -> i64>,
     pub objects: Option<super::object_api::ObjectApi>,
     pub numeric_create: unsafe extern "C" fn(i32, *const u8, u64) -> i64,
+    pub numeric_batch_create: Option<NumericBatchCreate>,
     pub numeric_size: unsafe extern "C" fn(i64, i64, i32) -> i64,
     pub numeric_copy: unsafe extern "C" fn(i64, i64, i32, *mut u8, u64, u64) -> i64,
     pub scalar_create: unsafe extern "C" fn(i32, i64, f64) -> i64,
@@ -55,6 +57,9 @@ impl NativeApi {
                             address,
                         )
                     }),
+                numeric_batch_create: symbol(handle, c"gerbil_scheme_rust_numeric_batch_create")
+                    .ok()
+                    .map(|address| std::mem::transmute::<*mut c_void, NumericBatchCreate>(address)),
                 numeric_create: std::mem::transmute::<
                     *mut c_void,
                     unsafe extern "C" fn(i32, *const u8, u64) -> i64,

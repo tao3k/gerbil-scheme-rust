@@ -35,3 +35,18 @@ A scalar projection experiment did not establish a stable endpoint gain and was 
 Qualify changes through real installed Python calls, native types, GC, multi-shot continuations, exceptions, initialization/retirement, matched same-VM performance, p99 and finite fairness observations. Source checks, models, local runs, CI and portability are distinct evidence. The private-image backend remains experimental on Darwin.
 
 Raw logs, performance captures, experimental patches and source snapshots are kept outside the repository. Maintain English summaries, reproduction commands and executable tests in source control.
+
+
+## Opt-in completion-driven Rust admission
+
+The optional Rust `gerbil_scheme_python::owner_flow` API drives owner-affine FIFO
+lanes through the existing native async ticket API. One caller future rotates
+admission across owners, replenishes bounded per-invocation credits and places
+completed results in input order without spawning per-request or per-owner Rust
+tasks. It does not execute Scheme, replace its scheduler, reserve global queue
+capacity or add a Python dispatch mode. Existing selections and defaults remain.
+
+Focused same-VM comparisons show throughput gains versus Tokio/Rayon in the
+recorded short CPU cohorts, with unstable p99, direct and fairness outcomes.
+The candidate is not promoted. See the [architecture, negatives and next capacity
+boundary](30-39-status/30.27-completion-driven-owner-flow.org).

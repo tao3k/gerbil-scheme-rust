@@ -31,7 +31,7 @@ impl Executor {
                 assert_eq!(workers, 0);
                 Engine::Direct
             }
-            "tokio" => Engine::Tokio(
+            "tokio" | "owner-flow" => Engine::Tokio(
                 tokio::runtime::Builder::new_multi_thread()
                     .worker_threads(workers)
                     .enable_all()
@@ -89,6 +89,22 @@ impl Executor {
     ) -> Vec<Completed> {
         if self.profile {
             return super::attribution::window(self, dispatch, jobs, released);
+        }
+        if self.name == "owner-flow" {
+            let Engine::Tokio(runtime) = &self.engine else {
+                unreachable!()
+            };
+            return runtime.block_on(gerbil_scheme_python::owner_flow::owner_flow_window(
+                jobs,
+                gerbil_scheme_python::owner_flow::FlowControl {
+                    budget: gerbil_scheme_python::owner_dispatch::WindowBudget {
+                        released,
+                        timeout: GATE,
+                    },
+                    maximum_in_flight: 128,
+                },
+                |owner, items| dispatch.submit_numeric_batch_async_on(owner, items, 1),
+            ));
         }
         if self.grouped && self.name != "direct" {
             return self.grouped_window(dispatch, jobs, released);

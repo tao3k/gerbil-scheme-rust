@@ -22,6 +22,9 @@ pub(super) fn window(
     released: Instant,
 ) -> Vec<Completed> {
     let ready = Instant::now();
+    if executor.name == "owner-flow" {
+        return super::flow_attribution::window(executor, dispatch, jobs, released, ready);
+    }
     if executor.grouped && executor.name != "direct" {
         return super::grouped_attribution::window(executor, dispatch, jobs, released, ready);
     }
@@ -112,7 +115,8 @@ pub(super) fn emit(
     let mut failed = 0;
     let results = frames
         .into_iter()
-        .map(|result| {
+        .enumerate()
+        .map(|(index, result)| {
             result
                 .map(|f| {
                     let t = f.output.timeline;
@@ -138,7 +142,11 @@ pub(super) fn emit(
                         spans.iter().sum::<u128>(),
                         f.collected.duration_since(released).as_nanos()
                     );
-                    rows.push(json!({"owner": f.owner, "ns": spans,
+                    rows.push(json!({"index": index, "owner": f.owner, "ns": spans,
+            "native_completed_ns": f.native.duration_since(released).as_nanos(),
+            "observed_ns": f.received.duration_since(released).as_nanos(),
+            "collected_ns": f.collected.duration_since(released).as_nanos(),
+            "collections": t.collections,
             "admission_return_ns": f.admitted.duration_since(t.dispatched).as_nanos(),
             "owner_wait_lower_ns": t.entered.saturating_duration_since(f.admitted).as_nanos(),
             "sdk": t.diagnostics}));

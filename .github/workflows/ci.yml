@@ -134,6 +134,7 @@ jobs:
         run: |
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --grouped-ab
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --profile --grouped-ab
+          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --focused-flow
           cargo test -p gerbil-scheme-qualification --features instance-dispatch --test owner_dispatch_faults --locked
       - name: Native owner Rust lint
         run: |

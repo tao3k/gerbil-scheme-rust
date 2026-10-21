@@ -122,10 +122,10 @@ pub struct WindowBudget {
     pub timeout: Duration,
 }
 impl WindowBudget {
-    fn remaining(self) -> Duration {
+    pub(super) fn remaining(self) -> Duration {
         self.timeout.saturating_sub(self.released.elapsed())
     }
-    fn expired(self) -> bool {
+    pub(super) fn expired(self) -> bool {
         self.released.elapsed() >= self.timeout
     }
 }

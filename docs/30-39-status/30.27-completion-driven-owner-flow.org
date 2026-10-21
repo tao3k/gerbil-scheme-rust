@@ -1,0 +1,263 @@
+#+TITLE: Completion-driven owner flow: architectural candidate and focused qualification
+#+STARTUP: overview
+
+* Decision and evidence boundary
+
+Optimize the request topology rather than select more dispatcher threads. Native
+Scheme remains Gerbil -> Gambit C -> O2 on fixed owner threads. Scheme retains
+macros, arbitrary procedures, GC, exceptions, continuations, Actors and green
+threads. Rust handles routed admission, owned results and instance lifecycle.
+No Scheme operation moves into Tokio or Rayon; no SMP work is included.
+
+The previous grouping candidate still allocates owner tasks per offered window.
+Its Rayon path retains a parallel-submission barrier before caller collection.
+The Python =tokio-pipeline= implementation already replenishes bounded work, but
+still spawns a Tokio task per request and retains 128-request group boundaries.
+The new driver must reuse the native API rather than build another evaluator or
+move Scheme scheduling into Rust. Existing Python selections and defaults remain
+unchanged; this candidate is an explicit Rust library API.
+
+* What existing measurements actually establish
+
+The ten-phase diagnostic cohort in [[file:30.26-rust-dispatch-costs-and-grouped-candidate.org][30.26]] shows owner waiting around
+247-276 microseconds versus about 5 microseconds in Scheme/GC for short CPU
+requests. Rust result observation/collection also consumes hundreds of
+microseconds in some modes. Admission returns around 1-3 microseconds; removing
+its shared close fence is unsupported by this evidence and would change safety.
+These are instrumented cohort means, not a decomposition of every extreme.
+
+The following are exact-source historical CPU, four-owner, single-item *worst
+windows*. Delivery and recovery belong to the same sample/window. Recovery is
+caller delivery minus that window's last native completion, not a difference of
+unrelated p99 statistics. Capture names are evidence-relative filenames.
+
+| Capture | Mode | Grouped | Delivery ms | Recovery ms | Fraction through last native completion |
+|---------+------+---------+-------------+-------------+-----------------------------------------|
+| dispatch-admitted-a.jsonl | Tokio 2 | yes | 58.945 | 0.031 | 99.95% |
+| dispatch-admitted-b.jsonl | Tokio 2 | yes | 3.202 | 0.044 | 98.64% |
+| dispatch-admitted-a.jsonl | Rayon 2 | no | 94.442 | 4.058 | 95.70% |
+| dispatch-admitted-b.jsonl | Rayon 2 | yes | 113.396 | 15.688 | 86.17% |
+| dispatch-admitted-b.jsonl | Rayon 4 | no | 65.952 | 2.512 | 96.19% |
+
+Most delay in these extremes occurs before the last native completion. That
+interval includes dispatch, owner queueing, conversion, execution/GC and OS
+scheduling. It is not pure Scheme execution and does not prove a unique historical
+cause. Optimizing collection alone cannot eliminate these tails. Rayon also has
+measurable post-native recovery in some windows. Retain these negative outcomes.
+
+* Architectural change
+
+=gerbil_scheme_python::owner_flow= is an optional, caller-polled driver over the
+existing =AsyncInstanceTicket= interface. One future manages a routed invocation;
+it creates no request or owner Tokio tasks, no worker thread and no Rayon
+submission barrier. Native per-request channels remain unchanged. This removes
+an executor scheduling layer without replacing the native queue or its close
+fence. Normal hooks acquire no diagnostic clocks.
+
+The driver groups inputs into owner-affine FIFO lanes, admits them in rotating
+owner order and maintains an explicit finite in-flight credit limit. Ready
+completions refill credits without waiting for all owners to finish a turn.
+Soft per-owner quotas prefer balanced admission; otherwise idle credits can be
+borrowed by owners with remaining work. At most the head native ticket of each
+lane needs polling because that native owner's execution is serial. Ready
+results enter original-index slots immediately; output ordering does not impose
+a cross-owner observation barrier. Work per poll is bounded before yielding the
+Rust future. This yield does not schedule or preempt Scheme green threads.
+
+A single invocation can span more inputs than its credit limit. The driver's
+credit is per invocation, not a global reservation against other callers. It
+therefore does not fix the separately recorded competing-probe =QueueFull= case.
+Native queue bounds, rejection and pool close still belong to the existing
+admission API. No silent QueueFull retry or deadline extension is introduced.
+Submission panic becomes that request's =TaskPanicked=; other accepted peers are
+observed. Observation timeout or dropping the caller future never cancels Scheme;
+callers retain responsibility for accepted-work and opaque-token retirement.
+
+* Tokio and Rayon responsibilities
+
+Tokio supplies async I/O and application orchestration. The short native-admission
+path does not require a separately scheduled task for each request. The candidate
+runs on the caller's =block_on= future; the two Tokio workers remain configured in
+the matched experiment, but do not execute the driver or Scheme. This placement
+is explicit, rather than advertised as faster two-worker parallel Scheme entry.
+
+Rayon remains available for substantial independent Rust computation before or
+after native requests. This workload contains no such computation: parallelizing
+microsecond admission adds work distribution and a barrier. Compare existing
+Rayon 2/4 directly with the explicit owner-flow strategy rather than introduce an
+untested automatic mode switch or infer that Rayon is universally slow.
+
+* Focused acceptance
+
+Run from the repository root using the existing SDK and Cargo graph:
+
+#+begin_src sh
+just bridge-owner-dispatch-benchmark --focused-flow --test
+just bridge-owner-dispatch-benchmark --focused-flow
+just bridge-owner-dispatch-benchmark --focused-flow --profile
+#+end_src
+
+The existing complete matrix is unchanged. Focused runs retain four live Scheme
+VMs, the same 128-order release windows, native types, single-item requests and
+48-line invoice corpus. Compare direct, Tokio 2, Rayon 2 and Rayon 4 separately
+against owner-flow with two configured Tokio workers. CPU and mixed cooperative
+wait loads are retained. Each pair runs forward AB/reverse BA on identical VM
+states; the full focused run has ten samples per arm. Profiled runs are separate
+and cannot substitute for throughput admission. The existing five-second native
+watchdog and observation deadline remain unchanged.
+
+Report throughput, native p99, window delivery p99, same-window post-native
+recovery, per-owner tails and finite progress. Four Scheme Actors per owner and
+the independent Rust result oracle remain unchanged. Single-item requests have
+no within-batch Actor fairness metric; these burst tests do not establish
+open-loop SLOs, global admission fairness or starvation freedom. Keeping identical
+windows isolates dispatch topology, and does not qualify barrier-free streaming
+across the old benchmark's windows. Initialization/retirement stays outside sample
+timing; no fresh VM is substituted between pair arms.
+
+The real native fault test additionally checks a three-ticket credit limit over
+four owners, FIFO admission, original result positions, a submission panic with
+accepted peers, expired/invalid-credit rejection, GC roots and clean shutdown.
+The same native fault target also captures and resumes multi-shot continuations
+twice across separate driver/FFI returns on every owner, forces GC after each
+step and checks the existing dynamic-wind result. Source policy (two tests),
+strict library/bench/fault-target Clippy and the real native fault/continuation
+control pass. The initial fault-test lint findings (function size and unchecked
+time subtraction) are repaired without suppression; their failed log remains.
+These controls remain distinct from measured performance. New candidate results and exact-source identities are recorded below
+after execution. No default promotion is implied.
+
+See the repository-relative [[file:../../crates/gerbil-scheme-qualification/benches/owner_dispatch/README.md][capture instructions]] for portable evidence names,
+source/artifact identities and host-load limitations. Raw logs remain outside Git.
+
+
+* Completed local qualification and negative results
+
+The first normal performance attempt exits 70 with =DISPATCH-STALL last=start=
+before any sample. It is retained as
+=flow-initial-startup-watchdog-failure.jsonl=/=.stderr= with its original binary
+manifest. Its cleanup is unverified; it is not admitted as timing or native
+startup success. The focused harness originally reports progress only after all
+four serial owner initializations. It now uses existing =start_observed= callbacks
+for real per-owner native-ready milestones. Per-owner startup and every watchdog
+remain five seconds; no timer or native implementation is relaxed. This corrects
+an observation gap without assigning a unique cause to the initial failed setup.
+
+Two subsequent normal cohorts, =flow-a.jsonl= and =flow-b.jsonl=, each finish with
+160 measured samples, sixteen summaries, twenty real Scheme exceptions with
+accepted-peer/recovery checks and one clean four-owner teardown. Every pair uses
+the same live VM states. The same archived Cargo executable is used for both
+normal cohorts and the separate diagnostic run. Its SHA-256 is
+=cb2a1c7642f55ba771106058f03fb722621cf0cc46376f5db5f84c066536e7b6=.
+The native image SHA-256 remains
+=772e86e8bda56ca1fa523bd5c4023b61b191137243ac9e34a6bb40c7f0a09437=,
+byte-identical to the preceding qualification image. =flow-manifest.json= records
+repository-relative source/artifact names and hashes. Initial smoke predates the
+startup-observer repair and retains its original executable identity.
+
+The host is shared and external compiler activity is recorded. These are loaded
+host observations, not quiet-host certification, intrinsic dispatcher costs or a
+universal speedup. Control -> candidate values below keep all regressions visible.
+
+| Cohort | Load | Control | Orders/s control -> flow | Native p99 ms control -> flow | Delivery p99 ms control -> flow | Recovery p99 ms control -> flow | Owner minimum control -> flow |
+|--------+------+---------+--------------------------+-------------------------------+---------------------------------+---------------------------------+-------------------------------|
+| A | CPU | direct 0 | 72525 -> 67293 | 5.893 -> 4.288 | 15.536 -> 5.854 | 1.737 -> 1.192 | 0 -> 0 |
+| A | CPU | tokio 2 | 28898 -> 61181 | 17.089 -> 21.294 | 29.896 -> 39.436 | 6.316 -> 17.972 | 0 -> 0 |
+| A | CPU | rayon 2 | 37837 -> 76951 | 11.501 -> 3.399 | 18.448 -> 5.85 | 8.746 -> 0.155 | 0 -> 0 |
+| A | CPU | rayon 4 | 20988 -> 68626 | 18.4 -> 6.563 | 39.955 -> 15.443 | 22.195 -> 1.394 | 0 -> 0 |
+| A | mixed | direct 0 | 13271 -> 11948 | 25.685 -> 35.515 | 36.251 -> 105.153 | 3.253 -> 8.908 | 14 -> 7 |
+| A | mixed | tokio 2 | 12647 -> 13610 | 19.281 -> 18.394 | 38.303 -> 40.157 | 9.653 -> 6.099 | 3 -> 14 |
+| A | mixed | rayon 2 | 11856 -> 12512 | 34.264 -> 61.913 | 70.451 -> 152.211 | 8.675 -> 15.863 | 13 -> 3 |
+| A | mixed | rayon 4 | 12211 -> 14204 | 25.599 -> 25.941 | 51.808 -> 45.72 | 12.301 -> 8.619 | 13 -> 7 |
+| B | CPU | direct 0 | 92880 -> 104479 | 20.163 -> 6.863 | 41.811 -> 26.789 | 13.432 -> 2.645 | 0 -> 0 |
+| B | CPU | tokio 2 | 55151 -> 71206 | 31.365 -> 15.678 | 43.389 -> 21.331 | 2.909 -> 0.357 | 0 -> 0 |
+| B | CPU | rayon 2 | 52900 -> 74015 | 11.969 -> 18.938 | 33.219 -> 41.218 | 9.28 -> 4.138 | 0 -> 0 |
+| B | CPU | rayon 4 | 51400 -> 77002 | 7.47 -> 8.48 | 18.77 -> 26.162 | 7.195 -> 6.202 | 0 -> 0 |
+| B | mixed | direct 0 | 12381 -> 12677 | 36.091 -> 26.115 | 69.914 -> 85.065 | 3.613 -> 10.343 | 9 -> 12 |
+| B | mixed | tokio 2 | 13029 -> 13241 | 13.489 -> 21.451 | 38.836 -> 37.057 | 7.716 -> 4.226 | 10 -> 14 |
+| B | mixed | rayon 2 | 12598 -> 14004 | 22.466 -> 15.269 | 33.918 -> 26.164 | 2.548 -> 0.608 | 5 -> 8 |
+| B | mixed | rayon 4 | 14010 -> 14452 | 13.099 -> 10.094 | 24.042 -> 13.64 | 10.644 -> 0.122 | 14 -> 21 |
+
+CPU throughput versus Tokio 2 improves 111.72% / 29.11%; Rayon 2 improves
+103.38% / 39.92%; Rayon 4 improves 226.97% / 49.81%. These large, variable ratios
+are cohort-specific. Direct comparison changes -7.21% / +12.49%, so the driver
+has not established a stable advantage over direct. CPU Tokio 2 native/delivery
+p99 regresses in A; Rayon 2/4 native/delivery p99 regresses in B. Mixed outcomes
+also regress in several cells, including A Rayon 2 delivery 70.451 -> 152.211 ms.
+The architecture reduces avoidable dispatch work, but end-to-end tail and fairness
+admission remain open. No defaults or automatic mode selections are changed.
+
+All CPU owner minimums are zero; they cannot establish improved owner fairness.
+Mixed finite owner progress varies in both directions. These are completed-order
+observations at the first owner's completion, not internal Scheme starvation.
+Single-item workloads have no within-batch Actor peer measurement.
+
+* Same-window diagnostic closure
+
+=flow-profile.jsonl= separately completes 64 diagnostic samples, sixteen summaries,
+twenty native Scheme failure/recovery controls and clean teardown. All 512 measured
+windows and 65,536 request rows are correlated: each row's first eight spans sum
+exactly to its native-completion offset; all ten sum to its collection offset;
+each window's maximum native timestamp equals its measured delivery minus its own
+recovery. Warmup windows are excluded. Request indices, native/observed/collected
+offsets and SDK collection counters are now explicit fields. No unprofiled normal
+call reads these diagnostic clocks.
+
+Representative CPU per-request means, microseconds, are diagnostic rather than
+normal performance estimates. Control/flow compare matched runs on the same VMs.
+
+| Pair | Dispatch control/flow | Owner wait plus admission control/flow | Scheme/GC control/flow | Observation control/flow | Ordered task collection control/flow |
+|------+-----------------------+----------------------------------------+------------------------+--------------------------+--------------------------------------|
+| Tokio 2 | 777.01 / 47.08 | 1857.79 / 709.24 | 12.82 / 8.95 | 430.77 / 186.00 | 1057.71 / 0 |
+| Rayon 2 | 560.80 / 44.12 | 732.18 / 622.81 | 8.88 / 8.76 | 721.35 / 97.40 | 0 / 0 |
+| Rayon 4 | 488.64 / 45.15 | 1257.06 / 1740.58 | 10.95 / 13.35 | 1357.50 / 423.56 | 0 / 0 |
+
+Zero separate task-collection span in the driver follows from observing and
+placing the result in one operation; it does not mean zero collection cost.
+The observation span includes that work, and final vector materialization still
+contributes to window recovery. Removing the stage is an architectural change,
+not permission to omit its remaining costs from timing.
+
+A retained negative driver window in the Rayon 4 comparison (CPU, block zero,
+forward arm, window three) delivers at 25.038 ms. The critical request on owner
+one completes at 23.464 ms; same-window recovery is 1.575 ms. Its admission
+returns in 0.208 microseconds and its owner-wait lower bound is 23,346.375
+microseconds; Scheme execution is 4.167 microseconds. Its four SDK collection
+counts are all 84. This locates this critical request's delay before native entry,
+not in its own Scheme/GC span. Earlier queued requests and OS descheduling still
+contribute to that interval; unchanged counters on this request do not prove
+that no other request collected or identify the OS cause. The Rayon 4 owner's
+mean waiting regression above remains visible.
+
+* Next architectural boundary
+
+The reusable completion driver is the first implemented topology change, not a
+claim that the complete concurrency architecture is finished. The next boundary
+is shared owner capacity across concurrent callers, followed by application-level
+resident/batched work and incremental result consumption:
+
+1. Pool-owned capacity must account for every accepted request until native
+   completion, including Scheme failure, Rust panic and observation timeout.
+   Returning credit when a caller merely stops waiting would permit unbounded
+   native backlog. Preserve the existing atomic close/admission fence and drain
+   semantics. Reuse and extend existing lifecycle/model obligations if this
+   protocol changes; the current model is not new-flow fairness acceptance.
+2. Stateful work keeps its owner and per-session ordering contract. Stateless
+   routing may use available owner capacity only after independence validation;
+   moving a Scheme object, closure or continuation between VMs remains forbidden.
+   Fairness must include concurrent callers and short probes, not just one burst.
+3. Reuse owner-resident typed inputs where identity/mutation contracts permit.
+   Expose explicit native Scheme batch/service operations to reduce repeated FFI
+   and type construction. Do not silently fuse arbitrary Scheme calls: exceptions,
+   dynamic bindings and continuation boundaries require their original semantics.
+4. Keep the completion consumer incremental across its invocation; couple
+   admission to both native capacity and bounded unconsumed results. Tokio
+   orchestrates async flow; Rayon handles substantial independent Rust computation.
+   Scheme retains its Actor and green-thread scheduler inside each owner.
+
+These steps need protocol evidence and focused same-load comparisons before
+production admission. The present driver does not reserve global credits, remove
+Python's outer 128-request grouping or change the default Python API. It does not
+solve the historical mixed competing-probe QueueFull case or certify industrial
+readiness. The next experiment must target the demonstrated shared-capacity and
+queueing boundary, rather than repeat the full thread-count matrix.

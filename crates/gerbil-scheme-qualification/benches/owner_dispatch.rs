@@ -7,6 +7,10 @@ mod comparison;
 mod corpus;
 #[path = "owner_dispatch/executor.rs"]
 mod executor;
+#[path = "owner_dispatch/flow_attribution.rs"]
+mod flow_attribution;
+#[path = "owner_dispatch/focused.rs"]
+mod focused;
 #[path = "owner_dispatch/grouped_attribution.rs"]
 mod grouped_attribution;
 #[path = "owner_dispatch/sample.rs"]
@@ -163,9 +167,12 @@ fn finish(pool: &mut InstancePool, progress: &mpsc::Sender<&'static str>) {
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     assert!(
-        args.iter()
-            .all(|a| a == "--test" || a == "--bench" || a == "--profile" || a == "--grouped-ab"),
-        "supported arguments: --test, --bench, --profile, --grouped-ab"
+        args.iter().all(|a| a == "--test"
+            || a == "--bench"
+            || a == "--profile"
+            || a == "--grouped-ab"
+            || a == "--focused-flow"),
+        "supported arguments: --test, --bench, --profile, --grouped-ab, --focused-flow"
     );
     let (progress, events) = mpsc::channel();
     let watchdog = thread::spawn(move || {
@@ -185,12 +192,24 @@ fn main() {
         "{}",
         json!({"event": "dispatch_configuration", "diagnostic": args.iter().any(|a| a == "--profile"), "grouped_ab": args.iter().any(|a| a == "--grouped-ab")})
     );
-    run(
-        &progress,
-        args.iter().any(|a| a == "--test"),
-        args.iter().any(|a| a == "--profile"),
-        args.iter().any(|a| a == "--grouped-ab"),
-    );
+    if args.iter().any(|a| a == "--focused-flow") {
+        assert!(
+            !args.iter().any(|a| a == "--grouped-ab"),
+            "focused flow is a separate experiment"
+        );
+        focused::run(
+            &progress,
+            args.iter().any(|a| a == "--test"),
+            args.iter().any(|a| a == "--profile"),
+        );
+    } else {
+        run(
+            &progress,
+            args.iter().any(|a| a == "--test"),
+            args.iter().any(|a| a == "--profile"),
+            args.iter().any(|a| a == "--grouped-ab"),
+        );
+    }
     drop(progress);
     watchdog.join().unwrap();
 }

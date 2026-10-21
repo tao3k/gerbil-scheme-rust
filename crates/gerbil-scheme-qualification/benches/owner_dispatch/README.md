@@ -142,3 +142,29 @@ an old run reproducible. Reproduction means building the specified source and
 running the stated command to obtain new captures; it does not promise identical
 timing or recover unavailable historical receipts. Keep original negative results,
 source/artifact hashes and missing-evidence boundaries intact.
+
+
+## Focused completion-driven architecture candidate
+
+```text
+just bridge-owner-dispatch-benchmark --focused-flow --test
+just bridge-owner-dispatch-benchmark --focused-flow
+just bridge-owner-dispatch-benchmark --focused-flow --profile
+```
+
+This is a separate four-owner, single-item CPU/mixed comparison against direct,
+Tokio 2 and Rayon 2/4, not an extension of the original matrix. Each control is
+paired AB/BA with the opt-in `gerbil_scheme_python::owner_flow` driver using two
+configured Tokio workers. Native VM identities, 128-order release windows,
+payloads, types, deadlines and result validation remain identical. Normal runs
+have ten samples per arm; diagnostic runs have four; smoke has two.
+
+`flow_sample` includes its control identity and original per-window arrays.
+`flow_pair` identifies the following two `dispatch_result` summaries. The candidate
+polls one caller future, admits owner FIFO lanes in rotating order, replenishes
+bounded credits and creates no per-request/owner Rust tasks. The credit bound is
+per invocation; it is not global cross-caller admission or a QueueFull fix.
+Historical p99 regressions remain in the status reports. Single-item Actor peer
+progress is null; finite owner progress is not starvation freedom. Keeping the
+same windows isolates dispatch topology rather than qualifying continuous traffic
+across the old benchmark's window barriers. No Python mode or default changes.

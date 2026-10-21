@@ -3,6 +3,7 @@ use super::{GATE, corpus, workload};
 use gerbil_scheme::instances::InstancePool;
 use serde_json::{Value, json};
 use std::{sync::Arc, time::Instant};
+use workload::ShortMode;
 pub(super) fn idle(pool: &InstancePool) {
     let start = Instant::now();
     while !pool
@@ -21,6 +22,7 @@ pub(super) enum Comparison {
     Combined,
     ShortLayout,
     ClassRouting,
+    ShortService,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -31,6 +33,9 @@ impl Comparison {
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
+            Self::ShortService => {
+                "same class router and native short layout; general versus Scheme short scheduling"
+            }
             Self::ClassRouting => {
                 "same native short/FIFO completion/quotas; fixed owner versus class-specific routing"
             }
@@ -39,16 +44,27 @@ impl Comparison {
 }
 #[derive(Clone, Copy)]
 struct Strategy {
-    short_layout: bool,
+    short_mode: ShortMode,
     ready_completion: bool,
     class_routing: bool,
 }
 impl Strategy {
     fn for_arm(comparison: Comparison, arm: bool) -> Self {
         Self {
-            short_layout: comparison == Comparison::ClassRouting || (comparison.is_split() && arm),
+            short_mode: if comparison == Comparison::ShortService && arm {
+                ShortMode::Dedicated
+            } else if matches!(
+                comparison,
+                Comparison::ClassRouting | Comparison::ShortService
+            ) || (comparison.is_split() && arm)
+            {
+                ShortMode::Native
+            } else {
+                ShortMode::Batch
+            },
             ready_completion: comparison == Comparison::Combined && arm,
-            class_routing: comparison == Comparison::ClassRouting && arm,
+            class_routing: comparison == Comparison::ShortService
+                || (comparison == Comparison::ClassRouting && arm),
         }
     }
 }
@@ -99,7 +115,7 @@ pub(super) fn run(
             probes,
             asynchronous,
             released,
-            strategy.short_layout,
+            strategy.short_mode,
             active_router,
         ));
         (bulk.await.unwrap(), probes.await.unwrap())
@@ -198,10 +214,10 @@ fn summarize(
                 .collect()
         })
         .collect();
-    json!({"orders":count,"asynchronous":asynchronous,"short_layout":strategy.short_layout,"ready_completion":strategy.ready_completion,"class_routing":strategy.class_routing,"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
+    json!({"orders":count,"asynchronous":asynchronous,"short_layout":strategy.short_mode.native(),"ready_completion":strategy.ready_completion,"class_routing":strategy.class_routing,"short_service":strategy.short_mode.dedicated(),"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
         "bulk_owner_native_ns":owner_native_ns,"bulk_service_ns":service,"bulk_construct_ns":construct,
         "bulk_pending_before_projection_ns":pending,"bulk_projection_retirement_ns":projection,
-        "probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
+        "probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
         "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer})
 }
@@ -227,6 +243,7 @@ pub(super) fn emit(samples: &[Value], arm: usize, mixed: bool) {
         "bulk_service_p99_ns":quantile(samples,"bulk_service_ns",99),"bulk_pending_p99_ns":quantile(samples,"bulk_pending_before_projection_ns",99),
         "probe_actual_p99_ns":quantile(samples,"probe_actual_ns",99),"probe_scheduled_p99_ns":quantile(samples,"probe_scheduled_ns",99),
         "probe_admission_p99_ns":quantile(samples,"probe_admission_ns",99),
+        "probe_post_admission_wait_p99_ns":quantile(samples,"probe_post_admission_wait_ns",99),
         "probe_construct_p99_ns":quantile(samples,"probe_construct_ns",99),"probe_pending_p99_ns":quantile(samples,"probe_pending_ns",99),"probe_projection_p99_ns":quantile(samples,"probe_projection_ns",99),
         "owner_progress_min":samples.iter().map(|s|s["owner_progress_at_first_done"].as_u64().unwrap()).min(),
         "owner_progress_fraction_min":samples.iter().map(|s|s["owner_progress_fraction_min"].as_f64().unwrap()).reduce(f64::min),

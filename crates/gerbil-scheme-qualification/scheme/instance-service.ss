@@ -57,10 +57,29 @@
 (def (orders-service-reference command)
   (unless (= (s64vector-ref (vector-ref command 0) 0) 6) (error "invalid synchronous reference"))
   (orders-service-handler 0 (vector-ref command 1)))
+;; One persistent worker exposes deterministic queue-order acceptance separately
+;; from the four-VM throughput workload. It uses the identical service protocol.
+(def single-started [])
+(def single-accepted 0)
+(def single-ready-max 0)
+(def single-endpoint
+  (make-gerbil-rs-service-endpoint
+    (lambda (_ input)
+      (set! single-started (cons (s64vector-ref input 0) single-started))
+      (when (= (s64vector-ref input 0) 90) (orders-latch-wait!))
+      (when (= (s64vector-ref input 0) 91) (raise #f))
+      input)
+    1 (lambda () (set! orders-latch-open #f)) orders-latch-release! void))
+(def (single-command command)
+  (let ((result (single-endpoint command)) (op (s64vector-ref (vector-ref command 0) 0)))
+    (when (= op 1) (set! single-accepted (1+ single-accepted)))
+    (when (= op 3) (set! single-ready-max (max single-ready-max (s64vector-length result))))
+    result))
 (def (orders-service-observe header)
   (case (s64vector-ref header 0)
     ((8) (orders-latch-release!) (s64vector 0))
     ((9) (set! orders-latch-open #f) (s64vector 0))
+    ((12) (list->s64vector (append (list single-accepted single-ready-max) (reverse single-started))))
     ((10) (thread-yield!) (##gc) (s64vector orders-latch-blocked))
     (else (error "invalid service observation"))))
 (begin-foreign
@@ -84,3 +103,8 @@
  (c-define (owner-service-observe root) (int64) int64 "gerbil_owner_service_observe" "extern"
   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
     gerbil-scheme-rust/qualification/actors#orders-service-observe)))
+
+(begin-foreign
+ (c-define (owner-service-single root) (int64) int64 "gerbil_owner_service_single" "extern"
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
+    gerbil-scheme-rust/qualification/actors#single-command)))

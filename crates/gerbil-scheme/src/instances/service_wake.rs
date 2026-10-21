@@ -21,6 +21,8 @@ pub(super) struct Wake {
     pub write_fd: i32,
     #[cfg(feature = "tokio-dispatch")]
     pub lanes: AtomicUsize,
+    #[cfg(feature = "tokio-dispatch")]
+    pub service_version: AtomicUsize,
     pending: AtomicBool,
     pub closed: AtomicBool,
     pub failed: AtomicBool,
@@ -64,6 +66,8 @@ impl Wake {
                 write_fd: fd,
                 #[cfg(feature = "tokio-dispatch")]
                 lanes: AtomicUsize::new(0),
+                #[cfg(feature = "tokio-dispatch")]
+                service_version: AtomicUsize::new(0),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
                 failed: AtomicBool::new(false),

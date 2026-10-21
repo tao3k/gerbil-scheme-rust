@@ -3,7 +3,7 @@ mod implementation;
 
 use std::fs;
 
-use implementation::{stamp_generated_scm, validate_generated_scm, workspace_input_fingerprint};
+use implementation::{generated_scm_receipt, validate_generated_scm, workspace_input_fingerprint};
 
 use super::support::unique_temp_dir;
 
@@ -66,30 +66,19 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
 }
 
 #[test]
-fn generated_scm_provenance_accepts_untouched_body_and_inputs() {
-    let tracked = stamp_generated_scm("(define answer 42)\n", INPUT_FINGERPRINT);
-
-    assert_eq!(validate_generated_scm(&tracked, INPUT_FINGERPRINT), Ok(()));
-}
-
-#[test]
-fn generated_scm_provenance_rejects_changed_inputs() {
-    let tracked = stamp_generated_scm("(define answer 42)\n", INPUT_FINGERPRINT);
-    let changed_input = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
-
+fn whole_file_receipt_rejects_any_file_or_input_change() {
+    let contents = b";; compiler comment\n(define answer 42)\n";
+    let receipt = generated_scm_receipt(contents, INPUT_FINGERPRINT);
     assert_eq!(
-        validate_generated_scm(&tracked, changed_input),
-        Err("input fingerprint does not match current Scheme build inputs")
+        validate_generated_scm(contents, &receipt, INPUT_FINGERPRINT),
+        Ok(())
     );
-}
-
-#[test]
-fn generated_scm_provenance_rejects_changed_body() {
-    let mut tracked = stamp_generated_scm("(define answer 42)\n", INPUT_FINGERPRINT);
-    tracked.push_str("(define drift #t)\n");
-
-    assert_eq!(
-        validate_generated_scm(&tracked, INPUT_FINGERPRINT),
-        Err("body fingerprint does not match committed SCM contents")
-    );
+    for changed in [
+        b";; changed comment\n(define answer 42)\n".as_slice(),
+        b";; compiler comment\n(define answer 43)\n".as_slice(),
+    ] {
+        assert!(validate_generated_scm(changed, &receipt, INPUT_FINGERPRINT).is_err());
+    }
+    assert!(validate_generated_scm(contents, &receipt, "changed-inputs").is_err());
+    assert!(validate_generated_scm(contents, "", INPUT_FINGERPRINT).is_err());
 }

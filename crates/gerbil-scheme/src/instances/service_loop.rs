@@ -56,7 +56,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || initialized[1] != 1
+        || !matches!(initialized[1], 1 | 2)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -64,6 +64,8 @@ pub(super) fn open(
             "Scheme service ABI/version receipt",
         ));
     }
+    wake.service_version
+        .store(usize::try_from(initialized[1]).unwrap(), Ordering::Release);
     wake.lanes
         .store(usize::try_from(initialized[2]).unwrap(), Ordering::Release);
     Ok(())
@@ -150,8 +152,19 @@ impl Pump<'_> {
         use super::batch_stream_runner::ProducerStep;
         let mut draining = false;
         loop {
+            let incoming = requests.try_recv().ok();
+            // Publish an already-admitted short payload before entering Scheme's
+            // next green-thread turn. Do not leave it in Rust while yielding.
+            // The FIFO inbox order is unchanged; Scheme still chooses execution.
+            if incoming.as_ref().is_some_and(
+                |request| matches!(&request.work, Work::Service(job) if job.short_service()),
+            ) {
+                self.receive(incoming.unwrap())?;
+                self.collect()?;
+                continue;
+            }
             self.collect()?;
-            if let Ok(request) = requests.try_recv() {
+            if let Some(request) = incoming.or_else(|| requests.try_recv().ok()) {
                 self.receive(request)?;
                 continue;
             }

@@ -12,6 +12,20 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ShortMode {
+    Batch,
+    Native,
+    Dedicated,
+}
+impl ShortMode {
+    pub(super) fn native(self) -> bool {
+        self != Self::Batch
+    }
+    pub(super) fn dedicated(self) -> bool {
+        self == Self::Dedicated
+    }
+}
 #[derive(Debug)]
 pub(super) struct Reply {
     pub values: Vec<Vec<i64>>,
@@ -24,11 +38,14 @@ struct Orders {
     request: NumericServiceBatch<i64>,
     entered: Option<Instant>,
     constructed: Option<Instant>,
-    short_layout: bool,
+    short_mode: ShortMode,
     _bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 }
 impl SchemeServiceRequest for Orders {
     type Output = Reply;
+    fn short_service(&self) -> bool {
+        self.short_mode.dedicated()
+    }
     fn work_units(&self) -> usize {
         self.request.work_units()
     }
@@ -37,7 +54,7 @@ impl SchemeServiceRequest for Orders {
         session: &NativeSession<'vm>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.entered = Some(Instant::now());
-        let value = if self.short_layout {
+        let value = if self.short_mode.native() {
             assert_eq!(self.request.items.len(), 1);
             let tag = session.numeric_vector(&[77_i64, 1])?;
             let input = session.numeric_vector(&self.request.items[0])?;
@@ -54,7 +71,7 @@ impl SchemeServiceRequest for Orders {
         output: &NativeRoot<'_>,
     ) -> Result<Reply, InstanceError> {
         let projection = Instant::now();
-        let values = if self.short_layout {
+        let values = if self.short_mode.native() {
             vec![session.copy_numeric(output)?]
         } else {
             self.request.project(session, output)?
@@ -70,7 +87,7 @@ impl SchemeServiceRequest for Orders {
 }
 fn orders(
     items: Vec<Vec<i64>>,
-    short_layout: bool,
+    short_mode: ShortMode,
     bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 ) -> Orders {
     Orders {
@@ -80,18 +97,18 @@ fn orders(
         },
         entered: None,
         constructed: None,
-        short_layout,
+        short_mode,
         _bulk_permit: bulk_permit,
     }
 }
 async fn routed(
     router: &SchemeServiceRouter,
     items: Vec<Vec<i64>>,
-    short_layout: bool,
+    short_mode: ShortMode,
     timeout: Duration,
 ) -> Result<AsyncInstanceTicket<Reply>, InstanceError> {
-    let request = orders(items, short_layout, None);
-    let selected = if short_layout {
+    let request = orders(items, short_mode, None);
+    let selected = if short_mode.native() {
         router.submit_short(request, timeout).await?
     } else {
         router.submit_batch(request, timeout).await?
@@ -103,11 +120,11 @@ pub(super) async fn submit(
     owner: usize,
     items: Vec<Vec<i64>>,
     asynchronous: bool,
-    short_layout: bool,
+    short_mode: ShortMode,
     timeout: Duration,
     bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 ) -> Result<AsyncInstanceTicket<Reply>, InstanceError> {
-    let request = orders(items, short_layout, bulk_permit);
+    let request = orders(items, short_mode, bulk_permit);
     if asynchronous {
         dispatch
             .submit_scheme_service_backpressured_on(owner, request, timeout)
@@ -167,7 +184,7 @@ pub(super) async fn bulk(
                 return routed(
                     &router,
                     items,
-                    false,
+                    ShortMode::Batch,
                     GATE.saturating_sub(released.elapsed()),
                 )
                 .await;
@@ -190,7 +207,7 @@ pub(super) async fn bulk(
                 owner,
                 items,
                 asynchronous,
-                false,
+                ShortMode::Batch,
                 GATE.saturating_sub(released.elapsed()),
                 permit,
             )
@@ -209,6 +226,7 @@ pub(super) struct Probes {
     pub admission: Vec<u128>,
     pub service: Vec<u128>,
     pub construct: Vec<u128>,
+    pub post_admission: Vec<u128>,
     pub pending: Vec<u128>,
     pub projection: Vec<u128>,
     pub completed: Vec<Instant>,
@@ -218,7 +236,7 @@ pub(super) async fn probes(
     count: usize,
     asynchronous: bool,
     released: Instant,
-    short_layout: bool,
+    short_mode: ShortMode,
     router: Option<SchemeServiceRouter>,
 ) -> Probes {
     let mut values = Probes {
@@ -227,6 +245,7 @@ pub(super) async fn probes(
         admission: Vec::new(),
         service: Vec::new(),
         construct: Vec::new(),
+        post_admission: Vec::new(),
         pending: Vec::new(),
         projection: Vec::new(),
         completed: Vec::new(),
@@ -241,7 +260,7 @@ pub(super) async fn probes(
             routed(
                 router,
                 vec![input.clone()],
-                true,
+                short_mode,
                 GATE.saturating_sub(released.elapsed()),
             )
             .await
@@ -251,19 +270,25 @@ pub(super) async fn probes(
                 id % 4,
                 vec![input.clone()],
                 asynchronous,
-                short_layout,
+                short_mode,
                 GATE.saturating_sub(released.elapsed()),
                 None,
             )
             .await
         }
         .unwrap();
-        values.admission.push(start.elapsed().as_nanos());
+        let admitted = Instant::now();
+        values
+            .admission
+            .push(admitted.duration_since(start).as_nanos());
         let (reply, completed) = ticket
             .wait_completed(GATE.saturating_sub(released.elapsed()))
             .await
             .unwrap();
         corpus::verify(&input, &reply.values[0]);
+        values
+            .post_admission
+            .push(reply.entered.saturating_duration_since(admitted).as_nanos());
         values
             .actual
             .push(completed.duration_since(start).as_nanos());

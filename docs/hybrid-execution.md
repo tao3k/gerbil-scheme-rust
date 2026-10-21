@@ -224,3 +224,20 @@ Class admission close drains through the existing native lifecycle protocol.
 The current opt-in heuristic has mixed-throughput and short-tail regressions, so
 it does not replace defaults or the prior accepted path. See the
 [class-routing qualification and negative results](30-39-status/30.35-class-specific-native-service-routing.org).
+
+### Explicit Scheme short scheduling
+
+Cross-instance routing and intra-instance service scheduling are separate choices.
+`SchemeServiceRouter::submit_short` selects an owner under class quotas;
+`SchemeServiceRequest::short_service()` independently opts that request into the
+Scheme short queue. The latter requires one declared work unit, no Actor lane and
+service ABI v2. Existing general requests and defaults remain unchanged. Rust
+rejects an unsupported endpoint before native construction rather than silently
+falling back. Scheme preserves execution, continuations, native waits and GC.
+
+Generated SCM files contain unmodified compiler bytes. External `.scm.sha256`
+receipts validate the SHA-256 of each **entire file**, plus framed build-input
+identity. `just bridge-regenerate` owns updates. No hash is embedded in a comment
+inside its own artifact. This is integrity/input-provenance validation, not proof
+that independently compiled output is byte-identical: Gerbil embeds a compilation
+timestamp. The native build and qualification gates remain separate.

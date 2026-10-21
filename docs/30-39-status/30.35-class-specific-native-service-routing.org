@@ -1,6 +1,9 @@
 #+TITLE: Class-Specific Native Scheme Service Routing
 #+DATE: 2026-10-21
 
+Follow-up: [[file:30.36-scheme-short-queues-and-whole-file-digests.org][30.36]] records the actual short-service protocol, external
+whole-file digest receipts and subsequent source-bound negative A/B evidence.
+
 * Scope and actual API
 
 This continues PR #18 from =2cc3c66=. Its native owner and finite model CI passed,

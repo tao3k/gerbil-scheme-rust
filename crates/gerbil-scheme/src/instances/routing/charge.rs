@@ -100,6 +100,9 @@ impl<M: SchemeServiceRequest> SchemeServiceRequest for RoutedRequest<M> {
     fn work_units(&self) -> usize {
         self.units
     }
+    fn short_service(&self) -> bool {
+        self.message.short_service()
+    }
     fn construct<'vm>(
         &mut self,
         session: &NativeSession<'vm>,

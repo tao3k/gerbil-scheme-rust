@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::generated_scm::{
-    stamp_generated_scm, validate_generated_scm, workspace_input_fingerprint,
+    generated_scm_receipt, validate_generated_scm, workspace_input_fingerprint,
 };
 
 /// Build the native Gerbil and Gambit archive for the consuming Cargo package.
@@ -35,6 +35,8 @@ fn run_native_build() {
     println!("cargo:rerun-if-changed=../../scheme/runtime.ssi");
     println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm");
     println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm");
+    println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm.sha256");
+    println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm.sha256");
     println!("cargo:rerun-if-changed=../../ffi/runtime.c");
     println!("cargo:rerun-if-changed=../../ffi/host_io.h");
 
@@ -196,28 +198,26 @@ fn sync_generated_scm(workspace: &Path, native_scm: &Path, module: &str) -> Path
     let check = env::var("GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM").as_deref() == Ok("1");
     let input_fingerprint = workspace_input_fingerprint(workspace);
 
+    let receipt_path = tracked_scm.with_extension("scm.sha256");
     if update {
         let parent = tracked_scm
             .parent()
             .expect("tracked generated SCM path must have a parent");
         fs::create_dir_all(parent).expect("create tracked generated SCM directory");
-        let generated = fs::read_to_string(native_scm).expect("read generated native SCM");
+        let generated = fs::read(native_scm).expect("read generated native SCM");
+        fs::write(&tracked_scm, &generated).expect("update tracked generated SCM");
         fs::write(
-            &tracked_scm,
-            stamp_generated_scm(&generated, &input_fingerprint),
+            &receipt_path,
+            generated_scm_receipt(&generated, &input_fingerprint),
         )
-        .expect("update tracked generated SCM with provenance");
+        .expect("write external whole-file SCM receipt");
     }
 
     if check {
-        let tracked = fs::read_to_string(&tracked_scm).expect(
-            "read tracked generated SCM; run with GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1",
-        );
-        validate_generated_scm(&tracked, &input_fingerprint).unwrap_or_else(|error| {
-            panic!(
-                "tracked generated SCM provenance is invalid: {error}; run with \
-                 GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1"
-            )
+        let tracked = fs::read(&tracked_scm).expect("read tracked generated SCM");
+        let receipt = fs::read_to_string(&receipt_path).expect("read external SCM receipt");
+        validate_generated_scm(&tracked, &receipt, &input_fingerprint).unwrap_or_else(|error| {
+            panic!("tracked generated SCM is invalid: {error}; run just bridge-regenerate")
         });
     }
 

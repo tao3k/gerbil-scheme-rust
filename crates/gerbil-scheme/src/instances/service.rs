@@ -23,6 +23,12 @@ pub trait SchemeServiceRequest: Send + 'static {
     fn lane(&self) -> Option<SchemeServiceLane> {
         None
     }
+    /// Opt into Scheme's short queue and bounded completion turns.
+    /// Requires one declared work unit and no Actor lane. This is a cooperative
+    /// work budget, not a wall-clock limit or preemption of Scheme computation.
+    fn short_service(&self) -> bool {
+        false
+    }
     /// Charge outstanding work through the shared owner budget until projection.
     fn work_units(&self) -> usize;
     /// Construct a native Scheme payload on its owner.
@@ -83,6 +89,13 @@ impl InstanceDispatcher {
         timeout: Duration,
     ) -> Result<AsyncInstanceTicket<M::Output>, InstanceError> {
         let lane = message.lane();
+        let short = message.short_service();
+        let units = message.work_units();
+        if short && (units != 1 || lane.is_some()) {
+            return Err(InstanceError::InvalidConfig(
+                "short service requires one stateless work unit",
+            ));
+        }
         {
             let senders = self
                 .admission
@@ -94,6 +107,11 @@ impl InstanceDispatcher {
                 .wake
                 .as_ref()
                 .ok_or(InstanceError::InvalidConfig("Scheme service not enabled"))?;
+            if short && wake.service_version.load(Ordering::Acquire) < 2 {
+                return Err(InstanceError::InvalidConfig(
+                    "Scheme service lacks short scheduling capability",
+                ));
+            }
             if wake.closed.load(Ordering::Acquire) {
                 return Err(InstanceError::Closed);
             }
@@ -103,7 +121,6 @@ impl InstanceDispatcher {
                 ));
             }
         }
-        let units = message.work_units();
         let reservation = self.reserve_owner(owner, timeout, units).await?;
         let (send, response) = oneshot::channel();
         let request = Request {
@@ -114,6 +131,7 @@ impl InstanceDispatcher {
                 message,
                 send,
                 lane,
+                short,
                 submitted: false,
             })),
         };
@@ -125,6 +143,7 @@ impl InstanceDispatcher {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub(super) struct JobId(pub i64);
 pub(super) trait Job: Send {
+    fn short_service(&self) -> bool;
     fn start(
         &mut self,
         image: &super::image::Image,
@@ -146,8 +165,12 @@ struct TypedJob<M: SchemeServiceRequest> {
     send: oneshot::Sender<super::types::Completed<M::Output>>,
     submitted: bool,
     lane: Option<SchemeServiceLane>,
+    short: bool,
 }
 impl<M: SchemeServiceRequest> Job for TypedJob<M> {
+    fn short_service(&self) -> bool {
+        self.short
+    }
     fn may_have_entered(&self) -> bool {
         self.submitted
     }
@@ -165,7 +188,9 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
             |session| {
                 let value = self.message.construct(session)?;
                 let lane = self.lane.map_or(-1, |lane| i64::try_from(lane.0).unwrap());
-                let input = envelope(session, &[1, lane], Some(&value))?;
+                let header = [1, lane, 1];
+                let length = if self.short { 3 } else { 2 };
+                let input = envelope(session, &header[..length], Some(&value))?;
                 self.submitted = true;
                 let token = call(session, &input)?;
                 let ids = session.copy_numeric::<i64>(&token)?;

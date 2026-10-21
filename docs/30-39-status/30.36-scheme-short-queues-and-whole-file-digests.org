@@ -1,0 +1,189 @@
+#+TITLE: Scheme Short Queues and Whole-File Generated Digests
+#+DATE: 2026-10-21
+
+* Starting evidence
+
+This continues =37568272f40377878a774e36ab1e2c79fa4d50b9= on PR #18.
+The prior class router improved some CPU and owner-progress samples but regressed
+mixed throughput and short p99. Those results in [[file:30.35-class-specific-native-service-routing.org][30.35]] remain negative evidence.
+A class-specific owner score did not provide an intra-Scheme scheduling policy.
+
+* Actual API and ownership
+
+=SchemeServiceRequest::short_service()= defaults to false. True requires exactly
+one declared work unit and no Scheme Actor lane. Validation snapshots this class
+before admission/construction. The private native submit header adds an explicit
+short flag, independently of application data layout and owner routing.
+=SchemeServiceRouter= forwards the request declaration. A shared router still
+protects one short / three bulk callbacks only for its cooperating callers.
+
+The endpoint negotiates ABI v2. ABI v1 still accepts general requests; a short
+request against v1 is rejected before native construction. No fallback changes
+execution semantics. Arbitrary Scheme programs, exceptions including =raise #f=,
+GC, closures, green threads and multishot continuations retain their existing
+execution and fixed-thread ownership. Rust handles cross-instance dispatch,
+admission, native type construction and owned result projection.
+
+* Scheme work, wake and retirement protocol
+
+- Short and general requests have separate pending queues. A worker alternates
+  eligible classes when both are queued; lane eligibility is preserved.
+- A short request is one declared work unit. The worker yields between transitions
+  involving short work. An already executing handler is not interrupted. This is
+  a cooperative work-count boundary, not a duration bound on arbitrary code.
+- Short and general completions have separate amortized constant-time FIFOs.
+  With short work outstanding, one owner turn returns at most one ID from each
+  class, giving host admission another turn between projections.
+- The existing Scheme condition-variable predicate includes both ready queues.
+  Partial collection cannot make the owner sleep while completions remain.
+- Strong job graphs, errors and native capacity remain held until take/projection.
+  Receiver abandonment does not release accepted work. Close drains all classes,
+  joins persistent workers/watcher and closes the existing native wake ports.
+
+The general-only path still drains ready results together and has no newly chosen
+runtime default. No SMP path, Bash runner or Scheme-to-Rust compiler is added.
+
+* Generated-file digest correction
+
+The v1 header updated only a comment when build input identity changed. It is
+removed. Each =scheme/generated/*.scm= now consists of raw compiler output; its
+external =.scm.sha256= receipt records an entire-file SHA-256 and framed build-input
+identity. A change even to a compiler comment is covered by the digest.
+
+The canonical native build remains responsible for regeneration. Timestamp-bearing
+Gerbil output is not falsely advertised as deterministic byte-for-byte output
+across separate compilations. Receipt validation is separate from native build,
+semantic tests and exact-head CI. No SDK compiler patch or timestamp stripping is
+introduced. The initial migration removes only the old metadata line and preserves
+every byte of the previously generated body.
+
+* Directed measurement and boundaries
+
+=just bridge-scheme-service-benchmark --short-service-ab= compares general service
+against explicit short service with identical class routing, four VMs, two Tokio
+workers, slot/work limits 4/32, batch eight, native short layout and FIFO client
+collection. CPU and mixed native workloads remain unchanged. This adds one pair,
+not a larger scheduler/thread matrix. Startup is outside sample windows; five-second
+progress gates remain unchanged. Each row verifies native numeric outputs.
+
+The new per-request post-admission interval separates admission from waiting until
+native construction. It is still combined owner queue/wake/OS cost; construction,
+pending native work and projection/retirement remain separately recorded. This Rust
+bench does not include Python/GIL costs. Aggregate quantiles must not be subtracted
+for causal attribution. Existing negative short-layout and class-routing results
+are retained. Performance admission is not established by the directed captures below.
+
+* Verification
+
+The native single-worker fixture uses the real dispatcher and the same service
+protocol. A latched first request holds both queues; earlier general requests and
+later short requests must execute =90,1,2,91,4=, preserving each FIFO and alternating
+classes. =91= raises =#f=. Invalid work/lane declarations must fail before entry,
+completion turns must respect their budget, and teardown must return roots/files.
+The existing four-VM continuation/GC/error/backpressure/close and descriptor-return
+checks remain active.
+
+The existing =owner_lifecycle.qnt= is reused with a partial-retirement scenario:
+a ready graph left behind retains its root and prevents parking; close drains it.
+Both small and wide domains passed all 28 scenarios. This does not model FIFO,
+preemption, fairness bounds or OS latency; native checks and measurements own those
+claims. The generated-file unit suite passed 18 tests including comment/body/input
+drift and missing-receipt controls.
+
+Two native fixture runs failed missing-export preflight. The second established
+the omitted image export-list entry, which is repaired in the build contract. Both
+failures remain recorded. An initial stale-build explanation was insufficient.
+Strict benchmark lint failures were repaired with an explicit short execution-mode
+enum and bounded argument list, without lint suppression.
+
+* Source-bound results and retained negatives
+
+The predecessor [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39594347086][CI run 39594347086]] completed successfully: six active jobs passed;
+the unsupported SMP job remained skipped. This is predecessor evidence, not a CI
+pass for the new commit.
+
+The first frozen short-service candidate (before the ingress-order correction)
+used binary SHA-256 =949343ff898e9310dda9792b701b509f21bb7a1300084091536cfeb5543dbd2c=
+and source archive =e69d38caad68728d7993c6df4fcbf2bc20d37c3851eeea90ad01e0d03599921b=.
+Its smoke produced eight samples; each full capture produced 40 samples. All three
+runs ended with four clean joins, zero roots, removed image files and service
+quiescence. The following negative/inconsistent results remain retained:
+
+| Capture | Load | General orders/s | Short orders/s | General short p99 ms | Short p99 ms |
+|---------+------+------------------+----------------+----------------------+--------------|
+| A | CPU | 22206 | 22089 | 60.255 | 35.769 |
+| B | CPU | 35756 | 42140 | 39.476 | 26.389 |
+| A | Mixed | 18157 | 15468 | 16.544 | 18.360 |
+| B | Mixed | 15328 | 18331 | 20.864 | 17.884 |
+
+In the slowest 1% of candidate mixed requests, 88.9% / 99.4% of aggregate latency
+was before construction and after admission returned. These are sums of actual
+per-request spans selected by total latency, not subtraction of aggregate p99s.
+Type projection is not the dominant component in these captures. The interval
+still combines owner queueing, Scheme progress/wake delivery and OS scheduling.
+
+* Concrete ingress-order correction
+
+The owner pump previously advanced Scheme through =ready/yield= before inspecting
+an already-populated host inbox. A short payload therefore could remain in Rust
+while Scheme ran a turn without being able to select that job. The corrected
+pump checks the next FIFO inbox entry first. An explicitly classified short entry
+is constructed/submitted before the next Scheme advance; general entries retain
+the previous collect-before-entry behavior. No FIFO entry is bypassed, no Scheme
+thread is scheduled by Rust, and native capacity/root retirement is unchanged.
+This removes an identifiable extra progress boundary; it does not prove that all
+preconstruction delay came from that boundary.
+
+The corrected candidate uses binary
+=361f0a451d1d0d82633c402d95f5e3fcfefb52d2abbbb385f6ff53bd07523ef5=,
+image =b761e818060c8f3727a14dc60d1cad332c80d795a33e30daa6a01fef40820d0e=,
+and source archive =f4333324de1ff6fd752ddf549355d0fc325637f8da3454f59995d2f7f3fdac67=.
+Each capture uses the same four live VMs/image for both arms. These are matched
+current-artifact comparisons, not a same-image experiment attributing every change
+from the preceding binary solely to ingress ordering.
+
+| Capture | Load | General orders/s | Short orders/s | Ratio | General short p99 ms | Short p99 ms | General batch p99 ms | Short batch p99 ms |
+|---------+------+------------------+----------------+-------+----------------------+--------------+----------------------+--------------------|
+| A | CPU | 42244 | 66096 | 1.565 | 35.950 | 16.859 | 10.385 | 5.940 |
+| B | CPU | 57674 | 36809 | 0.638 | 19.685 | 20.207 | 9.179 | 7.286 |
+| A | Mixed | 15971 | 20427 | 1.279 | 21.223 | 9.769 | 32.928 | 28.539 |
+| B | Mixed | 22781 | 23277 | 1.022 | 9.807 | 10.259 | 26.198 | 22.583 |
+
+Mixed normalized owner progress minima changed 98.3% to 98.6% in A and 98.4% to
+98.5% in B. This finite completion-progress metric is not a starvation guarantee.
+CPU denotes the compute-only workload, not CPU utilization; higher CPU occupation
+itself is not counted as a regression.
+
+The candidate mixed post-admission p99 was 9.727 / 9.006 ms, compared with
+21.147 / 8.235 ms. The mixed tail improvement did not reproduce. In corrected
+capture B's slowest 1%, construction accounted for 28.6% of aggregate latency:
+one native construction span lasted 56.410 ms in a 67.116 ms request. That span
+may include allocation, GC or descheduling; this instrumentation does not isolate
+those causes. Do not hide it behind its much smaller construction p99.
+
+Both corrected full captures completed 40 samples with four clean joins, zero
+roots, removed copied images and verified service quiescence. Absolute rates vary
+substantially across captures; no universal throughput, industrial-readiness or
+quiet-host claim is admitted. The mixed throughput direction improved in both,
+but CPU throughput and short-tail regressions prevent promotion to a default.
+The next unresolved measurement boundary is owner advance/wake versus OS delay,
+plus the rare native construction outlier. No larger matrix or default change is
+justified by these results.
+
+* Final local gates and publication boundary
+
+- Whole-file digest validation passed through the canonical native build.
+- The build-support unit target passed 18 tests.
+- Small/wide existing lifecycle domains each passed all 28 scenarios.
+- Strict core-library and qualification all-target lint gates passed. The small
+  ingress-only follow-up also passed strict core lint and release compilation.
+- The frozen pre-ingress native rerun passed in 4.92 seconds; the ingress-corrected
+  rerun passed in 5.41 seconds with continuous stage progress under the unchanged
+  five-second progress watchdog. Its four-VM close took 2.778 ms, with returned
+  roots/files/descriptors. Total test duration is not the progress deadline.
+- Formatting, diff checks and added-line English/private-path checks passed.
+
+Raw logs, failure records, native images, binaries and archives remain outside
+Git. Source-input manifests bind both frozen candidates; publication checks must
+match the final source snapshot. Exact-head remote CI remains a separate gate
+following the coordinated PR #18 push.

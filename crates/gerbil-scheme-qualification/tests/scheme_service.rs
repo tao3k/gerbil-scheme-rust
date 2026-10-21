@@ -1,6 +1,8 @@
 //! Native Scheme-owned waiting, continuation affinity and close/error drain.
 #[path = "../benches/support/orders.rs"]
 mod corpus;
+#[path = "scheme_service/priority.rs"]
+mod priority;
 #[path = "scheme_service/routing.rs"]
 mod routing;
 #[path = "scheme_service/short.rs"]
@@ -343,6 +345,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     progress
         .send("Scheme service initialization failure drained")
         .unwrap();
+    priority::contract(&runtime, &progress);
     let mut pool = InstancePool::start_observed(&descriptor(false), config(), |_| {
         progress.send("service owner initialized").unwrap();
     })

@@ -112,7 +112,8 @@ fn main() {
         || s == "--bench"
         || s == "--split-layout-ab"
         || s == "--short-layout-only"
-        || s == "--class-route-ab"));
+        || s == "--class-route-ab"
+        || s == "--short-service-ab"));
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
         let mut last = "start";
@@ -131,12 +132,17 @@ fn main() {
         args.iter()
             .filter(|s| matches!(
                 s.as_str(),
-                "--split-layout-ab" | "--short-layout-only" | "--class-route-ab"
+                "--split-layout-ab"
+                    | "--short-layout-only"
+                    | "--class-route-ab"
+                    | "--short-service-ab"
             ))
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--class-route-ab") {
+    let comparison = if args.iter().any(|s| s == "--short-service-ab") {
+        Comparison::ShortService
+    } else if args.iter().any(|s| s == "--class-route-ab") {
         Comparison::ClassRouting
     } else if args.iter().any(|s| s == "--short-layout-only") {
         Comparison::ShortLayout

@@ -1,6 +1,9 @@
 #+TITLE: Native Short Layout and Completion-Ready Scheme Service Flow
 #+DATE: 2026-10-21
 
+Follow-up: [[file:30.36-scheme-short-queues-and-whole-file-digests.org][30.36]] records the actual short-service protocol, external
+whole-file digest receipts and subsequent source-bound negative A/B evidence.
+
 * Starting evidence and CI repair
 
 This work continues PR #18 from =2cc3c66=. Exact-head

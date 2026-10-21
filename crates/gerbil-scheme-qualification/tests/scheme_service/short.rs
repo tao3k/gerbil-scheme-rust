@@ -11,6 +11,9 @@ use std::sync::{
 pub(super) struct Short(pub Vec<i64>);
 impl SchemeServiceRequest for Short {
     type Output = Vec<Vec<i64>>;
+    fn short_service(&self) -> bool {
+        true
+    }
     fn work_units(&self) -> usize {
         1
     }

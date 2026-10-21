@@ -95,3 +95,29 @@ See `docs/30-39-status/30.35-class-specific-native-service-routing.org` for the
 actual routing API, native quota/cancellation/close checks and complete negatives.
 Cross-instance routing and Scheme-owned short-queue scheduling are separate
 problems; this comparison does not implement or qualify the latter.
+
+## Scheme short scheduling only
+
+```text
+just bridge-scheme-service-benchmark --test --short-service-ab
+just bridge-scheme-service-benchmark --short-service-ab
+```
+
+Both arms use the same four VMs, two Tokio workers, class router (one short / three
+batch callbacks), native short layout, batch eight, work budget 32 and FIFO client
+collection. Only the candidate opts into `SchemeServiceRequest::short_service`.
+The service rejects this declaration unless it has one work unit, no Actor lane,
+and an endpoint negotiating ABI v2. ABI v1 remains usable for general requests.
+
+Scheme owns separate short work and completion queues, alternating eligible
+short/general work on each persistent worker and returning at most one completion
+of each class per owner turn while short work remains outstanding. This is a
+cooperative work budget, not a wall-clock guarantee for arbitrary Scheme code.
+An executing handler is not interrupted or moved to another thread.
+
+`probe_post_admission_wait_ns` measures the interval from the admission future's
+return to native construction entry, saturated at zero when execution starts
+before the future returns. It excludes the measured admission interval, but still
+combines host queueing, wake delivery and OS scheduling. Do not subtract aggregate
+p99 values or label this interval isolated Scheme execution or wake latency.
+See status report 30.36 for native acceptance and retained negative A/B evidence.

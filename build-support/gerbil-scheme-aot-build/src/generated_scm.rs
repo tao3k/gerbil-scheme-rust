@@ -3,7 +3,7 @@ use std::path::Path;
 
 use sha2::{Digest, Sha256};
 
-const PROVENANCE_SCHEMA: &str = "gerbil-scheme-rust.generated-scm-provenance.v1";
+const PROVENANCE_SCHEMA: &str = "gerbil-scheme-rust.generated-scm-provenance.v2";
 const INPUT_PATHS: &[&str] = &[
     "build.ss",
     "gerbil.pkg",
@@ -26,64 +26,23 @@ pub(crate) fn workspace_input_fingerprint(workspace: &Path) -> String {
     hex_digest(hasher.finalize())
 }
 
-pub(crate) fn stamp_generated_scm(body: &str, input_fingerprint: &str) -> String {
-    let body_fingerprint = sha256(body.as_bytes());
+/// External receipt: generated files remain byte-for-byte compiler output.
+pub(crate) fn generated_scm_receipt(contents: &[u8], input_fingerprint: &str) -> String {
     format!(
-        ";; {PROVENANCE_SCHEMA} input-sha256={input_fingerprint} \
-         body-sha256={body_fingerprint}\n{body}"
+        "{PROVENANCE_SCHEMA}\ninput-sha256={input_fingerprint}\nfile-sha256={}\n",
+        sha256(contents)
     )
 }
 
 pub(crate) fn validate_generated_scm(
-    tracked: &str,
+    contents: &[u8],
+    receipt: &str,
     expected_input_fingerprint: &str,
 ) -> Result<(), &'static str> {
-    let (header, body) = tracked
-        .split_once('\n')
-        .ok_or("missing provenance header separator")?;
-    let provenance = parse_provenance(header)?;
-    if provenance.input_fingerprint != expected_input_fingerprint {
-        return Err("input fingerprint does not match current Scheme build inputs");
-    }
-    if provenance.body_fingerprint != sha256(body.as_bytes()) {
-        return Err("body fingerprint does not match committed SCM contents");
+    if receipt != generated_scm_receipt(contents, expected_input_fingerprint) {
+        return Err("whole-file digest or build input receipt does not match");
     }
     Ok(())
-}
-
-struct GeneratedScmProvenance<'a> {
-    input_fingerprint: &'a str,
-    body_fingerprint: &'a str,
-}
-
-fn parse_provenance(header: &str) -> Result<GeneratedScmProvenance<'_>, &'static str> {
-    let mut fields = header.split_ascii_whitespace();
-    if fields.next() != Some(";;") || fields.next() != Some(PROVENANCE_SCHEMA) {
-        return Err("missing generated SCM provenance schema");
-    }
-    let input_fingerprint = fingerprint_field(fields.next(), "input-sha256=")?;
-    let body_fingerprint = fingerprint_field(fields.next(), "body-sha256=")?;
-    if fields.next().is_some() {
-        return Err("unexpected generated SCM provenance fields");
-    }
-    Ok(GeneratedScmProvenance {
-        input_fingerprint,
-        body_fingerprint,
-    })
-}
-
-fn fingerprint_field<'a>(field: Option<&'a str>, prefix: &str) -> Result<&'a str, &'static str> {
-    let fingerprint = field
-        .and_then(|field| field.strip_prefix(prefix))
-        .ok_or("missing generated SCM fingerprint field")?;
-    if fingerprint.len() != 64
-        || !fingerprint
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Err("generated SCM fingerprint is not lowercase SHA-256");
-    }
-    Ok(fingerprint)
 }
 
 fn sha256(value: &[u8]) -> String {

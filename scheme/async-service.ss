@@ -3,8 +3,25 @@
 (export make-gerbil-rs-service gerbil-rs-service-submit! gerbil-rs-service-ready!
         gerbil-rs-service-take! gerbil-rs-service-wait! gerbil-rs-service-stop! gerbil-rs-service-close! make-gerbil-rs-service-endpoint)
 
-(defstruct service-job (id input value failure failed done lane))
-(defstruct scheme-service (handler limit jobs next workers idle queued ready lock event port output watcher wake broken closing))
+(defstruct service-job (id input value failure failed done lane short))
+(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing))
+
+;; Completion queues have amortized constant-time push/pop. A bounded host
+;; turn must not repeatedly reverse every remaining completion under pressure.
+(defstruct service-fifo (front back))
+(def (service-fifo-empty? queue)
+  (and (null? (service-fifo-front queue)) (null? (service-fifo-back queue))))
+(def (service-fifo-push! queue value)
+  (set! (service-fifo-back queue) (cons value (service-fifo-back queue))))
+(def (service-fifo-pop! queue)
+  (when (null? (service-fifo-front queue))
+    (set! (service-fifo-front queue) (reverse (service-fifo-back queue)))
+    (set! (service-fifo-back queue) []))
+  (let (front (service-fifo-front queue))
+    (and (pair? front) (begin (set! (service-fifo-front queue) (cdr front)) (car front)))))
+(def (service-fifo-drain! queue)
+  (let (values (append (service-fifo-front queue) (reverse (service-fifo-back queue))))
+    (set! (service-fifo-front queue) []) (set! (service-fifo-back queue) []) values))
 
 (def (service-locked service thunk)
   (dynamic-wind
@@ -13,14 +30,33 @@
     (lambda () (mutex-unlock! (scheme-service-lock service)))))
 (def (service-signal! service)
   (condition-variable-broadcast! (scheme-service-event service)))
-(def (service-next! service worker)
-  (let loop ((queued (scheme-service-queued service)) (prefix []))
+;; Separate queues, one short turn followed by an eligible general turn.
+;; Affine jobs are never reassigned; active Scheme computations are not cancelled.
+(def (service-pop! service worker short?)
+  (let loop ((queued (if short? (scheme-service-short-queued service) (scheme-service-queued service))) (prefix []))
     (cond
-      ((null? queued)
-       (set! (scheme-service-idle service) (cons worker (scheme-service-idle service))) #f)
+      ((null? queued) #f)
       ((or (= (service-job-lane (car queued)) -1) (= (service-job-lane (car queued)) worker))
-       (set! (scheme-service-queued service) (append (reverse prefix) (cdr queued))) (car queued))
+       (let (remaining (append (reverse prefix) (cdr queued)))
+         (if short?
+           (set! (scheme-service-short-queued service) remaining)
+           (set! (scheme-service-queued service) remaining)))
+       (car queued))
       (else (loop (cdr queued) (cons (car queued) prefix))))))
+(def (service-next! service worker)
+  (let* ((short-first? (not (vector-ref (scheme-service-turns service) worker)))
+         (job (or (service-pop! service worker short-first?)
+                  (service-pop! service worker (not short-first?)))))
+    (if job
+      (begin (vector-set! (scheme-service-turns service) worker (service-job-short job)) job)
+      (begin (set! (scheme-service-idle service) (cons worker (scheme-service-idle service))) #f))))
+(def (service-finished! service job)
+  (set! (service-job-input job) #f)
+  (set! (service-job-done job) #t)
+  (if (service-job-short job)
+    (service-fifo-push! (scheme-service-short-ready service) (service-job-id job))
+    (service-fifo-push! (scheme-service-ready service) (service-job-id job)))
+  (service-signal! service))
 (def (service-worker service worker)
   (let receive ()
     (let (message (thread-receive))
@@ -34,13 +70,13 @@
           (let (next
                 (service-locked service
                   (lambda ()
-                    (set! (service-job-input job) #f)
-                    (set! (service-job-done job) #t)
-                    (set! (scheme-service-ready service)
-                      (cons (service-job-id job) (scheme-service-ready service)))
-                    (service-signal! service)
+                    (service-finished! service job)
                     (service-next! service worker))))
-            (if next (process next) (receive))))))))
+            (if next
+              (begin
+                (when (or (service-job-short job) (service-job-short next)) (thread-yield!))
+                (process next))
+              (receive))))))))
 (def (service-watch service)
   (with-catch
     (lambda (_)
@@ -68,7 +104,7 @@
          (output (with-catch (lambda (failure) (close-input-port port) (raise failure))
                    (lambda () (open-output-file (string-append "/dev/fd/" (number->string write-fd))))))
          (service (make-scheme-service handler limit (make-table test: eqv?) 1
-                    (make-vector count) [] [] [] (make-mutex)
+                    (make-vector count) [] [] (make-service-fifo [] []) [] (make-service-fifo [] []) 0 (make-vector count #f) (make-mutex)
                     (make-condition-variable) port output #f #f #f #f)))
     ;; Construction failure joins already-created children before propagating.
     (with-catch
@@ -92,36 +128,44 @@
             (loop (1+ worker))))
         (set! (scheme-service-watcher service) (spawn (lambda () (service-watch service))))
         service))))
-(def (gerbil-rs-service-submit! service input lane)
+(def (gerbil-rs-service-submit! service input lane (short? #f))
   (service-locked service
     (lambda ()
       (when (or (scheme-service-closing service) (scheme-service-broken service))
         (error "Scheme service closed"))
       (unless (and (integer? lane) (<= -1 lane) (< lane (vector-length (scheme-service-workers service))))
         (error "invalid Scheme service lane"))
+      (when (and short? (not (= lane -1))) (error "short service cannot move an affine Actor"))
       (when (>= (table-length (scheme-service-jobs service)) (scheme-service-limit service))
         (error "Scheme service capacity"))
-      (let* ((id (scheme-service-next service)) (job (make-service-job id input #f #f #f #f lane))
+      (let* ((id (scheme-service-next service)) (job (make-service-job id input #f #f #f #f lane short?))
              (idle (scheme-service-idle service))
              (target (if (= lane -1) (and (pair? idle) (car idle)) (and (memv lane idle) lane))))
         (when (>= id 9223372036854775807) (error "Scheme service identity exhausted"))
         (set! (scheme-service-next service) (1+ id))
         (table-set! (scheme-service-jobs service) id job)
+        (when short? (set! (scheme-service-short-count service) (1+ (scheme-service-short-count service))))
         (if target
           (begin
             (set! (scheme-service-idle service) (filter (lambda (worker) (not (= worker target))) idle))
+            (vector-set! (scheme-service-turns service) target short?)
             (thread-send (vector-ref (scheme-service-workers service) target) job))
-          (set! (scheme-service-queued service)
-            (append (scheme-service-queued service) (list job))))
+          (if short?
+            (set! (scheme-service-short-queued service) (append (scheme-service-short-queued service) (list job)))
+            (set! (scheme-service-queued service) (append (scheme-service-queued service) (list job)))))
         id))))
 (def (gerbil-rs-service-ready! service)
-  ;; A Scheme yield runs pending green work even during a busy host inbox.
+  ;; Give native green threads a turn; wake and task scheduling remain Scheme-owned.
   (thread-yield!)
   (service-locked service
     (lambda ()
-      (let (ready (scheme-service-ready service))
-        (set! (scheme-service-ready service) [])
-        (list->s64vector (reverse ready))))))
+      (if (zero? (scheme-service-short-count service))
+        (list->s64vector (service-fifo-drain! (scheme-service-ready service)))
+        ;; At most one short projection and one general projection per host turn.
+        ;; Keeping unreturned IDs in Scheme also makes wait observe pending work.
+        (let ((short (service-fifo-pop! (scheme-service-short-ready service)))
+              (general (service-fifo-pop! (scheme-service-ready service))))
+          (list->s64vector (append (if short (list short) []) (if general (list general) []))))))))
 (def (gerbil-rs-service-take! service id)
   (let (job
         (service-locked service
@@ -129,6 +173,8 @@
             (let (job (table-ref (scheme-service-jobs service) id #f))
               (unless (and job (service-job-done job)) (error "Scheme service result not ready"))
               (table-set! (scheme-service-jobs service) id)
+              (when (service-job-short job)
+                (set! (scheme-service-short-count service) (1- (scheme-service-short-count service))))
               job))))
     (if (service-job-failed job) (raise (service-job-failure job)) (service-job-value job))))
 (def (gerbil-rs-service-wait! service microseconds)
@@ -138,7 +184,7 @@
       (cond
         ((scheme-service-broken service)
          (mutex-unlock! lock) (error "Scheme service wake port failed"))
-        ((or (pair? (scheme-service-ready service)) (scheme-service-wake service))
+        ((or (not (service-fifo-empty? (scheme-service-ready service))) (not (service-fifo-empty? (scheme-service-short-ready service))) (scheme-service-wake service))
          (set! (scheme-service-wake service) #f) (mutex-unlock! lock) 0)
         (else
          ;; Only an actual host admission deadline supplies a timeout. Scheme's
@@ -165,7 +211,10 @@
         (begin
           (for-each (lambda (entry) (table-set! (scheme-service-jobs service) (car entry)))
             (table->list (scheme-service-jobs service)))
-          (set! (scheme-service-ready service) [])
+          (service-fifo-drain! (scheme-service-ready service))
+          (service-fifo-drain! (scheme-service-short-ready service))
+          (set! (scheme-service-short-queued service) [])
+          (set! (scheme-service-short-count service) 0)
           (mutex-unlock! lock))))
     (vector-for-each (lambda (worker) (thread-send worker 'stop)) (scheme-service-workers service))
     (vector-for-each thread-join! (scheme-service-workers service))
@@ -179,7 +228,7 @@
     0))
 
 ;; Rooted unary command protocol: [s64 header, optional native payload].
-;; 0=open(read-fd,write-fd,limit), 1=submit(lane), 2=take(id), 3=ready,
+;; 0=open(read-fd,write-fd,limit), 1=submit(lane, optional short-class=1), 2=take(id), 3=ready,
 ;; 4=wait(host-deadline-microseconds or zero), 7=prepare-close, 5=drain/close.
 ;; Hooks remain Scheme-owned; open/close track partially allocated app resources.
 (def (make-gerbil-rs-service-endpoint handler workers on-open on-prepare on-close)
@@ -202,10 +251,14 @@
            (on-open)
            (set! service (make-gerbil-rs-service handler workers (s64vector-ref header 3)
                           (s64vector-ref header 1) (s64vector-ref header 2)))
-           (s64vector 0 1 workers (s64vector-ref header 3)))
+           (s64vector 0 2 workers (s64vector-ref header 3)))
           ((1)
            (unless service (error "Scheme service not open"))
-           (s64vector (gerbil-rs-service-submit! service (vector-ref command 1) (s64vector-ref header 1))))
+           (unless (or (= (s64vector-length header) 2)
+                       (and (= (s64vector-length header) 3) (= (s64vector-ref header 2) 1)))
+             (error "invalid Scheme service submit class"))
+           (s64vector (gerbil-rs-service-submit! service (vector-ref command 1) (s64vector-ref header 1)
+                        (and (= (s64vector-length header) 3) (= (s64vector-ref header 2) 1)))))
           ((2) (gerbil-rs-service-take! service (s64vector-ref header 1)))
           ((3) (gerbil-rs-service-ready! service))
           ((4) (s64vector (gerbil-rs-service-wait! service (s64vector-ref header 1))))

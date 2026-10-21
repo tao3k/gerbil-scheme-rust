@@ -298,6 +298,16 @@ module owner_lifecycle {
     .then(all { assert(s.serviceRoots.contains(1)), assert(s.workHeld.contains(1)), assert(not(canJoin)), assert(safety), stutter })
     .then(readyService(1, true)).then(complete(1)).then(join)
     .then(all { assert(s.serviceRoots.size() == 0), assert(s.serviceFailed.contains(1)), assert(safety), stutter })
+  // Bounded class retirement may leave a ready graph behind. Reuse the same
+  // root/wake protocol; native tests separately check FIFO and class turns.
+  run servicePartialRetirementTest = init
+    .then(admit(1)).then(submitService(1)).then(readyService(1, false))
+    .then(admit(2)).then(submitService(2)).then(readyService(2, true))
+    .then(complete(2)).then(clearWake(ASSIGNED.get(1)))
+    .then(all { assert(s.serviceRoots == Set(1)), assert(s.serviceReady == Set(1)),
+      assert(not(canPark(ASSIGNED.get(1)))), assert(safety), stutter })
+    .then(close).then(complete(1)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
   run serviceEarlyRootMutationTest = init.then(admit(1)).then(submitService(1)).then(unsafeServiceRoot(1))
     .then(all { assert(not(safety)), stutter })
   run serviceLostWakeMutationTest = init.then(admit(1)).then(notify(1)).then(clearWake(1)).then(unsafePark(1))

@@ -17,7 +17,12 @@ fn values(
     if input.len() > 4096 {
         return Err(PyValueError::new_err("native value batch exceeds 4096"));
     }
-    input
+    let started = library
+        .service
+        .instances
+        .as_ref()
+        .and_then(super::instances::InstanceService::profile_start);
+    let result = input
         .iter()
         .map(|value| {
             let value = value
@@ -28,7 +33,11 @@ fn values(
             }
             Ok(value)
         })
-        .collect()
+        .collect();
+    if let Some(instances) = &library.service.instances {
+        instances.profile_finish("python-value-batch-read", started);
+    }
+    result
 }
 fn retire_tokens(py: Python<'_>, values: &[Py<PythonValue>], ids: &[u64]) {
     for (value, id) in values.iter().zip(ids) {
@@ -55,17 +64,31 @@ pub(super) fn project_many(
         .instances
         .as_ref()
         .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
-    let projected = py
-        .detach(|| instances.project_many(&ids))
-        .map_err(PyRuntimeError::new_err)?;
-    let projected = projected
+    let (projected, returned) = py.detach(|| {
+        let waiting = instances.profile_start();
+        let projected = instances.project_many(&ids);
+        instances.profile_finish("rust-projection-wait", waiting);
+        (projected, instances.profile_start())
+    });
+    instances.profile_finish("gil-return-projection", returned);
+    let projected = projected.map_err(PyRuntimeError::new_err)?;
+    let materializing = instances.profile_start();
+    let result = projected
         .into_iter()
         .map(|value| value.to_python(py))
-        .collect::<PyResult<Vec<_>>>()?;
+        .collect::<PyResult<Vec<_>>>();
+    instances.profile_finish("python-materialize-many", materializing);
+    let projected = result?;
     // Neither native projection failure nor Python allocation failure consumes input roots.
     if release {
-        py.detach(|| instances.release_many(&ids))
-            .map_err(PyRuntimeError::new_err)?;
+        let (released, returned) = py.detach(|| {
+            let waiting = instances.profile_start();
+            let released = instances.release_many(&ids);
+            instances.profile_finish("rust-release-wait", waiting);
+            (released, instances.profile_start())
+        });
+        instances.profile_finish("gil-return-release", returned);
+        released.map_err(PyRuntimeError::new_err)?;
         retire_tokens(py, &values, &ids);
     }
     Ok(projected)

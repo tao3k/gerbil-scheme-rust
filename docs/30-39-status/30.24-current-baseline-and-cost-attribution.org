@@ -1,0 +1,178 @@
+#+TITLE: Current native baseline, phase attribution and fixed-pool memory trends
+#+STARTUP: overview
+
+* Scope and current state
+
+The source baseline is =8c23217d1f838e71a972e606d6e38e6386f3b0a7=. Its six active remote CI jobs pass; Scheme SMP is explicitly skipped. Historical resource and performance results retain their original artifacts. No owner count, Rust worker count, dispatcher, admission window, native deadline or optimization default changes in this qualification.
+
+Scheme retains native types, Actors, green threads, hygienic macros, GC, exceptions and continuations through Gerbil -> Gambit C -> native O2. Rust only distributes work across fixed owners. Sessions sharing an owner share its Scheme state; a long native call occupies that owner's Rust entry queue while Scheme retains internal cooperative scheduling.
+
+The preceding raw =/private/tmp/gerbil-mapping-leases-20261020= captures and wheel are no longer available. This qualification rebuilds rather than claiming to reuse them. Evidence is stored outside Git under =/Users/guangtao/.local/state/gerbil-scheme-rust/20261021-baseline=.
+
+* Artifact admission
+
+Rebuilt baseline wheel SHA-256: =3fcb7c8b31e938ccabfad9371650b161bc563f68bd333543ff1c26f47044da5e=.
+Native Scheme image SHA-256: =b06f69bade2143b5482e8b63c55bc3eeae4cb871a4d2be29957fa89ee1a598ac=.
+All 76 packaged resource paths have recorded hashes. The wheel retains the existing external Homebrew library dependency warning; this is not self-contained deployment acceptance.
+
+Optional host/phase diagnostics are a separate source/artifact treatment. Their native resource parity, real API tests and sampled overhead must be checked independently; their timings must not be subtracted from an untraced run.
+
+* Current acceptance map
+
+| Area | Completed evidence | Open boundary |
+|------+--------------------+---------------|
+| Native lifecycle | Original startup-fault, GC/continuation/exception, join/TLS, module/callback and 32-image qualified-release controls | Arbitrary extension unload and stuck-native recovery |
+| Type ownership | Owner/library affinity, typed mapping receipts, code leases, projection failure retention and inherited-fork rejection | General cross-VM object transfer is not admitted |
+| Model | Extended existing model: twelve scenarios/domain, two sets of 1,000 sampled traces and five real mutation counterexamples | Twelve-transition symbolic target incomplete; old eight-step result not transferred |
+| Performance | Historical 21.18x / 10.10x observations preserved; current source-head matched replication completed below | No fixed magnitude, linear VM scaling or universal scheduler winner |
+| Memory | Default retention, authorized unload, allocator residency and small reachable allocations distinguished | One-hour fixed-pool trends and post-close checks complete below; multi-hour/churn and global residue bounds remain open |
+| Packaging | Native O2 wheel built and installed locally | External Homebrew dependencies; installed-wheel/platform deployment CI remains separate |
+
+* Rebuilt source-head baseline
+
+The unchanged original =bench_owner_payload.py --rounds 16= completes on the rebuilt source-head wheel. Every pair uses the same four live VM states and the same Scheme Actor work, fixed owner routes, 128 requests x 32 Actor items x 48 pairs, complete results and owner-batched projection/release. Both arms use the default pinned direct dispatcher and admission window 128. Read-only native input preparation is reported separately.
+
+| Arm | Median Actor items/s | Batch response p99 ms | Scheduled short-response p99 ms |
+|-----+----------------------+-----------------------+--------------------------------|
+| Fresh native input graphs | 17,758.67 | 241.962 | 188.734 |
+| Owner-resident Scheme graphs | 228,901.90 | 18.725 | 11.434 |
+
+These rates correspond to 554.96 / 7,153.18 complete application requests per second (divide Actor items by 32). Each batch returns 128 x 32 rows with four fields per row, including native projection, Python materialization and retirement. Actor-item rates must not be presented as application-request rates.
+
+The observed data-placement ratio is 12.8896x. It is not reproduction of a fixed 10.10x / 21.18x magnitude, nor a one-to-four-VM scaling factor. Each arm has 16 measured batches and 512 short probes, 128 per owner. The batch p99 is a finite batch-response statistic, not 2,048 independently arriving requests. Native short probes often arrive after the bulk response: only 64 / 512 finish before main completion versus 512 / 512 in the fresh arm. This is not sustained starvation-freedom or open-loop overload acceptance.
+
+Both arms validate the complete results, retain the same VM identities and close with zero external roots and removed files. Host observations include unrelated compilers and system work. No quiet-host certification, universal speedup or performance attribution to a particular background process is made.
+
+* Final-wheel untraced baselines after owned endurance retirement
+
+All cohorts below use the installed final diagnostic wheel with profiling disabled. Each fresh/resident pair retains its original live VM states, complete Actor work and typed output checks. Cohorts remain separate; host snapshots still show unrelated system/compiler activity. This is not quiet-host certification or a claim that the diagnostic source improved production speed.
+
+| Cohort | Owners / probes per owner | Fresh Actor items/s | Resident Actor items/s | Placement ratio | Resident batch p99 ms | Resident scheduled probe p99 ms |
+|--------+---------------------------+---------------------+------------------------+-----------------+-----------------------+--------------------------------|
+| Four A | 4 / 8 | 18,138.25 | 235,322.15 | 12.9738x | 17.908 | 11.290 |
+| Four B | 4 / 8 | 18,532.20 | 251,155.80 | 13.5524x | 29.701 | 9.798 |
+| Final v5 default | 4 / 8 | 18,538.27 | 232,063.83 | 12.5181x | 33.365 | 13.637 |
+| Single capacity only | 1 / 0 | 7,741.18 | 86,346.00 | 11.1541x | 77.953 | not offered |
+
+Every admitted cohort has sixteen measured pairs, two warmup rounds, complete result checks, zero-root/file retirement and natural process exit. The default v5 four-owner run reports 232,063.83 Actor items/s, or 7,251.99 complete application requests/s; its client batch-return and projection/release medians are 1.692 / 15.933 ms. Those separate medians are not added to reconstruct total latency. Its fresh arm reports 18,538.27 Actor items/s, or 579.32 requests/s. The higher Four B throughput does not reproduce as a fixed improvement: Four A/B/default resident batch p99 varies from 17.908 to 33.365 ms, and the cohorts are not pooled.
+
+Whole open-library initialization is 2,249.923--2,885.604 ms in the three four-owner cohorts; preparing the owner-resident payload is separately 14.661--14.744 ms. The single capacity control records 614.022 ms initialization and 4.106 ms preparation. These are measured API envelopes, not pure SDK/encoding CPU times. Macro first-use cost is covered by separate capability tests, not silently included as Actor execution.
+
+The single capacity-only cohort offers zero short probes; its unavailable probe statistics are null, not zero latency. It cannot replace the failed single mixed-load treatment below. Different probe populations and separate VM pools also prevent using these tables as matched one-to-four-VM scaling evidence. No 10.10x/21.18x threshold, multiplied speedup, new dispatcher/window/worker default or starvation-freedom claim is admitted.
+* Diagnostic boundaries
+
+The preexisting fixed-session API omitted the host clocks already available on stateless =library.call_many=. Optional session observations now cover Python input conversion, token-wrapper construction and the return from detached Rust work. Bulk projection observes Python value validation, native projection wait, Python materialization and release wait.
+
+=gil-return-*= spans begin immediately before detached work returns and end after PyO3 reacquires the interpreter. They include reacquisition, OS scheduling and binding return overhead; they are not a pure GIL mutex timer. Time before Python method entry is not isolated as GIL time. Client entry lateness and current-thread CPU are recorded separately.
+
+Native owner spans distinguish preparation-to-owner-start waiting, native construction and Scheme-call wall time. Optional cumulative SDK snapshots split GC user/system/real seconds, owner-thread CPU, external roots and collection counts between construction and execution. GC is included in the measured phases, not additional time to add to them. Projection spans retain their own queue/execution/GC observations. Host envelopes overlap owner spans; sums of quantiles do not reconstruct end-to-end latency. Diagnostics are opt-in and bounded, and measurement failures/dropped spans invalidate a diagnostic cohort. Legacy =stages_ns= clocks are only interpreted for successful staged calls; failed or unstaged operations do not provide a complete two-phase timeline, and unavailable stage counter pairs remain null.
+
+* Initial diagnostic cohort and preserved negatives
+
+Diagnostic wheel =de4793b0ac8db7ccba6a6e99045e03f9b958321265320145286fb9c0c73afe1d= has all 76 resource paths byte-identical to the rebuilt head. Four measured matched pairs exercise 512 Actor requests per arm, plus finite scheduled probes; no diagnostic span is dropped or marked failed.
+
+| Measured phase | Fresh inputs | Owner-resident inputs | Observation unit |
+|----------------+--------------+-----------------------+------------------|
+| Python input read median | 28.457 ms | 0.038 ms | 32-request pinned client batch; 16 samples/arm |
+| Preparation through owner start median | 52.449 ms | 1.402 ms | Actor request; 512 samples/arm |
+| Native construction median | 3.232 ms | 0.00348 ms | Actor request |
+| Scheme-call wall median, including GC | 0.02790 ms | 0.01579 ms | Actor request |
+| Construction GC count / real seconds | 691 / 0.283875 s | 3 / 0.001827 s | Cumulative across 512 requests |
+| Scheme-call GC count / real seconds | 10 / 0.003857 s | 11 / 0.007545 s | Cumulative across 512 requests |
+| Native projection median | 10.387 ms | 10.269 ms | Owner projection turn; 16 samples/arm |
+| Projection GC count / real seconds | 82 / 0.032285 s | 80 / 0.037063 s | Cumulative across owner turns |
+| Python materialization median | 5.619 ms | 5.832 ms | Whole 128-result batch; 4 samples/arm |
+| Session GIL return envelope median | 0.00154 ms | 0.00081 ms | Pinned client batch return |
+
+Native projection queue medians are 0.0264 / 0.0245 ms; native release turn medians are 0.1299 / 0.0460 ms. These observations point toward actual native graph traversal/conversion and Python materialization as the next resident-path investigation, before more Rust workers. They do not establish that GIL contention is absent in other workloads or during Python input conversion. Python read spans hold the interpreter but include scheduling and allocation; they are not conversion CPU clocks. The legacy =rust-admission-turn= span includes completing the turn and waiting for owner results, not merely enqueue CPU time.
+
+Preserve the trace-arm tail: resident batch maximum is 70.626 ms and scheduled short p99 is 71.009 ms in this four-pair cohort. Tracing and two concurrent resource-gate processes differ from the original untraced cohort; no causal overhead, p99 gain or cross-run subtraction is inferred. All finite result and close checks pass. Strict Clippy initially rejects two redundant method-call closures; correcting those findings changes no execution protocol and uses no suppression.
+
+The final lint-corrected diagnostic wheel is =71ca770517d38318cd18aaddaa249091634a29e53714b5d85aa3738a7b2f35fd=. Its resource parity and source hashes are recorded separately. Final-wheel profiling control PASS, including a real Scheme exception, unavailable partial-stage counters, subsequent recovery and disabled-profile silence; all twelve actual Python API tests PASS; full hygienic DSL, GC/continuations and shutdown PASS on all four owners. The instance and linked feature profiles both pass strict Clippy. These results are separate from the initial diagnostic artifact; linked lint is not linked-wheel runtime qualification. CPython 3.14.7 reports GIL-enabled execution, not a free-threaded build.
+
+A second four-pair diagnostic cohort on the final wheel independently validates 512 requests/arm, every expected phase, no dropped/failed spans, unchanged VM identities and zero-root/file retirement:
+
+| Phase | Fresh | Owner-resident |
+|-------+-------+----------------|
+| Python read ms / pinned batch | 41.690376 | 0.033688 |
+| GIL return ms / pinned batch | 0.001500 | 0.000708 |
+| Python materialize ms / whole result batch | 7.488709 | 8.004625 |
+| Preparation-to-owner-start ms / request | 66.845812 | 1.799542 |
+| Native construction ms / request | 3.675604 | 0.004416 |
+| Scheme-call ms / request including GC | 0.033146 | 0.019042 |
+| Construction GC count / real seconds | 676 / 0.528568 s | 1 / 0.000510 s |
+| Scheme-call GC count / real seconds | 13 / 0.006632 s | 9 / 0.009335 s |
+| Native projection ms / owner turn | 18.563354 | 12.348062 |
+
+Client current-thread CPU medians are 45.121 / 0.222 ms per pinned API batch (fresh / resident). Wake-to-Python-client-entry envelopes are 66.969 / 0.332 ms, with maxima 153.520 / 3.356 ms. These entry envelopes include Python scheduling and interpreter contention; they are not isolated GIL-lock waits. Client API CPU includes input conversion, Rust preparation/admission and wrapping, and excludes Scheme CPU on other owner threads. The main client's projection/release CPU is 8.218 / 8.522 ms versus wall envelopes 38.691 / 27.155 ms; the CPU/wall distinction is recorded without attributing their entire difference to one lock or scheduler.
+
+The direction of input-construction/GC savings repeats; absolute wall costs vary under concurrent resource/host work. Do not pool the two diagnostic wheels, normalize their tails into a performance claim or add parallel-owner/overlapping-phase medians. The final untraced performance cohorts above run separately after the owned endurance lanes retire.
+
+* Single-owner anchor and final benchmark contract
+
+The existing payload benchmark now accepts =--owners 1|4=, retaining its default of four. Both topologies execute the same 128 Actor requests, 32 Actor items/request, 48 pairs/item and four Scheme green workers. Each fresh/resident pair stays on its original live VM states. A one-owner control does not reduce Scheme Actor/green-thread functionality.
+
+Schema v4 preserves the v3 four-owner measured workload and records the selected topology explicitly. The v3 source used for the final four-owner diagnostic is preserved separately with its captured hash; the executable Rust source and installed wheel are unchanged by this benchmark-only parameter. The v4 source has its own manifest.
+
+The single-owner four-pair diagnostic validates every result and closes with root count =[0]= and removed files. Its observed fresh/resident Actor-item rates are 6,469.81 / 71,641.51 per second; this is diagnostic evidence, not the untraced baseline. There are eight probes per owner/round, so total probe populations differ across one/four-owner topologies. Cross-topology ratios are not admitted as matched scaling measurements. Final untraced cohorts are recorded separately above; the longer single-owner mixed treatment below fails and is not replaced by its capacity-only control.
+
+* Preserved single-owner mixed-load admission failure
+
+The final untraced =--owners 1 --rounds 16= cohort exits 1 with =RuntimeError: QueueFull= during the resident arm of round 15, after earlier successful rounds. It has no terminal success summary, so partial samples are not admitted as a complete performance result. The earlier four-pair single-owner traced pass does not qualify this longer untraced treatment.
+
+The actual owner queue capacity is 128 (=instance_admission.rs=); a pinned caller's default window can admit 128 jobs while the scheduled probes compete for the same finite queue. There is no shared per-owner reservation across those API clients. An untraced full-speed producer can reach this bound even though the instrumented short cohort did not. This is explicit overload rejection, not a Scheme exception, proof of a GC leak or evidence that adding Rust workers fixes owner capacity. The raw failure and its exact v4 harness are retained.
+
+Do not enlarge the queue, reduce the production window, retry accepted work or discard rejection samples to manufacture a pass. Schema v5 keeps owners=4 and probes=8 defaults, adds an explicit =--probes-per-owner 0= capacity-only control and emits typed unavailable probe statistics as =None= when no probes are offered. That separate workload cannot close mixed-load fairness/overload acceptance. It also records failure and post-failure retirement observations for future failed cohorts without suppressing exceptions. A request-rate/capacity baseline is distinct from an admission guarantee under competition.
+
+* Longer fixed-pool reuse
+
+Two independent concurrent processes exercise the existing full native workload for 3,600 seconds each: default retention and explicitly authorized release. Each process reuses its original four VM identities and rotates direct, Tokio, Rayon and Rayon-blocking. Samples force native collection and record per-owner post-GC live metric in raw SDK units, roots, malloc live/reserved bytes, RSS, mappings, threads and FDs. These resource lanes are not timing A/B treatments.
+
+Both 3,600-second lanes PASS and exit naturally with status 0. These endurance results qualify the rebuilt source-head wheel =3fcb7c8b...=; they are not relabeled as an hour-long run of the later diagnostic Rust extension. Native resource parity and final-extension semantic/phase checks are separate evidence.
+
+| Observation | Default retention | Authorized release |
+|-------------+-------------------+--------------------|
+| Timed fixed-pool workload | 3,600 s | 3,600 s |
+| Completed batch requests | 31,989,696 | 32,698,128 |
+| Outer elapsed including setup/close | 3607.427 s | 3606.766 s |
+| Post-GC samples | 60 | 60 |
+| Last-20-minute malloc live MiB | 282.613--294.801 | 282.613--294.801 |
+| Last-20-minute malloc reserved MiB | 608.000--608.000 | 536.000--536.000 |
+| Last-20-minute RSS MiB | 419.609--424.891 | 417.297--424.406 |
+| Post-close malloc live MiB | 5.021 | 5.021 |
+| Post-close reserved MiB | 608.000 | 536.000 |
+| Post-close RSS MiB | 410.531 | 378.750 |
+| Post-close owner/SDK images | 4 | 0 |
+| Post-close threads | 1 | 1 |
+| Post-close FDs | 3 | 3 |
+| Post-close external roots | [0,0,0,0] | [0,0,0,0] |
+| Resource files removed | yes | yes |
+
+Across all four owners and all post-warmup samples, the SDK post-GC live metric stays within 29,404,512--29,404,576 raw units. Expected retained roots stay at three per owner throughout work. Warmed pools have thirteen threads and eleven FDs; the initial eleven-to-thirteen thread transition is lazy Rayon worker creation, not continuing growth. The live owned-image population stays at eight during the complete workload; close separately leaves four policy-retained bases or zero authorized owner/SDK mappings.
+
+After the first five minutes, malloc live fits slopes of -0.883 / 0.316 MiB/hour and -0.0256 / 0.0125 MiB/million batch requests (default / authorized). These fits describe bounded capacity fluctuations, not proofs of negative allocation or unlimited leak freedom. Both last-twenty-minute reserved-capacity slopes are exactly zero in the sampled data.
+
+RSS is not a zero-growth theorem: last-window fits are -7.897 / 7.975 MiB/hour, including a small positive authorized-lane fit despite flat reserved capacity and bounded live data. RSS residency fluctuates, and approximately 410.5 / 378.8 MiB remains after close even with roughly 5.02 MiB malloc live. Do not call all retained RSS a live Scheme-heap leak, nor declare it completely reclaimed.
+
+For this fixed corpus and hour, native post-GC live data and allocator live/reserved observations settle into finite envelopes rather than growing with tens of millions of completed batch requests. The one-hour observation does not establish multi-hour behavior, unique-module churn, arbitrary mutable-session growth, complete small-allocation ownership or global zero residue. Full-ramp samples and time/work-normalized trends remain in the external evidence directory; the five-minute and last-twenty-minute windows are descriptive analyses, not relaxed safety gates. The original two-GiB RSS guard, native deadlines and all root/file/thread checks apply to the entire run.
+
+* Reproduction through the existing graph
+
+Use the interpreter of the explicitly installed wheel. Run untraced performance cohorts after owned resource gates have retired; keep other host activity visible and do not stop unrelated work. Each memory case is a separate process. The controls below do not change production defaults.
+
+#+begin_example
+just bridge-python-owner-profiling /path/to/installed/python
+just bridge-python-owner-tests /path/to/installed/python
+just bridge-python-owner-full /path/to/installed/python
+just bridge-python-native-payload-ab /path/to/installed/python --owners 4 --rounds 16
+just bridge-python-native-payload-ab /path/to/installed/python --owners 1 --probes-per-owner 0 --rounds 16
+just bridge-python-native-payload-ab /path/to/installed/python --owners 4 --rounds 4 --owner-trace
+just bridge-python-dispatch-memory /path/to/installed/python --case reuse --seconds 3600 --sample-seconds 60 --image-policy retained
+just bridge-python-dispatch-memory /path/to/installed/python --case reuse --seconds 3600 --sample-seconds 60 --image-policy qualified-release
+#+end_example
+
+Builds use the existing Maturin/Cargo/Gerbil graph with native dynamic-module optimization level 2. This Darwin qualification clears inherited =SDKROOT=, selects Apple =/usr/bin/cc= through =CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=, and uses CPython 3.14.7. No SDK source patch, replacement compilation pipeline or new shell script is added. Raw artifact/source manifests and command logs are kept in the evidence directory.
+
+* Admission and remaining work
+
+No optimization or default promotion is made. The next candidate must follow a repeatable dominant cost on this artifact and preserve projection failure ownership, original Scheme exceptions, typed identity and continuation behavior. Longer endurance is finite evidence; it cannot prove unlimited cache bounds or recovery from arbitrary stuck native code. Open-loop overload, long competing sessions, real concurrent I/O, instrumented sanitizers and deployment qualification remain separate gates.

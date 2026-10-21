@@ -106,6 +106,20 @@ impl Drop for InstanceService {
     }
 }
 impl InstanceService {
+    /// Start a host phase only when optional owner diagnostics are enabled.
+    pub(in super::super) fn profile_start(&self) -> Option<std::time::Instant> {
+        self.host.registry.trace.start()
+    }
+    /// Complete an optional wall-time envelope; it is not a CPU or pure GIL timer.
+    pub(in super::super) fn profile_finish(
+        &self,
+        kind: &'static str,
+        started: Option<std::time::Instant>,
+    ) {
+        if let Some(started) = started {
+            self.host_span(kind, started);
+        }
+    }
     pub(in super::super) fn host_span(&self, kind: &'static str, started: std::time::Instant) {
         self.host.registry.trace.host(kind, started);
     }

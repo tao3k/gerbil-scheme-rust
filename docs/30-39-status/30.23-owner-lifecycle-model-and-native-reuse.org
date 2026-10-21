@@ -1,13 +1,19 @@
 #+TITLE: Owner lifecycle model and native OS boundary repairs
 #+STARTUP: overview
 
-* Decision
+* Current status and historical receipt boundary
+
+The current lifecycle baseline is =8c23217= (six active CI jobs passed; SMP explicitly skipped). The dated artifacts, failures, ratios and model bounds below retain their original identities; they are not measurements of every later source revision. In particular, 10.10x / 21.18x data-placement ratios are not VM scaling factors, and the old eight-transition symbolic receipt does not qualify the extended lifecycle model.
+
+Use [[file:30.24-current-baseline-and-cost-attribution.org][the current baseline and attribution record]] for the rebuilt artifact, optional diagnostics and longer reuse observations. That record separates completed results from pending work. Raw historical temporary captures are currently unavailable on this host; their committed summaries are preserved without fabricating replacement logs.
+
+* Original decision and initial repair receipt
 
 Add a narrow Quint protocol extension to the existing handoff model, and keep native acceptance independent. The new model covers late publication, lazy executor recreation, owner-bound handles, observation timeout and close/drain/retirement. It does not reimplement Tokio, Rayon, Scheme GC, Actors, green threads or SMP scheduling.
 
 The original two native blockers are diagnosed and repaired at the OS directory boundary. A separately reproduced host-signal crash is repaired at native setup/cleanup. The identical 600-second reuse and eight-cycle lifecycle targets now complete on the repaired O2 artifact. This is finite native acceptance, not industrial endurance or complete memory-reclamation certification. Historical failures remain below. No dispatcher/window/owner default or native optimization setting changes.
 
-* Model scope and source boundary
+* Original model scope and source boundary
 
 =specs/owner_lifecycle.qnt= complements =bridge_handoff.qnt= instead of copying its queue and receiver machinery. =specs/owner_lifecycle.md= maps transitions to the actual Rust source and records lock linearization assumptions. Initialization and correct native owner execution are external preconditions; the model cannot explain an SDK setup failure or zero native root.
 
@@ -15,7 +21,7 @@ The host closes admission, drains native tasks, clears registry metadata and ret
 
 The model checks immutable owner association at handle-use admission, no late registry publication or lazy pool recreation, accepted-work drain before join, and closed-state root/registry/file retirement. Timeout does not cancel accepted work. Closed images cannot reopen in this model. Stuttering is allowed: no eventual completion, fairness, arbitrary-native-hang recovery or unbounded leak-freedom theorem is claimed.
 
-* Executed protocol gates
+* Original executed protocol gates
 
 Quint 0.33.0 executes two finite domains: three requests/two owners and five requests/two owners. Each has eight deterministic scenarios, including deliberately unsafe transitions whose violations are asserted. Both pass. Two sets of 1,000 sampled traces, each at most 64 transitions, report no safety violation. These are bounded samples, not exhaustive state exploration.
 
@@ -373,7 +379,7 @@ Add English documentation to the enum and its seven states without changing exec
 
 * Remaining native scope
 
-The concrete directory/SDK-ENOENT and post-open/post-close host-signal regressions are closed by actual native controls, not model results. Multi-hour fixed-VM reuse, longer image churn, complete attribution of residual allocations and a general image-unload protocol, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. The twelve-transition symbolic target also remains incomplete; the eight-transition smoke result does not replace it.
+The directory/SDK-ENOENT and post-open/post-close host-signal regressions have actual native controls. The current implementation adds explicit code leases, SDK module retirement and unsafe provider authorization after clean actual joins. Qualification of arbitrary extension callback/TLS ownership graphs remains open; the protocol is not absent, and the default still retains base images. Multi-hour fixed-VM reuse, longer image churn, complete residual-allocation attribution, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. Current longer-reuse observations are tracked in 30.24. The twelve-transition symbolic target remains incomplete; the historical eight-transition smoke result does not replace it or qualify the extended source.
 
 * Reproduction
 

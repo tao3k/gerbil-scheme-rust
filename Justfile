@@ -168,6 +168,10 @@ bridge-instance-library *args:
 bridge-instance-resources *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- {{ args }}
 
+# Optional diagnostic boundaries on actual fixed-owner Scheme calls.
+bridge-python-owner-profiling python="python3":
+    "{{ python }}" examples/python-ledger/tests/test_owner_profiling.py -v
+
 # Installed native Scheme owners; use the Python interpreter of the installed wheel.
 bridge-python-owner-tests python="python3":
     "{{ python }}" examples/python-ledger/tests/test_rust_backend.py -v

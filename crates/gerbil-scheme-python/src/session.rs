@@ -63,6 +63,11 @@ impl PythonSession {
         self.service
             .check_process()
             .map_err(PyRuntimeError::new_err)?;
+        let read_started = self
+            .service
+            .instances
+            .as_ref()
+            .and_then(super::instances::InstanceService::profile_start);
         let inputs = requests
             .iter()
             .map(|v| read(&v, &self.service, &mut BTreeSet::new()))
@@ -72,12 +77,20 @@ impl PythonSession {
             .instances
             .as_ref()
             .ok_or_else(|| PyRuntimeError::new_err("instance backend required"))?;
-        let outputs = py
-            .detach(|| instances.call_many_on(self.owner, &inputs, dispatch, admission_window))
-            .map_err(PyRuntimeError::new_err)?;
-        outputs
+        instances.profile_finish("python-session-read-many", read_started);
+        let (outputs, returned) = py.detach(|| {
+            let outputs = instances.call_many_on(self.owner, &inputs, dispatch, admission_window);
+            (outputs, instances.profile_start())
+        });
+        // Includes reacquisition, scheduling and the PyO3 return boundary.
+        instances.profile_finish("gil-return-session", returned);
+        let outputs = outputs.map_err(PyRuntimeError::new_err)?;
+        let wrapping = instances.profile_start();
+        let result = outputs
             .iter()
             .map(|output| token(&self.service, output))
-            .collect()
+            .collect();
+        instances.profile_finish("python-session-wrap-results", wrapping);
+        result
     }
 }

@@ -131,23 +131,26 @@ adapter confines directory operations to each fixed owner; the common lifecycle
 also preserves host SIGINT/SIGTERM/SIGCHLD handlers. Scheme execution, native
 types, GC, continuations and Actor/green-thread scheduling remain native.
 
-The repaired O2 artifact completes the original 600-second reuse and eight-cycle
-lifecycle targets, plus actual API, host-signal and initialization-failure
-controls. Every completed close has zero external roots, removed files and
-retired owner threads. This is finite acceptance, not industrial certification.
-Initialized images remain mapped: the eight-cycle capture grows from 263.1 to
-731.2 MiB RSS, with 32 retained images. Complete RSS return and indefinite leak
-freedom are not established. Darwin thread-directory private SPI is an explicit
-platform dependency; other OS-global resources require separate qualification.
-The follow-up distinguishes retained image mappings from allocator residency:
-32 images represent eight retired four-owner pools; live malloc remains about
-4.34--4.36 MiB in the mapping-observer capture despite 263.4--684.0 MiB RSS.
-A separate maintained-observer repeat reaches 768.5 MiB RSS with 4.98 MiB live
-malloc. No large outstanding Scheme heap leak is established, but small
-residual allocations are not all attributed. The current no-unload policy is
-conservative; it is not proof that every mapping is intrinsically necessary.
-Fresh pool replacement remains unbounded in mappings. Reuse the fixed pool;
-general native callback/TLS retirement must be qualified before hot unload.
+The current lifecycle source baseline is `8c23217`: six active remote CI jobs
+pass, while Scheme SMP is explicitly skipped. Actual O2 qualification completes
+the original 600-second fixed-pool reuse and eight-cycle lifecycle workloads,
+including real GC, continuations, exceptions, startup rollback and host signals.
+Normal close retires external roots, owner threads and resource files.
+
+Default providers still retain initialized base images. A separate explicitly
+authorized provider demonstrates 32-owner-image retirement to zero, including
+SDK module references and foreign TLS/code-lease controls. This does not admit
+arbitrary hot unload. Remaining RSS includes allocator-owned empty/fragmented
+pages; reachable XPC metadata and deferred Rust epoch allocations have separate
+finite observations. Neither all RSS nor every retained mapping is classified
+as a live Scheme-heap leak. Failed quiescence remains deliberate quarantine.
+
+The earlier 263.1--731.2 MiB / 32-image observation is a historical default-policy
+receipt, preserved in the lifecycle report below. Current-artifact baselines,
+phase attribution and longer memory trend qualification are tracked in
+[the current qualification record](../../docs/30-39-status/30.24-current-baseline-and-cost-attribution.org).
+Darwin private thread-directory SPI and additional OS-global boundaries remain
+explicit platform qualification requirements.
 
 Failed finalization, unbalanced roots and owner unwind now quarantine the
 initialized VM instead of treating queue drain as permission to destroy it.

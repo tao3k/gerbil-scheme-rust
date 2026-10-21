@@ -11,6 +11,38 @@ use std::{
     time::Instant,
 };
 const LIMIT: usize = 16384;
+/// Optional native phase clocks and cumulative SDK counters on the actual owner.
+#[derive(Debug)]
+pub(super) struct Stages {
+    started: Instant,
+    wall: [u64; 2],
+    counters: [Option<[f64; 6]>; 2],
+}
+impl Stages {
+    fn new(started: Instant) -> Self {
+        Self {
+            started,
+            wall: [0; 2],
+            counters: [None; 2],
+        }
+    }
+    pub(super) fn constructed(&mut self, session: &NativeSession<'_>) {
+        self.wall[0] = u64::try_from(self.started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        self.counters[0] = session.diagnostics();
+    }
+    pub(super) fn executed(&mut self, session: &NativeSession<'_>) {
+        self.wall[1] = u64::try_from(self.started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        self.counters[1] = session.diagnostics();
+    }
+    fn deltas(&self, before: [f64; 6]) -> Option<[[f64; 6]; 2]> {
+        let constructed = self.counters[0]?;
+        let executed = self.counters[1]?;
+        Some([
+            std::array::from_fn(|i| constructed[i] - before[i]),
+            std::array::from_fn(|i| executed[i] - constructed[i]),
+        ])
+    }
+}
 #[derive(Debug)]
 pub(super) struct Trace {
     enabled: AtomicBool,
@@ -37,9 +69,13 @@ struct Span {
     end_ns: u64,
     stages_ns: [u64; 2],
     diagnostics_delta: Option<[f64; 6]>,
+    stage_diagnostics_delta: Option<[[f64; 6]; 2]>,
     failed: bool,
 }
 impl Trace {
+    pub(super) fn start(&self) -> Option<Instant> {
+        self.enabled.load(Ordering::Acquire).then(Instant::now)
+    }
     pub(super) fn enable(&self, enabled: bool) {
         self.enabled.store(enabled, Ordering::Release);
     }
@@ -73,6 +109,7 @@ impl Trace {
                 end_ns: self.ns(ended),
                 stages_ns: [0; 2],
                 diagnostics_delta: None,
+                stage_diagnostics_delta: None,
                 failed: false,
             });
         } else {
@@ -88,14 +125,14 @@ impl Trace {
         kind: &'static str,
         queued: Instant,
         session: &NativeSession<'_>,
-        job: impl FnOnce(&mut Option<(Instant, [u64; 2])>) -> Result<R, InstanceError>,
+        job: impl FnOnce(&mut Option<Stages>) -> Result<R, InstanceError>,
     ) -> Result<R, InstanceError> {
         if !self.enabled.load(Ordering::Acquire) {
             return job(&mut None);
         }
         let started = Instant::now();
         let before = session.diagnostics();
-        let mut stages = Some((started, [0; 2]));
+        let mut stages = Some(Stages::new(started));
         let value = job(&mut stages);
         let after = session.diagnostics();
         let ended = Instant::now();
@@ -110,7 +147,8 @@ impl Trace {
                 queued_ns: self.ns(queued),
                 start_ns: self.ns(started),
                 end_ns: self.ns(ended),
-                stages_ns: stages.map_or([0; 2], |(_, stages)| stages),
+                stages_ns: stages.as_ref().map_or([0; 2], |stages| stages.wall),
+                stage_diagnostics_delta: before.and_then(|before| stages.as_ref()?.deltas(before)),
                 diagnostics_delta: before
                     .zip(after)
                     .map(|(a, b)| std::array::from_fn(|i| b[i] - a[i])),

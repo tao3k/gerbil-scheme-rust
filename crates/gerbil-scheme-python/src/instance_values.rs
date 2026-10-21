@@ -20,7 +20,7 @@ pub(super) fn execute_staged(
     command: Command,
     registry: &Registry,
     apply: &CStr,
-    stages: &mut Option<(std::time::Instant, [u64; 2])>,
+    stages: &mut Option<super::trace::Stages>,
 ) -> Result<NativeOutput, InstanceError> {
     let output = match command {
         Command::ProcessorCount => NativeOutput::Plain(Output::ProcessorCount(1)),
@@ -41,12 +41,12 @@ pub(super) fn execute_staged(
         }
         Command::Call(input) => {
             let input = encode(session, registry, &input)?;
-            if let Some((started, values)) = stages {
-                values[0] = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+            if let Some(stages) = stages {
+                stages.constructed(session);
             }
             let result = session.call(&input)?;
-            if let Some((started, values)) = stages {
-                values[1] = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+            if let Some(stages) = stages {
+                stages.executed(session);
             }
             NativeOutput::Root(session.retain(result)?)
         }

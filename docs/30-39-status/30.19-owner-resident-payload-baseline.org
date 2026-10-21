@@ -1,6 +1,12 @@
 #+TITLE: Owner-resident Scheme payload baseline and projection attribution
 #+STARTUP: overview
 
+* Current status and historical receipt boundary
+
+The current lifecycle baseline is =8c23217= (six active CI jobs passed; SMP explicitly skipped). The dated artifacts, failures, ratios and model bounds below retain their original identities; they are not measurements of every later source revision. In particular, 10.10x / 21.18x data-placement ratios are not VM scaling factors, and the old eight-transition symbolic receipt does not qualify the extended lifecycle model.
+
+Use [[file:30.24-current-baseline-and-cost-attribution.org][the current baseline and attribution record]] for the rebuilt artifact, optional diagnostics and longer reuse observations. That record separates completed results from pending work. Raw historical temporary captures are currently unavailable on this host; their committed summaries are preserved without fabricating replacement logs.
+
 #+begin_quote
 Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
 #+end_quote

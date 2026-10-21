@@ -1,6 +1,12 @@
 #+TITLE: Native Tokio and Rayon dispatch qualification
 #+STARTUP: overview
 
+* Current status and historical receipt boundary
+
+The current lifecycle baseline is =8c23217= (six active CI jobs passed; SMP explicitly skipped). The dated artifacts, failures, ratios and model bounds below retain their original identities; they are not measurements of every later source revision. In particular, 10.10x / 21.18x data-placement ratios are not VM scaling factors, and the old eight-transition symbolic receipt does not qualify the extended lifecycle model.
+
+Use [[file:30.24-current-baseline-and-cost-attribution.org][the current baseline and attribution record]] for the rebuilt artifact, optional diagnostics and longer reuse observations. That record separates completed results from pending work. Raw historical temporary captures are currently unavailable on this host; their committed summaries are preserved without fabricating replacement logs.
+
 * Decision and scope
 
 The industrial acceptance work now includes executable native startup, contention, overload, in-flight close and deadline-recovery gates. These finite local passes do not establish complete industrial readiness. The default four VM owners, two Rust dispatch workers, stateless Tokio dispatcher, session direct dispatcher and window 128 remain unchanged. The adopted 10.10x owner-resident payload baseline remains historical working evidence; the new matrix changes workload/probe parameters and is not a replacement capture or a multiplicative speedup.
@@ -125,7 +131,9 @@ Blocking the finite Rust workers can limit simultaneous owner-stream progress. O
 
 The bootstrap intervals describe these finite paired observations, not population guarantees; p99 differences do not inherit those throughput intervals. No scheduler, window or worker default is promoted. Rayon-blocking remains an explicit reference path, with its capacity cost stated. Treat compute-heavy, cooperative-wait and projection-heavy workloads separately before tuning.
 
-* Remaining industrial acceptance gates
+* Open gates recorded with the dispatch matrix
+
+These rows record the matrix artifact above. Later native startup/lifecycle controls and CI closures are tracked in 30.23 and 30.24; the historical rows do not undo those later passes. Arbitrary initialization hooks, longer endurance and deployment remain distinct from the exercised controls.
 
 | Area | Current boundary | Still required |
 |------+------------------+----------------|

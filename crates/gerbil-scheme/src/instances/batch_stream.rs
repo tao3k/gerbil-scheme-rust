@@ -167,7 +167,7 @@ impl InstanceDispatcher {
                 permit: registration,
                 admission,
                 deadline,
-                waker: super::owner_loop::waker(current.sender.clone()),
+                waker: super::owner_loop::waker(current.sender.clone(), current.wake.clone()),
             },
             batches,
             run,
@@ -180,11 +180,13 @@ impl InstanceDispatcher {
             capacity: None,
             work_units: 0,
         };
+        let wake = current.wake.clone();
         let sent = current.sender.try_send(request);
         if sent.is_ok() {
             senders.ever_admitted = true;
         }
         drop(senders);
+        super::service_wake::notify_enqueued(wake, sent.is_ok());
         sent.map_err(|error| match error {
             mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
             mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,

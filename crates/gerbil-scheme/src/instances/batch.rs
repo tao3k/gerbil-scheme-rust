@@ -73,7 +73,7 @@ pub(super) fn execute_native<T: NumericElement>(
     observe(BatchPhase::Projected);
     Ok(values)
 }
-fn project<T: NumericElement>(
+pub(super) fn project<T: NumericElement>(
     session: &NativeSession<'_>,
     output: &super::NativeRoot<'_>,
     count: usize,

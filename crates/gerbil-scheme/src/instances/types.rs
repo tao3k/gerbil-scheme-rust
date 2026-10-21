@@ -61,9 +61,24 @@ pub struct IsolatedProgram {
     pub(super) entry: CString,
     pub(super) exports: Vec<CString>,
     pub(super) finalizer: Option<CString>,
+    pub(super) service: Option<CString>,
     pub(super) unload_after_join: bool,
 }
 impl IsolatedProgram {
+    /// Opt into a Scheme-owned asynchronous service and native wake-port loop.
+    /// Ordinary entry/default pool behavior is unchanged without this descriptor.
+    /// # Safety
+    /// The export implements the rooted service command ABI documented in
+    /// `scheme/async-service.ss` and the native service protocol document: open, submit, take, ready, wait, prepare-close and drain/close.
+    /// It owns task graphs until take/close and closes every child/port before
+    /// returning from close. Wait wakes on host input or Scheme completion.
+    /// No native pointer escapes and no continuation crosses the foreign frame.
+    #[must_use]
+    pub unsafe fn with_scheme_service(mut self, export: &CStr) -> Self {
+        self.service = Some(export.to_owned());
+        self
+    }
+
     /// Authorize balancing this image's loader reference after clean native join.
     /// # Safety
     /// All VM-entering callbacks must be quiesced before SDK cleanup. Every
@@ -120,6 +135,7 @@ impl IsolatedProgram {
             entry: entry.to_owned(),
             exports: Vec::new(),
             finalizer: None,
+            service: None,
             unload_after_join: false,
         })
     }

@@ -12,10 +12,11 @@ publish = false
 [dependencies]
 gerbil-scheme-sys.workspace = true
 simdutf8.workspace = true
+libc = { version = "=0.2.186", optional = true }
 tokio = { workspace = true, optional = true, features = ["time"] }
 
 [features]
-isolated-instances = []
+isolated-instances = ["dep:libc"]
 tokio-dispatch = ["isolated-instances", "dep:tokio"]
 external-program = ["gerbil-scheme-sys/external-program"]
 

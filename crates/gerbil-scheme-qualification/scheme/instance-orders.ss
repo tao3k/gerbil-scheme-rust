@@ -34,7 +34,8 @@ c-end
     (lambda () (mutex-lock! orders-rank-lock))
     (lambda () (set! orders-rank (1+ orders-rank)) orders-rank)
     (lambda () (mutex-unlock! orders-rank-lock))))
-(def (orders-handler worker input)
+(def (orders-handler worker input) (orders-handler/rank orders-next-rank! worker input))
+(def (orders-handler/rank next-rank worker input)
   (unless (and (s64vector? input) (>= (s64vector-length input) 5)
                (zero? (modulo (- (s64vector-length input) 2) 3)))
     (error "invalid order records"))
@@ -56,7 +57,7 @@ c-end
           (set! gross (+ gross (* quantity cents))))
         (loop (+ i 3))))
     ;; rank/worker are application instrumentation, never a Rust scheduler.
-    (let ((rank (orders-next-rank!)) (result (make-s64vector 21 0)))
+    (let ((rank (next-rank)) (result (make-s64vector 21 0)))
       (s64vector-set! result 0 (s64vector-ref input 0))
       (s64vector-set! result 1 units)
       (s64vector-set! result 2 gross)

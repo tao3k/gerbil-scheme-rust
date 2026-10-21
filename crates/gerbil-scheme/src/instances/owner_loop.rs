@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-fn execute(image: &Image, request: Request, maximum_reply: usize) {
+pub(super) fn execute(image: &Image, request: Request, maximum_reply: usize) {
     #[cfg(feature = "tokio-dispatch")]
     let _capacity = request.capacity;
     request.started.store(true, Ordering::Release);
@@ -25,7 +25,9 @@ fn execute(image: &Image, request: Request, maximum_reply: usize) {
             let _ = response.send((value, Instant::now()));
         }
         #[cfg(feature = "tokio-dispatch")]
-        Work::Producer(_) | Work::Wake => unreachable!("control message routed before execution"),
+        Work::Service(_) | Work::Producer(_) | Work::Wake => {
+            unreachable!("control message routed before execution")
+        }
     }
 }
 #[cfg(not(feature = "tokio-dispatch"))]
@@ -49,6 +51,9 @@ pub(super) fn run(image: &Image, requests: &mpsc::Receiver<Request>, maximum_rep
                     } else {
                         producer = Some(next);
                     }
+                }
+                Work::Service(_) => {
+                    unreachable!("service rejected before ordinary owner admission")
                 }
                 Work::Wake => {}
                 work => execute(image, Request { work, ..request }, maximum_reply),
@@ -80,9 +85,15 @@ pub(super) fn run(image: &Image, requests: &mpsc::Receiver<Request>, maximum_rep
     }
 }
 #[cfg(feature = "tokio-dispatch")]
-pub(super) fn waker(sender: mpsc::SyncSender<Request>) -> std::task::Waker {
+pub(super) fn waker(
+    sender: mpsc::SyncSender<Request>,
+    wake: Option<std::sync::Arc<super::service_wake::Wake>>,
+) -> std::task::Waker {
     use std::sync::{Arc, atomic::AtomicBool};
-    struct WakeOwner(mpsc::SyncSender<Request>);
+    struct WakeOwner(
+        mpsc::SyncSender<Request>,
+        Option<Arc<super::service_wake::Wake>>,
+    );
     impl std::task::Wake for WakeOwner {
         fn wake(self: Arc<Self>) {
             self.wake_by_ref();
@@ -95,7 +106,10 @@ pub(super) fn waker(sender: mpsc::SyncSender<Request>) -> std::task::Waker {
                 capacity: None,
                 work_units: 0,
             });
+            if let Some(wake) = &self.1 {
+                wake.notify();
+            }
         }
     }
-    std::task::Waker::from(Arc::new(WakeOwner(sender)))
+    std::task::Waker::from(Arc::new(WakeOwner(sender, wake)))
 }

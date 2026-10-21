@@ -201,3 +201,12 @@ Strict =actor-aot,instance-dispatch= all-target Rust lint, formatting and diff
 checks pass after the helper extraction. The original producer controls and
 native resource checks test unchanged native Scheme code; the final rebuilt
 bench additionally repeats its trace and QoS smoke and two full directed A/Bs.
+
+* Subsequent implementation
+
+The opt-in Scheme-owned pending service and native owner wake protocol are now
+implemented and qualified separately in
+[[file:30.33-scheme-owned-service-and-native-wake.org][30.33 Scheme-owned service and native wake]]. The synchronous boundary and
+negative QoS observations above remain historical evidence. New measurements
+use an explicit equal work budget of 32; they do not replace the earlier
+work-eight baseline or change defaults.

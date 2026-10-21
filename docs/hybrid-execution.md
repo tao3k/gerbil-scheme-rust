@@ -159,8 +159,37 @@ The native batch call is synchronous. Scheme yielding or sleeping inside it
 lets other Scheme threads run, but the Rust owner pump checks its inbox after
 that full foreign call returns. Reducing the inter-batch refill gap cannot by
 itself remove OS wait overshoot or make host requests enter during that call.
-A Scheme-owned asynchronous service would need an explicit retained-root,
-bounded-work, wake and close/drain protocol before it could change that boundary.
+The explicit Scheme-owned service now provides that retained-root, bounded-work,
+wake and close/drain protocol. Ordinary synchronous calls keep their semantics.
 
 The directed native measurements and negative QoS results are recorded in
 [the wait attribution report](30-39-status/30.32-native-wait-attribution-and-owner-qos.org).
+
+### Explicit Scheme-owned asynchronous service
+
+A build-owned rooted unary endpoint created with
+`make-gerbil-rs-service-endpoint` can be admitted by the unsafe
+`IsolatedProgram::with_scheme_service` descriptor. The library resolves this
+capability privately before VM initialization; ordinary `call_export` cannot
+invoke its lifecycle commands.
+
+`InstanceDispatcher::submit_scheme_service_backpressured_on` accepts a
+`SchemeServiceRequest`: construct a native payload on its fixed owner, execute
+inside Scheme, and project an owned Rust result after completion.
+`NumericServiceBatch` reuses the existing native batch constructor/projector.
+A `SchemeServiceLane` selects a persistent Scheme Actor for stateful sessions;
+independent requests leave worker selection to Scheme. Lane affinity is not an
+exclusive lease: applications retain responsibility for shared state.
+
+Slot/work permits survive Scheme waits, observation timeouts and abandoned
+receivers. A Scheme table strongly holds each accepted job until take/projection.
+A task-owned native pipe wakes Scheme's event wait when the Rust inbox changes;
+clear/recheck prevents sleeping past a published request. Scheme owns its workers,
+continuations, GC and timers. Rust has no idle polling timer or Scheme scheduler.
+
+Shutdown rejects new admission, prepares the application, drains accepted work,
+joins Scheme children and retires roots before SDK cleanup. Failed quiescence
+quarantines heap/code with an unsuccessful receipt. This is opt-in; defaults and
+ordinary native APIs are unchanged. See the
+[service protocol and directed measurements](30-39-status/30.33-scheme-owned-service-and-native-wake.org)
+for native acceptance, reused model limits and retained performance regressions.

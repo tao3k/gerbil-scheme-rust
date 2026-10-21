@@ -1,0 +1,248 @@
+//! The owner enters Scheme's blocking event wait, never a Rust polling timer.
+use super::{
+    InstanceError, Request,
+    image::Image,
+    pool::Work,
+    service::{self, Job, JobId},
+    service_wake::{Reader, Wake},
+};
+use std::{
+    collections::BTreeMap,
+    os::fd::AsRawFd,
+    sync::{atomic::Ordering, mpsc},
+    time::Instant,
+};
+struct Pending {
+    job: Box<dyn Job>,
+    _permit: Option<super::capacity::CapacityPermit>,
+}
+fn control(image: &Image, header: &[i64]) -> Result<Vec<i64>, InstanceError> {
+    let mut result = None;
+    // Protocol metadata is bounded independently of application payload bytes.
+    super::native_dispatch::run_native(
+        image,
+        1024,
+        65536 * 8,
+        |session| {
+            let value = service::command(session, header, None)?;
+            session.copy_numeric::<i64>(&value)
+        },
+        |value| {
+            result = Some(value.0);
+            true
+        },
+    );
+    result.unwrap()
+}
+pub(super) fn open(
+    image: &Image,
+    reader: &Reader,
+    wake: &Wake,
+    capacity: usize,
+) -> Result<(), InstanceError> {
+    let count = i64::try_from(capacity)
+        .map_err(|_| InstanceError::InvalidConfig("service capacity overflow"))?;
+    if count > 65536 {
+        return Err(InstanceError::InvalidConfig("service queue bound"));
+    }
+    let initialized = control(
+        image,
+        &[
+            0,
+            i64::from(reader.as_raw_fd()),
+            i64::from(wake.write_fd),
+            count,
+        ],
+    )?;
+    if initialized.len() != 4
+        || initialized[0] != 0
+        || initialized[1] != 1
+        || !(1..=64).contains(&initialized[2])
+        || initialized[3] != count
+    {
+        return Err(InstanceError::InvalidConfig(
+            "Scheme service ABI/version receipt",
+        ));
+    }
+    wake.lanes
+        .store(usize::try_from(initialized[2]).unwrap(), Ordering::Release);
+    Ok(())
+}
+pub(super) fn close(image: &Image) {
+    let prepared = control(image, &[7]);
+    image
+        .service_status
+        .set(Some(if prepared.is_ok() && control(image, &[5]).is_ok() {
+            0
+        } else {
+            -73
+        }));
+}
+struct Pump<'a> {
+    image: &'a Image,
+    input: usize,
+    output: usize,
+    jobs: BTreeMap<JobId, Pending>,
+    producer: Option<Box<dyn super::batch_stream_runner::Producer>>,
+}
+impl Pump<'_> {
+    fn receive(&mut self, request: Request) -> Result<(), InstanceError> {
+        request.started.store(true, Ordering::Release);
+        match request.work {
+            Work::Service(mut job) => match job.start(self.image, self.input, self.output) {
+                Ok(id) => {
+                    if self.jobs.contains_key(&id) {
+                        job.fail(InstanceError::InvalidConfig(
+                            "duplicate Scheme service identity",
+                        ));
+                        return Err(InstanceError::InvalidConfig(
+                            "duplicate Scheme service identity",
+                        ));
+                    }
+                    self.jobs.insert(
+                        id,
+                        Pending {
+                            job,
+                            _permit: request.capacity,
+                        },
+                    );
+                }
+                Err(error) => {
+                    let entered = job.may_have_entered();
+                    job.fail(error.clone());
+                    if entered {
+                        return Err(error);
+                    }
+                }
+            },
+            Work::Producer(mut next) => {
+                if self.producer.is_some() {
+                    next.reject(InstanceError::QueueFull);
+                } else {
+                    self.producer = Some(next);
+                }
+            }
+            Work::Wake => {}
+            work => {
+                super::owner_loop::execute(self.image, Request { work, ..request }, self.output);
+            }
+        }
+        Ok(())
+    }
+    fn collect(&mut self) -> Result<(), InstanceError> {
+        for raw in control(self.image, &[3])? {
+            let id = JobId(raw);
+            let pending = self.jobs.remove(&id).ok_or(InstanceError::InvalidConfig(
+                "unknown Scheme service completion",
+            ))?;
+            pending
+                .job
+                .complete(self.image, id, self.input, self.output);
+            // The retained work/slot permit drops only after projection/root balance.
+        }
+        Ok(())
+    }
+    fn drive(
+        &mut self,
+        requests: &mpsc::Receiver<Request>,
+        wake: &Wake,
+    ) -> Result<(), InstanceError> {
+        use super::batch_stream_runner::ProducerStep;
+        let mut draining = false;
+        loop {
+            self.collect()?;
+            if let Ok(request) = requests.try_recv() {
+                self.receive(request)?;
+                continue;
+            }
+            let mut waiting = false;
+            if let Some(producer) = self.producer.as_mut() {
+                match producer.step(self.image) {
+                    ProducerStep::Progress => continue,
+                    ProducerStep::Finished => {
+                        self.producer = None;
+                        continue;
+                    }
+                    ProducerStep::Waiting => waiting = true,
+                }
+            }
+            // Clear/coalesce, then recheck. An enqueue before clear is visible in
+            // the inbox; one after recheck publishes a fresh native pipe byte.
+            wake.arm();
+            match requests.try_recv() {
+                Ok(request) => {
+                    self.receive(request)?;
+                    continue;
+                }
+                Err(mpsc::TryRecvError::Disconnected)
+                    if self.jobs.is_empty() && self.producer.is_none() =>
+                {
+                    return Ok(());
+                }
+                Err(_) => {}
+            }
+            if wake.closed.load(Ordering::Acquire) {
+                if !draining {
+                    control(self.image, &[7])?;
+                    draining = true;
+                }
+                if self.jobs.is_empty() && self.producer.is_none() {
+                    return Ok(());
+                }
+            }
+            if wake.failed.load(Ordering::Acquire) {
+                return Err(InstanceError::Loader(
+                    "Scheme service wake write failed".into(),
+                ));
+            }
+            let remaining = if waiting {
+                self.producer
+                    .as_ref()
+                    .unwrap()
+                    .deadline()
+                    .saturating_duration_since(Instant::now())
+            } else {
+                std::time::Duration::ZERO
+            };
+            if waiting && remaining.is_zero() {
+                continue;
+            }
+            let micros = i64::try_from(remaining.as_micros()).unwrap_or(i64::MAX);
+            control(self.image, &[4, micros])?;
+        }
+    }
+}
+pub(super) fn run(
+    image: &Image,
+    requests: &mpsc::Receiver<Request>,
+    maximum_input: usize,
+    maximum_output: usize,
+    wake: &Wake,
+) {
+    let mut pump = Pump {
+        image,
+        input: maximum_input,
+        output: maximum_output,
+        jobs: BTreeMap::new(),
+        producer: None,
+    };
+    // Application input bounds are also enforced by each admitted dispatcher.
+    let result = pump.drive(requests, wake);
+    wake.close();
+    // Close joins every accepted Scheme child and clears results before any
+    // SDK cleanup. Failure marks non-quiescence, keeping the heap/code quarantined.
+    close(image);
+    if let Err(error) = result {
+        for (_, pending) in pump.jobs {
+            pending.job.fail(error.clone());
+        }
+        if let Some(mut producer) = pump.producer {
+            producer.reject(error.clone());
+        }
+        while let Ok(request) = requests.try_recv() {
+            if let Work::Service(job) = request.work {
+                job.fail(error.clone());
+            }
+        }
+    }
+}

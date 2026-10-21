@@ -25,6 +25,7 @@ pub(super) struct Senders {
 #[derive(Debug)]
 pub(super) struct OwnerSender {
     pub(super) sender: mpsc::SyncSender<Request>,
+    pub(super) wake: Option<Arc<super::service_wake::Wake>>,
     #[cfg(feature = "tokio-dispatch")]
     pub(super) capacity: Option<Arc<super::capacity::Capacity>>,
     #[cfg(feature = "tokio-dispatch")]
@@ -51,7 +52,11 @@ impl InstanceDispatcher {
             }),
         }
     }
-    pub(super) fn add_sender(&self, sender: mpsc::SyncSender<Request>) {
+    pub(super) fn add_sender(
+        &self,
+        sender: mpsc::SyncSender<Request>,
+        wake: Option<Arc<super::service_wake::Wake>>,
+    ) {
         self.admission
             .senders
             .lock()
@@ -59,6 +64,7 @@ impl InstanceDispatcher {
             .owners
             .push(OwnerSender {
                 sender,
+                wake,
                 #[cfg(feature = "tokio-dispatch")]
                 capacity: None,
                 #[cfg(feature = "tokio-dispatch")]
@@ -77,6 +83,11 @@ impl InstanceDispatcher {
         for owner in &owners {
             if let Some(capacity) = &owner.capacity {
                 capacity.close();
+            }
+        }
+        for owner in &owners {
+            if let Some(wake) = &owner.wake {
+                wake.close();
             }
         }
         drop(owners);
@@ -118,6 +129,7 @@ impl InstanceDispatcher {
             drop(senders);
             return Err(error);
         }
+        let wake = sender.wake.clone();
         let result = sender.sender.try_send(request);
         #[cfg(feature = "tokio-dispatch")]
         if result.is_ok() {
@@ -126,6 +138,7 @@ impl InstanceDispatcher {
         // Request destruction may return a semaphore credit and wake a caller.
         // Never invoke foreign wakers under the admission/close fence.
         drop(senders);
+        super::service_wake::notify_enqueued(wake, result.is_ok());
         result.map_err(|error| match error {
             mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
             mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,
@@ -174,12 +187,14 @@ impl InstanceDispatcher {
             drop(senders);
             return Err(error);
         }
+        let wake = sender.wake.clone();
         let sent = sender.sender.try_send(request);
         #[cfg(feature = "tokio-dispatch")]
         if sent.is_ok() {
             senders.ever_admitted = true;
         }
         drop(senders);
+        super::service_wake::notify_enqueued(wake, sent.is_ok());
         sent.map_err(|error| match error {
             mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
             mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,

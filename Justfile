@@ -247,3 +247,7 @@ bridge-owner-dispatch-benchmark *args:
 # Explicit same-VM shared-capacity and Scheme Actor batch pairs, not a thread matrix.
 bridge-owner-capacity-benchmark *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_capacity --locked -- {{ args }}
+
+# Same native Scheme work/budgets: synchronous versus Scheme-owned async service.
+bridge-scheme-service-benchmark *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- {{ args }}

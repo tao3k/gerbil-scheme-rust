@@ -47,6 +47,9 @@ pub(super) struct Image {
     pub(super) native: NativeApi,
     pub(super) exports: BTreeMap<CString, Unary>,
     finalizer: Option<Unary>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) service: Option<Unary>,
+    pub(super) service_status: Cell<Option<i32>>,
     pub(super) retained: RefCell<BTreeMap<u64, i64>>,
     pub(super) next_retained: Cell<u64>,
     live: bool,
@@ -88,9 +91,31 @@ unsafe fn program_exports(
             }
         })
         .transpose()?;
-    Ok((exports, finalizer))
+    #[cfg(feature = "tokio-dispatch")]
+    let service = program
+        .service
+        .as_ref()
+        .map(|name| {
+            // SAFETY: this private rooted unary export shares the admitted image ABI.
+            unsafe {
+                symbol(handle, name)
+                    .map(|address| std::mem::transmute::<*mut c_void, Unary>(address))
+            }
+        })
+        .transpose()?;
+    Ok(ProgramExports {
+        exports,
+        finalizer,
+        #[cfg(feature = "tokio-dispatch")]
+        service,
+    })
 }
-type ProgramExports = (BTreeMap<CString, Unary>, Option<Unary>);
+struct ProgramExports {
+    exports: BTreeMap<CString, Unary>,
+    finalizer: Option<Unary>,
+    #[cfg(feature = "tokio-dispatch")]
+    service: Option<Unary>,
+}
 
 impl Image {
     pub(super) fn collection_count(&self) -> u64 {
@@ -105,17 +130,9 @@ impl Image {
     ) -> Result<Self, InstanceError> {
         let start = Instant::now();
         let image_path = path.to_owned();
-        let path = CString::new(path.as_os_str().as_encoded_bytes())
-            .map_err(|e| InstanceError::Loader(e.to_string()))?;
-        // SAFETY: the unsafe program descriptor admits this build-owned image.
-        // RTLD_LOCAL and an export allow-list isolate its Gambit symbols.
-        let handle = unsafe { dlopen(path.as_ptr(), 2 | 4) };
-        if handle.is_null() {
-            let message = loader_message();
-            let _ = std::fs::remove_file(&image_path);
-            return Err(InstanceError::Loader(message));
-        }
-        mapping.loaded(std::ptr::NonNull::new(handle).expect("loaded image"));
+        let opened = open_image(path)?;
+        mapping.loaded(opened);
+        let handle = opened.as_ptr();
         let mut preflight =
             super::preflight::Preflight::new(std::sync::Arc::clone(&mapping), image_path.clone());
         // Resolve every required symbol before setup, so a missing symbol never
@@ -143,7 +160,7 @@ impl Image {
                     symbol(handle, c"gerbil_scheme_rust_bytes_to_bytevector_root_raw")?,
                 );
             let call = std::mem::transmute::<*mut c_void, Unary>(symbol(handle, &program.entry)?);
-            let (exports, finalizer) = program_exports(handle, program)?;
+            let declared = program_exports(handle, program)?;
             let length = std::mem::transmute::<*mut c_void, Unary>(symbol(
                 handle,
                 c"gerbil_scheme_rust_root_bytevector_length_raw",
@@ -185,8 +202,11 @@ impl Image {
                 cleanup,
                 retired,
                 native,
-                exports,
-                finalizer,
+                exports: declared.exports,
+                finalizer: declared.finalizer,
+                #[cfg(feature = "tokio-dispatch")]
+                service: declared.service,
+                service_status: Cell::new(None),
                 retained: RefCell::new(BTreeMap::new()),
                 next_retained: Cell::new(1),
                 roots,
@@ -342,22 +362,29 @@ impl Image {
         }
     }
     pub(super) fn finish(mut self) -> super::OwnerShutdown {
-        let finalizer_status = self.finalizer.map(|finalize| {
-            // SAFETY: queue is drained; the admitted finalizer uses this owner's ABI.
-            unsafe {
-                let input = (self.native.collection)(std::ptr::null(), 0, 0);
-                if input <= 0 {
-                    return -71;
-                }
-                let output = finalize(input);
-                let released = (self.release)(input);
-                if output > 0 && (self.release)(output) == 1 && released == 1 {
-                    0
-                } else {
-                    -71
-                }
-            }
-        });
+        let finalizer_status = self
+            .service_status
+            .get()
+            .filter(|code| *code != 0)
+            .or_else(|| {
+                self.finalizer.map(|finalize| {
+                    // SAFETY: queue is drained; the admitted finalizer uses this owner's ABI.
+                    unsafe {
+                        let input = (self.native.collection)(std::ptr::null(), 0, 0);
+                        if input <= 0 {
+                            return -71;
+                        }
+                        let output = finalize(input);
+                        let released = (self.release)(input);
+                        if output > 0 && (self.release)(output) == 1 && released == 1 {
+                            0
+                        } else {
+                            -71
+                        }
+                    }
+                })
+            })
+            .or(self.service_status.get());
         let quiesced = finalizer_status.is_none_or(|status| status == 0);
         if quiesced {
             self.release_retained();
@@ -452,4 +479,17 @@ fn loader_message() -> String {
             .to_string_lossy()
             .into_owned()
     }
+}
+
+fn open_image(path: &Path) -> Result<std::ptr::NonNull<c_void>, InstanceError> {
+    let encoded = CString::new(path.as_os_str().as_encoded_bytes())
+        .map_err(|e| InstanceError::Loader(e.to_string()))?;
+    // SAFETY: Image::load's trusted descriptor admits this image; RTLD_LOCAL
+    // and its export allow-list isolate the embedded Gambit symbols.
+    let handle = unsafe { dlopen(encoded.as_ptr(), 2 | 4) };
+    std::ptr::NonNull::new(handle).ok_or_else(|| {
+        let message = loader_message();
+        let _ = std::fs::remove_file(path);
+        InstanceError::Loader(message)
+    })
 }

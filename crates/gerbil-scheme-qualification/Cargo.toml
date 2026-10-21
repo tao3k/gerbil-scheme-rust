@@ -87,3 +87,12 @@ required-features = ["instance-dispatch"]
 
 [lints]
 workspace = true
+
+[[test]]
+name = "scheme_service"
+required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "scheme_service"
+harness = false
+required-features = ["instance-dispatch"]

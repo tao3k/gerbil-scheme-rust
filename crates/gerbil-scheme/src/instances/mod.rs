@@ -28,6 +28,7 @@ mod batch_stream;
 #[cfg(feature = "tokio-dispatch")]
 mod batch_stream_runner;
 mod owner_loop;
+mod owner_thread;
 mod pool;
 #[cfg(feature = "tokio-dispatch")]
 pub use batch_stream::{BatchStreamRow, NumericBatchStreamTicket, ProfiledBatchStreamTicket};
@@ -43,3 +44,11 @@ pub use types::{
     InstanceConfig, InstanceError, InstanceReply, InstanceTicket, IsolatedProgram, OwnerReceipt,
     OwnerShutdown, ShutdownReceipt,
 };
+
+#[cfg(feature = "tokio-dispatch")]
+mod service;
+#[cfg(feature = "tokio-dispatch")]
+mod service_loop;
+mod service_wake;
+#[cfg(feature = "tokio-dispatch")]
+pub use service::{NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest};

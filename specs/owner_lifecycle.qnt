@@ -2,6 +2,10 @@
 // Fixed-owner lifetime refinement. bridge_handoff owns queue/receiver semantics;
 // this module adds close-flag publication and lazy-executor retirement races.
 // Native execution, GC, FFI ownership and successful joins remain assumptions.
+// serviceRoots covers the internal task table, then its temporary native root
+// during take/projection. Actor affinity and continuation semantics are native
+// qualification obligations. Notifications model delivery, not OS latency or
+// an unconditional liveness guarantee; enqueue/notify publication is split.
 module owner_lifecycle {
   const JOBS: Set[int]
   const ASSIGNED: int -> int
@@ -15,6 +19,8 @@ module owner_lifecycle {
     capacityLimit: int, capacityHeld: Set[int], reserved: Set[int],
     workLimit: int, workHeld: Set[int],
     producers: Set[int], staged: Set[int], producerJobs: Set[int],
+    servicePending: Set[int], serviceReady: Set[int], serviceRoots: Set[int], serviceFailed: Set[int],
+    inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
@@ -28,6 +34,8 @@ module owner_lifecycle {
     capacityLimit: JOBS.size(), capacityHeld: Set(), reserved: Set(),
     workLimit: JOBS.size() + 7, workHeld: Set(),
     producers: Set(), staged: Set(), producerJobs: Set(),
+    servicePending: Set(), serviceReady: Set(), serviceRoots: Set(), serviceFailed: Set(),
+    inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
   // Job 1 is a batch of eight; the other requests have unit cost.
@@ -65,7 +73,7 @@ module owner_lifecycle {
   }
   action admitReserved(r: int): bool = all {
     s.phase == "open", s.reserved.contains(r),
-    s' = { ...s, accepted: s.accepted.union(Set(r)), staged: s.staged.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)) }
+    s' = { ...s, accepted: s.accepted.union(Set(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ASSIGNED.get(r))), staged: s.staged.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)) }
   }
   action releaseReservation(r: int): bool = all {
     s.reserved.contains(r),
@@ -78,7 +86,7 @@ module owner_lifecycle {
   action admit(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
-    s' = { ...s, accepted: s.accepted.union(Set(r)), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
+    s' = { ...s, accepted: s.accepted.union(Set(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ASSIGNED.get(r))), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   action registerProducer(owner: int): bool = all {
     s.phase == "open", Set(1, 2).contains(owner), not(s.producers.contains(owner)),
@@ -107,7 +115,8 @@ module owner_lifecycle {
   action complete(r: int): bool = all {
     Set("open", "closing").contains(s.phase),
     s.accepted.contains(r), not(s.completed.contains(r)),
-    s' = { ...s, completed: s.completed.union(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)),
+    not(s.servicePending.contains(r)) or s.serviceReady.contains(r),
+    s' = { ...s, servicePending: s.servicePending.exclude(Set(r)), serviceReady: s.serviceReady.exclude(Set(r)), serviceRoots: s.serviceRoots.exclude(Set(r)), inbox: s.inbox.exclude(Set(r)), completed: s.completed.union(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)),
       roots: s.roots.union(Set(r)), ready: s.ready.union(Set(r)) }
   }
   // Observation timeout leaves accepted native work and roots unchanged.
@@ -115,7 +124,7 @@ module owner_lifecycle {
     s.accepted.contains(r), not(s.timedOut.contains(r)),
     s' = { ...s, timedOut: s.timedOut.union(Set(r)) }
   }
-  val canJoin = s.phase == "closing" and s.accepted.subseteq(s.completed) and s.producers.size() == 0
+  val canJoin = s.phase == "closing" and s.accepted.subseteq(s.completed) and s.producers.size() == 0 and s.serviceRoots.size() == 0
   def canPublish(r: int): bool = s.phase == "open" and s.ready.contains(r)
   def canUse(r: int, owner: int): bool = and {
     s.phase == "open", s.registry.contains(r), s.roots.contains(r),
@@ -139,9 +148,9 @@ module owner_lifecycle {
     s' = { ...s, executor: "alive", lateExecutor: s.lateExecutor or s.phase != "open" }
   }
   action createExecutor = all { s.phase == "open", createExecutorUnchecked }
-  action close = all { s.phase == "open", s' = { ...s, phase: "closing" } }
+  action close = all { s.phase == "open", s' = { ...s, phase: "closing", notified: Set(1, 2) } }
   action joinUnchecked = all {
-    s.phase == "closing", s' = { ...s, phase: "joined", roots: Set() }
+    s.phase == "closing", s' = { ...s, phase: "joined", roots: Set(), parked: Set(), notified: Set(), wakeOwed: Set() }
   }
   action join = all { canJoin, joinUnchecked }
   // Metadata can briefly outlive native roots during close. No API use or
@@ -183,17 +192,57 @@ module owner_lifecycle {
       unsafeCodeRelease: s.unsafeCodeRelease or not(canReleaseCode) }
   }
   action releaseCode = all { canReleaseCode, releaseCodeUnchecked }
+  // Strong Scheme task graphs persist until native result projection/retirement.
+  action submitService(r: int): bool = all {
+    Set("open", "closing").contains(s.phase), s.inbox.contains(r),
+    not(s.servicePending.contains(r)), not(s.completed.contains(r)),
+    s' = { ...s, inbox: s.inbox.exclude(Set(r)), servicePending: s.servicePending.union(Set(r)), serviceRoots: s.serviceRoots.union(Set(r)) }
+  }
+  action readyService(r: int, failed: bool): bool = all {
+    s.servicePending.contains(r), not(s.serviceReady.contains(r)),
+    s' = { ...s, serviceReady: s.serviceReady.union(Set(r)), notified: s.notified.union(Set(ASSIGNED.get(r))),
+      serviceFailed: if (failed) s.serviceFailed.union(Set(r)) else s.serviceFailed }
+  }
+  // Enqueue and OS notification publication are deliberately separate actions.
+  action notify(owner: int): bool = all {
+    s.wakeOwed.contains(owner), s' = { ...s, wakeOwed: s.wakeOwed.exclude(Set(owner)), notified: s.notified.union(Set(owner)) }
+  }
+  action deliverWake(owner: int): bool = all {
+    s.notified.contains(owner), s' = { ...s, parked: s.parked.exclude(Set(owner)) }
+  }
+  action clearWake(owner: int): bool = all {
+    not(s.parked.contains(owner)), s' = { ...s, notified: s.notified.exclude(Set(owner)) }
+  }
+  def canPark(owner: int): bool = and {
+    s.phase == "open", not(s.notified.contains(owner)),
+    not(s.inbox.exists(r => ASSIGNED.get(r) == owner)),
+    not(s.serviceReady.exists(r => ASSIGNED.get(r) == owner))
+  }
+  action park(owner: int): bool = all { canPark(owner), s' = { ...s, parked: s.parked.union(Set(owner)) } }
+  action unsafePark(owner: int): bool = s' = { ...s, parked: s.parked.union(Set(owner)) }
+  action unsafeServiceRoot(r: int): bool = all {
+    s.servicePending.contains(r), s' = { ...s, serviceRoots: s.serviceRoots.exclude(Set(r)) }
+  }
+  action unsafeParkStep = { nondet owner = Set(1, 2).oneOf(); any { step, unsafePark(owner) } }
+  action unsafeServiceRootStep = { nondet r = JOBS.oneOf(); any { step, unsafeServiceRoot(r) } }
   action stutter = s' = s
   action step = {
     nondet r = JOBS.oneOf()
     nondet owner = Set(1, 2).oneOf()
-    any { admit(r), complete(r), observeTimeout(r), publish(r), use(r, owner),
+    any { submitService(r), readyService(r, false), readyService(r, true), notify(owner), deliverWake(owner), clearWake(owner), park(owner), admit(r), complete(r), observeTimeout(r), publish(r), use(r, owner),
       release(r, owner), createExecutor, close, join, clearRegistry, retire,
       codeLease(r), releaseCodeLease(r), authorizeCodeRelease, quarantineCode, releaseCode,
       registerProducer(owner), stage(r), cancelProducer(owner), finishProducer(owner),
       reserveWork(r), reserveSlot(r), cancelWork(r), configureWork(8), configureWork(9), reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
   }
   val safety = and {
+    s.servicePending.subseteq(s.accepted.exclude(s.completed)), s.serviceRoots == s.servicePending,
+    s.serviceReady.subseteq(s.servicePending), s.serviceFailed.subseteq(s.accepted),
+    s.inbox.subseteq(s.accepted.exclude(s.completed)), s.inbox.intersect(s.servicePending).size() == 0,
+    s.parked.subseteq(Set(1, 2)), s.notified.subseteq(Set(1, 2)), s.wakeOwed.subseteq(Set(1, 2)),
+    s.parked.forall(owner => implies(
+      s.inbox.exists(r => ASSIGNED.get(r) == owner) or s.serviceReady.exists(r => ASSIGNED.get(r) == owner),
+      s.notified.contains(owner) or s.wakeOwed.contains(owner))),
     s.producers.subseteq(Set(1, 2)), s.staged.subseteq(s.producerJobs), s.producerJobs.subseteq(JOBS),
     s.producerJobs.subseteq(s.staged.union(s.accepted)), s.staged.intersect(s.accepted).size() == 0,
     s.producerJobs.forall(job => s.producers.contains(ASSIGNED.get(job))),
@@ -210,7 +259,7 @@ module owner_lifecycle {
     not(s.latePublication), not(s.lateExecutor), not(s.foreignUse),
     implies(s.phase == "open", s.registry.subseteq(s.roots)),
     implies(Set("joined", "closed").contains(s.phase), and {
-      s.accepted.subseteq(s.completed), s.roots.size() == 0, s.producers.size() == 0 }),
+      s.accepted.subseteq(s.completed), s.roots.size() == 0, s.producers.size() == 0, s.serviceRoots.size() == 0 }),
     implies(s.phase == "closed", and { s.executor == "retired",
       not(s.filesPresent), s.registry.size() == 0 }),
     s.codeLeases.subseteq(JOBS), not(s.unsafeCodeRelease),
@@ -241,6 +290,18 @@ module owner_lifecycle {
   }
   action unsafeForeignStep = any { step, unsafeForeignUse }
 
+  run serviceWakeRecheckTest = init.then(admit(1)).then(notify(1)).then(clearWake(1))
+    .then(all { assert(not(canPark(1))), assert(safety), stutter })
+    .then(submitService(1)).then(park(1)).then(readyService(1, false)).then(deliverWake(1)).then(complete(1))
+    .then(close).then(join).then(all { assert(safety), stutter })
+  run serviceTimeoutCloseDrainTest = init.then(admit(1)).then(submitService(1)).then(observeTimeout(1)).then(close)
+    .then(all { assert(s.serviceRoots.contains(1)), assert(s.workHeld.contains(1)), assert(not(canJoin)), assert(safety), stutter })
+    .then(readyService(1, true)).then(complete(1)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(s.serviceFailed.contains(1)), assert(safety), stutter })
+  run serviceEarlyRootMutationTest = init.then(admit(1)).then(submitService(1)).then(unsafeServiceRoot(1))
+    .then(all { assert(not(safety)), stutter })
+  run serviceLostWakeMutationTest = init.then(admit(1)).then(notify(1)).then(clearWake(1)).then(unsafePark(1))
+    .then(all { assert(not(safety)), stutter })
   run producerNativeRefillTest = init.then(configureWork(8)).then(registerProducer(1)).then(stage(1)).then(stage(3)).then(admit(1))
     .then(all { assert(not(hasCapacity(3))), assert(safety), stutter }).then(complete(1)).then(admit(3)).then(complete(3))
     .then(finishProducer(1)).then(all { assert(s.producers.size() == 0), assert(safety), stutter })

@@ -41,6 +41,8 @@ pub(super) enum Work {
     },
     Native(Box<dyn FnOnce(&Image) + Send>),
     #[cfg(feature = "tokio-dispatch")]
+    Service(Box<dyn super::service::Job>),
+    #[cfg(feature = "tokio-dispatch")]
     Producer(Box<dyn super::batch_stream_runner::Producer>),
     #[cfg(feature = "tokio-dispatch")]
     Wake,
@@ -50,6 +52,8 @@ impl std::fmt::Debug for Work {
         f.write_str(match self {
             Self::Bytes { .. } => "ByteRequest",
             Self::Native(_) => "NativeTypeJob",
+            #[cfg(feature = "tokio-dispatch")]
+            Self::Service(_) => "SchemeServiceJob",
             #[cfg(feature = "tokio-dispatch")]
             Self::Producer(_) => "BoundedBatchProducer",
             #[cfg(feature = "tokio-dispatch")]
@@ -102,6 +106,30 @@ impl InstancePool {
         config: InstanceConfig,
         mut ready: impl FnMut(&OwnerReceipt),
     ) -> Result<Self, InstanceError> {
+        #[cfg(not(feature = "tokio-dispatch"))]
+        if program.service.is_some() {
+            return Err(InstanceError::InvalidConfig(
+                "Scheme service requires tokio-dispatch",
+            ));
+        }
+        if program.service.as_ref().is_some_and(|name| {
+            name == &program.entry
+                || program.exports.contains(name)
+                || program.finalizer.as_ref() == Some(name)
+        }) {
+            return Err(InstanceError::InvalidConfig(
+                "Scheme service protocol entry must remain private",
+            ));
+        }
+        if program.service.is_some()
+            && (config.maximum_request_bytes < 128
+                || config.maximum_reply_bytes < 8
+                || config.queue_capacity > 65536)
+        {
+            return Err(InstanceError::InvalidConfig(
+                "Scheme service protocol bounds",
+            ));
+        }
         if config.owners == 0
             || config.owners > 64
             || config.queue_capacity == 0
@@ -173,10 +201,19 @@ impl InstancePool {
     ) -> Result<(), InstanceError> {
         let identity = super::image::next_identity()?;
         let path = self.image_directory.join(format!("owner-{owner}.dylib"));
+        let (wake_reader, wake) = if program.service.is_some() {
+            let (reader, signal) = super::service_wake::Wake::create()?;
+            (Some(reader), Some(signal))
+        } else {
+            (None, None)
+        };
+        // Allocate wake resources before creating an image copy: failure must
+        // leave neither a descriptor nor an untracked copied image behind.
         fs::copy(&program.path, &path).map_err(|e| {
             let _ = fs::remove_file(&path);
             InstanceError::Loader(e.to_string())
         })?;
+        let owner_wake = wake.clone();
         let (sender, requests) = mpsc::sync_channel::<Request>(config.queue_capacity);
         let (ready, initialized) = mpsc::channel();
         let program = program.clone();
@@ -187,34 +224,24 @@ impl InstancePool {
         let worker = thread::Builder::new()
             .name(format!("gerbil-owner-{owner}"))
             .spawn(move || {
-                let loaded = {
-                    let _guard = LIFECYCLE
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    Image::load(&path, &program, owner, owner_mapping)
-                };
-                let image = match loaded {
-                    Ok(image) => image,
-                    Err(error) => {
-                        let _ = ready.send(Err(error));
-                        return;
-                    }
-                };
-                let _ = ready.send(Ok(image.receipt.clone()));
-                super::owner_loop::run(&image, &requests, config.maximum_reply_bytes);
-                let receipt = {
-                    let _guard = LIFECYCLE
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    image.finish()
-                };
-                let _ = finished.send(receipt);
+                super::owner_thread::run(super::owner_thread::Task {
+                    path,
+                    program,
+                    owner,
+                    mapping: owner_mapping,
+                    config,
+                    ready,
+                    finished,
+                    wake_reader,
+                    wake: owner_wake,
+                    requests,
+                });
             })
             .map_err(|e| {
                 let _ = fs::remove_file(&failed_copy);
                 InstanceError::Loader(e.to_string())
             })?;
-        self.dispatcher.add_sender(sender);
+        self.dispatcher.add_sender(sender, wake);
         self.mappings.push(Arc::clone(&mapping));
         self.threads.push(Some(OwnerThread { worker, mapping }));
         let receipt = initialized

@@ -456,6 +456,7 @@ dependencies = [
  "gerbil-scheme-rust-project-harness",
  "gerbil-scheme-rust-project-harness-policy",
  "gerbil-scheme-sys",
+ "libc",
  "simdutf8",
  "syn 3.0.6",
  "tokio",

@@ -7,6 +7,7 @@ pub(super) struct Sample {
     pub elapsed: u128,
     pub latency: Vec<u128>,
     pub delivery: Vec<u128>,
+    pub after_native: Vec<u128>,
     pub owner_latency: Vec<Vec<u128>>,
     pub actor_peer_min: Option<usize>,
     pub owner_progress_min: usize,
@@ -23,6 +24,7 @@ pub(super) fn run(
         elapsed: 0,
         latency: Vec::new(),
         delivery: Vec::new(),
+        after_native: Vec::new(),
         owner_latency: vec![Vec::new(); owners],
         actor_peer_min: None,
         owner_progress_min: 128 / owners,
@@ -71,6 +73,15 @@ pub(super) fn run(
             .min()
             .unwrap();
         sample.owner_progress_min = sample.owner_progress_min.min(minimum);
+        let last_native = clocks
+            .iter()
+            .flatten()
+            .max()
+            .unwrap()
+            .duration_since(released)
+            .as_nanos();
+        assert!(last_native <= delivered);
+        sample.after_native.push(delivered - last_native);
         sample.delivery.push(delivered);
     }
     sample.elapsed = started.elapsed().as_nanos();
@@ -79,7 +90,7 @@ pub(super) fn run(
 pub(super) fn emit(
     samples: &[Sample],
     owners: usize,
-    (mode, workers): (&str, usize),
+    (mode, workers, diagnostic, grouped): (&str, usize, bool, bool),
     mixed: bool,
     batch: usize,
     smoke: bool,
@@ -93,6 +104,10 @@ pub(super) fn emit(
     let mut delivery: Vec<_> = samples
         .iter()
         .flat_map(|s| s.delivery.iter().copied())
+        .collect();
+    let mut recovery: Vec<_> = samples
+        .iter()
+        .flat_map(|s| s.after_native.iter().copied())
         .collect();
     let owner_p99: Vec<_> = (0..owners)
         .map(|owner| {
@@ -109,11 +124,12 @@ pub(super) fn emit(
     println!(
         "{}",
         json!({
-            "event": "dispatch_result", "owners": owners, "mode": mode, "workers": workers,
+            "event": "dispatch_result", "diagnostic": diagnostic, "grouped": grouped, "owners": owners, "mode": mode, "workers": workers,
             "mixed": mixed, "batch": batch, "smoke": smoke, "samples": samples.len(),
             "orders_per_sample": jobs, "median_ns": median, "orders_per_second": rate,
             "native_response_p99_ns": corpus::percentile(&mut latency, 99),
-            "window_delivery_p99_ns": corpus::percentile(&mut delivery, 99), "owner_p99_ns": owner_p99,
+            "window_delivery_p99_ns": corpus::percentile(&mut delivery, 99),
+            "window_recovery_p99_ns": corpus::percentile(&mut recovery, 99), "owner_p99_ns": owner_p99,
             "actor_peer_min": samples.iter().filter_map(|s| s.actor_peer_min).min(),
             "owner_progress_min_orders_at_first_done": samples.iter().map(|s| s.owner_progress_min).min().unwrap(),
             "owner_offered_orders_per_window": 128 / owners

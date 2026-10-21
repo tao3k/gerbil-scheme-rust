@@ -76,3 +76,41 @@ CI also runs the existing complete native capability/reuse smoke. Its Scheme
 fault assertion requires the explicit typed diagnostic; unexpected assertions
 retain their panic output. This is separate from the performance matrix and
 does not establish long-term memory or arbitrary extension unloading.
+
+## Stage attribution and owner-grouped controls
+
+```text
+just bridge-owner-dispatch-benchmark --profile
+just bridge-owner-dispatch-benchmark --grouped-ab
+just bridge-owner-dispatch-benchmark --profile --grouped-ab
+```
+
+Profiling uses the same native batch implementation with synchronous/asynchronous
+receipt clocks. Profiled summaries are explicitly `diagnostic=true`; they cannot
+replace unprofiled throughput controls. Ten ordered spans cover input copying,
+ready-to-dispatch-worker, validation, admission plus owner wait, native type
+construction, Scheme/GC, projection, root retirement, result observation and task
+collection. Admission return and a queue-wait lower bound are reported separately,
+because the owner can start before the submission method returns. SDK GC snapshots
+remain separate. Clock hooks, metadata allocation and OS scheduling affect spans.
+
+Grouped A/B retains all native requests, bounds and per-owner order. Only Rust
+work units change: Tokio spawns one task per distinct owner and collects finished
+groups in completion order; Rayon parallelizes owner groups and the caller waits
+on tickets. Original result positions are restored. The shared implementation is
+`gerbil_scheme_python::owner_dispatch` behind the optional `owner-dispatch` feature;
+it has no Python dependency. Existing Python dispatch selections and all defaults
+remain unchanged. The public Rust helper is an opt-in candidate, with workload and
+p99 negatives retained rather than a general performance promotion.
+
+Each unprofiled case pairs current/grouped arms in forward AB / reverse BA sweeps,
+with ten samples per arm. Direct's two arms execute the exact same code as an A/A
+control. Diagnostic paired cases have four samples per arm. Every worker variant
+must propagate a real Scheme failure and validate its accepted peers and subsequent
+recovery; the separate native fault test also injects a Rust submission panic.
+
+`window_recovery_p99_ns` measures each window's caller return minus that same
+window's last native completion. Raw per-window delivery/recovery arrays support
+pairing. Native response p99 and window-delivery p99 have different populations;
+their difference is not a recovery measurement. In particular, an isolated native
+straggler can be below the per-request p99 rank while dominating the window tail.

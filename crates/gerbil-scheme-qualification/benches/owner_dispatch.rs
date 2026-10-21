@@ -1,8 +1,14 @@
 //! Same live native Scheme owners and input corpus across Rust dispatchers.
+#[path = "owner_dispatch/attribution.rs"]
+mod attribution;
+#[path = "owner_dispatch/comparison.rs"]
+mod comparison;
 #[path = "support/orders.rs"]
 mod corpus;
 #[path = "owner_dispatch/executor.rs"]
 mod executor;
+#[path = "owner_dispatch/grouped_attribution.rs"]
+mod grouped_attribution;
 #[path = "owner_dispatch/sample.rs"]
 mod sample;
 use executor::Executor;
@@ -39,11 +45,26 @@ fn contracts(pool: &InstancePool, executor: &Executor, progress: &mpsc::Sender<&
     for owner in 0..pool.owners().len() {
         let mut bad = corpus::order(0, false);
         bad[3] = -1;
-        let result = executor.window(&pool.dispatcher(), vec![(owner, vec![bad])], Instant::now());
-        let error = result.into_iter().next().unwrap().unwrap_err();
+        let peers = [corpus::order(71, false), corpus::order(72, false)];
+        let result = executor.window(
+            &pool.dispatcher(),
+            vec![
+                (owner, vec![bad]),
+                (owner, vec![peers[0].clone()]),
+                (owner, vec![peers[1].clone()]),
+            ],
+            Instant::now(),
+        );
+        let mut replies = result.into_iter();
+        let error = replies.next().unwrap().unwrap_err();
+        for input in &peers {
+            let (output, _) = replies.next().unwrap().unwrap();
+            corpus::verify(input, &output[0]);
+        }
+        assert!(replies.next().is_none());
         println!(
             "{}",
-            json!({"event": "dispatch_scheme_exception", "mode": executor.name, "workers": executor.workers, "owner": owner, "error": error.to_string()})
+            json!({"event": "dispatch_scheme_exception", "mode": executor.name, "workers": executor.workers, "grouped": executor.grouped, "owner": owner, "error": error.to_string()})
         );
         assert!(
             matches!(&error, InstanceError::Scheme(message) if message.contains("Scheme actor batch handler failed")),
@@ -63,7 +84,7 @@ fn contracts(pool: &InstancePool, executor: &Executor, progress: &mpsc::Sender<&
         );
     }
 }
-fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
+fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, profile: bool, grouped_ab: bool) {
     // SAFETY: the existing Cargo build owns this Scheme image and native root ABI.
     let program = unsafe {
         IsolatedProgram::from_image(
@@ -72,8 +93,6 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         )
     }
     .unwrap();
-    let jobs = if smoke { 128 } else { 1024 };
-    let blocks = if smoke { 1 } else { 5 };
     for owners in [1, 4] {
         let mut pool = InstancePool::start(
             &program,
@@ -93,87 +112,60 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         );
         observed(progress, "native Scheme owners initialized");
         for &(mode, workers) in &CASES {
-            let executor = Executor::start(mode, workers);
-            contracts(&pool, &executor, progress);
-            executor.finish();
-            observed(progress, "dispatcher contract workers retired");
-        }
-        for mixed in [false, true] {
-            let inputs: Vec<_> = (0..jobs).map(|id| corpus::order(id, mixed)).collect();
-            for batch in [1, 32] {
-                let mut samples: [Vec<sample::Sample>; 7] = std::array::from_fn(|_| Vec::new());
-                for block in 0..blocks {
-                    // Rotate the forward order between blocks, then reverse it.
-                    // Each case has matched forward/reverse positions within a block.
-                    let order: Vec<_> = (0..CASES.len())
-                        .map(|i| (i + block) % CASES.len())
-                        .collect();
-                    for &case in order.iter().chain(order.iter().rev()) {
-                        let (mode, workers) = CASES[case];
-                        let executor = Executor::start(mode, workers);
-                        // Warm the fresh executor and the same Scheme service.
-                        sample::run(&pool, &executor, &inputs[..128], batch, progress);
-                        let value = sample::run(&pool, &executor, &inputs, batch, progress);
-                        println!(
-                            "{}",
-                            json!({"event": "dispatch_sample", "owners": owners, "mode": mode, "workers": workers, "mixed": mixed, "batch": batch, "block": block, "elapsed_ns": value.elapsed, "native_latency_ns": value.latency, "owner_progress_min": value.owner_progress_min})
-                        );
-                        executor.finish();
-                        samples[case].push(value);
-                        assert_eq!(
-                            states,
-                            pool.owners().iter().map(|o| o.state).collect::<Vec<_>>()
-                        );
-                        observed(
-                            progress,
-                            "measured dispatcher workers retired with VM identities unchanged",
-                        );
-                    }
+            for grouped in [false, true] {
+                if grouped && !grouped_ab {
+                    continue;
                 }
-                for (case, values) in samples.iter().enumerate() {
-                    let (mode, workers) = CASES[case];
-                    sample::emit(values, owners, (mode, workers), mixed, batch, smoke, jobs);
-                }
+                let executor = Executor::start(mode, workers, profile, grouped);
+                contracts(&pool, &executor, progress);
+                executor.finish();
+                observed(progress, "dispatcher contract workers retired");
             }
         }
-        for owner in 0..owners {
-            pool.dispatcher()
-                .submit_native_on(owner, |session| {
-                    let input = session.numeric_vector(&[7_i64])?;
-                    let output = session.call(&input)?;
-                    assert_eq!(session.copy_numeric::<i64>(&output)?, [0]);
-                    drop(output);
-                    drop(input);
-                    session.collect()?;
-                    assert_eq!(session.usage()?[3].to_bits(), 0.0_f64.to_bits());
-                    Ok(())
-                })
-                .unwrap()
-                .wait(GATE)
-                .unwrap();
-            observed(progress, "Scheme Actor services closed and roots balanced");
-        }
-        let receipt = pool.shutdown(GATE);
-        assert!(receipt.is_clean(), "{receipt:?}");
-        assert_eq!(receipt.joined, owners);
-        assert!(
-            receipt
-                .owners
-                .iter()
-                .all(|o| o.roots_before_cleanup == 0 && o.image_file_removed)
-        );
-        println!(
-            "{}",
-            json!({"event": "dispatch_cleanup", "owners": owners, "joined": receipt.joined, "roots": receipt.owners.iter().map(|o| o.roots_before_cleanup).collect::<Vec<_>>(), "files_removed": true})
-        );
-        observed(progress, "native Scheme owners retired");
+        comparison::run(&pool, smoke, profile, grouped_ab, progress);
+        finish(&mut pool, progress);
     }
+}
+fn finish(pool: &mut InstancePool, progress: &mpsc::Sender<&'static str>) {
+    let owners = pool.owners().len();
+    for owner in 0..owners {
+        pool.dispatcher()
+            .submit_native_on(owner, |session| {
+                let input = session.numeric_vector(&[7_i64])?;
+                let output = session.call(&input)?;
+                assert_eq!(session.copy_numeric::<i64>(&output)?, [0]);
+                drop(output);
+                drop(input);
+                session.collect()?;
+                assert_eq!(session.usage()?[3].to_bits(), 0.0_f64.to_bits());
+                Ok(())
+            })
+            .unwrap()
+            .wait(GATE)
+            .unwrap();
+        observed(progress, "Scheme Actor services closed and roots balanced");
+    }
+    let receipt = pool.shutdown(GATE);
+    assert!(receipt.is_clean(), "{receipt:?}");
+    assert_eq!(receipt.joined, owners);
+    assert!(
+        receipt
+            .owners
+            .iter()
+            .all(|o| o.roots_before_cleanup == 0 && o.image_file_removed)
+    );
+    println!(
+        "{}",
+        json!({"event": "dispatch_cleanup", "owners": owners, "joined": receipt.joined, "roots": receipt.owners.iter().map(|o| o.roots_before_cleanup).collect::<Vec<_>>(), "files_removed": true})
+    );
+    observed(progress, "native Scheme owners retired");
 }
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     assert!(
-        args.iter().all(|a| a == "--test" || a == "--bench"),
-        "supported arguments: --test, --bench"
+        args.iter()
+            .all(|a| a == "--test" || a == "--bench" || a == "--profile" || a == "--grouped-ab"),
+        "supported arguments: --test, --bench, --profile, --grouped-ab"
     );
     let (progress, events) = mpsc::channel();
     let watchdog = thread::spawn(move || {
@@ -189,7 +181,16 @@ fn main() {
             }
         }
     });
-    run(&progress, args.iter().any(|a| a == "--test"));
+    println!(
+        "{}",
+        json!({"event": "dispatch_configuration", "diagnostic": args.iter().any(|a| a == "--profile"), "grouped_ab": args.iter().any(|a| a == "--grouped-ab")})
+    );
+    run(
+        &progress,
+        args.iter().any(|a| a == "--test"),
+        args.iter().any(|a| a == "--profile"),
+        args.iter().any(|a| a == "--grouped-ab"),
+    );
     drop(progress);
     watchdog.join().unwrap();
 }

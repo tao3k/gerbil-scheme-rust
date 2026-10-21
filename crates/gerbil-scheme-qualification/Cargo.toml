@@ -10,7 +10,7 @@ actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tok
 instance-probe = ["dep:divan", "dep:tokio"]
 instance-library = ["instance-probe", "dep:gerbil-scheme", "gerbil-scheme/isolated-instances", "dep:serde_json", "dep:gerbil-scheme-python"]
 
-instance-dispatch = ["instance-library", "gerbil-scheme/tokio-dispatch", "dep:rayon"]
+instance-dispatch = ["instance-library", "gerbil-scheme/tokio-dispatch", "dep:rayon", "gerbil-scheme-python/owner-dispatch"]
 
 [dependencies]
 gerbil-scheme-python = { path = "../gerbil-scheme-python", default-features = false, features = ["c-abi"], optional = true }
@@ -66,6 +66,10 @@ required-features = ["instance-library"]
 [[bench]]
 name = "owner_dispatch"
 harness = false
+required-features = ["instance-dispatch"]
+
+[[test]]
+name = "owner_dispatch_faults"
 required-features = ["instance-dispatch"]
 
 [lints]

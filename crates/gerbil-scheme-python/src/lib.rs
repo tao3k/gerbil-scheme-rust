@@ -7,6 +7,8 @@
 
 mod backend;
 mod build_source;
+#[cfg(all(feature = "owner-dispatch", target_os = "macos"))]
+pub mod owner_dispatch;
 pub use build_source::build_source_root;
 mod owned_state;
 pub use owned_state::{OwnedState, StateError};

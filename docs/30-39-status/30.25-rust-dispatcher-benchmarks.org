@@ -237,3 +237,7 @@ long-term memory growth and general module unloading remain separate gates.
 This benchmark has no competing probes and does not repair global admission or
 prove zero RSS. Further optimization requires a repeated workload-specific
 bottleneck, followed by the same semantic and native acceptance controls.
+
+The subsequent stage attribution and optional owner-grouped A/B are recorded in
+[[file:30.26-rust-dispatch-costs-and-grouped-candidate.org][Rust dispatch costs and grouped candidate qualification]]. Cohorts and negative
+results are source/artifact-bound and do not replace the results above.

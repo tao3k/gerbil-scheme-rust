@@ -131,11 +131,14 @@ jobs:
       - name: Native Scheme capabilities and reuse
         run: cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --profile dev --locked -- --smoke
       - name: Native Rust dispatcher bench smoke
-        run: cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --grouped-ab
+          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --profile --grouped-ab
+          cargo test -p gerbil-scheme-qualification --features instance-dispatch --test owner_dispatch_faults --locked
       - name: Native owner Rust lint
         run: |
           cargo clippy -p gerbil-scheme --features external-program,isolated-instances,tokio-dispatch --lib --locked -- -D warnings
-          cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --bench owner_costs --bench owner_dispatch --locked -- -D warnings
+          cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --bench owner_costs --bench owner_dispatch --test owner_dispatch_faults --locked -- -D warnings
 
   # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
   # execution inside a VM. Restore this job only with a qualified SDK release.

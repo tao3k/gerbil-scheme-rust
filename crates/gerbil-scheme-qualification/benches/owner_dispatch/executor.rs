@@ -1,18 +1,20 @@
 //! Executors dispatch across owners; no executor worker enters a Scheme VM.
 use super::GATE;
 use gerbil_scheme::instances::{InstanceDispatcher, InstanceError};
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde_json::json;
 use std::{sync::mpsc, time::Instant};
 pub(super) type Completed = Result<(Vec<Vec<i64>>, Instant), InstanceError>;
 pub(super) type Job = (usize, Vec<Vec<i64>>);
-enum Engine {
+pub(super) enum Engine {
     Direct,
     Tokio(tokio::runtime::Runtime),
     Rayon(rayon::ThreadPool),
 }
 pub(super) struct Executor {
-    engine: Engine,
+    pub(super) engine: Engine,
+    pub profile: bool,
+    pub grouped: bool,
     pub name: &'static str,
     pub workers: usize,
     pub setup_ns: u128,
@@ -20,7 +22,7 @@ pub(super) struct Executor {
     stopped: mpsc::Receiver<String>,
 }
 impl Executor {
-    pub(super) fn start(name: &'static str, workers: usize) -> Self {
+    pub(super) fn start(name: &'static str, workers: usize, profile: bool, grouped: bool) -> Self {
         let started = Instant::now();
         let (ready, starts) = mpsc::channel();
         let (exit, stopped) = mpsc::channel();
@@ -70,6 +72,8 @@ impl Executor {
         assert_eq!(ids.len(), workers);
         Self {
             engine,
+            profile,
+            grouped,
             name,
             workers,
             setup_ns: started.elapsed().as_nanos(),
@@ -83,6 +87,12 @@ impl Executor {
         jobs: Vec<Job>,
         released: Instant,
     ) -> Vec<Completed> {
+        if self.profile {
+            return super::attribution::window(self, dispatch, jobs, released);
+        }
+        if self.grouped && self.name != "direct" {
+            return self.grouped_window(dispatch, jobs, released);
+        }
         let remaining = || GATE.saturating_sub(released.elapsed());
         let submit = |(owner, items)| {
             if released.elapsed() >= GATE {
@@ -131,6 +141,43 @@ impl Executor {
             }),
         }
     }
+    fn grouped_window(
+        &self,
+        dispatch: &InstanceDispatcher,
+        jobs: Vec<Job>,
+        released: Instant,
+    ) -> Vec<Completed> {
+        match &self.engine {
+            Engine::Tokio(runtime) => {
+                let dispatch = dispatch.clone();
+                runtime.block_on(gerbil_scheme_python::owner_dispatch::tokio_owner_window(
+                    jobs,
+                    released,
+                    GATE,
+                    move |owner, items| dispatch.submit_numeric_batch_async_on(owner, items, 1),
+                ))
+            }
+            Engine::Rayon(pool) => {
+                let tickets = gerbil_scheme_python::owner_dispatch::rayon_owner_submit(
+                    pool,
+                    jobs,
+                    |owner, items| {
+                        if released.elapsed() >= GATE {
+                            return Err(InstanceError::Timeout);
+                        }
+                        dispatch.submit_numeric_batch_on(owner, items, 1)
+                    },
+                );
+                tickets
+                    .into_iter()
+                    .map(|t| {
+                        t.and_then(|t| t.wait_completed(GATE.saturating_sub(released.elapsed())))
+                    })
+                    .collect()
+            }
+            Engine::Direct => unreachable!("direct A/A uses the unchanged direct window"),
+        }
+    }
     pub(super) fn finish(self) {
         let Self {
             engine,
@@ -139,6 +186,8 @@ impl Executor {
             starts,
             stopped,
             setup_ns,
+            profile: _,
+            grouped: _,
         } = self;
         let started = Instant::now();
         drop(engine);

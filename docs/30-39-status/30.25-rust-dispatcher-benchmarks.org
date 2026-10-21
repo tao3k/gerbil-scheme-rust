@@ -20,8 +20,9 @@ Python build/benchmark driver, Bash wrapper, JSON payload transport or translate
 Rust workload is introduced. The independent Rust invoice oracle and corpus are
 shared with =owner_costs= and the existing resource bench.
 
-Evidence and manifests remain outside Git at
-=/Users/guangtao/.local/state/gerbil-scheme-rust/20261021-baseline=.
+Evidence and manifests remain outside Git in
+a caller-selected directory (see the repository-relative
+[[file:../../crates/gerbil-scheme-qualification/benches/owner_dispatch/README.md][benchmark reproduction instructions]]).
 =rust-dispatch-manifest.json= records the source/API, executable and native image
 hashes, SDK path and separate capture identities. These results are not the
 Python ledger/resident-input application baseline and do not replace it.

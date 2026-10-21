@@ -142,7 +142,7 @@ Durable raw results and source/wheel identities are in
 outcomes.json and
 identity.json.
 The experimental wheels remain outside the repository, under
-=/private/tmp/gerbil-module-opt-20261019/=. O0 SHA256:
+a caller-selected external evidence directory. O0 SHA256:
 =6d99da0fce11d5042beadaec49118e369add32a8af0b5d9057e09d87d8460812=.
 
 * Follow-up: progress-supervised O2 completion

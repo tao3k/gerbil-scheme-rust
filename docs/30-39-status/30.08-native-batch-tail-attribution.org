@@ -184,8 +184,8 @@ process was present in the final paired before/after surveys; this remains a
 shared laptop and the surveys do not prove isolation throughout the run.
 
 #+begin_src sh
-env -u SDKROOT PATH=/Users/guangtao/.cargo/bin:/usr/bin:/bin:/opt/homebrew/bin \
+env -u SDKROOT \
   just bridge-instance-resources --scheduler-ab
-env -u SDKROOT PATH=/Users/guangtao/.cargo/bin:/usr/bin:/bin:/opt/homebrew/bin \
+env -u SDKROOT \
   just bridge-instance-resources --orders-profile
 #+end_src

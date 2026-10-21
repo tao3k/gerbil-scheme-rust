@@ -270,7 +270,7 @@ the 100,000-transfer encode control found 1,867 top-of-stack observations in
 the generated UTF-8 module out of 2,573 main-thread observations. This supports
 targeting the encoding loop rather than attributing the hotspot to allocation
 alone. That sampled run is diagnostic, not performance admission. The local
-stack receipt is `/private/tmp/bridge-utf8-phase-sample-20261011.txt`.
+stack receipt is `bridge-utf8-phase-sample-20261011.txt` (historical external evidence filename, not a repository resource).
 
 The next loop refinement replaces two surrogate-range comparisons with one
 aligned-block test (`codepoint >> 11 == 0x1b`). Surrogates are rejected within

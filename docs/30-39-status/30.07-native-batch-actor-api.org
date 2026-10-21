@@ -193,10 +193,10 @@ owner results must not be used to claim cross-owner scaling.
 * Reproduction and receipts
 
 #+begin_src sh
-env -u SDKROOT PATH=/Users/guangtao/.cargo/bin:/usr/bin:/bin:/opt/homebrew/bin \
+env -u SDKROOT \
   just bridge-instance-resources --orders
 # Existing native compatibility and lifecycle regression:
-env -u SDKROOT PATH=/Users/guangtao/.cargo/bin:/usr/bin:/bin:/opt/homebrew/bin \
+env -u SDKROOT \
   just bridge-instance-resources --smoke
 #+end_src
 

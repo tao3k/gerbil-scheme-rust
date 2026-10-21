@@ -96,7 +96,7 @@ host owners and complete producer allocation teardown.
 
 The Python/Rust + C ABI integration target passed 32 tests, zero ignored, in
 13.377 seconds including compilation, within the original 120-second cap.
-Raw receipt: `/private/tmp/ascent-c-abi-053-python001.json`.
+Raw receipt: `ascent-c-abi-053-python001.json` (historical external evidence filename, not a repository resource).
 Earlier compile and lint failures remain in the other `ascent-c-abi-053-*` receipts.
 These are local observations, not installed-wheel, ASCENT consumer, sealed review,
 current-graph, performance or published-Git qualification.

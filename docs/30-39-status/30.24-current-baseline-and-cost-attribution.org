@@ -7,7 +7,8 @@ The source baseline is =8c23217d1f838e71a972e606d6e38e6386f3b0a7=. Its six activ
 
 Scheme retains native types, Actors, green threads, hygienic macros, GC, exceptions and continuations through Gerbil -> Gambit C -> native O2. Rust only distributes work across fixed owners. Sessions sharing an owner share its Scheme state; a long native call occupies that owner's Rust entry queue while Scheme retains internal cooperative scheduling.
 
-The preceding raw =/private/tmp/gerbil-mapping-leases-20261020= captures and wheel are no longer available. This qualification rebuilds rather than claiming to reuse them. Evidence is stored outside Git under =/Users/guangtao/.local/state/gerbil-scheme-rust/20261021-baseline=.
+The raw captures and wheel from the historical =gerbil-mapping-leases-20261020= evidence set are no longer available. This qualification rebuilds rather than claiming to reuse them. New evidence is retained outside Git in a caller-selected directory (see the repository-relative
+[[file:../../crates/gerbil-scheme-qualification/benches/owner_dispatch/README.md][benchmark reproduction instructions]]).
 
 * Artifact admission
 

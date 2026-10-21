@@ -12,7 +12,8 @@ GC, dynamic bindings, exceptions and continuations. Production defaults, owner
 counts, worker counts, queue limits, deadlines and Scheme source remain unchanged.
 
 Evidence remains outside Git in
-=/Users/guangtao/.local/state/gerbil-scheme-rust/20261021-baseline=.
+a caller-selected directory (see the repository-relative
+[[file:../../crates/gerbil-scheme-qualification/benches/owner_dispatch/README.md][benchmark reproduction instructions]]).
 =dispatch-optimization-manifest.json= records source hashes, SDK identity, native
 image and the identical archived executable used in both final unprofiled cohorts.
 Earlier exploratory candidate and diagnostic captures retain separate identities.

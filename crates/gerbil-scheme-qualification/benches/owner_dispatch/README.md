@@ -114,3 +114,31 @@ window's last native completion. Raw per-window delivery/recovery arrays support
 pairing. Native response p99 and window-delivery p99 have different populations;
 their difference is not a recovery measurement. In particular, an isolated native
 straggler can be below the per-request p99 rank while dominating the window tail.
+
+
+## Portable evidence capture
+
+Run from the repository root with the documented Gerbil SDK and Rust toolchain
+available on `PATH`. Choose and create a writable directory outside the checkout,
+then set `EVIDENCE_DIR` to that directory in your shell. No particular host path
+is part of the benchmark contract. For a new capture:
+
+```sh
+just bridge-owner-dispatch-benchmark --grouped-ab > "$EVIDENCE_DIR/dispatch-ab.jsonl" 2> "$EVIDENCE_DIR/dispatch-ab.stderr"
+```
+
+Use `--test` for smoke or `--profile --grouped-ab` for a separate diagnostic
+capture, choosing distinct filenames. Keep raw captures and binaries outside Git.
+Record the Git commit and dirty diff, SDK/toolchain versions, exact invocation,
+exit status, host/load conditions and SHA-256 identities of the executable and
+native image actually used. Derive artifact identities from the build's output;
+do not assume a fixed Cargo executable hash suffix. Use repository-relative
+source names and evidence-directory-relative artifact names in shared manifests
+and reports. Redact host-specific paths before sharing tool output.
+
+Historical evidence filenames identify locally retained observations, not
+publicly available inputs. A filename or private storage location does not make
+an old run reproducible. Reproduction means building the specified source and
+running the stated command to obtain new captures; it does not promise identical
+timing or recover unavailable historical receipts. Keep original negative results,
+source/artifact hashes and missing-evidence boundaries intact.

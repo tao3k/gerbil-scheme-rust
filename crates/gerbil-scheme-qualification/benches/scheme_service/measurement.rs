@@ -15,16 +15,72 @@ pub(super) fn idle(pool: &InstancePool) {
         std::thread::yield_now();
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Comparison {
+    Service,
+    Combined,
+    ShortLayout,
+    ClassRouting,
+}
+impl Comparison {
+    pub(super) fn is_split(self) -> bool {
+        self != Self::Service
+    }
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::Service => "synchronous versus Scheme-owned service",
+            Self::Combined => "batch-short/FIFO versus native short/ready completion",
+            Self::ShortLayout => "same FIFO completion; batch-short versus native short",
+            Self::ClassRouting => {
+                "same native short/FIFO completion/quotas; fixed owner versus class-specific routing"
+            }
+        }
+    }
+}
+#[derive(Clone, Copy)]
+struct Strategy {
+    short_layout: bool,
+    ready_completion: bool,
+    class_routing: bool,
+}
+impl Strategy {
+    fn for_arm(comparison: Comparison, arm: bool) -> Self {
+        Self {
+            short_layout: comparison == Comparison::ClassRouting || (comparison.is_split() && arm),
+            ready_completion: comparison == Comparison::Combined && arm,
+            class_routing: comparison == Comparison::ClassRouting && arm,
+        }
+    }
+}
 pub(super) fn run(
     pool: &InstancePool,
     runtime: &tokio::runtime::Runtime,
     inputs: &Arc<Vec<Vec<i64>>>,
     probes: usize,
-    asynchronous: bool,
+    comparison: Comparison,
+    arm: bool,
 ) -> Value {
+    let strategy = Strategy::for_arm(comparison, arm);
+    let asynchronous = comparison != Comparison::Service || arm;
+    let split_pair = comparison.is_split();
     idle(pool);
+    let router = gerbil_scheme::instances::SchemeServiceRouter::new(
+        pool.dispatcher(),
+        gerbil_scheme::instances::SchemeRoutingConfig {
+            owners: vec![0, 1, 2, 3],
+            short_slots: 1,
+            batch_slots: 3,
+            short_max_work: 1,
+            batch_max_work: 8,
+        },
+    )
+    .unwrap();
+    let active_router = if strategy.class_routing {
+        Some(router.clone())
+    } else {
+        None
+    };
     let released = Instant::now();
-    let count = inputs.len();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
     let probe_dispatch = pool.dispatcher();
@@ -34,17 +90,49 @@ pub(super) fn run(
             bulk_inputs,
             asynchronous,
             released,
+            strategy.ready_completion,
+            split_pair,
+            active_router.clone(),
         ));
         let probes = runtime.spawn(workload::probes(
             probe_dispatch,
             probes,
             asynchronous,
             released,
+            strategy.short_layout,
+            active_router,
         ));
         (bulk.await.unwrap(), probes.await.unwrap())
     });
     let elapsed = released.elapsed().as_nanos();
     idle(pool);
+    assert!(
+        router
+            .loads()
+            .iter()
+            .all(|l| l.short_requests == 0 && l.batch_requests == 0 && l.batch_work == 0)
+    );
+    router.close();
+    summarize(
+        rows,
+        inputs,
+        &probe,
+        released,
+        elapsed,
+        asynchronous,
+        strategy,
+    )
+}
+fn summarize(
+    rows: Vec<gerbil_scheme_python::owner_dispatch::OwnerResult<workload::Reply>>,
+    inputs: &[Vec<i64>],
+    probe: &workload::Probes,
+    released: Instant,
+    elapsed: u128,
+    asynchronous: bool,
+    strategy: Strategy,
+) -> Value {
+    let count = inputs.len();
     let mut clocks = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
     let mut service = Vec::new();
     let mut construct = Vec::new();
@@ -67,8 +155,10 @@ pub(super) fn run(
                 .as_nanos(),
         );
         projection.push(completed.duration_since(reply.projection).as_nanos());
-        clocks[index / 4 % 4].extend([completed; 8]);
+        clocks[reply.owner].extend([completed; 8]);
     }
+    assert!(clocks.iter().all(|c| !c.is_empty()));
+    let owner_totals: Vec<_> = clocks.iter().map(Vec::len).collect();
     let end = *clocks.iter().flatten().max().unwrap();
     let first_done = *clocks
         .iter()
@@ -79,6 +169,15 @@ pub(super) fn run(
         .iter()
         .map(|c| c.iter().filter(|&&at| at <= first_done).count())
         .min()
+        .unwrap();
+    let progress_fraction = clocks
+        .iter()
+        .map(|c| {
+            let done = u32::try_from(c.iter().filter(|&&at| at <= first_done).count()).unwrap();
+            let total = u32::try_from(c.len()).unwrap();
+            f64::from(done) / f64::from(total)
+        })
+        .reduce(f64::min)
         .unwrap();
     let finish_spread = clocks
         .iter()
@@ -99,11 +198,11 @@ pub(super) fn run(
                 .collect()
         })
         .collect();
-    json!({"orders":count,"asynchronous":asynchronous,"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
+    json!({"orders":count,"asynchronous":asynchronous,"short_layout":strategy.short_layout,"ready_completion":strategy.ready_completion,"class_routing":strategy.class_routing,"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
         "bulk_owner_native_ns":owner_native_ns,"bulk_service_ns":service,"bulk_construct_ns":construct,
         "bulk_pending_before_projection_ns":pending,"bulk_projection_retirement_ns":projection,
-        "probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,
-        "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,
+        "probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
+        "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer})
 }
 fn quantile(samples: &[Value], field: &str, percent: usize) -> u128 {
@@ -128,7 +227,9 @@ pub(super) fn emit(samples: &[Value], arm: usize, mixed: bool) {
         "bulk_service_p99_ns":quantile(samples,"bulk_service_ns",99),"bulk_pending_p99_ns":quantile(samples,"bulk_pending_before_projection_ns",99),
         "probe_actual_p99_ns":quantile(samples,"probe_actual_ns",99),"probe_scheduled_p99_ns":quantile(samples,"probe_scheduled_ns",99),
         "probe_admission_p99_ns":quantile(samples,"probe_admission_ns",99),
+        "probe_construct_p99_ns":quantile(samples,"probe_construct_ns",99),"probe_pending_p99_ns":quantile(samples,"probe_pending_ns",99),"probe_projection_p99_ns":quantile(samples,"probe_projection_ns",99),
         "owner_progress_min":samples.iter().map(|s|s["owner_progress_at_first_done"].as_u64().unwrap()).min(),
+        "owner_progress_fraction_min":samples.iter().map(|s|s["owner_progress_fraction_min"].as_f64().unwrap()).reduce(f64::min),
         "owner_finish_spread_max_ns":samples.iter().map(|s|s["owner_finish_spread_ns"].as_u64().unwrap()).max(),
         "actor_peer_min":samples.iter().map(|s|s["actor_peer_min"].as_u64().unwrap()).min(),
         "probe_overlap_min":samples.iter().map(|s|s["probe_overlap"].as_u64().unwrap()).min()})

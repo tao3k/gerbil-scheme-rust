@@ -6,13 +6,15 @@ mod measurement;
 #[path = "scheme_service/workload.rs"]
 mod workload;
 use gerbil_scheme::instances::{InstanceConfig, InstancePool, IsolatedProgram};
+use measurement::Comparison;
 use serde_json::json;
 use std::{
     sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
 const GATE: Duration = Duration::from_secs(5);
-fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
+fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, comparison: Comparison) {
+    let split = comparison.is_split();
     // SAFETY: the build-owned image exports the admitted native service protocol.
     let program = unsafe {
         IsolatedProgram::from_image(
@@ -46,7 +48,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         "{}",
         json!({"event":"service_configuration","pool_startup_ns":startup.elapsed().as_nanos(),"sdk_setup_ns":pool.owners().iter().map(|r|r.setup_time.as_nanos()).collect::<Vec<_>>(),"owners":4,"states":identities,"rust_workers":2,"slots":4,"work":32,"batch":8,
         "quantum":1,"scheme_service_workers":4,"actor_workers_per_batch":4,"probe_interval_us":500,"defaults_changed":false,
-        "comparison":"same native constructor, handler, projection and VM; synchronous return versus Scheme-owned pending service"})
+        "split_layout_ab":split,"short_layout_only":comparison==Comparison::ShortLayout,"class_route_ab":comparison==Comparison::ClassRouting,"client_bulk_callbacks_per_owner":if split { Some(3) } else { None },"comparison":comparison.label()})
     );
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -61,7 +63,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         );
         let warm = Arc::new(inputs[..256].to_vec());
         for arm in [false, true] {
-            measurement::run(&pool, &runtime, &warm, 8, arm);
+            measurement::run(&pool, &runtime, &warm, 8, comparison, arm);
             progress.send("service warmup validated").unwrap();
         }
         let mut samples = [Vec::new(), Vec::new()];
@@ -73,6 +75,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
                         &runtime,
                         &inputs,
                         if smoke { 8 } else { 64 },
+                        comparison,
                         arm == 1,
                     );
                     println!(
@@ -105,7 +108,11 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
 }
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    assert!(args.iter().all(|s| s == "--test" || s == "--bench"));
+    assert!(args.iter().all(|s| s == "--test"
+        || s == "--bench"
+        || s == "--split-layout-ab"
+        || s == "--short-layout-only"
+        || s == "--class-route-ab"));
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
         let mut last = "start";
@@ -120,7 +127,25 @@ fn main() {
             }
         }
     });
-    run(&progress, args.iter().any(|s| s == "--test"));
+    assert!(
+        args.iter()
+            .filter(|s| matches!(
+                s.as_str(),
+                "--split-layout-ab" | "--short-layout-only" | "--class-route-ab"
+            ))
+            .count()
+            <= 1
+    );
+    let comparison = if args.iter().any(|s| s == "--class-route-ab") {
+        Comparison::ClassRouting
+    } else if args.iter().any(|s| s == "--short-layout-only") {
+        Comparison::ShortLayout
+    } else if args.iter().any(|s| s == "--split-layout-ab") {
+        Comparison::Combined
+    } else {
+        Comparison::Service
+    };
+    run(&progress, args.iter().any(|s| s == "--test"), comparison);
     drop(progress);
     watchdog.join().unwrap();
 }

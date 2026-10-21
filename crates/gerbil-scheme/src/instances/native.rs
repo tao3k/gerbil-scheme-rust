@@ -41,6 +41,11 @@ fn checked(code: i64, operation: &'static str) -> Result<(), InstanceError> {
     }
 }
 impl<'owner> NativeSession<'owner> {
+    /// Fixed owner index within the originating pool; not a transferable VM handle.
+    #[must_use]
+    pub fn owner_index(&self) -> usize {
+        self.image.receipt.owner
+    }
     /// Keep this owner's base and SDK-managed module code independently of heap roots.
     /// The lease does not authorize native calls after VM cleanup. Revoke
     /// VM-entering callbacks in the application's finalizer before cleanup.

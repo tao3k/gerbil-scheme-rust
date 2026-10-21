@@ -1,6 +1,10 @@
 //! Native Scheme-owned waiting, continuation affinity and close/error drain.
 #[path = "../benches/support/orders.rs"]
 mod corpus;
+#[path = "scheme_service/routing.rs"]
+mod routing;
+#[path = "scheme_service/short.rs"]
+mod short;
 use gerbil_scheme::instances::{
     InstanceConfig, InstanceDispatcher, InstanceError, InstancePool, IsolatedProgram, NativeRoot,
     NativeSession, NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest,
@@ -210,15 +214,20 @@ async fn wake_and_timeout(dispatch: &InstanceDispatcher, progress: &mpsc::Sender
     for _ in 0..8 {
         let mut short = batch(false);
         short.items.truncate(1);
+        short.items[0].truncate(14);
         let expected = short.items[0].clone();
         let offered = Instant::now();
-        let (reply, completed) = dispatch
-            .submit_scheme_service_backpressured_on(0, short, GATE)
-            .await
-            .unwrap()
-            .wait_completed(GATE)
-            .await
-            .unwrap();
+        let ticket = if wake_latencies.len() % 2 == 0 {
+            dispatch
+                .submit_scheme_service_backpressured_on(0, short::Short(expected.clone()), GATE)
+                .await
+        } else {
+            dispatch
+                .submit_scheme_service_backpressured_on(0, short, GATE)
+                .await
+        }
+        .unwrap();
+        let (reply, completed) = ticket.wait_completed(GATE).await.unwrap();
         corpus::verify(&expected, &reply[0]);
         wake_latencies.push(completed.duration_since(offered).as_nanos());
     }
@@ -361,6 +370,8 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     runtime.block_on(async {
         capabilities(&dispatch, &progress).await;
         wake_and_timeout(&dispatch, &progress).await;
+        short::completion_ready(&dispatch, &progress).await;
+        routing::contract(&dispatch, &progress).await;
         close_full(&mut pool, &progress).await;
     });
     drop(pool);

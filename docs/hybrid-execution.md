@@ -193,3 +193,34 @@ quarantines heap/code with an unsuccessful receipt. This is opt-in; defaults and
 ordinary native APIs are unchanged. See the
 [service protocol and directed measurements](30-39-status/30.33-scheme-owned-service-and-native-wake.org)
 for native acceptance, reused model limits and retained performance regressions.
+
+### Native short layout and ready completion observation
+
+Applications can implement a distinct bounded native short schema through the
+same `SchemeServiceRequest`, while keeping batch work on Scheme Actors. Schema
+selection must be explicit; short data size does not authorize Rust to schedule
+Scheme green threads. The qualification implements a four-line order/result
+schema alongside the existing full batch path.
+
+`owner_flow_ready_backpressured` in the Python/Rust client support library is an
+explicit flow API for asynchronous Scheme services. It can observe completed
+peers behind a pending head request and refill client window credits while
+preserving original output positions. Native capacity and root retirement remain
+owner-bound. Existing flow APIs and defaults remain unchanged. See
+[30.34 short layout and ready completion](30-39-status/30.34-short-layout-and-ready-completion.org)
+for the actual native acceptance, matched comparison and retained negatives.
+
+### Explicit short and batch route algorithms
+
+`SchemeServiceRouter` accepts an explicit `SchemeRoutingConfig` over selected
+owners and existing native budgets. `submit_short` prioritizes available short
+quota and request queue pressure; `submit_batch` prioritizes available batch
+quota and outstanding declared work. Router clones share class limits and
+load/cancellation guards. `RoutedSchemeTicket` retains the actual selected owner.
+Requests with a Scheme lane must keep the original fixed-owner API.
+
+This routes native work across VMs; Scheme owns execution and intra-VM scheduling.
+Class admission close drains through the existing native lifecycle protocol.
+The current opt-in heuristic has mixed-throughput and short-tail regressions, so
+it does not replace defaults or the prior accepted path. See the
+[class-routing qualification and negative results](30-39-status/30.35-class-specific-native-service-routing.org).

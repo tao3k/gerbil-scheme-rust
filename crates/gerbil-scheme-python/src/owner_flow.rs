@@ -62,6 +62,7 @@ where
         |owner, item| std::future::ready(submit(owner, item)),
         &mut observe,
         false,
+        false,
     )
     .await
 }
@@ -80,7 +81,23 @@ where
     F: FnMut(usize, T) -> A,
     A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
 {
-    drive(jobs, control, submit, &mut |_, _| {}, true).await
+    drive(jobs, control, submit, &mut |_, _| {}, true, false).await
+}
+/// Completion-ready variant for concurrent Scheme services. A slow earlier
+/// request does not block observing a later result or refilling client credits.
+/// Final output positions and per-owner admission order remain unchanged.
+/// This explicit API changes neither native capacity nor Scheme scheduling.
+pub async fn owner_flow_ready_backpressured<T, R, F, A>(
+    jobs: Vec<(usize, T)>,
+    control: FlowControl,
+    submit: F,
+) -> Vec<OwnerResult<R>>
+where
+    R: Send + 'static,
+    F: FnMut(usize, T) -> A,
+    A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
+{
+    drive(jobs, control, submit, &mut |_, _| {}, true, true).await
 }
 async fn drive<T, R, F, A, O>(
     jobs: Vec<(usize, T)>,
@@ -88,6 +105,7 @@ async fn drive<T, R, F, A, O>(
     mut submit: F,
     observe: &mut O,
     bounded_admission: bool,
+    ready_completion: bool,
 ) -> Vec<OwnerResult<R>>
 where
     R: Send + 'static,
@@ -95,7 +113,7 @@ where
     A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
     O: FnMut(usize, FlowStage),
 {
-    let mut flow = Flow::new(jobs, control, bounded_admission);
+    let mut flow = Flow::new(jobs, control, bounded_admission, ready_completion);
     poll_fn(|context| flow.poll(context, &mut submit, observe)).await;
     flow.finish()
 }
@@ -125,9 +143,15 @@ struct Flow<T, R> {
     cursor: usize,
     quota: usize,
     bounded_admission: bool,
+    ready_completion: bool,
 }
 impl<T, R: Send + 'static> Flow<T, R> {
-    fn new(jobs: Vec<(usize, T)>, control: FlowControl, bounded_admission: bool) -> Self {
+    fn new(
+        jobs: Vec<(usize, T)>,
+        control: FlowControl,
+        bounded_admission: bool,
+        ready_completion: bool,
+    ) -> Self {
         let count = jobs.len();
         let mut waiting: BTreeMap<usize, VecDeque<(usize, T)>> = BTreeMap::new();
         for (index, (owner, item)) in jobs.into_iter().enumerate() {
@@ -151,6 +175,7 @@ impl<T, R: Send + 'static> Flow<T, R> {
             cursor: 0,
             quota,
             bounded_admission,
+            ready_completion,
         }
     }
     fn finish(self) -> Vec<OwnerResult<R>> {
@@ -253,14 +278,28 @@ impl<T, R: Send + 'static> Flow<T, R> {
     {
         let mut progress = false;
         for lane in &mut self.lanes {
-            let Some(pending) = lane.active.front_mut() else {
+            // Register every pending receiver when opted in; otherwise an
+            // unready head can hide completed peers and strand client credits.
+            let width = if self.ready_completion {
+                lane.active.len()
+            } else {
+                1
+            };
+            let ready =
+                lane.active
+                    .iter_mut()
+                    .take(width)
+                    .enumerate()
+                    .find_map(|(position, pending)| {
+                        match pending.response.as_mut().poll(context) {
+                            Poll::Ready(result) => Some((position, result)),
+                            Poll::Pending => None,
+                        }
+                    });
+            let Some((position, result)) = ready else {
                 continue;
             };
-            let Poll::Ready(result) = pending.response.as_mut().poll(context) else {
-                continue;
-            };
-            let index = pending.index;
-            lane.active.pop_front();
+            let index = lane.active.remove(position).unwrap().index;
             self.slots[index] = Some(result);
             observe(index, FlowStage::Collected);
             self.remaining -= 1;

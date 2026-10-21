@@ -1,0 +1,158 @@
+#+TITLE: Native Short Layout and Completion-Ready Scheme Service Flow
+#+DATE: 2026-10-21
+
+* Starting evidence and CI repair
+
+This work continues PR #18 from =2cc3c66=. Exact-head
+[[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39580300337][CI 39580300337]] completed with four active jobs passing and two Bazel jobs
+failing; SMP was explicitly skipped. Both Bazel failures report stale tracked
+SCM input provenance after the previous =build.ss= addition. They are failures,
+not native runtime failures or successful remote acceptance.
+
+The repository's =just bridge-regenerate= updates and validates both tracked
+SCM provenance headers through the native Gerbil/Gambit build. Generated bodies
+are unchanged. No hand-stamped fingerprints, disabled validation, Bash addition,
+SDK patch, optimization downgrade or increased native progress gate is used.
+The subsequent exact-head CI is a separate gate.
+
+* Two application layouts with one complete Scheme runtime
+
+The previous short probe is a one-element native batch. It constructs a batch
+envelope, enters an Actor mailbox/barrier and creates/joins a coordinator for
+one order. The new application path uses a disjoint explicit native tag/version
+=[77,1]= plus one numeric order and returns one numeric result. Scheme executes
+the same =orders-handler/rank= order-line algorithm directly on a persistent
+Scheme service worker. It bypasses the batch coordinator, not Scheme execution.
+No classification depends on guessed runtime duration or input-length heuristics.
+
+The short entry accepts at most four order lines and rejects larger work. Its
+fixture is stateless; stateful sessions and continuations continue to use the
+existing stable Scheme Actor lane contract. The original batch quantum range,
+full service payloads, Actors, green threads, exceptions, continuations, GC,
+evaluator and native compile chain remain available. The application tag has two
+numeric header fields so it cannot collide with any valid one-field batch quantum.
+
+| Path | Input/result | Scheme execution | Completion protection |
+|------+--------------+------------------+-----------------------|
+| Explicit short | Tagged native order / numeric result | Existing order algorithm on service worker | Same internal strong job graph, take/root/project and retained native capacity |
+| Batch | Existing native batch envelope / result vector | Persistent Actor workers and existing coordinator barrier | Same service job and native capacity protocol |
+
+Both use the actual =SchemeServiceRequest= interface and
+=submit_scheme_service_backpressured_on=. The specialized application schema is
+not a second generic codec or a VM-less Rust implementation. Scheme selects its
+workers; Rust controls only host admission, native conversion/projection and
+cross-instance dispatch. Shared Scheme GC and non-yielding CPU computation still
+couple the two paths. A different layout alone is not latency isolation.
+
+* Completion head-of-line blocking
+
+The existing client flow polls only =lane.active.front_mut()=. If the first
+Scheme job waits while later jobs finish, the completed peers cannot be observed
+or return the client's invocation window credits. Native slot/work credits have
+already retired independently; the stuck credits are client flow credits.
+This is a concrete completion-collection dependency, not evidence of a slow GC.
+
+The explicit =owner_flow_ready_backpressured= API polls pending receivers and
+collects one ready result per owner per pass. Original result positions and
+per-owner admission order remain unchanged. Later completion can refill without
+waiting for the earliest job. Accepted work remains live through timeout/drop;
+native capacity still returns only after projection/root retirement. Existing
+flow APIs, backend selection and defaults are unchanged.
+
+The native regression holds the first Scheme batch on a latch, permits only two
+client in-flight tickets, and requires a completed peer to refill a third request
+before releasing that latch. It then checks outputs in their original positions.
+This independently validates the collection fix; it is not a timing benchmark.
+
+* Directed matched comparison
+
+Use one opt-in pair, not a VM/thread matrix:
+
+#+begin_src text
+just bridge-scheme-service-benchmark --test --split-layout-ab
+just bridge-scheme-service-benchmark --split-layout-ab
+#+end_src
+
+Both arms are asynchronous services on the same four VMs/image with two Tokio
+workers, native slots four/work 32, batch eight/quantum one, 8,192 48-line orders
+and 64 four-line probes at the same nominal schedule. Ten samples per arm/load
+alternate AB/BA. The control retains batch probes and FIFO completion observation;
+the candidate combines native short probes with completion-ready observation.
+This measures the combined pipeline, not independent per-component speedups.
+
+Both arms impose the same explicit client bulk cap of three callbacks per owner,
+held through projection. This leaves capacity for the one probe producer in this
+workload. Native credits and root retirement remain unchanged. This is not a
+pool-wide class quota against arbitrary independent producers. The client cap
+and compared paths differ from the earlier synchronous/service experiment;
+its results must not be spliced into the older baseline.
+
+Throughput uses median native bulk completion time. Short actual latency starts
+before admission; scheduled latency also retains delayed arrivals from the serial
+probe generator. Native short construction, pending-before-projection and
+projection spans are separate. Pending includes Scheme work, waits and owner
+interleaving; it does not isolate CPU execution. Per-owner finish maxima and
+progress, Actor peer minima, cleanup and all negative observations remain recorded.
+
+* Model and native boundary
+
+The existing lifecycle model is reused unchanged: its admitted jobs already
+permit arbitrary completion order and retain native roots/credits until retirement.
+This client completion observation and application layout introduce no new native
+ownership transition. The prior finite model pass is historical safety evidence;
+it does not replace current native GC, short-contract, latch/refill or drain tests.
+No second model or new unverified Scheme scheduler is introduced.
+
+The native test includes short requests while long handlers remain latched,
+forced GC, oversized short rejection, the completion-ready refill control,
+existing same-Actor multishot continuations and errors, backpressure and full close.
+The earlier retained test failure supplied a 48-line order to the new four-line
+entry. The fixture now uses the same four-line corpus as the benchmark; the
+contract is not weakened. That failed run remains a failure, not a clean drain
+receipt. Final gates and directed measurements follow below.
+
+* Retained intermediate measurements
+
+These comparisons precede the classified router. They qualify local layout and
+completion costs, not route selection or the final publication-source pipeline.
+Each full capture passes forty samples and native cleanup. Portable receipt
+names and source manifests remain outside Git. All defaults remain unchanged.
+
+** Combined short layout and ready observation
+
+| Capture/load | Throughput control -> candidate | Ratio | Short actual p99 ms | Short pending p99 ms | Batch p99 ms |
+|--------------+---------------------------------+-------+---------------------+----------------------+--------------|
+| A/CPU | 55,079 -> 75,909 | 1.38x | 24.68 -> 24.23 | 3.80 -> 3.45 | 9.52 -> 11.66 |
+| A/mixed | 16,927 -> 16,839 | 0.99x | 22.73 -> 15.49 | 5.24 -> 2.15 | 24.53 -> 23.99 |
+| B/CPU | 34,460 -> 57,348 | 1.66x | 24.20 -> 26.70 | 10.56 -> 6.43 | 12.08 -> 11.45 |
+| B/mixed | 19,440 -> 15,801 | 0.81x | 18.88 -> 15.53 | 7.57 -> 2.30 | 20.15 -> 26.56 |
+
+Benchmark SHA-256: =9976550f8ae647bc5517c0e54349c2949f8855885c115a405967f58f4b8c7ff1=.
+
+** Short layout only, identical FIFO observation
+
+| Capture/load | Throughput control -> candidate | Ratio | Short actual p99 ms | Short pending p99 ms | Batch p99 ms |
+|--------------+---------------------------------+-------+---------------------+----------------------+--------------|
+| A/CPU | 43,027 -> 34,774 | 0.81x | 31.98 -> 35.55 | 7.91 -> 4.47 | 11.28 -> 9.80 |
+| A/mixed | 24,139 -> 22,432 | 0.93x | 10.06 -> 14.49 | 4.24 -> 1.37 | 14.54 -> 15.25 |
+| B/CPU | 43,744 -> 29,674 | 0.68x | 29.92 -> 51.92 | 10.34 -> 8.32 | 12.62 -> 14.15 |
+| B/mixed | 18,426 -> 19,749 | 1.07x | 10.66 -> 15.83 | 4.02 -> 1.50 | 28.59 -> 20.92 |
+
+Benchmark SHA-256: =238fde54b183be192555f49275941862a9755832bbce71d6a93dd88bdce561f8=.
+
+The combined candidate loses approximately 0.5% / 19% mixed throughput. The
+layout-only candidate changes mixed throughput -7% / +7%, and worsens actual
+short p99 in both captures. These are not admitted mixed-throughput improvements.
+Short pending spans decrease, but the work before owner construction dominates
+the slowest probes: in the layout-only mixed candidate, 98% / 87% of summed
+latency among the slowest one percent is before construction. This is derived
+per observation from actual latency minus native service span, not subtraction
+of unrelated percentiles. It includes admission, host preparation, dispatch,
+owner queueing/wake and OS scheduling; it does not isolate those components.
+
+The concrete conclusion is that shorter native payload/Actor overhead does not
+solve route selection or pre-construction delay. Completion-ready behavior is
+validated functionally by the latch oracle, but the combined performance path
+remains explicit and unpromoted. The subsequent actual classified route API and
+its separate negative evidence are recorded in
+[[file:30.35-class-specific-native-service-routing.org][30.35 Class-specific native service routing]].

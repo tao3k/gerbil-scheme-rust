@@ -34,3 +34,64 @@ source archives outside Git. See the repository status report
 `docs/30-39-status/30.33-scheme-owned-service-and-native-wake.org` for matched
 measurements and negative results. This is not an old-default Python comparison
 or a claim that every CPU workload benefits.
+
+## Explicit short layout and completion-ready comparison
+
+```text
+just bridge-scheme-service-benchmark --test --split-layout-ab
+just bridge-scheme-service-benchmark --split-layout-ab
+```
+
+Both arms are asynchronous Scheme services on the same VMs. The control keeps
+single-element batch probes and FIFO client completion observation. The candidate
+uses a tagged native order/result layout for probes and the actual opt-in
+`owner_flow_ready_backpressured` API for bulk completion observation. This is a
+combined pipeline comparison, not independent attribution of each component.
+Both arms impose the same explicit client bulk limit of three callbacks per
+owner through projection, retaining the existing four native slots/work 32.
+This leaves capacity for the one probe producer in this workload. It is not a
+pool-wide reserved class quota against arbitrary independent producers.
+
+The application's tag/version `[77,1]` is disjoint from every valid one-element
+batch quantum header. It accepts at most four order lines and returns one native
+numeric vector. Larger work is rejected at that entry; the full generic service,
+batch Actor, evaluator and continuation capabilities remain available. Scheme
+selects and executes the service worker; Rust does not execute the order logic.
+Native short construction, pending and projection spans are retained separately.
+The pool still shares Scheme workers and GC: this layout is not preemption or
+complete latency isolation from CPU-bound non-yielding handlers.
+
+The combined pipeline is not automatically admitted for performance. To isolate
+short layout while retaining FIFO client observation and the same three-callback
+bulk cap in both arms:
+
+```text
+just bridge-scheme-service-benchmark --test --short-layout-only
+just bridge-scheme-service-benchmark --short-layout-only
+```
+
+This targeted follow-up addresses the mixed-throughput regression observed in
+the combined candidate; it adds no VM/thread matrix. Keep both comparisons and
+all negative captures under their own source identities.
+
+## Classified route algorithms
+
+```text
+just bridge-scheme-service-benchmark --test --class-route-ab
+just bridge-scheme-service-benchmark --class-route-ab
+```
+
+This pair keeps native short layout and FIFO completion identical. The fixed
+control uses the same three-batch/one-short bound as the candidate's actual
+`SchemeServiceRouter`; only the candidate selects destinations through the
+explicit short queue-pressure and batch declared-work algorithms. Owner clocks
+come from `NativeSession::owner_index`, with normalized progress and actual
+assigned totals retained. Configuration is opt-in and shared by router clones.
+Independent routers/unclassified native callers do not share its class quotas.
+
+The current route heuristic regresses mixed throughput and short p99 despite
+better normalized owner progress. It is experimental, not a default promotion.
+See `docs/30-39-status/30.35-class-specific-native-service-routing.org` for the
+actual routing API, native quota/cancellation/close checks and complete negatives.
+Cross-instance routing and Scheme-owned short-queue scheduling are separate
+problems; this comparison does not implement or qualify the latter.

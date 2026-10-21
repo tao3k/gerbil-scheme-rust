@@ -2,11 +2,11 @@
 use super::{GATE, corpus};
 use gerbil_scheme::instances::{
     AsyncInstanceTicket, InstanceDispatcher, InstanceError, NativeRoot, NativeSession,
-    NumericServiceBatch, SchemeServiceRequest,
+    NumericServiceBatch, SchemeServiceRequest, SchemeServiceRouter,
 };
 use gerbil_scheme_python::{
     owner_dispatch::{OwnerResult, WindowBudget},
-    owner_flow::{FlowControl, owner_flow_backpressured},
+    owner_flow::{FlowControl, owner_flow_backpressured, owner_flow_ready_backpressured},
 };
 use std::{
     sync::Arc,
@@ -15,6 +15,7 @@ use std::{
 #[derive(Debug)]
 pub(super) struct Reply {
     pub values: Vec<Vec<i64>>,
+    pub owner: usize,
     pub entered: Instant,
     pub constructed: Instant,
     pub projection: Instant,
@@ -23,6 +24,8 @@ struct Orders {
     request: NumericServiceBatch<i64>,
     entered: Option<Instant>,
     constructed: Option<Instant>,
+    short_layout: bool,
+    _bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 }
 impl SchemeServiceRequest for Orders {
     type Output = Reply;
@@ -34,7 +37,14 @@ impl SchemeServiceRequest for Orders {
         session: &NativeSession<'vm>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.entered = Some(Instant::now());
-        let value = self.request.construct(session)?;
+        let value = if self.short_layout {
+            assert_eq!(self.request.items.len(), 1);
+            let tag = session.numeric_vector(&[77_i64, 1])?;
+            let input = session.numeric_vector(&self.request.items[0])?;
+            session.vector(&[&tag, &input])?
+        } else {
+            self.request.construct(session)?
+        };
         self.constructed = Some(Instant::now());
         Ok(value)
     }
@@ -44,30 +54,60 @@ impl SchemeServiceRequest for Orders {
         output: &NativeRoot<'_>,
     ) -> Result<Reply, InstanceError> {
         let projection = Instant::now();
-        let values = self.request.project(session, output)?;
+        let values = if self.short_layout {
+            vec![session.copy_numeric(output)?]
+        } else {
+            self.request.project(session, output)?
+        };
         Ok(Reply {
             values,
+            owner: session.owner_index(),
             entered: self.entered.unwrap(),
             constructed: self.constructed.unwrap(),
             projection,
         })
     }
 }
-pub(super) async fn submit(
-    dispatch: InstanceDispatcher,
-    owner: usize,
+fn orders(
     items: Vec<Vec<i64>>,
-    asynchronous: bool,
-    timeout: Duration,
-) -> Result<AsyncInstanceTicket<Reply>, InstanceError> {
-    let request = Orders {
+    short_layout: bool,
+    bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
+) -> Orders {
+    Orders {
         request: NumericServiceBatch {
             items,
             yield_every: 1,
         },
         entered: None,
         constructed: None,
+        short_layout,
+        _bulk_permit: bulk_permit,
+    }
+}
+async fn routed(
+    router: &SchemeServiceRouter,
+    items: Vec<Vec<i64>>,
+    short_layout: bool,
+    timeout: Duration,
+) -> Result<AsyncInstanceTicket<Reply>, InstanceError> {
+    let request = orders(items, short_layout, None);
+    let selected = if short_layout {
+        router.submit_short(request, timeout).await?
+    } else {
+        router.submit_batch(request, timeout).await?
     };
+    Ok(selected.ticket)
+}
+pub(super) async fn submit(
+    dispatch: InstanceDispatcher,
+    owner: usize,
+    items: Vec<Vec<i64>>,
+    asynchronous: bool,
+    short_layout: bool,
+    timeout: Duration,
+    bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
+) -> Result<AsyncInstanceTicket<Reply>, InstanceError> {
+    let request = orders(items, short_layout, bulk_permit);
     if asynchronous {
         dispatch
             .submit_scheme_service_backpressured_on(owner, request, timeout)
@@ -95,38 +135,82 @@ pub(super) async fn bulk(
     inputs: Arc<Vec<Vec<i64>>>,
     asynchronous: bool,
     released: Instant,
+    ready_completion: bool,
+    split_pair: bool,
+    router: Option<SchemeServiceRouter>,
 ) -> Vec<OwnerResult<Reply>> {
     let jobs = inputs
         .chunks(8)
         .enumerate()
         .map(|(index, items)| (index / 4 % 4, items.to_vec()))
         .collect();
-    owner_flow_backpressured(
-        jobs,
-        FlowControl {
-            budget: WindowBudget {
-                released,
-                timeout: GATE,
-            },
-            maximum_in_flight: 128,
+    let control = FlowControl {
+        budget: WindowBudget {
+            released,
+            timeout: GATE,
         },
-        move |owner, items| {
+        maximum_in_flight: 128,
+    };
+    // Equal explicit client admission cap in both split-layout arms. This
+    // producer cannot occupy all four native request slots with bulk callbacks.
+    let limits: Arc<Vec<_>> = Arc::new(
+        (0..4)
+            .map(|_| Arc::new(tokio::sync::Semaphore::new(3)))
+            .collect(),
+    );
+    let submitter = move |owner: usize, items| {
+        let limit = Arc::clone(&limits[owner]);
+        let dispatch = dispatch.clone();
+        let router = router.clone();
+        async move {
+            if let Some(router) = router {
+                return routed(
+                    &router,
+                    items,
+                    false,
+                    GATE.saturating_sub(released.elapsed()),
+                )
+                .await;
+            }
+            let permit = if split_pair {
+                Some(
+                    tokio::time::timeout(
+                        GATE.saturating_sub(released.elapsed()),
+                        limit.acquire_owned(),
+                    )
+                    .await
+                    .map_err(|_| InstanceError::Timeout)?
+                    .map_err(|_| InstanceError::Closed)?,
+                )
+            } else {
+                None
+            };
             submit(
-                dispatch.clone(),
+                dispatch,
                 owner,
                 items,
                 asynchronous,
+                false,
                 GATE.saturating_sub(released.elapsed()),
+                permit,
             )
-        },
-    )
-    .await
+            .await
+        }
+    };
+    if ready_completion {
+        owner_flow_ready_backpressured(jobs, control, submitter).await
+    } else {
+        owner_flow_backpressured(jobs, control, submitter).await
+    }
 }
 pub(super) struct Probes {
     pub actual: Vec<u128>,
     pub scheduled: Vec<u128>,
     pub admission: Vec<u128>,
     pub service: Vec<u128>,
+    pub construct: Vec<u128>,
+    pub pending: Vec<u128>,
+    pub projection: Vec<u128>,
     pub completed: Vec<Instant>,
 }
 pub(super) async fn probes(
@@ -134,12 +218,17 @@ pub(super) async fn probes(
     count: usize,
     asynchronous: bool,
     released: Instant,
+    short_layout: bool,
+    router: Option<SchemeServiceRouter>,
 ) -> Probes {
     let mut values = Probes {
         actual: Vec::new(),
         scheduled: Vec::new(),
         admission: Vec::new(),
         service: Vec::new(),
+        construct: Vec::new(),
+        pending: Vec::new(),
+        projection: Vec::new(),
         completed: Vec::new(),
     };
     for id in 0..count {
@@ -148,14 +237,26 @@ pub(super) async fn probes(
         let start = Instant::now();
         let mut input = corpus::order(100_000 + id, false);
         input.truncate(14);
-        let ticket = submit(
-            dispatch.clone(),
-            id % 4,
-            vec![input.clone()],
-            asynchronous,
-            GATE.saturating_sub(released.elapsed()),
-        )
-        .await
+        let ticket = if let Some(router) = router.as_ref() {
+            routed(
+                router,
+                vec![input.clone()],
+                true,
+                GATE.saturating_sub(released.elapsed()),
+            )
+            .await
+        } else {
+            submit(
+                dispatch.clone(),
+                id % 4,
+                vec![input.clone()],
+                asynchronous,
+                short_layout,
+                GATE.saturating_sub(released.elapsed()),
+                None,
+            )
+            .await
+        }
         .unwrap();
         values.admission.push(start.elapsed().as_nanos());
         let (reply, completed) = ticket
@@ -172,6 +273,18 @@ pub(super) async fn probes(
         values
             .service
             .push(completed.duration_since(reply.entered).as_nanos());
+        values
+            .construct
+            .push(reply.constructed.duration_since(reply.entered).as_nanos());
+        values.pending.push(
+            reply
+                .projection
+                .duration_since(reply.constructed)
+                .as_nanos(),
+        );
+        values
+            .projection
+            .push(completed.duration_since(reply.projection).as_nanos());
         values.completed.push(completed);
     }
     values

@@ -52,3 +52,8 @@ mod service_loop;
 mod service_wake;
 #[cfg(feature = "tokio-dispatch")]
 pub use service::{NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest};
+
+#[cfg(feature = "tokio-dispatch")]
+mod routing;
+#[cfg(feature = "tokio-dispatch")]
+pub use routing::{RoutedSchemeTicket, SchemeRouteLoad, SchemeRoutingConfig, SchemeServiceRouter};

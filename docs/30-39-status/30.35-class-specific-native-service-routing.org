@@ -1,0 +1,161 @@
+#+TITLE: Class-Specific Native Scheme Service Routing
+#+DATE: 2026-10-21
+
+* Scope and actual API
+
+This continues PR #18 from =2cc3c66=. Its native owner and finite model CI passed,
+while both Bazel jobs failed stale SCM provenance. The native
+=just bridge-regenerate= repair and the preceding layout/collection experiments
+are documented in [[file:30.34-short-layout-and-ready-completion.org][30.34]]. A new exact-head CI remains a separate gate.
+
+=SchemeServiceRouter= is an explicit library API over the existing dispatcher.
+Its =SchemeRoutingConfig= names owners and independent short/batch slot and
+maximum declared-work bounds. =submit_short= and =submit_batch= select distinct
+algorithms. =RoutedSchemeTicket= reports the selected owner and the existing typed
+ticket. =NativeSession::owner_index= lets native results identify their real owner;
+it is an index within the originating pool, not a transferable runtime handle.
+
+Classification is explicit at the caller. No payload-length heuristic, silent
+fallback, Scheme-to-Rust translation or new default scheduler is introduced.
+Requests needing Scheme lane affinity are rejected by the stateless router;
+stateful sessions and continuations keep their existing fixed owner/lane API.
+Scheme continues to own its workers, Actor mailboxes, timers, exceptions, GC,
+continuations and native execution. Rust selects the instance before native
+construction and handles host admission/projection.
+
+* Two route policies
+
+All decisions exclude closed/failed owners observed before selection. Owners
+with remaining class quota precede saturated destinations. Selection/debit is
+serialized across router clones, and each class rotates ties independently.
+
+| Class | Remaining score in priority order | Intent |
+|-------+-----------------------------------+--------|
+| Short | Pending short requests, total pending request count, declared batch work | Reduce short-class admission and request queue pressure |
+| Batch | Outstanding declared batch work, batch request count, short count | Balance declared bulk work under its own quota |
+
+These scores include routing/admission waits and accepted requests until
+projection/failure. They are heuristics over declared work and queue pressure,
+not a prediction of CPU duration, native wait phase, GC pause or OS wake cost.
+Correct classification/quota behavior does not imply optimal short p99. The
+current negative performance evidence below is part of this API's qualification.
+
+* Protected admission and lifetime
+
+Each configured owner has independent short and batch callback semaphores shared
+by clones of one router. Configuration checks positive bounds, distinct existing
+service owners, slot sum and worst declared work sum against already configured
+native owner budgets. The measured configuration uses one short and three batch
+callbacks, maximum work one/eight: four class slots and worst work 25 fit native
+slots four/work 32. These are explicit invocation settings, not new defaults.
+
+Queue/load guards exist before native construction. Timeout, cancellation and
+admission failure drop those guards without creating a Scheme graph. Accepted
+messages retain their class permit through native projection/failure, even when
+the receiver is dropped. Existing native capacity remains independently charged
+until root retirement; class permits never authorize earlier native root release.
+
+=close= closes class semaphores and wakes their queued waiters. Class reservations
+already granted may finish native admission/execution. Drain those tickets, then
+use the pool's existing close fence and Scheme prepare/drain/join protocol. Owner
+close races report failure without replaying possibly executed Scheme effects.
+
+Protection applies to one shared router and its cooperating class callers. Direct
+dispatcher calls, independent routers and later native budget reconfiguration can
+bypass this class contract; they still obey native capacity/root rules. Keep native
+budgets fixed while using this router. This is not a global class reservation
+against arbitrary native API consumers, and it is not a real-time deadline proof.
+
+* Native acceptance and reused model boundary
+
+The native fixture pins real long Scheme work behind latches. It validates
+different short/batch choices with deliberately unequal work/request counts,
+class saturation with free capacity elsewhere, short admission while both owners'
+batch quotas are full, invalid slot/work configurations and stateful lane rejection.
+It also checks class admission timeout, cancellation rollback, an abandoned
+accepted receiver, close waking queued work, retained accepted loads during close,
+correct native outputs and zero final routing charges. The full service test
+then joins all four owners with zero external roots, removed copied image files
+and returned descriptor counts. GC, multishot continuations, Scheme errors and
+Rust panic controls remain native checks.
+
+Current strict core Tokio/non-Tokio and qualification all-target lint pass. The
+service/capacity/fault/producer native targets pass; the current service fixture is
+repeated after final lint edits. Five-second progress gates and the =-O2= native
+chain are unchanged. Initial Rust module-owner/dependency-cycle gate failures
+were repaired by an interface-only module and a shared contract leaf, not waivers.
+A test initially used an unavailable Tokio selection macro; it now uses the
+existing timeout feature without expanding runtime dependencies.
+
+The existing native lifecycle model is reused unchanged. Selection fixes an owner
+before admission, matching its assigned-owner assumption; native root/credit
+retirement is unchanged. Client class guards add an admission refinement, not a
+new Scheme root authority. The prior model pass is historical finite safety
+support. Class score optimality, OS wake/liveness and the new class ledger are
+not separately model-checked or claimed from that pass; the current class
+cancellation/close checks above are executable native evidence.
+
+* Matched routing comparison
+
+#+begin_src text
+just bridge-scheme-service-benchmark --test --class-route-ab
+just bridge-scheme-service-benchmark --class-route-ab
+#+end_src
+
+Both arms use the same four VMs/image, two Tokio workers, native slots four/work
+32, batch eight/quantum one, native four-line short layout and FIFO client
+completion observation. The control keeps fixed owner grouping/round-robin probes
+with a three-callback batch cap. The candidate uses the actual class router with
+matching one-short/three-batch quotas. It does not combine the previously regressed
+completion-ready experiment. Ten samples per arm/load alternate AB/BA on the
+same 8,192 orders and 64 probes. This is one directed routing pair, not a new
+thread/VM matrix. Earlier source-bound layout comparisons remain above.
+
+Native owner attribution now follows the actual execution owner rather than the
+original routing hint. Dynamic routing changes assigned owner totals, so fairness
+also reports progress divided by that owner's actual total at the first owner's
+finish. Raw totals and completion clocks remain in private receipts. This is
+finite progress evidence, not a starvation or OS fairness proof.
+
+* Routing results: not admitted for mixed-load performance
+
+| Capture/load | Throughput fixed -> class orders/s | Ratio | Short actual p99 ms | Batch p99 ms | Minimum normalized owner progress |
+|--------------+-----------------------------------+-------+---------------------+--------------+-----------------------------------|
+| A/CPU | 109,183 -> 139,556 | 1.28x | 6.23 -> 8.18 | 2.90 -> 1.29 | 75.4% -> 98.4% |
+| A/mixed | 22,031 -> 21,429 | 0.97x | 5.83 -> 8.90 | 12.85 -> 14.43 | 59.8% -> 98.8% |
+| B/CPU | 87,371 -> 201,641 | 2.31x | 12.49 -> 8.85 | 2.68 -> 4.52 | 79.3% -> 97.9% |
+| B/mixed | 28,279 -> 20,376 | 0.72x | 4.00 -> 7.56 | 9.48 -> 13.42 | 76.6% -> 98.2% |
+
+CPU throughput and normalized owner progress improve in both captures. Mixed
+throughput falls approximately 3% / 28%; mixed short p99 worsens approximately
+53% / 89%, and mixed batch p99 also increases. Actor peer minima are zero in both
+arms. Mixed owner finish spread changes 254.43 -> 21.51 ms and
+38.44 -> 45.40 ms; it is not uniformly better. These results do not satisfy the
+requirement to preserve mixed throughput while improving short tails.
+
+Consequently the router remains explicit and experimental. No default or prior
+accepted mixed-load path is replaced. Outstanding work count cannot distinguish
+Scheme computation from timer/event waits, and the current route scores do not
+measure owner wake/dispatch readiness. Those are concrete gaps in the heuristic;
+they are not proved to explain every regression. The next short-request work
+must distinguish cross-instance routing from Scheme-owned short-queue scheduling,
+service budget, wake and completion behavior. A different layout or a balanced
+final owner progress chart is insufficient evidence of solved short latency.
+
+The current implementation provides classified routing and native lifecycle
+closure, not a completed Scheme priority-queue/service-budget protocol or an
+optimal performance claim. Scheme retains all execution capabilities. No further
+matrix, automatic tuning, CPU policy or default promotion is performed.
+
+* Evidence identity
+
+Four final smoke modes and two full routing captures pass. Each full routing
+capture has forty samples/four summaries and four clean native joins, zero
+external roots, successful Scheme service quiescence and removed copied image
+files. Raw logs, source archives and binaries stay outside Git. Portable receipts
+are =class-route-{a,b}.jsonl=, =class-route-manifest.json= and
+=class-route-source.tar.gz=. The manifest binds 202 current source inputs.
+
+Benchmark SHA-256: =b732581e8393995956531b45bca934771d3f5f428f20256b9e02096ec4f2c9c9=.
+
+Native image SHA-256: =0388f9a2db5a35618640faeb21c307b5c6e394e4b37daa9617b3939333333bc5=.

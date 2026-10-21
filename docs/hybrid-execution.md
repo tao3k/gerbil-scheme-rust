@@ -241,3 +241,25 @@ identity. `just bridge-regenerate` owns updates. No hash is embedded in a commen
 inside its own artifact. This is integrity/input-provenance validation, not proof
 that independently compiled output is byte-identical: Gerbil embeds a compilation
 timestamp. The native build and qualification gates remain separate.
+
+
+### Shared resources, explicit feed bounds and observation
+
+Separate short queues and worker quotas do not isolate a VM's CPU or GC.
+`InstanceDispatcher::configure_scheme_service_feed_on(owner, maximum)` is an
+opt-in input-publication bound, with idle native-capacity validation. It feeds
+immediately available FIFO service inputs before advancing Scheme and never
+waits to fill a batch. The default remains one. This does not interrupt arbitrary
+Scheme code, migrate Actors or schedule Scheme green threads in Rust.
+
+`observe_scheme_service_on(owner)` enables optional owner phase diagnostics;
+`scheme_service_observation_on(owner)` returns a ticket for an owned snapshot.
+Counters cover advance, wait, submit and retire wall/SDK thread CPU/GC spans.
+Native waits may include Scheme work, blocked select and OS descheduling; these
+spans do not identify pure OS delay. Observation is disabled by default.
+
+The reused lifecycle model now contains shared-resource counterexamples and a
+separate candidate cooperative CPU/class-debt policy. The latter is not an
+implemented general execution-time guarantee. See the
+[shared-resource refinement and directed feed qualification](30-39-status/30.37-shared-resource-refinement-and-owner-feed.org)
+and [model boundaries](../specs/owner_lifecycle.md#shared-vm-resources-and-scheduling-refinement).

@@ -34,6 +34,26 @@ fn control(image: &Image, header: &[i64]) -> Result<Vec<i64>, InstanceError> {
     );
     result.unwrap()
 }
+fn observed<T>(
+    image: &Image,
+    wake: &Wake,
+    phase: super::SchemeServicePhase,
+    action: impl FnOnce() -> T,
+) -> T {
+    let Some(monitor) = wake.observation.get() else {
+        return action();
+    };
+    monitor.measure(
+        phase,
+        || {
+            let read = image.native.diagnostics?;
+            let mut values = [0.0; 6];
+            // SAFETY: audited native counters on this active fixed owner, no Scheme entry.
+            (unsafe { read(values.as_mut_ptr()) } == 0).then_some(values)
+        },
+        action,
+    )
+}
 pub(super) fn open(
     image: &Image,
     reader: &Reader,
@@ -86,12 +106,18 @@ struct Pump<'a> {
     output: usize,
     jobs: BTreeMap<JobId, Pending>,
     producer: Option<Box<dyn super::batch_stream_runner::Producer>>,
+    wake: &'a Wake,
 }
 impl Pump<'_> {
     fn receive(&mut self, request: Request) -> Result<(), InstanceError> {
         request.started.store(true, Ordering::Release);
         match request.work {
-            Work::Service(mut job) => match job.start(self.image, self.input, self.output) {
+            Work::Service(mut job) => match observed(
+                self.image,
+                self.wake,
+                super::SchemeServicePhase::Submit,
+                || job.start(self.image, self.input, self.output),
+            ) {
                 Ok(id) => {
                     if self.jobs.contains_key(&id) {
                         job.fail(InstanceError::InvalidConfig(
@@ -132,17 +158,52 @@ impl Pump<'_> {
         Ok(())
     }
     fn collect(&mut self) -> Result<(), InstanceError> {
-        for raw in control(self.image, &[3])? {
+        for raw in observed(
+            self.image,
+            self.wake,
+            super::SchemeServicePhase::Advance,
+            || control(self.image, &[3]),
+        )? {
             let id = JobId(raw);
             let pending = self.jobs.remove(&id).ok_or(InstanceError::InvalidConfig(
                 "unknown Scheme service completion",
             ))?;
-            pending
-                .job
-                .complete(self.image, id, self.input, self.output);
+            observed(
+                self.image,
+                self.wake,
+                super::SchemeServicePhase::Retire,
+                || {
+                    pending
+                        .job
+                        .complete(self.image, id, self.input, self.output);
+                },
+            );
             // The retained work/slot permit drops only after projection/root balance.
         }
         Ok(())
+    }
+    fn feed(
+        &mut self,
+        first: Request,
+        requests: &mpsc::Receiver<Request>,
+        maximum: usize,
+    ) -> Result<(), InstanceError> {
+        let mut request = first;
+        for index in 0..maximum {
+            self.receive(request)?;
+            if index + 1 == maximum {
+                return self.collect();
+            }
+            match requests.try_recv() {
+                Ok(next) if matches!(&next.work, Work::Service(_)) => request = next,
+                Ok(next) => {
+                    self.collect()?;
+                    return self.receive(next);
+                }
+                Err(_) => return self.collect(),
+            }
+        }
+        unreachable!("positive validated feed bound")
     }
     fn drive(
         &mut self,
@@ -153,6 +214,15 @@ impl Pump<'_> {
         let mut draining = false;
         loop {
             let incoming = requests.try_recv().ok();
+            let feed_limit = wake.feed_limit.load(Ordering::Acquire);
+            if feed_limit > 1
+                && incoming
+                    .as_ref()
+                    .is_some_and(|request| matches!(&request.work, Work::Service(_)))
+            {
+                self.feed(incoming.unwrap(), requests, feed_limit)?;
+                continue;
+            }
             // Publish an already-admitted short payload before entering Scheme's
             // next green-thread turn. Do not leave it in Rust while yielding.
             // The FIFO inbox order is unchanged; Scheme still chooses execution.
@@ -221,7 +291,12 @@ impl Pump<'_> {
                 continue;
             }
             let micros = i64::try_from(remaining.as_micros()).unwrap_or(i64::MAX);
-            control(self.image, &[4, micros])?;
+            observed(
+                self.image,
+                self.wake,
+                super::SchemeServicePhase::Wait,
+                || control(self.image, &[4, micros]),
+            )?;
         }
     }
 }
@@ -238,6 +313,7 @@ pub(super) fn run(
         output: maximum_output,
         jobs: BTreeMap::new(),
         producer: None,
+        wake,
     };
     // Application input bounds are also enforced by each admitted dispatcher.
     let result = pump.drive(requests, wake);

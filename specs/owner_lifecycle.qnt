@@ -385,3 +385,260 @@ module owner_lifecycle_small {
 module owner_lifecycle_wide {
   import owner_lifecycle(JOBS = Set(1, 2, 3, 4, 5), ASSIGNED = Set(1, 2, 3, 4, 5).mapBy(r => if (Set(2, 4).contains(r)) 2 else 1)).*
 }
+
+// Refinement of the existing lifecycle, not another root/capacity model.
+// Two single-processor VMs, two persistent Scheme workers each. Ticks are
+// abstract delay observations, NOT milliseconds. OS/GC progress is external.
+module service_sharing {
+  const JOBS: Set[int]
+  const ASSIGNED: int -> int
+  import owner_lifecycle(JOBS = JOBS, ASSIGNED = ASSIGNED) as life
+  val owners = Set(1, 2)
+  val workers = Set(1, 2, 3, 4)
+  val shortJobs = Set(3, 4)
+  def workerOwner(w: int): int = if (w <= 2) 1 else 2
+  type Shared = {
+    host: List[int], queued: List[int], jobs: int -> int, cpu: int -> int,
+    left: int -> int, spent: int -> int, lastShort: int -> bool, debt: int -> bool,
+    blocked: Set[int], gc: Set[int], paused: Set[int], age: int -> int, overtakes: int -> int,
+    feedUsed: int -> int, feedMax: int,
+    split: bool, eager: bool, reserved: bool, fairCpu: bool, bounded: bool,
+    entryGap: bool, cpuGap: bool, resourceViolation: bool
+  }
+  def entries(values: List[int]): Set[int] = values.foldl(Set(), (seen, r) => seen.union(Set(r)))
+  def keep(values: List[int], predicate: (int) => bool): List[int] = values.foldl(List(), (kept, r) => if (predicate(r)) kept.append(r) else kept)
+  val inboxJobs = life::s.inbox
+  val rootedJobs = life::s.serviceRoots
+  val readyJobs = life::s.serviceReady
+  val completedJobs = life::s.completed
+  var q: Shared
+  action resourceInitWith(split0: bool, eager0: bool, reserved0: bool, cpu0: bool, bounded0: bool, feed0: int): bool = all {
+    life::init,
+    q' = { host: List(), queued: List(), jobs: workers.mapBy(_ => 0), cpu: owners.mapBy(_ => 0),
+      left: JOBS.mapBy(r => life::units(r)), spent: owners.mapBy(_ => 0),
+      lastShort: workers.mapBy(_ => false), debt: owners.mapBy(_ => false),
+      blocked: Set(), gc: Set(), paused: Set(), age: JOBS.mapBy(_ => 0), overtakes: JOBS.mapBy(_ => 0),
+      feedUsed: owners.mapBy(_ => 0), feedMax: feed0,
+      split: split0, eager: eager0, reserved: reserved0, fairCpu: cpu0, bounded: bounded0,
+      entryGap: false, cpuGap: false, resourceViolation: false }
+  }
+  action resourceInit = resourceInitWith(false, false, false, false, false, 1)
+  action implementationInit = resourceInitWith(true, true, true, false, false, 2)
+  action candidateInit = resourceInitWith(true, true, true, true, true, 2)
+  action mutationInit = resourceInitWith(true, true, false, true, true, 1)
+  action policy(split: bool, eager: bool, reserved: bool, fairCpu: bool, bounded: bool, feed: int): bool = all {
+    life::s.accepted.size() == 0, feed > 0, feed <= JOBS.size(), life::stutter,
+    q' = { ...q, split: split, eager: eager, reserved: reserved, fairCpu: fairCpu, bounded: bounded, feedMax: feed }
+  }
+  def ownPending(owner: int): Set[int] = life::s.accepted.exclude(life::s.completed).filter(r => ASSIGNED.get(r) == owner)
+  def classSpace(r: int): bool = not(q.reserved) or
+    ownPending(ASSIGNED.get(r)).filter(j => shortJobs.contains(j) == shortJobs.contains(r)).size() < 1
+  action offer(r: int): bool = all {
+    classSpace(r), life::admit(r), q' = { ...q, host: q.host.append(r) }
+  }
+  def hostHead(owner: int): List[int] = keep(q.host, r => ASSIGNED.get(r) == owner)
+  def ownerFree(owner: int): bool = q.cpu.get(owner) == 0 and not(q.gc.contains(owner)) and not(q.paused.contains(owner))
+  def canFeed(r: int): bool = and {
+    entries(q.host).contains(r), ownerFree(ASSIGNED.get(r)),
+    hostHead(ASSIGNED.get(r)).head() == r,
+    q.feedUsed.get(ASSIGNED.get(r)) < q.feedMax
+  }
+  action feed(r: int): bool = all {
+    canFeed(r), life::submitService(r),
+    q' = { ...q, host: keep(q.host, j => j != r), queued: q.queued.append(r),
+      feedUsed: q.feedUsed.set(ASSIGNED.get(r), q.feedUsed.get(ASSIGNED.get(r)) + 1) }
+  }
+  def feedShortFirst(owner: int): bool = {
+    val pending = hostHead(owner)
+    pending.length() > 0 and shortJobs.contains(pending.head()) and q.feedUsed.get(owner) < q.feedMax
+  }
+  action boundary(owner: int): bool = all {
+    ownerFree(owner), not(q.eager and feedShortFirst(owner)), life::stutter,
+    q' = { ...q, feedUsed: q.feedUsed.set(owner, 0), entryGap: q.entryGap or feedShortFirst(owner) }
+  }
+  def eligible(w: int): List[int] = {
+    val queue = keep(q.queued, r => ASSIGNED.get(r) == workerOwner(w))
+    val shorts = keep(queue, r => shortJobs.contains(r))
+    val bulk = keep(queue, r => not(shortJobs.contains(r)))
+    if (not(q.split)) queue else
+      if (q.lastShort.get(w) and bulk.length() > 0) bulk else
+      if (shorts.length() > 0) shorts else bulk
+  }
+  action assignWorker(w: int, r: int): bool = all {
+    ownerFree(workerOwner(w)), q.jobs.get(w) == 0,
+    eligible(w).length() > 0, eligible(w).head() == r, life::stutter,
+    q' = { ...q, queued: keep(q.queued, j => j != r), jobs: q.jobs.set(w, r), lastShort: q.lastShort.set(w, shortJobs.contains(r)) }
+  }
+  def runnable(w: int): bool = q.jobs.get(w) != 0 and not(q.blocked.contains(w))
+  def classRunnable(owner: int, short: bool): Set[int] = workers.filter(w =>
+    workerOwner(w) == owner and runnable(w) and shortJobs.contains(q.jobs.get(w)) == short)
+  def preferShortCpu(owner: int): bool = classRunnable(owner, true).size() > 0 and
+    (not(q.debt.get(owner)) or classRunnable(owner, false).size() == 0)
+  def allowedCpu(w: int): bool = not(q.fairCpu) or
+    (if (preferShortCpu(workerOwner(w))) shortJobs.contains(q.jobs.get(w)) else
+      (classRunnable(workerOwner(w), false).size() == 0 or not(shortJobs.contains(q.jobs.get(w)))))
+  action acquireCpu(w: int): bool = all {
+    ownerFree(workerOwner(w)), runnable(w), allowedCpu(w), life::stutter,
+    q' = { ...q, cpu: q.cpu.set(workerOwner(w), w), spent: q.spent.set(workerOwner(w), 0),
+      debt: q.debt.set(workerOwner(w), shortJobs.contains(q.jobs.get(w))),
+      overtakes: JOBS.mapBy(r => if (r == q.jobs.get(w)) 0 else
+        if (not(shortJobs.contains(q.jobs.get(w))) and classRunnable(workerOwner(w), true).exists(sw => q.jobs.get(sw) == r))
+          (if (q.overtakes.get(r) < 2) q.overtakes.get(r) + 1 else 2) else q.overtakes.get(r)),
+      cpuGap: q.cpuGap or (preferShortCpu(workerOwner(w)) and not(shortJobs.contains(q.jobs.get(w)))) }
+  }
+  def canCompute(w: int): bool = and {
+    q.cpu.get(workerOwner(w)) == w, runnable(w),
+    not(q.gc.contains(workerOwner(w))), not(q.paused.contains(workerOwner(w))),
+    not(q.bounded) or q.spent.get(workerOwner(w)) < 1
+  }
+  action compute(w: int): bool = {
+    val r = q.jobs.get(w)
+    all {
+      canCompute(w), q.left.get(r) > 0,
+      if (q.left.get(r) == 1) all {
+        life::readyService(r, false),
+        q' = { ...q, left: q.left.set(r, 0), jobs: q.jobs.set(w, 0), cpu: q.cpu.set(workerOwner(w), 0), spent: q.spent.set(workerOwner(w), 0) }
+      } else all {
+        life::stutter,
+        q' = { ...q, left: q.left.set(r, q.left.get(r) - 1), spent: q.spent.set(workerOwner(w), q.spent.get(workerOwner(w)) + 1) }
+      }
+    }
+  }
+  action yieldCpu(w: int): bool = all {
+    q.cpu.get(workerOwner(w)) == w, not(q.paused.contains(workerOwner(w))), not(q.gc.contains(workerOwner(w))), life::stutter,
+    q' = { ...q, cpu: q.cpu.set(workerOwner(w), 0), spent: q.spent.set(workerOwner(w), 0) }
+  }
+  action block(w: int): bool = all {
+    q.cpu.get(workerOwner(w)) == w, not(q.gc.contains(workerOwner(w))), not(q.paused.contains(workerOwner(w))), life::stutter,
+    q' = { ...q, blocked: q.blocked.union(Set(w)), cpu: q.cpu.set(workerOwner(w), 0), spent: q.spent.set(workerOwner(w), 0) }
+  }
+  action wakeTask(w: int): bool = all { q.blocked.contains(w), life::stutter, q' = { ...q, blocked: q.blocked.exclude(Set(w)), overtakes: q.overtakes.set(q.jobs.get(w), 0) } }
+  action gcStart(owner: int): bool = all { Set("open", "closing").contains(life::s.phase), not(q.gc.contains(owner)), life::stutter, q' = { ...q, gc: q.gc.union(Set(owner)) } }
+  action gcFinish(owner: int): bool = all { q.gc.contains(owner), not(q.paused.contains(owner)), life::stutter, q' = { ...q, gc: q.gc.exclude(Set(owner)) } }
+  action osPause(owner: int): bool = all { not(q.paused.contains(owner)), life::stutter, q' = { ...q, paused: q.paused.union(Set(owner)) } }
+  action osResume(owner: int): bool = all { q.paused.contains(owner), life::stutter, q' = { ...q, paused: q.paused.exclude(Set(owner)) } }
+  action delayTick = all {
+    life::stutter,
+    q' = { ...q, age: JOBS.mapBy(r => if (shortJobs.contains(r) and life::s.accepted.contains(r) and not(life::s.serviceReady.contains(r)) and not(life::s.completed.contains(r)))
+      (if (q.age.get(r) < 4) q.age.get(r) + 1 else 4) else q.age.get(r)) }
+  }
+  action project(r: int): bool = all { life::s.serviceReady.contains(r), life::complete(r), q' = q }
+  action abandon(r: int): bool = all { life::observeTimeout(r), q' = q }
+  action resourceClose = all { life::close, q' = q }
+  action resourceJoin = all {
+    q.gc.size() == 0, q.paused.size() == 0, workers.forall(w => q.jobs.get(w) == 0),
+    life::join, q' = q
+  }
+  action resourceStutter = all { life::stutter, q' = q }
+  val resourceSafety = and {
+    life::safety, entries(q.host) == life::s.inbox,
+    q.host.length() == entries(q.host).size(), q.queued.length() == entries(q.queued).size(),
+    entries(q.queued).union(workers.map(w => q.jobs.get(w)).exclude(Set(0))) == life::s.servicePending.exclude(life::s.serviceReady),
+    workers.map(w => q.jobs.get(w)).filter(r => r != 0).size() == workers.filter(w => q.jobs.get(w) != 0).size(),
+    workers.forall(w => implies(q.jobs.get(w) != 0, ASSIGNED.get(q.jobs.get(w)) == workerOwner(w))),
+    owners.forall(o => implies(q.cpu.get(o) != 0, workerOwner(q.cpu.get(o)) == o and runnable(q.cpu.get(o)))),
+    q.blocked.forall(w => q.jobs.get(w) != 0), q.gc.subseteq(owners), q.paused.subseteq(owners),
+    q.feedMax > 0, owners.forall(o => q.feedUsed.get(o) <= q.feedMax),
+    implies(q.reserved and q.fairCpu, shortJobs.forall(r => q.overtakes.get(r) <= 1)),
+    implies(q.eager, not(q.entryGap)), implies(q.fairCpu, not(q.cpuGap)), not(q.resourceViolation)
+  }
+  // Mutation controls validate the model's guards, not latency improvements.
+  action unsafeBoundary(owner: int): bool = all {
+    feedShortFirst(owner), life::stutter, q' = { ...q, entryGap: true, feedUsed: q.feedUsed.set(owner, 0) }
+  }
+  action unsafeCpu(w: int): bool = all {
+    runnable(w), life::stutter,
+    q' = { ...q, cpu: q.cpu.set(workerOwner(w), w),
+      cpuGap: q.cpuGap or (preferShortCpu(workerOwner(w)) and not(shortJobs.contains(q.jobs.get(w)))),
+      resourceViolation: q.resourceViolation or q.gc.contains(workerOwner(w)) or q.paused.contains(workerOwner(w))
+        or (q.cpu.get(workerOwner(w)) != 0 and q.cpu.get(workerOwner(w)) != w) }
+  }
+  action unsafeFeed(r: int): bool = all {
+    life::submitService(r), q' = { ...q, host: keep(q.host, j => j != r), queued: q.queued.append(r),
+      feedUsed: q.feedUsed.set(ASSIGNED.get(r), q.feedUsed.get(ASSIGNED.get(r)) + 1),
+      resourceViolation: q.resourceViolation or not(canFeed(r)) }
+  }
+  action resourceStep = {
+    nondet r = JOBS.oneOf()
+    nondet w = workers.oneOf()
+    nondet owner = owners.oneOf()
+    any { offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
+      block(w), wakeTask(w), gcStart(owner), gcFinish(owner), osPause(owner), osResume(owner), delayTick,
+      project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
+  }
+  action unsafeBoundaryStep = { nondet owner = owners.oneOf(); any { resourceStep, unsafeBoundary(owner) } }
+  action unsafeCpuStep = { nondet w = workers.oneOf(); any { resourceStep, unsafeCpu(w) } }
+  action unsafeFeedStep = { nondet r = JOBS.oneOf(); any { resourceStep, unsafeFeed(r) } }
+
+}
+module service_sharing_cases {
+  const CASE_JOBS: Set[int]
+  const CASE_ASSIGNED: int -> int
+  import service_sharing(JOBS = CASE_JOBS, ASSIGNED = CASE_ASSIGNED).*
+  action currentInit = implementationInit
+  action sharedInit = candidateInit
+  action sharedStep = resourceStep
+  val sharedSafety = resourceSafety
+  action mutationStart = mutationInit
+  action boundaryMutationStep = unsafeBoundaryStep
+  action cpuMutationStep = unsafeCpuStep
+  action feedMutationStep = unsafeFeedStep
+  run splitQueueStillBlockedAtEntryTest = resourceInit.then(policy(true, false, false, false, false, 1))
+    .then(offer(1)).then(feed(1)).then(assignWorker(1, 1)).then(acquireCpu(1)).then(compute(1)).then(offer(3))
+    .then(delayTick).then(delayTick).then(delayTick).then(delayTick)
+    .then(all { assert(inboxJobs.contains(3)), assert(not(canFeed(3))), assert(q.age.get(3) == 4), assert(resourceSafety), resourceStutter })
+  run reservedWorkerStillSharesCpuTest = resourceInit.then(policy(true, true, true, false, true, 2))
+    .then(offer(1)).then(feed(1)).then(assignWorker(1, 1)).then(acquireCpu(1)).then(compute(1)).then(yieldCpu(1))
+    .then(offer(3)).then(feed(3)).then(assignWorker(2, 3)).then(acquireCpu(1))
+    .then(all { assert(q.jobs.get(2) == 3), assert(q.cpuGap), assert(resourceSafety), resourceStutter })
+  run gcBlocksSameVmNotOtherVmTest = resourceInit.then(policy(true, true, false, true, true, 2))
+    .then(offer(3)).then(feed(3)).then(assignWorker(2, 3)).then(gcStart(1))
+    .then(offer(2)).then(feed(2)).then(assignWorker(3, 2)).then(acquireCpu(3)).then(compute(3))
+    .then(all { assert(not(ownerFree(1))), assert(readyJobs.contains(2)), assert(rootedJobs.contains(3)), assert(resourceSafety), resourceStutter })
+  run osPauseHasNoQueueOnlyDeadlineTest = resourceInit.then(offer(3)).then(osPause(1))
+    .then(delayTick).then(delayTick).then(delayTick).then(delayTick)
+    .then(all { assert(q.age.get(3) == 4), assert(not(canFeed(3))), assert(resourceSafety), resourceStutter })
+  run eagerFeedBeforeAdvanceTest = resourceInit.then(policy(true, true, false, false, false, 2))
+    .then(offer(1)).then(offer(3)).then(feed(1))
+    .then(all { assert(feedShortFirst(1)), assert(resourceSafety), resourceStutter })
+    .then(feed(3)).then(boundary(1))
+    .then(all { assert(rootedJobs == Set(1, 3)), assert(not(q.entryGap)), assert(resourceSafety), resourceStutter })
+  run cooperativeCpuAndClassDebtTest = resourceInit.then(policy(true, true, true, true, true, 2))
+    .then(offer(1)).then(feed(1)).then(assignWorker(1, 1)).then(acquireCpu(1)).then(compute(1))
+    .then(all { assert(not(canCompute(1))), assert(resourceSafety), resourceStutter }).then(yieldCpu(1))
+    .then(offer(3)).then(feed(3)).then(assignWorker(2, 3))
+    .then(all { assert(not(allowedCpu(1))), resourceStutter }).then(acquireCpu(2)).then(compute(2)).then(project(3))
+    .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(2, 4))
+    .then(all { assert(not(allowedCpu(2))), assert(allowedCpu(1)), assert(rootedJobs.contains(1)), assert(resourceSafety), resourceStutter })
+  run closeAndAbandonKeepSharedRootsTest = resourceInit.then(policy(true, true, false, true, false, 2))
+    .then(offer(1)).then(feed(1)).then(assignWorker(1, 1)).then(acquireCpu(1)).then(block(1))
+    .then(offer(3)).then(feed(3)).then(assignWorker(2, 3)).then(acquireCpu(2)).then(compute(2))
+    .then(abandon(1)).then(resourceClose).then(project(3)).then(wakeTask(1)).then(acquireCpu(1))
+    .then(compute(1)).then(compute(1)).then(compute(1)).then(compute(1))
+    .then(compute(1)).then(compute(1)).then(compute(1)).then(compute(1)).then(project(1)).then(resourceJoin)
+    .then(all { assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  run prematureAdvanceMutationTest = resourceInit.then(policy(true, true, false, false, false, 2))
+    .then(offer(3)).then(unsafeBoundary(1)).then(all { assert(not(resourceSafety)), resourceStutter })
+  run cpuClassBypassMutationTest = resourceInit.then(policy(true, true, false, true, true, 2))
+    .then(offer(1)).then(feed(1)).then(assignWorker(1, 1)).then(offer(3)).then(feed(3)).then(assignWorker(2, 3))
+    .then(unsafeCpu(1)).then(all { assert(not(resourceSafety)), resourceStutter })
+  run feedBudgetMutationTest = resourceInit.then(policy(true, true, false, false, false, 1))
+    .then(offer(1)).then(offer(3)).then(feed(1)).then(unsafeFeed(3)).then(all { assert(not(resourceSafety)), resourceStutter })
+  run gcExecutionMutationTest = resourceInit.then(offer(3)).then(feed(3)).then(assignWorker(2, 3)).then(gcStart(1))
+    .then(unsafeCpu(2)).then(all { assert(not(resourceSafety)), resourceStutter })
+}
+module service_sharing_small {
+  import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4), CASE_ASSIGNED = Set(1, 2, 3, 4).mapBy(r => if (r == 2) 2 else 1)).*
+}
+module service_sharing_wide {
+  import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4, 5), CASE_ASSIGNED = Set(1, 2, 3, 4, 5).mapBy(r => if (Set(2, 5).contains(r)) 2 else 1)).*
+}
+
+// Fixed stateless routing alternative. Stateful Actor ownership never migrates.
+module service_routing_isolated {
+  import service_sharing(JOBS = Set(1, 2, 3, 4), ASSIGNED = Set(1, 2, 3, 4).mapBy(r => if (Set(3, 4).contains(r)) 2 else 1)) as shared
+  run statelessOtherVmSurvivesGcTest = shared::candidateInit.then(shared::gcStart(1))
+    .then(shared::offer(3)).then(shared::feed(3)).then(shared::assignWorker(3, 3))
+    .then(shared::acquireCpu(3)).then(shared::compute(3)).then(shared::project(3))
+    .then(all { assert(shared::completedJobs.contains(3)), assert(shared::q.gc.contains(1)), assert(shared::resourceSafety), shared::resourceStutter })
+}

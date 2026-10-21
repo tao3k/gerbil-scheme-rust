@@ -3,6 +3,8 @@
 mod corpus;
 #[path = "scheme_service/measurement.rs"]
 mod measurement;
+#[path = "scheme_service/observation.rs"]
+mod observation;
 #[path = "scheme_service/workload.rs"]
 mod workload;
 use gerbil_scheme::instances::{InstanceConfig, InstancePool, IsolatedProgram};
@@ -13,7 +15,12 @@ use std::{
     time::{Duration, Instant},
 };
 const GATE: Duration = Duration::from_secs(5);
-fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, comparison: Comparison) {
+fn run(
+    progress: &mpsc::Sender<&'static str>,
+    smoke: bool,
+    comparison: Comparison,
+    observation: bool,
+) {
     let split = comparison.is_split();
     // SAFETY: the build-owned image exports the admitted native service protocol.
     let program = unsafe {
@@ -43,11 +50,16 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, comparison: Compariso
     pool.dispatcher()
         .configure_owner_budgets(4, Some(32))
         .unwrap();
+    if observation {
+        for owner in 0..4 {
+            pool.dispatcher().observe_scheme_service_on(owner).unwrap();
+        }
+    }
     let identities: Vec<_> = pool.owners().iter().map(|r| r.state).collect();
     println!(
         "{}",
         json!({"event":"service_configuration","pool_startup_ns":startup.elapsed().as_nanos(),"sdk_setup_ns":pool.owners().iter().map(|r|r.setup_time.as_nanos()).collect::<Vec<_>>(),"owners":4,"states":identities,"rust_workers":2,"slots":4,"work":32,"batch":8,
-        "quantum":1,"scheme_service_workers":4,"actor_workers_per_batch":4,"probe_interval_us":500,"defaults_changed":false,
+        "quantum":1,"scheme_service_workers":4,"actor_workers_per_batch":4,"probe_interval_us":500,"defaults_changed":false,"phase_observation":observation,
         "split_layout_ab":split,"short_layout_only":comparison==Comparison::ShortLayout,"class_route_ab":comparison==Comparison::ClassRouting,"client_bulk_callbacks_per_owner":if split { Some(3) } else { None },"comparison":comparison.label()})
     );
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -63,7 +75,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, comparison: Compariso
         );
         let warm = Arc::new(inputs[..256].to_vec());
         for arm in [false, true] {
-            measurement::run(&pool, &runtime, &warm, 8, comparison, arm);
+            measurement::run(&pool, &runtime, &warm, 8, comparison, arm, observation);
             progress.send("service warmup validated").unwrap();
         }
         let mut samples = [Vec::new(), Vec::new()];
@@ -77,6 +89,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, comparison: Compariso
                         if smoke { 8 } else { 64 },
                         comparison,
                         arm == 1,
+                        observation,
                     );
                     println!(
                         "{}",
@@ -113,7 +126,9 @@ fn main() {
         || s == "--split-layout-ab"
         || s == "--short-layout-only"
         || s == "--class-route-ab"
-        || s == "--short-service-ab"));
+        || s == "--short-service-ab"
+        || s == "--phase-observation"
+        || s == "--feed-ab"));
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
         let mut last = "start";
@@ -132,7 +147,8 @@ fn main() {
         args.iter()
             .filter(|s| matches!(
                 s.as_str(),
-                "--split-layout-ab"
+                "--feed-ab"
+                    | "--split-layout-ab"
                     | "--short-layout-only"
                     | "--class-route-ab"
                     | "--short-service-ab"
@@ -140,7 +156,9 @@ fn main() {
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--short-service-ab") {
+    let comparison = if args.iter().any(|s| s == "--feed-ab") {
+        Comparison::Feed
+    } else if args.iter().any(|s| s == "--short-service-ab") {
         Comparison::ShortService
     } else if args.iter().any(|s| s == "--class-route-ab") {
         Comparison::ClassRouting
@@ -151,7 +169,12 @@ fn main() {
     } else {
         Comparison::Service
     };
-    run(&progress, args.iter().any(|s| s == "--test"), comparison);
+    run(
+        &progress,
+        args.iter().any(|s| s == "--test"),
+        comparison,
+        args.iter().any(|s| s == "--phase-observation"),
+    );
     drop(progress);
     watchdog.join().unwrap();
 }

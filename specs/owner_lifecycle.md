@@ -166,3 +166,84 @@ abstraction does not model partial Tokio allocations, inbox wakers, output byte
 limits or native startup. Those remain direct source/native controls, including
 close while a host registration future remains deliberately unpolled. No symbolic,
 starvation-freedom, GC implementation or cold-start reliability theorem is added.
+
+
+## Shared VM resources and scheduling refinement
+
+`service_sharing` imports the existing lifecycle as `life`. It reuses admission,
+assigned owners, work/slot credits, accepted roots, result publication, timeout,
+close and join; it does not create a second resource-lifetime authority.
+`service_sharing_cases` supplies executable scenarios for the small and wide
+instantiations. The finite configuration uses two single-processor VMs, two
+persistent Scheme workers per VM and four/five single-use requests. These are
+exploration parameters, not changes to the production four-VM benchmark.
+
+The refinement explicitly separates:
+
+- Rust owner inbox and bounded native input feeding before Scheme advancement;
+- Scheme class queues and worker assignment;
+- the single execution resource shared by workers in each VM;
+- cooperative work units, blocked green threads and wake transitions;
+- VM-wide GC and owner descheduling by the OS;
+- completion projection, abandonment, rooted draining and actual join.
+
+`currentInit` describes cooperating class-routed callers with reserved admission
+and opt-in eager feeding (bound two in the finite model), without assuming a CPU
+lease or bounded duration for arbitrary Scheme. It is not the default feed-one
+configuration or a guarantee against independent unclassified callers.
+`sharedInit` adds a candidate cooperative one-unit execution boundary and class
+debt: after short execution, eligible bulk work gets a turn. With one reserved
+short request per modeled owner, an eligible short worker cannot be overtaken by
+more than one new bulk CPU lease. This is an invariant over abstract leases, not
+elapsed time, starvation freedom or an implemented general Scheme preemptor.
+
+Eleven scenarios per shared domain retain the failures of queue-only isolation:
+a short request can remain before native entry; a reserved worker can still wait
+for the same VM's CPU; GC blocks both classes in that VM; an OS pause has no
+queue-only deadline. Other scenarios exercise bounded eager feeding, candidate
+class debt, root retention through abandonment/close, and four deliberate guard
+violations. `service_routing_isolated` separately shows a stateless short request
+finishing on another VM while the bulk VM is collecting. It does not migrate
+stateful Actors or establish that dedicated capacity improves throughput.
+
+The existing Rust integration gate checks both policies on both domains (1,000
+sampled traces, at most 64 steps each; seeds 1 and 42). Three new mutation controls
+must exit 1 with an actual invariant violation: premature advancement, CPU guard
+bypass and unbounded input feeding. Syntax/tool failures cannot satisfy them.
+Together with the existing lifecycle domains this is 79 scenario runs, 6,000
+sampled traces and 12 mutation controls. No symbolic result from an older source
+is transferred to this extension.
+
+```text
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture
+quint test specs/owner_lifecycle.qnt --main service_sharing_small --seed 1
+quint run specs/owner_lifecycle.qnt --main service_sharing_small --init currentInit --step sharedStep --invariant sharedSafety --seed 1 --max-samples 1000 --max-steps 64
+quint run specs/owner_lifecycle.qnt --main service_sharing_small --init sharedInit --step sharedStep --invariant sharedSafety --seed 1 --max-samples 1000 --max-steps 64
+quint test specs/owner_lifecycle.qnt --main service_routing_isolated --seed 1
+```
+
+### Algorithm and native evidence links
+
+| Modeled boundary | Actual implementation or independent gate |
+| --- | --- |
+| Bounded input feeding, FIFO and existing credit ownership | `instances/service_feed.rs`, `instances/service_loop.rs`; opt-in feed limit, default one |
+| Split classes and worker alternation | `scheme/async-service.ss`; existing explicit short-service ABI |
+| Per-owner admission and class route | `instances/routing/policy.rs`; cooperating callers only |
+| CPU/GC/OS shared spans | opt-in `instances/service_observation.rs`, native diagnostics, directed `scheme_service` bench |
+| Root conservation, failure, close and GC/continuations | real `tests/scheme_service.rs` and `tests/scheme_service/priority.rs` |
+| Candidate cooperative CPU lease and class debt | model only; not implemented or performance-admitted |
+| Other-VM GC isolation | model routing contrast; no automatic stateful migration |
+
+`configure_scheme_service_feed_on(owner, maximum)` publishes only immediately
+available FIFO service inputs before advancing Scheme, bounded by configured
+native slots. It never waits to fill a batch. Reconfiguration requires idle native
+slots/work/producer state. This removes one avoidable host-entry gap; it cannot
+interrupt an already executing Scheme handler or isolate same-VM GC.
+
+`observe_scheme_service_on` is optional. Owner snapshots record wall time and SDK
+thread CPU/GC deltas for submit, advance, wait and retire phases. A long wait span
+can include Scheme execution, blocked native select and OS descheduling. GC wall
+and thread CPU have different accounting and may overlap; neither residual nor
+subtracted aggregate quantiles isolate OS scheduling. Native counter snapshots
+and sampled stacks are diagnostic evidence, not consequences of model success.
+See status report 30.37 for artifacts, directed A/B and remaining obligations.

@@ -15,15 +15,21 @@ use std::{
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ShortMode {
     Batch,
-    Native,
-    Dedicated,
+    Native(bool),
+    Dedicated(bool),
 }
 impl ShortMode {
     pub(super) fn native(self) -> bool {
         self != Self::Batch
     }
+    fn observed(self) -> bool {
+        match self {
+            Self::Batch => false,
+            Self::Native(enabled) | Self::Dedicated(enabled) => enabled,
+        }
+    }
     pub(super) fn dedicated(self) -> bool {
-        self == Self::Dedicated
+        matches!(self, Self::Dedicated(_))
     }
 }
 #[derive(Debug)]
@@ -33,12 +39,15 @@ pub(super) struct Reply {
     pub entered: Instant,
     pub constructed: Instant,
     pub projection: Instant,
+    pub diagnostics: Option<[[f64; 6]; 3]>,
 }
 struct Orders {
     request: NumericServiceBatch<i64>,
     entered: Option<Instant>,
     constructed: Option<Instant>,
     short_mode: ShortMode,
+    construction_before: Option<[f64; 6]>,
+    construction_after: Option<[f64; 6]>,
     _bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 }
 impl SchemeServiceRequest for Orders {
@@ -54,6 +63,9 @@ impl SchemeServiceRequest for Orders {
         session: &NativeSession<'vm>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.entered = Some(Instant::now());
+        if self.short_mode.observed() {
+            self.construction_before = session.diagnostics();
+        }
         let value = if self.short_mode.native() {
             assert_eq!(self.request.items.len(), 1);
             let tag = session.numeric_vector(&[77_i64, 1])?;
@@ -62,6 +74,9 @@ impl SchemeServiceRequest for Orders {
         } else {
             self.request.construct(session)?
         };
+        if self.short_mode.observed() {
+            self.construction_after = session.diagnostics();
+        }
         self.constructed = Some(Instant::now());
         Ok(value)
     }
@@ -71,6 +86,14 @@ impl SchemeServiceRequest for Orders {
         output: &NativeRoot<'_>,
     ) -> Result<Reply, InstanceError> {
         let projection = Instant::now();
+        let diagnostics = if self.short_mode.observed() {
+            self.construction_before
+                .zip(self.construction_after)
+                .zip(session.diagnostics())
+                .map(|((a, b), c)| [a, b, c])
+        } else {
+            None
+        };
         let values = if self.short_mode.native() {
             vec![session.copy_numeric(output)?]
         } else {
@@ -82,6 +105,7 @@ impl SchemeServiceRequest for Orders {
             entered: self.entered.unwrap(),
             constructed: self.constructed.unwrap(),
             projection,
+            diagnostics,
         })
     }
 }
@@ -98,6 +122,8 @@ fn orders(
         entered: None,
         constructed: None,
         short_mode,
+        construction_before: None,
+        construction_after: None,
         _bulk_permit: bulk_permit,
     }
 }
@@ -227,6 +253,7 @@ pub(super) struct Probes {
     pub service: Vec<u128>,
     pub construct: Vec<u128>,
     pub post_admission: Vec<u128>,
+    pub diagnostics: Vec<Option<[[f64; 6]; 3]>>,
     pub pending: Vec<u128>,
     pub projection: Vec<u128>,
     pub completed: Vec<Instant>,
@@ -246,6 +273,7 @@ pub(super) async fn probes(
         service: Vec::new(),
         construct: Vec::new(),
         post_admission: Vec::new(),
+        diagnostics: Vec::new(),
         pending: Vec::new(),
         projection: Vec::new(),
         completed: Vec::new(),
@@ -310,6 +338,7 @@ pub(super) async fn probes(
         values
             .projection
             .push(completed.duration_since(reply.projection).as_nanos());
+        values.diagnostics.push(reply.diagnostics);
         values.completed.push(completed);
     }
     values

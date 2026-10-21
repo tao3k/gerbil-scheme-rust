@@ -23,6 +23,7 @@ pub(super) enum Comparison {
     ShortLayout,
     ClassRouting,
     ShortService,
+    Feed,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -33,6 +34,9 @@ impl Comparison {
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
+            Self::Feed => {
+                "same short queues/router/native work; feed one versus four admitted inputs per Scheme advance"
+            }
             Self::ShortService => {
                 "same class router and native short layout; general versus Scheme short scheduling"
             }
@@ -49,21 +53,23 @@ struct Strategy {
     class_routing: bool,
 }
 impl Strategy {
-    fn for_arm(comparison: Comparison, arm: bool) -> Self {
+    fn for_arm(comparison: Comparison, arm: bool, observation: bool) -> Self {
         Self {
-            short_mode: if comparison == Comparison::ShortService && arm {
-                ShortMode::Dedicated
+            short_mode: if matches!(comparison, Comparison::ShortService | Comparison::Feed)
+                && (arm || comparison == Comparison::Feed)
+            {
+                ShortMode::Dedicated(observation)
             } else if matches!(
                 comparison,
                 Comparison::ClassRouting | Comparison::ShortService
             ) || (comparison.is_split() && arm)
             {
-                ShortMode::Native
+                ShortMode::Native(observation)
             } else {
                 ShortMode::Batch
             },
             ready_completion: comparison == Comparison::Combined && arm,
-            class_routing: comparison == Comparison::ShortService
+            class_routing: matches!(comparison, Comparison::ShortService | Comparison::Feed)
                 || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -75,8 +81,9 @@ pub(super) fn run(
     probes: usize,
     comparison: Comparison,
     arm: bool,
+    observation: bool,
 ) -> Value {
-    let strategy = Strategy::for_arm(comparison, arm);
+    let strategy = Strategy::for_arm(comparison, arm, observation);
     let asynchronous = comparison != Comparison::Service || arm;
     let split_pair = comparison.is_split();
     idle(pool);
@@ -96,6 +103,14 @@ pub(super) fn run(
     } else {
         None
     };
+    if comparison == Comparison::Feed {
+        for owner in 0..4 {
+            pool.dispatcher()
+                .configure_scheme_service_feed_on(owner, if arm { 4 } else { 1 })
+                .unwrap();
+        }
+    }
+    let before = observation.then(|| super::observation::snapshot(pool));
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -129,7 +144,7 @@ pub(super) fn run(
             .all(|l| l.short_requests == 0 && l.batch_requests == 0 && l.batch_work == 0)
     );
     router.close();
-    summarize(
+    let mut value = summarize(
         rows,
         inputs,
         &probe,
@@ -137,7 +152,17 @@ pub(super) fn run(
         elapsed,
         asynchronous,
         strategy,
-    )
+    );
+    if let Some(before) = before {
+        value["owner_phases"] =
+            super::observation::delta(&before, &super::observation::snapshot(pool));
+    }
+    value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
+        4
+    } else {
+        1
+    });
+    value
 }
 fn summarize(
     rows: Vec<gerbil_scheme_python::owner_dispatch::OwnerResult<workload::Reply>>,
@@ -217,7 +242,7 @@ fn summarize(
     json!({"orders":count,"asynchronous":asynchronous,"short_layout":strategy.short_mode.native(),"ready_completion":strategy.ready_completion,"class_routing":strategy.class_routing,"short_service":strategy.short_mode.dedicated(),"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
         "bulk_owner_native_ns":owner_native_ns,"bulk_service_ns":service,"bulk_construct_ns":construct,
         "bulk_pending_before_projection_ns":pending,"bulk_projection_retirement_ns":projection,
-        "probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
+        "probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
         "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer})
 }

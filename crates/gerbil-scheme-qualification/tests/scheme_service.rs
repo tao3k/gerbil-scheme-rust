@@ -354,6 +354,9 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     assert_eq!(states.len(), 4);
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
+    for owner in 0..4 {
+        dispatch.configure_scheme_service_feed_on(owner, 4).unwrap();
+    }
     let hidden = dispatch
         .submit_native_on(0, |session| {
             let header = session.numeric_vector(&[5_i64])?;

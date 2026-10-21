@@ -23,6 +23,10 @@ pub(super) struct Wake {
     pub lanes: AtomicUsize,
     #[cfg(feature = "tokio-dispatch")]
     pub service_version: AtomicUsize,
+    #[cfg(feature = "tokio-dispatch")]
+    pub feed_limit: AtomicUsize,
+    #[cfg(feature = "tokio-dispatch")]
+    pub observation: std::sync::OnceLock<Arc<super::service_metrics::Monitor>>,
     pending: AtomicBool,
     pub closed: AtomicBool,
     pub failed: AtomicBool,
@@ -68,6 +72,10 @@ impl Wake {
                 lanes: AtomicUsize::new(0),
                 #[cfg(feature = "tokio-dispatch")]
                 service_version: AtomicUsize::new(0),
+                #[cfg(feature = "tokio-dispatch")]
+                feed_limit: AtomicUsize::new(1),
+                #[cfg(feature = "tokio-dispatch")]
+                observation: std::sync::OnceLock::new(),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
                 failed: AtomicBool::new(false),

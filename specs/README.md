@@ -167,3 +167,15 @@ late reply metadata. See [scope, source correspondence and assumptions](owner_li
   domain. Only a completed `NoError` is bounded symbolic evidence.
 - The independent CI job runs the pinned CLI and the same owner-check script.
   It does not label simulation as symbolic verification or native acceptance.
+
+
+### Shared VM resource refinement
+
+The existing owner lifecycle now imports its lifetime/credit state into
+`service_sharing`, separating host entry, Scheme class queues, shared single-VM
+execution, GC, OS pause and retirement. Small/wide scenarios compare current
+policy with a model-only cooperative CPU/class-debt candidate. A separate fixed
+stateless route contrasts same-VM and other-VM GC. The existing integration gate
+covers both policies and explicit guard-breaking controls; it adds no native
+correctness or elapsed-time proof. See [assumptions and API mapping](owner_lifecycle.md#shared-vm-resources-and-scheduling-refinement)
+and [directed results](../docs/30-39-status/30.37-shared-resource-refinement-and-owner-feed.org).

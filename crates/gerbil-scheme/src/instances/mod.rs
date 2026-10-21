@@ -57,3 +57,13 @@ pub use service::{NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest};
 mod routing;
 #[cfg(feature = "tokio-dispatch")]
 pub use routing::{RoutedSchemeTicket, SchemeRouteLoad, SchemeRoutingConfig, SchemeServiceRouter};
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_metrics;
+#[cfg(feature = "tokio-dispatch")]
+mod service_observation;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_metrics::{SchemePhaseObservation, SchemeServiceObservation, SchemeServicePhase};
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_feed;

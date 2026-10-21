@@ -47,6 +47,12 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     let mut pool = InstancePool::start(&program, settings).unwrap();
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(8, Some(8)).unwrap();
+    assert!(matches!(
+        dispatch.scheme_service_observation_on(0),
+        Err(InstanceError::InvalidConfig(_))
+    ));
+    dispatch.observe_scheme_service_on(0).unwrap();
+    configure_feed(&dispatch);
     runtime.block_on(async {
         for (units, affine) in [(2, false), (1, true)] {
             let invalid = PriorityRequest {
@@ -90,6 +96,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             tokio::task::yield_now().await;
         }
         assert_eq!(command(&dispatch, 0, 12)[2..], [90]);
+        assert!(dispatch.configure_scheme_service_feed_on(0, 1).is_err());
         command(&dispatch, 0, 8);
         for (index, ticket) in tickets.into_iter().enumerate() {
             let result = ticket.wait_completed(GATE).await;
@@ -111,6 +118,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             "short-active completion turn exceeded its budget"
         );
     });
+    check_observation(&dispatch);
     let shutdown = pool.shutdown(GATE);
     assert!(shutdown.is_clean(), "{shutdown:?}");
     assert_eq!(shutdown.joined, 1);
@@ -121,4 +129,27 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             .all(|owner| owner.roots_before_cleanup == 0 && owner.image_file_removed)
     );
     progress.send("native single-worker short/general FIFO, alternating work budget, exception and retirement contract passed").unwrap();
+}
+
+fn check_observation(dispatch: &InstanceDispatcher) {
+    let observation = dispatch
+        .scheme_service_observation_on(0)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    assert_eq!(observation.phases[2].calls, 5);
+    assert_eq!(observation.phases[3].calls, 5);
+    assert!(observation.phases[0].calls > 0);
+    assert!(
+        observation
+            .phases
+            .iter()
+            .all(|phase| phase.cpu_ns.is_some() && phase.gc_real_ns.is_some())
+    );
+}
+
+fn configure_feed(dispatch: &InstanceDispatcher) {
+    assert!(dispatch.configure_scheme_service_feed_on(0, 0).is_err());
+    assert!(dispatch.configure_scheme_service_feed_on(0, 9).is_err());
+    dispatch.configure_scheme_service_feed_on(0, 4).unwrap();
 }

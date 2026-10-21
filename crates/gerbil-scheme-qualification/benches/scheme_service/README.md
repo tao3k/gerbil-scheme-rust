@@ -121,3 +121,33 @@ before the future returns. It excludes the measured admission interval, but stil
 combines host queueing, wake delivery and OS scheduling. Do not subtract aggregate
 p99 values or label this interval isolated Scheme execution or wake latency.
 See status report 30.36 for native acceptance and retained negative A/B evidence.
+
+
+## Shared-resource refinement and bounded input feeding
+
+```text
+just bridge-scheme-service-benchmark --feed-ab
+just bridge-scheme-service-benchmark --feed-ab --phase-observation
+```
+
+This is one additional directed pair, without a VM/thread matrix. Both arms use
+explicit Scheme short service, identical class routing, native short layout,
+FIFO client observation, four VMs and the same 4/32 slot/work bounds. Only the
+per-owner native feed bound changes from one to four. The opt-in API publishes
+up to that many immediately available FIFO service inputs before advancing
+Scheme; it never waits to fill a batch. Defaults stay at one. Accepted permits
+remain held until native completion/projection.
+
+`--phase-observation` enables owner-side counters for advance, native wait,
+submit/construction and take/projection/retirement. Samples carry per-owner wall,
+SDK thread CPU and GC deltas, plus native diagnostic snapshots around each short
+constructor. Without this flag, no phase clock or native counter reads are added.
+Snapshot APIs themselves use the existing owner queue; treat observed runs as
+diagnostics, separately from unobserved throughput admission. Wall/CPU/GC intervals
+overlap and cannot be summed or subtracted into isolated OS scheduling cost.
+
+The existing `specs/owner_lifecycle.qnt` refinement shows why reserved short worker
+capacity is insufficient: native entry, VM CPU, GC and OS progress remain shared.
+Its candidate cooperative CPU policy is model-only; bounded native feeding does
+not implement it or preempt arbitrary Scheme handlers. See status report 30.37
+for the model-to-code mapping, native gates and retained directed results.

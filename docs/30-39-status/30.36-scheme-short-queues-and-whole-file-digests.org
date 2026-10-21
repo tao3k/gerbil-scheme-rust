@@ -187,3 +187,11 @@ Raw logs, failure records, native images, binaries and archives remain outside
 Git. Source-input manifests bind both frozen candidates; publication checks must
 match the final source snapshot. Exact-head remote CI remains a separate gate
 following the coordinated PR #18 push.
+
+
+* Shared-resource follow-up
+
+[[file:30.37-shared-resource-refinement-and-owner-feed.org][30.37]] refines the existing QNT lifecycle with native entry, shared VM CPU,
+GC and OS progress; it preserves this report's inconsistent CPU/p99 captures.
+The stronger modeled cooperative CPU rule is separate from the opt-in bounded
+native feed implementation and its own directed A/B.

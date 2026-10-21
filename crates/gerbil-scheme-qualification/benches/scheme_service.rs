@@ -134,6 +134,7 @@ fn main() {
         || s == "--class-route-ab"
         || s == "--short-service-ab"
         || s == "--phase-observation"
+        || s == "--notification-ab"
         || s == "--ingress-ab"
         || s == "--budget-ab"
         || s == "--feed-ab"));
@@ -155,7 +156,8 @@ fn main() {
         args.iter()
             .filter(|s| matches!(
                 s.as_str(),
-                "--ingress-ab"
+                "--notification-ab"
+                    | "--ingress-ab"
                     | "--budget-ab"
                     | "--feed-ab"
                     | "--split-layout-ab"
@@ -166,7 +168,9 @@ fn main() {
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--ingress-ab") {
+    let comparison = if args.iter().any(|s| s == "--notification-ab") {
+        Comparison::Notification
+    } else if args.iter().any(|s| s == "--ingress-ab") {
         Comparison::Ingress
     } else if args.iter().any(|s| s == "--budget-ab") {
         Comparison::Budget

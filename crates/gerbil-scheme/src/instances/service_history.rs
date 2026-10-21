@@ -9,6 +9,8 @@ pub struct SchemeServiceOwnerSpan {
     pub phase_wall_ns: u64,
     pub phase_cpu_ns: Option<u64>,
     pub phase_gc_ns: Option<u64>,
+    /// SDK process CPU over GC intervals; includes other host threads.
+    pub phase_gc_cpu_ns: Option<u64>,
 }
 #[derive(Debug)]
 struct Record {
@@ -68,6 +70,7 @@ impl History {
                 phase_wall_ns: ns(row.start, row.end),
                 phase_cpu_ns: row.delta.map(|delta| delta[0]),
                 phase_gc_ns: row.delta.map(|delta| delta[1]),
+                phase_gc_cpu_ns: row.delta.map(|delta| delta[2]),
             })
             .collect();
         (spans, rows.lost_before.is_some_and(|at| at > start))

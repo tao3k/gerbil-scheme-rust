@@ -26,6 +26,7 @@ pub(super) enum Comparison {
     Feed,
     Budget,
     Ingress,
+    Notification,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -36,6 +37,9 @@ impl Comparison {
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
+            Self::Notification => {
+                "same native port/budget/work; coalesced versus independent short notification"
+            }
             Self::Ingress => "same cooperative budget/native work; watcher versus native port wake",
             Self::Budget => {
                 "same short queues/router/native work/feed; Scheme cooperative budget disabled versus one"
@@ -67,10 +71,14 @@ impl Strategy {
                     | Comparison::Feed
                     | Comparison::Budget
                     | Comparison::Ingress
+                    | Comparison::Notification
             ) && (arm
                 || matches!(
                     comparison,
-                    Comparison::Feed | Comparison::Budget | Comparison::Ingress
+                    Comparison::Feed
+                        | Comparison::Budget
+                        | Comparison::Ingress
+                        | Comparison::Notification
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -89,6 +97,7 @@ impl Strategy {
                     | Comparison::Feed
                     | Comparison::Budget
                     | Comparison::Ingress
+                    | Comparison::Notification
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -176,12 +185,35 @@ pub(super) fn run(
         value["owner_phases"] =
             super::observation::delta(&before, &super::observation::snapshot(pool));
     }
-    if matches!(comparison, Comparison::Budget | Comparison::Ingress) {
-        value["scheme_budget"] = json!(usize::from(arm || comparison == Comparison::Ingress));
-        value["native_port_wake"] = json!(comparison == Comparison::Ingress && arm);
+    append_policy(&mut value, pool, comparison, arm, inputs, probes);
+    if observation && comparison == Comparison::Notification && arm {
+        super::budget::verify_notifications(&value, probes);
+    }
+    value
+}
+fn append_policy(
+    value: &mut Value,
+    pool: &InstancePool,
+    comparison: Comparison,
+    arm: bool,
+    inputs: &[Vec<i64>],
+    probes: usize,
+) {
+    if matches!(
+        comparison,
+        Comparison::Budget | Comparison::Ingress | Comparison::Notification
+    ) {
+        value["scheme_budget"] = json!(usize::from(
+            arm || matches!(comparison, Comparison::Ingress | Comparison::Notification)
+        ));
+        value["native_port_wake"] = json!(
+            (comparison == Comparison::Ingress && arm) || comparison == Comparison::Notification
+        );
+        value["independent_short_notifications"] =
+            json!(comparison == Comparison::Notification && arm);
         value["scheme_budget_counters"] = super::budget::snapshot(
             pool,
-            arm || comparison == Comparison::Ingress,
+            arm || matches!(comparison, Comparison::Ingress | Comparison::Notification),
             inputs,
             probes,
         );
@@ -191,7 +223,6 @@ pub(super) fn run(
     } else {
         1
     });
-    value
 }
 fn configure(pool: &InstancePool, comparison: Comparison, arm: bool) {
     if comparison == Comparison::Feed {
@@ -204,9 +235,10 @@ fn configure(pool: &InstancePool, comparison: Comparison, arm: bool) {
     if comparison == Comparison::Budget {
         super::budget::configure(pool, arm);
     }
-    if comparison == Comparison::Ingress {
+    if matches!(comparison, Comparison::Ingress | Comparison::Notification) {
         super::budget::configure(pool, true);
-        super::budget::wake(pool, arm);
+        super::budget::wake(pool, arm || comparison == Comparison::Notification);
+        super::budget::notification(pool, comparison == Comparison::Notification && arm);
     }
 }
 fn summarize(

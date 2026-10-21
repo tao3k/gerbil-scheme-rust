@@ -271,3 +271,16 @@ continuation, failure and close controls. The current finite model does not
 mechanically prove port buffering, reader transfer, elapsed deadlines or OS
 scheduling; native controls remain separate required evidence. Defaults retain
 the watcher bridge and disabled cooperative budget.
+
+### Publisher claim and notification delivery
+
+The unchanged lifecycle model separates publication (`wakeOwed`) from actual
+`notify` delivery. It does not model a Rust publisher paused between its pending
+flag claim and pipe write, or provide an unconditional elapsed-time guarantee.
+The real-pipe fault control injects this claimed-but-unwritten state: legacy
+coalescing returns without making the pipe readable. Independent notification
+writes while that claim and the legacy writer mutex remain held. Concurrent,
+full-pipe and reader-close controls validate the actual descriptor boundary.
+Every independent publisher discharges its own notification duty; inbox recheck,
+root conservation and close remain the existing protocol. No additional
+scheduler model or assumed OS fairness is substituted for native acceptance.

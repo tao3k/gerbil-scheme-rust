@@ -309,3 +309,23 @@ History loss is reported; enclosing CPU/GC counters are not overlap CPU time.
 No entry clocks run for unobserved requests. The directed `--ingress-ab` bench
 keeps budget one in both arms, same VMs, native work, route, feed and collection.
 See [attribution, native controls and all results](30-39-status/30.39-owner-entry-attribution-and-native-port-wake.org).
+
+
+### Independent host notification (explicit opt-in)
+
+`configure_scheme_service_notification_on(owner, SchemeServiceNotification::ShortIndependent)`
+selects an atomic nonblocking pipe write for every explicitly declared short
+service publication. That path borrows neither another publisher's pending claim
+nor its writer mutex. Bulk publication stays coalesced; close also writes
+independently. A full pipe is already readable and IO errors remain failures.
+Descriptor lifetime stays with the shared wake object. Redundant bytes are safe
+under the existing inbox recheck. `Coalesced` stays the default, independently of
+native port mode. This removes short-publisher dependency, not OS or GC delay.
+Scheme still owns all intra-instance execution. A prototype using host wait-phase
+hints stalled and is not included in the library.
+See [qualification, trade-offs and retained failures](30-39-status/30.40-independent-notification-and-mixed-tail.org).
+
+SDK GC CPU counters measure process CPU over a VM's GC intervals, including
+other host threads. They are not isolated owner/collector CPU and must not be
+summed across owners or subtracted from GC wall for attribution. Owner thread
+CPU is a separate clock. See the linked report for the verified clock sources.

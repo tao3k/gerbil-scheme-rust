@@ -73,3 +73,27 @@ pub(super) fn wake(pool: &InstancePool, direct: bool) {
         ticket.wait(GATE).unwrap();
     }
 }
+
+pub(super) fn notification(pool: &InstancePool, independent: bool) {
+    use gerbil_scheme::instances::SchemeServiceNotification;
+    let policy = if independent {
+        SchemeServiceNotification::ShortIndependent
+    } else {
+        SchemeServiceNotification::Coalesced
+    };
+    for owner in 0..4 {
+        pool.dispatcher()
+            .configure_scheme_service_notification_on(owner, policy)
+            .unwrap();
+    }
+}
+
+pub(super) fn verify_notifications(value: &Value, probes: usize) {
+    let entries = value["probe_entry"].as_array().unwrap();
+    assert_eq!(entries.len(), probes);
+    assert!(
+        entries
+            .iter()
+            .all(|entry| matches!(entry["wake"].as_str(), Some("Written" | "Full")))
+    );
+}

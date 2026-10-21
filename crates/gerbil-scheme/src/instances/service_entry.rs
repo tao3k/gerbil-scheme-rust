@@ -56,17 +56,20 @@ pub(super) fn notify(
     wake: Option<Arc<Wake>>,
     enqueued: bool,
     trace: Option<Arc<SchemeServiceEntryTrace>>,
+    short: bool,
 ) {
     if !enqueued {
         return;
     }
     let Some(trace) = trace else {
-        super::service_wake::notify_enqueued(wake, true);
+        if let Some(wake) = wake {
+            wake.notify_for(short);
+        }
         return;
     };
     trace.mark(SchemeServiceEntryPhase::WakeStart);
     if let Some(wake) = wake {
-        let delivery = wake.notify();
+        let delivery = wake.notify_for(short);
         trace
             .0
             .lock()

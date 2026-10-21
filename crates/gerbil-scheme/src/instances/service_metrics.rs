@@ -19,6 +19,7 @@ pub struct SchemePhaseObservation {
     pub wall_ns: u64,
     pub cpu_ns: Option<u64>,
     pub gc_real_ns: Option<u64>,
+    /// SDK process CPU over GC intervals, not isolated owner/collector CPU.
     pub gc_cpu_ns: Option<u64>,
 }
 /// Read on the fixed owner after prior phases finish; no native values escape.

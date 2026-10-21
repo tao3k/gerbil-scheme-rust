@@ -17,6 +17,12 @@ pub(super) fn configure(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&
                 .wait(GATE)
                 .unwrap();
         }
+        dispatch
+            .configure_scheme_service_notification_on(
+                owner,
+                gerbil_scheme::instances::SchemeServiceNotification::ShortIndependent,
+            )
+            .unwrap();
         let before = dispatch
             .scheme_service_budget_on(owner)
             .unwrap()

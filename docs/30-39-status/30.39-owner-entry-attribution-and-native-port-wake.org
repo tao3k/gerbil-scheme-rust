@@ -184,3 +184,10 @@ checks passed. The generated Scheme file bytes stayed unchanged; only external
 input fingerprints changed with the build dependency declaration. Initial build
 and strict-lint failures remain private. New exact-head remote CI is required
 after publication; local checks are not remote CI acceptance.
+
+* Follow-up clock-scope correction
+
+[[file:30.40-independent-notification-and-mixed-tail.org][30.40]] verifies that SDK GC CPU uses process time, while owner CPU uses a
+thread clock. GC CPU is not isolated collector CPU and must not be subtracted
+from GC wall or summed across owners. The original observations above remain
+unchanged; the new report retains the process/owner distinction and all negatives.

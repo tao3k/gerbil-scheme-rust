@@ -36,6 +36,8 @@ pub(super) struct Wake {
     #[cfg(feature = "tokio-dispatch")]
     pub direct: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
+    pub independent_short: AtomicBool,
+    #[cfg(feature = "tokio-dispatch")]
     pub observation: std::sync::OnceLock<Arc<super::service_metrics::Monitor>>,
     pending: AtomicBool,
     pub closed: AtomicBool,
@@ -87,6 +89,8 @@ impl Wake {
                 #[cfg(feature = "tokio-dispatch")]
                 direct: AtomicBool::new(false),
                 #[cfg(feature = "tokio-dispatch")]
+                independent_short: AtomicBool::new(false),
+                #[cfg(feature = "tokio-dispatch")]
                 observation: std::sync::OnceLock::new(),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
@@ -117,11 +121,43 @@ impl Wake {
         }
     }
     #[cfg(feature = "tokio-dispatch")]
+    pub fn notify_for(&self, short: bool) -> SchemeWakeDelivery {
+        if short && self.independent_short.load(Ordering::Acquire) {
+            self.notify_independent()
+        } else {
+            self.notify()
+        }
+    }
+    #[cfg(feature = "tokio-dispatch")]
+    fn notify_independent(&self) -> SchemeWakeDelivery {
+        loop {
+            // SAFETY: this Wake owns the descriptor until all notifier Arcs drop.
+            // One-byte writes are atomic; nonblocking and no-SIGPIPE flags were
+            // established at creation. No other publisher owns our wake duty.
+            match unsafe { libc::write(self.write_fd, [1_u8].as_ptr().cast(), 1) } {
+                1 => return SchemeWakeDelivery::Written,
+                -1 => match io::Error::last_os_error().kind() {
+                    io::ErrorKind::Interrupted => continue,
+                    io::ErrorKind::WouldBlock => return SchemeWakeDelivery::Full,
+                    _ => {}
+                },
+                _ => {}
+            }
+            self.failed.store(true, Ordering::Release);
+            return SchemeWakeDelivery::Failed;
+        }
+    }
+    #[cfg(feature = "tokio-dispatch")]
     pub fn arm(&self) {
         self.pending.store(false, Ordering::Release);
     }
     pub fn close(&self) {
         if !self.closed.swap(true, Ordering::AcqRel) {
+            #[cfg(feature = "tokio-dispatch")]
+            if self.independent_short.load(Ordering::Acquire) {
+                self.notify_independent();
+                return;
+            }
             self.notify();
         }
     }
@@ -182,3 +218,7 @@ pub(super) fn notify_enqueued(wake: Option<Arc<Wake>>, enqueued: bool) {
         }
     }
 }
+
+#[cfg(all(test, feature = "tokio-dispatch"))]
+#[path = "service_wake_tests.rs"]
+mod tests;

@@ -201,3 +201,23 @@ protocol changes, not independently attributed speedups. The watcher bridge
 remains the default; mode changes require an idle service and join its old
 reader before transferring ownership. Gambit retains IO, timers, Actors,
 continuations and green-thread scheduling. No Rust green scheduler is added.
+
+## Independent notification comparison
+
+```text
+just bridge-scheme-service-benchmark --notification-ab
+just bridge-scheme-service-benchmark --notification-ab --phase-observation
+```
+
+Both arms retain native port wake, budget one, the same class route, four VMs,
+two Tokio workers, workload and FIFO collection. Only the candidate opts into
+`SchemeServiceNotification::ShortIndependent` through the actual dispatcher API.
+Each explicitly declared short-service publication makes its own nonblocking atomic byte write, bypassing the
+legacy coalescing claim and writer mutex. Full pipes already contain a wake;
+errors remain failures. Coalesced notification remains the default. Bulk publication retains coalescing and close writes independently. The change
+does not alter Scheme scheduling, native compilation, timers or continuations.
+
+Observed candidate probes must have real Written/Full notification receipts.
+Paired owner history now retains enclosing GC CPU as well as GC wall time; old
+captures lacking this field have unknown GC CPU, not zero. These clocks still
+do not isolate kernel wake delivery from runnable-thread scheduling delay.

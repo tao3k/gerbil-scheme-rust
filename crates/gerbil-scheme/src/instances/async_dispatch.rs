@@ -1,5 +1,6 @@
 //! Tokio dispatch never enters a VM; dedicated native owners execute jobs.
 use super::{InstanceDispatcher, InstanceError, NativeSession};
+use crate::NumericElement;
 use std::time::{Duration, Instant};
 /// One asynchronous owner result. A timeout does not cancel accepted Scheme work.
 #[derive(Debug)]
@@ -19,6 +20,27 @@ impl<R> AsyncInstanceTicket<R> {
     }
 }
 impl InstanceDispatcher {
+    /// Submit the same bounded Scheme Actor batch without blocking a waiter thread.
+    /// Native construction, Scheme scheduling, projection and root retirement use
+    /// the same owner-local implementation as `submit_numeric_batch_on`.
+    /// # Errors
+    /// Reports the same input, admission and native errors as the synchronous API.
+    /// An expired wait does not cancel accepted Scheme work.
+    pub fn submit_numeric_batch_async_on<T>(
+        &self,
+        owner: usize,
+        items: Vec<Vec<T>>,
+        yield_every: usize,
+    ) -> Result<AsyncInstanceTicket<Vec<Vec<T>>>, InstanceError>
+    where
+        T: NumericElement + Send + 'static,
+    {
+        super::batch::validate(&items, yield_every, self.maximum_input())?;
+        self.submit_native_async_on(owner, move |session| {
+            super::batch::execute(session, &items, yield_every, |_| {})
+        })
+    }
+
     /// Enqueue native Scheme work and await delivery without a blocking waiter thread.
     /// # Errors
     /// Reports admission failures before returning a ticket.

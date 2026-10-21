@@ -509,6 +509,7 @@ dependencies = [
  "gerbil-scheme-python",
  "gerbil-scheme-sys",
  "libc",
+ "rayon",
  "serde_json",
  "simdutf8",
  "tokio",

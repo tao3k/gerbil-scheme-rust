@@ -9,8 +9,13 @@ fn live(values: &[[f64; 4]]) -> f64 {
     values.iter().map(|value| value[2]).sum()
 }
 pub(super) fn run(smoke: bool, observer: &Observer, progress: &Progress) {
-    std::panic::set_hook(Box::new(|_| {
-        PANICS.fetch_add(1, Ordering::Relaxed);
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if info.payload().downcast_ref::<&str>() == Some(&"injected Rust projection panic") {
+            PANICS.fetch_add(1, Ordering::Relaxed);
+        } else {
+            previous(info);
+        }
     }));
     let process_before = observer.emit("before-pool", 0, &[]);
     let mut pool = InstancePool::start(&normal(), config(4)).unwrap();
@@ -49,10 +54,8 @@ pub(super) fn run(smoke: bool, observer: &Observer, progress: &Progress) {
                         rust_errors += 1;
                         panic_by_owner[owner] += 1;
                     }
-                    Err(InstanceError::Native {
-                        operation: "native root",
-                        code: 0,
-                    }) => {
+                    Err(InstanceError::Scheme(message)) => {
+                        assert!(message.contains("injected Scheme task failure"));
                         assert_eq!(index % 16, 0);
                         scheme_errors += 1;
                         scheme_by_owner[owner] += 1;
@@ -172,6 +175,9 @@ fn continuations(dispatch: &InstanceDispatcher, progress: &Progress) {
             );
         }
     }
+    eprintln!(
+        "RESOURCE-CONTINUATIONS owners=4 capture=true resume-twice=true gc=true dynamic-wind=true"
+    );
 }
 fn retention(pool: &InstancePool, observer: &Observer, progress: &Progress) -> (f64, f64) {
     let dispatch = pool.dispatcher();

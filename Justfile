@@ -239,3 +239,7 @@ owner-model-verify-smoke:
 # Same live Scheme owners and order corpus; normal versus opt-in phase clocks.
 bridge-owner-cost-benchmark *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-library --bench owner_costs --locked -- {{ args }}
+
+# Fixed Scheme VMs; direct versus asynchronous Tokio and submit-only Rayon.
+bridge-owner-dispatch-benchmark *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --locked -- {{ args }}

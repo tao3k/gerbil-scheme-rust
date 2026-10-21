@@ -1,7 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Benchmark-only exports. Rust owns foreign entry; Gerbil owns actor execution.
 package: gerbil-scheme-rust/qualification
-(import :gerbil-scheme-rust/scheme/async-service :gerbil-scheme-rust/scheme/actor-batch :gerbil-scheme-rust/scheme/runtime :std/encoding/json "utf8-controls")
+(import :gerbil-scheme-rust/scheme/service-budget :gerbil-scheme-rust/scheme/async-service :gerbil-scheme-rust/scheme/actor-batch :gerbil-scheme-rust/scheme/runtime :std/encoding/json "utf8-controls")
 (export main)
 
 (def (main . _) (void))

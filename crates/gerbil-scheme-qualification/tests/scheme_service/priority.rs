@@ -97,6 +97,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         }
         assert_eq!(command(&dispatch, 0, 12)[2..], [90]);
         assert!(dispatch.configure_scheme_service_feed_on(0, 1).is_err());
+        reject_active_budget(&dispatch);
         command(&dispatch, 0, 8);
         for (index, ticket) in tickets.into_iter().enumerate() {
             let result = ticket.wait_completed(GATE).await;
@@ -146,10 +147,36 @@ fn check_observation(dispatch: &InstanceDispatcher) {
             .iter()
             .all(|phase| phase.cpu_ns.is_some() && phase.gc_real_ns.is_some())
     );
+    let budget = dispatch
+        .scheme_service_budget_on(0)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    assert_eq!((budget.short_units, budget.bulk_units), (2, 4));
+    assert_eq!(budget.suspensions, 1);
+    assert_eq!(
+        (budget.queued_short, budget.queued_bulk, budget.active),
+        (0, 0, 0)
+    );
 }
 
 fn configure_feed(dispatch: &InstanceDispatcher) {
     assert!(dispatch.configure_scheme_service_feed_on(0, 0).is_err());
     assert!(dispatch.configure_scheme_service_feed_on(0, 9).is_err());
     dispatch.configure_scheme_service_feed_on(0, 4).unwrap();
+    dispatch
+        .configure_scheme_service_budget_on(0, 1)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+}
+
+fn reject_active_budget(dispatch: &InstanceDispatcher) {
+    assert!(
+        dispatch
+            .configure_scheme_service_budget_on(0, 0)
+            .unwrap()
+            .wait(GATE)
+            .is_err()
+    );
 }

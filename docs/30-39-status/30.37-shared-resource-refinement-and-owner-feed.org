@@ -188,3 +188,11 @@ that rule requires a real Scheme yield/service boundary and native validation
 without weakening arbitrary macros, continuations, exceptions or GC. Stateless
 owner partitioning is another explicit capacity trade-off; it cannot move live
 Actor/session state. Defaults remain unchanged pending reproducible evidence.
+
+
+* Native policy follow-up
+
+[[file:30.38-cooperative-scheme-units-and-class-fairness.org][30.38]] connects the cooperative unit/class policy to the native Scheme service
+API and real order workload. This report's model-only boundary and negative
+feed captures remain the historical checkpoint; they are not rewritten as
+acceptance of the later implementation.

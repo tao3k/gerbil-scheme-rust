@@ -1,10 +1,11 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Scheme owns tasks, continuations, native waits and wake delivery.
+(import :gerbil-scheme-rust/scheme/service-budget)
 (export make-gerbil-rs-service gerbil-rs-service-submit! gerbil-rs-service-ready!
         gerbil-rs-service-take! gerbil-rs-service-wait! gerbil-rs-service-stop! gerbil-rs-service-close! make-gerbil-rs-service-endpoint)
 
 (defstruct service-job (id input value failure failed done lane short))
-(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing))
+(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing budget))
 
 ;; Completion queues have amortized constant-time push/pop. A bounded host
 ;; turn must not repeatedly reverse every remaining completion under pressure.
@@ -66,7 +67,8 @@
             (lambda (failure) (set! (service-job-failed job) #t) (set! (service-job-failure job) failure))
             (lambda ()
               (set! (service-job-value job)
-                ((scheme-service-handler service) worker (service-job-input job)))))
+                (call-with-gerbil-rs-budget-context (scheme-service-budget service) (service-job-short job)
+                  (lambda () ((scheme-service-handler service) worker (service-job-input job)))))))
           (let (next
                 (service-locked service
                   (lambda ()
@@ -105,7 +107,7 @@
                    (lambda () (open-output-file (string-append "/dev/fd/" (number->string write-fd))))))
          (service (make-scheme-service handler limit (make-table test: eqv?) 1
                     (make-vector count) [] [] (make-service-fifo [] []) [] (make-service-fifo [] []) 0 (make-vector count #f) (make-mutex)
-                    (make-condition-variable) port output #f #f #f #f)))
+                    (make-condition-variable) port output #f #f #f #f (make-gerbil-rs-budget))))
     ;; Construction failure joins already-created children before propagating.
     (with-catch
       (lambda (failure)
@@ -218,6 +220,8 @@
           (mutex-unlock! lock))))
     (vector-for-each (lambda (worker) (thread-send worker 'stop)) (scheme-service-workers service))
     (vector-for-each thread-join! (scheme-service-workers service))
+    (unless (gerbil-rs-budget-idle? (scheme-service-budget service))
+      (error "cooperative unit resources did not drain"))
     (write-u8 0 (scheme-service-output service))
     (force-output (scheme-service-output service))
     (thread-join! (scheme-service-watcher service))
@@ -230,6 +234,7 @@
 ;; Rooted unary command protocol: [s64 header, optional native payload].
 ;; 0=open(read-fd,write-fd,limit), 1=submit(lane, optional short-class=1), 2=take(id), 3=ready,
 ;; 4=wait(host-deadline-microseconds or zero), 7=prepare-close, 5=drain/close.
+;; ABI v3 adds 8=configure cooperative units (zero disables), 9=unit counters.
 ;; Hooks remain Scheme-owned; open/close track partially allocated app resources.
 (def (make-gerbil-rs-service-endpoint handler workers on-open on-prepare on-close)
   (let ((service #f) (opened #f) (preparing #f))
@@ -251,7 +256,7 @@
            (on-open)
            (set! service (make-gerbil-rs-service handler workers (s64vector-ref header 3)
                           (s64vector-ref header 1) (s64vector-ref header 2)))
-           (s64vector 0 2 workers (s64vector-ref header 3)))
+           (s64vector 0 3 workers (s64vector-ref header 3)))
           ((1)
            (unless service (error "Scheme service not open"))
            (unless (or (= (s64vector-length header) 2)
@@ -262,6 +267,18 @@
           ((2) (gerbil-rs-service-take! service (s64vector-ref header 1)))
           ((3) (gerbil-rs-service-ready! service))
           ((4) (s64vector (gerbil-rs-service-wait! service (s64vector-ref header 1))))
+          ((8)
+           (unless (and service (= (s64vector-length header) 2) (not preparing))
+             (error "invalid cooperative scheduling configuration"))
+           (service-locked service
+             (lambda ()
+               (unless (zero? (table-length (scheme-service-jobs service)))
+                 (error "Scheme service must be idle to configure scheduling"))
+               (gerbil-rs-budget-configure! (scheme-service-budget service) (s64vector-ref header 1))))
+           (s64vector 0))
+          ((9)
+           (unless service (error "Scheme service not open"))
+           (gerbil-rs-budget-snapshot (scheme-service-budget service)))
           ((7) (prepare!) (s64vector 0))
           ((5)
            (prepare!)

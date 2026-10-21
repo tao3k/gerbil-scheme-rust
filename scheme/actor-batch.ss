@@ -1,9 +1,10 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Fixed-owner mailbox actors. No Rust scheduler or foreign Scheme references.
+(import :gerbil-scheme-rust/scheme/service-budget)
 (export make-gerbil-rs-actor-batch gerbil-rs-actor-batch! gerbil-rs-actor-batch-close!)
 
 (defstruct actor-batch (workers busy closed))
-(defstruct actor-turn (reply input output quantum width))
+(defstruct actor-turn (reply input output quantum width context))
 
 (def (actor-turn-run! handler worker turn)
   (let loop ((index worker) (done 0) (ok #t))
@@ -23,7 +24,8 @@
   (let loop ()
     (let (turn (thread-receive))
       (unless (eq? turn 'stop)
-        (thread-send (actor-turn-reply turn) (actor-turn-run! handler worker turn))
+        (thread-send (actor-turn-reply turn) (parameterize ((gerbil-rs-service-context (actor-turn-context turn)))
+          (actor-turn-run! handler worker turn)))
         (loop)))))
 (def (make-gerbil-rs-actor-batch handler count)
   (unless (and (procedure? handler) (integer? count) (<= 1 count 64))
@@ -41,7 +43,7 @@
   (let* ((workers (actor-batch-workers service)) (count (vector-length workers))
          (active (min count (vector-length input)))
          (output (make-vector (vector-length input)))
-         (turn (make-actor-turn (current-thread) input output quantum count)))
+         (turn (make-actor-turn (current-thread) input output quantum count (gerbil-rs-service-context))))
     ;; Empty actors have no work and do not participate in this turn's barrier.
     (let loop ((worker 0))
       (when (< worker active)
@@ -68,7 +70,8 @@
       (lambda () (set! (actor-batch-busy service) #t))
       ;; A private coordinator owns acknowledgements; the application's foreign
       ;; entry thread may already have unrelated mailbox traffic.
-      (lambda () (thread-join! (spawn (lambda () (actor-batch-execute! service input quantum)))))
+      (lambda () (call-with-gerbil-rs-service-suspension
+        (lambda () (thread-join! (spawn (lambda () (actor-batch-execute! service input quantum)))))))
       (lambda () (set! (actor-batch-busy service) #f)))))
 (def (gerbil-rs-actor-batch-close! service)
   (actor-batch-check! service)

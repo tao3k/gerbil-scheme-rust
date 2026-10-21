@@ -263,3 +263,32 @@ separate candidate cooperative CPU/class-debt policy. The latter is not an
 implemented general execution-time guarantee. See the
 [shared-resource refinement and directed feed qualification](30-39-status/30.37-shared-resource-refinement-and-owner-feed.org)
 and [model boundaries](../specs/owner_lifecycle.md#shared-vm-resources-and-scheduling-refinement).
+
+
+### Scheme cooperative unit and class policy (explicit opt-in)
+
+ABI v3 adds `configure_scheme_service_budget_on(owner, maximum_consecutive_units)`.
+The returned fixed-owner ticket confirms native configuration. Zero disables the
+policy (the default); 1..=256 sets a class streak bound. Configuration rejects
+accepted Scheme jobs or active leases/waiters. Older service ABIs still execute
+existing work and reject this unsupported policy before native entry.
+
+Scheme applications import `:gerbil-scheme-rust/scheme/service-budget` and use
+`call-with-gerbil-rs-service-unit` around an application-defined work unit, with
+`call-with-gerbil-rs-service-suspension` around blocking operations inside it.
+Actor batches propagate the request context to persistent children and release
+an enclosing unit across their coordinator join. The real order handler uses
+one complete order as a unit, releasing around its real one-ms native wait.
+
+Scheme owns two FIFO lease queues. With both classes waiting, the configured
+streak forces a class switch; otherwise the runnable class proceeds immediately.
+This is fairness among participating, registered unit waiters. Rust does not
+select or execute green threads. Arbitrary Scheme computation remains available
+and is not preempted or transformed; an uncooperative handler, VM GC or OS pause
+can still delay requests. No elapsed-time bound follows from the work-unit count.
+
+`scheme_service_budget_on` returns typed native lease/contention counters, queue
+sizes and active state. A resumed wait obtains another grant: grant counts are
+not completed-order counts. Dynamic extents balance leases on exceptions and
+continuation exits/reentry. Closing requires drained workers, leases and waiters.
+See [native policy qualification and negative results](30-39-status/30.38-cooperative-scheme-units-and-class-fairness.org).

@@ -151,3 +151,27 @@ capacity is insufficient: native entry, VM CPU, GC and OS progress remain shared
 Its candidate cooperative CPU policy is model-only; bounded native feeding does
 not implement it or preempt arbitrary Scheme handlers. See status report 30.37
 for the model-to-code mapping, native gates and retained directed results.
+
+
+## Scheme cooperative unit/class policy only
+
+```text
+just bridge-scheme-service-benchmark --test --budget-ab
+just bridge-scheme-service-benchmark --budget-ab
+```
+
+Both arms use the same four VMs, native O2 image, two Tokio workers, explicit short
+service/router/layout, native feed one, slots/work 4/32, batch eight and FIFO
+collection. Only the Scheme cooperative budget changes: disabled versus one
+consecutive unit while both classes wait. The order handler defines one order as
+a unit and releases its lease around the same real one-ms wait. Actor children
+receive the same request class; Rust only configures and dispatches.
+
+Each sample checks exact native participation: zero grants in the disabled arm;
+64 short grants and one bulk grant per order plus one reacquisition per real wait
+in the full candidate. All queues/leases must return idle. Cumulative native
+class-bypass maxima must not exceed one. Those are fairness observations among
+registered cooperative unit waiters; host entry, uncooperative handlers, GC and
+OS scheduling are separate and can still dominate request p99. State/continuation
+ownership and existing output/progress/cleanup checks remain required. Keep the
+negative captures and source identities; see status report 30.38.

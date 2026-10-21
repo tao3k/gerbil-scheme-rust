@@ -31,7 +31,8 @@
     (vector actors rank)))
 (def (orders-service-handler lane input)
   (if (s64vector? input)
-    (if (= (s64vector-ref input 0) 11) (raise #f) (instance-native-call input))
+    (call-with-gerbil-rs-service-unit
+      (lambda () (if (= (s64vector-ref input 0) 11) (raise #f) (instance-native-call input))))
   ;; Explicit application tag/version [77,1] selects one native order/result layout. It is
   ;; not inferred from input length and does not enter the Actor batch barrier.
   (if (and (vector? input) (= (vector-length input) 2)
@@ -65,10 +66,13 @@
 (def single-endpoint
   (make-gerbil-rs-service-endpoint
     (lambda (_ input)
-      (set! single-started (cons (s64vector-ref input 0) single-started))
-      (when (= (s64vector-ref input 0) 90) (orders-latch-wait!))
-      (when (= (s64vector-ref input 0) 91) (raise #f))
-      input)
+      (call-with-gerbil-rs-service-unit
+        (lambda ()
+          (set! single-started (cons (s64vector-ref input 0) single-started))
+          (when (= (s64vector-ref input 0) 90)
+            (call-with-gerbil-rs-service-suspension orders-latch-wait!))
+          (when (= (s64vector-ref input 0) 91) (raise #f))
+          input)))
     1 (lambda () (set! orders-latch-open #f)) orders-latch-release! void))
 (def (single-command command)
   (let ((result (single-endpoint command)) (op (s64vector-ref (vector-ref command 0) 0)))
@@ -79,6 +83,8 @@
   (case (s64vector-ref header 0)
     ((8) (orders-latch-release!) (s64vector 0))
     ((9) (set! orders-latch-open #f) (s64vector 0))
+    ((13) (orders-budget-contract))
+    ((14) (orders-budget-contention))
     ((12) (list->s64vector (append (list single-accepted single-ready-max) (reverse single-started))))
     ((10) (thread-yield!) (##gc) (s64vector orders-latch-blocked))
     (else (error "invalid service observation"))))
@@ -108,3 +114,63 @@
  (c-define (owner-service-single root) (int64) int64 "gerbil_owner_service_single" "extern"
   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
     gerbil-scheme-rust/qualification/actors#single-command)))
+
+;; Contention is made deterministic while one bulk unit owns the gate. The
+;; production class selector, not a test scheduler, determines subsequent grants.
+(def (orders-budget-contract)
+  (let ((budget (make-gerbil-rs-budget)) (events []) (parent (current-thread)))
+    (gerbil-rs-budget-configure! budget 1)
+    (let* ((first (spawn (lambda ()
+                    (call-with-gerbil-rs-budget-context budget #f
+                      (lambda () (call-with-gerbil-rs-service-unit
+                        (lambda () (set! events (cons 0 events))
+                          (thread-send parent 'held) (thread-receive))))))))
+           (workers []))
+      (thread-receive)
+      (for-each
+        (lambda (entry)
+          (let* ((id (car entry)) (short? (cdr entry))
+                 (worker (spawn (lambda ()
+                           (call-with-gerbil-rs-budget-context budget short?
+                             (lambda () (call-with-gerbil-rs-service-unit
+                               (lambda () (set! events (cons id events))))))))))
+            (set! workers (cons worker workers))
+            (let wait ()
+              (let (state (gerbil-rs-budget-snapshot budget))
+                (unless (= (+ (s64vector-ref state 6) (s64vector-ref state 7)) (length workers))
+                  (thread-yield!) (wait))))))
+        (list (cons 1 #t) (cons 2 #f) (cons 3 #t)))
+      (thread-send first 'release)
+      (thread-join! first)
+      (for-each thread-join! workers)
+      (list->s64vector (append (reverse events) (s64vector->list (gerbil-rs-budget-snapshot budget)))))))
+
+
+;; One directed stress control: both policies run identical real orders and an
+;; explicit in-unit Scheme yield, making repeated contention observable.
+(def (orders-budget-stress enabled?)
+  (let ((budget (make-gerbil-rs-budget)) (verified 0) (workers []))
+    (gerbil-rs-budget-configure! budget (if enabled? 1 0))
+    (let launch ((worker 0))
+      (when (< worker 4)
+        (let (id worker)
+          (set! workers (cons (spawn (lambda ()
+            (call-with-gerbil-rs-budget-context budget (zero? id)
+              (lambda ()
+                (let loop ((index 0))
+                  (when (< index 64)
+                    (call-with-gerbil-rs-service-unit
+                      (lambda ()
+                        (thread-yield!)
+                        (let (value (orders-handler/rank (lambda () 1) id
+                                      (s64vector (+ (* id 64) index) 0 1 2 3)))
+                          (unless (and (= (s64vector-ref value 1) 2) (= (s64vector-ref value 2) 6))
+                            (error "cooperative stress order mismatch"))
+                          (set! verified (1+ verified)))))
+                    (loop (1+ index)))))))) workers)))
+        (launch (1+ worker))))
+    (for-each thread-join! workers)
+    (cons verified (s64vector->list (gerbil-rs-budget-snapshot budget)))))
+(def (orders-budget-contention)
+  (let ((control (orders-budget-stress #f)) (candidate (orders-budget-stress #t)))
+    (list->s64vector (cons (car control) candidate))))

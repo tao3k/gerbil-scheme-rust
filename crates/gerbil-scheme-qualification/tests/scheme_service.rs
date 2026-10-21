@@ -1,4 +1,6 @@
 //! Native Scheme-owned waiting, continuation affinity and close/error drain.
+#[path = "scheme_service/budget.rs"]
+mod budget;
 #[path = "../benches/support/orders.rs"]
 mod corpus;
 #[path = "scheme_service/priority.rs"]
@@ -139,6 +141,9 @@ async fn capabilities(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'s
             InstanceError::TaskPanicked
         );
         for (op, expected) in [(1, 23), (2, marker + 7), (3, marker + 9), (4, 31)] {
+            if op == 2 || op == 3 {
+                budget::toggle_retained(dispatch, owner, op == 3).await;
+            }
             assert_eq!(
                 vector(dispatch, owner, vec![2, op, marker], false)
                     .await
@@ -357,6 +362,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     for owner in 0..4 {
         dispatch.configure_scheme_service_feed_on(owner, 4).unwrap();
     }
+    budget::configure(&dispatch, &progress);
     let hidden = dispatch
         .submit_native_on(0, |session| {
             let header = session.numeric_vector(&[5_i64])?;

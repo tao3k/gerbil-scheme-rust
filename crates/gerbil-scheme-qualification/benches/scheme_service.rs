@@ -1,4 +1,6 @@
 //! One directed pair: same VMs, native work and explicit budgets, Scheme-owned async service.
+#[path = "scheme_service/budget.rs"]
+mod budget;
 #[path = "support/orders.rs"]
 mod corpus;
 #[path = "scheme_service/measurement.rs"]
@@ -128,6 +130,7 @@ fn main() {
         || s == "--class-route-ab"
         || s == "--short-service-ab"
         || s == "--phase-observation"
+        || s == "--budget-ab"
         || s == "--feed-ab"));
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
@@ -147,7 +150,8 @@ fn main() {
         args.iter()
             .filter(|s| matches!(
                 s.as_str(),
-                "--feed-ab"
+                "--budget-ab"
+                    | "--feed-ab"
                     | "--split-layout-ab"
                     | "--short-layout-only"
                     | "--class-route-ab"
@@ -156,7 +160,9 @@ fn main() {
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--feed-ab") {
+    let comparison = if args.iter().any(|s| s == "--budget-ab") {
+        Comparison::Budget
+    } else if args.iter().any(|s| s == "--feed-ab") {
         Comparison::Feed
     } else if args.iter().any(|s| s == "--short-service-ab") {
         Comparison::ShortService

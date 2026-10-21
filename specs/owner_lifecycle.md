@@ -231,7 +231,7 @@ quint test specs/owner_lifecycle.qnt --main service_routing_isolated --seed 1
 | Per-owner admission and class route | `instances/routing/policy.rs`; cooperating callers only |
 | CPU/GC/OS shared spans | opt-in `instances/service_observation.rs`, native diagnostics, directed `scheme_service` bench |
 | Root conservation, failure, close and GC/continuations | real `tests/scheme_service.rs` and `tests/scheme_service/priority.rs` |
-| Candidate cooperative CPU lease and class debt | model only; not implemented or performance-admitted |
+| Cooperative CPU lease and class debt | opt-in `scheme/service-budget.ss`, `instances/service_budget.rs` and native service tests; participating unit boundaries only, not a general preemptor or performance admission |
 | Other-VM GC isolation | model routing contrast; no automatic stateful migration |
 
 `configure_scheme_service_feed_on(owner, maximum)` publishes only immediately
@@ -247,3 +247,15 @@ and thread CPU have different accounting and may overlap; neither residual nor
 subtracted aggregate quantiles isolate OS scheduling. Native counter snapshots
 and sampled stacks are diagnostic evidence, not consequences of model success.
 See status report 30.37 for artifacts, directed A/B and remaining obligations.
+
+
+### Native cooperative-policy follow-up
+
+Status report 30.38 implements the modeled budget-one class transition for actual
+participating Scheme units. Actor children share the request context; a modeled
+request's units abstract those child executions rather than identifying every
+production thread. Unit waits release and reacquire the Scheme lease. Native
+controls cover two-class contention, exceptions, GC, multi-shot continuations
+through disable/re-enable and close. The model source remains unchanged; this
+correspondence is not a mechanically proved implementation refinement. Unwrapped
+Scheme, GC and OS pauses remain outside the cooperative fairness claim.

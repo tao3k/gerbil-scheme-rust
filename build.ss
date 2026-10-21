@@ -9,6 +9,7 @@
   '("scheme/utf8"
     (gxc: "scheme/runtime" (extra-inputs: ("scheme/runtime-collections.ss"
       "scheme/runtime-object-kinds.ss" "scheme/runtime-composites.ss")))
+    "scheme/service-budget"
     "scheme/actor-batch"
     "scheme/async-service"
     "scheme/program-build"

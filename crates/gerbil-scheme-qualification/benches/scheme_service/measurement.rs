@@ -24,6 +24,7 @@ pub(super) enum Comparison {
     ClassRouting,
     ShortService,
     Feed,
+    Budget,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -34,6 +35,9 @@ impl Comparison {
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
+            Self::Budget => {
+                "same short queues/router/native work/feed; Scheme cooperative budget disabled versus one"
+            }
             Self::Feed => {
                 "same short queues/router/native work; feed one versus four admitted inputs per Scheme advance"
             }
@@ -55,8 +59,10 @@ struct Strategy {
 impl Strategy {
     fn for_arm(comparison: Comparison, arm: bool, observation: bool) -> Self {
         Self {
-            short_mode: if matches!(comparison, Comparison::ShortService | Comparison::Feed)
-                && (arm || comparison == Comparison::Feed)
+            short_mode: if matches!(
+                comparison,
+                Comparison::ShortService | Comparison::Feed | Comparison::Budget
+            ) && (arm || matches!(comparison, Comparison::Feed | Comparison::Budget))
             {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -69,8 +75,10 @@ impl Strategy {
                 ShortMode::Batch
             },
             ready_completion: comparison == Comparison::Combined && arm,
-            class_routing: matches!(comparison, Comparison::ShortService | Comparison::Feed)
-                || (comparison == Comparison::ClassRouting && arm),
+            class_routing: matches!(
+                comparison,
+                Comparison::ShortService | Comparison::Feed | Comparison::Budget
+            ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
 }
@@ -109,6 +117,9 @@ pub(super) fn run(
                 .configure_scheme_service_feed_on(owner, if arm { 4 } else { 1 })
                 .unwrap();
         }
+    }
+    if comparison == Comparison::Budget {
+        super::budget::configure(pool, arm);
     }
     let before = observation.then(|| super::observation::snapshot(pool));
     let released = Instant::now();
@@ -156,6 +167,10 @@ pub(super) fn run(
     if let Some(before) = before {
         value["owner_phases"] =
             super::observation::delta(&before, &super::observation::snapshot(pool));
+    }
+    if comparison == Comparison::Budget {
+        value["scheme_budget"] = json!(usize::from(arm));
+        value["scheme_budget_counters"] = super::budget::snapshot(pool, arm, inputs, probes);
     }
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4

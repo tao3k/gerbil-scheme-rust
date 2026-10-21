@@ -67,3 +67,8 @@ pub use service_metrics::{SchemePhaseObservation, SchemeServiceObservation, Sche
 
 #[cfg(feature = "tokio-dispatch")]
 mod service_feed;
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_budget;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_budget::SchemeCooperativeBudgetObservation;

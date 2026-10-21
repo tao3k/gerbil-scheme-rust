@@ -30,7 +30,9 @@ pub(super) struct Request {
     pub(super) started: Arc<AtomicBool>,
     pub(super) work: Work,
     #[cfg(feature = "tokio-dispatch")]
-    pub(super) capacity: Option<tokio::sync::OwnedSemaphorePermit>,
+    pub(super) capacity: Option<super::capacity::CapacityPermit>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) work_units: usize,
 }
 pub(super) enum Work {
     Bytes {

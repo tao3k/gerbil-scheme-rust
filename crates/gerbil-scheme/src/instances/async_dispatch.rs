@@ -36,7 +36,7 @@ impl InstanceDispatcher {
         T: NumericElement + Send + 'static,
     {
         super::batch::validate(&items, yield_every, self.maximum_input())?;
-        self.submit_native_async_on(owner, move |session| {
+        self.submit_native_async_units_on(owner, items.len(), move |session| {
             super::batch::execute(session, &items, yield_every, |_| {})
         })
     }
@@ -53,8 +53,20 @@ impl InstanceDispatcher {
         R: Send + 'static,
         F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
     {
+        self.submit_native_async_units_on(owner, 1, job)
+    }
+    pub(super) fn submit_native_async_units_on<R, F>(
+        &self,
+        owner: usize,
+        units: usize,
+        job: F,
+    ) -> Result<AsyncInstanceTicket<R>, InstanceError>
+    where
+        R: Send + 'static,
+        F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
+    {
         let (send, response) = tokio::sync::oneshot::channel();
-        self.native_request(owner, job, move |value| send.send(value).is_ok())?;
+        self.native_request_units(owner, units, job, move |value| send.send(value).is_ok())?;
         Ok(AsyncInstanceTicket { response })
     }
 }
@@ -75,7 +87,25 @@ impl InstanceDispatcher {
         R: Send + 'static,
         F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
     {
-        let reservation = self.reserve_owner(owner, timeout).await?;
+        self.submit_native_weighted_backpressured_on(owner, 1, job, timeout)
+            .await
+    }
+    /// Submit a native job with an explicit application-declared work charge.
+    /// Units constrain outstanding work, never preempt or translate Scheme.
+    /// # Errors
+    /// Rejects zero/oversized charges and the ordinary finite admission failures.
+    pub async fn submit_native_weighted_backpressured_on<R, F>(
+        &self,
+        owner: usize,
+        units: usize,
+        job: F,
+        timeout: Duration,
+    ) -> Result<AsyncInstanceTicket<R>, InstanceError>
+    where
+        R: Send + 'static,
+        F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
+    {
+        let reservation = self.reserve_owner(owner, timeout, units).await?;
         let (send, response) = tokio::sync::oneshot::channel();
         self.native_request_reserved(reservation, job, move |value| send.send(value).is_ok())?;
         Ok(AsyncInstanceTicket { response })
@@ -94,8 +124,9 @@ impl InstanceDispatcher {
         T: NumericElement + Send + 'static,
     {
         super::batch::validate(&items, admission.yield_every, self.maximum_input())?;
-        self.submit_native_backpressured_on(
+        self.submit_native_weighted_backpressured_on(
             admission.owner,
+            items.len(),
             move |session| super::batch::execute(session, &items, admission.yield_every, |_| {}),
             admission.timeout,
         )

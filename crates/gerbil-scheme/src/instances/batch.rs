@@ -26,7 +26,7 @@ impl InstanceDispatcher {
         T: NumericElement + Send + 'static,
     {
         validate(&items, yield_every, self.maximum_input())?;
-        self.submit_native_on(owner, move |session| {
+        self.submit_native_units_on(owner, items.len(), move |session| {
             execute(session, &items, yield_every, |_| {})
         })
     }

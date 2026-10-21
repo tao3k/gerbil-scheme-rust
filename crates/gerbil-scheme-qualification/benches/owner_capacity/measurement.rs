@@ -7,12 +7,17 @@ use std::{sync::Arc, time::Instant};
 pub(super) struct Case {
     pub capacity: usize,
     pub batch: usize,
+    pub work: usize,
 }
 pub(super) fn idle(pool: &InstancePool) {
     let started = Instant::now();
     loop {
         let snapshots = pool.dispatcher().owner_capacity();
-        if snapshots.len() == 4 && snapshots.iter().all(|s| s.available == s.limit) {
+        if snapshots.len() == 4
+            && snapshots
+                .iter()
+                .all(|s| s.available == s.limit && s.work_available == s.work_limit)
+        {
             return;
         }
         assert!(started.elapsed() < GATE, "pool credits did not return");
@@ -28,7 +33,7 @@ pub(super) fn run(
 ) -> Value {
     idle(pool);
     pool.dispatcher()
-        .configure_owner_capacity(case.capacity)
+        .configure_owner_budgets(case.capacity, Some(case.work))
         .unwrap();
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
@@ -84,13 +89,29 @@ pub(super) fn run(
                 .collect()
         })
         .collect();
+    let entry_delivery: Vec<_> = probe
+        .delivery
+        .iter()
+        .zip(&probe.wake)
+        .map(|(delivery, wake)| delivery.checked_sub(*wake).unwrap())
+        .collect();
+    let post_admission: Vec<_> = entry_delivery
+        .iter()
+        .zip(&probe.admission)
+        .map(|(delivery, admission)| delivery.checked_sub(*admission).unwrap())
+        .collect();
     json!({"elapsed_ns": elapsed, "bulk_elapsed_ns": bulk.elapsed,
         "bulk_orders": inputs.len(), "probe_orders": probes,
         "bulk_owner_native_ns": bulk_owner_ns, "probe_native_ns": probe.native,
         "probe_delivery_ns": probe.delivery, "probe_admission_ns": probe.admission,
+        "probe_entry_delivery_ns": entry_delivery, "probe_post_admission_ns": post_admission,
         "probe_wake_ns": probe.wake, "owner_progress_at_first_done": owner_progress,
         "bulk_completed_at_last_probe": bulk_before_last_probe, "probes_completed_during_bulk": probe_before_bulk_end,
-        "actor_peer_min": bulk.actor_peer_min, "capacity": case.capacity, "batch": case.batch})
+        "bulk_service_ns": bulk.service, "bulk_queue_and_admission_ns": bulk.queue,
+        "bulk_scheme_ns": bulk.scheme, "bulk_collections": bulk.collections,
+        "probe_service_ns": probe.service, "probe_queue_and_admission_ns": probe.queue,
+        "probe_scheme_ns": probe.scheme,
+        "work_budget": case.work, "actor_peer_min": bulk.actor_peer_min, "capacity": case.capacity, "batch": case.batch})
 }
 fn series(samples: &[Value], field: &str) -> Vec<u128> {
     samples
@@ -124,7 +145,16 @@ pub(super) fn emit(samples: &[Value], pair: usize, arm: usize, mixed: bool) {
     println!(
         "{}",
         json!({"event": "capacity_result", "pair": pair, "arm": arm, "mixed": mixed,
-        "samples": samples.len(), "capacity": samples[0]["capacity"], "batch": samples[0]["batch"],
+        "bulk_service_max_ns": series(samples, "bulk_service_ns").into_iter().max(),
+        "probe_service_max_ns": series(samples, "probe_service_ns").into_iter().max(),
+        "probe_entry_delivery_p99_ns": quantile(samples, "probe_entry_delivery_ns"),
+        "probe_post_admission_p99_ns": quantile(samples, "probe_post_admission_ns"),
+        "bulk_service_p99_ns": quantile(samples, "bulk_service_ns"),
+        "bulk_queue_and_admission_p99_ns": quantile(samples, "bulk_queue_and_admission_ns"),
+        "bulk_scheme_p99_ns": quantile(samples, "bulk_scheme_ns"),
+        "probe_service_p99_ns": quantile(samples, "probe_service_ns"),
+        "probe_queue_and_admission_p99_ns": quantile(samples, "probe_queue_and_admission_ns"),
+        "work_budget": samples[0]["work_budget"], "samples": samples.len(), "capacity": samples[0]["capacity"], "batch": samples[0]["batch"],
         "bulk_orders": orders, "probe_orders": probes, "median_ns": elapsed,
         "median_bulk_ns": bulk_elapsed, "bulk_orders_per_second": u32::try_from(orders).map(f64::from).unwrap() / seconds(bulk_elapsed),
         "complete_orders_per_second": u32::try_from(orders + probes).map(f64::from).unwrap() / seconds(elapsed),

@@ -20,16 +20,30 @@ impl InstanceDispatcher {
         R: Send + 'static,
         F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
     {
+        self.submit_native_units_on(owner, 1, job)
+    }
+    pub(super) fn submit_native_units_on<R, F>(
+        &self,
+        owner: usize,
+        units: usize,
+        job: F,
+    ) -> Result<InstanceTicket<R>, InstanceError>
+    where
+        R: Send + 'static,
+        F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
+    {
         let (response, result) = mpsc::channel();
-        let started = self.native_request(owner, job, move |value| response.send(value).is_ok())?;
+        let started = self
+            .native_request_units(owner, units, job, move |value| response.send(value).is_ok())?;
         Ok(InstanceTicket {
             started,
             response: result,
         })
     }
-    pub(super) fn native_request<R, F>(
+    pub(super) fn native_request_units<R, F>(
         &self,
         owner: usize,
+        units: usize,
         job: F,
         deliver: impl FnOnce(super::types::Completed<R>) -> bool + Send + 'static,
     ) -> Result<Arc<AtomicBool>, InstanceError>
@@ -38,6 +52,14 @@ impl InstanceDispatcher {
         F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
     {
         let request = self.native_work(job, deliver);
+        #[cfg(feature = "tokio-dispatch")]
+        let request = {
+            let mut request = request;
+            request.work_units = units;
+            request
+        };
+        #[cfg(not(feature = "tokio-dispatch"))]
+        let _ = units;
         let started = Arc::clone(&request.started);
         self.enqueue(owner, request)?;
         Ok(started)
@@ -73,6 +95,8 @@ impl InstanceDispatcher {
             started,
             #[cfg(feature = "tokio-dispatch")]
             capacity: None,
+            #[cfg(feature = "tokio-dispatch")]
+            work_units: 1,
             work: Work::Native(Box::new(move |image| {
                 let first = image.next_retained.get();
                 let session = NativeSession {

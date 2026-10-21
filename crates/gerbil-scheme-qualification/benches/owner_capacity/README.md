@@ -7,12 +7,12 @@ just bridge-owner-capacity-benchmark --test
 just bridge-owner-capacity-benchmark
 ```
 
-This separate focused bench retains four identical native Scheme VM states and
-two Tokio workers. It has two explicit AB/BA pairs: shared owner capacity 128
-versus 4 at batch size 1, then batch size 1 versus 8 at capacity 4. CPU and mixed
-cooperative Scheme waits use the same 48-line invoice corpus. This adds no thread
-count/VM matrix and changes no production defaults. The first control also enables
-shared capacity; it is not relabeled as a historical unbounded binary baseline.
+This focused bench retains four identical native Scheme VM states and two Tokio
+workers. The current AB/BA pair fixes request slots at four and native batch size
+at eight, changing only the per-owner declared item budget from 32 to eight. CPU
+and mixed cooperative Scheme waits use the same 48-line invoice corpus. This adds
+no thread/VM matrix and changes no production defaults. Historical request-capacity
+and batch-1/batch-8 pairs remain in status report 30.28 and their external captures.
 
 Each full sample offers 8,192 independent bulk orders and 64 four-line short
 probes scheduled every 500 microseconds. Smoke uses 256 and 8. Probes are one
@@ -56,12 +56,30 @@ for Git/source, executable/native-image SHA-256, command, exit and host-load
 identities. JSON Lines are result records, not the Scheme payload protocol.
 
 
-The shared bound counts native requests, not items or CPU time. At capacity 4,
-batch 8 can retain up to 32 bulk items per owner versus four at batch 1. The second
-pair therefore evaluates an explicit batch policy under the same request-slot
-limit, not equal queued-work budgets or a pure Scheme scheduler speedup. Whole
-native turns remain non-preemptive to the Rust owner queue; internal Scheme Actor
-yields do not let another Rust queue entry enter mid-call. A throughput gain with
-a short-probe tail regression must remain unpromoted. Work-weighted/service-turn
-budgets require a separate protocol refinement; arbitrary Scheme work has no
-automatically inferable execution cost.
+Request slots and item credits are independent. All native numeric batch API
+variants charge their item count; byte and generic native calls charge one unless
+the application explicitly declares a weight. Acquire work credits before a slot,
+under one finite admission deadline. Cancellation returns partial reservations;
+accepted work holds both resources through native completion and rollback. FIFO
+multi-permit acquisition can make small requests wait behind a larger reservation;
+a smaller work budget is not a priority scheduler or a starvation theorem.
+
+Both arms use the same opt-in profiled batch API. Each batch records
+`dispatched`, `entered`, `constructed`, `executed`, `projected`, native completion,
+and GC counter deltas. `bulk_service_ns` and `probe_service_ns` measure owner entry
+to native completion, including construction, Scheme/GC, projection and root
+retirement, excluding final result delivery/credit return. Queue-and-admission
+spans run from API entry to owner entry and include host validation. Scheme spans
+include diagnostics between markers; they are wall-clock spans, not pure CPU cost.
+The profiling overhead is present in both arms, so these rates must not be compared
+directly to the historical unprofiled executable. Raw per-call spans stay in the
+external sample captures; summary p99 fields are derived from the same rows.
+
+Whole native turns remain non-preemptible to the Rust owner queue. Scheme Actor
+yields run other Scheme threads but cannot service another Rust entry mid-call.
+The candidate permits at most eight outstanding declared items per owner and
+rejects a larger indivisible batch; it does not silently split a batch or weaken
+exception/drain semantics. Eight bounded handlers imply a finite service boundary
+only if the application independently bounds each handler, GC and host scheduling.
+Arbitrary Scheme retains its complete capability and has no automatic wall-clock
+bound. Observed service p99 is a measurement, not an enforced deadline.

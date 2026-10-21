@@ -253,3 +253,9 @@ feature route also passes strict core lint. Native controls include a permanentl
 pending admission future returning within its configured budget. No installed
 Python wheel, long-memory soak, open-loop SLO or new hot-unload acceptance is
 claimed for this source. New exact-head remote CI remains a separate gate.
+
+
+* Follow-up: independent work budget
+
+[[file:30.29-independent-work-budget-and-batch-service.org][30.29]] separates request slots from declared work, retains this report's negative
+batch-eight results, and qualifies one focused batch-eight work-budget pair.

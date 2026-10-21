@@ -20,7 +20,7 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 | `admit`, `close` | `InstanceService::runtime`, closed flag, native pool admission |
 | `reserve`, `admitReserved`, `releaseReservation`, `configureCapacity` | `instances/capacity.rs`: shared owner reservations, the existing admission fence and quiescent reconfiguration |
 | `capacityHeld` | Optional permit on `pool::Request`, retained through native execution, delivery and abandoned-reply rollback |
-| `complete` | `instances/native_dispatch.rs::native_request`, fixed-owner completion |
+| `complete` | `instances/native_dispatch.rs::native_request_units`, fixed-owner completion |
 | `observeTimeout` | Ticket observation/draining; accepted Scheme work is not cancelled |
 | `publish` | `instance_runtime.rs::Registry::insert`, closed check under values lock |
 | `createExecutor` | `instance_batch.rs::rayon_pool`, closed check under pool lock |
@@ -73,7 +73,7 @@ or dependency failures cannot satisfy a negative control.
 
 The small domain has three requests and two owners; the wide domain has five
 requests and two owners. These are exploration parameters, not runtime limits.
-Each has sixteen deterministic scenarios and 1,000 sampled traces of at most 64
+Each has nineteen deterministic scenarios and 1,000 sampled traces of at most 64
 transitions. A 12-transition symbolic check is a separate command. Neither finite
 simulation nor bounded symbolic checking is an unbounded theorem, implementation
 refinement, fairness proof or throughput result. Stuttering is allowed; arbitrary
@@ -122,3 +122,26 @@ audit obligations. No temporal fairness or starvation theorem is claimed. Native
 tests independently cover FIFO waiters, clone/API participation, cancellation,
 continuations across forced GC, panic and in-flight close. The older symbolic
 results above are not transferred to this extended state.
+
+## Independent declared work budget
+
+Request slots and work credits are separate per-owner resources. Numeric batch
+APIs charge one work unit per item; generic native and byte jobs retain a unit
+charge unless the caller uses the explicit weighted native API. These are declared
+units, not a CPU-time estimate. No universal time bound follows from an item count.
+
+The same lifecycle model assigns job 1 a weight of eight and other jobs a weight
+of one. `workHeld` includes full work reservations made before slot acquisition,
+slot reservations and accepted native work. `reserveWork`, `reserveSlot` and
+`cancelWork` cover two-stage reservation and cancellation; both budgets must be
+quiescent before reconfiguration. The finite work-bound invariant and timeout
+scenario retain the entire charge until native completion. Partial multi-permit
+allocation inside Tokio, FIFO order and waker behavior are outside the abstraction;
+actual native cancellation, timeout, panic and close tests cover those boundaries.
+
+A Scheme batch is a non-preemptible Rust owner turn. Its service span includes
+native construction, Scheme scheduling/execution/GC, projection and final root
+retirement. Scheme-internal yields allow peer green threads to run; they do not
+service another Rust queue entry. Limiting the batch's item count bounds the number
+of handlers in a turn, not arbitrary handler duration. Hard wall-clock preemption
+is not introduced, and continuations, exceptions and drain semantics are unchanged.

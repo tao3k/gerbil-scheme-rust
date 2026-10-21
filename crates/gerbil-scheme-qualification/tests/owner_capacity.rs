@@ -23,10 +23,11 @@ fn drained(dispatch: &InstanceDispatcher, limit: usize) {
     loop {
         let owners = dispatch.owner_capacity();
         assert_eq!(owners.len(), 4);
-        if owners
-            .iter()
-            .all(|owner| owner.limit == limit && owner.available == limit)
-        {
+        if owners.iter().all(|owner| {
+            owner.limit == limit
+                && owner.available == limit
+                && owner.work_available == owner.work_limit
+        }) {
             return;
         }
         assert!(
@@ -144,6 +145,111 @@ fn conservation(pool: &InstancePool, runtime: &tokio::runtime::Runtime) {
     );
     drained(&dispatch, 1);
 }
+fn work_budgets(pool: &InstancePool, runtime: &tokio::runtime::Runtime) {
+    let dispatch = pool.dispatcher();
+    dispatch.configure_owner_budgets(4, Some(8)).unwrap();
+    for units in [0, 9] {
+        let error = runtime
+            .block_on(dispatch.submit_native_weighted_backpressured_on(0, units, |_| Ok(()), GATE))
+            .unwrap_err();
+        assert!(matches!(error, InstanceError::InvalidConfig(_)));
+    }
+    // Every native batch variant charges item count, including the old APIs.
+    let oversized = || vec![vec![0_i64]; 9];
+    assert!(matches!(
+        dispatch.submit_numeric_batch_on(0, oversized(), 1),
+        Err(InstanceError::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        dispatch.submit_numeric_batch_async_on(0, oversized(), 1),
+        Err(InstanceError::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        dispatch.submit_numeric_batch_profiled_on(0, oversized(), 1),
+        Err(InstanceError::InvalidConfig(_))
+    ));
+    assert!(matches!(
+        dispatch.submit_numeric_batch_profiled_async_on(0, oversized(), 1),
+        Err(InstanceError::InvalidConfig(_))
+    ));
+    let (ticket, release) = block_owner(&dispatch);
+    let queued = runtime
+        .block_on(dispatch.submit_native_weighted_backpressured_on(0, 7, |_| Ok(()), GATE))
+        .unwrap();
+    let state = &dispatch.owner_capacity()[0];
+    assert_eq!((state.available, state.work_available), (2, Some(0)));
+    assert!(matches!(
+        dispatch.submit_native_on(0, |_| Ok(())),
+        Err(InstanceError::QueueFull)
+    ));
+    assert!(matches!(
+        dispatch.submit_on(0, vec![]),
+        Err(InstanceError::QueueFull)
+    ));
+    // Receiver timeout returns neither slots nor work; no new work executes.
+    assert_eq!(
+        runtime
+            .block_on(queued.wait_completed(Duration::from_millis(1)))
+            .unwrap_err(),
+        InstanceError::Timeout
+    );
+    assert_eq!(dispatch.owner_capacity()[0].work_available, Some(0));
+    runtime.block_on(async {
+        let waiting = dispatch.submit_native_weighted_backpressured_on(0, 8, |_| Ok(()), GATE);
+        let mut waiting = Box::pin(waiting);
+        registered(waiting.as_mut()).await;
+        drop(waiting);
+        assert_eq!(
+            dispatch
+                .submit_native_backpressured_on(0, |_| Ok(()), Duration::from_millis(1))
+                .await
+                .unwrap_err(),
+            InstanceError::Timeout
+        );
+    });
+    assert!(dispatch.configure_owner_budgets(4, Some(16)).is_err());
+    release.send(()).unwrap();
+    runtime.block_on(ticket.wait_completed(GATE)).unwrap();
+    drained(&dispatch, 4);
+    assert!(
+        dispatch
+            .owner_capacity()
+            .iter()
+            .all(|s| s.work_available == Some(8))
+    );
+    let panic = runtime
+        .block_on(dispatch.submit_native_weighted_backpressured_on(
+            0,
+            8,
+            |_| -> Result<(), InstanceError> { panic!("weighted job panic control") },
+            GATE,
+        ))
+        .unwrap();
+    assert_eq!(
+        runtime.block_on(panic.wait_completed(GATE)).unwrap_err(),
+        InstanceError::TaskPanicked
+    );
+    drained(&dispatch, 4);
+    assert!(
+        dispatch
+            .owner_capacity()
+            .iter()
+            .all(|s| s.work_available == Some(8))
+    );
+    // Partial multi-unit acquisition must be returned when admission is cancelled.
+    let (ticket, release) = block_owner(&dispatch);
+    runtime.block_on(async {
+        let mut waiting =
+            Box::pin(dispatch.submit_native_weighted_backpressured_on(0, 8, |_| Ok(()), GATE));
+        registered(waiting.as_mut()).await;
+        drop(waiting);
+    });
+    assert_eq!(dispatch.owner_capacity()[0].work_available, Some(7));
+    release.send(()).unwrap();
+    runtime.block_on(ticket.wait_completed(GATE)).unwrap();
+    drained(&dispatch, 4);
+    dispatch.configure_owner_capacity(1).unwrap();
+}
 fn fifo(pool: &InstancePool, runtime: &tokio::runtime::Runtime) {
     let dispatch = pool.dispatcher();
     let (head, release) = block_owner(&dispatch);
@@ -239,10 +345,10 @@ fn continuations(pool: &InstancePool, runtime: &tokio::runtime::Runtime) {
 }
 fn close_waiters(pool: &mut InstancePool, runtime: &tokio::runtime::Runtime) {
     let dispatch = pool.dispatcher();
-    dispatch.configure_owner_capacity(1).unwrap();
+    dispatch.configure_owner_budgets(1, Some(8)).unwrap();
     let (head, release) = block_owner(&dispatch);
     runtime.block_on(async {
-        let pending = dispatch.submit_native_backpressured_on(0, |_| Ok(()), GATE);
+        let pending = dispatch.submit_native_weighted_backpressured_on(0, 8, |_| Ok(()), GATE);
         let mut pending = Box::pin(pending);
         registered(pending.as_mut()).await;
         let closing = pool.shutdown(Duration::from_millis(1));
@@ -310,6 +416,7 @@ fn shared_credits_survive_timeout_and_close_and_serialize_waiters() {
         );
     }
     conservation(&pool, &runtime);
+    work_budgets(&pool, &runtime);
     progress.send(()).unwrap();
     fifo(&pool, &runtime);
     progress.send(()).unwrap();

@@ -10,6 +10,10 @@ pub(super) struct Bulk {
     pub elapsed: u128,
     pub clocks: Vec<Vec<Instant>>,
     pub actor_peer_min: Option<usize>,
+    pub service: Vec<u128>,
+    pub queue: Vec<u128>,
+    pub scheme: Vec<u128>,
+    pub collections: Vec<u64>,
 }
 pub(super) struct Probe {
     pub native: Vec<u128>,
@@ -17,6 +21,9 @@ pub(super) struct Probe {
     pub admission: Vec<u128>,
     pub wake: Vec<u128>,
     pub clocks: Vec<Instant>,
+    pub service: Vec<u128>,
+    pub queue: Vec<u128>,
+    pub scheme: Vec<u128>,
 }
 pub(super) async fn bulk(
     dispatch: InstanceDispatcher,
@@ -42,7 +49,7 @@ pub(super) async fn bulk(
             let dispatch = dispatch.clone();
             async move {
                 dispatch
-                    .submit_numeric_batch_backpressured(
+                    .submit_numeric_batch_profiled_backpressured(
                         items,
                         BatchAdmission {
                             owner,
@@ -57,8 +64,28 @@ pub(super) async fn bulk(
     .await;
     let mut clocks = vec![Vec::new(); 4];
     let mut actor_peer_min = None;
+    let mut service = Vec::new();
+    let mut queue = Vec::new();
+    let mut scheme = Vec::new();
+    let mut collections = Vec::new();
     for (chunk, row) in outputs.into_iter().enumerate() {
         let (values, completed) = row.expect("native bulk request must complete");
+        let timeline = values.timeline;
+        service.push(completed.duration_since(timeline.entered).as_nanos());
+        queue.push(
+            timeline
+                .entered
+                .duration_since(timeline.dispatched)
+                .as_nanos(),
+        );
+        scheme.push(
+            timeline
+                .executed
+                .duration_since(timeline.constructed)
+                .as_nanos(),
+        );
+        collections.push(timeline.collections[3].saturating_sub(timeline.collections[0]));
+        let values = values.values;
         assert_eq!(values.len(), batch);
         for (offset, value) in values.iter().enumerate() {
             corpus::verify(&inputs[chunk * batch + offset], value);
@@ -73,6 +100,10 @@ pub(super) async fn bulk(
         elapsed: released.elapsed().as_nanos(),
         clocks,
         actor_peer_min,
+        service,
+        queue,
+        scheme,
+        collections,
     }
 }
 pub(super) async fn probes(
@@ -86,6 +117,9 @@ pub(super) async fn probes(
         admission: Vec::new(),
         wake: Vec::new(),
         clocks: Vec::new(),
+        service: Vec::new(),
+        queue: Vec::new(),
+        scheme: Vec::new(),
     };
     for id in 0..count {
         let scheduled =
@@ -95,7 +129,7 @@ pub(super) async fn probes(
         let mut input = corpus::order(100_000 + id, false);
         input.truncate(14); // Four lines, validated by the shared independent oracle.
         let ticket = dispatch
-            .submit_numeric_batch_backpressured(
+            .submit_numeric_batch_profiled_backpressured(
                 vec![input.clone()],
                 BatchAdmission {
                     owner: id % 4,
@@ -109,7 +143,24 @@ pub(super) async fn probes(
             .wait_completed(GATE.saturating_sub(released.elapsed()))
             .await?;
         let delivered = Instant::now();
-        corpus::verify(&input, &output[0]);
+        probe
+            .service
+            .push(completed.duration_since(output.timeline.entered).as_nanos());
+        probe.queue.push(
+            output
+                .timeline
+                .entered
+                .duration_since(output.timeline.dispatched)
+                .as_nanos(),
+        );
+        probe.scheme.push(
+            output
+                .timeline
+                .executed
+                .duration_since(output.timeline.constructed)
+                .as_nanos(),
+        );
+        corpus::verify(&input, &output.values[0]);
         probe
             .native
             .push(completed.saturating_duration_since(scheduled).as_nanos());

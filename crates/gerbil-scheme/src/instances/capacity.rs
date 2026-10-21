@@ -11,6 +11,10 @@ pub struct OwnerCapacitySnapshot {
     pub limit: usize,
     /// Currently unreserved request credits.
     pub available: usize,
+    /// Optional declared work-unit bound; numeric batches charge one unit per item.
+    pub work_limit: Option<usize>,
+    /// Work credits include reservations waiting for a request slot.
+    pub work_available: Option<usize>,
 }
 /// Explicit native Scheme batch routing and finite capacity-wait budget.
 #[derive(Clone, Copy, Debug)]
@@ -22,27 +26,86 @@ pub struct BatchAdmission {
     /// Capacity observation budget; timeout before admission executes no Scheme.
     pub timeout: Duration,
 }
+/// Independent request slots and declared work units for one fixed owner.
+/// Work units are application declarations, not elapsed-time predictions.
+#[derive(Debug)]
+pub(super) struct Capacity {
+    pub slots: Arc<Semaphore>,
+    pub work: Option<Arc<Semaphore>>,
+    pub work_limit: usize,
+}
+impl Capacity {
+    pub fn close(&self) {
+        self.slots.close();
+        if let Some(work) = &self.work {
+            work.close();
+        }
+    }
+    fn units(&self, units: usize) -> Result<u32, InstanceError> {
+        let units = u32::try_from(units)
+            .map_err(|_| InstanceError::InvalidConfig("work units overflow"))?;
+        if units == 0 || (self.work.is_some() && units as usize > self.work_limit) {
+            return Err(InstanceError::InvalidConfig(
+                "work units exceed owner budget",
+            ));
+        }
+        Ok(units)
+    }
+}
+#[derive(Debug)]
+pub(super) struct CapacityPermit {
+    capacity: Arc<Capacity>,
+    // Partial immediate acquisition stays in Request until outside the admission lock.
+    slot: Option<OwnedSemaphorePermit>,
+    work: Option<OwnedSemaphorePermit>,
+}
+impl Drop for CapacityPermit {
+    fn drop(&mut self) {
+        drop(self.work.take());
+        drop(self.slot.take());
+    }
+}
 pub(super) struct ReservedOwner {
     pub owner: usize,
-    pub permit: OwnedSemaphorePermit,
+    pub permit: CapacityPermit,
 }
 pub(super) fn attach(owner: &OwnerSender, request: &mut Request) -> Result<(), InstanceError> {
     match (&owner.capacity, &request.capacity) {
-        (Some(capacity), Some(permit)) if Arc::ptr_eq(capacity, permit.semaphore()) => Ok(()),
+        (Some(capacity), Some(permit)) if Arc::ptr_eq(capacity, &permit.capacity) => Ok(()),
         (_, Some(_)) => Err(InstanceError::Closed),
         (None, None) => Ok(()),
         (Some(capacity), None) => {
-            request.capacity =
-                Some(
-                    Arc::clone(capacity)
+            let units = capacity.units(request.work_units)?;
+            let mut permit = CapacityPermit {
+                capacity: Arc::clone(capacity),
+                slot: None,
+                work: None,
+            };
+            // Immediate APIs never wait or bypass FIFO work waiters.
+            let result = (|| {
+                if let Some(work) = &capacity.work {
+                    permit.work = Some(
+                        Arc::clone(work)
+                            .try_acquire_many_owned(units)
+                            .map_err(|error| immediate_error(&error))?,
+                    );
+                }
+                permit.slot = Some(
+                    Arc::clone(&capacity.slots)
                         .try_acquire_owned()
-                        .map_err(|error| match error {
-                            tokio::sync::TryAcquireError::Closed => InstanceError::Closed,
-                            tokio::sync::TryAcquireError::NoPermits => InstanceError::QueueFull,
-                        })?,
+                        .map_err(|error| immediate_error(&error))?,
                 );
-            Ok(())
+                Ok(())
+            })();
+            request.capacity = Some(permit);
+            result
         }
+    }
+}
+fn immediate_error(error: &tokio::sync::TryAcquireError) -> InstanceError {
+    match error {
+        tokio::sync::TryAcquireError::Closed => InstanceError::Closed,
+        tokio::sync::TryAcquireError::NoPermits => InstanceError::QueueFull,
     }
 }
 impl InstanceDispatcher {
@@ -54,6 +117,24 @@ impl InstanceDispatcher {
     /// Rejects closed pools, bounds above the native queue size, active capacity
     /// and first activation after unbounded work has already been admitted.
     pub fn configure_owner_capacity(&self, maximum_in_flight: usize) -> Result<(), InstanceError> {
+        self.configure_owner_budgets(maximum_in_flight, None)
+    }
+    /// Configure request slots independently from declared work credits.
+    /// Numeric batch APIs charge their item count; generic/byte jobs charge one.
+    /// Use the explicit weighted native API for application-specific work units.
+    /// A unit bound cannot preempt Scheme or guarantee a wall-clock service time.
+    /// # Errors
+    /// Rejects zero/oversized bounds, active reservations and late first activation.
+    pub fn configure_owner_budgets(
+        &self,
+        maximum_in_flight: usize,
+        maximum_work: Option<usize>,
+    ) -> Result<(), InstanceError> {
+        if maximum_work
+            .is_some_and(|n| n == 0 || n > u32::MAX as usize || n > Semaphore::MAX_PERMITS)
+        {
+            return Err(InstanceError::InvalidConfig("invalid owner work budget"));
+        }
         if maximum_in_flight == 0 || maximum_in_flight > self.admission.queue_capacity {
             return Err(InstanceError::InvalidConfig(
                 "owner capacity must fit the native queue",
@@ -64,7 +145,7 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let previous = configure(&mut senders, maximum_in_flight)?;
+        let previous = configure(&mut senders, maximum_in_flight, maximum_work)?;
         drop(senders);
         retire(previous);
         Ok(())
@@ -83,6 +164,7 @@ impl InstanceDispatcher {
         &self,
         owner: usize,
         timeout: Duration,
+        units: usize,
     ) -> Result<ReservedOwner, InstanceError> {
         let started = std::time::Instant::now();
         if timeout.is_zero() {
@@ -104,10 +186,32 @@ impl InstanceDispatcher {
                     ))?,
             )
         };
-        let permit = tokio::time::timeout(timeout, capacity.acquire_owned())
+        let units = capacity.units(units)?;
+        // Consistent work-before-slot ordering: no waiter holds a slot while
+        // waiting for work. Cancellation/timeout drops partial work ownership.
+        let acquire = async {
+            let work = match &capacity.work {
+                Some(work) => Some(
+                    Arc::clone(work)
+                        .acquire_many_owned(units)
+                        .await
+                        .map_err(|_| InstanceError::Closed)?,
+                ),
+                None => None,
+            };
+            let slot = Arc::clone(&capacity.slots)
+                .acquire_owned()
+                .await
+                .map_err(|_| InstanceError::Closed)?;
+            Ok::<_, InstanceError>(CapacityPermit {
+                capacity: Arc::clone(&capacity),
+                slot: Some(slot),
+                work,
+            })
+        };
+        let permit = tokio::time::timeout(timeout, acquire)
             .await
-            .map_err(|_| InstanceError::Timeout)?
-            .map_err(|_| InstanceError::Closed)?;
+            .map_err(|_| InstanceError::Timeout)??;
         if started.elapsed() >= timeout {
             drop(permit);
             return Err(InstanceError::Timeout);
@@ -119,7 +223,8 @@ impl InstanceDispatcher {
 fn configure(
     senders: &mut super::dispatch::Senders,
     maximum_in_flight: usize,
-) -> Result<Vec<Arc<Semaphore>>, InstanceError> {
+    maximum_work: Option<usize>,
+) -> Result<Vec<Arc<Capacity>>, InstanceError> {
     if senders.owners.is_empty() {
         return Err(InstanceError::Closed);
     }
@@ -129,10 +234,13 @@ fn configure(
         ));
     }
     if senders.owners.iter().any(|owner| {
-        owner
-            .capacity
-            .as_ref()
-            .is_some_and(|capacity| capacity.available_permits() != owner.capacity_limit)
+        owner.capacity.as_ref().is_some_and(|capacity| {
+            capacity.slots.available_permits() != owner.capacity_limit
+                || capacity
+                    .work
+                    .as_ref()
+                    .is_some_and(|work| work.available_permits() != capacity.work_limit)
+        })
     }) {
         return Err(InstanceError::InvalidConfig(
             "owner capacity has outstanding reservations",
@@ -140,16 +248,16 @@ fn configure(
     }
     let mut previous = Vec::new();
     for owner in &mut senders.owners {
-        previous.extend(
-            owner
-                .capacity
-                .replace(Arc::new(Semaphore::new(maximum_in_flight))),
-        );
+        previous.extend(owner.capacity.replace(Arc::new(Capacity {
+            slots: Arc::new(Semaphore::new(maximum_in_flight)),
+            work: maximum_work.map(|n| Arc::new(Semaphore::new(n))),
+            work_limit: maximum_work.unwrap_or(0),
+        })));
         owner.capacity_limit = maximum_in_flight;
     }
     Ok(previous)
 }
-fn retire(previous: Vec<Arc<Semaphore>>) {
+fn retire(previous: Vec<Arc<Capacity>>) {
     for capacity in previous {
         capacity.close();
     }
@@ -166,7 +274,9 @@ fn snapshot(senders: &super::dispatch::Senders) -> Vec<OwnerCapacitySnapshot> {
                 .map(|capacity| OwnerCapacitySnapshot {
                     owner,
                     limit: sender.capacity_limit,
-                    available: capacity.available_permits(),
+                    available: capacity.slots.available_permits(),
+                    work_limit: capacity.work.as_ref().map(|_| capacity.work_limit),
+                    work_available: capacity.work.as_ref().map(|work| work.available_permits()),
                 })
         })
         .collect()

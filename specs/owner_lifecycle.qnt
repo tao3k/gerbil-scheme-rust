@@ -13,6 +13,7 @@ module owner_lifecycle {
     codeLeases: Set[int], unloadAuthorized: bool, codeQuarantined: bool,
     unsafeCodeRelease: bool,
     capacityLimit: int, capacityHeld: Set[int], reserved: Set[int],
+    workLimit: int, workHeld: Set[int],
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
@@ -24,14 +25,41 @@ module owner_lifecycle {
     codeLeases: Set(), unloadAuthorized: false, codeQuarantined: false,
     unsafeCodeRelease: false,
     capacityLimit: JOBS.size(), capacityHeld: Set(), reserved: Set(),
+    workLimit: JOBS.size() + 7, workHeld: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
-  def hasCapacity(r: int): bool =
+  // Job 1 is a batch of eight; the other requests have unit cost.
+  def units(r: int): int = if (r == 1) 8 else 1
+  def workUsed(owner: int): int = {
+    val held = s.workHeld.filter(job => ASSIGNED.get(job) == owner)
+    held.size() + (if (held.contains(1)) 7 else 0)
+  }
+  def hasSlot(r: int): bool =
     s.capacityHeld.filter(job => ASSIGNED.get(job) == ASSIGNED.get(r)).size() < s.capacityLimit
+  def hasWork(r: int): bool = workUsed(ASSIGNED.get(r)) + units(r) <= s.workLimit
+  def hasCapacity(r: int): bool = hasSlot(r) and hasWork(r)
+  // Full work acquisition can precede slot acquisition. Partial semaphore
+  // allocation is an implementation detail covered by native cancellation tests.
+  action reserveWork(r: int): bool = all {
+    s.phase == "open", JOBS.contains(r), not(s.workHeld.contains(r)), not(s.accepted.contains(r)), hasWork(r),
+    s' = { ...s, workHeld: s.workHeld.union(Set(r)) }
+  }
+  action reserveSlot(r: int): bool = all {
+    s.phase == "open", s.workHeld.contains(r), not(s.capacityHeld.contains(r)), not(s.accepted.contains(r)), hasSlot(r),
+    s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)) }
+  }
+  action cancelWork(r: int): bool = all {
+    s.workHeld.contains(r), not(s.capacityHeld.contains(r)), not(s.accepted.contains(r)),
+    s' = { ...s, workHeld: s.workHeld.exclude(Set(r)) }
+  }
+  action configureWork(limit: int): bool = all {
+    s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, limit > 0,
+    s' = { ...s, workLimit: limit }
+  }
   action reserve(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
-    not(s.reserved.contains(r)), hasCapacity(r),
-    s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)) }
+    not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
+    s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   action admitReserved(r: int): bool = all {
     s.phase == "open", s.reserved.contains(r),
@@ -39,22 +67,22 @@ module owner_lifecycle {
   }
   action releaseReservation(r: int): bool = all {
     s.reserved.contains(r),
-    s' = { ...s, reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)) }
+    s' = { ...s, reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)) }
   }
   action configureCapacity(limit: int): bool = all {
-    s.phase == "open", s.capacityHeld.size() == 0, limit > 0,
+    s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, limit > 0,
     s' = { ...s, capacityLimit: limit }
   }
   action admit(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
-    not(s.reserved.contains(r)), hasCapacity(r),
-    s' = { ...s, accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)) }
+    not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
+    s' = { ...s, accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   // Completion is an externally validated owner action, not Rust computation.
   action complete(r: int): bool = all {
     Set("open", "closing").contains(s.phase),
     s.accepted.contains(r), not(s.completed.contains(r)),
-    s' = { ...s, completed: s.completed.union(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)),
+    s' = { ...s, completed: s.completed.union(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)),
       roots: s.roots.union(Set(r)), ready: s.ready.union(Set(r)) }
   }
   // Observation timeout leaves accepted native work and roots unchanged.
@@ -137,9 +165,12 @@ module owner_lifecycle {
     any { admit(r), complete(r), observeTimeout(r), publish(r), use(r, owner),
       release(r, owner), createExecutor, close, join, clearRegistry, retire,
       codeLease(r), releaseCodeLease(r), authorizeCodeRelease, quarantineCode, releaseCode,
-      reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
+      reserveWork(r), reserveSlot(r), cancelWork(r), configureWork(8), configureWork(9), reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
   }
   val safety = and {
+    s.workLimit > 0, s.workHeld.subseteq(JOBS), s.capacityHeld.subseteq(s.workHeld),
+    s.workHeld.intersect(s.completed).size() == 0,
+    Set(1, 2).forall(owner => workUsed(owner) <= s.workLimit),
     s.capacityLimit > 0, s.capacityHeld.subseteq(JOBS), s.reserved.subseteq(JOBS),
     s.reserved.intersect(s.accepted).size() == 0,
     s.capacityHeld == s.reserved.union(s.accepted.exclude(s.completed)),
@@ -176,6 +207,15 @@ module owner_lifecycle {
   }
   action unsafeForeignStep = any { step, unsafeForeignUse }
 
+  run workAndSlotsAreIndependentTest = init.then(configureCapacity(4)).then(configureWork(8)).then(admit(1))
+    .then(all { assert(hasSlot(3)), assert(not(hasWork(3))), assert(safety), stutter })
+    .then(observeTimeout(1)).then(all { assert(workUsed(1) == 8), assert(safety), stutter })
+    .then(complete(1)).then(all { assert(hasCapacity(3)), assert(safety), stutter })
+  run workBeforeSlotCancellationTest = init.then(configureWork(8)).then(reserveWork(1))
+    .then(all { assert(s.capacityHeld.size() == 0), assert(not(hasWork(3))), assert(safety), stutter })
+    .then(close).then(cancelWork(1)).then(all { assert(s.workHeld.size() == 0), assert(safety), stutter })
+  run workThenSlotTest = init.then(configureWork(8)).then(reserveWork(1)).then(reserveSlot(1))
+    .then(admitReserved(1)).then(complete(1)).then(all { assert(s.workHeld.size() == 0), assert(safety), stutter })
   run timeoutKeepsSharedCreditTest = init.then(configureCapacity(1)).then(admit(1))
     .then(observeTimeout(1)).then(all { assert(s.capacityHeld.contains(1)), assert(not(hasCapacity(3))), assert(safety), stutter })
     .then(complete(1)).then(all { assert(hasCapacity(3)), assert(safety), stutter })

@@ -15,28 +15,19 @@ use std::{
     time::Duration,
 };
 const GATE: Duration = Duration::from_secs(5);
-const PAIRS: [[Case; 2]; 2] = [
-    [
-        Case {
-            capacity: 128,
-            batch: 1,
-        },
-        Case {
-            capacity: 4,
-            batch: 1,
-        },
-    ],
-    [
-        Case {
-            capacity: 4,
-            batch: 1,
-        },
-        Case {
-            capacity: 4,
-            batch: 8,
-        },
-    ],
-];
+// One targeted pair: identical batch-8 workload, independent item budget.
+const PAIRS: [[Case; 2]; 1] = [[
+    Case {
+        capacity: 4,
+        work: 32,
+        batch: 8,
+    },
+    Case {
+        capacity: 4,
+        work: 8,
+        batch: 8,
+    },
+]];
 fn batch_contracts(
     pool: &InstancePool,
     runtime: &tokio::runtime::Runtime,
@@ -120,13 +111,15 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         |_| progress.send("owner initialized").unwrap(),
     )
     .unwrap();
-    pool.dispatcher().configure_owner_capacity(128).unwrap();
+    pool.dispatcher()
+        .configure_owner_budgets(128, Some(8))
+        .unwrap();
     let states: Vec<_> = pool.owners().iter().map(|o| o.state).collect();
     println!(
         "{}",
         json!({"event": "capacity_configuration", "states": states, "owners": 4,
         "rust_workers": 2, "bulk_invocation_credit": 128, "probe_interval_us": 500,
-        "case_scope": "two explicit pairs; same VM, no automatic default promotion"})
+        "case_scope": "one batch-8 work-budget pair; same VM, no automatic default promotion"})
     );
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)

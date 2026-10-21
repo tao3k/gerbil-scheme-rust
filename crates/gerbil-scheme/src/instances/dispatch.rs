@@ -26,7 +26,7 @@ pub(super) struct Senders {
 pub(super) struct OwnerSender {
     pub(super) sender: mpsc::SyncSender<Request>,
     #[cfg(feature = "tokio-dispatch")]
-    pub(super) capacity: Option<Arc<tokio::sync::Semaphore>>,
+    pub(super) capacity: Option<Arc<super::capacity::Capacity>>,
     #[cfg(feature = "tokio-dispatch")]
     pub(super) capacity_limit: usize,
 }
@@ -164,11 +164,16 @@ impl InstanceDispatcher {
             started: Arc::clone(&started),
             #[cfg(feature = "tokio-dispatch")]
             capacity: None,
+            #[cfg(feature = "tokio-dispatch")]
+            work_units: 1,
         };
         #[cfg(feature = "tokio-dispatch")]
         let mut request = request;
         #[cfg(feature = "tokio-dispatch")]
-        super::capacity::attach(sender, &mut request)?;
+        if let Err(error) = super::capacity::attach(sender, &mut request) {
+            drop(senders);
+            return Err(error);
+        }
         let sent = sender.sender.try_send(request);
         #[cfg(feature = "tokio-dispatch")]
         if sent.is_ok() {

@@ -23,9 +23,33 @@ impl InstanceDispatcher {
     {
         validate(&items, yield_every, self.maximum_input())?;
         let dispatched = Instant::now();
-        self.submit_native_on(owner, move |session| {
+        self.submit_native_units_on(owner, items.len(), move |session| {
             execute_profiled(session, &items, yield_every, dispatched)
         })
+    }
+
+    /// Measure the existing Scheme turn after finite weighted admission.
+    /// Markers observe service duration; they do not enforce wall-clock preemption.
+    /// # Errors
+    /// Same native batch validation, work-budget and finite admission failures.
+    #[cfg(feature = "tokio-dispatch")]
+    pub async fn submit_numeric_batch_profiled_backpressured<T>(
+        &self,
+        items: Vec<Vec<T>>,
+        admission: super::BatchAdmission,
+    ) -> Result<super::AsyncInstanceTicket<ProfiledBatch<T>>, InstanceError>
+    where
+        T: NumericElement + Send + 'static,
+    {
+        validate(&items, admission.yield_every, self.maximum_input())?;
+        let dispatched = Instant::now();
+        self.submit_native_weighted_backpressured_on(
+            admission.owner,
+            items.len(),
+            move |session| execute_profiled(session, &items, admission.yield_every, dispatched),
+            admission.timeout,
+        )
+        .await
     }
 
     /// Submit the same profiled native batch with asynchronous result delivery.
@@ -43,12 +67,12 @@ impl InstanceDispatcher {
     {
         validate(&items, yield_every, self.maximum_input())?;
         let dispatched = Instant::now();
-        self.submit_native_async_on(owner, move |session| {
+        self.submit_native_async_units_on(owner, items.len(), move |session| {
             execute_profiled(session, &items, yield_every, dispatched)
         })
     }
 }
-fn execute_profiled<T: NumericElement>(
+pub(super) fn execute_profiled<T: NumericElement>(
     session: &NativeSession<'_>,
     items: &[Vec<T>],
     yield_every: usize,

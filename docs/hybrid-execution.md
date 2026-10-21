@@ -67,3 +67,27 @@ Native Scheme batches retain their explicit whole-turn exception/drain semantics
 Request slots are not work/time credits: increasing batch size can worsen short
 request latency. See the [shared-capacity protocol, focused fairness controls and
 remaining service-budget boundary](30-39-status/30.28-shared-owner-capacity-and-batch-fairness.org).
+
+
+## Optional independent work budget
+
+Use `configure_owner_budgets(request_slots, Some(work_units))` to constrain
+outstanding declared work separately from the number of native requests.
+Every numeric batch API charges its item count. Generic native/byte jobs retain
+a unit charge; applications can explicitly declare a larger charge with
+`submit_native_weighted_backpressured_on`. This is a declared resource contract,
+not automatic cost inference. `configure_owner_capacity` retains slot-only behavior.
+Neither API changes the production default or existing Python mode selection.
+
+Work credits are acquired before a request slot under one finite wait budget.
+Cancellation returns partial unaccepted reservations. Both resources remain held
+through accepted execution, reply delivery and abandoned-reply rollback. Quiescent
+reconfiguration and pool close cover both resources and preserve generation fencing.
+FIFO weighted admission can still delay a short request behind a large one.
+
+A batch remains one native owner turn: internal Scheme yields do not admit another
+Rust queue entry. Item bounds cannot guarantee an arbitrary handler's service time.
+Observed service spans include native construction, Scheme/GC, projection and root
+retirement; `submit_numeric_batch_profiled_backpressured` exposes the existing
+phase markers after weighted admission. No batch splitting, evaluator restriction
+or host preemption is introduced. See the [targeted batch-8 qualification](30-39-status/30.29-independent-work-budget-and-batch-service.org).

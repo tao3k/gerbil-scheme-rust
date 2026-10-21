@@ -145,3 +145,22 @@ the cursor offer before enqueue, not native acceptance of staged turns. No
 unprofiled per-turn clocks or Scheme-thread scheduler are introduced. See
 [30.31 native construction and owner skew](30-39-status/30.31-native-batch-construction-and-owner-skew.org)
 for the directed controls, withdrawn candidate and retained tail/fairness negatives.
+
+### Host OS scheduling and Scheme wake ownership
+
+OS thread service class is separate from Scheme Actor/green-thread scheduling.
+The existing owner-pinned native closure API can execute an explicit host policy
+on the correct fixed OS thread; selecting such a policy does not transfer Scheme
+continuations or scheduling to Tokio. There is no automatic QoS policy or changed
+pool default. Diagnostic Scheme commands used by qualification are private
+fixtures, not new public runtime opcodes.
+
+The native batch call is synchronous. Scheme yielding or sleeping inside it
+lets other Scheme threads run, but the Rust owner pump checks its inbox after
+that full foreign call returns. Reducing the inter-batch refill gap cannot by
+itself remove OS wait overshoot or make host requests enter during that call.
+A Scheme-owned asynchronous service would need an explicit retained-root,
+bounded-work, wake and close/drain protocol before it could change that boundary.
+
+The directed native measurements and negative QoS results are recorded in
+[the wait attribution report](30-39-status/30.32-native-wait-attribution-and-owner-qos.org).

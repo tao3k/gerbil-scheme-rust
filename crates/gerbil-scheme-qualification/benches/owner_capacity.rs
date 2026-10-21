@@ -7,6 +7,8 @@ mod measurement;
 mod producer;
 #[path = "owner_capacity/transfer.rs"]
 mod transfer;
+#[path = "owner_capacity/wait.rs"]
+mod wait;
 #[path = "owner_capacity/workload.rs"]
 mod workload;
 use gerbil_scheme::instances::{
@@ -27,6 +29,7 @@ const PAIRS: [[Case; 2]; 1] = [[
         batch: 8,
         producer: false,
         transfer_control: None,
+        owner_qos: None,
     },
     Case {
         capacity: 4,
@@ -34,6 +37,7 @@ const PAIRS: [[Case; 2]; 1] = [[
         batch: 8,
         producer: true,
         transfer_control: None,
+        owner_qos: None,
     },
 ]];
 const TRANSFER_PAIRS: [[Case; 2]; 1] = [[
@@ -43,6 +47,7 @@ const TRANSFER_PAIRS: [[Case; 2]; 1] = [[
         batch: 8,
         producer: false,
         transfer_control: Some(false),
+        owner_qos: None,
     },
     Case {
         capacity: 4,
@@ -50,6 +55,7 @@ const TRANSFER_PAIRS: [[Case; 2]; 1] = [[
         batch: 8,
         producer: false,
         transfer_control: Some(true),
+        owner_qos: None,
     },
 ]];
 fn batch_contracts(
@@ -115,6 +121,8 @@ fn batch_contracts(
     measurement::idle(pool);
 }
 fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, transfer: bool) {
+    let qos = std::env::args().any(|arg| arg == "--qos-ab");
+    assert!(!(qos && transfer), "select one targeted pair");
     // SAFETY: the existing Cargo graph owns the unchanged Scheme native batch ABI.
     let program = unsafe {
         IsolatedProgram::from_image(
@@ -143,7 +151,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, transfer: bool) {
         "{}",
         json!({"event": "capacity_configuration", "states": states, "owners": 4,
         "rust_workers": 2, "bulk_invocation_credit": 128, "probe_interval_us": 500,
-        "case_scope": if transfer { "one bulk-native/rooted transfer pair; same VM and typed Scheme work" } else { "one batch-8 producer pair at work budget 8; same VM, no automatic default promotion" }})
+        "case_scope": if qos { "one restored owner-OS-QoS pair; identical native producer and Scheme work" } else if transfer { "one bulk-native/rooted transfer pair; same VM and typed Scheme work" } else { "one batch-8 producer pair at work budget 8; same VM, no automatic default promotion" }})
     );
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -164,7 +172,13 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool, transfer: bool) {
             &runtime,
             &inputs,
             (probes, smoke, mixed),
-            if transfer { &TRANSFER_PAIRS } else { &PAIRS },
+            if qos {
+                &wait::QOS_PAIRS
+            } else if transfer {
+                &TRANSFER_PAIRS
+            } else {
+                &PAIRS
+            },
             progress,
         );
         assert_eq!(
@@ -241,10 +255,11 @@ fn compare(
 }
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    assert!(
-        args.iter()
-            .all(|s| s == "--test" || s == "--bench" || s == "--transfer-ab")
-    );
+    assert!(args.iter().all(|s| s == "--test"
+        || s == "--bench"
+        || s == "--transfer-ab"
+        || s == "--wait-trace"
+        || s == "--qos-ab"));
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
         let mut last = "start";

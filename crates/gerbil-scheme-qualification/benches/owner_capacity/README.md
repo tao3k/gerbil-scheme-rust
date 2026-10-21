@@ -145,3 +145,38 @@ retains a stable selected child root because Scheme may mutate its parent betwee
 foreign entries. Report 30.31 retains that semantic rejection, the safe matched
 results, initialization failure and mixed tail/progress negatives. Do not transfer
 unqualified candidate speedups to the constructor-only version.
+
+## Native wait attribution
+
+`just bridge-owner-capacity-benchmark --wait-trace` runs the existing pipeline
+pair with an opt-in diagnostic observer in the qualification image. It records
+Scheme handler sleep intervals and the embedded runtime's `select` intervals,
+including each requested timeout. No SDK source or timer policy changes.
+
+The observer is private to the qualification image, forwards all original
+arguments, preserves `errno`, and is enabled only on its fixed owner thread.
+Each owner has a bounded 4,096-row buffer. Samples carry `wait_events` with two
+leading counters (overflow, unexpected select errors), followed by four-integer
+rows: `[kind, start_ns, end_ns, requested_ns]`. Kind 1 is a select timeout, 2 is Scheme sleep, 3 is select interrupted
+by a signal, 4 is descriptor readiness, and 5 is a select error. Infinite select
+timeouts use `i64::MAX`. Clocks share `CLOCK_MONOTONIC`. Configuration and typed snapshot
+calls run outside the timed sample. A valid trace requires zero overflow/errors,
+actual select observations for mixed samples, and the expected Scheme wait count.
+
+A select interval includes kernel waiting and delivery back to user space. Its
+excess over the requested timeout does not distinguish timer coalescing from OS
+runnable latency. Time after select returns and before a sleeping Actor resumes
+also includes Scheme scheduling and possible OS preemption. Do not label either
+quantity as pure scheduler CPU cost. Diagnostic and unobserved captures are
+separate evidence; compare both arms with the same observer setting.
+
+`just bridge-owner-capacity-benchmark --qos-ab --wait-trace` replaces the pipeline
+pair with one diagnostic comparison: the same native producer under the original
+owner OS service class versus explicit Darwin `QOS_CLASS_USER_INITIATED`. It does
+not change a pool default. Each fixed owner saves its original requested class
+and relative priority, applies the selected class outside timing, and restores
+the original after every sample. Native return codes and requested-class receipts
+are recorded. An unspecified original class is rejected rather than guessing a
+restoration policy. Only these four task-owned OS threads are configured; the
+Scheme green-thread scheduler and all other processes remain under their existing
+policies. This experiment does not establish a portable scheduling default.

@@ -10,6 +10,7 @@ pub(super) struct Case {
     pub work: usize,
     pub producer: bool,
     pub transfer_control: Option<bool>,
+    pub owner_qos: Option<bool>,
 }
 pub(super) fn idle(pool: &InstancePool) {
     let started = Instant::now();
@@ -39,6 +40,8 @@ pub(super) fn run(
     pool.dispatcher()
         .configure_owner_budgets(case.capacity, Some(case.work))
         .unwrap();
+    let qos_receipts = super::wait::policy(pool, case.owner_qos);
+    let wait_trace = super::wait::begin(pool);
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -60,6 +63,12 @@ pub(super) fn run(
     });
     let elapsed = released.elapsed().as_nanos();
     idle(pool);
+    let wait_events = if wait_trace {
+        super::wait::snapshot(pool, inputs)
+    } else {
+        Vec::new()
+    };
+    let qos_restored = super::wait::policy(pool, case.owner_qos.map(|_| false));
     let last_bulk = *bulk.clocks.iter().flatten().max().unwrap();
     let last_probe = *probe.clocks.iter().max().unwrap();
     let bulk_before_last_probe = bulk
@@ -111,7 +120,7 @@ pub(super) fn run(
         .zip(&probe.admission)
         .map(|(delivery, admission)| delivery.checked_sub(*admission).unwrap())
         .collect();
-    json!({"elapsed_ns": elapsed, "bulk_elapsed_ns": bulk.elapsed,
+    json!({"owner_qos": case.owner_qos, "owner_qos_receipts": qos_receipts, "owner_qos_restored": qos_restored, "wait_events": wait_events, "elapsed_ns": elapsed, "bulk_elapsed_ns": bulk.elapsed,
         "bulk_orders": inputs.len(), "probe_orders": probes,
         "bulk_owner_native_ns": bulk_owner_ns, "probe_native_ns": probe.native,
         "probe_delivery_ns": probe.delivery, "probe_admission_ns": probe.admission,
@@ -158,7 +167,7 @@ pub(super) fn emit(samples: &[Value], pair: usize, arm: usize, mixed: bool) {
     let seconds = |ns| std::time::Duration::from_nanos(u64::try_from(ns).unwrap()).as_secs_f64();
     println!(
         "{}",
-        json!({"event": "capacity_result", "pair": pair, "arm": arm, "mixed": mixed,
+        json!({"event": "capacity_result", "pair": pair, "arm": arm, "mixed": mixed, "owner_qos": samples[0]["owner_qos"],
         "bulk_service_max_ns": series(samples, "bulk_service_ns").into_iter().max(),
         "probe_service_max_ns": series(samples, "probe_service_ns").into_iter().max(),
         "probe_entry_delivery_p99_ns": quantile(samples, "probe_entry_delivery_ns"),

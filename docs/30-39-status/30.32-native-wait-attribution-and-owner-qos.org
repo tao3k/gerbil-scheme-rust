@@ -1,0 +1,203 @@
+#+TITLE: Native Wait Attribution and Explicit Owner OS Policy
+#+DATE: 2026-10-21
+
+* Scope and decision
+
+Continue PR #18 from =ce9a2af= using the existing Rust owner-capacity bench.
+The preceding accepted native constructor and owner producer remain unchanged.
+This change adds bounded, opt-in native observations and one explicit Darwin
+OS-policy experiment. It does not claim a repaired Scheme scheduler or change
+library defaults, queue budgets, backend selection, SDK sources or optimization.
+
+The final mixed-service tails spend median 99.48--99.77% of their matched turn
+inside observed native =select= intervals. These intervals include kernel wait
+and delivery back to user space. This is stronger evidence than inferring a
+cause from low CPU time, but still does not separate timer coalescing, kernel
+wake delivery and runnable-thread scheduling latency.
+
+Explicit =USER_INITIATED= owner QoS helps throughput in the source-identical
+final captures. Earlier captures regress CPU throughput, and one regresses
+mixed throughput too. It is not promoted to a default or presented as a general fix.
+
+* Observation contract
+
+Only the private qualification image defines the hidden =select= observer.
+The SDK archive's select reference binds locally; neither a process-wide dyld
+interposer nor an SDK patch is used. The forwarding target is resolved once
+with =pthread_once= and =RTLD_NEXT=. All original arguments, timeout mutation,
+return status and errno semantics are retained. Other images/processes are not
+configured. The normal library adapter contains none of this observer.
+
+Recording is enabled only on the fixed owner through an ordinary native typed
+call. Each image has a fixed 4,096-row buffer (128 KiB) and a trivial thread-local
+recording flag. There are no TLS destructors, escaping Scheme pointers or host
+callbacks registered outside the image. A hidden image constructor binds the
+observer to the qualification Scheme graph without starting a VM. Ordinary
+linked qualification graphs use an inert callback until an image binds it.
+
+Each sample records real Scheme =thread-sleep! 0.001= intervals and native
+select intervals on =CLOCK_MONOTONIC=. The native trace distinguishes timeout,
+signal interruption, descriptor readiness and error. Rust verifies zero lost
+rows/errors, monotonic intervals, expected per-owner Scheme wait counts and
+actual SDK select observations. Full mixed samples contain 1,171 Scheme waits:
+293, 293, 292 and 293 for the four owners. Pure CPU samples have no such waits.
+Trace configuration, snapshot projection and QoS changes occur outside timing.
+
+Matched tail attribution groups each owner's observed sleeps by the original
+batch's known wait count. It intersects native select intervals with that
+batch's wait span and divides the covered time by that same turn's measured
+service time. Select intervals cannot overlap on an owner, and covered time
+must not exceed Scheme time or service time. No subtraction of unrelated p99s
+is used. Residual time includes Scheme work/scheduling and possible OS
+preemption outside the observed syscall; it is not a pure CPU measurement.
+
+* Same-VM experiment
+
+The exclusive =--qos-ab= pair uses the native owner producer and single-entry
+Scheme constructor in both arms. Four unchanged Scheme VMs, two Tokio workers,
+work budget eight, request slots four, batch eight and quantum one are fixed.
+Each sample executes 8,192 48-line orders and 64 scheduled four-line probes.
+Ten samples per arm/load alternate AB/BA. No additional thread-count matrix is
+introduced. Both arms have identical trace settings and native type projection.
+
+The control uses each owner's original requested class/relative priority.
+The candidate explicitly requests Darwin =QOS_CLASS_USER_INITIATED=. Native
+receipts show =DEFAULT (21) -> USER_INITIATED (25) -> DEFAULT (21)=. Restoration
+is checked after every sample, including exact original class equality. An
+unspecified original class is rejected rather than inventing restoration.
+Only these task-owned OS threads are configured; Scheme still owns Actor and
+green-thread scheduling. Other processes are neither paused nor reconfigured.
+
+The local host had concurrent compiler activity. These are matched diagnostic
+captures, not quiet-host performance acceptance, and no comparison to older
+quiet captures is claimed. Their variation is retained.
+
+| Capture/load | Bulk orders/s control -> candidate | Change | Service p99 ms | Short entry-to-delivery p99 ms | Minimum owner progress |
+|--------------+-----------------------------------+--------+----------------+-------------------------------+------------------------|
+| A CPU | 165,866 -> 287,224 | +73.17% | 1.305 -> 0.932 | 23.733 -> 21.698 | 504 -> 784 |
+| B CPU | 128,052 -> 156,381 | +22.12% | 2.093 -> 2.108 | 25.809 -> 16.252 | 0 -> 592 |
+| A mixed | 10,122 -> 11,812 | +16.69% | 20.845 -> 20.531 | 37.915 -> 28.829 | 1776 -> 1912 |
+| B mixed | 10,395 -> 11,933 | +14.80% | 19.071 -> 14.667 | 34.468 -> 25.745 | 1912 -> 1944 |
+
+Minimum progress counts bulk orders completed by every owner before the first
+owner finishes; it is not a fairness guarantee. Mixed median owner finish spread
+improves from 22.264 to 15.531 ms in A but worsens from 13.751 to 16.817 ms in B.
+CPU spread improves from 19.755 to 11.695 ms and 25.804 to 14.157 ms. B CPU service
+p99 regresses slightly despite increased throughput. These mixed directions and
+the earlier stronger CPU regressions prevent a default promotion.
+
+* Where the mixed tail spends time
+
+| Capture/arm | Scheme sleep p99 ms | Select p99 ms | Timeout excess p99 ms | Sleep outside select p99 ms | Matched slow-turn median select/service |
+|-------------+---------------------+---------------+-----------------------+----------------------------+----------------------------------------|
+| A control | 20.745 | 19.129 | 19.762 | 0.417 | 99.77% |
+| A candidate | 19.859 | 18.858 | 18.210 | 0.513 | 99.58% |
+| B control | 18.099 | 17.405 | 17.096 | 0.478 | 99.59% |
+| B candidate | 14.138 | 13.101 | 12.555 | 0.466 | 99.48% |
+
+Native requested timeout median is 0.988--0.989 ms and p99 is 0.998 ms in
+all four final mixed arms; the SDK is not requesting these multi-millisecond tail waits.
+
+The table's separate percentiles are descriptive distributions. Only the last
+column is matched per-turn coverage. Timeout excess uses timeout-return events;
+signal/readiness returns are classified separately, not treated as expired
+requested timers. An interval after select returns and before Actor resumption
+is not independently proven to be Scheme scheduler CPU cost.
+
+* Retained preliminary and negative evidence
+
+The initial forwarding observer's pipeline capture completes all real native
+checks but has much lower throughput than the previous quiet baseline. Its
+control/candidate Scheme wait p99 is 11.879/13.522 ms; native select p99 is
+10.905/12.091 ms. This capture lacks the final select-status classification and
+exact QoS restoration receipts and is not substituted for the final captures.
+
+The preliminary QoS capture has CPU throughput +25.39%, but mixed throughput
+8,958 -> 8,553 orders/s (-4.53%) and mixed service p99 14.350 -> 16.146 ms.
+That direction differs from final mixed results and must not be discarded.
+Preliminary sources/receipts remain distinct from the final frozen source/image.
+Smoke figures are correctness controls, never throughput acceptance.
+
+Before the final lint extraction, two complete same-image captures retained
+CPU throughput -7.80%/-10.15% and mixed throughput +4.98%/+21.59%. CPU service p99
+worsens in both, A mixed minimum progress declines 1936 -> 1928, and CPU finish
+spread worsens in both. Their portable receipts are =wait-final-a.jsonl=,
+=wait-final-b.jsonl= and =wait-final-manifest.json=. They belong to the earlier
+benchmark executable, not the final source-identical artifact. Extracting the
+untimed policy/setup helpers resolves strict function-size lint (119 then 101
+lines); failed lint receipts remain separate. No allow/suppression is introduced.
+The final rebuilt source is rerun below its own frozen identity; prior captures
+are not relabeled or discarded.
+
+* Consequences for further optimization
+
+The measured mixed critical path is occupied by native OS wait intervals.
+Optimizing only Rust refill allocation, numeric projection or Scheme arithmetic
+cannot remove that occupied time. Raising OS priority alone is not sufficient,
+as the preliminary mixed regression and final CPU regressions show.
+
+The current host owner pump observes new host work only after a complete
+synchronous Scheme batch returns. A pending Scheme wait therefore holds that
+foreign-entry boundary even when its CPU demand is tiny. Reducing the gap
+between completed batches is useful for CPU throughput but cannot itself make
+that entry interruptible or eliminate OS timer overshoot.
+
+The next architectural candidate must keep asynchronous execution and wake
+ownership in Scheme. An explicit Scheme service can retain pending Actors and
+continuations while accepting independent native typed submissions. That needs
+separate bounded accepted-work, runnable-work and retained-result accounting,
+owner-local roots, close/error drain and real wake integration. It must not move
+Scheme continuation scheduling to Tokio, fuse original batches silently, spin
+on timers, or allow a host callback to outlive its image. This protocol is not
+implemented or admitted by this diagnostic change. Reuse and extend the existing
+owner protocol model when those transitions are actually added; model success
+must still be followed by native validation.
+
+The immediate admission decision is to retain the existing producer/constructor
+baseline and expose the diagnostic experiment only. No SDK timer patch, OS-policy
+default change or Scheme capability reduction is justified by these captures.
+
+* Reproduction and source identity
+
+#+begin_src text
+just bridge-owner-capacity-benchmark --test --wait-trace
+just bridge-owner-capacity-benchmark --test --qos-ab --wait-trace
+just bridge-owner-capacity-benchmark --qos-ab --wait-trace
+#+end_src
+
+Use the repository's standard SDK/Cargo environment and =-O2= native compilation.
+Do not compare captures whose embedded image path has been overwritten; freeze
+and verify both executable and actual image identities before running either arm.
+Raw captures, native images and source receipts remain outside Git. Portable
+receipt names are =wait-ready-a.jsonl=, =wait-ready-b.jsonl=,
+=wait-ready-summary.json= and =wait-ready-manifest.json=.
+
+Final benchmark SHA-256: =3dab9b70595ad81d4b7f3a5ca798000952c602283a7d4c48919e9a70a5746c41=.
+
+Final native image SHA-256: =84310b38636cab97363a685aa35bc70908eac6addf3339fcd68839cea38a37a3=.
+
+* Validation
+
+The predecessor exact-head CI run
+[[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39560525020][39560525020]] passed all six active jobs for =ce9a2af=; SMP was explicitly
+skipped. This is a distinct gate from the new diagnostic change's CI.
+
+Three final release smoke modes pass: pipeline with wait tracing, constructor
+comparison, and owner-QoS comparison with wait tracing. Each has eight samples,
+four result summaries, four genuine Scheme exception/recovery observations and
+four clean owner joins, zero strong roots and removed copied image files.
+The two full final captures each pass forty samples and the same native cleanup.
+Every requested QoS change and restoration succeeds on all four owners.
+
+Existing native =owner_capacity=, =owner_dispatch_faults= and =owner_producer=
+tests pass with the updated image. The nine numeric families, scalar/Unicode/
+mixed native types, forced GC, multishot continuation and dynamic-wind controls,
+and six create/reuse/destroy epochs pass the unchanged resource smoke. No model
+is duplicated: this diagnostic adds no producer admission/close transitions.
+Neither finite-model success nor these bounded native checks prove leak freedom,
+all macro/DSL workloads, OS fairness or a portable QoS benefit.
+
+Strict =actor-aot,instance-dispatch= all-target Rust lint, formatting and diff
+checks pass after the helper extraction. The original producer controls and
+native resource checks test unchanged native Scheme code; the final rebuilt
+bench additionally repeats its trace and QoS smoke and two full directed A/Bs.

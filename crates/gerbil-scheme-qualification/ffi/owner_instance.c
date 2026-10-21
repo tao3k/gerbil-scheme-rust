@@ -48,3 +48,5 @@ uint64_t gerbil_owner_allocator_relief(void) {
 
 
 #include "owner_callbacks.h"
+
+#include "owner_wait.h"

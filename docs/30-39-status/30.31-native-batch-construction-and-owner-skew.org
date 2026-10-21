@@ -235,3 +235,10 @@ are =safe-transfer-manifest.json=, =safe-transfer-summary.json=,
 =safe-constructor-a.jsonl=, =safe-constructor-b.jsonl=, =safe-pipeline-a.jsonl= and
 =safe-pipeline-b.jsonl=. Withdrawn source/captures and failures retain their own
 identities. No raw logs, binaries, patches or private machine paths are published.
+
+* Exact-head CI and next diagnostic
+
+CI run [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39560525020][39560525020]] completed successfully for =ce9a2af=: all six active
+jobs passed; Scheme SMP remains explicitly skipped. The subsequent bounded
+native wait attribution and retained owner-QoS trade-offs are documented in
+[[file:30.32-native-wait-attribution-and-owner-qos.org][Native Wait Attribution and Explicit Owner OS Policy]].

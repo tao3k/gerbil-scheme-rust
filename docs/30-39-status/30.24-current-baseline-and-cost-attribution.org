@@ -176,3 +176,68 @@ Builds use the existing Maturin/Cargo/Gerbil graph with native dynamic-module op
 * Admission and remaining work
 
 No optimization or default promotion is made. The next candidate must follow a repeatable dominant cost on this artifact and preserve projection failure ownership, original Scheme exceptions, typed identity and continuation behavior. Longer endurance is finite evidence; it cannot prove unlimited cache bounds or recovery from arbitrary stuck native code. Open-loop overload, long competing sessions, real concurrent I/O, instrumented sanitizers and deployment qualification remain separate gates.
+
+* Native Rust benchmark entrypoint
+
+The =owner_costs= Cargo benchmark lives under
+=crates/gerbil-scheme-qualification/benches=, with runner-specific code and an
+English usage/boundary document in =benches/owner_costs/=. It reuses the existing
+Scheme order image and native numeric type API. The existing resource qualification
+and this benchmark share one input corpus, independent Rust invoice oracle,
+percentile estimator and Scheme Actor progress check in =benches/support/orders.rs=.
+No runtime, production admission, scheduler default or Scheme compiler changes are
+part of this addition. Source parent is =18cf7e8=; the external manifest records the
+bench sources and executable hashes rather than relabeling older Python artifacts.
+
+Commands are =just bridge-owner-cost-benchmark --test= for smoke and
+=just bridge-owner-cost-benchmark= for the full release-profile matrix. CI uses
+smoke plus strict Rust lint. Each full case has five ABBA blocks, ten samples per
+arm, 1,024 orders per sample and fixed windows of 128 orders. A is the normal batch
+API; B is the opt-in phase-profiled API. Every pair uses the same live VM owners,
+native Scheme workload and complete validation. This measures diagnostic overhead,
+not the earlier fresh/resident-input optimization. Python/GIL costs and dispatcher
+comparisons remain separate qualification boundaries.
+
+The full local run completed all sixteen arm/case summaries and 160 measured
+samples, with clean joins, zero external roots and removed owner image files.
+Smoke also completed. Strict Clippy passes for both the new and existing resource
+bench targets. The first strict-lint failure (numeric precision/float comparison)
+is preserved outside Git; checked conversions and exact counter representation
+checks repair it without lint suppression.
+
+| Owners | Workload | Normal batch | Complete orders/s | Window response p99 ms | Actor peer minimum |
+|--------+----------+--------------+-------------------+------------------------+--------------------|
+| 1 | CPU | 1 | 100,519 | 1.543 | not applicable |
+| 1 | CPU | 32 | 217,521 | 0.732 | 7 |
+| 4 | CPU | 1 | 247,122 | 0.822 | not applicable |
+| 4 | CPU | 32 | 648,101 | 0.486 | 7 |
+| 1 | Mixed Scheme wait | 1 | 5,101 | 26.978 | not applicable |
+| 1 | Mixed Scheme wait | 32 | 14,600 | 10.504 | 2 |
+| 4 | Mixed Scheme wait | 1 | 18,598 | 7.253 | not applicable |
+| 4 | Mixed Scheme wait | 32 | 42,798 | 5.684 | 2 |
+
+Each order has 48 invoice lines. Mixed inputs explicitly request a 1 ms Scheme
+cooperative wait every seventh order. Rates include Rust input cloning, native
+conversion, dispatch, native projection, retirement and independent validation;
+input corpus generation and warmup are outside the sample. This is a smaller order
+workload than the Python payload baseline and its rates cannot be compared as the
+same application throughput. Batch members share response timestamps; these are
+closed-loop burst results, not independent open-loop arrivals or service SLOs.
+No competing short probes are submitted, so the retained mixed-probe =QueueFull=
+failure is not repaired or superseded. No quiet-host certification is claimed.
+
+The negative diagnostic overhead is material for single-item CPU calls:
+1-owner throughput is 82,117 orders/s profiled versus 100,519 normal; 4-owner is
+209,421 versus 247,122. For 4-owner CPU batch 32, normal/profiled rates are
+648,101 / 639,201. No universal overhead correction is inferred or subtracted.
+In the profiled 4-owner CPU batch-32 arm, construction captures 44 collections
+across ten samples and execution captures zero; item construction p99 is 0.419 ms,
+Scheme execution p99 0.078 ms, native projection p99 0.042 ms. Mixed batch-32
+construction also captures 44 collections; Scheme execution p99 is 3.679 ms.
+Wall spans include instrumentation and OS scheduling. Their quantiles are not
+additive and GC real counters cannot be subtracted to infer pure compute.
+
+One/four-owner initialization is 0.663 / 2.473 s in this cohort; clean shutdown
+is approximately 1.30 / 1.31 ms. Removed image files and zero roots do not prove
+zero RSS or universal dynamic-library unload. The separate one-hour memory
+qualification retains its original artifact identity and limits above.

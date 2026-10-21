@@ -126,10 +126,12 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-release
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-foreign-tls
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --module-capture-failure
+      - name: Native Rust owner cost bench smoke
+        run: cargo bench -p gerbil-scheme-qualification --features instance-library --bench owner_costs --profile dev --locked -- --test
       - name: Native owner Rust lint
         run: |
           cargo clippy -p gerbil-scheme --features external-program,isolated-instances,tokio-dispatch --lib --locked -- -D warnings
-          cargo clippy -p gerbil-scheme-qualification --features instance-library --bench instance_resources --locked -- -D warnings
+          cargo clippy -p gerbil-scheme-qualification --features instance-library --bench instance_resources --bench owner_costs --locked -- -D warnings
 
   # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
   # execution inside a VM. Restore this job only with a qualified SDK release.

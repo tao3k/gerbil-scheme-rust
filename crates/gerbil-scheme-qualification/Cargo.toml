@@ -55,5 +55,10 @@ name = "instance_resources"
 harness = false
 required-features = ["instance-library"]
 
+[[bench]]
+name = "owner_costs"
+harness = false
+required-features = ["instance-library"]
+
 [lints]
 workspace = true

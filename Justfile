@@ -235,3 +235,7 @@ native-model-check: model-check owner-model-check
 # Separate smaller bound; never substitutes for the 12-transition target.
 owner-model-verify-smoke:
     {{ build_env }} cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_symbolic_8 --locked -- --ignored --exact --nocapture
+
+# Same live Scheme owners and order corpus; normal versus opt-in phase clocks.
+bridge-owner-cost-benchmark *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-library --bench owner_costs --locked -- {{ args }}

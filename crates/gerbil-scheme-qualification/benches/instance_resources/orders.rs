@@ -1,7 +1,8 @@
 //! Public batch API, real native order records, matched semantic admission.
-use super::{
-    GATE, Progress, bounded_integer, checkpoint, command, config, finish, observed, program,
-};
+#[path = "../support/orders.rs"]
+mod corpus;
+use super::{GATE, Progress, checkpoint, command, config, finish, observed, program};
+pub(super) use corpus::{order, peers, percentile, verify};
 use gerbil_scheme::instances::{InstanceError, InstancePool, InstanceTicket};
 use std::time::Instant;
 pub(super) fn orders_program() -> gerbil_scheme::instances::IsolatedProgram {
@@ -18,66 +19,6 @@ pub(super) struct Sample {
     pub(super) latency: Vec<u128>,
     pub(super) probe: Vec<u128>,
     pub(super) peer_min: usize,
-}
-pub(super) fn order(id: usize, mixed: bool) -> Vec<i64> {
-    let mut input = vec![
-        bounded_integer(id),
-        i64::from(mixed && id.rem_euclid(7) == 0),
-    ];
-    for line in 0..48 {
-        input.extend([
-            bounded_integer((id + line) % 16),
-            bounded_integer(line % 5 + 1),
-            bounded_integer((id * 17 + line * 31) % 10000),
-        ]);
-    }
-    input
-}
-pub(super) fn verify(input: &[i64], output: &[i64]) {
-    assert_eq!(output.len(), 21);
-    assert_eq!(output[0], input[0]);
-    let mut expected = [0_i64; 18];
-    for line in input[2..].chunks_exact(3) {
-        expected[0] += line[1];
-        expected[1] += line[1] * line[2];
-        expected[2 + usize::try_from(line[0]).unwrap()] += line[1] * line[2];
-    }
-    assert_eq!(output[1..3], expected[..2]);
-    assert_eq!(output[5..], expected[2..]);
-}
-pub(super) fn peers(output: &[Vec<i64>]) -> usize {
-    if output.len() < 4 {
-        return 0;
-    }
-    let mut ranks: Vec<_> = output.iter().map(|row| row[3]).collect();
-    ranks.sort_unstable();
-    assert_eq!(
-        ranks,
-        (1..=bounded_integer(output.len())).collect::<Vec<_>>()
-    );
-    for (index, row) in output.iter().enumerate() {
-        assert_eq!(row[4], bounded_integer(index % 4));
-    }
-    let first_finish = (0..4)
-        .map(|worker| {
-            output
-                .iter()
-                .filter(|row| row[4] == worker)
-                .map(|row| row[3])
-                .max()
-                .unwrap()
-        })
-        .min()
-        .unwrap();
-    (0..4)
-        .map(|worker| {
-            output
-                .iter()
-                .filter(|row| row[4] == worker && row[3] <= first_finish)
-                .count()
-        })
-        .min()
-        .unwrap()
 }
 pub(super) fn sample(
     pool: &InstancePool,
@@ -143,10 +84,6 @@ pub(super) fn sample_using(
     }
     result.elapsed = start.elapsed().as_nanos();
     result
-}
-pub(super) fn percentile(values: &mut [u128], percent: usize) -> u128 {
-    values.sort_unstable();
-    values[(values.len() * percent).div_ceil(100).saturating_sub(1)]
 }
 fn contracts(pool: &InstancePool, progress: &Progress) {
     let dispatch = pool.dispatcher();

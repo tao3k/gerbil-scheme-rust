@@ -231,6 +231,10 @@ mean waiting regression above remains visible.
 
 * Next architectural boundary
 
+[[file:30.28-shared-owner-capacity-and-batch-fairness.org][30.28]] implements the next shared-capacity/backpressure stage and records its
+explicit Scheme batch negatives. The remaining items below retain their original
+planning context; they are not all completed by that later stage.
+
 The reusable completion driver is the first implemented topology change, not a
 claim that the complete concurrency architecture is finished. The next boundary
 is shared owner capacity across concurrent callers, followed by application-level

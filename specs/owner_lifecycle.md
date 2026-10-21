@@ -18,6 +18,8 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 | Model transition/property | Actual boundary |
 | --- | --- |
 | `admit`, `close` | `InstanceService::runtime`, closed flag, native pool admission |
+| `reserve`, `admitReserved`, `releaseReservation`, `configureCapacity` | `instances/capacity.rs`: shared owner reservations, the existing admission fence and quiescent reconfiguration |
+| `capacityHeld` | Optional permit on `pool::Request`, retained through native execution, delivery and abandoned-reply rollback |
 | `complete` | `instances/native_dispatch.rs::native_request`, fixed-owner completion |
 | `observeTimeout` | Ticket observation/draining; accepted Scheme work is not cancelled |
 | `publish` | `instance_runtime.rs::Registry::insert`, closed check under values lock |
@@ -54,9 +56,11 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 
 The safety predicate checks closed-state retirement, ownership, result/root
 conservation constraints and absence of late publication, late executor creation
-or foreign handle use. Five mutations deliberately remove one boundary each:
-late publication, late executor creation, early join, foreign handle use and
-unsafe code release. The code-lease extension also permits cloning an existing
+or foreign handle use. Shared credits additionally conserve reservations plus
+accepted work that has not completed, with a per-owner capacity bound. Six
+mutations deliberately remove one boundary each: late publication, late executor
+creation, early join, foreign handle use, unsafe code release and early credit
+return on observation timeout. The code-lease extension also permits cloning an existing
 lease after join, but cannot create a first lease after code release.
 
 The model treats each owner code group as one resource. It does not model OS
@@ -69,7 +73,7 @@ or dependency failures cannot satisfy a negative control.
 
 The small domain has three requests and two owners; the wide domain has five
 requests and two owners. These are exploration parameters, not runtime limits.
-Each has twelve deterministic scenarios and 1,000 sampled traces of at most 64
+Each has sixteen deterministic scenarios and 1,000 sampled traces of at most 64
 transitions. A 12-transition symbolic check is a separate command. Neither finite
 simulation nor bounded symbolic checking is an unbounded theorem, implementation
 refinement, fairness proof or throughput result. Stuttering is allowed; arbitrary
@@ -100,3 +104,21 @@ controls have been rerun independently. The twelve-transition attempt was stoppe
 later SMT queries become expensive. It is not a pass, and the eight-step result
 does not replace that target. Symbolic wrappers preserve all generated output
 in a fresh temporary directory outside the checkout.
+
+
+## Shared owner capacity extension
+
+The capacity state refines this existing model; it does not model another runtime.
+`capacityHeld` equals live reservations plus accepted work not yet completed.
+Observation timeout preserves both terms. Only native completion returns accepted
+credit; cancelling a reservation that was never admitted returns reservation
+credit. The closed admission fence rejects conversion of a reservation into native
+work. Quiescent capacity changes cannot discard accepted native work.
+
+The finite scenarios cover timeout conservation, reserved-close rejection, native
+completion/reconfiguration and an early-return mutation. FIFO semaphore mechanics,
+waker reentrancy, generation identity checks and OS scheduling remain native/code
+audit obligations. No temporal fairness or starvation theorem is claimed. Native
+tests independently cover FIFO waiters, clone/API participation, cancellation,
+continuations across forced GC, panic and in-flight close. The older symbolic
+results above are not transferred to this extended state.

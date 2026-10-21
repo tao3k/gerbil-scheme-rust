@@ -56,6 +56,7 @@ fn owner_protocol_scenarios_and_controls() {
         "unsafeJoinStep",
         "unsafeForeignStep",
         "unsafeCodeReleaseStep",
+        "unsafeCreditReturnStep",
     ] {
         let output = run(&[
             "run",

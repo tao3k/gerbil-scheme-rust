@@ -12,6 +12,7 @@ module owner_lifecycle {
     executor: str, filesPresent: bool, imagesRetained: bool,
     codeLeases: Set[int], unloadAuthorized: bool, codeQuarantined: bool,
     unsafeCodeRelease: bool,
+    capacityLimit: int, capacityHeld: Set[int], reserved: Set[int],
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
@@ -22,17 +23,38 @@ module owner_lifecycle {
     filesPresent: true, imagesRetained: true,
     codeLeases: Set(), unloadAuthorized: false, codeQuarantined: false,
     unsafeCodeRelease: false,
+    capacityLimit: JOBS.size(), capacityHeld: Set(), reserved: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
+  }
+  def hasCapacity(r: int): bool =
+    s.capacityHeld.filter(job => ASSIGNED.get(job) == ASSIGNED.get(r)).size() < s.capacityLimit
+  action reserve(r: int): bool = all {
+    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
+    not(s.reserved.contains(r)), hasCapacity(r),
+    s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)) }
+  }
+  action admitReserved(r: int): bool = all {
+    s.phase == "open", s.reserved.contains(r),
+    s' = { ...s, accepted: s.accepted.union(Set(r)), reserved: s.reserved.exclude(Set(r)) }
+  }
+  action releaseReservation(r: int): bool = all {
+    s.reserved.contains(r),
+    s' = { ...s, reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)) }
+  }
+  action configureCapacity(limit: int): bool = all {
+    s.phase == "open", s.capacityHeld.size() == 0, limit > 0,
+    s' = { ...s, capacityLimit: limit }
   }
   action admit(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
-    s' = { ...s, accepted: s.accepted.union(Set(r)) }
+    not(s.reserved.contains(r)), hasCapacity(r),
+    s' = { ...s, accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)) }
   }
   // Completion is an externally validated owner action, not Rust computation.
   action complete(r: int): bool = all {
     Set("open", "closing").contains(s.phase),
     s.accepted.contains(r), not(s.completed.contains(r)),
-    s' = { ...s, completed: s.completed.union(Set(r)),
+    s' = { ...s, completed: s.completed.union(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)),
       roots: s.roots.union(Set(r)), ready: s.ready.union(Set(r)) }
   }
   // Observation timeout leaves accepted native work and roots unchanged.
@@ -114,9 +136,14 @@ module owner_lifecycle {
     nondet owner = Set(1, 2).oneOf()
     any { admit(r), complete(r), observeTimeout(r), publish(r), use(r, owner),
       release(r, owner), createExecutor, close, join, clearRegistry, retire,
-      codeLease(r), releaseCodeLease(r), authorizeCodeRelease, quarantineCode, releaseCode, stutter }
+      codeLease(r), releaseCodeLease(r), authorizeCodeRelease, quarantineCode, releaseCode,
+      reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
   }
   val safety = and {
+    s.capacityLimit > 0, s.capacityHeld.subseteq(JOBS), s.reserved.subseteq(JOBS),
+    s.reserved.intersect(s.accepted).size() == 0,
+    s.capacityHeld == s.reserved.union(s.accepted.exclude(s.completed)),
+    Set(1, 2).forall(owner => s.capacityHeld.filter(job => ASSIGNED.get(job) == owner).size() <= s.capacityLimit),
     s.accepted.subseteq(JOBS), s.completed.subseteq(s.accepted),
     s.timedOut.subseteq(s.accepted), s.ready.subseteq(s.completed),
     s.roots.subseteq(s.completed), s.registry.subseteq(s.completed),
@@ -132,6 +159,11 @@ module owner_lifecycle {
       s.codeLeases.size() == 0, not(s.codeQuarantined) })
   }
 
+  action unsafeCreditReturn(r: int): bool = all {
+    s.accepted.contains(r), not(s.completed.contains(r)), s.timedOut.contains(r),
+    s' = { ...s, capacityHeld: s.capacityHeld.exclude(Set(r)) }
+  }
+  action unsafeCreditReturnStep = { nondet r = JOBS.oneOf(); any { step, unsafeCreditReturn(r) } }
   action unsafePublicationStep = { nondet r = JOBS.oneOf(); any { step, publishUnchecked(r) } }
   action unsafeExecutorStep = any { step, createExecutorUnchecked }
   action unsafeJoinStep = any { step, joinUnchecked }
@@ -144,6 +176,15 @@ module owner_lifecycle {
   }
   action unsafeForeignStep = any { step, unsafeForeignUse }
 
+  run timeoutKeepsSharedCreditTest = init.then(configureCapacity(1)).then(admit(1))
+    .then(observeTimeout(1)).then(all { assert(s.capacityHeld.contains(1)), assert(not(hasCapacity(3))), assert(safety), stutter })
+    .then(complete(1)).then(all { assert(hasCapacity(3)), assert(safety), stutter })
+  run reservedCloseCannotAdmitTest = init.then(configureCapacity(1)).then(reserve(1)).then(close)
+    .then(releaseReservation(1)).then(join).then(all { assert(s.capacityHeld.size() == 0), assert(safety), stutter })
+  run nativeCompletionReturnsCreditTest = init.then(configureCapacity(1)).then(reserve(1)).then(admitReserved(1))
+    .then(complete(1)).then(configureCapacity(2)).then(all { assert(safety), stutter })
+  run earlyCreditReturnMutationTest = init.then(configureCapacity(1)).then(admit(1)).then(observeTimeout(1))
+    .then(unsafeCreditReturn(1)).then(all { assert(not(safety)), stutter })
   run codeLeasePreventsReleaseTest = init.then(authorizeCodeRelease).then(codeLease(1))
     .then(close).then(join)
     .then(all { assert(not(canReleaseCode)), assert(s.imagesRetained), stutter })

@@ -4,6 +4,10 @@
 mod async_dispatch;
 #[cfg(feature = "tokio-dispatch")]
 pub use async_dispatch::AsyncInstanceTicket;
+#[cfg(feature = "tokio-dispatch")]
+mod capacity;
+#[cfg(feature = "tokio-dispatch")]
+pub use capacity::{BatchAdmission, OwnerCapacitySnapshot};
 mod batch;
 mod batch_trace;
 mod batch_types;

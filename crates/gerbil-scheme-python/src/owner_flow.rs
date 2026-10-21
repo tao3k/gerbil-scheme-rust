@@ -56,9 +56,54 @@ where
     F: FnMut(usize, T) -> Result<AsyncInstanceTicket<R>, InstanceError>,
     O: FnMut(usize, FlowStage),
 {
-    let mut flow = Flow::new(jobs, control);
-    poll_fn(|context| flow.poll(context, &mut submit, &mut observe)).await;
+    drive(
+        jobs,
+        control,
+        |owner, item| std::future::ready(submit(owner, item)),
+        &mut observe,
+        false,
+    )
+    .await
+}
+/// Completion flow whose callback may await pool-wide owner capacity. There is
+/// at most one pending admission per owner per invocation, so a producer cannot
+/// prequeue its entire backlog ahead of other producers' reservations. Poll in
+/// a Tokio runtime with time enabled. Accepted native work is never cancelled.
+/// Callback futures must perform admission only and return the existing ticket.
+pub async fn owner_flow_backpressured<T, R, F, A>(
+    jobs: Vec<(usize, T)>,
+    control: FlowControl,
+    submit: F,
+) -> Vec<OwnerResult<R>>
+where
+    R: Send + 'static,
+    F: FnMut(usize, T) -> A,
+    A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
+{
+    drive(jobs, control, submit, &mut |_, _| {}, true).await
+}
+async fn drive<T, R, F, A, O>(
+    jobs: Vec<(usize, T)>,
+    control: FlowControl,
+    mut submit: F,
+    observe: &mut O,
+    bounded_admission: bool,
+) -> Vec<OwnerResult<R>>
+where
+    R: Send + 'static,
+    F: FnMut(usize, T) -> A,
+    A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
+    O: FnMut(usize, FlowStage),
+{
+    let mut flow = Flow::new(jobs, control, bounded_admission);
+    poll_fn(|context| flow.poll(context, &mut submit, observe)).await;
     flow.finish()
+}
+type Admission<R> =
+    Pin<Box<dyn Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send>>;
+struct Admitting<R> {
+    index: usize,
+    future: Admission<R>,
 }
 type Response<R> = Pin<Box<dyn Future<Output = OwnerResult<R>> + Send>>;
 struct Pending<R> {
@@ -69,6 +114,7 @@ struct Lane<T, R> {
     owner: usize,
     waiting: VecDeque<(usize, T)>,
     active: VecDeque<Pending<R>>,
+    admitting: Option<Admitting<R>>,
 }
 struct Flow<T, R> {
     lanes: Vec<Lane<T, R>>,
@@ -78,9 +124,10 @@ struct Flow<T, R> {
     active: usize,
     cursor: usize,
     quota: usize,
+    bounded_admission: bool,
 }
 impl<T, R: Send + 'static> Flow<T, R> {
-    fn new(jobs: Vec<(usize, T)>, control: FlowControl) -> Self {
+    fn new(jobs: Vec<(usize, T)>, control: FlowControl, bounded_admission: bool) -> Self {
         let count = jobs.len();
         let mut waiting: BTreeMap<usize, VecDeque<(usize, T)>> = BTreeMap::new();
         for (index, (owner, item)) in jobs.into_iter().enumerate() {
@@ -94,6 +141,7 @@ impl<T, R: Send + 'static> Flow<T, R> {
                     owner,
                     waiting,
                     active: VecDeque::new(),
+                    admitting: None,
                 })
                 .collect(),
             slots: (0..count).map(|_| None).collect(),
@@ -102,6 +150,7 @@ impl<T, R: Send + 'static> Flow<T, R> {
             active: 0,
             cursor: 0,
             quota,
+            bounded_admission,
         }
     }
     fn finish(self) -> Vec<OwnerResult<R>> {
@@ -110,51 +159,93 @@ impl<T, R: Send + 'static> Flow<T, R> {
             .map(|slot| slot.expect("one result per offered request"))
             .collect()
     }
-    fn submit_one<F, O>(&mut self, lane: usize, submit: &mut F, observe: &mut O)
+    fn begin_admission<F, A, O>(&mut self, lane: usize, submit: &mut F, observe: &mut O)
     where
-        F: FnMut(usize, T) -> Result<AsyncInstanceTicket<R>, InstanceError>,
+        F: FnMut(usize, T) -> A,
+        A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
         O: FnMut(usize, FlowStage),
     {
         let owner = &mut self.lanes[lane];
         let (index, item) = owner.waiting.pop_front().expect("waiting input");
         observe(index, FlowStage::Submitting);
-        let ticket = if self.control.budget.expired() {
-            Err(InstanceError::Timeout)
+        let future: Admission<R> = if self.control.budget.expired() {
+            Box::pin(std::future::ready(Err(InstanceError::Timeout)))
         } else {
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| submit(owner.owner, item)))
-                .unwrap_or(Err(InstanceError::TaskPanicked))
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                submit(owner.owner, item)
+            })) {
+                Ok(future) if self.bounded_admission => {
+                    let budget = self.control.budget;
+                    Box::pin(async move {
+                        if budget.expired() {
+                            return Err(InstanceError::Timeout);
+                        }
+                        tokio::time::timeout(budget.remaining(), future)
+                            .await
+                            .unwrap_or(Err(InstanceError::Timeout))
+                    })
+                }
+                Ok(future) => Box::pin(future),
+                Err(_) => Box::pin(std::future::ready(Err(InstanceError::TaskPanicked))),
+            }
         };
+        owner.admitting = Some(Admitting { index, future });
+        self.active += 1;
+    }
+    fn poll_admission<O>(&mut self, lane: usize, context: &mut Context<'_>, observe: &mut O) -> bool
+    where
+        O: FnMut(usize, FlowStage),
+    {
+        let owner = &mut self.lanes[lane];
+        let Some(admitting) = owner.admitting.as_mut() else {
+            return false;
+        };
+        let poll = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            admitting.future.as_mut().poll(context)
+        }))
+        .unwrap_or(Poll::Ready(Err(InstanceError::TaskPanicked)));
+        let Poll::Ready(ticket) = poll else {
+            return false;
+        };
+        let index = admitting.index;
+        owner.admitting = None;
         observe(index, FlowStage::Admitted);
         let budget = self.control.budget;
         owner.active.push_back(Pending {
             index,
             response: Box::pin(async move { ticket?.wait_completed(budget.remaining()).await }),
         });
-        self.active += 1;
+        true
     }
-    fn fill<F, O>(&mut self, submit: &mut F, observe: &mut O)
+    fn fill<F, A, O>(&mut self, context: &mut Context<'_>, submit: &mut F, observe: &mut O)
     where
-        F: FnMut(usize, T) -> Result<AsyncInstanceTicket<R>, InstanceError>,
+        F: FnMut(usize, T) -> A,
+        A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
         O: FnMut(usize, FlowStage),
     {
+        // Poll reservations even if they occupy the last invocation credits.
+        for lane in 0..self.lanes.len() {
+            self.poll_admission(lane, context, observe);
+        }
         while self.active < self.control.maximum_in_flight {
             let next = (0..self.lanes.len())
                 .map(|offset| (self.cursor + offset) % self.lanes.len())
-                .find(|&lane| {
-                    !self.lanes[lane].waiting.is_empty()
-                        && self.lanes[lane].active.len() < self.quota
+                .find(|&lane| self.can_admit(lane) && self.lanes[lane].active.len() < self.quota)
+                .or_else(|| {
+                    (0..self.lanes.len())
+                        .map(|offset| (self.cursor + offset) % self.lanes.len())
+                        .find(|&lane| self.can_admit(lane))
                 });
-            let next = next.or_else(|| {
-                (0..self.lanes.len())
-                    .map(|offset| (self.cursor + offset) % self.lanes.len())
-                    .find(|&lane| !self.lanes[lane].waiting.is_empty())
-            });
             let Some(lane) = next else {
                 break;
             };
             self.cursor = (lane + 1) % self.lanes.len();
-            self.submit_one(lane, submit, observe);
+            self.begin_admission(lane, submit, observe);
+            self.poll_admission(lane, context, observe);
         }
+    }
+    fn can_admit(&self, lane: usize) -> bool {
+        !self.lanes[lane].waiting.is_empty() && self.lanes[lane].admitting.is_none()
     }
     fn collect_ready<O>(&mut self, context: &mut Context<'_>, observe: &mut O) -> bool
     where
@@ -178,9 +269,15 @@ impl<T, R: Send + 'static> Flow<T, R> {
         }
         progress
     }
-    fn poll<F, O>(&mut self, context: &mut Context<'_>, submit: &mut F, observe: &mut O) -> Poll<()>
+    fn poll<F, A, O>(
+        &mut self,
+        context: &mut Context<'_>,
+        submit: &mut F,
+        observe: &mut O,
+    ) -> Poll<()>
     where
-        F: FnMut(usize, T) -> Result<AsyncInstanceTicket<R>, InstanceError>,
+        F: FnMut(usize, T) -> A,
+        A: Future<Output = Result<AsyncInstanceTicket<R>, InstanceError>> + Send + 'static,
         O: FnMut(usize, FlowStage),
     {
         if self.control.maximum_in_flight == 0 {
@@ -193,7 +290,7 @@ impl<T, R: Send + 'static> Flow<T, R> {
         }
         // Bound synchronous completion work per poll; no Scheme scheduling changes.
         for _ in 0..self.control.maximum_in_flight {
-            self.fill(submit, observe);
+            self.fill(context, submit, observe);
             if self.remaining == 0 {
                 return Poll::Ready(());
             }

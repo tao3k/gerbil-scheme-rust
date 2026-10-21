@@ -50,3 +50,20 @@ Focused same-VM comparisons show throughput gains versus Tokio/Rayon in the
 recorded short CPU cohorts, with unstable p99, direct and fairness outcomes.
 The candidate is not promoted. See the [architecture, negatives and next capacity
 boundary](30-39-status/30.27-completion-driven-owner-flow.org).
+
+
+## Optional pool-wide capacity and Scheme batch policy
+
+Configure `InstanceDispatcher::configure_owner_capacity` before the first
+unbounded dispatcher admission to share per-owner request credits across every
+clone/API. Backpressured native and numeric-batch methods await that capacity;
+accepted requests retain it until their owner finishes execution and delivery,
+including abandoned-reply rollback. Observation timeout never returns credit early.
+The optional `owner_flow_backpressured` driver limits pending reservations per
+owner/producer and bounds admission futures by the common deadline. Defaults and
+existing Python dispatcher modes remain unchanged.
+
+Native Scheme batches retain their explicit whole-turn exception/drain semantics.
+Request slots are not work/time credits: increasing batch size can worsen short
+request latency. See the [shared-capacity protocol, focused fairness controls and
+remaining service-budget boundary](30-39-status/30.28-shared-owner-capacity-and-batch-fairness.org).

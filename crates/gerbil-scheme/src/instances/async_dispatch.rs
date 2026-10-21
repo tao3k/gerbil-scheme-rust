@@ -58,3 +58,47 @@ impl InstanceDispatcher {
         Ok(AsyncInstanceTicket { response })
     }
 }
+
+impl InstanceDispatcher {
+    /// Await shared owner capacity before enqueuing a native operation.
+    /// FIFO reservations share capacity with all synchronous/asynchronous APIs.
+    /// Observation timeout after acceptance never returns the native credit early.
+    /// # Errors
+    /// Reports disabled capacity, admission timeout, close or native queue rejection.
+    pub async fn submit_native_backpressured_on<R, F>(
+        &self,
+        owner: usize,
+        job: F,
+        timeout: Duration,
+    ) -> Result<AsyncInstanceTicket<R>, InstanceError>
+    where
+        R: Send + 'static,
+        F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
+    {
+        let reservation = self.reserve_owner(owner, timeout).await?;
+        let (send, response) = tokio::sync::oneshot::channel();
+        self.native_request_reserved(reservation, job, move |value| send.send(value).is_ok())?;
+        Ok(AsyncInstanceTicket { response })
+    }
+    /// Submit an explicitly bounded Scheme Actor batch through shared capacity.
+    /// Batch error/drain and cooperative quantum are the existing native semantics;
+    /// arbitrary Scheme calls are never implicitly fused or translated.
+    /// # Errors
+    /// Preserves native batch validation and shared-capacity admission failures.
+    pub async fn submit_numeric_batch_backpressured<T>(
+        &self,
+        items: Vec<Vec<T>>,
+        admission: super::BatchAdmission,
+    ) -> Result<AsyncInstanceTicket<Vec<Vec<T>>>, InstanceError>
+    where
+        T: NumericElement + Send + 'static,
+    {
+        super::batch::validate(&items, admission.yield_every, self.maximum_input())?;
+        self.submit_native_backpressured_on(
+            admission.owner,
+            move |session| super::batch::execute(session, &items, admission.yield_every, |_| {}),
+            admission.timeout,
+        )
+        .await
+    }
+}

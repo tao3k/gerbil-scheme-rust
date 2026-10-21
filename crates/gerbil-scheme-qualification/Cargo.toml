@@ -64,8 +64,17 @@ harness = false
 required-features = ["instance-library"]
 
 [[bench]]
+name = "owner_capacity"
+harness = false
+required-features = ["instance-dispatch"]
+
+[[bench]]
 name = "owner_dispatch"
 harness = false
+required-features = ["instance-dispatch"]
+
+[[test]]
+name = "owner_capacity"
 required-features = ["instance-dispatch"]
 
 [[test]]

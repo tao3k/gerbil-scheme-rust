@@ -37,11 +37,42 @@ impl InstanceDispatcher {
         R: Send + 'static,
         F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
     {
+        let request = self.native_work(job, deliver);
+        let started = Arc::clone(&request.started);
+        self.enqueue(owner, request)?;
+        Ok(started)
+    }
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) fn native_request_reserved<R, F>(
+        &self,
+        reservation: super::capacity::ReservedOwner,
+        job: F,
+        deliver: impl FnOnce(super::types::Completed<R>) -> bool + Send + 'static,
+    ) -> Result<(), InstanceError>
+    where
+        R: Send + 'static,
+        F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
+    {
+        let mut request = self.native_work(job, deliver);
+        request.capacity = Some(reservation.permit);
+        self.enqueue(reservation.owner, request)
+    }
+    fn native_work<R, F>(
+        &self,
+        job: F,
+        deliver: impl FnOnce(super::types::Completed<R>) -> bool + Send + 'static,
+    ) -> Request
+    where
+        R: Send + 'static,
+        F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
+    {
         let maximum_input = self.maximum_input();
         let maximum_output = self.maximum_output();
         let started = Arc::new(AtomicBool::new(false));
-        let request = Request {
-            started: Arc::clone(&started),
+        Request {
+            started,
+            #[cfg(feature = "tokio-dispatch")]
+            capacity: None,
             work: Work::Native(Box::new(move |image| {
                 let first = image.next_retained.get();
                 let session = NativeSession {
@@ -65,8 +96,6 @@ impl InstanceDispatcher {
                     image.rollback_retained(first);
                 }
             })),
-        };
-        self.enqueue(owner, request)?;
-        Ok(started)
+        }
     }
 }

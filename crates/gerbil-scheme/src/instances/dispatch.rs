@@ -7,24 +7,44 @@ use std::sync::{
 };
 
 #[derive(Debug)]
-struct Admission {
-    senders: Mutex<Vec<mpsc::SyncSender<Request>>>,
+pub(super) struct Admission {
+    pub(super) senders: Mutex<Senders>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) queue_capacity: usize,
     next: AtomicUsize,
     maximum_request: usize,
     maximum_reply: usize,
 }
 
+#[derive(Debug, Default)]
+pub(super) struct Senders {
+    pub(super) owners: Vec<OwnerSender>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) ever_admitted: bool,
+}
+#[derive(Debug)]
+pub(super) struct OwnerSender {
+    pub(super) sender: mpsc::SyncSender<Request>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) capacity: Option<Arc<tokio::sync::Semaphore>>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) capacity_limit: usize,
+}
 /// Cloneable, Send + Sync admission for concurrent Rust callers.
 /// Closing its owning pool closes all clones before native teardown.
 #[derive(Clone, Debug)]
 pub struct InstanceDispatcher {
-    admission: Arc<Admission>,
+    pub(super) admission: Arc<Admission>,
 }
 impl InstanceDispatcher {
-    pub(super) fn new(maximum_request: usize, maximum_reply: usize) -> Self {
+    pub(super) fn new(maximum_request: usize, maximum_reply: usize, queue_capacity: usize) -> Self {
+        #[cfg(not(feature = "tokio-dispatch"))]
+        let _ = queue_capacity;
         Self {
             admission: Arc::new(Admission {
-                senders: Mutex::new(Vec::new()),
+                senders: Mutex::new(Senders::default()),
+                #[cfg(feature = "tokio-dispatch")]
+                queue_capacity,
                 next: AtomicUsize::new(0),
                 maximum_request,
                 maximum_reply,
@@ -36,14 +56,30 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push(sender);
+            .owners
+            .push(OwnerSender {
+                sender,
+                #[cfg(feature = "tokio-dispatch")]
+                capacity: None,
+                #[cfg(feature = "tokio-dispatch")]
+                capacity_limit: 0,
+            });
     }
     pub(super) fn close(&self) {
-        self.admission
+        let mut senders = self
+            .admission
             .senders
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clear();
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let owners = std::mem::take(&mut senders.owners);
+        drop(senders);
+        #[cfg(feature = "tokio-dispatch")]
+        for owner in &owners {
+            if let Some(capacity) = &owner.capacity {
+                capacity.close();
+            }
+        }
+        drop(owners);
     }
     /// Round-robin admission of an owned, stateless request.
     /// # Errors
@@ -72,15 +108,30 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        senders
-            .get(owner)
-            .ok_or(InstanceError::Closed)?
-            .try_send(request)
-            .map_err(|error| match error {
-                mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
-                mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,
-            })
+        #[cfg(feature = "tokio-dispatch")]
+        let mut senders = senders;
+        let sender = senders.owners.get(owner).ok_or(InstanceError::Closed)?;
+        #[cfg(feature = "tokio-dispatch")]
+        let mut request = request;
+        #[cfg(feature = "tokio-dispatch")]
+        if let Err(error) = super::capacity::attach(sender, &mut request) {
+            drop(senders);
+            return Err(error);
+        }
+        let result = sender.sender.try_send(request);
+        #[cfg(feature = "tokio-dispatch")]
+        if result.is_ok() {
+            senders.ever_admitted = true;
+        }
+        // Request destruction may return a semaphore credit and wake a caller.
+        // Never invoke foreign wakers under the admission/close fence.
+        drop(senders);
+        result.map_err(|error| match error {
+            mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
+            mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,
+        })
     }
+
     fn admit(&self, owner: Option<usize>, bytes: Vec<u8>) -> Result<InstanceTicket, InstanceError> {
         if !crate::instance_backend::images_ready() {
             return Err(InstanceError::Closed);
@@ -97,23 +148,37 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if senders.is_empty() {
+        #[cfg(feature = "tokio-dispatch")]
+        let mut senders = senders;
+        if senders.owners.is_empty() {
             return Err(InstanceError::Closed);
         }
-        let owner = owner
-            .unwrap_or_else(|| self.admission.next.fetch_add(1, Ordering::Relaxed) % senders.len());
-        let sender = senders.get(owner).ok_or(InstanceError::Closed)?;
+        let owner = owner.unwrap_or_else(|| {
+            self.admission.next.fetch_add(1, Ordering::Relaxed) % senders.owners.len()
+        });
+        let sender = senders.owners.get(owner).ok_or(InstanceError::Closed)?;
         let (response, result) = mpsc::channel();
         let started = Arc::new(AtomicBool::new(false));
-        sender
-            .try_send(Request {
-                work: Work::Bytes { bytes, response },
-                started: Arc::clone(&started),
-            })
-            .map_err(|error| match error {
-                mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
-                mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,
-            })?;
+        let request = Request {
+            work: Work::Bytes { bytes, response },
+            started: Arc::clone(&started),
+            #[cfg(feature = "tokio-dispatch")]
+            capacity: None,
+        };
+        #[cfg(feature = "tokio-dispatch")]
+        let mut request = request;
+        #[cfg(feature = "tokio-dispatch")]
+        super::capacity::attach(sender, &mut request)?;
+        let sent = sender.sender.try_send(request);
+        #[cfg(feature = "tokio-dispatch")]
+        if sent.is_ok() {
+            senders.ever_admitted = true;
+        }
+        drop(senders);
+        sent.map_err(|error| match error {
+            mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
+            mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,
+        })?;
         Ok(InstanceTicket {
             response: result,
             started,

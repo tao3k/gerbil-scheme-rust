@@ -29,6 +29,8 @@ struct OwnerThread {
 pub(super) struct Request {
     pub(super) started: Arc<AtomicBool>,
     pub(super) work: Work,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) capacity: Option<tokio::sync::OwnedSemaphorePermit>,
 }
 pub(super) enum Work {
     Bytes {
@@ -120,6 +122,7 @@ impl InstancePool {
             dispatcher: InstanceDispatcher::new(
                 config.maximum_request_bytes,
                 config.maximum_reply_bytes,
+                config.queue_capacity,
             ),
             threads: Vec::new(),
             done,
@@ -189,6 +192,10 @@ impl InstancePool {
                 };
                 let _ = ready.send(Ok(image.receipt.clone()));
                 for request in requests {
+                    // Retain the optional shared credit through execution, delivery
+                    // and abandoned-reply rollback, not just queue removal.
+                    #[cfg(feature = "tokio-dispatch")]
+                    let _capacity = request.capacity;
                     request.started.store(true, Ordering::Release);
                     match request.work {
                         Work::Native(job) => job(&image),

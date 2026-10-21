@@ -243,3 +243,7 @@ bridge-owner-cost-benchmark *args:
 # Fixed Scheme VMs; direct versus asynchronous Tokio and submit-only Rayon.
 bridge-owner-dispatch-benchmark *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --locked -- {{ args }}
+
+# Explicit same-VM shared-capacity and Scheme Actor batch pairs, not a thread matrix.
+bridge-owner-capacity-benchmark *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_capacity --locked -- {{ args }}

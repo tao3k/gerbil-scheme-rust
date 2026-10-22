@@ -13,6 +13,8 @@ mod reselection;
 mod reselection_contract;
 #[path = "scheme_service/routing.rs"]
 mod routing;
+#[path = "scheme_service/settings.rs"]
+mod settings;
 #[path = "scheme_service/short.rs"]
 mod short;
 #[path = "scheme_service/stream.rs"]

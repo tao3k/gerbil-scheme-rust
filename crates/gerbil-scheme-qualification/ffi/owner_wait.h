@@ -4,9 +4,11 @@
 #include <pthread.h>
 #include <pthread/qos.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
 #define OWNER_WAIT_ROWS 4096
 static struct {
-  uint64_t rows[OWNER_WAIT_ROWS][4];
+  uint64_t rows[OWNER_WAIT_ROWS][6];
   uint64_t count, overflow, errors;
 } owner_wait;
 static _Thread_local int owner_wait_enabled;
@@ -31,10 +33,37 @@ static uint64_t owner_wait_clock(void) {
   clock_gettime(CLOCK_MONOTONIC, &now);
   return (uint64_t)now.tv_sec * 1000000000ULL + (uint64_t)now.tv_nsec;
 }
-static void owner_wait_record(uint64_t kind, uint64_t start, uint64_t end, uint64_t requested) {
+static uint64_t owner_wait_cpu(void) {
+  struct timespec now;
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
+  return (uint64_t)now.tv_sec * 1000000000ULL + (uint64_t)now.tv_nsec;
+}
+static void owner_wait_record(uint64_t kind, uint64_t start, uint64_t end, uint64_t requested, uint64_t cpu, uint64_t flags) {
   if (owner_wait.count == OWNER_WAIT_ROWS) { owner_wait.overflow++; return; }
   uint64_t *row = owner_wait.rows[owner_wait.count++];
-  row[0] = kind; row[1] = start; row[2] = end; row[3] = requested;
+  row[0] = kind; row[1] = start; row[2] = end; row[3] = requested; row[4] = cpu; row[5] = flags;
+}
+/* Register the original read endpoint; Scheme opens a duplicate of this pipe.
+ * Observation identifies that duplicate without consuming any wake byte. */
+static struct stat owner_wait_pipe;
+static int owner_wait_pipe_known, owner_wait_pipe_fd = -1;
+static int owner_wait_descriptor(int count, fd_set *readers) {
+  if (!readers || !owner_wait_pipe_known) return -1;
+  if (owner_wait_pipe_fd >= 0 && owner_wait_pipe_fd < count && FD_ISSET(owner_wait_pipe_fd, readers))
+    return owner_wait_pipe_fd;
+  for (int fd = 0; fd < count; ++fd) {
+    struct stat candidate;
+    if (FD_ISSET(fd, readers) && fstat(fd, &candidate) == 0 &&
+        S_ISFIFO(candidate.st_mode) && candidate.st_dev == owner_wait_pipe.st_dev &&
+        candidate.st_ino == owner_wait_pipe.st_ino) {
+      owner_wait_pipe_fd = fd; return fd;
+    }
+  }
+  return -1;
+}
+static int owner_wait_readable(int fd) {
+  int count = 0;
+  return fd >= 0 && ioctl(fd, FIONREAD, &count) == 0 && count > 0;
 }
 typedef int (*owner_select_fn)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 static owner_select_fn owner_select_original;
@@ -50,13 +79,21 @@ int select(int count, fd_set *readers, fd_set *writers, fd_set *errors, struct t
   errno = incoming_errno;
   if (!owner_select_original) { errno = ENOSYS; return -1; }
   int observed = owner_wait_enabled;
-  uint64_t start = observed ? owner_wait_clock() : 0;
   uint64_t requested = timeout ? (uint64_t)timeout->tv_sec * 1000000000ULL + (uint64_t)timeout->tv_usec * 1000ULL : INT64_MAX;
+  int wake_fd = observed ? owner_wait_descriptor(count, readers) : -1;
+  uint64_t flags = wake_fd >= 0 ? 1 : 0;
+  if (observed && owner_wait_readable(wake_fd)) flags |= 2;
+  uint64_t cpu = observed ? owner_wait_cpu() : 0;
+  uint64_t start = observed ? owner_wait_clock() : 0;
+  errno = incoming_errno;
   int result = owner_select_original(count, readers, writers, errors, timeout);
   int saved_errno = errno;
   if (observed) {
     uint64_t kind = result == 0 ? 1 : result > 0 ? 4 : saved_errno == EINTR ? 3 : 5;
-    owner_wait_record(kind, start, owner_wait_clock(), requested);
+    uint64_t end = owner_wait_clock(), used = owner_wait_cpu() - cpu;
+    if (wake_fd >= 0 && result > 0 && FD_ISSET(wake_fd, readers)) flags |= 4;
+    if (owner_wait_readable(wake_fd)) flags |= 8;
+    owner_wait_record(kind, start, end, requested, used, flags);
     if (result < 0 && saved_errno != EINTR) owner_wait.errors++;
   }
   errno = saved_errno;
@@ -69,17 +106,21 @@ static uint64_t gerbil_owner_wait_observe(int operation, uint64_t value) {
       owner_wait.count = owner_wait.overflow = owner_wait.errors = 0;
       owner_wait_enabled = value != 0;
       return 0;
+    case 8:
+      owner_wait_pipe_known = fstat((int)value, &owner_wait_pipe) == 0 && S_ISFIFO(owner_wait_pipe.st_mode);
+      owner_wait_pipe_fd = -1;
+      return owner_wait_pipe_known ? 0 : UINT64_MAX;
     case 5: return owner_wait_qos_set(value);
     case 6: return (uint64_t)qos_class_self();
     case 7: return (uint64_t)owner_wait_qos;
     case 1: return owner_wait_clock();
-    case 2: owner_wait_record(2, value, owner_wait_clock(), 1000000); return 0;
-    case 3: owner_wait_enabled = 0; return owner_wait.count * 4 + 2;
+    case 2: owner_wait_record(2, value, owner_wait_clock(), 1000000, 0, 0); return 0;
+    case 3: owner_wait_enabled = 0; return owner_wait.count * 6 + 2;
     case 4:
       if (value == 0) return owner_wait.overflow;
       if (value == 1) return owner_wait.errors;
       value -= 2;
-      return value < owner_wait.count * 4 ? owner_wait.rows[value / 4][value % 4] : INT64_MAX;
+      return value < owner_wait.count * 6 ? owner_wait.rows[value / 6][value % 6] : INT64_MAX;
     default: return UINT64_MAX;
   }
 }

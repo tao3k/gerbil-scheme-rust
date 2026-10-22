@@ -268,7 +268,7 @@ fairness regressions. `--test --owner-qos-ab` is a correctness smoke only.
 `just bridge-scheme-service-benchmark --resident-ab` compares the existing host
 refill with `submit_scheme_service_stream_on` on the same four Scheme VMs and
 two Tokio workers. Both arms retain the same fixed bulk partition, three active
-bulk callbacks per owner, native short/reselection probe path, native port wake,
+bulk callbacks per owner, native short/reselection probe path, native the explicit native wake policy,
 budget one, feed one, coalesced notifications, slots four and work 32. No owner
 OS priority changes. Candidate staging is 32 original batches/owner, 256 declared
 work units/owner, at most 128 staged callbacks; control retains the existing
@@ -288,7 +288,7 @@ overlap and owner/Actor fairness negatives. See the maintained
 `just bridge-scheme-service-benchmark --pooled-ab` compares fixed-owner resident
 supply against the public pool-source API. Both arms use the same four native VMs,
 two Tokio workers, original batch-eight Scheme workload, three active callbacks
-per owner, native short service, progress-aware short reselection, port wake,
+per owner, native short service, progress-aware short reselection, the explicit native wake policy,
 budget one, feed one, coalesced notification and native slot/work bounds.
 The input ceiling is 128 callbacks/1024 declared work units across the pool:
 control stages four fixed groups of 32/256; candidate stages one shared group of
@@ -303,3 +303,37 @@ owners and must be read alongside that list. Preserve all short/scheduled/batch
 p99, overlap, owner totals and Actor fairness negatives. Phase observations are a
 separate diagnostic, never interchangeable with unobserved throughput. See
 [protocol and measured evidence](../../../../docs/30-39-status/30.45-pooled-resident-service.org).
+
+## Applied policy receipts and native wait boundaries
+
+`just bridge-scheme-service-benchmark --pooled-wake-ab` keeps pooled resident
+supply and capacity/progress short routing in both arms. It compares NativePort
+against Watcher with cooperative budget one. `--test --pooled-wake-ab` is a
+correctness smoke. Every comparison now has an exhaustive requested-policy map,
+applies its settings explicitly, reads `scheme_service_settings_on` on every
+owner, and asserts the native receipts before timing. The emitted
+`native_policy_receipts` are read from Scheme, not inferred from the strategy name.
+Existing defaults remain unchanged.
+
+Historical `--pooled-ab` runs before this repair implicitly used Watcher/budget
+zero because an outer match omitted that comparison. The report preserves their
+numbers with a configuration correction. Current `--pooled-ab` applies and verifies
+the intended NativePort/budget-one settings; it is a separate baseline.
+
+With `--phase-observation`, `native_wait_event_width` is six. Rows are
+`[kind, start_ns, end_ns, requested_ns, thread_cpu_ns, wake_flags]` after the two
+existing overflow/error headers. Kinds retain their previous meanings. Wake flag
+bits are: 1 the registered wake pipe is in the read set; 2 bytes are readable
+before the syscall; 4 the returned ready set includes that pipe; 8 bytes remain
+readable after return. The descriptor is identified by the registered pipe's
+`fstat` identity; probes consume no bytes and own no new descriptors. Entry flags
+are sampled before syscall timing. The observer preserves arguments and errno.
+
+Owner spans include full monotonic start/end boundaries, so select wall/CPU can
+be matched to an enclosing phase instead of treating an overlap as clipped CPU.
+A ready-at-entry syscall's non-CPU wall interval exposes OS/syscall delay, but
+there is no exact kernel runnable timestamp. A written notification followed by
+a ready-set return gives an upper bound on notification-to-return delay, not pure
+scheduler latency. Outside-select non-CPU wall time remains unattributed unless
+additional evidence identifies its blocking/descheduling cause. Keep all
+instrumented negatives separate from unobserved throughput and p99 acceptance.

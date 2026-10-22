@@ -1,6 +1,6 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Opt-in cooperative units. Scheme owns all leases, waits and class decisions.
-(export make-gerbil-rs-budget gerbil-rs-budget-configure! gerbil-rs-budget-snapshot gerbil-rs-budget-idle?
+(export gerbil-rs-budget-limit make-gerbil-rs-budget gerbil-rs-budget-configure! gerbil-rs-budget-snapshot gerbil-rs-budget-idle?
         gerbil-rs-service-context call-with-gerbil-rs-budget-context
         call-with-gerbil-rs-service-unit call-with-gerbil-rs-service-suspension)
 
@@ -126,3 +126,6 @@
   (budget-locked budget (lambda ()
     (and (not (service-budget-owner budget))
          (budget-empty? (service-budget-short budget)) (budget-empty? (service-budget-bulk budget))))))
+
+(def (gerbil-rs-budget-limit budget)
+  (budget-locked budget (lambda () (service-budget-limit budget))))

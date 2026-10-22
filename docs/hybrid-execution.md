@@ -422,3 +422,18 @@ per router; this does not create a globally reserved short queue. Existing routi
 Scheme execution, wake, budget and feed defaults remain unchanged.
 
 See [pooled supply qualification](30-39-status/30.45-pooled-resident-service.org).
+
+### Native configuration readback
+
+`InstanceDispatcher::scheme_service_settings_on` returns typed native
+`SchemeServiceSettings`: the applied cooperative budget and `SchemeServiceWake`.
+Service ABI v5 adds the read-only query; existing service versions remain accepted
+for their existing operations, while older endpoints reject this new capability
+explicitly. Values come from Scheme's actual service/budget state, not a host-side
+cache or requested configuration. Reading does not change scheduling or defaults.
+The fixed-owner capacity, native type, root and lifecycle rules still apply.
+
+The Rust bench now configures every comparison through an exhaustive policy map,
+reads every owner's settings and asserts them before starting the clock. See
+[native policy and wake qualification](30-39-status/30.46-native-policy-readback-and-wake-boundaries.org)
+for the historical configuration correction and the separate rebuilt baseline.

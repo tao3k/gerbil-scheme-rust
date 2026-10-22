@@ -340,3 +340,12 @@ accepted drain after pool cancellation, and forbidden accepted-owner migration.
 The aggregate Rust gate samples `poolStep` and requires the missing-registration-
 barrier mutation to fail from `poolRegistrationMutationInit`. This is finite safety
 evidence, not a throughput, fairness, scheduling-liveness or native-memory proof.
+
+### Policy readback evidence boundary
+
+The native service settings query copies two primitive metadata values from the
+existing owner; it grants no work/slot/root authority. Native wait observations
+also add no lifecycle transition. The existing lifecycle and reselection model
+is reused unchanged. Its successful traces do not verify benchmark policy labels;
+actual native configuration receipts are an independent prerequisite for any
+new policy-specific performance claim.

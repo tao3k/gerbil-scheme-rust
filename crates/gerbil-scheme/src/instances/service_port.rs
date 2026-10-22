@@ -2,7 +2,7 @@
 use super::{InstanceDispatcher, InstanceError, InstanceTicket};
 use std::sync::{Arc, atomic::Ordering};
 /// Existing watcher is the default. `NativePort` uses the same Scheme IO/timer loop.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SchemeServiceWake {
     Watcher,
     NativePort,

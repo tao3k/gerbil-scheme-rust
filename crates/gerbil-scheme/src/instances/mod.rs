@@ -119,3 +119,8 @@ mod service_pool_stream;
 mod service_stream_source;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_pool_stream::SchemeServicePoolStreamConfig;
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_settings;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_settings::SchemeServiceSettings;

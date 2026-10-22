@@ -241,6 +241,7 @@
 ;; Rooted unary command protocol: [s64 header, optional native payload].
 ;; 0=open(read-fd,write-fd,limit), 1=submit(lane, optional short-class=1), 2=take(id), 3=ready,
 ;; 4=wait(host-deadline-microseconds or zero), 7=prepare-close, 5=drain/close.
+;; ABI v5 adds 11=read actual cooperative budget and native wake mode.
 ;; ABI v3 adds 8=configure cooperative units (zero disables), 9=unit counters.
 ;; Hooks remain Scheme-owned; open/close track partially allocated app resources.
 (def (make-gerbil-rs-service-endpoint handler workers on-open on-prepare on-close)
@@ -263,7 +264,7 @@
            (on-open)
            (set! service (make-gerbil-rs-service handler workers (s64vector-ref header 3)
                           (s64vector-ref header 1) (s64vector-ref header 2)))
-           (s64vector 0 4 workers (s64vector-ref header 3)))
+           (s64vector 0 5 workers (s64vector-ref header 3)))
           ((1)
            (unless service (error "Scheme service not open"))
            (unless (or (= (s64vector-length header) 2)
@@ -277,6 +278,11 @@
           ((10)
            (unless (and service (= (s64vector-length header) 2)) (error "invalid native wake configuration"))
            (s64vector (service-port-mode! service (s64vector-ref header 1))))
+          ((11)
+           (unless (and service (= (s64vector-length header) 1)) (error "invalid service settings query"))
+           (service-locked service
+             (lambda () (s64vector (gerbil-rs-budget-limit (scheme-service-budget service))
+                           (if (scheme-service-direct service) 1 0)))))
           ((8)
            (unless (and service (= (s64vector-length header) 2) (not preparing))
              (error "invalid cooperative scheduling configuration"))

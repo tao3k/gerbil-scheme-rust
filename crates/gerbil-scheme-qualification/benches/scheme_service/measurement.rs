@@ -6,12 +6,9 @@ use std::{sync::Arc, time::Instant};
 use workload::ShortMode;
 pub(super) fn idle(pool: &InstancePool) {
     let start = Instant::now();
-    while !pool
-        .dispatcher()
-        .owner_capacity()
-        .iter()
-        .all(|c| c.available == c.limit && c.work_available == c.work_limit)
-    {
+    while !pool.dispatcher().owner_capacity().iter().all(|c| {
+        c.available == c.limit && c.work_available == c.work_limit && c.producer_available == 1
+    }) {
         assert!(start.elapsed() < GATE, "service credits did not return");
         std::thread::yield_now();
     }
@@ -31,6 +28,7 @@ pub(super) enum Comparison {
     OwnerQos,
     Resident,
     Pooled,
+    PooledWake,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -43,6 +41,9 @@ impl Comparison {
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
             Self::Reselection => {
                 "same native work/queues/quotas; pinned versus capacity-reserved owner reselection"
+            }
+            Self::PooledWake => {
+                "same pooled supply/budget; native port versus Scheme completion condition wake"
             }
             Self::Pooled => {
                 "same progress-aware short routing; fixed versus pooled bounded resident supply"
@@ -92,6 +93,7 @@ impl Strategy {
                     | Comparison::OwnerQos
                     | Comparison::Resident
                     | Comparison::Pooled
+                    | Comparison::PooledWake
             ) && (arm
                 || matches!(
                     comparison,
@@ -103,6 +105,7 @@ impl Strategy {
                         | Comparison::OwnerQos
                         | Comparison::Resident
                         | Comparison::Pooled
+                        | Comparison::PooledWake
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -126,6 +129,7 @@ impl Strategy {
                     | Comparison::OwnerQos
                     | Comparison::Resident
                     | Comparison::Pooled
+                    | Comparison::PooledWake
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -149,7 +153,8 @@ pub(super) fn run(
     } else {
         None
     };
-    configure(pool, comparison, arm);
+    let settings = super::settings::configure(pool, comparison, arm);
+    idle(pool);
     let qos = (comparison == Comparison::OwnerQos).then(|| super::native_wait::qos(pool, arm));
     let before = observation.then(|| super::observation::snapshot(pool));
     if observation {
@@ -160,13 +165,18 @@ pub(super) fn run(
     let dispatch = pool.dispatcher();
     let probe_dispatch = pool.dispatcher();
     let (rows, probe) = runtime.block_on(async {
-        let bulk_router = if matches!(comparison, Comparison::Resident | Comparison::Pooled) {
+        let bulk_router = if matches!(
+            comparison,
+            Comparison::Resident | Comparison::Pooled | Comparison::PooledWake
+        ) {
             None
         } else {
             active_router.clone()
         };
         let bulk = runtime.spawn(async move {
-            if comparison == Comparison::Pooled {
+            if comparison == Comparison::PooledWake {
+                super::pooled::bulk(dispatch, bulk_inputs, released).await
+            } else if comparison == Comparison::Pooled {
                 if arm {
                     super::pooled::bulk(dispatch, bulk_inputs, released).await
                 } else {
@@ -217,6 +227,7 @@ pub(super) fn run(
     );
     if observation {
         value["native_wait_events"] = super::native_wait::finish(pool, inputs);
+        value["native_wait_event_width"] = json!(6);
     }
     if let Some(before) = before {
         value["owner_phases"] =
@@ -226,7 +237,7 @@ pub(super) fn run(
         value["owner_qos_receipts"] = qos;
         value["owner_qos_restored"] = super::native_wait::qos(pool, false);
     }
-    append_policy(&mut value, pool, comparison, arm, inputs, probes);
+    append_policy(&mut value, pool, comparison, arm, &settings, inputs, probes);
     if observation && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
     }
@@ -246,12 +257,15 @@ fn router(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if comparison == Comparison::Pooled {
+        if matches!(comparison, Comparison::Pooled | Comparison::PooledWake) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
             || matches!(
                 comparison,
-                Comparison::OwnerQos | Comparison::Resident | Comparison::Pooled
+                Comparison::OwnerQos
+                    | Comparison::Resident
+                    | Comparison::Pooled
+                    | Comparison::PooledWake
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -266,107 +280,43 @@ fn append_policy(
     pool: &InstancePool,
     comparison: Comparison,
     arm: bool,
+    settings: &[gerbil_scheme::instances::SchemeServiceSettings],
     inputs: &[Vec<i64>],
     probes: usize,
 ) {
-    if matches!(
-        comparison,
-        Comparison::Budget
-            | Comparison::Ingress
-            | Comparison::Notification
-            | Comparison::Reselection
-            | Comparison::OwnerQos
-            | Comparison::Resident
-    ) {
-        value["scheme_budget"] = json!(usize::from(
-            arm || matches!(
-                comparison,
-                Comparison::Ingress
-                    | Comparison::Notification
-                    | Comparison::Reselection
-                    | Comparison::OwnerQos
-                    | Comparison::Resident
-                    | Comparison::Pooled
-            )
-        ));
-        value["native_port_wake"] = json!(
-            (comparison == Comparison::Ingress && arm)
-                || matches!(
-                    comparison,
-                    Comparison::Notification
-                        | Comparison::Reselection
-                        | Comparison::OwnerQos
-                        | Comparison::Resident
-                        | Comparison::Pooled
-                )
-        );
-        value["independent_short_notifications"] =
-            json!(comparison == Comparison::Notification && arm);
-        value["scheme_budget_counters"] = super::budget::snapshot(
-            pool,
-            arm || matches!(
-                comparison,
-                Comparison::Ingress
-                    | Comparison::Notification
-                    | Comparison::Reselection
-                    | Comparison::OwnerQos
-                    | Comparison::Resident
-                    | Comparison::Pooled
-            ),
-            inputs,
-            probes,
-        );
-    }
+    use gerbil_scheme::instances::SchemeServiceWake;
+    value["native_policy_receipts"] = json!(settings.iter().enumerate().map(|(owner,s)|
+        json!({"owner":owner,"scheme_budget":s.cooperative_budget,"wake":format!("{:?}",s.wake)})).collect::<Vec<_>>());
+    value["scheme_budget"] = json!(settings[0].cooperative_budget);
+    value["native_port_wake"] = json!(settings[0].wake == SchemeServiceWake::NativePort);
+    value["independent_short_notifications"] = json!(comparison == Comparison::Notification && arm);
+    value["scheme_budget_counters"] =
+        super::budget::snapshot(pool, settings[0].cooperative_budget > 0, inputs, probes);
     value["owner_reselection"] = json!(
         (comparison == Comparison::Reselection && arm)
             || matches!(
                 comparison,
-                Comparison::OwnerQos | Comparison::Resident | Comparison::Pooled
+                Comparison::OwnerQos
+                    | Comparison::Resident
+                    | Comparison::Pooled
+                    | Comparison::PooledWake
             )
     );
-    value["owner_resident_supply"] =
-        json!(comparison == Comparison::Pooled || comparison == Comparison::Resident && arm);
-    value["pool_resident_supply"] = json!(comparison == Comparison::Pooled && arm);
-    value["producer_progress_routing"] = json!(comparison == Comparison::Pooled);
+    value["owner_resident_supply"] = json!(
+        matches!(comparison, Comparison::Pooled | Comparison::PooledWake)
+            || comparison == Comparison::Resident && arm
+    );
+    value["pool_resident_supply"] =
+        json!(comparison == Comparison::PooledWake || comparison == Comparison::Pooled && arm);
+    value["producer_progress_routing"] = json!(matches!(
+        comparison,
+        Comparison::Pooled | Comparison::PooledWake
+    ));
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
     } else {
         1
     });
-}
-fn configure(pool: &InstancePool, comparison: Comparison, arm: bool) {
-    if comparison == Comparison::Feed {
-        for owner in 0..4 {
-            pool.dispatcher()
-                .configure_scheme_service_feed_on(owner, if arm { 4 } else { 1 })
-                .unwrap();
-        }
-    }
-    if comparison == Comparison::Budget {
-        super::budget::configure(pool, arm);
-    }
-    if matches!(
-        comparison,
-        Comparison::Ingress
-            | Comparison::Notification
-            | Comparison::Reselection
-            | Comparison::OwnerQos
-            | Comparison::Resident
-    ) {
-        super::budget::configure(pool, true);
-        super::budget::wake(
-            pool,
-            arm || matches!(
-                comparison,
-                Comparison::Notification
-                    | Comparison::Reselection
-                    | Comparison::OwnerQos
-                    | Comparison::Resident
-                    | Comparison::Pooled
-            ),
-        );
-        super::budget::notification(pool, comparison == Comparison::Notification && arm);
-    }
 }
 fn summarize(
     rows: Vec<gerbil_scheme_python::owner_dispatch::OwnerResult<workload::Reply>>,

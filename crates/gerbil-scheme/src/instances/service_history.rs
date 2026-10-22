@@ -5,6 +5,9 @@ use std::{collections::VecDeque, sync::Mutex, time::Instant};
 #[derive(Clone, Copy, Debug)]
 pub struct SchemeServiceOwnerSpan {
     pub phase: SchemeServicePhase,
+    /// Full phase boundaries; CPU counters enclose this entire interval.
+    pub start: Instant,
+    pub end: Instant,
     pub overlap_ns: u64,
     pub phase_wall_ns: u64,
     pub phase_cpu_ns: Option<u64>,
@@ -66,6 +69,8 @@ impl History {
             .filter(|row| row.end > start && row.start < end)
             .map(|row| SchemeServiceOwnerSpan {
                 phase: row.phase,
+                start: row.start,
+                end: row.end,
                 overlap_ns: ns(row.start.max(start), row.end.min(end)),
                 phase_wall_ns: ns(row.start, row.end),
                 phase_cpu_ns: row.delta.map(|delta| delta[0]),

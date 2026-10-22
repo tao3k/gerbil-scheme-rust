@@ -1,6 +1,20 @@
 #+title: Pooled Resident Supply and Producer-Aware Short Routing
 #+startup: overview
 
+* Configuration correction (supersedes the original policy description)
+
+The later source audit found that =Pooled= was absent from the outer configuration
+match. These captures therefore used the source defaults, Watcher wake and
+cooperative budget zero, in both arms. The original report incorrectly described
+NativePort and budget one. Native settings were not read back in these historical
+runs. The source archive, raw results, image identities and negative rows are
+retained unchanged; the relative fixed-versus-pooled observations apply only to
+that implicit configuration and do not validate the originally declared policy.
+
+See [[file:30.46-native-policy-readback-and-wake-boundaries.org][the configuration repair and new qualification]]. New captures require native
+settings receipts and start a distinct baseline. They must not be spliced into
+these historical results or used to multiply their speedup claims.
+
 * Scope and predecessor
 
 The exact predecessor is =f9bf56c372def683ace7fd6da93e55a0c561df23=.
@@ -94,7 +108,7 @@ control. Finite safety is separate from native acceptance and performance.
 | Active bulk / native slots / native work per owner | 3 / 4 / 32 |
 | Shared aggregate staged count / declared work | 128 / 1024 |
 | Short route | =ReselectProgress=, native dedicated short execution |
-| Native wake / budget / feed / notification | port / 1 / 1 / coalesced |
+| Actual wake / budget / feed / notification | Watcher / 0 / 1 / coalesced (source-inferred) |
 | Samples | 10 per arm and load, alternating ABBA |
 
 Control retains four fixed groups of 32 callbacks and 256 work units per owner.

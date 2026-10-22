@@ -54,7 +54,13 @@
 (def orders-endpoint
   (make-gerbil-rs-service-endpoint orders-service-handler 4 orders-lanes-open!
     orders-latch-release! orders-lanes-close!))
-(def (orders-service-command command) (orders-endpoint command))
+(def (orders-service-command command)
+  (when (and (vector? command) (positive? (vector-length command))
+             (s64vector? (vector-ref command 0)) (>= (s64vector-length (vector-ref command 0)) 2)
+             (= (s64vector-ref (vector-ref command 0) 0) 0))
+    (unless (zero? (owner-wait-trace 8 (s64vector-ref (vector-ref command 0) 1)))
+      (error "qualification wake pipe identity unavailable")))
+  (orders-endpoint command))
 (def (orders-service-reference command)
   (unless (= (s64vector-ref (vector-ref command 0) 0) 6) (error "invalid synchronous reference"))
   (orders-service-handler 0 (vector-ref command 1)))

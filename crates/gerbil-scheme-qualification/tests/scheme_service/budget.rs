@@ -1,6 +1,7 @@
 //! Actual Scheme unit arbitration, release-on-wait and continuation-safe reuse.
 use super::*;
 pub(super) fn configure(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>) {
+    super::settings::defaults(dispatch);
     assert!(matches!(
         dispatch.configure_scheme_service_budget_on(0, 257),
         Err(InstanceError::InvalidConfig(_))

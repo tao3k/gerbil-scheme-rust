@@ -84,6 +84,7 @@ pub(super) async fn contract(
     expiry(dispatch, progress).await;
     abandonment(dispatch, progress).await;
     super::pool_stream::contract(dispatch, progress).await;
+    super::settings::contract(dispatch, progress).await;
     finished
 }
 async fn recovery(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>) {

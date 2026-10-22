@@ -28,8 +28,17 @@ pub(super) fn anchor() -> Anchor {
     }
 }
 impl Anchor {
+    pub(super) fn clock(&self, at: Instant) -> u64 {
+        if at >= self.at {
+            self.clock
+                .saturating_add(u64::try_from(at.duration_since(self.at).as_nanos()).unwrap())
+        } else {
+            self.clock
+                .saturating_sub(u64::try_from(self.at.duration_since(at).as_nanos()).unwrap())
+        }
+    }
     pub(super) fn marks(&self, marks: &[Option<Instant>; 9]) -> Value {
-        json!({"uncertainty_ns":self.uncertainty,"marks_ns":marks.map(|at|at.map(|at|self.clock+u64::try_from(at.saturating_duration_since(self.at).as_nanos()).unwrap()))})
+        json!({"uncertainty_ns":self.uncertainty,"marks_ns":marks.map(|at|at.map(|at|self.clock(at)))})
     }
 }
 fn control(pool: &InstancePool, command: &[i64]) -> Vec<Vec<i64>> {
@@ -58,8 +67,8 @@ pub(super) fn finish(pool: &InstancePool, inputs: &[Vec<i64>]) -> Value {
     let mut sleeps = 0;
     for row in &events {
         assert_eq!(&row[..2], &[0, 0], "native trace overflow/error");
-        assert_eq!((row.len() - 2) % 4, 0);
-        for event in row[2..].chunks_exact(4) {
+        assert_eq!((row.len() - 2) % 6, 0);
+        for event in row[2..].chunks_exact(6) {
             assert!((1..=5).contains(&event[0]) && event[2] >= event[1] && event[3] >= 0);
             sleeps += usize::from(event[0] == 2);
         }

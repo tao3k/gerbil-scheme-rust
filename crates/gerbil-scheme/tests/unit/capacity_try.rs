@@ -7,7 +7,8 @@ use std::{
 };
 use tokio::sync::{Semaphore, watch};
 fn capacity() -> (Arc<Capacity>, watch::Receiver<()>) {
-    let (changed, receiver) = watch::channel(());
+    let changed = crate::instances::capacity_event::CapacityEvents::new();
+    let receiver = changed.subscribe();
     (
         Arc::new(Capacity {
             changed: Arc::new(OnceLock::from(changed)),
@@ -101,7 +102,7 @@ fn version_mark_before_scan_preserves_concurrent_return() {
             let (capacity, mut changes) = capacity();
             let held = capacity.try_pair(8).unwrap();
             // An earlier notification can be discarded only before the live scan.
-            capacity.changed.get().unwrap().send_replace(());
+            capacity.changed.get().unwrap().publish();
             changes.mark_unchanged();
             assert!(capacity.try_pair(8).is_err());
             drop(held); // after scan, before registration of changed()
@@ -113,5 +114,58 @@ fn version_mark_before_scan_preserves_concurrent_return() {
             drop(returned);
             changes.mark_unchanged(); // return before mark: scan observes real credits
             assert!(capacity.try_pair(8).is_ok());
+        });
+}
+
+#[test]
+fn cancellation_publishes_after_internal_partial_work_is_returned() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::task::{Context, Wake, Waker};
+    struct Probe {
+        work: Arc<Semaphore>,
+        visible: AtomicUsize,
+    }
+    impl Wake for Probe {
+        fn wake(self: Arc<Self>) {
+            self.wake_by_ref();
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            self.visible
+                .store(self.work.available_permits(), Ordering::Release);
+        }
+    }
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let (capacity, mut changes) = capacity();
+            let work = Arc::clone(capacity.work.as_ref().unwrap());
+            let held = Arc::clone(&work).try_acquire_many_owned(4).unwrap();
+            let mut acquiring = Box::pin(acquire_pair(Arc::clone(&capacity), 8));
+            poll_fn(|cx| {
+                assert!(acquiring.as_mut().poll(cx).is_pending());
+                Poll::Ready(())
+            })
+            .await;
+            let probe = Arc::new(Probe {
+                work,
+                visible: AtomicUsize::new(usize::MAX),
+            });
+            let waker = Waker::from(Arc::clone(&probe));
+            let mut changed = Box::pin(changes.changed());
+            assert!(
+                changed
+                    .as_mut()
+                    .poll(&mut Context::from_waker(&waker))
+                    .is_pending()
+            );
+            drop(acquiring);
+            assert_eq!(
+                probe.visible.load(Ordering::Acquire),
+                4,
+                "foreign waker must see restored partial credits during publication"
+            );
+            drop(held);
         });
 }

@@ -14,7 +14,10 @@ pub(super) struct Admission {
     #[cfg(feature = "tokio-dispatch")]
     pub(super) queue_capacity: usize,
     #[cfg(feature = "tokio-dispatch")]
-    pub(super) capacity_changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
+    pub(super) capacity_changed:
+        Arc<std::sync::OnceLock<crate::instances::capacity_event::CapacityEvents>>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) short_pool: std::sync::OnceLock<Arc<super::short_pool::Source>>,
     next: AtomicUsize,
     maximum_request: usize,
     maximum_reply: usize,
@@ -54,6 +57,8 @@ impl InstanceDispatcher {
                 queue_capacity,
                 #[cfg(feature = "tokio-dispatch")]
                 capacity_changed: Arc::default(),
+                #[cfg(feature = "tokio-dispatch")]
+                short_pool: std::sync::OnceLock::new(),
                 next: AtomicUsize::new(0),
                 maximum_request,
                 maximum_reply,
@@ -98,6 +103,10 @@ impl InstanceDispatcher {
         let owners = std::mem::take(&mut senders.owners);
         drop(senders);
         #[cfg(feature = "tokio-dispatch")]
+        if let Some(source) = self.admission.short_pool.get() {
+            source.close();
+        }
+        #[cfg(feature = "tokio-dispatch")]
         for owner in &owners {
             if let Some(capacity) = &owner.capacity {
                 capacity.close();
@@ -111,7 +120,7 @@ impl InstanceDispatcher {
         drop(owners);
         #[cfg(feature = "tokio-dispatch")]
         if let Some(changed) = self.admission.capacity_changed.get() {
-            changed.send_replace(());
+            changed.publish();
         }
     }
     /// Round-robin admission of an owned, stateless request.

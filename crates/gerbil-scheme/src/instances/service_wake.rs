@@ -40,8 +40,11 @@ pub(super) struct Wake {
     #[cfg(feature = "tokio-dispatch")]
     pub observation: std::sync::OnceLock<Arc<super::service_metrics::Monitor>>,
     #[cfg(feature = "tokio-dispatch")]
-    pub capacity_changed:
-        std::sync::OnceLock<Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>>,
+    pub capacity_changed: std::sync::OnceLock<
+        Arc<std::sync::OnceLock<crate::instances::capacity_event::CapacityEvents>>,
+    >,
+    #[cfg(feature = "tokio-dispatch")]
+    pub short_pool: std::sync::OnceLock<super::short_pool::Port>,
     pending: AtomicBool,
     pub closed: AtomicBool,
     pub failed: AtomicBool,
@@ -97,6 +100,8 @@ impl Wake {
                 observation: std::sync::OnceLock::new(),
                 #[cfg(feature = "tokio-dispatch")]
                 capacity_changed: std::sync::OnceLock::new(),
+                #[cfg(feature = "tokio-dispatch")]
+                short_pool: std::sync::OnceLock::new(),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
                 failed: AtomicBool::new(false),
@@ -164,16 +169,24 @@ impl Wake {
             .get()
             .and_then(|changed| changed.get())
         {
-            changed.send_replace(());
+            changed.publish();
         }
     }
     fn fail(&self) {
         self.failed.store(true, Ordering::Release);
         #[cfg(feature = "tokio-dispatch")]
+        if let Some(port) = self.short_pool.get() {
+            port.source.owner_closed();
+        }
+        #[cfg(feature = "tokio-dispatch")]
         self.signal_capacity_change();
     }
     pub fn close(&self) {
         if !self.closed.swap(true, Ordering::AcqRel) {
+            #[cfg(feature = "tokio-dispatch")]
+            if let Some(port) = self.short_pool.get() {
+                port.source.owner_closed();
+            }
             #[cfg(feature = "tokio-dispatch")]
             self.signal_capacity_change();
             #[cfg(feature = "tokio-dispatch")]

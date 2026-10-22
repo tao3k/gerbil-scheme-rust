@@ -54,7 +54,7 @@ impl SchemeServiceRouter {
             dispatch
                 .admission
                 .capacity_changed
-                .get_or_init(|| tokio::sync::watch::channel(()).0);
+                .get_or_init(crate::instances::capacity_event::CapacityEvents::new);
         }
         let destinations = config
             .owners
@@ -83,8 +83,20 @@ impl SchemeServiceRouter {
             config,
             admission,
             state: Arc::new(State {
-                changed,
-                producer_progress: admission == SchemeRoutingAdmission::ReselectProgress,
+                changed: Arc::clone(&changed),
+                watch: if matches!(
+                    admission,
+                    SchemeRoutingAdmission::Reselect | SchemeRoutingAdmission::ReselectProgress
+                ) {
+                    Some(dispatch_events(&changed))
+                } else {
+                    None
+                },
+                producer_progress: matches!(
+                    admission,
+                    SchemeRoutingAdmission::ReselectProgress
+                        | SchemeRoutingAdmission::ReselectProgressNotified
+                ),
                 short_gate: Arc::new(Semaphore::new(1)),
                 batch_gate: Arc::new(Semaphore::new(1)),
                 destinations,
@@ -109,7 +121,7 @@ impl SchemeServiceRouter {
             destination.batch.close();
         }
         if let Some(changed) = self.dispatch.admission.capacity_changed.get() {
-            changed.send_replace(());
+            changed.publish();
         }
     }
     /// Snapshot spans owner reservation through projection. Pinned additionally
@@ -297,4 +309,13 @@ fn validate(
         capacities.push(Arc::clone(native));
     }
     Ok(capacities)
+}
+
+fn dispatch_events(
+    changed: &std::sync::OnceLock<crate::instances::capacity_event::CapacityEvents>,
+) -> tokio::sync::watch::Receiver<()> {
+    changed
+        .get()
+        .expect("reselection events initialized")
+        .subscribe()
 }

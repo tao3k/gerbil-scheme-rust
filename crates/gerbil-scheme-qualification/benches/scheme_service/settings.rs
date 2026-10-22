@@ -18,7 +18,8 @@ fn requested(comparison: Comparison, arm: bool) -> SchemeServiceSettings {
         | Comparison::Pooled
         | Comparison::ObserverCost
         | Comparison::ShortRouteLoad
-        | Comparison::SupplyAdmission => (true, true),
+        | Comparison::SupplyAdmission
+        | Comparison::PoolProtocol => (true, true),
         Comparison::PooledWake => (true, !arm),
     };
     SchemeServiceSettings {
@@ -63,4 +64,16 @@ fn read(pool: &InstancePool) -> Vec<SchemeServiceSettings> {
         .into_iter()
         .map(|ticket| ticket.wait(GATE).unwrap())
         .collect()
+}
+
+pub(super) fn short_pool(pool: &InstancePool, comparison: Comparison) {
+    if comparison == Comparison::PoolProtocol {
+        pool.dispatcher()
+            .configure_scheme_short_pool(gerbil_scheme::instances::SchemeShortPoolConfig {
+                owners: vec![0, 1, 2, 3],
+                maximum_pending: 128,
+                maximum_active_per_owner: 1,
+            })
+            .unwrap();
+    }
 }

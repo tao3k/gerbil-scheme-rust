@@ -32,13 +32,14 @@ pub(super) enum Comparison {
     ObserverCost,
     ShortRouteLoad,
     SupplyAdmission,
+    PoolProtocol,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
         self != Self::Service
     }
     fn supply_admission(self, arm: bool) -> gerbil_scheme::instances::SchemeServiceSupplyAdmission {
-        if self == Self::SupplyAdmission && arm {
+        if self == Self::PoolProtocol || self == Self::SupplyAdmission && arm {
             gerbil_scheme::instances::SchemeServiceSupplyAdmission::OwnerLocal
         } else {
             gerbil_scheme::instances::SchemeServiceSupplyAdmission::Queued
@@ -46,6 +47,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::PoolProtocol => {
+                "same owner-local supply; watch host routing versus shared owner-claimed short requests"
+            }
             Self::SupplyAdmission => {
                 "same pooled supply; queued/wrapped versus owner-local native credit ownership"
             }
@@ -116,6 +120,7 @@ impl Strategy {
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
+                    | Comparison::PoolProtocol
             ) && (arm
                 || matches!(
                     comparison,
@@ -131,6 +136,7 @@ impl Strategy {
                         | Comparison::ObserverCost
                         | Comparison::ShortRouteLoad
                         | Comparison::SupplyAdmission
+                        | Comparison::PoolProtocol
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -158,6 +164,7 @@ impl Strategy {
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
+                    | Comparison::PoolProtocol
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -198,6 +205,7 @@ pub(super) fn run(
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
+                | Comparison::PoolProtocol
         ) {
             None
         } else {
@@ -219,6 +227,8 @@ pub(super) fn run(
             released,
             strategy.short_mode,
             active_router,
+            (comparison == Comparison::PoolProtocol && arm)
+                .then(|| pool.dispatcher().scheme_short_pool().unwrap()),
         ));
         (bulk.await.unwrap(), probes.await.unwrap())
     });
@@ -266,6 +276,7 @@ async fn run_bulk(
             | Comparison::ObserverCost
             | Comparison::ShortRouteLoad
             | Comparison::SupplyAdmission
+            | Comparison::PoolProtocol
     ) || comparison == Comparison::Pooled && arm
     {
         super::pooled::bulk(dispatch, inputs, released, comparison.supply_admission(arm)).await
@@ -298,7 +309,9 @@ fn router(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if comparison == Comparison::ShortRouteLoad && arm {
+        if comparison == Comparison::PoolProtocol && arm {
+            gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgressNotified
+        } else if comparison == Comparison::ShortRouteLoad && arm {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
         } else if matches!(
             comparison,
@@ -307,6 +320,7 @@ fn router(
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
+                | Comparison::PoolProtocol
         ) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
@@ -319,6 +333,7 @@ fn router(
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
+                    | Comparison::PoolProtocol
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -358,6 +373,7 @@ fn append_policy(
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
+                    | Comparison::PoolProtocol
             )
     );
     value["owner_resident_supply"] = json!(
@@ -368,6 +384,7 @@ fn append_policy(
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
+                | Comparison::PoolProtocol
         ) || comparison == Comparison::Resident && arm
     );
     value["pool_resident_supply"] = json!(
@@ -377,6 +394,7 @@ fn append_policy(
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
+                | Comparison::PoolProtocol
         ) || comparison == Comparison::Pooled && arm
     );
     value["producer_progress_routing"] = json!(
@@ -387,8 +405,19 @@ fn append_policy(
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
+                | Comparison::PoolProtocol
         ) && !(comparison == Comparison::ShortRouteLoad && arm)
     );
+    value["short_admission_boundary"] = json!(if comparison == Comparison::PoolProtocol && arm {
+        "owner claim"
+    } else {
+        "host publication"
+    });
+    value["deferred_short_owner_claim"] = json!(comparison == Comparison::PoolProtocol && arm);
+    if comparison == Comparison::PoolProtocol && arm {
+        value["producer_progress_routing"] = json!(false);
+        value["owner_reselection"] = json!(false);
+    }
     value["supply_admission"] = json!(format!("{:?}", comparison.supply_admission(arm)));
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4

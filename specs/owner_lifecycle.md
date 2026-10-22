@@ -349,3 +349,20 @@ also add no lifecycle transition. The existing lifecycle and reselection model
 is reused unchanged. Its successful traces do not verify benchmark policy labels;
 actual native configuration receipts are an independent prerequisite for any
 new policy-specific performance claim.
+
+### Capacity registration and dynamic short claims
+
+The same lifecycle state now includes two class scanner registrations and their
+coalesced notifications. `capacityProtocolStep` samples arm/publish/disarm together
+with existing capacity/root/close actions. Scenarios establish arm-before-scan,
+return-before-await, cancellation and close; a scan-before-arm control demonstrates
+the missing-notification window. These checks assume native credit returns are
+published and do not prove OS scheduling latency or unconditional progress.
+
+`shortPoolStep` adds unit-cost dynamic offers after registration, reusing
+`poolStaged`, atomic owner claim and accepted-root drain. In this refinement,
+registered producer identities abstract installed owner claim endpoints; the
+native short facility does not consume bulk producer registration permits.
+Dynamic offer/claim and observation-timeout/close scenarios preserve committed
+ownership. Actual partial-permit cancellation, wake ports, root lifetimes and
+Scheme semantics remain separate native acceptance obligations.

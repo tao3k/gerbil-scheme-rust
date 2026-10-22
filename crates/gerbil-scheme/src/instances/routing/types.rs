@@ -49,6 +49,9 @@ pub enum SchemeRoutingAdmission {
     /// Includes resident producer reservations through native retirement. These
     /// are approximate capacity observations, not predicted service durations.
     ReselectProgress,
+    /// Same occupancy ranking, with register-before-scan capacity notification.
+    /// No payload lock or retry timer is needed for this wait protocol.
+    ReselectProgressNotified,
 }
 pub(super) struct Destination {
     pub(super) owner: usize,
@@ -62,7 +65,8 @@ pub(super) struct Ledger {
     pub(super) batch_cursor: usize,
 }
 pub(super) struct State {
-    pub(super) changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
+    pub(super) changed: Arc<std::sync::OnceLock<crate::instances::capacity_event::CapacityEvents>>,
+    pub(super) watch: Option<tokio::sync::watch::Receiver<()>>,
     pub(super) short_gate: Arc<Semaphore>,
     pub(super) batch_gate: Arc<Semaphore>,
     pub(super) destinations: Vec<Destination>,

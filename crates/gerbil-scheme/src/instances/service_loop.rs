@@ -232,6 +232,26 @@ impl Pump<'_> {
         }
         unreachable!("positive validated feed bound")
     }
+    fn claim_short(&mut self) -> Result<bool, InstanceError> {
+        let request = self
+            .wake
+            .short_pool
+            .get()
+            .and_then(super::short_pool::Port::claim);
+        if let Some(request) = request {
+            self.receive(request)?;
+            self.collect()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+    fn wait_remaining(&self, waiting: bool) -> Option<Duration> {
+        waiting
+            .then(|| self.producer.as_ref().and_then(|p| p.deadline()))
+            .flatten()
+            .map(|deadline| deadline.saturating_duration_since(Instant::now()))
+    }
     fn drive(
         &mut self,
         requests: &mpsc::Receiver<Request>,
@@ -239,7 +259,15 @@ impl Pump<'_> {
     ) -> Result<(), InstanceError> {
         use super::batch_stream_runner::ProducerStep;
         let mut draining = false;
+        let mut short_turn = true;
         loop {
+            if short_turn && self.claim_short()? {
+                short_turn = false;
+                continue;
+            }
+            // One shared short claim alternates with one ordinary owner turn.
+            // Scheme still owns green-thread execution and class fairness.
+            short_turn = true;
             let incoming = dequeue(requests, self.wake).ok();
             let feed_limit = wake.feed_limit.load(Ordering::Acquire);
             if feed_limit > 1
@@ -300,6 +328,11 @@ impl Pump<'_> {
                 }
                 Err(_) => {}
             }
+            // Match the local-inbox arm/recheck protocol for shared publication.
+            if self.claim_short()? {
+                short_turn = false;
+                continue;
+            }
             if wake.closed.load(Ordering::Acquire) {
                 if !draining {
                     control(self.image, &[7])?;
@@ -314,14 +347,7 @@ impl Pump<'_> {
                     "Scheme service wake write failed".into(),
                 ));
             }
-            let remaining = if waiting {
-                self.producer
-                    .as_ref()
-                    .and_then(|producer| producer.deadline())
-                    .map(|deadline| deadline.saturating_duration_since(Instant::now()))
-            } else {
-                None
-            };
+            let remaining = self.wait_remaining(waiting);
             if remaining.is_some_and(|value| value.is_zero()) {
                 continue;
             }

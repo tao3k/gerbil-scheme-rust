@@ -32,7 +32,7 @@ pub struct BatchAdmission {
 /// Work units are application declarations, not elapsed-time predictions.
 #[derive(Debug)]
 pub(super) struct Capacity {
-    pub(super) changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
+    pub(super) changed: Arc<std::sync::OnceLock<crate::instances::capacity_event::CapacityEvents>>,
     pub slots: Arc<Semaphore>,
     pub slot_limit: usize,
     pub work: Option<Arc<Semaphore>>,
@@ -50,7 +50,7 @@ impl Capacity {
     }
     fn signal(&self) {
         if let Some(changed) = self.changed.get() {
-            changed.send_replace(());
+            changed.publish();
         }
     }
     pub(super) fn units(&self, units: usize) -> Result<u32, InstanceError> {
@@ -174,6 +174,11 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if self.admission.short_pool.get().is_some() {
+            return Err(InstanceError::InvalidConfig(
+                "short pool freezes native budgets",
+            ));
+        }
         let previous = configure(
             &mut senders,
             maximum_in_flight,
@@ -269,7 +274,7 @@ fn configure(
     senders: &mut super::dispatch::Senders,
     maximum_in_flight: usize,
     maximum_work: Option<usize>,
-    changed: &Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
+    changed: &Arc<std::sync::OnceLock<crate::instances::capacity_event::CapacityEvents>>,
 ) -> Result<Vec<Arc<Capacity>>, InstanceError> {
     if senders.owners.is_empty() {
         return Err(InstanceError::Closed);

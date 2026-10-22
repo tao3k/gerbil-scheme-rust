@@ -7,6 +7,10 @@ pub use async_dispatch::AsyncInstanceTicket;
 #[cfg(feature = "tokio-dispatch")]
 mod capacity;
 #[cfg(feature = "tokio-dispatch")]
+use capacity::Capacity;
+#[cfg(feature = "tokio-dispatch")]
+mod capacity_event;
+#[cfg(feature = "tokio-dispatch")]
 mod capacity_try;
 #[cfg(feature = "tokio-dispatch")]
 pub use capacity::{BatchAdmission, OwnerCapacitySnapshot};
@@ -15,6 +19,8 @@ mod batch_trace;
 mod batch_types;
 pub use batch_types::{BatchTimeline, ProfiledBatch};
 mod dispatch;
+#[cfg(feature = "tokio-dispatch")]
+use dispatch::Admission;
 mod image;
 mod mapping;
 mod mapping_modules;
@@ -128,3 +134,8 @@ pub use service_pool_stream::SchemeServicePoolStreamConfig;
 mod service_settings;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_settings::SchemeServiceSettings;
+
+#[cfg(feature = "tokio-dispatch")]
+mod short_pool;
+#[cfg(feature = "tokio-dispatch")]
+pub use short_pool::{SchemeShortPool, SchemeShortPoolConfig};

@@ -36,13 +36,18 @@ impl SchemeServiceRouter {
                 .acquire_owned()
                 .await
                 .map_err(|_| InstanceError::Closed)?;
-            let mut changes = self.state.changed.get().unwrap().subscribe();
+            let events = self.state.changed.get().unwrap();
+            let mut changes = self.state.watch.clone();
             loop {
-                // This channel carries only a version, not application data.
-                // Do not take its payload read lock on a host worker: native
-                // owners publish capacity with the matching write lock. Mark
-                // before scanning so a concurrent return remains observable.
-                changes.mark_unchanged();
+                let notified = events.notify.notified();
+                tokio::pin!(notified);
+                if let Some(changes) = changes.as_mut() {
+                    changes.mark_unchanged();
+                } else {
+                    // Registration precedes the scan, including its failed path.
+                    // notify_waiters after this point cannot be lost before await.
+                    notified.as_mut().enable();
+                }
                 if gate.is_closed() {
                     return Err(InstanceError::Closed);
                 }
@@ -83,9 +88,11 @@ impl SchemeServiceRouter {
                     // No class, work or request-slot permit crosses this wait.
                     drop(permit);
                 }
-                // Watch versions survive events between scan and changed(). No
-                // retry timer, reserve-all fanout, or foreign Scheme entry here.
-                changes.changed().await.map_err(|_| InstanceError::Closed)?;
+                if let Some(changes) = changes.as_mut() {
+                    changes.changed().await.map_err(|_| InstanceError::Closed)?;
+                } else {
+                    notified.await;
+                }
             }
         };
         let (_turn, permit, charge, reservation) = tokio::time::timeout(timeout, reserve)

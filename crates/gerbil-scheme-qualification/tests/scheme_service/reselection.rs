@@ -68,9 +68,21 @@ fn probe() -> short::Short {
     short::Short(vec![0, 0, 1, 1, 1])
 }
 pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>) {
+    for admission in [
+        SchemeRoutingAdmission::Reselect,
+        SchemeRoutingAdmission::ReselectProgressNotified,
+    ] {
+        admission_contract(dispatch, progress, admission).await;
+    }
+}
+async fn admission_contract(
+    dispatch: &InstanceDispatcher,
+    progress: &mpsc::Sender<&'static str>,
+    admission: SchemeRoutingAdmission,
+) {
     idle(dispatch).await;
     let old = router(dispatch, SchemeRoutingAdmission::Pinned);
-    let new = router(dispatch, SchemeRoutingAdmission::Reselect);
+    let new = router(dispatch, admission);
     let (release_a, a) = fill(dispatch, 0);
     let (release_b, b) = fill(dispatch, 1);
     let before: Vec<_> = dispatch

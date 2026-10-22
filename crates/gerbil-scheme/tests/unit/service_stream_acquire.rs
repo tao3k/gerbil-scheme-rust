@@ -10,7 +10,8 @@ use std::{
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, watch};
 fn capacity() -> (Arc<Capacity>, watch::Receiver<()>) {
-    let (changed, receiver) = watch::channel(());
+    let changed = crate::instances::capacity_event::CapacityEvents::new();
+    let receiver = changed.subscribe();
     (
         Arc::new(Capacity {
             changed: Arc::new(OnceLock::from(changed)),

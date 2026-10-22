@@ -73,6 +73,7 @@ fn run(
     pool.dispatcher()
         .configure_owner_budgets(4, Some(32))
         .unwrap();
+    settings::short_pool(&pool, comparison);
     if observation.full() {
         for owner in 0..4 {
             pool.dispatcher().observe_scheme_service_on(owner).unwrap();
@@ -152,7 +153,9 @@ fn cleanup(pool: &mut InstancePool) {
     );
 }
 fn select_comparison(args: &[String]) -> Comparison {
-    if args.iter().any(|s| s == "--supply-admission-ab") {
+    if args.iter().any(|s| s == "--pool-protocol-ab") {
+        Comparison::PoolProtocol
+    } else if args.iter().any(|s| s == "--supply-admission-ab") {
         Comparison::SupplyAdmission
     } else if args.iter().any(|s| s == "--short-route-load-ab") {
         Comparison::ShortRouteLoad
@@ -234,6 +237,7 @@ fn main() {
         || s == "--observer-ab"
         || s == "--short-route-load-ab"
         || s == "--supply-admission-ab"
+        || s == "--pool-protocol-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"
@@ -274,6 +278,8 @@ fn main() {
                 "--notification-ab"
                     | "--observer-ab"
                     | "--short-route-load-ab"
+                    | "--supply-admission-ab"
+                    | "--pool-protocol-ab"
                     | "--reselection-ab"
                     | "--owner-qos-ab"
                     | "--resident-ab"

@@ -591,3 +591,37 @@ normal wait, and the capacity guard has an additional optional credit field.
 Retain CPU p99 and owner finish-spread regressions alongside any throughput gains.
 See [the optimization audit](../../../../docs/30-39-status/30.52-owner-supply-ownership-and-optimization-audit.org)
 for the targeted result and the remaining early-owner-binding/notification work.
+
+### Shared capacity and late owner binding
+
+```text
+just bridge-scheme-service-benchmark --test --pool-protocol-ab
+just bridge-scheme-service-benchmark --pool-protocol-ab
+```
+
+Both arms retain four live VMs, O2 Scheme code, native short types, two Tokio
+workers, one cooperative work quantum, slots four/work 32, and `OwnerLocal`
+bulk supply. The control submits shorts through watch-backed `ReselectProgress`;
+the candidate uses `SchemeShortPool::submit`, letting a running owner claim an
+unassigned Rust payload and real credits before native construction. Configure
+this bounded facility once; it freezes native budget identities until shutdown.
+
+Admission ends at host publication for the control and owner claim for the
+candidate. Compare end-to-end latency, not interchangeable component labels.
+The candidate emits `deferred_short_owner_claim=true`, `owner_reselection=false`
+and `producer_progress_routing=false`. `class_routing` is the class-aware strategy
+selector, not evidence that the candidate submits through the host router.
+Observation remains off. One joint comparison cannot isolate the two changes.
+
+The initial capture before the final owner-failure close-fence repair retained
+CPU throughput +1.11%/p99 -9.29%, but mixed throughput
+-0.46%, p99 +1.86% and maximum finish spread +19.91%. No default or overall
+performance promotion follows. [Protocol, native controls and negative results](../../../../docs/30-39-status/30.53-shared-capacity-and-late-owner-binding.org)
+record the source identity and remaining ownership/scheduling boundaries.
+
+After the final owner-failure close-fence repair, one affected pair was recaptured:
+CPU throughput +0.55%/short p99 -79.60%, mixed throughput +3.32%/short p99 -15.20%.
+CPU maximum owner finish spread regressed +34.55%, and CPU short-owner placement
+remained concentrated. Both captures retain their own source/binary identities;
+the changed outcome is not attributed to the close repair or promoted to a
+stable/default speedup. See the final comparison in the same protocol report.

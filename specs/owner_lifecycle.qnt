@@ -23,6 +23,7 @@ module owner_lifecycle {
     producerLimit: int, producers: Set[int], staged: Set[int], producerJobs: Set[int],
     servicePending: Set[int], serviceReady: Set[int], serviceRoots: Set[int], serviceFailed: Set[int],
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
+    capacityArmed: Set[int], capacitySignalled: Set[int],
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
@@ -40,6 +41,7 @@ module owner_lifecycle {
     producerLimit: JOBS.size(), producers: Set(), staged: Set(), producerJobs: Set(),
     servicePending: Set(), serviceReady: Set(), serviceRoots: Set(), serviceFailed: Set(),
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
+    capacityArmed: Set(), capacitySignalled: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
   action init = s' = initial
@@ -260,6 +262,7 @@ module owner_lifecycle {
       reserveWork(r), reserveSlot(r), cancelWork(r), configureWork(8), configureWork(9), reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
   }
   val safety = and {
+    s.capacityArmed.subseteq(Set(1, 2)), s.capacitySignalled.subseteq(s.capacityArmed),
     JOBS.forall(r => Set(1, 2).contains(ownerOf(r))),
     s.accepted.forall(r => ownerOf(r) == s.committed.get(r)),
     s.servicePending.subseteq(s.accepted.exclude(s.completed)), s.serviceRoots == s.servicePending,
@@ -470,6 +473,49 @@ module owner_lifecycle {
   run poolAcceptedMoveMutationTest = init.then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2))
     .then(enablePool).then(claimPool(3, 2)).then(unsafeOwnerMove(3, 1))
     .then(all { assert(not(safety)), stutter })
+  // Shared-capacity notification refines this lifecycle, not a second credit
+  // model. Scanner IDs represent the two class gates, not native owners.
+  // No permit is reserved while a scanner waits. Registration precedes the
+  // live scan; every credit return/close publishes before the producer blocks.
+  action armCapacity(scanner: int): bool = all {
+    Set(1, 2).contains(scanner), not(s.capacityArmed.contains(scanner)),
+    s' = { ...s, capacityArmed: s.capacityArmed.union(Set(scanner)), capacitySignalled: s.capacitySignalled.exclude(Set(scanner)) }
+  }
+  action publishCapacity = s' = { ...s, capacitySignalled: s.capacitySignalled.union(s.capacityArmed) }
+  action disarmCapacity(scanner: int): bool = all {
+    s.capacityArmed.contains(scanner),
+    s' = { ...s, capacityArmed: s.capacityArmed.exclude(Set(scanner)), capacitySignalled: s.capacitySignalled.exclude(Set(scanner)) }
+  }
+  action capacityProtocolStep = any { step, armCapacity(1), armCapacity(2), publishCapacity, disarmCapacity(1), disarmCapacity(2) }
+  run capacityArmScanReturnWaitTest = init.then(configureCapacity(1)).then(admit(1))
+    .then(armCapacity(1)).then(armCapacity(2))
+    .then(all { assert(not(hasCapacity(3))), stutter }).then(complete(1)).then(publishCapacity).then(publishCapacity)
+    .then(all { assert(hasCapacity(3)), assert(s.capacitySignalled == Set(1, 2)), assert(safety), stutter })
+    .then(disarmCapacity(1)).then(reserve(3)).then(admitReserved(3)).then(complete(3)).then(publishCapacity)
+    .then(all { assert(s.capacitySignalled == Set(2)), assert(safety), stutter })
+  run capacityCancelAndCloseTest = init.then(armCapacity(1)).then(armCapacity(2)).then(disarmCapacity(1))
+    .then(close).then(publishCapacity).then(all { assert(s.capacitySignalled == Set(2)), assert(safety), stutter })
+  // Negative ordering control: scan first, then return/publish, then register
+  // has no notification. The implementation must never use this ordering.
+  run capacityScanBeforeArmLosesWakeTest = init.then(configureCapacity(1)).then(admit(1))
+    .then(all { assert(not(hasCapacity(3))), stutter }).then(complete(1)).then(publishCapacity).then(armCapacity(1))
+    .then(all { assert(hasCapacity(3)), assert(not(s.capacitySignalled.contains(1))), assert(safety), stutter })
+  // A dynamic short offer reuses the existing unassigned source and claim
+  // boundary. producers abstracts installed owner claim endpoints here; this
+  // facility does not consume the native bulk producer registration semaphore.
+  action offerShort(r: int): bool = all {
+    s.phase == "open", s.poolReady, s.producers == Set(1, 2), units(r) == 1,
+    not(s.poolStaged.union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
+    s' = { ...s, poolStaged: s.poolStaged.union(Set(r)) }
+  }
+  action shortPoolStep = { nondet r = JOBS.oneOf(); any { poolStep, offerShort(r) } }
+  run dynamicShortClaimAndCloseTest = init.then(configureCapacity(1)).then(admit(1))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(offerShort(3))
+    .then(all { assert(not(s.workHeld.contains(3))), assert(s.committed.get(3) == 0), assert(safety), stutter })
+    .then(claimPool(3, 2)).then(submitService(3)).then(observeTimeout(3)).then(close)
+    .then(all { assert(ownerOf(3) == 2), assert(s.serviceRoots == Set(3)), assert(safety), stutter })
+    .then(readyService(3, false)).then(complete(3)).then(complete(1)).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
   action streamStep = any { step, configureProducer(1), configureProducer(2) }
   action producerMutationInit = s' = { ...initial, producerLimit: 1,
     producers: Set(1), producerJobs: Set(1, 3), staged: Set(3), accepted: Set(1),

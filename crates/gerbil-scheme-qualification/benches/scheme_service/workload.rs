@@ -289,6 +289,7 @@ pub(super) async fn probes(
     released: Instant,
     short_mode: ShortMode,
     router: Option<SchemeServiceRouter>,
+    short_pool: Option<gerbil_scheme::instances::SchemeShortPool>,
 ) -> Probes {
     let mut values = Probes {
         owners: Vec::new(),
@@ -312,7 +313,15 @@ pub(super) async fn probes(
         let start = Instant::now();
         let mut input = corpus::order(100_000 + id, false);
         input.truncate(14);
-        let ticket = if let Some(router) = router.as_ref() {
+        let ticket = if let Some(short_pool) = short_pool.as_ref() {
+            short_pool
+                .submit(
+                    orders(vec![input.clone()], short_mode, None),
+                    GATE.saturating_sub(released.elapsed()),
+                )
+                .await
+                .map(|selected| selected.ticket)
+        } else if let Some(router) = router.as_ref() {
             routed(
                 router,
                 vec![input.clone()],

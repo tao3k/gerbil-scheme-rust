@@ -191,3 +191,10 @@ that receipt has unverified cleanup. Moving the new independent stream to free
 owner 3 fixes the fixture conflict; the corrected native fixture passed. The
 failed invocation is retained, not reported as successful cleanup. New-head CI
 and the directed smoke remain separate receipts from the predecessor CI.
+
+* Follow-up: capacity notification and late binding
+
+[[file:30.53-shared-capacity-and-late-owner-binding.org][The protocol follow-up]] implements explicit notified reselection and a bounded
+owner-claimed short queue, including independent owner-failure close fencing.
+It retains both the initial mixed-load regression and the final directed result,
+with separate identities. Existing defaults and complete Scheme execution remain.

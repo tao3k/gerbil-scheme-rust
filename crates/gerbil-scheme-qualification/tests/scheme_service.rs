@@ -3,6 +3,8 @@
 mod budget;
 #[path = "../benches/support/orders.rs"]
 mod corpus;
+#[path = "scheme_service/deferred.rs"]
+mod deferred;
 #[path = "../benches/scheme_service/os_attribution.rs"]
 mod os_attribution;
 #[path = "scheme_service/os_attribution.rs"]
@@ -433,7 +435,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     progress
         .send("Scheme service initialization failure drained")
         .unwrap();
-    priority::contract(&runtime, &progress);
+    additional_contracts(&runtime, &progress);
     let mut pool = InstancePool::start_observed(&descriptor(false), config(), |_| {
         progress.send("service owner initialized").unwrap();
     })
@@ -486,4 +488,9 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     );
     drop(progress);
     watchdog.join().unwrap();
+}
+
+fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>) {
+    deferred::contract(runtime, progress);
+    priority::contract(runtime, progress);
 }

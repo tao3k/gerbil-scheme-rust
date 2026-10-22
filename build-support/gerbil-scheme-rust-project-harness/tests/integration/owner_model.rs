@@ -138,7 +138,30 @@ fn owner_protocol_scenarios_and_controls() {
         "unsafePoolRegistrationStep",
         "safety",
     );
+    capacity_protocol(source);
     shared_protocol(source);
+}
+fn capacity_protocol(source: &str) {
+    for step in ["capacityProtocolStep", "shortPoolStep"] {
+        success(&[
+            "run",
+            source,
+            "--main",
+            "owner_lifecycle_small",
+            "--step",
+            step,
+            "--invariant",
+            "safety",
+            "--seed",
+            "1",
+            "--max-samples",
+            "1000",
+            "--max-steps",
+            "64",
+            "--verbosity",
+            "1",
+        ]);
+    }
 }
 fn symbolic(bound: &str) {
     // Keep solver output, including incomplete attempts, outside the checkout.

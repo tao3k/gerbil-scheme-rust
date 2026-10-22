@@ -489,3 +489,18 @@ to match Rust `Instant`; longer adjusted-clock captures that fail offset bounds
 are rejected. [The follow-up report](30-39-status/30.51-diagnostic-free-owner-tail-and-route-qualification.org)
 records same-run owner states, an unsuccessful short-route ranking experiment
 and the feed-configuration retirement fence. Production defaults remain unchanged.
+
+### Explicit unassigned short supply
+
+`configure_scheme_short_pool` and `SchemeShortPool::submit` add a bounded Rust
+queue for stateless one-unit short-service requests. Only a running fixed owner
+claims native credits and constructs Scheme inputs. The returned ticket carries
+that actual owner; accepted Scheme work survives observation timeout and drains
+through projection/root retirement. Stateful lanes continue to use explicit-owner
+APIs. Rust does not schedule Scheme green threads or move native values.
+
+`ReselectProgressNotified` separately offers register-before-scan shared-capacity
+notification with the existing occupancy ranking. Both facilities are opt-in.
+[The directed protocol qualification](30-39-status/30.53-shared-capacity-and-late-owner-binding.org)
+retains the mixed-load throughput/p99/finish-spread regressions; defaults remain
+unchanged and no general speedup is admitted.

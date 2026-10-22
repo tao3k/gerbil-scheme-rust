@@ -71,7 +71,8 @@ fn concurrent_independent_publish_preserves_every_byte() {
 #[test]
 fn full_pipe_is_an_existing_wake_and_closed_reader_is_failure() {
     let (reader, wake) = Wake::create().unwrap();
-    let (notifier, changes) = tokio::sync::watch::channel(());
+    let notifier = crate::instances::capacity_event::CapacityEvents::new();
+    let changes = notifier.subscribe();
     wake.capacity_changed
         .set(Arc::new(std::sync::OnceLock::from(notifier)))
         .unwrap();
@@ -104,7 +105,8 @@ fn full_pipe_is_an_existing_wake_and_closed_reader_is_failure() {
 #[test]
 fn owner_close_publishes_durable_capacity_change() {
     let (_reader, wake) = Wake::create().unwrap();
-    let (notifier, changes) = tokio::sync::watch::channel(());
+    let notifier = crate::instances::capacity_event::CapacityEvents::new();
+    let changes = notifier.subscribe();
     wake.capacity_changed
         .set(Arc::new(std::sync::OnceLock::from(notifier)))
         .unwrap();

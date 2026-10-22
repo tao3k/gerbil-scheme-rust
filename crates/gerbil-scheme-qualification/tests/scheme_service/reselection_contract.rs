@@ -48,6 +48,7 @@ pub(super) async fn contract(dispatch: &InstanceDispatcher) {
     for admission in [
         SchemeRoutingAdmission::Pinned,
         SchemeRoutingAdmission::Reselect,
+        SchemeRoutingAdmission::ReselectProgressNotified,
     ] {
         let router = SchemeServiceRouter::with_admission(
             dispatch.clone(),

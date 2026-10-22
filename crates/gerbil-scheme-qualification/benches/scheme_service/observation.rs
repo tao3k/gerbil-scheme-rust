@@ -40,3 +40,13 @@ pub(super) fn delta(
             .collect::<Vec<_>>()
     )
 }
+
+pub(super) fn append(
+    value: &mut Value,
+    pool: &InstancePool,
+    before: Option<Vec<SchemeServiceObservation>>,
+) {
+    if let Some(before) = before {
+        value["owner_phases"] = delta(&before, &snapshot(pool));
+    }
+}

@@ -12,6 +12,8 @@ pub enum SchemeServicePhase {
     Retire,
     /// Owner-resident Rust supply, including capacity and admission checks.
     Supply,
+    /// Native slot/work retirement and host admission notifications.
+    Release,
 }
 /// Cumulative completed phase intervals. CPU and GC overlap; do not add them.
 /// Wall minus thread CPU includes blocking and descheduling, not isolated OS cost.
@@ -27,8 +29,8 @@ pub struct SchemePhaseObservation {
 /// Read on the fixed owner after prior phases finish; no native values escape.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SchemeServiceObservation {
-    /// Advance, wait, construct/submit, take/project, resident supply, respectively.
-    pub phases: [SchemePhaseObservation; 5],
+    /// Advance, wait, construct/submit, take/project, resident supply, capacity release, respectively.
+    pub phases: [SchemePhaseObservation; 6],
 }
 #[derive(Debug, Default)]
 struct Phase {
@@ -41,7 +43,7 @@ struct Phase {
 }
 #[derive(Debug, Default)]
 pub(super) struct Monitor {
-    phases: [Phase; 5],
+    phases: [Phase; 6],
     pub(super) history: super::service_history::History,
 }
 fn nanos(seconds: f64) -> Option<u64> {

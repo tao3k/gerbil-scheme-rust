@@ -26,7 +26,7 @@ fn dequeue(requests: &mpsc::Receiver<Request>, wake: &Wake) -> Result<Request, m
 }
 struct Pending {
     job: Box<dyn Job>,
-    _permit: Option<super::capacity::CapacityPermit>,
+    permit: Option<super::capacity::CapacityPermit>,
 }
 fn control(image: &Image, header: &[i64]) -> Result<Vec<i64>, InstanceError> {
     let mut result = None;
@@ -148,7 +148,7 @@ impl Pump<'_> {
                         id,
                         Pending {
                             job,
-                            _permit: request.capacity,
+                            permit: request.capacity,
                         },
                     );
                 }
@@ -200,6 +200,12 @@ impl Pump<'_> {
                 },
             );
             // The retained work/slot permit drops only after projection/root balance.
+            observed(
+                self.image,
+                self.wake,
+                super::SchemeServicePhase::Release,
+                || drop(pending.permit),
+            );
         }
         Ok(())
     }

@@ -11,6 +11,8 @@ mod measurement;
 mod native_wait;
 #[path = "scheme_service/observation.rs"]
 mod observation;
+#[path = "scheme_service/os_calibration.rs"]
+mod os_calibration;
 #[path = "scheme_service/os_sampling.rs"]
 mod os_sampling;
 #[path = "scheme_service/os_threads.rs"]
@@ -83,6 +85,9 @@ fn run(
         .enable_all()
         .build()
         .unwrap();
+    if observation {
+        os_calibration::run(&pool);
+    }
     for mixed in [false, true] {
         let inputs = Arc::new(
             (0..if smoke { 256 } else { 8192 })

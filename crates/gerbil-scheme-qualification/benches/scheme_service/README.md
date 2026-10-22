@@ -366,3 +366,19 @@ These diagnostic captures do not qualify unobserved throughput.
 `owner_capacity --wait-trace` consumes the same six-column native wait rows as
 this service bench and emits `wait_event_width: 6`; historical four-column
 consumers must not reinterpret those records silently.
+
+### Capacity-release boundary and observer calibration
+
+`Release` appends phase six, after Supply. The original five indices remain
+unchanged. It encloses native slot/work permit return after projection, including
+host admission notifications; this destructor was previously outside Retire's
+closure. `owner_phase_names` declares the phase order. No notification policy
+or default is changed by this observation.
+
+Observed runs also emit one `os_calibration` event before workload warmup. Eight
+controls run on the same four initialized owners: concurrent 20 ms sleeps, then
+concurrent 20 ms of measured thread CPU using Rust spin loops. They make no
+Scheme call, assert unchanged GC wall counters, and retain the original progress
+watchdog. These known controls validate CPU/state observation and expose
+non-CPU wall time in a CPU-demanding control; they are not Scheme throughput or a substitute workload.
+Unobserved performance runs execute neither calibration nor OS sampling.

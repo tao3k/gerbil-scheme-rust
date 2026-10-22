@@ -254,13 +254,15 @@ Scheme code, migrate Actors or schedule Scheme green threads in Rust.
 
 `observe_scheme_service_on(owner)` enables optional owner phase diagnostics;
 `scheme_service_observation_on(owner)` returns a ticket for an owned snapshot.
-Counters cover advance, wait, submit, retire and owner-resident supply
-wall/thread CPU/GC spans. Supply appends the fifth phase; prior indices remain
-unchanged. The Rust bench can additionally sample own-owner OS run states;
+Counters cover advance, wait, submit, retire, owner-resident supply and
+capacity release wall/thread CPU/GC spans. Supply and Release append phases
+five and six; prior indices remain unchanged. Release includes permit return
+and host admission notification after projection. The Rust bench can additionally sample own-owner OS run states;
 these are point observations, not exact kernel dispatch timestamps. See
 [the directed supply and OS qualification](30-39-status/30.47-owner-supply-and-os-run-state.org).
 Native waits may include Scheme work, blocked select and OS descheduling; these
-spans do not identify pure OS delay. Observation is disabled by default.
+spans do not identify pure OS delay. Observation is disabled by default. Known CPU/sleep controls validate observed
+runs before warmup; see [capacity release qualification](30-39-status/30.48-capacity-release-and-notification-qualification.org).
 
 The reused lifecycle model now contains shared-resource counterexamples and a
 separate candidate cooperative CPU/class-debt policy. The latter is not an

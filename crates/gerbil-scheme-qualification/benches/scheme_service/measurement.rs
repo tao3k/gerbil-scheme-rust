@@ -147,11 +147,7 @@ pub(super) fn run(
     let asynchronous = comparison != Comparison::Service || arm;
     idle(pool);
     let router = router(pool, comparison, arm);
-    let active_router = if strategy.class_routing {
-        Some(router.clone())
-    } else {
-        None
-    };
+    let active_router = strategy.class_routing.then(|| router.clone());
     let settings = super::settings::configure(pool, comparison, arm);
     idle(pool);
     let qos = (comparison == Comparison::OwnerQos).then(|| super::native_wait::qos(pool, arm));
@@ -230,10 +226,7 @@ pub(super) fn run(
     if observation {
         super::native_wait::append(&mut value, pool, inputs);
     }
-    if let Some(before) = before {
-        value["owner_phases"] =
-            super::observation::delta(&before, &super::observation::snapshot(pool));
-    }
+    super::observation::append(&mut value, pool, before);
     if let Some(qos) = qos {
         value["owner_qos_receipts"] = qos;
         value["owner_qos_restored"] = super::native_wait::qos(pool, false);
@@ -288,6 +281,8 @@ fn append_policy(
     use gerbil_scheme::instances::SchemeServiceWake;
     value["native_policy_receipts"] = json!(settings.iter().enumerate().map(|(owner,s)|
         json!({"owner":owner,"scheme_budget":s.cooperative_budget,"wake":format!("{:?}",s.wake)})).collect::<Vec<_>>());
+    value["owner_phase_names"] =
+        json!(["Advance", "Wait", "Submit", "Retire", "Supply", "Release"]);
     value["scheme_budget"] = json!(settings[0].cooperative_budget);
     value["native_port_wake"] = json!(settings[0].wake == SchemeServiceWake::NativePort);
     value["independent_short_notifications"] = json!(comparison == Comparison::Notification && arm);

@@ -179,6 +179,89 @@ production router variant/default is added. The explicit existing-API control
 remains reproducible. A cheap occupancy proxy is insufficient, but indiscriminately
 removing it is also insufficient. Capacity safety remains necessary in both.
 
+* Unprofiled replay and independently scoped owner point evidence
+
+The repaired predecessor =d5b593b5903448e4777be69d6eb4b4794484d1d4=
+completed run =39761112720= successfully: both Cargo jobs, both Bazel jobs,
+fixed-owner native lifecycle and Quint passed. The unsupported SMP job remained
+explicitly skipped. The following observation update requires its own new-head
+CI; predecessor success is not transferred to it.
+
+The exact frozen predecessor executable and original five-block Off/Entry
+arguments were replayed without a profiler. CPU p99 was 0.614291/0.565416 ms,
+versus the retained historical 34.143083/11.302334 ms. Mixed p99 was
+0.579167/0.528667 ms. Native shutdown remained clean. Thus the extreme-tail
+absence is also reproducible without profiling; profiling is not established
+as the cause of the difference. Host state, faults and scheduling remain
+hypotheses, not identified causes. The old binary and its failed performance
+receipt are retained unchanged.
+
+The opt-in =--state-observation= scope reuses own-process Mach inspection while
+reading zero per-request Scheme diagnostic/GC counters. It records entry marks
+and owner cumulative CPU, state and priorities. It does not enable whole-owner
+phase monitors or calibration. Fixed numeric rows replace per-point JSON
+allocation, with JSON serialization after stopping. A completed initial sweep
+and a final sweep bracket the timed workload. Native owner TIDs are checked
+against the same sample's Scheme clock anchors. Rights and sampler threads are
+released before owner shutdown. Defaults and native progress gates are unchanged.
+
+The versioned ten-column schema uses CPU nanoseconds with one-microsecond
+quantization per user/system counter. Historical seven-column microsecond rows
+remain distinct. The Rust bench computes per-request CPU upper bounds from
+outer points, allows two microseconds for quantization, widens the brackets for
+clock uncertainty and emits null for missing brackets. It reports actual gaps
+and query durations. No source analysis script or private path is required.
+Focused controls reject interpreting a runnable point as a complete interval
+and reject a CPU bound without a final bracket.
+
+A directed 50-block Off/State run completed 400 full-size samples, with 100
+samples per arm/load and the same four VMs throughout. No profiler ran; both
+arms had zero per-request native diagnostics. This is observer qualification,
+not an admitted routing speedup:
+
+| Load | Orders/s Off -> State | Actual p99 ms Off -> State | Minimum progress Off -> State |
+|------+------------------------+---------------------------+-------------------------------|
+| CPU | 377715 -> 378850 | 0.661167 -> 0.742125 | 98.39% -> 98.46% |
+| Mixed | 66643 -> 66774 | 0.540584 -> 0.525375 | 98.77% -> 98.78% |
+
+CPU p99 regressed 12.2%; small throughput differences do not establish observer
+transparency. The 34 ms p99 did not recur. An actual 6.223916 ms State mixed
+request nevertheless has same-run evidence: 6.082541 ms before construction,
+3.459 us construction, 134 us pending and 3.916 us projection. Admission was
+12.083 us. Published-to-dequeued was 6.070958 ms and wake delivery was
+=Coalesced=. The enclosing owner CPU increment plus quantization was at most
+1.193 ms, establishing at least 5.030916 ms without that owner's CPU execution.
+This excludes interpreting the complete delay as owner CPU or GC CPU.
+
+Only one complete state query fell inside that request: state 1, current/base
+priority 31 and maximum 63. The other owners also had state-1 points at that
+sweep. The sampler itself had gaps; the largest in the run was 11.578208 ms,
+and the longest query was 188.833 us. Another 5.185208 ms request had no
+interior state point at all. Apple XNU's
+[[https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/osfmk/kern/thread.c][thread-info implementation]] maps =TH_RUN= to state 1, which includes runnable
+threads. These points cannot establish exact blocked/runnable durations.
+Coalescing alone is not a lost-wakeup proof, and the missing CPU cannot be
+assigned to OS scheduling rather than blocking or faults without that evidence.
+
+That 50-block sampler revision preceded the explicit TID cross-check and Rust
+postprocessing additions. Its frozen executable SHA256 is
+=8593a9d3990b4d318d4e25b65a0985a8022bce432fb30b53674cd57c459cd0e5=;
+its bounds above were derived from the retained numeric rows. A final five-block
+run of the updated executable
+=ed438a76059e7ea4028ebcf1938f4a298bbfa14bfdf3e43f9c86d39bcc67377a=
+validated all 1280 State request bounds and TID checks in Rust, with zero missing
+outer brackets. CPU p99 was 0.425750/0.423083 ms Off/State and mixed p99
+0.457459/0.450834 ms. Those values do not erase the earlier CPU p99 regression.
+Both runs joined four owners, returned zero external roots and removed copied
+image files. The original dev-profile feed/Phase CI command also passed locally
+with the versioned sampler and clean shutdown.
+
+The benchmark now emits these conservative bounds itself, including clock,
+identity and coverage checks. Complete kernel intervals for a reproduced
+20-39 ms tail remain the gate before a causal routing/supply change. Earlier
+inconsistent route A/B negatives remain valid. No new scheduler/default or
+Scheme capability reduction is admitted from a sparse point trace.
+
 * Acceptance and remaining protocol work
 
 The feed quiescence race and capture clock-domain mismatch are repaired. The

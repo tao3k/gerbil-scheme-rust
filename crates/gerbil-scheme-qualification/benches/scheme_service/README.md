@@ -346,22 +346,49 @@ indices. It covers owner-local producer steps, including lifecycle and capacity
 checks; previously these Rust-side intervals had no separate phase. Disabled
 observation still takes no phase clocks.
 
-On the Darwin qualification target, `--phase-observation` also takes bounded
-one-millisecond nominal point samples of the four named owners in this process.
-`os_thread_samples` reports overflow/error counts and seven-column rows:
-`[owner, query_start_ns, query_end_ns, run_state, cumulative_cpu_us, flags,
-suspend_count]`. The clocks match the native select trace. Inspection send rights
-and the task-thread array are released; the sampler joins before native shutdown,
+On the Darwin qualification target, `--state-observation` takes bounded nominal
+one-millisecond point samples of the four named owners, plus request entry marks.
+It reads no per-request Scheme diagnostics and enables neither whole-owner phase
+monitoring nor the calibration workload. `--phase-observation` retains its full
+observation and uses the same sampler. Observation remains off by default.
+
+```text
+just bridge-scheme-service-benchmark --test --observer-ab --state-observation
+just bridge-scheme-service-benchmark --observer-ab --state-observation
+```
+
+This is an Off/State observer-cost pair on the same VMs and pooled workload,
+not a routing optimization. `--blocks=50` explicitly increases repetitions for
+rare-event capture; it retains native inputs and the five-second progress gate.
+
+`os_thread_samples` schema version 2 has ten-column rows:
+`[owner, before_ns, after_ns, run_state, cumulative_cpu_ns, flags, policy,
+current_priority, base_priority, max_priority]`. It declares columns, CPU
+resolution, requested period, owner TIDs and overflow/error counts. Historical
+seven-column rows use CPU microseconds and must not be silently reinterpreted.
+The sampler completes a real initial sweep before timing and a final sweep after
+completion. Fixed numeric rows are buffered during execution; JSON serialization
+occurs after stopping. Inspection rights are released and the sampler joins,
 including unwinding. No owner is suspended, reprioritized or migrated.
 
-Run states use Darwin `THREAD_BASIC_INFO`: 1 running normally, 2 stopped,
-3 waiting, 4 uninterruptible wait, 5 halted. A state is a point observation,
-not the state of the surrounding interval. CPU is kernel cumulative thread CPU
-in microseconds; its sampling quantization differs from the enclosing phase
-clock. RUNNING does not provide an exact runnable-to-running timestamp.
-GC wall time and enclosing owner CPU remain overlapping, not additive counters;
-collector CPU cannot be derived by subtracting process GC CPU from wall time.
-These diagnostic captures do not qualify unobserved throughput.
+`THREAD_EXTENDED_INFO` states are points: 1 runnable or running, 2 stopped,
+3 waiting, 4 uninterruptible wait, 5 halted. State 1 cannot separate on-CPU from
+ready-queue time. Apple XNU's
+[implementation](https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/osfmk/kern/thread.c)
+reports `TH_RUN` as state 1; extended CPU nanosecond fields are converted from
+microsecond counters. Reading this information can update lazy scheduler
+bookkeeping, so the observer is not assumed transparent.
+
+The Rust bench emits `os_request_attribution` after timing. It validates owner
+TIDs against native clock anchors and monotonic CPU counters. The last point
+strictly before each request and the first strictly after it bound that owner's
+CPU consumption, including a two-microsecond quantization allowance. Clock
+uncertainty and resolution widen the required brackets. Missing brackets yield
+null bounds. This is owner CPU, not isolated request or GC CPU. State points are
+never interpolated: the full request interval remains unclassified, with actual
+sampler gaps and query costs reported. Per-request GC attribution still requires
+independent evidence. GC wall and enclosing CPU remain overlapping counters;
+process GC CPU cannot be subtracted from owner wall time.
 
 `owner_capacity --wait-trace` consumes the same six-column native wait rows as
 this service bench and emits `wait_event_width: 6`; historical four-column
@@ -375,7 +402,7 @@ host admission notifications; this destructor was previously outside Retire's
 closure. `owner_phase_names` declares the phase order. No notification policy
 or default is changed by this observation.
 
-Observed runs also emit one `os_calibration` event before workload warmup. Eight
+Full Phase runs also emit one `os_calibration` event before workload warmup. Eight
 controls run on the same four initialized owners: concurrent 20 ms sleeps, then
 concurrent 20 ms of measured thread CPU using Rust spin loops. They make no
 Scheme call, assert unchanged GC wall counters, and retain the original progress
@@ -386,7 +413,7 @@ Unobserved performance runs execute neither calibration nor OS sampling.
 
 ### Complete owner scheduling capture
 
-`--trace-once` requires `--phase-observation`, `--probe-observation` or `--entry-observation`. It runs one A/B per CPU/mixed
+`--trace-once` requires an explicit Phase, Probe, Entry or State observation mode. It runs one A/B per CPU/mixed
 load, retaining the normal 8192-order inputs, 64 short probes, warmups, four live
 VMs, two Tokio workers, capacity bounds and original progress watchdog. It does
 not shorten the input to the smoke workload. Configuration emits `trace_once`;
@@ -454,7 +481,7 @@ read three; do not attribute their full wall spans to type conversion. These
 costs also include any off-core delay inside the read.
 `native_probe_snapshots` checks actual snapshot availability; missing native
 counters reject an observed native-short sample. `observation_mode` distinguishes
-Off, Entry, Probe and Phase. Native trace reset/readback asserts no wait events in Probe.
+Off, Entry, State, Probe and Phase. Native trace reset/readback asserts no wait events in Probe.
 
 `--observer-ab` compares observation Off with Probe on the same live VMs, using
 pooled supply, native short layout, progress-aware routing, NativePort wake and

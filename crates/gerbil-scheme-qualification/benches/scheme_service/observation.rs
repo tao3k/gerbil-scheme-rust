@@ -56,6 +56,7 @@ pub(super) fn append(
 pub(super) enum Mode {
     Off,
     Entry,
+    State,
     Probe,
     Phase,
 }
@@ -63,8 +64,8 @@ impl Mode {
     pub(super) fn paired(self, comparison: super::measurement::Comparison, arm: bool) -> Self {
         if comparison == super::measurement::Comparison::ObserverCost {
             if arm {
-                if self == Self::Entry {
-                    Self::Entry
+                if matches!(self, Self::Entry | Self::State) {
+                    self
                 } else {
                     Self::Probe
                 }
@@ -80,6 +81,9 @@ impl Mode {
     }
     pub(super) fn counters(self) -> bool {
         matches!(self, Self::Probe | Self::Phase)
+    }
+    pub(super) fn sampled(self) -> bool {
+        matches!(self, Self::State | Self::Phase)
     }
     pub(super) fn full(self) -> bool {
         self == Self::Phase
@@ -107,7 +111,7 @@ impl Capture {
             mode,
             anchored,
             before,
-            sampling: mode.full().then(super::os_sampling::Sampler::start),
+            sampling: mode.sampled().then(super::os_sampling::Sampler::start),
             clock: anchored.then(super::native_wait::anchor),
         }
     }
@@ -143,6 +147,9 @@ impl Capture {
         value["native_probe_snapshots"] = json!(snapshots);
         value["native_clock_bridge"] = json!(self.anchored);
         value["sample_native_clock"] = json!(self.clock.map(|clock| clock.instant(released)));
+        if self.mode.sampled() {
+            super::os_attribution::append(value);
+        }
     }
 }
 
@@ -160,7 +167,10 @@ pub(super) fn select(args: &[String]) -> Mode {
         args.iter()
             .filter(|s| matches!(
                 s.as_str(),
-                "--phase-observation" | "--probe-observation" | "--entry-observation"
+                "--phase-observation"
+                    | "--probe-observation"
+                    | "--entry-observation"
+                    | "--state-observation"
             ))
             .count()
             <= 1,
@@ -170,6 +180,8 @@ pub(super) fn select(args: &[String]) -> Mode {
         Mode::Phase
     } else if args.iter().any(|s| s == "--probe-observation") {
         Mode::Probe
+    } else if args.iter().any(|s| s == "--state-observation") {
+        Mode::State
     } else if args.iter().any(|s| s == "--entry-observation") {
         Mode::Entry
     } else {

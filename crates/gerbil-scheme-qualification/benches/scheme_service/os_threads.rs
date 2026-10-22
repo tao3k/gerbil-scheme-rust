@@ -31,6 +31,25 @@ impl Drop for Threads {
 }
 pub(super) struct Owners(pub [libc::thread_t; 4]);
 impl Owners {
+    pub(super) fn identities(&self) -> [u64; 4] {
+        self.0.map(|port| {
+            // SAFETY: this C output structure admits an all-zero initial value.
+            let mut info: libc::thread_identifier_info = unsafe { std::mem::zeroed() };
+            let mut count = libc::THREAD_IDENTIFIER_INFO_COUNT;
+            // SAFETY: own-process inspection right and correctly sized output.
+            let status = unsafe {
+                libc::thread_info(
+                    port,
+                    libc::THREAD_IDENTIFIER_INFO.try_into().unwrap(),
+                    (&raw mut info).cast(),
+                    &raw mut count,
+                )
+            };
+            assert_eq!(status, 0, "owner identity inspection");
+            assert_eq!(count, libc::THREAD_IDENTIFIER_INFO_COUNT);
+            info.thread_id
+        })
+    }
     pub(super) fn acquire() -> Self {
         let mut threads = Threads {
             ports: ptr::null_mut(),

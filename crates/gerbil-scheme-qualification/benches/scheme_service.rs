@@ -11,6 +11,8 @@ mod measurement;
 mod native_wait;
 #[path = "scheme_service/observation.rs"]
 mod observation;
+#[path = "scheme_service/os_attribution.rs"]
+mod os_attribution;
 #[path = "scheme_service/os_calibration.rs"]
 mod os_calibration;
 #[path = "scheme_service/os_sampling.rs"]
@@ -226,6 +228,7 @@ fn main() {
         || s == "--phase-observation"
         || s == "--probe-observation"
         || s == "--entry-observation"
+        || s == "--state-observation"
         || s == "--observer-ab"
         || s == "--short-route-load-ab"
         || s == "--trace-once"
@@ -244,7 +247,7 @@ fn main() {
     assert!(!trace_once || observation.enabled());
     assert!(
         !args.iter().any(|s| s == "--observer-ab")
-            || matches!(observation, Mode::Off | Mode::Entry)
+            || matches!(observation, Mode::Off | Mode::Entry | Mode::State)
     );
     await_trace_start(&args);
     let (progress, events) = mpsc::channel();

@@ -3,6 +3,10 @@
 mod budget;
 #[path = "../benches/support/orders.rs"]
 mod corpus;
+#[path = "../benches/scheme_service/os_attribution.rs"]
+mod os_attribution;
+#[path = "scheme_service/os_attribution.rs"]
+mod os_attribution_tests;
 #[path = "scheme_service/pool_stream.rs"]
 mod pool_stream;
 #[path = "scheme_service/priority.rs"]

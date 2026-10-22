@@ -237,3 +237,11 @@ The native image hash is unchanged from the initial comparison and was verified
 after timing. Subsequent publication edits change documentation only. Both source
 snapshots, complete result sets and build-policy failures remain private and
 retain their original identities.
+
+* Follow-up clock and protocol scope
+
+[[file:30.54-selective-wake-and-nonexclusive-claim.org][Selective wake qualification]] separates notification duty from nonexclusive
+claim and retains its negative results. Historical =probe_actual= values above
+measure request start to native projection completion, not Tokio caller resume;
+caller admission/scheduled-probe delays must not be read as native CPU time.
+No historical receipt or result identity is rewritten by this clarification.

@@ -33,13 +33,16 @@ pub(super) enum Comparison {
     ShortRouteLoad,
     SupplyAdmission,
     PoolProtocol,
+    SelectiveWake,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
         self != Self::Service
     }
     fn supply_admission(self, arm: bool) -> gerbil_scheme::instances::SchemeServiceSupplyAdmission {
-        if self == Self::PoolProtocol || self == Self::SupplyAdmission && arm {
+        if matches!(self, Self::PoolProtocol | Self::SelectiveWake)
+            || self == Self::SupplyAdmission && arm
+        {
             gerbil_scheme::instances::SchemeServiceSupplyAdmission::OwnerLocal
         } else {
             gerbil_scheme::instances::SchemeServiceSupplyAdmission::Queued
@@ -47,6 +50,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::SelectiveWake => {
+                "same owner-claimed short supply; broadcast versus FIFO registered selective wake"
+            }
             Self::PoolProtocol => {
                 "same owner-local supply; watch host routing versus shared owner-claimed short requests"
             }
@@ -121,6 +127,7 @@ impl Strategy {
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
+                    | Comparison::SelectiveWake
             ) && (arm
                 || matches!(
                     comparison,
@@ -137,6 +144,7 @@ impl Strategy {
                         | Comparison::ShortRouteLoad
                         | Comparison::SupplyAdmission
                         | Comparison::PoolProtocol
+                        | Comparison::SelectiveWake
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -165,6 +173,7 @@ impl Strategy {
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
+                    | Comparison::SelectiveWake
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -185,6 +194,10 @@ pub(super) fn run(
     let router = router(pool, comparison, arm);
     let active_router = strategy.class_routing.then(|| router.clone());
     let settings = super::settings::configure(pool, comparison, arm);
+    // Settings replies precede native permit retirement. Policy mutation must
+    // observe returned credits, not just a delivered reply.
+    idle(pool);
+    super::settings::short_wake(pool, comparison, arm);
     idle(pool);
     let qos = (comparison == Comparison::OwnerQos).then(|| super::native_wait::qos(pool, arm));
     let capture = super::observation::Capture::start(
@@ -206,6 +219,7 @@ pub(super) fn run(
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
+                | Comparison::SelectiveWake
         ) {
             None
         } else {
@@ -227,7 +241,8 @@ pub(super) fn run(
             released,
             strategy.short_mode,
             active_router,
-            (comparison == Comparison::PoolProtocol && arm)
+            (comparison == Comparison::PoolProtocol && arm
+                || comparison == Comparison::SelectiveWake)
                 .then(|| pool.dispatcher().scheme_short_pool().unwrap()),
         ));
         (bulk.await.unwrap(), probes.await.unwrap())
@@ -277,6 +292,7 @@ async fn run_bulk(
             | Comparison::ShortRouteLoad
             | Comparison::SupplyAdmission
             | Comparison::PoolProtocol
+            | Comparison::SelectiveWake
     ) || comparison == Comparison::Pooled && arm
     {
         super::pooled::bulk(dispatch, inputs, released, comparison.supply_admission(arm)).await
@@ -309,7 +325,8 @@ fn router(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if comparison == Comparison::PoolProtocol && arm {
+        if comparison == Comparison::PoolProtocol && arm || comparison == Comparison::SelectiveWake
+        {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgressNotified
         } else if comparison == Comparison::ShortRouteLoad && arm {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -321,6 +338,7 @@ fn router(
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
+                | Comparison::SelectiveWake
         ) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
@@ -334,6 +352,7 @@ fn router(
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
+                    | Comparison::SelectiveWake
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -374,6 +393,7 @@ fn append_policy(
                     | Comparison::ShortRouteLoad
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
+                    | Comparison::SelectiveWake
             )
     );
     value["owner_resident_supply"] = json!(
@@ -385,6 +405,7 @@ fn append_policy(
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
+                | Comparison::SelectiveWake
         ) || comparison == Comparison::Resident && arm
     );
     value["pool_resident_supply"] = json!(
@@ -395,6 +416,7 @@ fn append_policy(
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
+                | Comparison::SelectiveWake
         ) || comparison == Comparison::Pooled && arm
     );
     value["producer_progress_routing"] = json!(
@@ -406,15 +428,26 @@ fn append_policy(
                 | Comparison::ShortRouteLoad
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
+                | Comparison::SelectiveWake
         ) && !(comparison == Comparison::ShortRouteLoad && arm)
     );
-    value["short_admission_boundary"] = json!(if comparison == Comparison::PoolProtocol && arm {
+    value["short_wake_policy"] = json!(
+        pool.dispatcher()
+            .scheme_short_pool()
+            .map(|p| format!("{:?}", p.wake_policy()))
+    );
+    value["selective_short_wake"] = json!(comparison == Comparison::SelectiveWake && arm);
+    value["short_admission_boundary"] = json!(if comparison == Comparison::PoolProtocol && arm
+        || comparison == Comparison::SelectiveWake
+    {
         "owner claim"
     } else {
         "host publication"
     });
-    value["deferred_short_owner_claim"] = json!(comparison == Comparison::PoolProtocol && arm);
-    if comparison == Comparison::PoolProtocol && arm {
+    value["deferred_short_owner_claim"] = json!(
+        comparison == Comparison::PoolProtocol && arm || comparison == Comparison::SelectiveWake
+    );
+    if comparison == Comparison::PoolProtocol && arm || comparison == Comparison::SelectiveWake {
         value["producer_progress_routing"] = json!(false);
         value["owner_reselection"] = json!(false);
     }

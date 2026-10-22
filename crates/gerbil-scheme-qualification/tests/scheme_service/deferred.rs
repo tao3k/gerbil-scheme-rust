@@ -44,6 +44,11 @@ async fn cancel_and_timeout(dispatch: &InstanceDispatcher, supply: &SchemeShortP
             .map(|c| (c.available, c.work_available))
             .collect::<Vec<_>>()
     );
+    assert!(
+        supply
+            .configure_wake(gerbil_scheme::instances::SchemeShortWake::Selective)
+            .is_err()
+    );
     drop(cancelled);
     // maximum_pending is one: each repetition needs the cancelled/expired slot.
     for _ in 0..3 {
@@ -141,6 +146,12 @@ async fn close_queued(pool: &mut InstancePool, supply: &SchemeShortPool) {
     reselection::registered(capacity_waiter.as_mut()).await;
     let pending = pool.shutdown(Duration::ZERO);
     assert_eq!(pending.pending, 4);
+    assert_eq!(
+        supply
+            .configure_wake(gerbil_scheme::instances::SchemeShortWake::Selective)
+            .unwrap_err(),
+        InstanceError::Closed
+    );
     assert!(matches!(queued.await, Err(InstanceError::Closed)));
     assert!(matches!(capacity_waiter.await, Err(InstanceError::Closed)));
     release.send(()).unwrap();
@@ -156,7 +167,40 @@ async fn close_queued(pool: &mut InstancePool, supply: &SchemeShortPool) {
             .all(|o| o.roots_before_cleanup == 0 && o.image_file_removed)
     );
 }
+async fn burst(dispatch: &InstanceDispatcher, supply: &SchemeShortPool) {
+    let tasks: Vec<_> = (0..12)
+        .map(|id| {
+            let supply = supply.clone();
+            tokio::spawn(async move {
+                let mut input = corpus::order(900 + id, false);
+                input.truncate(14);
+                let accepted = supply
+                    .submit(short::Short(input.clone()), GATE)
+                    .await
+                    .unwrap();
+                let values = accepted.ticket.wait_completed(GATE).await.unwrap().0;
+                corpus::verify(&input, &values[0]);
+            })
+        })
+        .collect();
+    for task in tasks {
+        task.await.unwrap();
+    }
+    idle(dispatch).await;
+}
 pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>) {
+    for policy in [
+        gerbil_scheme::instances::SchemeShortWake::Broadcast,
+        gerbil_scheme::instances::SchemeShortWake::Selective,
+    ] {
+        policy_contract(runtime, progress, policy);
+    }
+}
+fn policy_contract(
+    runtime: &tokio::runtime::Runtime,
+    progress: &mpsc::Sender<&'static str>,
+    policy: gerbil_scheme::instances::SchemeShortWake,
+) {
     let mut pool = InstancePool::start_observed(&descriptor(false), config(), |_| {
         progress.send("late-binding owner initialized").unwrap();
     })
@@ -165,11 +209,17 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
     let supply = dispatch
         .configure_scheme_short_pool(SchemeShortPoolConfig {
-            owners: vec![0, 1, 2, 3],
+            owners: vec![3, 1, 0, 2],
             maximum_pending: 1,
             maximum_active_per_owner: 1,
         })
         .unwrap();
+    assert_eq!(
+        supply.wake_policy(),
+        gerbil_scheme::instances::SchemeShortWake::Broadcast
+    );
+    supply.configure_wake(policy).unwrap();
+    assert_eq!(supply.wake_policy(), policy);
     assert!(dispatch.configure_owner_budgets(4, Some(32)).is_err());
     runtime.block_on(async {
         assert!(supply.submit(super::batch(false), GATE).await.is_err());
@@ -182,6 +232,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         let values = accepted.ticket.wait_completed(GATE).await.unwrap().0;
         corpus::verify(&input, &values[0]);
         unblock(vec![busy]);
+        burst(&dispatch, &supply).await;
         accepted_timeout(&dispatch, &supply).await;
         progress.send("owner claims typed short work; observation timeout retains native root and credit until retirement").unwrap();
         close_queued(&mut pool, &supply).await;

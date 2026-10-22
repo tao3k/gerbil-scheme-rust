@@ -24,9 +24,12 @@ module owner_lifecycle {
     servicePending: Set[int], serviceReady: Set[int], serviceRoots: Set[int], serviceFailed: Set[int],
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
     capacityArmed: Set[int], capacitySignalled: Set[int],
+    shortWaiters: List[int], shortSignalled: Set[int],
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
+  val shortWaiterSet = s.shortWaiters.foldl(Set(), (seen, o) => seen.union(Set(o)))
+  def waitersWithout(owner: int): List[int] = s.shortWaiters.foldl(List(), (kept, o) => if (o == owner) kept else kept.append(o))
 
   val initial = {
     selected: ASSIGNED, committed: JOBS.mapBy(_ => 0),
@@ -42,6 +45,7 @@ module owner_lifecycle {
     servicePending: Set(), serviceReady: Set(), serviceRoots: Set(), serviceFailed: Set(),
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
     capacityArmed: Set(), capacitySignalled: Set(),
+    shortWaiters: List(), shortSignalled: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
   action init = s' = initial
@@ -174,7 +178,7 @@ module owner_lifecycle {
     s' = { ...s, executor: "alive", lateExecutor: s.lateExecutor or s.phase != "open" }
   }
   action createExecutor = all { s.phase == "open", createExecutorUnchecked }
-  action close = all { s.phase == "open", s' = { ...s, phase: "closing", notified: Set(1, 2) } }
+  action close = all { s.phase == "open", s' = { ...s, phase: "closing", notified: Set(1, 2), shortWaiters: List(), shortSignalled: Set() } }
   action joinUnchecked = all {
     s.phase == "closing", s' = { ...s, phase: "joined", roots: Set(), parked: Set(), notified: Set(), wakeOwed: Set() }
   }
@@ -262,6 +266,9 @@ module owner_lifecycle {
       reserveWork(r), reserveSlot(r), cancelWork(r), configureWork(8), configureWork(9), reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
   }
   val safety = and {
+    shortWaiterSet.subseteq(Set(1, 2)), s.shortSignalled.subseteq(Set(1, 2)),
+    s.shortWaiters.length() == shortWaiterSet.size(),
+    shortWaiterSet.intersect(s.shortSignalled).size() == 0,
     s.capacityArmed.subseteq(Set(1, 2)), s.capacitySignalled.subseteq(s.capacityArmed),
     JOBS.forall(r => Set(1, 2).contains(ownerOf(r))),
     s.accepted.forall(r => ownerOf(r) == s.committed.get(r)),
@@ -429,13 +436,14 @@ module owner_lifecycle {
     workUsed(owner) + units(r) <= s.workLimit,
     s' = { ...s, poolPremature: s.poolPremature or not(s.poolReady), selected: s.selected.set(r, owner), committed: s.committed.set(r, owner),
       poolStaged: s.poolStaged.exclude(Set(r)), producerJobs: s.producerJobs.union(Set(r)),
+      shortWaiters: waitersWithout(owner), shortSignalled: if (s.poolStaged.size() == 1) Set() else s.shortSignalled.exclude(Set(owner)),
       accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)),
       inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(owner)) }
   }
   action claimPool(r: int, owner: int): bool = all { s.poolReady, claimPoolUnchecked(r, owner) }
   action cancelPool = all {
     Set("open", "closing", "joined", "closed").contains(s.phase), s.poolStaged.size() > 0,
-    s' = { ...s, poolStaged: Set() }
+    s' = { ...s, poolStaged: Set(), shortSignalled: Set() }
   }
   action poolStep = {
     nondet r = JOBS.oneOf()
@@ -508,6 +516,56 @@ module owner_lifecycle {
     not(s.poolStaged.union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
     s' = { ...s, poolStaged: s.poolStaged.union(Set(r)) }
   }
+  // Wait registration and notification duty are distinct from committed owner
+  // and native credit ownership. A running owner may claim a signalled peer's
+  // payload; no OS scheduling bound or equal placement is assumed.
+  action armShort(owner: int): bool = all {
+    s.phase == "open", s.producers.contains(owner),
+    not(shortWaiterSet.union(s.shortSignalled).contains(owner)),
+    s' = { ...s, shortWaiters: s.shortWaiters.append(owner) }
+  }
+  action resumeShort(owner: int): bool = all {
+    shortWaiterSet.union(s.shortSignalled).contains(owner),
+    s' = { ...s, shortWaiters: waitersWithout(owner), shortSignalled: s.shortSignalled.exclude(Set(owner)) }
+  }
+  def shortEligible(owner: int): bool = and {
+    s.producers.contains(owner), producerActive(owner) < s.producerLimit,
+    s.capacityHeld.filter(r => ownerOf(r) == owner).size() < s.capacityLimit,
+    workUsed(owner) + 1 <= s.workLimit }
+  action selectiveShortWake = {
+    val eligible = s.shortWaiters.foldl(List(), (kept, o) => if (shortEligible(o)) kept.append(o) else kept)
+    all {
+      s.phase == "open", s.poolStaged.size() > s.shortSignalled.size(), eligible.length() > 0,
+      s' = { ...s, shortWaiters: waitersWithout(eligible.head()),
+        shortSignalled: s.shortSignalled.union(Set(eligible.head())), wakeOwed: s.wakeOwed.union(Set(eligible.head())) }
+    }
+  }
+  // Visible admissible work is claimed before the owner enters its wait path.
+  // Registration still handles publication racing a failed scan.
+  action claimOrArmShort(r: int, owner: int): bool =
+    if (s.poolStaged.contains(r) and units(r) == 1 and shortEligible(owner))
+      claimPool(r, owner) else armShort(owner)
+  run selectiveVisibleWorkBeforeWaitTest = init.then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerShort(3)).then(claimOrArmShort(3, 2))
+    .then(all { assert(s.accepted == Set(3)), assert(s.committed.get(3) == 2), assert(s.shortSignalled.size() == 0), assert(safety), stutter })
+  action selectiveShortStep = {
+    nondet owner = Set(1, 2).oneOf()
+    any { shortPoolStep, armShort(owner), resumeShort(owner), selectiveShortWake, claimOrArmShort(3, owner) }
+  }
+  run selectiveWakeDoesNotBindTest = init.then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(armShort(1)).then(armShort(2)).then(offerShort(3)).then(selectiveShortWake)
+    .then(all { assert(s.shortSignalled == Set(1)), assert(s.committed.get(3) == 0), assert(not(s.workHeld.contains(3))), assert(safety), stutter })
+    .then(claimPool(3, 2)).then(submitService(3)).then(observeTimeout(3)).then(close)
+    .then(readyService(3, false)).then(complete(3)).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
+  run selectiveInterruptedWaitRelaysTest = init.then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(armShort(1)).then(armShort(2)).then(offerShort(3)).then(selectiveShortWake).then(resumeShort(1)).then(selectiveShortWake)
+    .then(all { assert(s.shortSignalled == Set(2)), assert(s.accepted.size() == 0), assert(safety), stutter })
+    .then(cancelPool).then(close).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.shortSignalled.size() == 0), assert(s.shortWaiters.length() == 0), assert(safety), stutter })
+  run selectiveArmAfterPublishTest = init.then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerShort(3)).then(armShort(2)).then(selectiveShortWake)
+    .then(all { assert(s.shortSignalled == Set(2)), assert(safety), stutter })
   action shortPoolStep = { nondet r = JOBS.oneOf(); any { poolStep, offerShort(r) } }
   run dynamicShortClaimAndCloseTest = init.then(configureCapacity(1)).then(admit(1))
     .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(offerShort(3))

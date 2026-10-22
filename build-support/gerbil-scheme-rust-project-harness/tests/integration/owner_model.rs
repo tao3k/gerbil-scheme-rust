@@ -142,7 +142,11 @@ fn owner_protocol_scenarios_and_controls() {
     shared_protocol(source);
 }
 fn capacity_protocol(source: &str) {
-    for step in ["capacityProtocolStep", "shortPoolStep"] {
+    for step in [
+        "capacityProtocolStep",
+        "shortPoolStep",
+        "selectiveShortStep",
+    ] {
         success(&[
             "run",
             source,

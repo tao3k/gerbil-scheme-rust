@@ -7,14 +7,20 @@ use std::{
 };
 impl Port {
     pub(crate) fn claim(&self) -> Option<Request> {
+        if !self.selective() {
+            return self.claim_one();
+        }
+        self.resume();
+        let request = self.claim_one();
+        self.source.capacity_available();
+        request
+    }
+    fn claim_one(&self) -> Option<Request> {
         if self.source.length.load(Ordering::Acquire) == 0 {
             return None;
         }
-        let target = self
-            .source
-            .destinations
-            .iter()
-            .find(|t| t.owner == self.owner)?;
+        let target = &self.source.destinations[self.index];
+        debug_assert_eq!(target.owner, self.owner);
         let active = Arc::clone(&target.active).try_acquire_owned().ok()?;
         let permit = target.capacity.try_pair(1).ok()?.retain_active(active);
         let admission = self.source.admission.upgrade()?;
@@ -42,13 +48,19 @@ impl Port {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut expired = Vec::new();
         while queue
+            .requests
             .front()
             .is_some_and(|q| q.deadline <= Instant::now() || q.assigned.is_closed())
         {
-            expired.push(queue.pop_front().unwrap());
+            expired.push(queue.requests.pop_front().unwrap());
         }
-        let queued = queue.pop_front();
-        self.source.length.store(queue.len(), Ordering::Release);
+        let queued = queue.requests.pop_front();
+        if queue.requests.is_empty() {
+            queue.notified.clear();
+        }
+        self.source
+            .length
+            .store(queue.requests.len(), Ordering::Release);
         drop(queue);
         drop(senders);
         for queued in expired {

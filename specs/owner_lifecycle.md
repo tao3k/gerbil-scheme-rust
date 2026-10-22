@@ -366,3 +366,14 @@ native short facility does not consume bulk producer registration permits.
 Dynamic offer/claim and observation-timeout/close scenarios preserve committed
 ownership. Actual partial-permit cancellation, wake ports, root lifetimes and
 Scheme semantics remain separate native acceptance obligations.
+
+### Selective wake refinement
+
+`selectiveShortStep` adds FIFO waiting-owner registration and nonexclusive wake
+duties to the same lifecycle state. Notifications own no payload, work/slot credit
+or root. Existing `claimPool` establishes actual affinity; a running peer may
+claim before the signalled owner. Scenarios cover registration after publication,
+interrupted-wait relay, cancellation and accepted-timeout close drain. The aggregate
+Rust gate samples this step alongside existing capacity/source transitions and
+retains the old migration/root mutations. OS delivery latency and equal-count
+placement are not implied by finite safety admission.

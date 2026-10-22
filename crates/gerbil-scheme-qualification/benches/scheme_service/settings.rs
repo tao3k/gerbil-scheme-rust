@@ -19,7 +19,8 @@ fn requested(comparison: Comparison, arm: bool) -> SchemeServiceSettings {
         | Comparison::ObserverCost
         | Comparison::ShortRouteLoad
         | Comparison::SupplyAdmission
-        | Comparison::PoolProtocol => (true, true),
+        | Comparison::PoolProtocol
+        | Comparison::SelectiveWake => (true, true),
         Comparison::PooledWake => (true, !arm),
     };
     SchemeServiceSettings {
@@ -67,7 +68,10 @@ fn read(pool: &InstancePool) -> Vec<SchemeServiceSettings> {
 }
 
 pub(super) fn short_pool(pool: &InstancePool, comparison: Comparison) {
-    if comparison == Comparison::PoolProtocol {
+    if matches!(
+        comparison,
+        Comparison::PoolProtocol | Comparison::SelectiveWake
+    ) {
         pool.dispatcher()
             .configure_scheme_short_pool(gerbil_scheme::instances::SchemeShortPoolConfig {
                 owners: vec![0, 1, 2, 3],
@@ -75,5 +79,31 @@ pub(super) fn short_pool(pool: &InstancePool, comparison: Comparison) {
                 maximum_active_per_owner: 1,
             })
             .unwrap();
+    }
+}
+
+pub(super) fn short_wake(pool: &InstancePool, comparison: Comparison, arm: bool) {
+    if comparison == Comparison::SelectiveWake {
+        use gerbil_scheme::instances::SchemeShortWake;
+        pool.dispatcher()
+            .scheme_short_pool()
+            .unwrap()
+            .configure_wake(if arm {
+                SchemeShortWake::Selective
+            } else {
+                SchemeShortWake::Broadcast
+            })
+            .unwrap();
+        assert_eq!(
+            pool.dispatcher().scheme_short_pool().unwrap().wake_policy(),
+            if arm {
+                SchemeShortWake::Selective
+            } else {
+                SchemeShortWake::Broadcast
+            }
+        );
+        // Same native boundary in both arms, outside timing. Configuration wakes
+        // old-policy sleepers so they can register under the new protocol.
+        read(pool);
     }
 }

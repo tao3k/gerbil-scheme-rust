@@ -3,12 +3,14 @@
 mod admission;
 #[path = "claim.rs"]
 mod claim;
+#[path = "notification.rs"]
+mod notification;
 use crate::instances::{Admission, Capacity, InstanceError, Request, service_wake::Wake};
 use std::{
-    collections::VecDeque,
+    collections::{BTreeSet, VecDeque},
     sync::{
         Arc, Mutex, Weak,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Instant,
 };
@@ -20,6 +22,20 @@ pub struct SchemeShortPoolConfig {
     pub owners: Vec<usize>,
     pub maximum_pending: usize,
     pub maximum_active_per_owner: usize,
+}
+/// Explicit shared-short notification policy; existing broadcast is unchanged.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SchemeShortWake {
+    #[default]
+    Broadcast,
+    /// FIFO wait registration and bounded, nonexclusive wake obligations.
+    Selective,
+}
+#[derive(Debug, Default)]
+pub(super) struct Queue {
+    requests: VecDeque<Queued>,
+    waiters: VecDeque<usize>,
+    notified: BTreeSet<usize>,
 }
 /// Owner binding occurs when a running owner claims a request, before construct.
 /// This queue accepts only stateless, one-unit Scheme short-service requests.
@@ -33,6 +49,7 @@ pub(super) struct Destination {
     capacity: Arc<Capacity>,
     active: Arc<Semaphore>,
     wake: Weak<Wake>,
+    waiting: AtomicBool,
 }
 pub(super) struct Queued {
     id: usize,
@@ -52,7 +69,9 @@ impl std::fmt::Debug for Queued {
 pub(crate) struct Source {
     admission: Weak<Admission>,
     destinations: Vec<Destination>,
-    queue: Mutex<VecDeque<Queued>>,
+    queue: Mutex<Queue>,
+    selective: AtomicBool,
+    pending_limit: usize,
     pending: Arc<Semaphore>,
     length: AtomicUsize,
     next: AtomicUsize,
@@ -60,6 +79,7 @@ pub(crate) struct Source {
 #[derive(Debug)]
 pub(crate) struct Port {
     pub owner: usize,
+    index: usize,
     pub source: Arc<Source>,
 }
 impl Source {
@@ -69,7 +89,7 @@ impl Source {
         }
     }
 
-    fn wake(&self) {
+    fn broadcast(&self) {
         for target in &self.destinations {
             if let Some(wake) = target
                 .wake
@@ -87,14 +107,18 @@ impl Source {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let removed = queue
+                .requests
                 .iter()
                 .position(|r| r.id == id)
-                .and_then(|i| queue.remove(i));
-            self.length.store(queue.len(), Ordering::Release);
+                .and_then(|i| queue.requests.remove(i));
+            self.length.store(queue.requests.len(), Ordering::Release);
+            if queue.requests.is_empty() {
+                queue.notified.clear();
+            }
             removed
         };
-        // Destruction can wake Rust tasks: no admission/queue lock is held.
         drop(removed);
+        self.capacity_available();
     }
     pub(crate) fn close(&self) {
         self.pending.close();
@@ -104,13 +128,19 @@ impl Source {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             self.length.store(0, Ordering::Release);
-            std::mem::take(&mut *queue)
+            queue.waiters.clear();
+            queue.notified.clear();
+            for target in &self.destinations {
+                target.waiting.store(false, Ordering::Release);
+            }
+            std::mem::take(&mut queue.requests)
         };
         for request in queued {
             reject(request, InstanceError::Closed);
         }
     }
     pub(crate) fn owner_closed(&self) {
+        self.remove_closed_waiters();
         if self.destinations.iter().all(|t| {
             t.wake.upgrade().is_none_or(|w| {
                 w.closed.load(Ordering::Acquire) || w.failed.load(Ordering::Acquire)
@@ -141,3 +171,7 @@ impl Drop for PendingGuard {
 #[cfg(test)]
 #[path = "../../../tests/unit/short_pool_close.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../tests/unit/short_pool_notification.rs"]
+mod notification_tests;

@@ -1,6 +1,6 @@
 //! Configuration and cancel-safe publication under the pool close fence.
 use super::{
-    Destination, PendingGuard, Port, Queued, SchemeShortPool, SchemeShortPoolConfig, Source,
+    Destination, PendingGuard, Port, Queue, Queued, SchemeShortPool, SchemeShortPoolConfig, Source,
 };
 use crate::instances::{
     AsyncInstanceTicket, InstanceDispatcher, InstanceError, Request, RoutedSchemeTicket,
@@ -8,7 +8,6 @@ use crate::instances::{
     service_contract::Checked,
 };
 use std::{
-    collections::VecDeque,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -73,13 +72,16 @@ impl InstanceDispatcher {
                 capacity: Arc::clone(capacity),
                 active: Arc::new(Semaphore::new(config.maximum_active_per_owner)),
                 wake: Arc::downgrade(wake),
+                waiting: AtomicBool::new(false),
             });
             wakes.push((owner, Arc::clone(wake)));
         }
         let source = Arc::new(Source {
             admission: Arc::downgrade(&self.admission),
             destinations,
-            queue: std::sync::Mutex::new(VecDeque::new()),
+            queue: std::sync::Mutex::new(Queue::default()),
+            selective: AtomicBool::new(false),
+            pending_limit: config.maximum_pending,
             pending: Arc::new(Semaphore::new(config.maximum_pending)),
             length: AtomicUsize::new(0),
             next: AtomicUsize::new(0),
@@ -163,8 +165,8 @@ impl Source {
             drop(senders);
             return Err(InstanceError::Closed);
         }
-        queue.push_back(queued);
-        self.length.store(queue.len(), Ordering::Release);
+        queue.requests.push_back(queued);
+        self.length.store(queue.requests.len(), Ordering::Release);
         drop(queue);
         drop(senders);
         self.wake();
@@ -228,10 +230,11 @@ fn install(
         .short_pool
         .set(Arc::downgrade(source))
         .map_err(|_| invalid())?;
-    for (owner, wake) in wakes {
+    for (index, (owner, wake)) in wakes.into_iter().enumerate() {
         wake.short_pool
             .set(Port {
                 owner,
+                index,
                 source: Arc::clone(source),
             })
             .map_err(|_| invalid())?;

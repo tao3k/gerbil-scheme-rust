@@ -138,4 +138,4 @@ pub use service_settings::SchemeServiceSettings;
 #[cfg(feature = "tokio-dispatch")]
 mod short_pool;
 #[cfg(feature = "tokio-dispatch")]
-pub use short_pool::{SchemeShortPool, SchemeShortPoolConfig};
+pub use short_pool::{SchemeShortPool, SchemeShortPoolConfig, SchemeShortWake};

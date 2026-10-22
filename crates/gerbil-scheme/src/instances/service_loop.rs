@@ -122,6 +122,9 @@ struct Pump<'a> {
 }
 impl Pump<'_> {
     fn receive(&mut self, request: Request) -> Result<(), InstanceError> {
+        if let Some(port) = self.wake.short_pool.get() {
+            port.interrupted();
+        }
         if let Work::Service(job) = &request.work {
             if let Some(trace) = job.entry_trace() {
                 trace.mark(super::SchemeServiceEntryPhase::OwnerTurn);
@@ -328,11 +331,13 @@ impl Pump<'_> {
                 }
                 Err(_) => {}
             }
-            // Match the local-inbox arm/recheck protocol for shared publication.
+            // Work conservation: try visible work before entering native wait.
+            // Registration then checks publication under the shared queue lock.
             if self.claim_short()? {
                 short_turn = false;
                 continue;
             }
+            register_short_wait(wake);
             if wake.closed.load(Ordering::Acquire) {
                 if !draining {
                     control(self.image, &[7])?;
@@ -394,6 +399,12 @@ pub(super) fn run(
                 job.fail(error.clone());
             }
         }
+    }
+}
+
+fn register_short_wait(wake: &Wake) {
+    if let Some(port) = wake.short_pool.get() {
+        port.arm_wait();
     }
 }
 

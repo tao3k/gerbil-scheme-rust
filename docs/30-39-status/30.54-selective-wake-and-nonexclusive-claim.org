@@ -1,0 +1,219 @@
+#+TITLE: Selective Wake and Nonexclusive Short Claim
+#+DATE: 2026-10-22
+
+* Decision from existing evidence
+
+The predecessor's final pair improved mixed throughput and short p99 but worsened
+CPU maximum owner finish spread by 34.55%. CPU short placement was
+=[336,141,99,64]= across 640 probes. The initial mixed regression remains in
+[[file:30.53-shared-capacity-and-late-owner-binding.org][the preceding report]] with its own source identity. These observations identify
+coordination questions; they do not establish that broadcast caused all of the
+finish-spread regression or that equal owner counts maximize throughput.
+
+Fixed-order broadcast wakes every destination for one queued short request.
+Every running owner then races for the same queue. Rotating broadcast order alone
+would retain the fanout; hard assignment to a sleeping owner would introduce
+head-of-line waiting for its GC/OS scheduling. Neither addresses the ownership
+boundary adequately. The new explicit policy separates notification duty from
+payload ownership and keeps running-owner claims nonexclusive.
+
+* Protocol and type boundaries
+
+=SchemeShortWake::Broadcast= remains the default. A configured short facility
+can opt into =Selective= through =configure_wake= while its native budgets and
+pending admission are idle. =wake_policy= reads the actual host policy. A single
+transition broadcast refreshes owners still sleeping under the previous policy;
+this is outside measured work and is not the steady-state algorithm.
+
+| State / event | Protocol |
+|---------------+----------|
+| Owner about to wait | Clear wake, recheck inbox and claim visible work; register under the queue lock only after a failed claim |
+| Queued payload / returned capacity | Select the oldest registered owners with usable declared capacity; keep at most one logical duty per owner and issue no more new duties than queued inputs lacking duties |
+| Notification | Remove selected owners from the waiting list; notify their weak wake handles after unlocking |
+| Owner resumes | Remove its registration and duty before attempting a claim |
+| Owner claims | Reserve real short/work/slot credits and use the original admission-plus-queue fence; only now commit the owner |
+| Ordinary inbox interrupts a wait | Withdraw registration/duty and relay notification before entering arbitrary application work |
+| Target fails or closes | Remove its registration/duty and notify another eligible waiter; close the facility if no targets remain |
+| Cancellation / pre-claim timeout | Remove only that Rust input and pending slot; clear obsolete duties when the queue becomes empty |
+| Accepted timeout / close | Keep native roots, fixed owner and credits through Scheme completion/projection; close wakes pending-capacity callers and drains unassigned inputs |
+
+Capacity is an availability observation, not a reservation or predicted duration.
+An already-running owner can claim a payload even when a peer has been notified.
+A notification therefore cannot carry a Scheme value, reserve a head request or
+change Actor affinity. Failed speculative acquisition does not publish a retry
+event; genuine capacity return does. No timer, busy polling thread, hard wall-clock
+Scheme budget or new Rust executor is introduced.
+
+Registration, selection, withdrawal and queue publication share the existing
+queue mutex. Final claim retains the admission fence and capacity identity check.
+User destruction, result sends, permit returns and pipe notifications remain
+outside locks. Owner failure independently closes the source, so publication's
+under-queue closed check from the predecessor remains required.
+
+Ports cache an immutable destination index established during configuration.
+Actual owner IDs remain separate and are checked at claim; capacity identities
+stay frozen until shutdown. This removes repeated linear destination searches
+without introducing a shared mutable owner map or weakening close ownership.
+
+* What fairness means here
+
+FIFO ordering applies to eligible wait registrations, preserving skipped waiters'
+relative order. It does not force equal counts across busy or differently paced
+VMs. Opportunistic claim remains possible to preserve progress, so a fast running
+owner can still take more requests. Logical wake duties are bounded; physical
+notifications already in flight can become stale after cancellation or a peer
+claim. Owners recheck live queue state rather than trusting those bytes.
+
+The native wait registration means an owner is entering Scheme's service wait;
+it is not proof that the OS thread is asleep or immediately runnable. Selective
+notification alone cannot guarantee a runnable-time bound for a paused target.
+The native workload must demonstrate whether reduced fanout outweighs registration
+and relay costs. Scheme continues to own Actors, green threads, GC, continuations,
+exceptions and native computation. Rust handles cross-instance admission only.
+
+* Reused model and executable controls
+
+The existing lifecycle model gains a waiting-owner list and a set of notification
+duties. Existing pool staging, native capacity, committed owner, root and drain
+transitions are reused. =selectiveShortStep= joins the original aggregate CI gate.
+Scenarios exercise notification without binding, active-peer claim, interrupted
+wait relay, publication before registration, cancellation and accepted timeout /
+close drain. Existing owner-migration and premature-root-release mutations remain.
+Finite safety checks do not prove OS liveness, performance or an equal-count bound.
+
+Real-pipe controls check single-request fanout, bursts, capacity return, failure
+relay and rejected dead-owner registration. The native four-VM fixture runs both
+policies, concurrent typed short submissions, admission cancellation/expiry,
+accepted observation timeout and queued/capacity-waiter close with root-balanced
+cleanup. Policy changes reject outstanding work and closed admission.
+
+* Directed comparison
+
+Only =--selective-wake-ab= is added to the existing Rust bench. Both arms use the
+same four live VMs, owner-claimed short API, =OwnerLocal= bulk supply, O2 Scheme
+payload/projection, two Tokio workers, slot/work limits four/32, batch eight,
+feed one, native-port wait and Scheme cooperative budget one. The control uses
+broadcast and the candidate uses selective notification. Both admission clocks
+end at owner claim. Native settings and actual host policy are read back outside
+timing; observation is off and no profiler is added.
+
+#+begin_src text
+just bridge-scheme-service-benchmark --test --selective-wake-ab
+just bridge-scheme-service-benchmark --selective-wake-ab
+#+end_src
+
+No default or broad-matrix promotion follows from this experiment. Raw captures,
+source manifests, native artifacts and failed gate attempts remain private.
+
+* Rejected intermediate capture and work conservation
+
+The first attempt exited 101 while switching policy: configuration-query replies
+arrived before their native permits retired. The API's idle check correctly
+rejected the transition. Cleanup was not qualified and its partial samples are
+not admitted. A pre-switch =idle= fence was added outside timing; no deadline or
+idle predicate was relaxed. Failed binary SHA-256:
+=a799a56dd6c30039622a98a940750e7d413aa97f799f86c78e7564ee8c5b1e5e=.
+
+The subsequent complete capture used binary
+=b3b75ce733ba2b182d1cdd9a84bda0ff455311811d062c2c7ab3cb942bc9d776=
+and completed 40 full samples with four joined owners, zero roots and removed
+files. It substantially improved short placement, with a latency tradeoff:
+
+| Load | Metric | Broadcast | Selective intermediate | Change |
+|------+--------+-----------+------------------------+--------|
+| CPU | Orders/s | 420,562 | 414,522 | -1.44% |
+| CPU | Pooled short p99, ms | 0.112500 | 0.282125 | +150.78% |
+| CPU | Maximum finish spread, ms | 0.413709 | 0.408459 | -1.27% |
+| CPU | Short placement, 640 probes | [304,161,79,96] | [184,152,149,155] | Less concentrated |
+| Mixed | Orders/s | 67,821 | 67,686 | -0.20% |
+| Mixed | Pooled short p99, ms | 0.236708 | 0.415792 | +75.66% |
+| Mixed | Maximum finish spread, ms | 1.527292 | 1.232375 | -19.31% |
+| Mixed | Short placement, 640 probes | [206,174,119,141] | [180,156,155,149] | Less concentrated |
+
+This result is rejected for general performance promotion. Inspection exposed
+a work-conservation gap in the intermediate owner loop: selective registration
+skipped the final pre-wait claim, permitting an avoidable native wait even with
+a visible eligible payload. Final ordering retains the existing inbox recheck,
+tries a real claim, and registers only if no claim succeeds. Registration still
+covers publication racing the failed scan. The wake/claim distinction and FIFO
+eligible-waiter order remain intact.
+
+A real-pipe control verifies visible work can be claimed without any pipe round
+trip; the reused model adds =claimOrArmShort= and the corresponding scenario.
+The full negative capture remains unchanged. The ordering correction is justified
+by executable work conservation; it is not proof that the extra wait alone
+caused every observed tail. Only the affected directed pair is rerun.
+
+* Final work-conserving qualification
+
+All 27 protocol units passed. The native Scheme-service suite passed its three
+tests, including both policies and concurrent short submissions; the reused
+aggregate Quint gate passed in 139.64 seconds, including the additional
+claim-before-wait scenario and existing mutation counterexamples. Warnings-denied
+qualification Clippy passed. No native timeout bound was increased.
+
+The final binary completed 40 full samples, ten per arm/load. Both arms joined
+the same four live VMs with roots =[0,0,0,0]=, service quiescence and removed
+files. The native image remained unchanged. Results are not cross-capture ratios:
+
+| Load | Metric | Broadcast | Selective final | Change |
+|------+--------+-----------+-----------------+--------|
+| CPU | Orders/s | 391,498 | 398,289 | +1.73% |
+| CPU | Native-completion short p99, ms | 0.435916 | 0.838792 | +92.42% |
+| CPU | Maximum owner finish spread, ms | 0.462500 | 0.618333 | +33.69% |
+| CPU | Minimum owner progress | 98.7342% | 98.1818% | Worse |
+| CPU | Short placement, 640 probes | [302,123,111,104] | [163,168,167,142] | Maximum share 47.19% to 26.25% |
+| Mixed | Orders/s | 67,564 | 67,569 | +0.007% |
+| Mixed | Native-completion short p99, ms | 0.493291 | 0.428334 | -13.17% |
+| Mixed | Maximum owner finish spread, ms | 1.587958 | 1.519625 | -4.30% |
+| Mixed | Minimum owner progress | 98.8142% | 98.8048% | Slightly worse |
+| Mixed | Short placement, 640 probes | [228,145,112,155] | [170,169,154,147] | Maximum share 35.63% to 26.56% |
+
+The protocol clearly reduces placement concentration in these captures, while
+CPU finish spread and CPU short p99 remain unresolved. Mixed throughput is
+essentially unchanged. There is no default or general-performance promotion;
+all earlier regressions remain admitted negative evidence for their own snapshots.
+Equalizing short placement does not equalize completion of an independently
+scheduled bulk pipeline, per-VM allocation/GC or OS execution. The existing
+sharing model permits those delays; notification fairness cannot prove them away.
+
+The historical =probe_actual_p99_ns= field uses native projection-completion
+timestamps, not the time when a Tokio caller resumes. Admission can therefore
+exceed native-completion latency when the caller resumes after native completion.
+The final CPU scheduled-probe p99 was 15.404042 ms / 38.393833 ms (control /
+candidate); mixed was 3.224667 ms / 1.894917 ms. Those observations remain visible,
+not relabeled as native execution time or proof of OS/GC attribution. Both captures
+ran on the shared local host with other work untouched and no profiler. No quiet-
+host or stable tail improvement is claimed.
+
+The next design obligation is bulk supply/retirement fairness at owner boundaries,
+with native execution/GC variability kept separate from wake fairness. Per-owner
+waiting flags, shared queue coordination, placement acknowledgement and Scheme
+service progress are distinct costs. These results do not justify blindly replacing
+Arc, changing default budgets, hard owner binding or further unchanged timing runs.
+
+Final binary SHA-256:
+=1e981562d8d5d5995bc24d1d1f3242fdb8a45ae40a57b1e97db7c1b62ee5ca73=.
+Final private source archive SHA-256:
+=0f12f63edad230772d2f4ff8f4e9bd3ebd08e6eed969ce563062fb822c0db870=.
+Native image SHA-256:
+=0e79bb79f9686fc36e13e1be76deda04ae1877e370a081a096f32a61e53c3d16=.
+After timing, only documentation, a permuted-owner native fixture and the CI
+network-bound repair below changed; runtime, payload and timed benchmark code did
+not change. Owner IDs and destination indices are exercised with a noncanonical
+=[3,1,0,2]= configuration to qualify their separation.
+
+* Predecessor CI boundary
+
+PR #18 predecessor =bf50c00f59f6d435b00c14cd69a5530f1f82d695= finished with
+five supported jobs successful and the Ubuntu bindings job cancelled after its
+30-minute limit. The unsupported SMP job was skipped. The Ubuntu log stopped
+in prerequisite =apt-get update=, repeatedly ignoring Azure archive package
+indexes; Gerbil activation and Cargo checks were not reached. This is not an
+Ubuntu/native pass and does not establish a Rust/Scheme test failure.
+
+The existing apt command arguments now bound HTTP(S) waits to 30 seconds, allow
+two retries and make missing update indexes an error. No new Bash script, build
+driver, fallback mirror or longer CI/native timeout is introduced. The completed
+predecessor run and its failure log remain retained; new-head CI must qualify the
+published sources independently.

@@ -1,8 +1,7 @@
 //! Reproduce publication blocked behind the queue while owner failure closes it.
-use super::{Queued, Source};
+use super::{Queue, Queued, Source};
 use crate::instances::{InstanceDispatcher, InstanceError, Request, pool::Work};
 use std::{
-    collections::VecDeque,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize},
@@ -17,7 +16,9 @@ fn owner_failure_close_cannot_be_overtaken_by_queued_publication() {
     let source = Arc::new(Source {
         admission: Arc::downgrade(&dispatch.admission),
         destinations: Vec::new(),
-        queue: Mutex::new(VecDeque::new()),
+        queue: Mutex::new(Queue::default()),
+        selective: AtomicBool::new(false),
+        pending_limit: 1,
         pending: Arc::clone(&pending),
         length: AtomicUsize::new(0),
         next: AtomicUsize::new(0),

@@ -504,3 +504,12 @@ notification with the existing occupancy ranking. Both facilities are opt-in.
 [The directed protocol qualification](30-39-status/30.53-shared-capacity-and-late-owner-binding.org)
 retains the mixed-load throughput/p99/finish-spread regressions; defaults remain
 unchanged and no general speedup is admitted.
+
+The configured short facility can explicitly select `SchemeShortWake::Selective`.
+FIFO eligible wait registrations receive bounded wake obligations; running peers
+can still claim and only real credit acquisition commits owner affinity. The
+owner attempts visible work before registering for native wait. Ordinary inbox
+interruptions and target failure relay wake duty without moving Scheme objects.
+Broadcast remains the default. [Selective wake qualification](30-39-status/30.54-selective-wake-and-nonexclusive-claim.org)
+records improved short placement, unresolved CPU finish spread/tail regressions,
+and separate native-completion versus caller scheduling clock boundaries.

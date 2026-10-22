@@ -625,3 +625,28 @@ CPU maximum owner finish spread regressed +34.55%, and CPU short-owner placement
 remained concentrated. Both captures retain their own source/binary identities;
 the changed outcome is not attributed to the close repair or promoted to a
 stable/default speedup. See the final comparison in the same protocol report.
+
+### Selective short wake comparison
+
+```text
+just bridge-scheme-service-benchmark --test --selective-wake-ab
+just bridge-scheme-service-benchmark --selective-wake-ab
+```
+
+Both arms use the same owner-claimed short API and native O2 workload. Only the
+explicit host wake policy changes: broadcast versus FIFO registered selective
+notification. `short_wake_policy` reads actual configuration; `selective_short_wake`
+identifies the candidate. Both use `OwnerLocal` supply and owner-claim admission
+timing. Policy transitions and readback occur outside timing. See the
+[protocol and ownership report](../../../../docs/30-39-status/30.54-selective-wake-and-nonexclusive-claim.org).
+No profiler, wider matrix, changed timeout or default-policy switch is required.
+
+The final selective protocol keeps a real claim attempt before native wait.
+A rejected intermediate capture improved placement but regressed both short tails;
+the failed pre-switch idle-fence attempt is also retained. The final matched pair
+has CPU throughput +1.73%, native-completion p99 +92.42%, finish spread +33.69%;
+mixed throughput +0.007%, native-completion p99 -13.17%, finish spread -4.30%.
+Maximum short-owner shares fell from 47.19%/35.63% to 26.25%/26.56% (CPU/mixed).
+This is a placement improvement, not overall/default admission. `probe_actual`
+uses the native completion timestamp, not caller resume time; scheduled-probe
+latency remains separate. All captures retain their original identities.

@@ -455,3 +455,13 @@ are rejected. [The scheduling report](30-39-status/30.49-owner-scheduling-and-gc
 records complete captures, genuine select blocking, GC-associated CPU work and
 the withdrawn advisory phase-routing experiment. No routing or supply defaults
 changed, and no phase-routing API is retained.
+
+
+The explicit `--probe-observation` mode records short-request entry and native
+counter snapshots without whole-owner monitoring, OS polling or wait tracing.
+`--observer-ab` measures its cost against observation off on the same pooled
+service. Longer repeated captures reproduced unobserved tens-of-milliseconds
+tails; some large construction wall spans had little thread CPU and zero GC.
+[The low-intrusion report](30-39-status/30.50-low-intrusion-owner-tail-qualification.org)
+keeps the degraded runs and distinguishes those spans from actual GC CPU work.
+No production routing/supply change is admitted from that attribution alone.

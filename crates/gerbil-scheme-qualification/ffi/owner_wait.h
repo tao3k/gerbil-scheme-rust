@@ -123,6 +123,11 @@ static uint64_t gerbil_owner_wait_observe(int operation, uint64_t value) {
       owner_wait_pipe_fd = -1;
       return owner_wait_pipe_known ? 0 : UINT64_MAX;
     case 9: return value < 3 ? owner_wait_anchor[value] : UINT64_MAX;
+    case 10:
+      owner_wait_enabled = 0;
+      owner_wait.count = owner_wait.overflow = owner_wait.errors = 0;
+      owner_wait_mark();
+      return 0;
     case 5: return owner_wait_qos_set(value);
     case 6: return (uint64_t)qos_class_self();
     case 7: return (uint64_t)owner_wait_qos;

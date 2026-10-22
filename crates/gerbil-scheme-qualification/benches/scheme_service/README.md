@@ -386,7 +386,7 @@ Unobserved performance runs execute neither calibration nor OS sampling.
 
 ### Complete owner scheduling capture
 
-`--trace-once` requires `--phase-observation`. It runs one A/B per CPU/mixed
+`--trace-once` requires `--phase-observation` or `--probe-observation`. It runs one A/B per CPU/mixed
 load, retaining the normal 8192-order inputs, 64 short probes, warmups, four live
 VMs, two Tokio workers, capacity bounds and original progress watchdog. It does
 not shorten the input to the smoke workload. Configuration emits `trace_once`;
@@ -400,7 +400,8 @@ per owner, bracketing emission with the native monotonic clock.
 trace remains six columns and its existing event kinds are unchanged. A tiny
 host-Clang object uses Apple's standard signpost macros; Gambit-generated C
 continues through its configured native compiler. Each marker releases its log
-object. No marker executes in unobserved runs.
+object. Ordinary unobserved runs emit no markers. The explicit observer-cost pair uses
+matched fences outside timing in both arms, including its unobserved arm.
 
 Build through Cargo; use the executable printed by `--no-run` as `SERVICE_BENCH`
 and choose an external evidence directory as `STATE_DIR`:
@@ -431,3 +432,43 @@ reject unknown/missing/overlapping intervals. Native CPU counters enclose their
 whole measured phase and cannot be clipped by prorating wall overlap.
 
 See [complete scheduling evidence and rejected phase routing](../../../../docs/30-39-status/30.49-owner-scheduling-and-gc-cpu-qualification.org).
+
+
+### Low-intrusion probe controls
+
+```text
+just bridge-scheme-service-benchmark --observer-ab
+just bridge-scheme-service-benchmark --observer-ab --blocks=50
+just bridge-scheme-service-benchmark --pooled-ab --probe-observation
+```
+
+`--probe-observation` retains the nine request entry marks and three native
+counter snapshots per short request, plus owner clock anchors outside sample
+timing. It disables whole-owner phase monitors, OS polling, calibration and
+native select/sleep recording. It adds no bulk-request counter snapshots.
+`probe_native_snapshot_ns` separately reports the wall cost of each of the three
+diagnostic reads. Construction includes reads one/two and projection includes
+read three; do not attribute their full wall spans to type conversion. These
+costs also include any off-core delay inside the read.
+`native_probe_snapshots` checks actual snapshot availability; missing native
+counters reject an observed native-short sample. `observation_mode` distinguishes
+Off, Probe and Phase. Native trace reset/readback asserts no wait events in Probe.
+
+`--observer-ab` compares observation Off with Probe on the same live VMs, using
+pooled supply, native short layout, progress-aware routing, NativePort wake and
+budget one in both arms. Clock fences execute outside timing in both arms to
+balance their Scheme allocations. The observer still has measurable cost;
+close p99 values do not establish transparency at rarer percentiles. This flag
+cannot be combined with either observation flag or another comparison.
+
+`--blocks=N` changes only repetition count (1 through 50). The default remains
+five blocks, with AB/BA order alternation. Smoke and `--trace-once` retain their
+fixed single block and reject an explicit block count. Long captures reuse the
+same VMs, workload and five-second progress gate. Do not run a long capture in
+a rolling kernel-trace window that discards owner identity metadata.
+
+For one reduced kernel capture, replace `--phase-observation` with
+`--probe-observation` in the xctrace command above. All clock, identity, coverage
+and cleanup gates still apply. Kernel acquisition remains intrusive and is not
+an unobserved throughput result. See [low-intrusion tail qualification](../../../../docs/30-39-status/30.50-low-intrusion-owner-tail-qualification.org)
+for reproduced unobserved tails, GC-associated construction and remaining limits.

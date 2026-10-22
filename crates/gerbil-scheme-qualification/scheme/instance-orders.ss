@@ -96,6 +96,7 @@ c-end
         ((10) (set! orders-wait-trace? (not (zero? (s64vector-ref value 1))))
               (owner-wait-trace 0 (s64vector-ref value 1)) (s64vector 0))
         ((11) (orders-wait-snapshot))
+        ((14) (set! orders-wait-trace? #f) (s64vector (owner-wait-trace 10 0)))
         ((13) (s64vector (owner-wait-trace 9 0) (owner-wait-trace 9 1) (owner-wait-trace 9 2)))
         ((12) (s64vector (owner-wait-trace 5 (s64vector-ref value 1)) (owner-wait-trace 6 0) (owner-wait-trace 7 0)))
         (else (instance-native-call value))))

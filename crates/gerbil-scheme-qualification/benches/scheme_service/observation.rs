@@ -50,3 +50,88 @@ pub(super) fn append(
         value["owner_phases"] = delta(&before, &snapshot(pool));
     }
 }
+
+/// Qualification collection scope; Probe never enables whole-owner monitors.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Mode {
+    Off,
+    Probe,
+    Phase,
+}
+impl Mode {
+    pub(super) fn paired(self, comparison: super::measurement::Comparison, arm: bool) -> Self {
+        if comparison == super::measurement::Comparison::ObserverCost {
+            if arm { Self::Probe } else { Self::Off }
+        } else {
+            self
+        }
+    }
+    pub(super) fn enabled(self) -> bool {
+        self != Self::Off
+    }
+    pub(super) fn full(self) -> bool {
+        self == Self::Phase
+    }
+}
+
+/// Owns the optional sampler so unwind stops it before native owners retire.
+pub(super) struct Capture {
+    mode: Mode,
+    anchored: bool,
+    before: Option<Vec<SchemeServiceObservation>>,
+    sampling: Option<super::os_sampling::Sampler>,
+}
+impl Capture {
+    pub(super) fn start(pool: &InstancePool, mode: Mode, balanced_fence: bool) -> Self {
+        let before = mode.full().then(|| snapshot(pool));
+        let anchored = mode.enabled() || balanced_fence;
+        if mode.full() {
+            super::native_wait::begin(pool);
+        } else if anchored {
+            super::native_wait::anchor_begin(pool);
+        }
+        Self {
+            mode,
+            anchored,
+            before,
+            sampling: mode.full().then(super::os_sampling::Sampler::start),
+        }
+    }
+    pub(super) fn finish(
+        self,
+        value: &mut Value,
+        pool: &InstancePool,
+        inputs: &[Vec<i64>],
+        snapshots: usize,
+    ) {
+        super::os_sampling::append(
+            value,
+            self.sampling.map(super::os_sampling::Sampler::finish),
+        );
+        if self.mode.full() {
+            super::native_wait::append(value, pool, inputs);
+        } else if self.anchored {
+            super::native_wait::append_probe_anchors(value, pool);
+        }
+        append(value, pool, self.before);
+        value["observation_mode"] = json!(format!("{:?}", self.mode));
+        if self.mode.enabled() && value["short_layout"] == true {
+            assert_eq!(
+                snapshots,
+                value["probe_actual_ns"].as_array().unwrap().len() * 3,
+                "native probe counters unavailable"
+            );
+        }
+        value["native_probe_snapshots"] = json!(snapshots);
+        value["native_clock_bridge"] = json!(self.anchored);
+    }
+}
+
+/// Keep observer wall cost separate from native construction/execution cost.
+pub(super) fn counter(
+    session: &gerbil_scheme::instances::NativeSession<'_>,
+) -> (Option<[f64; 6]>, u128) {
+    let start = std::time::Instant::now();
+    let value = session.diagnostics();
+    (value, start.elapsed().as_nanos())
+}

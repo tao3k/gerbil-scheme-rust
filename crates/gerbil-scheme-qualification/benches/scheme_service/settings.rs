@@ -15,7 +15,8 @@ fn requested(comparison: Comparison, arm: bool) -> SchemeServiceSettings {
         | Comparison::Reselection
         | Comparison::OwnerQos
         | Comparison::Resident
-        | Comparison::Pooled => (true, true),
+        | Comparison::Pooled
+        | Comparison::ObserverCost => (true, true),
         Comparison::PooledWake => (true, !arm),
     };
     SchemeServiceSettings {

@@ -1,5 +1,5 @@
 //! Finite same-owner sample; phase labels do not claim isolated CPU execution.
-use super::{GATE, corpus, workload};
+use super::{GATE, corpus, observation::Mode, workload};
 use gerbil_scheme::instances::InstancePool;
 use serde_json::{Value, json};
 use std::{sync::Arc, time::Instant};
@@ -29,6 +29,7 @@ pub(super) enum Comparison {
     Resident,
     Pooled,
     PooledWake,
+    ObserverCost,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -36,6 +37,7 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::ObserverCost => "same pooled native workload; observation off versus probe-only",
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
@@ -80,7 +82,7 @@ struct Strategy {
     class_routing: bool,
 }
 impl Strategy {
-    fn for_arm(comparison: Comparison, arm: bool, observation: bool) -> Self {
+    fn for_arm(comparison: Comparison, arm: bool, observation: Mode) -> Self {
         Self {
             short_mode: if matches!(
                 comparison,
@@ -94,6 +96,7 @@ impl Strategy {
                     | Comparison::Resident
                     | Comparison::Pooled
                     | Comparison::PooledWake
+                    | Comparison::ObserverCost
             ) && (arm
                 || matches!(
                     comparison,
@@ -106,6 +109,7 @@ impl Strategy {
                         | Comparison::Resident
                         | Comparison::Pooled
                         | Comparison::PooledWake
+                        | Comparison::ObserverCost
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -130,6 +134,7 @@ impl Strategy {
                     | Comparison::Resident
                     | Comparison::Pooled
                     | Comparison::PooledWake
+                    | Comparison::ObserverCost
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -141,8 +146,9 @@ pub(super) fn run(
     probes: usize,
     comparison: Comparison,
     arm: bool,
-    observation: bool,
+    observation: Mode,
 ) -> Value {
+    let observation = observation.paired(comparison, arm);
     let strategy = Strategy::for_arm(comparison, arm, observation);
     let asynchronous = comparison != Comparison::Service || arm;
     idle(pool);
@@ -151,11 +157,11 @@ pub(super) fn run(
     let settings = super::settings::configure(pool, comparison, arm);
     idle(pool);
     let qos = (comparison == Comparison::OwnerQos).then(|| super::native_wait::qos(pool, arm));
-    let before = observation.then(|| super::observation::snapshot(pool));
-    if observation {
-        super::native_wait::begin(pool);
-    }
-    let sampling = observation.then(super::os_sampling::Sampler::start);
+    let capture = super::observation::Capture::start(
+        pool,
+        observation,
+        comparison == Comparison::ObserverCost,
+    );
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -163,14 +169,20 @@ pub(super) fn run(
     let (rows, probe) = runtime.block_on(async {
         let bulk_router = if matches!(
             comparison,
-            Comparison::Resident | Comparison::Pooled | Comparison::PooledWake
+            Comparison::Resident
+                | Comparison::Pooled
+                | Comparison::PooledWake
+                | Comparison::ObserverCost
         ) {
             None
         } else {
             active_router.clone()
         };
         let bulk = runtime.spawn(async move {
-            if comparison == Comparison::PooledWake {
+            if matches!(
+                comparison,
+                Comparison::PooledWake | Comparison::ObserverCost
+            ) {
                 super::pooled::bulk(dispatch, bulk_inputs, released).await
             } else if comparison == Comparison::Pooled {
                 if arm {
@@ -204,7 +216,6 @@ pub(super) fn run(
         (bulk.await.unwrap(), probes.await.unwrap())
     });
     let elapsed = released.elapsed().as_nanos();
-    let points = sampling.map(super::os_sampling::Sampler::finish);
     idle(pool);
     assert!(
         router
@@ -222,17 +233,18 @@ pub(super) fn run(
         asynchronous,
         strategy,
     );
-    super::os_sampling::append(&mut value, points);
-    if observation {
-        super::native_wait::append(&mut value, pool, inputs);
-    }
-    super::observation::append(&mut value, pool, before);
+    capture.finish(
+        &mut value,
+        pool,
+        inputs,
+        probe.diagnostics.iter().flatten().count() * 3,
+    );
     if let Some(qos) = qos {
         value["owner_qos_receipts"] = qos;
         value["owner_qos_restored"] = super::native_wait::qos(pool, false);
     }
     append_policy(&mut value, pool, comparison, arm, &settings, inputs, probes);
-    if observation && comparison == Comparison::Notification && arm {
+    if observation.full() && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
     }
     value
@@ -251,7 +263,10 @@ fn router(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if matches!(comparison, Comparison::Pooled | Comparison::PooledWake) {
+        if matches!(
+            comparison,
+            Comparison::Pooled | Comparison::PooledWake | Comparison::ObserverCost
+        ) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
             || matches!(
@@ -260,6 +275,7 @@ fn router(
                     | Comparison::Resident
                     | Comparison::Pooled
                     | Comparison::PooledWake
+                    | Comparison::ObserverCost
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -296,17 +312,24 @@ fn append_policy(
                     | Comparison::Resident
                     | Comparison::Pooled
                     | Comparison::PooledWake
+                    | Comparison::ObserverCost
             )
     );
     value["owner_resident_supply"] = json!(
-        matches!(comparison, Comparison::Pooled | Comparison::PooledWake)
-            || comparison == Comparison::Resident && arm
+        matches!(
+            comparison,
+            Comparison::Pooled | Comparison::PooledWake | Comparison::ObserverCost
+        ) || comparison == Comparison::Resident && arm
     );
-    value["pool_resident_supply"] =
-        json!(comparison == Comparison::PooledWake || comparison == Comparison::Pooled && arm);
+    value["pool_resident_supply"] = json!(
+        matches!(
+            comparison,
+            Comparison::PooledWake | Comparison::ObserverCost
+        ) || comparison == Comparison::Pooled && arm
+    );
     value["producer_progress_routing"] = json!(matches!(
         comparison,
-        Comparison::Pooled | Comparison::PooledWake
+        Comparison::Pooled | Comparison::PooledWake | Comparison::ObserverCost
     ));
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
@@ -394,7 +417,7 @@ fn summarize(
     json!({"orders":count,"asynchronous":asynchronous,"short_layout":strategy.short_mode.native(),"ready_completion":strategy.ready_completion,"class_routing":strategy.class_routing,"short_service":strategy.short_mode.dedicated(),"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
         "bulk_owner_native_ns":owner_native_ns,"bulk_service_ns":service,"bulk_construct_ns":construct,
         "bulk_pending_before_projection_ns":pending,"bulk_projection_retirement_ns":projection,
-        "probe_entry":probe.entry,"probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
+        "probe_entry":probe.entry,"probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_native_snapshot_ns":probe.snapshot_ns,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
         "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"unused_owners":unused_owners,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer})
 }

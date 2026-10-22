@@ -1,5 +1,5 @@
 //! Same native order computation and projection for synchronous/asynchronous arms.
-use super::{GATE, corpus};
+use super::{GATE, corpus, observation::Mode};
 use gerbil_scheme::instances::{
     AsyncInstanceTicket, InstanceDispatcher, InstanceError, NativeRoot, NativeSession,
     NumericServiceBatch, SchemeServiceRequest, SchemeServiceRouter,
@@ -15,8 +15,8 @@ use std::{
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ShortMode {
     Batch,
-    Native(bool),
-    Dedicated(bool),
+    Native(Mode),
+    Dedicated(Mode),
 }
 impl ShortMode {
     pub(super) fn native(self) -> bool {
@@ -25,7 +25,7 @@ impl ShortMode {
     fn observed(self) -> bool {
         match self {
             Self::Batch => false,
-            Self::Native(enabled) | Self::Dedicated(enabled) => enabled,
+            Self::Native(mode) | Self::Dedicated(mode) => mode.enabled(),
         }
     }
     pub(super) fn dedicated(self) -> bool {
@@ -40,6 +40,7 @@ pub(super) struct Reply {
     pub constructed: Instant,
     pub projection: Instant,
     pub diagnostics: Option<[[f64; 6]; 3]>,
+    pub snapshot_ns: Option<[u128; 3]>,
     pub entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
 }
 pub(super) struct Orders {
@@ -49,6 +50,7 @@ pub(super) struct Orders {
     short_mode: ShortMode,
     construction_before: Option<[f64; 6]>,
     construction_after: Option<[f64; 6]>,
+    snapshot_ns: [u128; 3],
     entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
     _bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 }
@@ -69,7 +71,7 @@ impl SchemeServiceRequest for Orders {
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.entered = Some(Instant::now());
         if self.short_mode.observed() {
-            self.construction_before = session.diagnostics();
+            (self.construction_before, self.snapshot_ns[0]) = super::observation::counter(session);
         }
         let value = if self.short_mode.native() {
             assert_eq!(self.request.items.len(), 1);
@@ -80,21 +82,23 @@ impl SchemeServiceRequest for Orders {
             self.request.construct(session)?
         };
         if self.short_mode.observed() {
-            self.construction_after = session.diagnostics();
+            (self.construction_after, self.snapshot_ns[1]) = super::observation::counter(session);
         }
         self.constructed = Some(Instant::now());
         Ok(value)
     }
     fn project(
-        self,
+        mut self,
         session: &NativeSession<'_>,
         output: &NativeRoot<'_>,
     ) -> Result<Reply, InstanceError> {
         let projection = Instant::now();
         let diagnostics = if self.short_mode.observed() {
+            let (last, cost) = super::observation::counter(session);
+            self.snapshot_ns[2] = cost;
             self.construction_before
                 .zip(self.construction_after)
-                .zip(session.diagnostics())
+                .zip(last)
                 .map(|((a, b), c)| [a, b, c])
         } else {
             None
@@ -111,6 +115,7 @@ impl SchemeServiceRequest for Orders {
             constructed: self.constructed.unwrap(),
             projection,
             diagnostics,
+            snapshot_ns: self.short_mode.observed().then_some(self.snapshot_ns),
             entry: self.entry,
         })
     }
@@ -133,6 +138,7 @@ pub(super) fn orders(
             .then(|| Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default())),
         construction_before: None,
         construction_after: None,
+        snapshot_ns: [0; 3],
         _bulk_permit: bulk_permit,
     }
 }
@@ -263,6 +269,7 @@ pub(super) struct Probes {
     pub construct: Vec<u128>,
     pub post_admission: Vec<u128>,
     pub diagnostics: Vec<Option<[[f64; 6]; 3]>>,
+    pub snapshot_ns: Vec<Option<[u128; 3]>>,
     pub pending: Vec<u128>,
     pub projection: Vec<u128>,
     pub completed: Vec<Instant>,
@@ -284,6 +291,7 @@ pub(super) async fn probes(
         construct: Vec::new(),
         post_admission: Vec::new(),
         diagnostics: Vec::new(),
+        snapshot_ns: Vec::new(),
         pending: Vec::new(),
         projection: Vec::new(),
         completed: Vec::new(),
@@ -354,6 +362,7 @@ pub(super) async fn probes(
             .entry
             .push(super::entry::receipt(&reply, start, anchor.as_ref()));
         values.diagnostics.push(reply.diagnostics);
+        values.snapshot_ns.push(reply.snapshot_ns);
         values.completed.push(completed);
     }
     values

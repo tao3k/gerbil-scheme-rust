@@ -77,6 +77,9 @@ fn control(pool: &InstancePool, command: &[i64]) -> Vec<Vec<i64>> {
 pub(super) fn begin(pool: &InstancePool) {
     assert!(control(pool, &[10, 1]).iter().all(|row| row == &[0]));
 }
+pub(super) fn anchor_begin(pool: &InstancePool) {
+    assert!(control(pool, &[14]).iter().all(|row| row == &[0]));
+}
 pub(super) fn finish(pool: &InstancePool, inputs: &[Vec<i64>]) -> Value {
     let events = control(pool, &[11]);
     let mut sleeps = 0;
@@ -110,6 +113,10 @@ pub(super) fn qos(pool: &InstancePool, elevated: bool) -> Value {
 
 pub(super) fn append(value: &mut Value, pool: &InstancePool, inputs: &[Vec<i64>]) {
     value["native_wait_events"] = finish(pool, inputs);
+    append_anchors(value, pool);
+    value["native_wait_event_width"] = json!(6);
+}
+pub(super) fn append_anchors(value: &mut Value, pool: &InstancePool) {
     let anchors = control(pool, &[13]);
     assert!(
         anchors
@@ -118,5 +125,14 @@ pub(super) fn append(value: &mut Value, pool: &InstancePool, inputs: &[Vec<i64>]
     );
     value["kernel_clock_anchors"] = json!(anchors);
     value["kernel_clock_resolution_ns"] = json!(resolution());
-    value["native_wait_event_width"] = json!(6);
+}
+
+pub(super) fn append_probe_anchors(value: &mut Value, pool: &InstancePool) {
+    let rows = control(pool, &[11]);
+    assert!(
+        rows.iter().all(|row| row == &[0, 0]),
+        "probe mode enabled native wait tracing"
+    );
+    append_anchors(value, pool);
+    value["native_wait_event_count"] = json!(0);
 }

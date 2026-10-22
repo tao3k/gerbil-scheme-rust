@@ -1,6 +1,9 @@
 #+title: Dedicated offer ports and owner-side native admission
 #+options: toc:nil num:nil
 
+Follow-up: [[file:30.61-scheme-completion-handoff.org][30.61]] isolates completion handoff with identical routing in both arms.
+Historical measurements and the unattributed watchdog failure below remain valid.
+
 * Decision from the existing evidence
 
 Report [[file:30.59-revocable-offer-native-entry.org][30.59]] establishes real withdrawal before native entry, but retains CPU

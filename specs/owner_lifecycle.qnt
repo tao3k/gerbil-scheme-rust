@@ -903,6 +903,7 @@ module service_sharing {
     blocked: Set[int], gc: Set[int], paused: Set[int], age: int -> int, overtakes: int -> int,
     feedUsed: int -> int, feedMax: int,
     split: bool, eager: bool, reserved: bool, fairCpu: bool, bounded: bool,
+    completionFair: bool, harvested: Set[int],
     entryGap: bool, cpuGap: bool, resourceViolation: bool
   }
   def entries(values: List[int]): Set[int] = values.foldl(Set(), (seen, r) => seen.union(Set(r)))
@@ -911,6 +912,7 @@ module service_sharing {
   val rootedJobs = life::s.serviceRoots
   val readyJobs = life::s.serviceReady
   val completedJobs = life::s.completed
+  def canSleep(owner: int): bool = life::canPark(owner)
   var q: Shared
   action resourceInitWith(split0: bool, eager0: bool, reserved0: bool, cpu0: bool, bounded0: bool, feed0: int): bool = all {
     life::init,
@@ -920,6 +922,7 @@ module service_sharing {
       blocked: Set(), gc: Set(), paused: Set(), age: JOBS.mapBy(_ => 0), overtakes: JOBS.mapBy(_ => 0),
       feedUsed: owners.mapBy(_ => 0), feedMax: feed0,
       split: split0, eager: eager0, reserved: reserved0, fairCpu: cpu0, bounded: bounded0,
+      completionFair: false, harvested: Set(),
       entryGap: false, cpuGap: false, resourceViolation: false }
   }
   action resourceInit = resourceInitWith(false, false, false, false, false, 1)
@@ -1022,7 +1025,22 @@ module service_sharing {
     q' = { ...q, age: JOBS.mapBy(r => if (shortJobs.contains(r) and life::s.accepted.contains(r) and not(life::s.serviceReady.contains(r)) and not(life::s.completed.contains(r)))
       (if (q.age.get(r) < 4) q.age.get(r) + 1 else 4) else q.age.get(r)) }
   }
-  action project(r: int): bool = all { life::s.serviceReady.contains(r), life::complete(r), q' = q }
+  action completionPolicy = all {
+    life::s.accepted.size() == 0, life::stutter,
+    q' = { ...q, completionFair: true }
+  }
+  def harvestClass(ids: Set[int], short: bool): Set[int] = ids.filter(r => shortJobs.contains(r) == short)
+  action harvest(owner: int, ids: Set[int]): bool = all {
+    q.completionFair, ids.size() > 0, ids.subseteq(readyJobs),
+    ids.forall(r => ASSIGNED.get(r) == owner),
+    q.harvested.filter(r => ASSIGNED.get(r) == owner).size() == 0,
+    harvestClass(ids, true).size() <= 1, harvestClass(ids, false).size() <= 1,
+    life::stutter, q' = { ...q, harvested: q.harvested.union(ids) }
+  }
+  action project(r: int): bool = all {
+    life::s.serviceReady.contains(r), not(q.completionFair) or q.harvested.contains(r),
+    life::complete(r), q' = { ...q, harvested: q.harvested.exclude(Set(r)) }
+  }
   action abandon(r: int): bool = all { life::observeTimeout(r), q' = q }
   action resourceClose = all { life::close, q' = q }
   action resourceJoin = all {
@@ -1038,6 +1056,10 @@ module service_sharing {
     workers.forall(w => implies(q.jobs.get(w) != 0, ASSIGNED.get(q.jobs.get(w)) == workerOwner(w))),
     owners.forall(o => implies(q.cpu.get(o) != 0, workerOwner(q.cpu.get(o)) == o and runnable(q.cpu.get(o)))),
     q.blocked.forall(w => q.jobs.get(w) != 0), q.gc.subseteq(owners), q.paused.subseteq(owners),
+    q.harvested.subseteq(readyJobs),
+    owners.forall(o => and {
+      harvestClass(q.harvested.filter(r => ASSIGNED.get(r) == o), true).size() <= 1,
+      harvestClass(q.harvested.filter(r => ASSIGNED.get(r) == o), false).size() <= 1 }),
     q.feedMax > 0, owners.forall(o => q.feedUsed.get(o) <= q.feedMax),
     implies(q.reserved and q.fairCpu, shortJobs.forall(r => q.overtakes.get(r) <= 1)),
     implies(q.eager, not(q.entryGap)), implies(q.fairCpu, not(q.cpuGap)), not(q.resourceViolation)
@@ -1058,13 +1080,16 @@ module service_sharing {
       feedUsed: q.feedUsed.set(ASSIGNED.get(r), q.feedUsed.get(ASSIGNED.get(r)) + 1),
       resourceViolation: q.resourceViolation or not(canFeed(r)) }
   }
+  action unsafeCompletionSnapshot(ids: Set[int]): bool = all {
+    ids.subseteq(readyJobs), life::stutter, q' = { ...q, harvested: ids }
+  }
   action resourceStep = {
     nondet r = JOBS.oneOf()
     nondet w = workers.oneOf()
     nondet owner = owners.oneOf()
     any { offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
       block(w), wakeTask(w), gcStart(owner), gcFinish(owner), osPause(owner), osResume(owner), delayTick,
-      project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
+      harvest(owner, Set(r)), project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
   }
   action unsafeBoundaryStep = { nondet owner = owners.oneOf(); any { resourceStep, unsafeBoundary(owner) } }
   action unsafeCpuStep = { nondet w = workers.oneOf(); any { resourceStep, unsafeCpu(w) } }
@@ -1083,6 +1108,24 @@ module service_sharing_cases {
   action boundaryMutationStep = unsafeBoundaryStep
   action cpuMutationStep = unsafeCpuStep
   action feedMutationStep = unsafeFeedStep
+  // Two ready short graphs share one owner; harvesting is distinct from
+  // projection/root release and cannot turn a ready backlog into a sleep.
+  action completionStart = resourceInit.then(completionPolicy)
+  action completionReadyStart = completionStart
+    .then(offer(3)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
+    .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(1, 4)).then(acquireCpu(1)).then(compute(1))
+  action completionMutationStep = any { sharedStep, unsafeCompletionSnapshot(readyJobs) }
+  run completionBoundedHandoffTest = completionStart
+    .then(offer(3)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
+    .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(1, 4)).then(acquireCpu(1)).then(compute(1))
+    .then(harvest(1, Set(3))).then(abandon(4)).then(resourceClose).then(project(3))
+    .then(all { assert(rootedJobs == Set(4)), assert(readyJobs == Set(4)), assert(not(canSleep(1))), assert(resourceSafety), resourceStutter })
+    .then(harvest(1, Set(4))).then(project(4)).then(resourceJoin)
+    .then(all { assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  run completionUnboundedSnapshotMutationTest = completionStart
+    .then(offer(3)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
+    .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(1, 4)).then(acquireCpu(1)).then(compute(1))
+    .then(unsafeCompletionSnapshot(Set(3, 4))).then(all { assert(not(resourceSafety)), resourceStutter })
   run splitQueueStillBlockedAtEntryTest = resourceInit.then(policy(true, false, false, false, false, 1))
     .then(offer(1)).then(feed(1)).then(assignWorker(1, 1)).then(acquireCpu(1)).then(compute(1)).then(offer(3))
     .then(delayTick).then(delayTick).then(delayTick).then(delayTick)

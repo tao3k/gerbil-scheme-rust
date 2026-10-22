@@ -5,7 +5,7 @@
         gerbil-rs-service-take! gerbil-rs-service-wait! gerbil-rs-service-stop! gerbil-rs-service-close! make-gerbil-rs-service-endpoint)
 
 (defstruct service-job (id input value failure failed done lane short progress))
-(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing budget direct notified write-fd progress))
+(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing budget direct notified write-fd progress completion-fair))
 
 ;; Completion queues have amortized constant-time push/pop. A bounded host
 ;; turn must not repeatedly reverse every remaining completion under pressure.
@@ -62,6 +62,31 @@
     (service-fifo-push! (scheme-service-ready service) (service-job-id job)))
   (service-signal! service)
   (when (scheme-service-direct service) (service-port-notify! service)))
+(def (service-eligible? queued worker)
+  (and (pair? queued)
+       (or (= (service-job-lane (car queued)) -1)
+           (= (service-job-lane (car queued)) worker)
+           (service-eligible? (cdr queued) worker))))
+(def (service-handoff! service worker job)
+  (if (scheme-service-completion-fair service)
+    (let (handoff?
+          (service-locked service
+            (lambda ()
+              (service-finished! service job)
+              (if (or (service-eligible? (scheme-service-short-queued service) worker)
+                      (service-eligible? (scheme-service-queued service) worker))
+                #t
+                ;; No eligible successor: publish idle under the same mutex.
+                ;; Blocking receive supplies the handoff without an extra yield.
+                (begin (service-next! service worker) #f)))))
+      (and handoff?
+        (begin
+          ;; Publish completion before choosing a successor. Host retirement and
+          ;; new short input participate in the next Scheme class selection.
+          (thread-yield!)
+          (service-locked service (lambda () (service-next! service worker))))))
+    (service-locked service
+      (lambda () (service-finished! service job) (service-next! service worker)))))
 (def (service-worker service worker)
   (let receive ()
     (let (message (thread-receive))
@@ -74,14 +99,11 @@
                 (call-with-gerbil-rs-budget-context (scheme-service-budget service) (service-job-short job)
                   (lambda () (parameterize ((gerbil-rs-progress-context (service-job-progress job)))
                     ((scheme-service-handler service) worker (service-job-input job))))))))
-          (let (next
-                (service-locked service
-                  (lambda ()
-                    (service-finished! service job)
-                    (service-next! service worker))))
+          (let (next (service-handoff! service worker job))
             (if next
               (begin
-                (when (or (service-job-short job) (service-job-short next)) (thread-yield!))
+                (when (and (not (scheme-service-completion-fair service))
+                           (or (service-job-short job) (service-job-short next))) (thread-yield!))
                 (process next))
               (receive))))))))
 (def (service-watch service)
@@ -112,7 +134,7 @@
                    (lambda () (open-output-file (string-append "/dev/fd/" (number->string write-fd))))))
          (service (make-scheme-service handler limit (make-table test: eqv?) 1
                     (make-vector count) [] [] (make-service-fifo [] []) [] (make-service-fifo [] []) 0 (make-vector count #f) (make-mutex)
-                    (make-condition-variable) port output #f #f #f #f (make-gerbil-rs-budget) #f #f write-fd #f)))
+                    (make-condition-variable) port output #f #f #f #f (make-gerbil-rs-budget) #f #f write-fd #f #f)))
     ;; Construction failure joins already-created children before propagating.
     (with-catch
       (lambda (failure)
@@ -165,10 +187,16 @@
         id))))
 (def (service-ready-ids! service)
   ;; Give native green threads a turn; wake and task scheduling remain Scheme-owned.
-  (thread-yield!)
+  ;; A completed graph is already a host opportunity. Do not place a fresh
+  ;; native compute turn before its retirement; bound each class independently.
+  (unless (and (scheme-service-completion-fair service)
+               (or (not (service-fifo-empty? (scheme-service-ready service)))
+                   (not (service-fifo-empty? (scheme-service-short-ready service)))))
+    (thread-yield!))
   (service-locked service
     (lambda ()
-      (if (zero? (scheme-service-short-count service))
+      (if (and (not (scheme-service-completion-fair service))
+               (zero? (scheme-service-short-count service)))
         (list->s64vector (service-fifo-drain! (scheme-service-ready service)))
         ;; At most one short projection and one general projection per host turn.
         ;; Keeping unreturned IDs in Scheme also makes wait observe pending work.
@@ -248,6 +276,7 @@
 ;; Rooted unary command protocol: [s64 header, optional native payload].
 ;; 0=open(read-fd,write-fd,limit), 1=submit(lane, optional short-class=1), 2=take(id), 3=ready,
 ;; 4=wait(host-deadline-microseconds or zero), 7=prepare-close, 5=drain/close.
+;; ABI v7 adds 13=idle completion handoff configuration (default zero).
 ;; ABI v6 adds optional declared units, progress receipts and 12=idle progress configuration.
 ;; ABI v5 adds 11=read actual cooperative budget and native wake mode.
 ;; ABI v3 adds 8=configure cooperative units (zero disables), 9=unit counters.
@@ -272,7 +301,7 @@
            (on-open)
            (set! service (make-gerbil-rs-service handler workers (s64vector-ref header 3)
                           (s64vector-ref header 1) (s64vector-ref header 2)))
-           (s64vector 0 6 workers (s64vector-ref header 3)))
+           (s64vector 0 7 workers (s64vector-ref header 3)))
           ((1)
            (unless service (error "Scheme service not open"))
            (unless (or (= (s64vector-length header) 2)
@@ -283,6 +312,14 @@
            (s64vector (gerbil-rs-service-submit! service (vector-ref command 1) (s64vector-ref header 1)
                         (and (>= (s64vector-length header) 3) (= (s64vector-ref header 2) 1))
                         (if (= (s64vector-length header) 4) (s64vector-ref header 3) 1))))
+          ((13)
+           (unless (and service (= (s64vector-length header) 2) (not preparing)
+                        (memv (s64vector-ref header 1) '(0 1))
+                        (zero? (table-length (scheme-service-jobs service)))
+                        (gerbil-rs-budget-idle? (scheme-service-budget service)))
+             (error "completion policy requires idle service"))
+           (set! (scheme-service-completion-fair service) (= (s64vector-ref header 1) 1))
+           (s64vector (if (scheme-service-completion-fair service) 1 0)))
           ((12)
            (unless (and service (= (s64vector-length header) 2) (not preparing)
                         (= (s64vector-ref header 1) 1)

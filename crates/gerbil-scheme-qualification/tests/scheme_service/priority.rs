@@ -6,6 +6,7 @@ struct PriorityRequest {
     units: usize,
     affine: bool,
     trace: Option<std::sync::Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
+    on_project: Option<Box<dyn FnOnce() + Send>>,
 }
 impl SchemeServiceRequest for PriorityRequest {
     type Output = Vec<i64>;
@@ -34,10 +35,27 @@ impl SchemeServiceRequest for PriorityRequest {
         session: &NativeSession<'_>,
         output: &NativeRoot<'_>,
     ) -> Result<Self::Output, InstanceError> {
-        session.copy_numeric(output)
+        let result = session.copy_numeric(output)?;
+        if let Some(hook) = self.on_project {
+            hook();
+        }
+        Ok(result)
     }
 }
 pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>) {
+    use gerbil_scheme::instances::SchemeServiceCompletion;
+    for policy in [
+        SchemeServiceCompletion::Snapshot,
+        SchemeServiceCompletion::FairHandoff,
+    ] {
+        contract_policy(runtime, progress, policy);
+    }
+}
+fn contract_policy(
+    runtime: &tokio::runtime::Runtime,
+    progress: &mpsc::Sender<&'static str>,
+    policy: gerbil_scheme::instances::SchemeServiceCompletion,
+) {
     // SAFETY: same build-owned private service ABI, one persistent Scheme worker.
     let program = unsafe {
         IsolatedProgram::from_image(
@@ -59,77 +77,19 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     ));
     dispatch.observe_scheme_service_on(0).unwrap();
     configure_feed(&dispatch);
+    dispatch
+        .configure_scheme_service_completion_on(0, policy)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
     let trace = std::sync::Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default());
-    runtime.block_on(async {
-        for (units, affine) in [(2, false), (1, true)] {
-            let invalid = PriorityRequest {
-                id: 0,
-                short: true,
-                units,
-                affine,
-                trace: None,
-            };
-            assert!(matches!(
-                dispatch
-                    .submit_scheme_service_backpressured_on(0, invalid, GATE)
-                    .await,
-                Err(InstanceError::InvalidConfig(_))
-            ));
-        }
-        let mut tickets = Vec::new();
-        // First handler blocks; general requests arrive before both short requests.
-        for (id, short) in [(90, false), (2, false), (4, false), (1, true), (91, true)] {
-            tickets.push(
-                dispatch
-                    .submit_scheme_service_backpressured_on(
-                        0,
-                        PriorityRequest {
-                            id,
-                            short,
-                            units: 1,
-                            affine: false,
-                            trace: (id == 1).then(|| std::sync::Arc::clone(&trace)),
-                        },
-                        GATE,
-                    )
-                    .await
-                    .unwrap(),
-            );
-        }
-        let start = Instant::now();
-        while command(&dispatch, 0, 12)[0] < 5 {
-            assert!(
-                start.elapsed() < GATE,
-                "service did not accept queue-order fixture"
-            );
-            tokio::task::yield_now().await;
-        }
-        assert_eq!(command(&dispatch, 0, 12)[2..], [90]);
-        assert!(dispatch.configure_scheme_service_feed_on(0, 1).is_err());
-        reject_active_budget(&dispatch);
-        command(&dispatch, 0, 8);
-        for (index, ticket) in tickets.into_iter().enumerate() {
-            let result = ticket.wait_completed(GATE).await;
-            if index == 4 {
-                assert!(matches!(result, Err(InstanceError::Scheme(_))));
-            } else {
-                assert_eq!(result.unwrap().0, [[90, 2, 4, 1][index]]);
-            }
-        }
-        idle(&dispatch).await;
-        let observed = command(&dispatch, 0, 12);
-        assert_eq!(
-            observed[2..],
-            [90, 1, 2, 91, 4],
-            "bounded short/general turns must preserve each FIFO"
-        );
-        assert!(
-            observed[1] <= 2,
-            "short-active completion turn exceeded its budget"
-        );
-    });
+    runtime.block_on(order_fixture(&dispatch, &trace));
     check_observation(&dispatch);
     check_entry(&trace);
+    runtime.block_on(bulk_fixture(&dispatch, policy));
+    if policy == gerbil_scheme::instances::SchemeServiceCompletion::FairHandoff {
+        runtime.block_on(late_short_fixture(&dispatch));
+    }
     let shutdown = pool.shutdown(GATE);
     assert!(shutdown.is_clean(), "{shutdown:?}");
     assert_eq!(shutdown.joined, 1);
@@ -140,6 +100,215 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             .all(|owner| owner.roots_before_cleanup == 0 && owner.image_file_removed)
     );
     progress.send("native single-worker short/general FIFO, alternating work budget, exception and retirement contract passed").unwrap();
+}
+
+async fn order_fixture(
+    dispatch: &InstanceDispatcher,
+    trace: &std::sync::Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>,
+) {
+    for (units, affine) in [(2, false), (1, true)] {
+        let invalid = PriorityRequest {
+            id: 0,
+            short: true,
+            units,
+            affine,
+            trace: None,
+            on_project: None,
+        };
+        assert!(matches!(
+            dispatch
+                .submit_scheme_service_backpressured_on(0, invalid, GATE)
+                .await,
+            Err(InstanceError::InvalidConfig(_))
+        ));
+    }
+    let mut tickets = Vec::new();
+    // First handler blocks; general requests arrive before both short requests.
+    for (id, short) in [(90, false), (2, false), (4, false), (1, true), (91, true)] {
+        tickets.push(
+            dispatch
+                .submit_scheme_service_backpressured_on(
+                    0,
+                    PriorityRequest {
+                        id,
+                        short,
+                        units: 1,
+                        affine: false,
+                        trace: (id == 1).then(|| std::sync::Arc::clone(trace)),
+                        on_project: None,
+                    },
+                    GATE,
+                )
+                .await
+                .unwrap(),
+        );
+    }
+    let start = Instant::now();
+    while command(dispatch, 0, 12)[0] < 5 {
+        assert!(
+            start.elapsed() < GATE,
+            "service did not accept queue-order fixture"
+        );
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(command(dispatch, 0, 12)[2..], [90]);
+    assert!(dispatch.configure_scheme_service_feed_on(0, 1).is_err());
+    reject_active_budget(dispatch);
+    command(dispatch, 0, 8);
+    for (index, ticket) in tickets.into_iter().enumerate() {
+        let result = ticket.wait_completed(GATE).await;
+        if index == 4 {
+            assert!(matches!(result, Err(InstanceError::Scheme(_))));
+        } else {
+            assert_eq!(result.unwrap().0, [[90, 2, 4, 1][index]]);
+        }
+    }
+    idle(dispatch).await;
+    let observed = command(dispatch, 0, 12);
+    assert_eq!(
+        observed[2..],
+        [90, 1, 2, 91, 4],
+        "bounded short/general turns must preserve each FIFO"
+    );
+    assert!(
+        observed[1] <= 2,
+        "short-active completion turn exceeded its budget"
+    );
+}
+async fn bulk_fixture(
+    dispatch: &InstanceDispatcher,
+    policy: gerbil_scheme::instances::SchemeServiceCompletion,
+) {
+    command(dispatch, 0, 9);
+    command(dispatch, 0, 17);
+    let before = command(dispatch, 0, 12)[0];
+    let mut tickets = Vec::new();
+    for id in [90, 2, 4] {
+        tickets.push(
+            dispatch
+                .submit_scheme_service_backpressured_on(
+                    0,
+                    PriorityRequest {
+                        id,
+                        short: false,
+                        units: 1,
+                        affine: false,
+                        trace: None,
+                        on_project: None,
+                    },
+                    GATE,
+                )
+                .await
+                .unwrap(),
+        );
+    }
+    let start = Instant::now();
+    while command(dispatch, 0, 12)[0] < before + 3 {
+        assert!(start.elapsed() < GATE, "bulk handoff fixture did not enter");
+        tokio::task::yield_now().await;
+    }
+    command(dispatch, 0, 8);
+    for (ticket, id) in tickets.into_iter().zip([90, 2, 4]) {
+        assert_eq!(ticket.wait_completed(GATE).await.unwrap().0, [id]);
+    }
+    idle(dispatch).await;
+    if policy == gerbil_scheme::instances::SchemeServiceCompletion::FairHandoff {
+        assert_eq!(
+            command(dispatch, 0, 12)[1],
+            1,
+            "bulk-only harvest must retain its one-result boundary without short jobs"
+        );
+    }
+}
+
+async fn late_short_fixture(dispatch: &InstanceDispatcher) {
+    use std::{
+        future::Future,
+        task::{Context, Poll, Waker},
+    };
+    command(dispatch, 0, 9);
+    let before = command(dispatch, 0, 12)[0];
+    let (send, receive) = mpsc::channel();
+    let submit = dispatch.clone();
+    let runtime = tokio::runtime::Handle::current();
+    let hook = Box::new(move || {
+        // This fixture polls Tokio admission from the fixed native owner; it
+        // explicitly supplies the caller runtime's timer context, not a VM move.
+        let _context = runtime.enter();
+        let mut request = std::pin::pin!(submit.submit_scheme_service_backpressured_on(
+            0,
+            PriorityRequest {
+                id: 1,
+                short: true,
+                units: 1,
+                affine: false,
+                trace: None,
+                on_project: None
+            },
+            GATE
+        ));
+        let Poll::Ready(ticket) = request
+            .as_mut()
+            .poll(&mut Context::from_waker(Waker::noop()))
+        else {
+            panic!("fixture has spare native credit; short must publish without blocking");
+        };
+        send.send(ticket.unwrap()).unwrap();
+    });
+    let first = dispatch
+        .submit_scheme_service_backpressured_on(
+            0,
+            PriorityRequest {
+                id: 90,
+                short: false,
+                units: 1,
+                affine: false,
+                trace: None,
+                on_project: Some(hook),
+            },
+            GATE,
+        )
+        .await
+        .unwrap();
+    let mut bulk = Vec::new();
+    for id in [2, 4] {
+        bulk.push(
+            dispatch
+                .submit_scheme_service_backpressured_on(
+                    0,
+                    PriorityRequest {
+                        id,
+                        short: false,
+                        units: 1,
+                        affine: false,
+                        trace: None,
+                        on_project: None,
+                    },
+                    GATE,
+                )
+                .await
+                .unwrap(),
+        );
+    }
+    let start = Instant::now();
+    while command(dispatch, 0, 12)[0] < before + 3 {
+        assert!(start.elapsed() < GATE);
+        tokio::task::yield_now().await;
+    }
+    command(dispatch, 0, 8);
+    assert_eq!(first.wait_completed(GATE).await.unwrap().0, [90]);
+    let short = receive.recv_timeout(GATE).unwrap();
+    assert_eq!(short.wait_completed(GATE).await.unwrap().0, [1]);
+    for (ticket, id) in bulk.into_iter().zip([2, 4]) {
+        assert_eq!(ticket.wait_completed(GATE).await.unwrap().0, [id]);
+    }
+    idle(dispatch).await;
+    let starts = command(dispatch, 0, 12);
+    assert_eq!(
+        starts[starts.len() - 4..],
+        [90, 1, 2, 4],
+        "short admitted by completion must participate before next bulk selection"
+    );
 }
 
 fn check_observation(dispatch: &InstanceDispatcher) {
@@ -182,6 +351,16 @@ fn configure_feed(dispatch: &InstanceDispatcher) {
 }
 
 fn reject_active_budget(dispatch: &InstanceDispatcher) {
+    assert!(
+        dispatch
+            .configure_scheme_service_completion_on(
+                0,
+                gerbil_scheme::instances::SchemeServiceCompletion::FairHandoff
+            )
+            .unwrap()
+            .wait(GATE)
+            .is_err()
+    );
     assert!(
         dispatch
             .configure_scheme_service_wake_on(

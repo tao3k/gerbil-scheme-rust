@@ -27,6 +27,8 @@ mod settings;
 mod short;
 #[path = "scheme_service/stream.rs"]
 mod stream;
+#[path = "scheme_service/watchdog.rs"]
+mod watchdog;
 use gerbil_scheme::instances::{
     InstanceConfig, InstanceDispatcher, InstanceError, InstancePool, IsolatedProgram, NativeRoot,
     NativeSession, NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest,
@@ -387,32 +389,11 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
         .send("close releases application latch and drains accepted graphs")
         .unwrap();
 }
-// Bypass libtest's capture only on failure: exit(70) otherwise loses the last
-// real progress event. Passing workloads perform no additional diagnostic I/O.
-fn native_stall(last: &str) -> ! {
-    use std::io::Write;
-    let _ = writeln!(
-        std::io::stderr().lock(),
-        "SERVICE-STALL last={last} cleanup=UNVERIFIED"
-    );
-    std::process::exit(70);
-}
 #[test]
 fn scheme_owns_waits_roots_continuations_and_close() {
     let (progress, events) = mpsc::channel();
-    let watchdog = std::thread::spawn(move || {
-        let mut last = "start";
-        loop {
-            match events.recv_timeout(GATE) {
-                Ok(event) => {
-                    println!("SERVICE-PROGRESS {event}");
-                    last = event;
-                }
-                Err(mpsc::RecvTimeoutError::Disconnected) => return,
-                Err(mpsc::RecvTimeoutError::Timeout) => native_stall(last),
-            }
-        }
-    });
+    let watchdog = std::thread::spawn(move || watchdog::observe(&events));
+    progress.send("PHASE initialization controls").unwrap();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -444,7 +425,9 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     progress
         .send("Scheme service initialization failure drained")
         .unwrap();
+    progress.send("PHASE auxiliary native contracts").unwrap();
     additional_contracts(&runtime, &progress);
+    progress.send("PHASE four-owner main pool startup").unwrap();
     let mut pool = InstancePool::start_observed(&descriptor(false), config(), |_| {
         progress.send("service owner initialized").unwrap();
     })
@@ -457,6 +440,16 @@ fn scheme_owns_waits_roots_continuations_and_close() {
         dispatch.configure_scheme_service_feed_on(owner, 4).unwrap();
     }
     budget::configure(&dispatch, &progress);
+    for owner in [1, 3] {
+        dispatch
+            .configure_scheme_service_completion_on(
+                owner,
+                gerbil_scheme::instances::SchemeServiceCompletion::FairHandoff,
+            )
+            .unwrap()
+            .wait(GATE)
+            .unwrap();
+    }
     let hidden = dispatch
         .submit_native_on(0, |session| {
             let header = session.numeric_vector(&[5_i64])?;
@@ -500,6 +493,10 @@ fn scheme_owns_waits_roots_continuations_and_close() {
 }
 
 fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>) {
+    progress.send("PHASE deferred projection contract").unwrap();
     deferred::contract(runtime, progress);
+    progress
+        .send("PHASE single-worker completion contract")
+        .unwrap();
     priority::contract(runtime, progress);
 }

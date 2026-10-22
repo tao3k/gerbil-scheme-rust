@@ -52,6 +52,23 @@ pub(super) fn configure(
                 .unwrap();
         }
     }
+    if completion_fair_ab() {
+        assert!(comparison == Comparison::ProgressFair && fixed_short_selective());
+        super::measurement::idle(pool);
+        for owner in 0..4 {
+            use gerbil_scheme::instances::SchemeServiceCompletion;
+            let policy = if arm {
+                SchemeServiceCompletion::FairHandoff
+            } else {
+                SchemeServiceCompletion::Snapshot
+            };
+            pool.dispatcher()
+                .configure_scheme_service_completion_on(owner, policy)
+                .unwrap()
+                .wait(GATE)
+                .unwrap();
+        }
+    }
     let actual = read(pool);
     assert!(
         actual.iter().all(|settings| *settings == expected),
@@ -132,4 +149,9 @@ pub(super) fn progress(pool: &InstancePool, comparison: Comparison) {
 /// Isolate bulk offer ownership while keeping both short-routing arms identical.
 pub(super) fn fixed_short_selective() -> bool {
     std::env::args().any(|arg| arg == "--fixed-short-selective")
+}
+
+/// Isolate completion handoff with identical `ProgressFair` supply in both arms.
+pub(super) fn completion_fair_ab() -> bool {
+    std::env::args().any(|arg| arg == "--completion-fair-ab")
 }

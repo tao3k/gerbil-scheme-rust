@@ -249,6 +249,7 @@ fn main() {
         || s == "--retirement-refill-ab"
         || s == "--progress-fair-ab"
         || s == "--fixed-short-selective"
+        || s == "--completion-fair-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"
@@ -260,6 +261,12 @@ fn main() {
         || s == "--ingress-ab"
         || s == "--budget-ab"
         || s == "--feed-ab"));
+    assert!(
+        !settings::completion_fair_ab()
+            || (args.iter().any(|s| s == "--progress-fair-ab")
+                && settings::fixed_short_selective()),
+        "completion comparison requires identical bulk and short routing"
+    );
     let trace_once = args.iter().any(|s| s == "--trace-once");
     let observation = observation::select(&args);
     assert!(!trace_once || observation.enabled());

@@ -111,7 +111,7 @@ pub use service_history::SchemeServiceOwnerSpan;
 #[cfg(feature = "tokio-dispatch")]
 mod service_port;
 #[cfg(feature = "tokio-dispatch")]
-pub use service_port::SchemeServiceWake;
+pub use service_port::{SchemeServiceCompletion, SchemeServiceWake};
 
 #[cfg(feature = "tokio-dispatch")]
 mod service_notify;

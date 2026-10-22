@@ -140,6 +140,7 @@ fn owner_protocol_scenarios_and_controls() {
     );
     capacity_protocol(source);
     shared_protocol(source);
+    owner_completion_scenarios_and_control();
     progress_protocol(source);
 }
 fn capacity_protocol(source: &str) {
@@ -254,6 +255,51 @@ fn owner_protocol_symbolic_8() {
     symbolic("8");
 }
 
+#[test]
+#[ignore = "explicit targeted completion model gate"]
+fn owner_completion_scenarios_and_control() {
+    let source = "specs/owner_lifecycle.qnt";
+    success(&["typecheck", source]);
+    for domain in ["service_sharing_small", "service_sharing_wide"] {
+        success(&[
+            "test",
+            source,
+            "--main",
+            domain,
+            "--match",
+            "completion.*Test",
+            "--seed",
+            "1",
+        ]);
+        success(&[
+            "run",
+            source,
+            "--main",
+            domain,
+            "--init",
+            "completionStart",
+            "--step",
+            "sharedStep",
+            "--invariant",
+            "sharedSafety",
+            "--seed",
+            "42",
+            "--max-samples",
+            "1000",
+            "--max-steps",
+            "64",
+            "--verbosity",
+            "1",
+        ]);
+        mutation_counterexample(
+            source,
+            domain,
+            "completionReadyStart",
+            "completionMutationStep",
+            "sharedSafety",
+        );
+    }
+}
 fn shared_protocol(source: &str) {
     for (domain, seed) in [
         ("service_sharing_small", "1"),

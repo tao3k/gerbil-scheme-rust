@@ -88,7 +88,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=6)
+        || !matches!(initialized[1], 1..=7)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {

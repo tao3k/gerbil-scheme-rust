@@ -42,7 +42,7 @@ impl Comparison {
         self != Self::Service
     }
     fn supply_admission(self, arm: bool) -> gerbil_scheme::instances::SchemeServiceSupplyAdmission {
-        if self == Self::ProgressFair && arm {
+        if self == Self::ProgressFair && (arm || super::settings::completion_fair_ab()) {
             return gerbil_scheme::instances::SchemeServiceSupplyAdmission::ProgressFair;
         }
         if self == Self::RetirementRefill && arm {
@@ -60,6 +60,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::ProgressFair if super::settings::completion_fair_ab() => {
+                "same ProgressFair supply and Selective short routing; snapshot versus fair completion handoff"
+            }
             Self::ProgressFair => {
                 "same native progress receipts; FIFO versus residual-service joint fairness"
             }
@@ -505,6 +508,8 @@ fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Compa
             .unwrap()
             .enabled
     );
+    value["completion_fair_ab"] = json!(super::settings::completion_fair_ab());
+    value["fair_completion_handoff"] = json!(super::settings::completion_fair_ab() && arm);
     value["joint_progress_fairness"] = json!(
         comparison == Comparison::ProgressFair && arm && !super::settings::fixed_short_selective()
     );

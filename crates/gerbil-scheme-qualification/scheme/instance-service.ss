@@ -98,6 +98,7 @@
        (orders-endpoint (vector (s64vector 4 1000)))
        (s64vector (- (owner-wait-trace 1 0) start))))
     ((12) (list->s64vector (append (list single-accepted single-ready-max) (reverse single-started))))
+    ((17) (set! single-ready-max 0) (s64vector 0))
     ((10) (thread-yield!) (##gc) (s64vector orders-latch-blocked))
     (else (error "invalid service observation"))))
 (begin-foreign

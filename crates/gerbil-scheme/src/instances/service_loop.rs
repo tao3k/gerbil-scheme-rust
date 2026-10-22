@@ -122,6 +122,18 @@ struct Pump<'a> {
 }
 impl Pump<'_> {
     fn receive(&mut self, mut request: Request) -> Result<(), InstanceError> {
+        let offer = if let Work::Offer(offer) = &request.work {
+            Some(std::sync::Arc::clone(offer))
+        } else {
+            None
+        };
+        if let Some(offer) = &offer {
+            // Receipt remains retractable until the native entry fence.
+            let Some(entered) = offer.claim(self.wake).enter() else {
+                return Ok(());
+            };
+            request = entered;
+        }
         if let Some(port) = self.wake.short_pool.get() {
             port.interrupted();
         }
@@ -138,12 +150,18 @@ impl Pump<'_> {
                 self.wake,
                 super::SchemeServicePhase::Submit,
                 || {
-                    job.start(
+                    let result = job.start(
                         self.image,
                         self.input,
                         self.output,
                         self.wake.progress.enabled.load(Ordering::Acquire),
-                    )
+                    );
+                    // Source notification must not insert scheduling work between
+                    // the ownership fence and the first native constructor.
+                    if let Some(offer) = &offer {
+                        offer.wake_source();
+                    }
+                    result
                 },
             ) {
                 Ok(id) => {

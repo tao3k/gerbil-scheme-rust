@@ -248,6 +248,7 @@ fn main() {
         || s == "--selective-wake-ab"
         || s == "--retirement-refill-ab"
         || s == "--progress-fair-ab"
+        || s == "--fixed-short-selective"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"

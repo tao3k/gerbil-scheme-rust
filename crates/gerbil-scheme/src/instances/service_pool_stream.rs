@@ -61,10 +61,12 @@ impl InstanceDispatcher {
     /// snapshot, bounded by retired count and active limit. Shared short work
     /// takes priority. Each attempt is bounded; Scheme owns execution. Existing
     /// active/native limits and immediate credit publication remain unchanged.
-    /// `ProgressFair` ranks shared claims using Scheme-owned residual units and
-    /// commits at most one capacity-backed peer delivery before a local attempt.
-    /// Pending native inbox work is counted until Scheme submission. A failed
-    /// delivery retains the FIFO head and local acquisition remains runnable.
+    /// `ProgressFair` offers work to a less loaded peer only when local capacity
+    /// is exhausted. Mailbox receipt is a revocable Rust claim: a ready owner
+    /// may withdraw it and return the provisional target credits. The first
+    /// native entry fence, before input construction, fixes ownership. Cancel,
+    /// deadline and close reject unentered offers; entered Scheme work drains.
+    /// Stale mailbox notifications own no payload or credit and cannot execute.
     /// It requires explicitly enabled native progress on every configured owner;
     /// it does not use retirement refill or change native execution budgets.
     /// # Errors

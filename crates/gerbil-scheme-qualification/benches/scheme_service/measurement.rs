@@ -228,6 +228,7 @@ pub(super) fn run(
         comparison == Comparison::ObserverCost,
     );
     let deliveries_before = peer_deliveries(pool);
+    let outcomes_before = offer_outcomes(pool);
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -301,6 +302,9 @@ pub(super) fn run(
         value["owner_qos_restored"] = super::native_wait::qos(pool, false);
     }
     value["peer_inbox_deliveries"] = json!(peer_deliveries(pool) - deliveries_before);
+    let outcomes = offer_outcomes(pool);
+    value["peer_offer_withdrawals"] = json!(outcomes[0] - outcomes_before[0]);
+    value["peer_offer_entries"] = json!(outcomes[1] - outcomes_before[1]);
     append_policy(&mut value, pool, comparison, arm, &settings, inputs, probes);
     if observation.full() && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
@@ -500,7 +504,9 @@ fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Compa
             .unwrap()
             .enabled
     );
-    value["joint_progress_fairness"] = json!(comparison == Comparison::ProgressFair && arm);
+    value["joint_progress_fairness"] = json!(
+        comparison == Comparison::ProgressFair && arm && !super::settings::fixed_short_selective()
+    );
     value["short_wake_policy"] = json!(
         pool.dispatcher()
             .scheme_short_pool()
@@ -657,4 +663,13 @@ fn peer_deliveries(pool: &InstancePool) -> u64 {
                 .peer_deliveries
         })
         .sum()
+}
+
+fn offer_outcomes(pool: &InstancePool) -> [u64; 2] {
+    (0..4).fold([0, 0], |mut total, owner| {
+        let p = pool.dispatcher().scheme_service_progress_on(owner).unwrap();
+        total[0] += p.peer_withdrawals;
+        total[1] += p.peer_entries;
+        total
+    })
 }

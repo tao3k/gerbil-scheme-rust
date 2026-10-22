@@ -25,6 +25,7 @@ module owner_lifecycle {
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
     capacityArmed: Set[int], capacitySignalled: Set[int],
     shortWaiters: List[int], shortSignalled: Set[int],
+    offers: Set[int], offerEpoch: int -> int, receivedEpoch: int -> int,
     progressDone: int -> Set[int], progressYielded: Set[int], shortDebt: int -> int,
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
@@ -47,6 +48,7 @@ module owner_lifecycle {
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
     capacityArmed: Set(), capacitySignalled: Set(),
     shortWaiters: List(), shortSignalled: Set(),
+    offers: Set(), offerEpoch: JOBS.mapBy(_ => 0), receivedEpoch: JOBS.mapBy(_ => -1),
     progressDone: JOBS.mapBy(_ => Set()), progressYielded: Set(), shortDebt: Set(1, 2).mapBy(_ => 0),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
@@ -97,11 +99,11 @@ module owner_lifecycle {
     s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   action admitReserved(r: int): bool = all {
-    s.phase == "open", s.reserved.contains(r), canProducerEnter(r),
+    s.phase == "open", s.reserved.contains(r), not(s.offers.contains(r)), canProducerEnter(r),
     s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)) }
   }
   action releaseReservation(r: int): bool = all {
-    s.reserved.contains(r),
+    s.reserved.contains(r), not(s.offers.contains(r)),
     s' = { ...s, reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)) }
   }
   action configureCapacity(limit: int): bool = all {
@@ -114,7 +116,7 @@ module owner_lifecycle {
     s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   action admit(r: int): bool = all { canProducerEnter(r), admitUnchecked(r) }
-  def producerActive(owner: int): int = s.producerJobs.intersect(s.accepted).exclude(s.completed).filter(r => ownerOf(r) == owner).size()
+  def producerActive(owner: int): int = s.producerJobs.intersect(s.accepted.union(s.offers)).exclude(s.completed).filter(r => ownerOf(r) == owner).size()
   def canProducerEnter(r: int): bool = not(s.producerJobs.contains(r)) or producerActive(ownerOf(r)) < s.producerLimit
   action configureProducer(limit: int): bool = all {
     s.phase == "open", s.producers.size() == 0, limit > 0,
@@ -133,13 +135,13 @@ module owner_lifecycle {
     Set("open", "closing").contains(s.phase), s.producers.contains(owner),
     all {
       val pending = s.staged.filter(job => ownerOf(job) == owner)
-      s' = { ...s, staged: s.staged.exclude(pending), producerJobs: s.producerJobs.exclude(pending),
+      s' = { ...s, offers: s.offers.exclude(pending), staged: s.staged.exclude(pending), producerJobs: s.producerJobs.exclude(pending),
         reserved: s.reserved.exclude(pending), capacityHeld: s.capacityHeld.exclude(pending), workHeld: s.workHeld.exclude(pending) }
     }
   }
   action finishProducer(owner: int): bool = all {
     Set("open", "closing").contains(s.phase), s.producers.contains(owner),
-    s.poolStaged.size() == 0, s.producerJobs.filter(job => ownerOf(job) == owner).subseteq(s.completed),
+    s.poolStaged.size() == 0, s.offers.size() == 0, s.producerJobs.filter(job => ownerOf(job) == owner).subseteq(s.completed),
     s' = { ...s, producers: s.producers.exclude(Set(owner)),
       producerJobs: s.producerJobs.filter(job => ownerOf(job) != owner) }
   }
@@ -639,13 +641,53 @@ module owner_lifecycle {
         shortSignalled: s.shortSignalled.union(Set(chosen)), wakeOwed: s.wakeOwed.union(Set(chosen)) }
     }
   }
-  val progressSafety = and { safety, s.progressYielded.subseteq(Set(1, 2)),
+  // Offers hold provisional credits, not an accepted native job. The received
+  // epoch is a mailbox claim receipt; it cannot authorize a later incarnation.
+  action offerProgress(r: int, target: int): bool = all {
+    s.phase == "open", s.poolReady, s.poolStaged.contains(r), s.producers.contains(target),
+    s.offerEpoch.get(r) < 2, producerActive(target) < s.producerLimit,
+    s.capacityHeld.filter(j => ownerOf(j) == target).size() < s.capacityLimit,
+    workUsed(target) + units(r) <= s.workLimit,
+    s' = { ...s, offers: s.offers.union(Set(r)), offerEpoch: s.offerEpoch.set(r, s.offerEpoch.get(r) + 1),
+      selected: s.selected.set(r, target), poolStaged: s.poolStaged.exclude(Set(r)),
+      staged: s.staged.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)),
+      reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)),
+      workHeld: s.workHeld.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(target)) }
+  }
+  action receiveOffer(r: int): bool = all {
+    s.offers.contains(r), s' = { ...s, receivedEpoch: s.receivedEpoch.set(r, s.offerEpoch.get(r)) }
+  }
+  action withdrawOffer(r: int): bool = all {
+    s.offers.contains(r), not(s.accepted.contains(r)),
+    s' = { ...s, offers: s.offers.exclude(Set(r)), poolStaged: s.poolStaged.union(Set(r)),
+      staged: s.staged.exclude(Set(r)), producerJobs: s.producerJobs.exclude(Set(r)),
+      reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)) }
+  }
+  def canEnterOffer(r: int): bool = and { s.phase == "open", s.offers.contains(r),
+    s.receivedEpoch.get(r) == s.offerEpoch.get(r) }
+  // Atomic Rust entry fence precedes construction of any Scheme graph. Native
+  // roots here conservatively include the whole constructor/submit operation.
+  action enterOffer(r: int): bool = all {
+    canEnterOffer(r),
+    s' = { ...s, offers: s.offers.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)),
+      staged: s.staged.exclude(Set(r)), accepted: s.accepted.union(Set(r)),
+      committed: s.committed.set(r, ownerOf(r)), servicePending: s.servicePending.union(Set(r)),
+      serviceRoots: s.serviceRoots.union(Set(r)) }
+  }
+  action unsafeStaleOfferEntry(r: int): bool = all {
+    s.receivedEpoch.get(r) > 0, not(s.offers.contains(r)), not(s.accepted.contains(r)),
+    s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)),
+      servicePending: s.servicePending.union(Set(r)), serviceRoots: s.serviceRoots.union(Set(r)) }
+  }
+  val progressSafety = and { safety, s.offers.subseteq(s.reserved.intersect(s.staged)),
+    s.offers.intersect(s.accepted.union(s.serviceRoots)).size() == 0,
+    s.offers.forall(r => s.committed.get(r) == 0), s.progressYielded.subseteq(Set(1, 2)),
     JOBS.forall(r => s.progressDone.get(r).forall(unit => 0 <= unit and unit < units(r))),
     Set(1, 2).forall(o => residual(o) >= 0 and s.shortDebt.get(o) <= 2) }
   action progressStep = {
     nondet r = JOBS.oneOf(); nondet unit = Set(0, 1, 2, 3, 4, 5, 6, 7).oneOf()
     nondet owner = Set(1, 2).oneOf(); nondet peer = Set(1, 2).oneOf()
-    any { selectiveShortStep, reportProgress(r, unit), yieldProgress(r, owner, peer), routeProgress(r, owner, peer), claimProgressPool(r, owner), progressShortWake }
+    any { selectiveShortStep, offerProgress(r, owner), receiveOffer(r), withdrawOffer(r), enterOffer(r), reportProgress(r, unit), yieldProgress(r, owner, peer), routeProgress(r, owner, peer), claimProgressPool(r, owner), progressShortWake }
   }
   action unsafeProgressRelease(r: int): bool = all {
     s.servicePending.contains(r), s.progressDone.get(r).size() > 0,
@@ -683,6 +725,32 @@ module owner_lifecycle {
     .then(readyService(3, true)).then(complete(3)).then(readyService(1, false)).then(complete(1))
     .then(finishProducer(1)).then(finishProducer(2)).then(join)
     .then(all { assert(s.serviceRoots.size() == 0), assert(progressSafety), stutter })
+  run progressOfferWithdrawReclaimTest = init.then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(3, 2)).then(receiveOffer(3))
+    .then(all { assert(s.committed.get(3) == 0), assert(s.serviceRoots.size() == 0), assert(progressSafety), stutter })
+    .then(withdrawOffer(3)).then(offerProgress(3, 1))
+    .then(all { assert(not(canEnterOffer(3))), assert(s.receivedEpoch.get(3) != s.offerEpoch.get(3)), assert(progressSafety), stutter })
+    .then(receiveOffer(3)).then(enterOffer(3)).then(observeTimeout(3)).then(close)
+    .then(all { assert(ownerOf(3) == 1), assert(s.serviceRoots == Set(3)), assert(progressSafety), stutter })
+    .then(readyService(3, true)).then(complete(3)).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(progressSafety), stutter })
+  run progressOfferCancelTest = init.then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(3, 2)).then(receiveOffer(3)).then(cancelProducer(2))
+    .then(all { assert(not(canEnterOffer(3))), assert(s.workHeld.size() == 0), assert(s.capacityHeld.size() == 0), assert(progressSafety), stutter })
+    .then(close).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(progressSafety), stutter })
+  run progressOfferCloseBeforeEntryTest = init.then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(3, 2)).then(receiveOffer(3)).then(close)
+    .then(all { assert(not(canEnterOffer(3))), assert(progressSafety), stutter })
+    .then(withdrawOffer(3)).then(cancelPool).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.workHeld.size() == 0), assert(progressSafety), stutter })
+  run progressStaleOfferMutationTest = init.then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(3, 2)).then(receiveOffer(3)).then(withdrawOffer(3)).then(unsafeStaleOfferEntry(3))
+    .then(all { assert(not(progressSafety)), stutter })
   run progressShortPromotionTest = init.then(admit(1)).then(submitService(1))
     .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(offerShort(3))
     .then(armShort(1)).then(armShort(2)).then(progressShortWake)

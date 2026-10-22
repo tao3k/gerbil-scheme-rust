@@ -140,7 +140,11 @@ pub(super) use service_progress_fair::Fair;
 #[cfg(feature = "tokio-dispatch")]
 use service_progress_fair::{RouteTarget, StagedWork};
 #[cfg(feature = "tokio-dispatch")]
+mod service_offer;
+#[cfg(feature = "tokio-dispatch")]
 mod service_progress_route;
+#[cfg(feature = "tokio-dispatch")]
+use service_offer::Offer;
 #[cfg(feature = "tokio-dispatch")]
 use service_progress_route::assist as route_progress;
 #[cfg(feature = "tokio-dispatch")]

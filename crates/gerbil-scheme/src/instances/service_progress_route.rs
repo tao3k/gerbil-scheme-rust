@@ -9,11 +9,11 @@ use std::{
 };
 
 pub(super) fn assist(
-    source: &PoolSource,
+    source: &Arc<PoolSource>,
     owner: usize,
     units: usize,
-    accepting: &AtomicBool,
-    cancelled: &AtomicBool,
+    accepting: &Arc<AtomicBool>,
+    cancelled: &Arc<AtomicBool>,
     deadline: Instant,
 ) -> bool {
     let Some(target) = source.fair.get().and_then(|f| f.target(owner, units)) else {
@@ -35,11 +35,11 @@ fn reserve(target: &RouteTarget, units: usize) -> Option<CapacityPermit> {
     Some(permit)
 }
 fn deliver(
-    source: &PoolSource,
+    source: &Arc<PoolSource>,
     target: &RouteTarget,
-    accepting: &AtomicBool,
+    accepting: &Arc<AtomicBool>,
     permit: &mut Option<CapacityPermit>,
-    cancelled: &AtomicBool,
+    cancelled: &Arc<AtomicBool>,
     deadline: Instant,
 ) -> bool {
     // This capability was issued under the registration/close fence. A weak
@@ -74,31 +74,43 @@ fn deliver(
     if let Some(trace) = &trace {
         trace.mark(super::SchemeServiceEntryPhase::Published);
     }
-    let result = mailbox.try_send(request);
-    let sent = match result {
-        Ok(()) => {
-            target
-                .wake
-                .progress
-                .peer_deliveries
-                .fetch_add(1, Ordering::AcqRel);
-            true
-        }
-        Err(
-            std::sync::mpsc::TrySendError::Full(mut request)
-            | std::sync::mpsc::TrySendError::Disconnected(mut request),
-        ) => {
-            *permit = request.capacity.take();
-            requests.push_front(request);
-            false
-        }
+    let offer = super::Offer::new(
+        request,
+        source,
+        &target.wake,
+        Arc::clone(accepting),
+        Arc::clone(cancelled),
+        deadline,
+    );
+    let marker = super::Request {
+        started: Arc::new(AtomicBool::new(false)),
+        work: Work::Offer(Arc::clone(&offer)),
+        capacity: None,
+        work_units: units,
     };
+    let sent = mailbox.try_send(marker).is_ok();
+    if sent {
+        source
+            .offers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push_back(offer);
+        target
+            .wake
+            .progress
+            .peer_deliveries
+            .fetch_add(1, Ordering::AcqRel);
+    } else {
+        let mut request = offer.withdraw().unwrap();
+        *permit = request.capacity.take();
+        requests.push_front(request);
+    }
     let head_changed = sent && requests.front().map(|r| r.work_units) != Some(units);
     drop(requests);
     if head_changed {
         source.wake();
     }
-    // The request and all three native budgets are committed before notification.
+    // Provisional credits precede notification; the payload remains revocable.
     super::service_entry::notify(Some(Arc::clone(&target.wake)), sent, trace, short);
     sent
 }

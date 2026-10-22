@@ -146,28 +146,24 @@ impl Producer for ServiceProducer {
         if !self.requests.ready() {
             return ProducerStep::Waiting;
         }
-        // One actual remote admission per producer turn; never sacrifice a local
-        // native turn to an unacknowledged wake. Partial local waits retain FIFO.
-        if self.requests.assist(
-            self.owner,
-            units,
-            &self.accepting,
-            &self.cancelled,
-            self.deadline,
-        ) && self.requests.units() != Some(units)
-        {
-            if self.acquiring.waiting() {
-                self.acquiring.clear();
-            }
-            return ProducerStep::Progress;
-        }
         let mut context = Context::from_waker(&self.signal.0);
         let (active, capacity) =
             match self
                 .acquiring
                 .poll(&self.active, &self.capacity, units, &mut context)
             {
-                Poll::Pending => return ProducerStep::Waiting,
+                Poll::Pending => {
+                    // Offer only when this owner cannot enter now. Ready owners
+                    // pull revocable work directly instead of forwarding it back.
+                    self.requests.assist(
+                        self.owner,
+                        units,
+                        &self.accepting,
+                        &self.cancelled,
+                        self.deadline,
+                    );
+                    return ProducerStep::Waiting;
+                }
                 Poll::Ready(Err(error)) => {
                     self.reject(error);
                     return ProducerStep::Progress;

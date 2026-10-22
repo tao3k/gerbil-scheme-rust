@@ -52,6 +52,11 @@ impl SchemeServiceRequest for Blocking {
     }
 }
 pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>) {
+    for reclaim in [false, true] {
+        case(dispatch, progress, reclaim).await;
+    }
+}
+async fn case(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>, reclaim: bool) {
     idle(dispatch).await;
     for owner in [0, 1] {
         command(dispatch, owner, 9);
@@ -100,16 +105,30 @@ pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sen
     let occupied = dispatch.owner_capacity()[1].clone();
     assert_eq!(occupied.available, occupied.limit - 2);
     assert_eq!(occupied.work_available, occupied.work_limit.map(|n| n - 16));
-    // Cancellation rejects only the shared source. The queued accepted peer entry
-    // must keep its credits and execute after its actual native owner resumes.
-    stream.cancel();
-    assert_eq!(
-        dispatch
+    // The mailbox accepted only an offer. Cancellation must return its credits
+    // while the target remains blocked inside its earlier native constructor.
+    if reclaim {
+        let before = dispatch
             .scheme_service_progress_on(1)
             .unwrap()
-            .inbox_remaining,
-        8
-    );
+            .peer_withdrawals;
+        command(dispatch, 0, 8);
+        let start = Instant::now();
+        while dispatch
+            .scheme_service_progress_on(1)
+            .unwrap()
+            .peer_withdrawals
+            == before
+        {
+            assert!(
+                start.elapsed() < GATE,
+                "ready native owner did not reclaim peer offer"
+            );
+            tokio::task::yield_now().await;
+        }
+    }
+    stream.cancel();
+    refund_before_release(dispatch).await;
     release.send(()).unwrap();
     for owner in [0, 1] {
         command(dispatch, owner, 8);
@@ -122,7 +141,7 @@ pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sen
             Err(e) => panic!("peer drain: {e:?}"),
         }
     }
-    assert!(accepted >= 3);
+    assert!(accepted >= if reclaim { 4 } else { 2 });
     producer_free(dispatch, &[0, 1]).await;
     idle(dispatch).await;
     assert_eq!(
@@ -132,5 +151,24 @@ pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sen
             .inbox_remaining,
         0
     );
-    progress.send("actual peer inbox: native owner blocked, all budgets charged, cancellation drains accepted entry and clears staged hint").unwrap();
+    progress.send("revocable peer offer: blocked native owner, cancellation refunds unentered work before release; entered Scheme work drains").unwrap();
+}
+
+async fn refund_before_release(dispatch: &InstanceDispatcher) {
+    let start = Instant::now();
+    loop {
+        let p = dispatch.scheme_service_progress_on(1).unwrap();
+        let capacity = dispatch.owner_capacity()[1].clone();
+        if p.inbox_remaining == 0
+            && capacity.available == capacity.limit - 1
+            && capacity.work_available == capacity.work_limit.map(|n| n - 8)
+        {
+            break;
+        }
+        assert!(
+            start.elapsed() < GATE,
+            "unentered offer credits were not fully returned"
+        );
+        tokio::task::yield_now().await;
+    }
 }

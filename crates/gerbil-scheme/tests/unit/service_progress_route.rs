@@ -61,7 +61,7 @@ impl Fixture {
             &self.target,
             &self.dispatch.admission.accepting,
             &mut permit,
-            &AtomicBool::new(cancelled),
+            &Arc::new(AtomicBool::new(cancelled)),
             if expired {
                 Instant::now()
             } else {
@@ -121,7 +121,12 @@ fn actual_delivery_keeps_native_credits_after_inbox_hint_moves() {
     assert!(f.deliver(false, false));
     assert!(f.source.requests.lock().unwrap().is_empty());
     assert_eq!(f.target.staged.load(Ordering::Acquire), 8);
-    let mut received = f.inbox.try_recv().unwrap();
+    let marker = f.inbox.try_recv().unwrap();
+    let Work::Offer(offer) = marker.work else {
+        panic!("offer marker");
+    };
+    let mut received = offer.claim(&f.target.wake).enter().unwrap();
+    assert!(offer.claim(&f.target.wake).enter().is_none());
     let permit = received.capacity.as_mut().unwrap();
     permit.entered();
     assert_eq!(f.target.staged.load(Ordering::Acquire), 0);
@@ -162,7 +167,7 @@ fn full_or_disconnected_inbox_restores_fifo_and_all_credits() {
         &target,
         &dispatch.admission.accepting,
         &mut permit,
-        &AtomicBool::new(false),
+        &Arc::new(AtomicBool::new(false)),
         Instant::now() + Duration::from_secs(1)
     ));
     drop(permit);
@@ -193,4 +198,102 @@ fn expired_registration_mailbox_cannot_bind_a_replacement_owner() {
     assert!(f.target.mailbox.upgrade().is_none());
     assert!(!f.deliver(false, false));
     f.refunded();
+}
+
+#[test]
+fn received_claim_can_be_withdrawn_before_native_entry() {
+    let f = Fixture::new();
+    assert!(f.deliver(false, false));
+    let marker = f.inbox.try_recv().unwrap();
+    let Work::Offer(offer) = marker.work else {
+        panic!("offer marker");
+    };
+    let claim = offer.claim(&f.target.wake);
+    let mut source = crate::instances::service_stream_source::Source::Pool(Arc::clone(&f.source));
+    assert_eq!(source.units(), Some(8));
+    let request = source.take(8).unwrap();
+    assert!(
+        claim.enter().is_none(),
+        "stale claim must never execute twice"
+    );
+    assert_eq!(f.target.active.available_permits(), 3);
+    assert_eq!(f.target.capacity.slots.available_permits(), 4);
+    assert_eq!(
+        f.target.capacity.work.as_ref().unwrap().available_permits(),
+        32
+    );
+    assert_eq!(f.target.staged.load(Ordering::Acquire), 0);
+    assert!(request.capacity.is_none());
+    assert!(source.is_empty());
+}
+#[test]
+fn unentered_offers_cancel_expire_close_and_reject_without_credit_leaks() {
+    for case in 0..4 {
+        let f = Fixture::new();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let mut permit = Some(reserve(&f.target, 8).unwrap());
+        let deadline = Instant::now() + Duration::from_millis(20);
+        assert!(deliver(
+            &f.source,
+            &f.target,
+            &f.dispatch.admission.accepting,
+            &mut permit,
+            &cancelled,
+            deadline
+        ));
+        let marker = f.inbox.try_recv().unwrap();
+        let Work::Offer(offer) = marker.work else {
+            panic!("offer marker");
+        };
+        let claim = offer.claim(&f.target.wake);
+        match case {
+            0 => cancelled.store(true, Ordering::Release),
+            1 => std::thread::sleep(deadline.saturating_duration_since(Instant::now())),
+            2 => {
+                f.dispatch
+                    .admission
+                    .accepting
+                    .store(false, Ordering::Release);
+            }
+            _ => {
+                let mut source =
+                    crate::instances::service_stream_source::Source::Pool(Arc::clone(&f.source));
+                source.reject(&crate::instances::InstanceError::Cancelled);
+            }
+        }
+        assert!(claim.enter().is_none());
+        assert_eq!(f.target.active.available_permits(), 3);
+        assert_eq!(f.target.capacity.slots.available_permits(), 4);
+        assert_eq!(
+            f.target.capacity.work.as_ref().unwrap().available_permits(),
+            32
+        );
+        assert_eq!(f.target.staged.load(Ordering::Acquire), 0);
+    }
+}
+#[test]
+fn entry_and_withdrawal_have_one_payload_winner() {
+    for _ in 0..32 {
+        let f = Fixture::new();
+        assert!(f.deliver(false, false));
+        let marker = f.inbox.try_recv().unwrap();
+        let Work::Offer(offer) = marker.work else {
+            panic!("offer marker");
+        };
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let other = Arc::clone(&offer);
+        let ready = Arc::clone(&barrier);
+        let withdrawal = std::thread::spawn(move || {
+            ready.wait();
+            other.withdraw()
+        });
+        barrier.wait();
+        let entered = offer.claim(&f.target.wake).enter();
+        let withdrawn = withdrawal.join().unwrap();
+        assert_ne!(entered.is_some(), withdrawn.is_some());
+        drop((entered, withdrawn));
+        assert_eq!(f.target.active.available_permits(), 3);
+        assert_eq!(f.target.capacity.slots.available_permits(), 4);
+        assert_eq!(f.target.staged.load(Ordering::Acquire), 0);
+    }
 }

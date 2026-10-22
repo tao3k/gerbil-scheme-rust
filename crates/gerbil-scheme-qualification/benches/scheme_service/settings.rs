@@ -90,7 +90,9 @@ pub(super) fn short_pool(pool: &InstancePool, comparison: Comparison) {
 pub(super) fn short_wake(pool: &InstancePool, comparison: Comparison, arm: bool) {
     use gerbil_scheme::instances::SchemeShortWake;
     let policy = match comparison {
-        Comparison::ProgressFair if arm => SchemeShortWake::ProgressFair,
+        Comparison::ProgressFair if arm && !fixed_short_selective() => {
+            SchemeShortWake::ProgressFair
+        }
         Comparison::ProgressFair | Comparison::RetirementRefill => SchemeShortWake::Selective,
         Comparison::SelectiveWake => {
             if arm {
@@ -125,4 +127,9 @@ pub(super) fn progress(pool: &InstancePool, comparison: Comparison) {
         }
         super::measurement::idle(pool);
     }
+}
+
+/// Isolate bulk offer ownership while keeping both short-routing arms identical.
+pub(super) fn fixed_short_selective() -> bool {
+    std::env::args().any(|arg| arg == "--fixed-short-selective")
 }

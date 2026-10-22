@@ -14,8 +14,12 @@ pub struct SchemeServiceProgress {
     /// Capacity-backed peer reservations/inbox work not yet submitted to Scheme.
     /// A provisional reservation can roll back; this is not a delivery receipt.
     pub inbox_remaining: u64,
-    /// Cumulative successful capacity-backed peer inbox admissions.
+    /// Cumulative capacity-backed offer notifications, not native acceptance.
     pub peer_deliveries: u64,
+    /// Offers reclaimed by a ready owner before first native entry.
+    pub peer_withdrawals: u64,
+    /// Target claims that passed the irrevocable first-entry fence.
+    pub peer_entries: u64,
     pub bulk_remaining: u32,
     pub short_remaining: u32,
 }
@@ -26,6 +30,8 @@ pub(super) struct Progress {
     remaining: AtomicU64,
     pub queued: Arc<AtomicU64>,
     pub peer_deliveries: AtomicU64,
+    pub peer_withdrawals: AtomicU64,
+    pub peer_entries: AtomicU64,
 }
 impl Progress {
     pub(super) fn snapshot(&self) -> SchemeServiceProgress {
@@ -35,6 +41,8 @@ impl Progress {
             waiting_for_claim: self.waiting_for_claim.load(Ordering::Acquire),
             inbox_remaining: self.queued.load(Ordering::Acquire),
             peer_deliveries: self.peer_deliveries.load(Ordering::Acquire),
+            peer_withdrawals: self.peer_withdrawals.load(Ordering::Acquire),
+            peer_entries: self.peer_entries.load(Ordering::Acquire),
             bulk_remaining: u32::try_from(bits >> 32).unwrap(),
             short_remaining: u32::try_from(bits & u64::from(u32::MAX)).unwrap(),
         }

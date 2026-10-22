@@ -24,9 +24,10 @@ pub enum SchemeServiceSupplyAdmission {
     /// Experimental bounded refill after the complete result snapshot is retired.
     /// Retains `OwnerLocal` bounds; short publication takes priority over bulk.
     RetirementRefill,
-    /// Scheme-progress weighted, capacity-backed peer delivery before local claims.
-    /// Rust routes unentered work; Scheme executes only on the selected owner.
-    /// This changes neither refill order nor native resource-retirement rules.
+    /// Experimental progress-weighted offers when local capacity is exhausted.
+    /// Offers remain revocable until the owner starts native construction. Ready
+    /// owners may reclaim them; entered Scheme state never migrates. Provisional
+    /// credits are returned on withdrawal; native credits span result projection.
     ProgressFair,
 }
 type Pair = (OwnedSemaphorePermit, CapacityPermit);
@@ -52,6 +53,7 @@ impl Acquisition {
     pub(super) fn retirement_refill(&self) -> bool {
         self.mode == SchemeServiceSupplyAdmission::RetirementRefill
     }
+    #[cfg(test)]
     pub(super) fn waiting(&self) -> bool {
         self.pending.is_some()
     }

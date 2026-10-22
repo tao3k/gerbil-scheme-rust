@@ -25,7 +25,7 @@ pub(super) fn execute(image: &Image, request: Request, maximum_reply: usize) {
             let _ = response.send((value, Instant::now()));
         }
         #[cfg(feature = "tokio-dispatch")]
-        Work::Service(_) | Work::Producer(_) | Work::Wake => {
+        Work::Service(_) | Work::Offer(_) | Work::Producer(_) | Work::Wake => {
             unreachable!("control message routed before execution")
         }
     }
@@ -52,7 +52,7 @@ pub(super) fn run(image: &Image, requests: &mpsc::Receiver<Request>, maximum_rep
                         producer = Some(next);
                     }
                 }
-                Work::Service(_) => {
+                Work::Service(_) | Work::Offer(_) => {
                     unreachable!("service rejected before ordinary owner admission")
                 }
                 Work::Wake => {}

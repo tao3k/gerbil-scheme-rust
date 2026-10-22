@@ -5,6 +5,9 @@ This report retains the first failed architecture capture and the final
 per-owner mailbox-capability revision. The initial lifecycle-fence algorithm
 below is superseded by the final data-path revision; its negative evidence stays.
 
+The irrevocable-inbox contract below is historical;
+[[file:30.59-revocable-offer-native-entry.org][30.59]] refines it with revocable offers and a first-native-entry fence.
+
 * Architecture decision
 
 The previous reports show tradeoffs rather than general performance admission.

@@ -329,3 +329,7 @@ SDK GC CPU counters measure process CPU over a VM's GC intervals, including
 other host threads. They are not isolated owner/collector CPU and must not be
 summed across owners or subtracted from GC wall for attribution. Owner thread
 CPU is a separate clock. See the linked report for the verified clock sources.
+
+### Targeted algorithm and contract audit
+
+See the [routing, Scheme queue and contract audit](30-39-status/30.41-targeted-routing-and-scheme-queue-audit.org) for source-confirmed costs, admission reselection, eligible FIFO equivalence, cooperative unit semantics and directed acceptance obligations. These are candidate changes; the audit does not claim a measured performance improvement.

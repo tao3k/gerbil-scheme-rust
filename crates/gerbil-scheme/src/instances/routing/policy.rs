@@ -50,7 +50,7 @@ impl SchemeServiceRouter {
         admission: SchemeRoutingAdmission,
     ) -> Result<Self, InstanceError> {
         let capacities = validate(&dispatch, &config)?;
-        if admission == SchemeRoutingAdmission::Reselect {
+        if admission != SchemeRoutingAdmission::Pinned {
             dispatch
                 .admission
                 .capacity_changed
@@ -84,6 +84,7 @@ impl SchemeServiceRouter {
             admission,
             state: Arc::new(State {
                 changed,
+                producer_progress: admission == SchemeRoutingAdmission::ReselectProgress,
                 short_gate: Arc::new(Semaphore::new(1)),
                 batch_gate: Arc::new(Semaphore::new(1)),
                 destinations,
@@ -203,7 +204,7 @@ impl SchemeServiceRouter {
         if units == 0 || units > bound {
             return Err(InstanceError::InvalidConfig("routing class work bound"));
         }
-        if self.admission == SchemeRoutingAdmission::Reselect {
+        if self.admission != SchemeRoutingAdmission::Pinned {
             return self
                 .submit_reselected(class, message, timeout.saturating_sub(started.elapsed()))
                 .await;

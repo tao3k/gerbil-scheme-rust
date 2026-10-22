@@ -282,3 +282,24 @@ identifies the candidate. Shutdown must join all four owners, balance roots and
 remove copied files. Preserve throughput, short/batch p99, scheduled-probe,
 overlap and owner/Actor fairness negatives. See the maintained
 [protocol and evidence](../../../../docs/30-39-status/30.44-bounded-owner-resident-service.org).
+
+## Pooled resident supply
+
+`just bridge-scheme-service-benchmark --pooled-ab` compares fixed-owner resident
+supply against the public pool-source API. Both arms use the same four native VMs,
+two Tokio workers, original batch-eight Scheme workload, three active callbacks
+per owner, native short service, progress-aware short reselection, port wake,
+budget one, feed one, coalesced notification and native slot/work bounds.
+The input ceiling is 128 callbacks/1024 declared work units across the pool:
+control stages four fixed groups of 32/256; candidate stages one shared group of
+128/1024. Chunk boundaries differ: control drains each owner's group independently;
+candidate drains the shared group before re-registering. This pair measures the
+whole supply algorithm, not solely mutex or routing overhead. No default changes.
+
+`--test --pooled-ab` is a correctness smoke. Four owners need not all receive work
+in a short opportunistic sample. `unused_owners` is explicit, and any unused owner
+counts as zero in normalized minimum progress. Finish spread covers participating
+owners and must be read alongside that list. Preserve all short/scheduled/batch
+p99, overlap, owner totals and Actor fairness negatives. Phase observations are a
+separate diagnostic, never interchangeable with unobserved throughput. See
+[protocol and measured evidence](../../../../docs/30-39-status/30.45-pooled-resident-service.org).

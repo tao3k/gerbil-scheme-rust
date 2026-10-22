@@ -45,6 +45,10 @@ pub enum SchemeRoutingAdmission {
     #[default]
     Pinned,
     Reselect,
+    /// Reselect using native occupancy as well as this router's class ledger.
+    /// Includes resident producer reservations through native retirement. These
+    /// are approximate capacity observations, not predicted service durations.
+    ReselectProgress,
 }
 pub(super) struct Destination {
     pub(super) owner: usize,
@@ -65,4 +69,5 @@ pub(super) struct State {
     pub(super) ledger: Mutex<Ledger>,
     pub(super) short_slots: usize,
     pub(super) batch_slots: usize,
+    pub(super) producer_progress: bool,
 }

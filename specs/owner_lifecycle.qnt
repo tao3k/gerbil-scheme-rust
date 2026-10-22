@@ -19,6 +19,7 @@ module owner_lifecycle {
     unsafeCodeRelease: bool,
     capacityLimit: int, capacityHeld: Set[int], reserved: Set[int],
     workLimit: int, workHeld: Set[int],
+    poolStaged: Set[int], poolReady: bool, poolPremature: bool,
     producerLimit: int, producers: Set[int], staged: Set[int], producerJobs: Set[int],
     servicePending: Set[int], serviceReady: Set[int], serviceRoots: Set[int], serviceFailed: Set[int],
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
@@ -35,6 +36,7 @@ module owner_lifecycle {
     unsafeCodeRelease: false,
     capacityLimit: JOBS.size(), capacityHeld: Set(), reserved: Set(),
     workLimit: JOBS.size() + 7, workHeld: Set(),
+    poolStaged: Set(), poolReady: false, poolPremature: false,
     producerLimit: JOBS.size(), producers: Set(), staged: Set(), producerJobs: Set(),
     servicePending: Set(), serviceReady: Set(), serviceRoots: Set(), serviceFailed: Set(),
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
@@ -66,7 +68,7 @@ module owner_lifecycle {
   // Full work acquisition can precede slot acquisition. Partial semaphore
   // allocation is an implementation detail covered by native cancellation tests.
   action reserveWork(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), not(s.workHeld.contains(r)), not(s.accepted.contains(r)), hasWork(r),
+    s.phase == "open", JOBS.contains(r), not(s.poolStaged.contains(r)), not(s.workHeld.contains(r)), not(s.accepted.contains(r)), hasWork(r),
     s' = { ...s, workHeld: s.workHeld.union(Set(r)) }
   }
   action reserveSlot(r: int): bool = all {
@@ -82,7 +84,7 @@ module owner_lifecycle {
     s' = { ...s, workLimit: limit }
   }
   action reserve(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
+    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)), not(s.poolStaged.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
     s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
@@ -99,7 +101,7 @@ module owner_lifecycle {
     s' = { ...s, capacityLimit: limit }
   }
   action admitUnchecked(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
+    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)), not(s.poolStaged.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
     s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
@@ -115,7 +117,7 @@ module owner_lifecycle {
     s' = { ...s, producers: s.producers.union(Set(owner)) }
   }
   action stage(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), s.producers.contains(ownerOf(r)),
+    s.phase == "open", JOBS.contains(r), not(s.poolStaged.contains(r)), s.producers.contains(ownerOf(r)),
     not(s.accepted.contains(r)), not(s.staged.contains(r)), not(s.workHeld.contains(r)),
     s' = { ...s, staged: s.staged.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)) }
   }
@@ -129,7 +131,7 @@ module owner_lifecycle {
   }
   action finishProducer(owner: int): bool = all {
     Set("open", "closing").contains(s.phase), s.producers.contains(owner),
-    s.producerJobs.filter(job => ownerOf(job) == owner).subseteq(s.completed),
+    s.poolStaged.size() == 0, s.producerJobs.filter(job => ownerOf(job) == owner).subseteq(s.completed),
     s' = { ...s, producers: s.producers.exclude(Set(owner)),
       producerJobs: s.producerJobs.filter(job => ownerOf(job) != owner) }
   }
@@ -267,6 +269,8 @@ module owner_lifecycle {
     s.parked.forall(owner => implies(
       s.inbox.exists(r => ownerOf(r) == owner) or s.serviceReady.exists(r => ownerOf(r) == owner),
       s.notified.contains(owner) or s.wakeOwed.contains(owner))),
+    not(s.poolPremature), s.poolStaged.subseteq(JOBS), s.poolStaged.intersect(s.accepted.union(s.producerJobs).union(s.workHeld)).size() == 0,
+    implies(s.poolReady and s.poolStaged.size() > 0, s.producers == Set(1, 2)),
     s.producerLimit > 0, Set(1, 2).forall(owner => producerActive(owner) <= s.producerLimit),
     s.producers.subseteq(Set(1, 2)), s.staged.subseteq(s.producerJobs), s.producerJobs.subseteq(JOBS),
     s.producerJobs.subseteq(s.staged.union(s.accepted)), s.staged.intersect(s.accepted).size() == 0,
@@ -403,6 +407,69 @@ module owner_lifecycle {
     .then(all { assert(not(safety)), stutter })
   run foreignHandleMutationTest = init.then(admit(1)).then(complete(1)).then(publish(1))
     .then(unsafeForeignUse).then(all { assert(not(safety)), stutter })
+  // A bounded uncommitted source has no owner charge. Claim atomically selects
+  // a fixed owner only after its active/native capacities and barrier are ready.
+  // Speculative partial credits and OS wake delivery are native obligations.
+  action stagePool(r: int): bool = all {
+    s.phase == "open", not(s.poolReady), JOBS.contains(r),
+    not(s.poolStaged.union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
+    s' = { ...s, poolStaged: s.poolStaged.union(Set(r)) }
+  }
+  action enablePool = all {
+    s.phase == "open", not(s.poolReady), s.producers == Set(1, 2),
+    s' = { ...s, poolReady: true }
+  }
+  action claimPoolUnchecked(r: int, owner: int): bool = all {
+    s.phase == "open", s.poolStaged.contains(r), s.producers.contains(owner),
+    producerActive(owner) < s.producerLimit,
+    s.capacityHeld.filter(job => ownerOf(job) == owner).size() < s.capacityLimit,
+    workUsed(owner) + units(r) <= s.workLimit,
+    s' = { ...s, poolPremature: s.poolPremature or not(s.poolReady), selected: s.selected.set(r, owner), committed: s.committed.set(r, owner),
+      poolStaged: s.poolStaged.exclude(Set(r)), producerJobs: s.producerJobs.union(Set(r)),
+      accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)),
+      inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(owner)) }
+  }
+  action claimPool(r: int, owner: int): bool = all { s.poolReady, claimPoolUnchecked(r, owner) }
+  action cancelPool = all {
+    Set("open", "closing", "joined", "closed").contains(s.phase), s.poolStaged.size() > 0,
+    s' = { ...s, poolStaged: Set() }
+  }
+  action poolStep = {
+    nondet r = JOBS.oneOf()
+    nondet owner = Set(1, 2).oneOf()
+    any { streamStep, stagePool(r), enablePool, claimPool(r, owner), cancelPool }
+  }
+  action poolRegistrationMutationInit = s' = { ...initial, poolStaged: Set(3), producers: Set(1) }
+  action unsafePoolRegistrationStep = {
+    nondet r = JOBS.oneOf()
+    nondet owner = Set(1, 2).oneOf()
+    any { poolStep, claimPoolUnchecked(r, owner) }
+  }
+  run poolBarrierMutationTest = init.then(stagePool(3)).then(registerProducer(1)).then(claimPoolUnchecked(3, 1))
+    .then(all { assert(not(safety)), stutter })
+  run poolBusyOwnerBypassTest = init.then(configureCapacity(1)).then(admit(1))
+    .then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(claimPool(3, 2)).then(submitService(3))
+    .then(all { assert(ownerOf(3) == 2), assert(s.serviceRoots == Set(3)), assert(safety), stutter })
+    .then(readyService(3, false)).then(complete(3)).then(complete(1))
+    .then(finishProducer(1)).then(finishProducer(2)).then(all { assert(safety), stutter })
+  run poolCancelAcceptedDrainTest = init.then(configureProducer(1)).then(stagePool(1)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(claimPool(1, 2)).then(submitService(1))
+    .then(cancelPool).then(close)
+    .then(all { assert(s.poolStaged.size() == 0), assert(s.serviceRoots == Set(1)), assert(safety), stutter })
+    .then(readyService(1, true)).then(complete(1)).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(safety), stutter })
+  // Unregistered Rust inputs can outlive native join while their host future is
+  // unpolled. They own no native root/credit; a later failure/drop rejects them.
+  run poolUnregisteredCloseTest = init.then(stagePool(3)).then(close).then(join)
+    .then(all { assert(s.accepted.size() == 0), assert(s.serviceRoots.size() == 0), assert(safety), stutter })
+    .then(cancelPool).then(all { assert(s.poolStaged.size() == 0), assert(safety), stutter })
+  run poolPartialRegistrationCancelTest = init.then(stagePool(1)).then(registerProducer(1))
+    .then(all { assert(not(s.poolReady)), assert(s.accepted.size() == 0), assert(safety), stutter })
+    .then(cancelPool).then(finishProducer(1)).then(all { assert(s.producers.size() == 0), assert(safety), stutter })
+  run poolAcceptedMoveMutationTest = init.then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2))
+    .then(enablePool).then(claimPool(3, 2)).then(unsafeOwnerMove(3, 1))
+    .then(all { assert(not(safety)), stutter })
   action streamStep = any { step, configureProducer(1), configureProducer(2) }
   action producerMutationInit = s' = { ...initial, producerLimit: 1,
     producers: Set(1), producerJobs: Set(1, 3), staged: Set(3), accepted: Set(1),

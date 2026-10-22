@@ -1,6 +1,6 @@
 //! Existing producer pump supplies typed jobs; only Scheme schedules their execution.
 use super::{
-    InstanceDispatcher, InstanceError, Request,
+    InstanceDispatcher, InstanceError,
     batch_stream_runner::{Producer, ProducerStep, Registration},
     capacity::{Capacity, CapacityPermit, acquire_pair},
     dispatch::Admission,
@@ -9,7 +9,6 @@ use super::{
     service::{Job, JobId},
 };
 use std::{
-    collections::VecDeque,
     future::Future,
     pin::Pin,
     sync::{
@@ -35,10 +34,11 @@ pub(super) struct ServiceProducer {
     owner: usize,
     capacity: Arc<Capacity>,
     _registration: OwnedSemaphorePermit,
-    requests: VecDeque<Request>,
+    requests: super::service_stream_source::Source,
     active: Arc<Semaphore>,
     maximum: usize,
     acquiring: Option<Acquiring>,
+    acquiring_units: usize,
     deadline: Instant,
     cancelled: Arc<AtomicBool>,
     pub(super) signal: Arc<Signal>,
@@ -48,7 +48,7 @@ impl ServiceProducer {
         dispatch: &InstanceDispatcher,
         registration: Registration,
         maximum: usize,
-        requests: VecDeque<Request>,
+        requests: super::service_stream_source::Source,
         cancelled: Arc<AtomicBool>,
     ) -> Self {
         Self {
@@ -60,6 +60,7 @@ impl ServiceProducer {
             active: Arc::new(Semaphore::new(maximum)),
             maximum,
             acquiring: None,
+            acquiring_units: 0,
             deadline: registration.deadline,
             cancelled,
             signal: Arc::new(Signal(registration.waker)),
@@ -93,11 +94,7 @@ impl Producer for ServiceProducer {
     }
     fn reject(&mut self, error: InstanceError) {
         self.acquiring = None; // return both partial native and active credits first
-        for request in self.requests.drain(..) {
-            if let Work::Service(job) = request.work {
-                job.fail(error.clone());
-            }
-        }
+        self.requests.reject(&error);
     }
     fn step(&mut self, _: &Image) -> ProducerStep {
         if !self.open() {
@@ -107,17 +104,24 @@ impl Producer for ServiceProducer {
         } else if Instant::now() >= self.deadline {
             self.reject(InstanceError::Timeout);
         }
-        if self.requests.is_empty() {
+        let Some(units) = self.requests.units() else {
+            self.acquiring = None;
             return if self.active.available_permits() == self.maximum {
                 ProducerStep::Finished
             } else {
                 ProducerStep::Waiting
             };
+        };
+        if !self.requests.ready() {
+            return ProducerStep::Waiting;
+        }
+        if self.acquiring.is_some() && self.acquiring_units != units {
+            self.acquiring = None;
         }
         if self.acquiring.is_none() {
             let active = Arc::clone(&self.active);
             let capacity = Arc::clone(&self.capacity);
-            let units = self.requests.front().unwrap().work_units;
+            self.acquiring_units = units;
             self.acquiring = Some(Box::pin(async move {
                 let active = active
                     .acquire_owned()
@@ -155,7 +159,13 @@ impl Producer for ServiceProducer {
             self.reject(error);
             return ProducerStep::Progress;
         }
-        let mut request = self.requests.pop_front().unwrap();
+        let Some(mut request) = self.requests.take(self.acquiring_units) else {
+            // Another owner advanced the shared FIFO while credits were pending.
+            // Return speculative credits; never consume a differently priced job.
+            drop(capacity);
+            drop(active);
+            return ProducerStep::Progress;
+        };
         let Work::Service(job) = request.work else {
             unreachable!("typed staged service")
         };

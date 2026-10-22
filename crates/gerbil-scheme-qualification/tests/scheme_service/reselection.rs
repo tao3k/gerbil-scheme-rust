@@ -10,7 +10,10 @@ use std::{
     task::Poll,
     time::Duration,
 };
-fn router(dispatch: &InstanceDispatcher, admission: SchemeRoutingAdmission) -> SchemeServiceRouter {
+pub(super) fn router(
+    dispatch: &InstanceDispatcher,
+    admission: SchemeRoutingAdmission,
+) -> SchemeServiceRouter {
     SchemeServiceRouter::with_admission(
         dispatch.clone(),
         SchemeRoutingConfig {
@@ -24,7 +27,7 @@ fn router(dispatch: &InstanceDispatcher, admission: SchemeRoutingAdmission) -> S
     )
     .unwrap()
 }
-fn fill(
+pub(super) fn fill(
     dispatch: &InstanceDispatcher,
     owner: usize,
 ) -> (mpsc::Sender<()>, Vec<InstanceTicket<()>>) {

@@ -25,16 +25,21 @@ pub struct SchemeServiceStreamConfig {
 /// signal. Unconsumed application outputs keep their ordinary resource ownership.
 #[derive(Debug)]
 pub struct SchemeServiceStream<R> {
-    pending: VecDeque<AsyncInstanceTicket<R>>,
-    cancelled: Arc<AtomicBool>,
-    signal: Weak<super::service_stream_runner::Signal>,
+    pub(super) pending: VecDeque<AsyncInstanceTicket<R>>,
+    pub(super) cancelled: Arc<AtomicBool>,
+    pub(super) signals: Vec<Weak<super::service_stream_runner::Signal>>,
 }
 impl<R> SchemeServiceStream<R> {
     /// Reject staged work at the next admission boundary; committed entries drain.
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
-        if let Some(signal) = self.signal.upgrade() {
-            signal.wake();
+        self.wake();
+    }
+    pub(super) fn wake(&self) {
+        for signal in &self.signals {
+            if let Some(signal) = signal.upgrade() {
+                signal.wake();
+            }
         }
     }
     /// Consume one FIFO delivery with a finite observation budget.
@@ -101,7 +106,7 @@ impl InstanceDispatcher {
                 self,
                 registration,
                 config.maximum_active,
-                requests,
+                super::service_stream_source::Source::Owner(requests),
                 Arc::clone(&cancelled),
             );
             signal = Arc::downgrade(&producer.signal);
@@ -111,10 +116,10 @@ impl InstanceDispatcher {
         Ok(SchemeServiceStream {
             pending,
             cancelled,
-            signal,
+            signals: vec![signal],
         })
     }
-    fn stage_service_requests<M: SchemeServiceRequest>(
+    pub(super) fn stage_service_requests<M: SchemeServiceRequest>(
         &self,
         messages: Vec<M>,
         config: SchemeServiceStreamConfig,

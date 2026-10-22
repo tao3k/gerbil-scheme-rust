@@ -392,3 +392,33 @@ This supplies Scheme's native service without returning to Tokio for each refill
 Scheme continues to schedule its Actors and green threads. See
 [bounded supply qualification](30-39-status/30.44-bounded-owner-resident-service.org)
 for bounds, cancellation races, validation and retained performance negatives.
+
+### Pool-level independent supply and short-route progress
+
+`submit_scheme_service_pool_stream` is an explicit alternative to fixed-owner
+staging. `SchemeServicePoolStreamConfig` bounds the entire input count by the
+existing queue capacity, aggregate declared work across the pool, and accepted
+requests separately per owner. It freezes native type declarations once, rejects
+affinity, validates every destination and registers producers in sorted order.
+A registration barrier prevents partial startup from executing inputs. Dropping
+the registration future cancels staged work and releases acquired registrations.
+
+Only uncommitted Rust inputs share a FIFO. An owner obtains its active/work/slot
+credits and passes the existing lifecycle fence before claiming the next input.
+If another owner changes the FIFO's work charge, speculative credits are refunded
+before retry. Empty/head-charge transitions wake waiting producers to retire or
+reprice their reservations. Cancellation, expiry or a participating owner closing
+rejects shared uncommitted work; accepted Scheme jobs retain owner, roots and
+credits through projection. Result positions remain in input order. A completely
+consumed result handle owns only weak transport signals. Application-owned outputs
+retain their ordinary resource ownership.
+
+`SchemeRoutingAdmission::ReselectProgress` additionally observes native occupied
+request slots, including direct resident producers invisible to the router's own
+ledger. Short-class pending counts retain priority; native occupancy then breaks
+ties before the router's total/batch load. These are approximate capacity samples,
+not OS-runnable timestamps or execution-duration predictions. Class quotas remain
+per router; this does not create a globally reserved short queue. Existing routing,
+Scheme execution, wake, budget and feed defaults remain unchanged.
+
+See [pooled supply qualification](30-39-status/30.45-pooled-resident-service.org).

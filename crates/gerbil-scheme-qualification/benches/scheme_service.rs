@@ -11,6 +11,8 @@ mod measurement;
 mod native_wait;
 #[path = "scheme_service/observation.rs"]
 mod observation;
+#[path = "scheme_service/pooled.rs"]
+mod pooled;
 #[path = "scheme_service/resident.rs"]
 mod resident;
 #[path = "scheme_service/workload.rs"]
@@ -140,6 +142,7 @@ fn main() {
         || s == "--reselection-ab"
         || s == "--owner-qos-ab"
         || s == "--resident-ab"
+        || s == "--pooled-ab"
         || s == "--ingress-ab"
         || s == "--budget-ab"
         || s == "--feed-ab"));
@@ -165,6 +168,7 @@ fn main() {
                     | "--reselection-ab"
                     | "--owner-qos-ab"
                     | "--resident-ab"
+                    | "--pooled-ab"
                     | "--ingress-ab"
                     | "--budget-ab"
                     | "--feed-ab"
@@ -176,7 +180,9 @@ fn main() {
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--resident-ab") {
+    let comparison = if args.iter().any(|s| s == "--pooled-ab") {
+        Comparison::Pooled
+    } else if args.iter().any(|s| s == "--resident-ab") {
         Comparison::Resident
     } else if args.iter().any(|s| s == "--owner-qos-ab") {
         Comparison::OwnerQos

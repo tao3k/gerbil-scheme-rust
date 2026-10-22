@@ -16,7 +16,7 @@ fn config(timeout: Duration) -> SchemeServiceStreamConfig {
         timeout,
     }
 }
-struct Independent(VectorRequest);
+pub(super) struct Independent(pub(super) VectorRequest);
 impl SchemeServiceRequest for Independent {
     type Output = Vec<i64>;
     fn work_units(&self) -> usize {
@@ -60,15 +60,20 @@ async fn blocked(dispatch: &InstanceDispatcher) {
         );
         tokio::task::yield_now().await;
     }
-    let capacity = &dispatch.owner_capacity()[0];
-    assert_eq!(
-        (
+    loop {
+        let capacity = &dispatch.owner_capacity()[0];
+        if (
             capacity.available,
             capacity.work_available,
-            capacity.producer_available
-        ),
-        (2, Some(16), 0)
-    );
+            capacity.producer_available,
+        ) == (2, Some(16), 0)
+        {
+            break;
+        }
+        // command's result can be delivered before its own slot/work guard drops.
+        assert!(start.elapsed() < GATE, "observer credits did not retire");
+        tokio::task::yield_now().await;
+    }
 }
 pub(super) async fn contract(
     dispatch: &InstanceDispatcher,
@@ -78,6 +83,7 @@ pub(super) async fn contract(
     let finished = cancellation(dispatch, progress).await;
     expiry(dispatch, progress).await;
     abandonment(dispatch, progress).await;
+    super::pool_stream::contract(dispatch, progress).await;
     finished
 }
 async fn recovery(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>) {

@@ -28,7 +28,7 @@ impl Charge {
             .map(|offset| (cursor + offset) % count)
             .filter(|index| eligible.contains(index))
             .collect();
-        indices.sort_by_key(|&index| key(class, ledger.loads[index], state));
+        indices.sort_by_key(|&index| key(class, index, ledger.loads[index], state));
         indices
     }
     pub(super) fn select(
@@ -49,7 +49,7 @@ impl Charge {
         let index = (0..count)
             .map(|offset| (cursor + offset) % count)
             .filter(|index| eligible.contains(index))
-            .min_by_key(|&index| key(class, ledger.loads[index], &state))
+            .min_by_key(|&index| key(class, index, ledger.loads[index], &state))
             .ok_or(InstanceError::Closed)?;
         record(&mut ledger, class, index, units)?;
         drop(ledger);
@@ -133,17 +133,32 @@ impl<M: SchemeServiceRequest> SchemeServiceRequest for RoutedRequest<M> {
     }
 }
 
-fn key(class: Class, load: SchemeRouteLoad, state: &State) -> (usize, usize, usize, usize) {
+fn key(
+    class: Class,
+    index: usize,
+    load: SchemeRouteLoad,
+    state: &State,
+) -> (usize, usize, usize, usize, usize) {
+    let capacity = &state.destinations[index].capacity;
+    let occupied = if state.producer_progress {
+        capacity
+            .slot_limit
+            .saturating_sub(capacity.slots.available_permits())
+    } else {
+        0
+    };
     match class {
         Class::Short => (
             usize::from(load.short_requests >= state.short_slots),
             load.short_requests,
+            occupied,
             load.batch_requests.saturating_add(load.short_requests),
             load.batch_work,
         ),
         Class::Batch => (
             usize::from(load.batch_requests >= state.batch_slots),
             load.batch_work,
+            occupied,
             load.batch_requests,
             load.short_requests,
         ),

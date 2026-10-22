@@ -3,6 +3,8 @@
 mod budget;
 #[path = "../benches/support/orders.rs"]
 mod corpus;
+#[path = "scheme_service/pool_stream.rs"]
+mod pool_stream;
 #[path = "scheme_service/priority.rs"]
 mod priority;
 #[path = "scheme_service/reselection.rs"]
@@ -278,11 +280,11 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
     }
     command(&dispatch, 1, 9);
     let mut closing_stream = dispatch
-        .submit_scheme_service_stream_on(
+        .submit_scheme_service_pool_stream(
             (0..4).map(|_| batch(true)).collect(),
-            gerbil_scheme::instances::SchemeServiceStreamConfig {
-                owner: 1,
-                maximum_active: 2,
+            gerbil_scheme::instances::SchemeServicePoolStreamConfig {
+                owners: vec![1],
+                maximum_active_per_owner: 2,
                 maximum_staged_work: 32,
                 timeout: GATE,
             },

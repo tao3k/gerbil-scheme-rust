@@ -30,6 +30,7 @@ pub(super) enum Comparison {
     Reselection,
     OwnerQos,
     Resident,
+    Pooled,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -42,6 +43,9 @@ impl Comparison {
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
             Self::Reselection => {
                 "same native work/queues/quotas; pinned versus capacity-reserved owner reselection"
+            }
+            Self::Pooled => {
+                "same progress-aware short routing; fixed versus pooled bounded resident supply"
             }
             Self::Resident => {
                 "same fixed-owner service and short routing; host refill versus bounded owner-resident supply"
@@ -87,6 +91,7 @@ impl Strategy {
                     | Comparison::Reselection
                     | Comparison::OwnerQos
                     | Comparison::Resident
+                    | Comparison::Pooled
             ) && (arm
                 || matches!(
                     comparison,
@@ -97,6 +102,7 @@ impl Strategy {
                         | Comparison::Reselection
                         | Comparison::OwnerQos
                         | Comparison::Resident
+                        | Comparison::Pooled
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -119,6 +125,7 @@ impl Strategy {
                     | Comparison::Reselection
                     | Comparison::OwnerQos
                     | Comparison::Resident
+                    | Comparison::Pooled
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -153,13 +160,19 @@ pub(super) fn run(
     let dispatch = pool.dispatcher();
     let probe_dispatch = pool.dispatcher();
     let (rows, probe) = runtime.block_on(async {
-        let bulk_router = if comparison == Comparison::Resident {
+        let bulk_router = if matches!(comparison, Comparison::Resident | Comparison::Pooled) {
             None
         } else {
             active_router.clone()
         };
         let bulk = runtime.spawn(async move {
-            if comparison == Comparison::Resident && arm {
+            if comparison == Comparison::Pooled {
+                if arm {
+                    super::pooled::bulk(dispatch, bulk_inputs, released).await
+                } else {
+                    super::resident::bulk(dispatch, bulk_inputs, released).await
+                }
+            } else if comparison == Comparison::Resident && arm {
                 super::resident::bulk(dispatch, bulk_inputs, released).await
             } else {
                 workload::bulk(
@@ -233,8 +246,13 @@ fn router(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if (comparison == Comparison::Reselection && arm)
-            || matches!(comparison, Comparison::OwnerQos | Comparison::Resident)
+        if comparison == Comparison::Pooled {
+            gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
+        } else if (comparison == Comparison::Reselection && arm)
+            || matches!(
+                comparison,
+                Comparison::OwnerQos | Comparison::Resident | Comparison::Pooled
+            )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
         } else {
@@ -268,6 +286,7 @@ fn append_policy(
                     | Comparison::Reselection
                     | Comparison::OwnerQos
                     | Comparison::Resident
+                    | Comparison::Pooled
             )
         ));
         value["native_port_wake"] = json!(
@@ -278,6 +297,7 @@ fn append_policy(
                         | Comparison::Reselection
                         | Comparison::OwnerQos
                         | Comparison::Resident
+                        | Comparison::Pooled
                 )
         );
         value["independent_short_notifications"] =
@@ -291,6 +311,7 @@ fn append_policy(
                     | Comparison::Reselection
                     | Comparison::OwnerQos
                     | Comparison::Resident
+                    | Comparison::Pooled
             ),
             inputs,
             probes,
@@ -298,9 +319,15 @@ fn append_policy(
     }
     value["owner_reselection"] = json!(
         (comparison == Comparison::Reselection && arm)
-            || matches!(comparison, Comparison::OwnerQos | Comparison::Resident)
+            || matches!(
+                comparison,
+                Comparison::OwnerQos | Comparison::Resident | Comparison::Pooled
+            )
     );
-    value["owner_resident_supply"] = json!(comparison == Comparison::Resident && arm);
+    value["owner_resident_supply"] =
+        json!(comparison == Comparison::Pooled || comparison == Comparison::Resident && arm);
+    value["pool_resident_supply"] = json!(comparison == Comparison::Pooled && arm);
+    value["producer_progress_routing"] = json!(comparison == Comparison::Pooled);
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
     } else {
@@ -335,6 +362,7 @@ fn configure(pool: &InstancePool, comparison: Comparison, arm: bool) {
                     | Comparison::Reselection
                     | Comparison::OwnerQos
                     | Comparison::Resident
+                    | Comparison::Pooled
             ),
         );
         super::budget::notification(pool, comparison == Comparison::Notification && arm);
@@ -374,14 +402,16 @@ fn summarize(
         projection.push(completed.duration_since(reply.projection).as_nanos());
         clocks[reply.owner].extend([completed; 8]);
     }
-    assert!(clocks.iter().all(|c| !c.is_empty()));
+    // A shared source need not assign work to every owner in a short sample.
+    // Keep unused owners in fairness as zero, rather than filtering them out.
+    let unused_owners: Vec<_> = clocks
+        .iter()
+        .enumerate()
+        .filter_map(|(i, c)| c.is_empty().then_some(i))
+        .collect();
     let owner_totals: Vec<_> = clocks.iter().map(Vec::len).collect();
     let end = *clocks.iter().flatten().max().unwrap();
-    let first_done = *clocks
-        .iter()
-        .map(|c| c.iter().max().unwrap())
-        .min()
-        .unwrap();
+    let first_done = *clocks.iter().filter_map(|c| c.iter().max()).min().unwrap();
     let minimum = clocks
         .iter()
         .map(|c| c.iter().filter(|&&at| at <= first_done).count())
@@ -392,19 +422,19 @@ fn summarize(
         .map(|c| {
             let done = u32::try_from(c.iter().filter(|&&at| at <= first_done).count()).unwrap();
             let total = u32::try_from(c.len()).unwrap();
-            f64::from(done) / f64::from(total)
+            if total == 0 {
+                0.0
+            } else {
+                f64::from(done) / f64::from(total)
+            }
         })
         .reduce(f64::min)
         .unwrap();
+    // Finish spread covers participating owners; unused_owners remains explicit.
     let finish_spread = clocks
         .iter()
-        .map(|c| {
-            c.iter()
-                .max()
-                .unwrap()
-                .duration_since(first_done)
-                .as_nanos()
-        })
+        .filter_map(|c| c.iter().max())
+        .map(|at| at.duration_since(first_done).as_nanos())
         .max()
         .unwrap();
     let owner_native_ns: Vec<Vec<u128>> = clocks
@@ -419,7 +449,7 @@ fn summarize(
         "bulk_owner_native_ns":owner_native_ns,"bulk_service_ns":service,"bulk_construct_ns":construct,
         "bulk_pending_before_projection_ns":pending,"bulk_projection_retirement_ns":projection,
         "probe_entry":probe.entry,"probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
-        "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"owner_progress_fraction_min":progress_fraction,
+        "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"unused_owners":unused_owners,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer})
 }
 fn quantile(samples: &[Value], field: &str, percent: usize) -> u128 {

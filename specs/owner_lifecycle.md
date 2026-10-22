@@ -317,3 +317,26 @@ validated safe `producerMutationInit`. The Rust driver retains the required
 negative counterexample control. Staged generic Rust byte size, partial internal
 semaphore permits, weak FD lifetime, native errors/GC and OS latency are native
 or application obligations, not finite-model guarantees.
+
+### Pool source and registration barrier
+
+`poolStep` refines the same lifecycle/producer model. `poolStaged` contains only
+uncommitted independent Rust inputs; `enablePool` requires all participating
+registrations. `claimPool` atomically assigns one fixed owner with active/work/slot
+capacity, then uses the existing accepted/root/completion lifecycle. Finite input
+count is bounded by `JOBS`; arbitrary Rust byte sizes are not modeled. Native
+speculative semaphore acquisition, FIFO head repricing and wake delivery require
+separate native controls.
+
+An unregistered host future can retain Rust inputs after native join without
+holding native credits or Scheme roots. A later failure/drop clears those inputs;
+no claim is allowed after close. The first new sampling run rejected an overly
+strong assertion that required such application-owned inputs to disappear before
+native join. Its counterexample is retained. The corrected model includes an
+explicit unregistered-close scenario, not a new native retention assumption.
+
+Scenarios cover a busy owner's bypass, partial registration cancellation,
+accepted drain after pool cancellation, and forbidden accepted-owner migration.
+The aggregate Rust gate samples `poolStep` and requires the missing-registration-
+barrier mutation to fail from `poolRegistrationMutationInit`. This is finite safety
+evidence, not a throughput, fairness, scheduling-liveness or native-memory proof.

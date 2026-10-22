@@ -1,8 +1,12 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Opt-in cooperative units. Scheme owns all leases, waits and class decisions.
 (export gerbil-rs-budget-limit make-gerbil-rs-budget gerbil-rs-budget-configure! gerbil-rs-budget-snapshot gerbil-rs-budget-idle?
+        make-gerbil-rs-progress-ledger gerbil-rs-progress-receipt gerbil-rs-progress-for-batch
+        gerbil-rs-progress-context gerbil-rs-progress-unit! make-gerbil-rs-progress gerbil-rs-progress-finish!
         gerbil-rs-service-context call-with-gerbil-rs-budget-context
         call-with-gerbil-rs-service-unit call-with-gerbil-rs-service-suspension)
+
+(include "service-progress.ss")
 
 (defstruct budget-queue (front back))
 (defstruct service-budget (limit owner depth short bulk last streak short-debt bulk-debt stats lock event))

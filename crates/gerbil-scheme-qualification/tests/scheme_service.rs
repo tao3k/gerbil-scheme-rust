@@ -19,6 +19,8 @@ mod reselection;
 mod reselection_contract;
 #[path = "scheme_service/routing.rs"]
 mod routing;
+#[path = "scheme_service/progress.rs"]
+mod service_progress;
 #[path = "scheme_service/settings.rs"]
 mod settings;
 #[path = "scheme_service/short.rs"]
@@ -321,7 +323,7 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
     let mut local_stream = closing_supply(
         &dispatch,
         3,
-        gerbil_scheme::instances::SchemeServiceSupplyAdmission::OwnerLocal,
+        gerbil_scheme::instances::SchemeServiceSupplyAdmission::ProgressFair,
     )
     .await;
     let partial_tickets = stream::partial_wait(&dispatch).await;
@@ -465,7 +467,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
         "service lifecycle/roots must not be exposed by ordinary export lookup"
     );
     let finished_stream = runtime.block_on(async {
-        capabilities(&dispatch, &progress).await;
+        service_progress::capabilities(&dispatch, &progress).await;
         wake_and_timeout(&dispatch, &progress).await;
         short::completion_ready(&dispatch, &progress).await;
         routing::contract(&dispatch, &progress).await;

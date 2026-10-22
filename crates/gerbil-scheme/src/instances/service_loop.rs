@@ -34,7 +34,7 @@ fn control(image: &Image, header: &[i64]) -> Result<Vec<i64>, InstanceError> {
     super::native_dispatch::run_native(
         image,
         1024,
-        65536 * 8,
+        (65536 + 3) * 8,
         |session| {
             let value = service::command(session, header, None)?;
             session.copy_numeric::<i64>(&value)
@@ -88,7 +88,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=5)
+        || !matches!(initialized[1], 1..=6)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -131,14 +131,23 @@ impl Pump<'_> {
             }
         }
         request.started.store(true, Ordering::Release);
+        let units = request.work_units;
         match request.work {
             Work::Service(mut job) => match observed(
                 self.image,
                 self.wake,
                 super::SchemeServicePhase::Submit,
-                || job.start(self.image, self.input, self.output),
+                || {
+                    job.start(
+                        self.image,
+                        self.input,
+                        self.output,
+                        self.wake.progress.enabled.load(Ordering::Acquire),
+                    )
+                },
             ) {
                 Ok(id) => {
+                    self.wake.progress.charge(units, job.short_service());
                     if self.jobs.contains_key(&id) {
                         job.fail(InstanceError::InvalidConfig(
                             "duplicate Scheme service identity",
@@ -182,12 +191,13 @@ impl Pump<'_> {
             return Ok(());
         }
 
-        let completed = observed(
+        let mut completed = observed(
             self.image,
             self.wake,
             super::SchemeServicePhase::Advance,
             || control(self.image, &[3]),
         )?;
+        self.wake.progress.receipt(&mut completed)?;
         let refill = completed.len().min(
             self.producer
                 .as_ref()
@@ -311,6 +321,11 @@ impl Pump<'_> {
         let mut draining = false;
         let mut short_turn = true;
         loop {
+            if wake.progress.enabled.load(Ordering::Acquire) {
+                wake.progress
+                    .waiting_for_claim
+                    .store(false, Ordering::Release);
+            }
             if short_turn && self.claim_short()? {
                 short_turn = false;
                 continue;
@@ -450,6 +465,11 @@ pub(super) fn run(
 }
 
 fn register_short_wait(wake: &Wake) {
+    if wake.progress.enabled.load(Ordering::Acquire) {
+        wake.progress
+            .waiting_for_claim
+            .store(true, Ordering::Release);
+    }
     if let Some(port) = wake.short_pool.get() {
         port.arm_wait();
     }

@@ -4,7 +4,7 @@
 (export make-gerbil-rs-actor-batch gerbil-rs-actor-batch! gerbil-rs-actor-batch-close!)
 
 (defstruct actor-batch (workers busy closed))
-(defstruct actor-turn (reply input output quantum width context))
+(defstruct actor-turn (reply input output quantum width context progress))
 
 (def (actor-turn-run! handler worker turn)
   (let loop ((index worker) (done 0) (ok #t))
@@ -15,6 +15,9 @@
                 (vector-set! (actor-turn-output turn) index
                   (handler worker (vector-ref (actor-turn-input turn) index)))
                 #t)))
+        (when (actor-turn-progress turn)
+          (parameterize ((gerbil-rs-progress-context (actor-turn-progress turn)))
+            (gerbil-rs-progress-unit! index)))
         (when (and (positive? (actor-turn-quantum turn))
                    (< (+ index (actor-turn-width turn)) (vector-length (actor-turn-input turn)))
                    (zero? (modulo (1+ done) (actor-turn-quantum turn))))
@@ -43,7 +46,7 @@
   (let* ((workers (actor-batch-workers service)) (count (vector-length workers))
          (active (min count (vector-length input)))
          (output (make-vector (vector-length input)))
-         (turn (make-actor-turn (current-thread) input output quantum count (gerbil-rs-service-context))))
+         (turn (make-actor-turn (current-thread) input output quantum count (gerbil-rs-service-context) (gerbil-rs-progress-for-batch (vector-length input)))))
     ;; Empty actors have no work and do not participate in this turn's barrier.
     (let loop ((worker 0))
       (when (< worker active)

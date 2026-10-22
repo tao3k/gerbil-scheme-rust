@@ -61,6 +61,10 @@ impl InstanceDispatcher {
     /// snapshot, bounded by retired count and active limit. Shared short work
     /// takes priority. Each attempt is bounded; Scheme owns execution. Existing
     /// active/native limits and immediate credit publication remain unchanged.
+    /// `ProgressFair` ranks shared claims using Scheme-owned residual units and
+    /// permits only one peer-opportunity deferral before a claim remains runnable.
+    /// It requires explicitly enabled native progress on every configured owner;
+    /// it does not use retirement refill or change native execution budgets.
     /// # Errors
     /// The same validation, registration, expiry and close errors as ordinary supply.
     pub async fn submit_scheme_service_pool_stream_with_admission<M: SchemeServiceRequest>(
@@ -69,8 +73,17 @@ impl InstanceDispatcher {
         mut config: SchemeServicePoolStreamConfig,
         mode: SchemeServiceSupplyAdmission,
     ) -> Result<SchemeServiceStream<M::Output>, InstanceError> {
+        if mode == SchemeServiceSupplyAdmission::ProgressFair {
+            self.require_progress_owners(&config.owners)?;
+        }
         let (source, mut stream, capacities, deadline) =
             self.prepare_pool(messages, &mut config)?;
+        if mode == SchemeServiceSupplyAdmission::ProgressFair {
+            source
+                .fair
+                .set(super::Fair::default())
+                .map_err(|_| InstanceError::InvalidConfig("duplicate progress source"))?;
+        }
         for (owner, capacity) in config.owners.into_iter().zip(capacities) {
             self.register_producer(owner, capacity, deadline, |registration| {
                 let producer = ServiceProducer::new(

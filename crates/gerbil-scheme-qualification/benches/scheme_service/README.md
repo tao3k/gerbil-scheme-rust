@@ -671,3 +671,19 @@ An earlier candidate interleaved construction between completed projections;
 its separately frozen negative capture is retained in report 30.55. It is not
 this algorithm. This pair does not change thread counts or claim an OS time slice,
 a GC CPU attribution, equal bulk assignment, or a bound on arbitrary callbacks.
+
+## Scheme progress and joint residual-service fairness
+
+```text
+just bridge-scheme-service-benchmark --progress-fair-ab
+```
+
+This pair enables identical ABI-v6 native progress receipts in both arms. The
+control uses `OwnerLocal` supply and FIFO `Selective` short wake; the candidate
+uses `ProgressFair` for both. Refill order, four live VMs, O2 work and execution
+budgets remain identical. Units are reported inside Scheme and piggyback on the
+existing native completion receipt; no profiler or per-unit Rust callback is
+used. Progress cannot release native work/slot/active/root credits. See report
+30.56 for the one-opportunity bulk rule, short promotion threshold, exact evidence
+boundary and retained negative results. This is a joint policy comparison, not
+independent component attribution or an instrumentation-overhead comparison.

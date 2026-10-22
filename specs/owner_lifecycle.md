@@ -389,3 +389,30 @@ drain. The first ordering is a measured negative performance candidate, despite
 its valid safety scenario. The runtime uses the second only under the explicit
 `RetirementRefill` supply policy. The aggregate model test discovers both runs.
 No scheduler, fairness theorem, native GC proof or performance claim is added.
+
+## Native progress and residual-service fairness
+
+The same lifecycle state now retains stable per-job `progressDone` identities,
+`progressYielded` owner opportunities and short-waiter promotion debt. These are
+advisory service metadata; the original capacity/root conservation remains
+unchanged. `progressReceiptKeepsCreditTest` repeats a native unit without freeing
+its eight-unit charge, then checks timeout/exception/close. The peer scenario
+allows the original claimant to continue after one opportunity even when its
+peer never runs. Short selection promotes an old eligible waiter after two
+bypasses, and wake duties still do not bind actual claim ownership.
+
+`progressStep`/`progressSafety` run 1,000 bounded traces under the aggregate gate;
+`unsafeProgressReleaseStep` must yield an invariant violation, not a parser/tool
+failure. The small and wide domains retain two owners. This safety refinement
+neither proves arbitrary-owner latency bounds nor models OS scheduling, native
+progress staleness, GC implementation or the packed-atomic Rust cache. Native
+partial-Actor, continuation/GC, type, exception and lifecycle checks remain
+independent gates. See report 30.56 and `--progress-fair-ab` for measured behavior.
+
+The final bulk peer eligibility also requires `parked`, the protocol wait
+boundary, corresponding to `waiting_for_claim` in the host. Free credits on a
+peer inside an arbitrary callback cannot force a deferral. The focused
+`owner_progress_scenarios_and_control` gate checks this case alongside the five
+progress scenarios in both domains, bounded progress traces and the unchanged
+premature-credit mutation control. This models a wait declaration, not kernel
+blocked/runnable status or a bound on Scheme execution inside native wait.

@@ -5,9 +5,11 @@ mod admission;
 mod claim;
 #[path = "notification.rs"]
 mod notification;
+#[path = "progress.rs"]
+mod progress;
 use crate::instances::{Admission, Capacity, InstanceError, Request, service_wake::Wake};
 use std::{
-    collections::{BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::{
         Arc, Mutex, Weak,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -30,12 +32,16 @@ pub enum SchemeShortWake {
     Broadcast,
     /// FIFO wait registration and bounded, nonexclusive wake obligations.
     Selective,
+    /// Native residual-service ranking; promote after two eligible bypasses.
+    /// Wake duties remain nonexclusive and never reserve work for a sleeper.
+    ProgressFair,
 }
 #[derive(Debug, Default)]
 pub(super) struct Queue {
     requests: VecDeque<Queued>,
     waiters: VecDeque<usize>,
     notified: BTreeSet<usize>,
+    bypass: BTreeMap<usize, u8>,
 }
 /// Owner binding occurs when a running owner claims a request, before construct.
 /// This queue accepts only stateless, one-unit Scheme short-service requests.
@@ -71,6 +77,7 @@ pub(crate) struct Source {
     destinations: Vec<Destination>,
     queue: Mutex<Queue>,
     selective: AtomicBool,
+    progress: AtomicBool,
     pending_limit: usize,
     pending: Arc<Semaphore>,
     length: AtomicUsize,
@@ -130,6 +137,7 @@ impl Source {
             self.length.store(0, Ordering::Release);
             queue.waiters.clear();
             queue.notified.clear();
+            queue.bypass.clear();
             for target in &self.destinations {
                 target.waiting.store(false, Ordering::Release);
             }

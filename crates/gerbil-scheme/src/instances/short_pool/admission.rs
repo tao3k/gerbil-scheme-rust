@@ -81,6 +81,7 @@ impl InstanceDispatcher {
             destinations,
             queue: std::sync::Mutex::new(Queue::default()),
             selective: AtomicBool::new(false),
+            progress: AtomicBool::new(false),
             pending_limit: config.maximum_pending,
             pending: Arc::new(Semaphore::new(config.maximum_pending)),
             length: AtomicUsize::new(0),

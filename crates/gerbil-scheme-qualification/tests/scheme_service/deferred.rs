@@ -192,6 +192,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     for policy in [
         gerbil_scheme::instances::SchemeShortWake::Broadcast,
         gerbil_scheme::instances::SchemeShortWake::Selective,
+        gerbil_scheme::instances::SchemeShortWake::ProgressFair,
     ] {
         policy_contract(runtime, progress, policy);
     }
@@ -207,6 +208,9 @@ fn policy_contract(
     .unwrap();
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
+    if policy == gerbil_scheme::instances::SchemeShortWake::ProgressFair {
+        runtime.block_on(super::service_progress::enable(&dispatch));
+    }
     let supply = dispatch
         .configure_scheme_short_pool(SchemeShortPoolConfig {
             owners: vec![3, 1, 0, 2],

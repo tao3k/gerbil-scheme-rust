@@ -174,6 +174,19 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if maximum_work.is_none()
+            && senders.owners.iter().any(|o| {
+                o.wake.as_ref().is_some_and(|w| {
+                    w.progress
+                        .enabled
+                        .load(std::sync::atomic::Ordering::Acquire)
+                })
+            })
+        {
+            return Err(InstanceError::InvalidConfig(
+                "native progress requires a bounded work ledger",
+            ));
+        }
         if self.admission.short_pool.get().is_some() {
             return Err(InstanceError::InvalidConfig(
                 "short pool freezes native budgets",

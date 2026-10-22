@@ -6,7 +6,9 @@ impl SchemeShortPool {
     /// Read the actual host notification policy without entering Scheme.
     #[must_use]
     pub fn wake_policy(&self) -> SchemeShortWake {
-        if self.source.selective.load(Ordering::Acquire) {
+        if self.source.progress.load(Ordering::Acquire) {
+            SchemeShortWake::ProgressFair
+        } else if self.source.selective.load(Ordering::Acquire) {
             SchemeShortWake::Selective
         } else {
             SchemeShortWake::Broadcast
@@ -19,6 +21,9 @@ impl SchemeShortPool {
     /// # Errors
     /// Rejects closed admission, queued/unpublished inputs or outstanding credits.
     pub fn configure_wake(&self, policy: SchemeShortWake) -> Result<(), InstanceError> {
+        self.configure_idle_policy(policy)
+    }
+    fn configure_idle_policy(&self, policy: SchemeShortWake) -> Result<(), InstanceError> {
         let admission = self
             .source
             .admission
@@ -50,6 +55,18 @@ impl SchemeShortPool {
                 "short wake policy requires idle budgets",
             ));
         }
+        if policy == SchemeShortWake::ProgressFair
+            && self.source.destinations.iter().any(|d| {
+                d.wake
+                    .upgrade()
+                    .is_none_or(|w| !w.progress.enabled.load(Ordering::Acquire))
+            })
+        {
+            return Err(InstanceError::InvalidConfig(
+                "progress wake requires native progress receipts",
+            ));
+        }
+        queue.bypass.clear();
         queue.waiters.clear();
         queue.notified.clear();
         for target in &self.source.destinations {
@@ -57,7 +74,10 @@ impl SchemeShortPool {
         }
         self.source
             .selective
-            .store(policy == SchemeShortWake::Selective, Ordering::Release);
+            .store(policy != SchemeShortWake::Broadcast, Ordering::Release);
+        self.source
+            .progress
+            .store(policy == SchemeShortWake::ProgressFair, Ordering::Release);
         drop(queue);
         drop(senders);
         // Owners may still be asleep under the previous policy with no selective
@@ -81,32 +101,7 @@ impl Source {
             if self.pending.is_closed() {
                 Vec::new()
             } else {
-                let super::Queue {
-                    waiters, notified, ..
-                } = &mut *queue;
-                let targets = waiters
-                    .iter()
-                    .filter_map(|index| {
-                        let target = &self.destinations[*index];
-                        if target.capacity.slots.is_closed()
-                            || target.capacity.work.as_ref().is_some_and(|w| w.is_closed())
-                            || target.active.available_permits() == 0
-                            || target.capacity.slots.available_permits() == 0
-                            || target
-                                .capacity
-                                .work
-                                .as_ref()
-                                .is_some_and(|w| w.available_permits() == 0)
-                        {
-                            return None;
-                        }
-                        notified.insert(*index);
-                        Some(target.wake.clone())
-                    })
-                    .take(available)
-                    .collect::<Vec<_>>();
-                waiters.retain(|index| !notified.contains(index));
-                targets
+                self.select_targets(&mut queue, available)
             }
         };
         for target in targets {
@@ -138,6 +133,7 @@ impl Source {
         for index in dead {
             queue.waiters.retain(|i| *i != index);
             queue.notified.remove(&index);
+            queue.bypass.remove(&index);
             self.destinations[index]
                 .waiting
                 .store(false, Ordering::Release);
@@ -195,6 +191,7 @@ impl Port {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         queue.waiters.retain(|i| *i != index);
         queue.notified.remove(&index);
+        queue.bypass.remove(&index);
         true
     }
     pub(crate) fn interrupted(&self) {

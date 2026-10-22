@@ -60,6 +60,7 @@ impl Fixture {
             destinations,
             queue: Mutex::new(Queue::default()),
             selective: AtomicBool::new(true),
+            progress: AtomicBool::new(false),
             pending_limit: 4,
             pending: Arc::new(Semaphore::new(4)),
             length: AtomicUsize::new(0),
@@ -232,4 +233,30 @@ fn visible_payload_can_be_claimed_without_a_pipe_round_trip() {
     f.port(0).arm_wait();
     assert_eq!(f.source.length.load(Ordering::Acquire), 0);
     assert!(f.source.queue.lock().unwrap().notified.is_empty());
+}
+
+#[test]
+fn progress_ranking_promotes_an_eligible_oldest_waiter() {
+    let f = Fixture::new();
+    f.source.progress.store(true, Ordering::Release);
+    for (i, w) in f.wakes.iter().enumerate() {
+        w.progress.enabled.store(true, Ordering::Release);
+        if i == 0 {
+            w.progress.charge(24, false);
+        }
+    }
+    // The old expensive owner must be promoted after two lower-service grants.
+    for owner in [0, 1, 2] {
+        f.port(owner).arm_wait();
+    }
+    for (id, expected) in [(0, 1), (1, 2), (2, 0)] {
+        let assigned = f.offer(id);
+        assert!(f.source.queue.lock().unwrap().notified.contains(&expected));
+        let request = f.port(expected).claim().unwrap();
+        assert_eq!(assigned.blocking_recv().unwrap().unwrap(), expected);
+        drop(request);
+        if id < 2 {
+            f.port(expected).arm_wait();
+        }
+    }
 }

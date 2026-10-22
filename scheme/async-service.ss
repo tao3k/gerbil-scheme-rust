@@ -4,8 +4,8 @@
 (export make-gerbil-rs-service gerbil-rs-service-submit! gerbil-rs-service-ready!
         gerbil-rs-service-take! gerbil-rs-service-wait! gerbil-rs-service-stop! gerbil-rs-service-close! make-gerbil-rs-service-endpoint)
 
-(defstruct service-job (id input value failure failed done lane short))
-(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing budget direct notified write-fd))
+(defstruct service-job (id input value failure failed done lane short progress))
+(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing budget direct notified write-fd progress))
 
 ;; Completion queues have amortized constant-time push/pop. A bounded host
 ;; turn must not repeatedly reverse every remaining completion under pressure.
@@ -54,6 +54,7 @@
       (begin (vector-set! (scheme-service-turns service) worker (service-job-short job)) job)
       (begin (set! (scheme-service-idle service) (cons worker (scheme-service-idle service))) #f))))
 (def (service-finished! service job)
+  (gerbil-rs-progress-finish! (service-job-progress job))
   (set! (service-job-input job) #f)
   (set! (service-job-done job) #t)
   (if (service-job-short job)
@@ -71,7 +72,8 @@
             (lambda ()
               (set! (service-job-value job)
                 (call-with-gerbil-rs-budget-context (scheme-service-budget service) (service-job-short job)
-                  (lambda () ((scheme-service-handler service) worker (service-job-input job)))))))
+                  (lambda () (parameterize ((gerbil-rs-progress-context (service-job-progress job)))
+                    ((scheme-service-handler service) worker (service-job-input job))))))))
           (let (next
                 (service-locked service
                   (lambda ()
@@ -110,7 +112,7 @@
                    (lambda () (open-output-file (string-append "/dev/fd/" (number->string write-fd))))))
          (service (make-scheme-service handler limit (make-table test: eqv?) 1
                     (make-vector count) [] [] (make-service-fifo [] []) [] (make-service-fifo [] []) 0 (make-vector count #f) (make-mutex)
-                    (make-condition-variable) port output #f #f #f #f (make-gerbil-rs-budget) #f #f write-fd)))
+                    (make-condition-variable) port output #f #f #f #f (make-gerbil-rs-budget) #f #f write-fd #f)))
     ;; Construction failure joins already-created children before propagating.
     (with-catch
       (lambda (failure)
@@ -133,7 +135,7 @@
             (loop (1+ worker))))
         (set! (scheme-service-watcher service) (spawn (lambda () (service-watch service))))
         service))))
-(def (gerbil-rs-service-submit! service input lane (short? #f))
+(def (gerbil-rs-service-submit! service input lane (short? #f) (units 1))
   (service-locked service
     (lambda ()
       (when (or (scheme-service-closing service) (scheme-service-broken service))
@@ -143,7 +145,9 @@
       (when (and short? (not (= lane -1))) (error "short service cannot move an affine Actor"))
       (when (>= (table-length (scheme-service-jobs service)) (scheme-service-limit service))
         (error "Scheme service capacity"))
-      (let* ((id (scheme-service-next service)) (job (make-service-job id input #f #f #f #f lane short?))
+      (let* ((id (scheme-service-next service)) (job (make-service-job id input #f #f #f #f lane short?
+                 (and (scheme-service-progress service)
+                      (make-gerbil-rs-progress (scheme-service-progress service) short? units))))
              (idle (scheme-service-idle service))
              (target (if (= lane -1) (and (pair? idle) (car idle)) (and (memv lane idle) lane))))
         (when (>= id 9223372036854775807) (error "Scheme service identity exhausted"))
@@ -159,7 +163,7 @@
             (set! (scheme-service-short-queued service) (append (scheme-service-short-queued service) (list job)))
             (set! (scheme-service-queued service) (append (scheme-service-queued service) (list job)))))
         id))))
-(def (gerbil-rs-service-ready! service)
+(def (service-ready-ids! service)
   ;; Give native green threads a turn; wake and task scheduling remain Scheme-owned.
   (thread-yield!)
   (service-locked service
@@ -171,6 +175,9 @@
         (let ((short (service-fifo-pop! (scheme-service-short-ready service)))
               (general (service-fifo-pop! (scheme-service-ready service))))
           (list->s64vector (append (if short (list short) []) (if general (list general) []))))))))
+(def (gerbil-rs-service-ready! service)
+  (let ((ids (service-ready-ids! service)) (totals (scheme-service-progress service)))
+    (if totals (gerbil-rs-progress-receipt totals ids) ids)))
 (def (gerbil-rs-service-take! service id)
   (let (job
         (service-locked service
@@ -241,6 +248,7 @@
 ;; Rooted unary command protocol: [s64 header, optional native payload].
 ;; 0=open(read-fd,write-fd,limit), 1=submit(lane, optional short-class=1), 2=take(id), 3=ready,
 ;; 4=wait(host-deadline-microseconds or zero), 7=prepare-close, 5=drain/close.
+;; ABI v6 adds optional declared units, progress receipts and 12=idle progress configuration.
 ;; ABI v5 adds 11=read actual cooperative budget and native wake mode.
 ;; ABI v3 adds 8=configure cooperative units (zero disables), 9=unit counters.
 ;; Hooks remain Scheme-owned; open/close track partially allocated app resources.
@@ -264,14 +272,25 @@
            (on-open)
            (set! service (make-gerbil-rs-service handler workers (s64vector-ref header 3)
                           (s64vector-ref header 1) (s64vector-ref header 2)))
-           (s64vector 0 5 workers (s64vector-ref header 3)))
+           (s64vector 0 6 workers (s64vector-ref header 3)))
           ((1)
            (unless service (error "Scheme service not open"))
            (unless (or (= (s64vector-length header) 2)
-                       (and (= (s64vector-length header) 3) (= (s64vector-ref header 2) 1)))
-             (error "invalid Scheme service submit class"))
+                       (and (= (s64vector-length header) 3) (= (s64vector-ref header 2) 1))
+                       (and (= (s64vector-length header) 4)
+                            (<= 0 (s64vector-ref header 2) 1) (positive? (s64vector-ref header 3))))
+             (error "invalid Scheme service submit class/progress"))
            (s64vector (gerbil-rs-service-submit! service (vector-ref command 1) (s64vector-ref header 1)
-                        (and (= (s64vector-length header) 3) (= (s64vector-ref header 2) 1)))))
+                        (and (>= (s64vector-length header) 3) (= (s64vector-ref header 2) 1))
+                        (if (= (s64vector-length header) 4) (s64vector-ref header 3) 1))))
+          ((12)
+           (unless (and service (= (s64vector-length header) 2) (not preparing)
+                        (= (s64vector-ref header 1) 1)
+                        (zero? (table-length (scheme-service-jobs service))))
+             (error "progress configuration requires an idle service"))
+           (unless (scheme-service-progress service)
+             (set! (scheme-service-progress service) (make-gerbil-rs-progress-ledger)))
+           (s64vector 0 (s64vector-ref header 1)))
           ((2) (gerbil-rs-service-take! service (s64vector-ref header 1)))
           ((3) (gerbil-rs-service-ready! service))
           ((4) (s64vector (gerbil-rs-service-wait! service (s64vector-ref header 1))))

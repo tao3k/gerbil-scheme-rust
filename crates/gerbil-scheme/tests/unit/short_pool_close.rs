@@ -18,6 +18,7 @@ fn owner_failure_close_cannot_be_overtaken_by_queued_publication() {
         destinations: Vec::new(),
         queue: Mutex::new(Queue::default()),
         selective: AtomicBool::new(false),
+        progress: AtomicBool::new(false),
         pending_limit: 1,
         pending: Arc::clone(&pending),
         length: AtomicUsize::new(0),

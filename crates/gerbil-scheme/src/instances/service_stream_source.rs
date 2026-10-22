@@ -3,12 +3,13 @@ use super::{InstanceError, Request, pool::Work};
 use std::{
     collections::VecDeque,
     sync::{
-        Arc, Mutex, Weak,
+        Arc, Mutex, OnceLock, Weak,
         atomic::{AtomicBool, Ordering},
     },
 };
 pub(super) struct Shared {
     pub ready: AtomicBool,
+    pub fair: OnceLock<super::Fair>,
     requests: Mutex<VecDeque<Request>>,
     pub signals: Mutex<Vec<Weak<super::service_stream_runner::Signal>>>,
 }
@@ -16,6 +17,7 @@ impl Shared {
     pub(super) fn new(requests: VecDeque<Request>) -> Arc<Self> {
         Arc::new(Self {
             ready: AtomicBool::new(false),
+            fair: OnceLock::new(),
             requests: Mutex::new(requests),
             signals: Mutex::new(Vec::new()),
         })
@@ -54,7 +56,12 @@ impl Source {
     pub(super) fn units(&mut self) -> Option<usize> {
         self.with(|q| q.front().map(|r| r.work_units))
     }
-    pub(super) fn take(&mut self, units: usize) -> Option<Request> {
+    pub(super) fn take(&mut self, units: usize, owner: usize) -> Option<Request> {
+        if let Self::Pool(s) = self {
+            if s.fair.get().is_some_and(|f| !f.allow(owner, units)) {
+                return None;
+            }
+        }
         let request = self.with(|q| {
             if q.front().is_some_and(|r| r.work_units == units) {
                 q.pop_front()

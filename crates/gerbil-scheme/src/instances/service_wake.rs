@@ -34,6 +34,8 @@ pub(super) struct Wake {
     #[cfg(feature = "tokio-dispatch")]
     pub feed_limit: AtomicUsize,
     #[cfg(feature = "tokio-dispatch")]
+    pub progress: super::service_progress::Progress,
+    #[cfg(feature = "tokio-dispatch")]
     pub direct: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
     pub independent_short: AtomicBool,
@@ -92,6 +94,8 @@ impl Wake {
                 service_version: AtomicUsize::new(0),
                 #[cfg(feature = "tokio-dispatch")]
                 feed_limit: AtomicUsize::new(1),
+                #[cfg(feature = "tokio-dispatch")]
+                progress: super::service_progress::Progress::default(),
                 #[cfg(feature = "tokio-dispatch")]
                 direct: AtomicBool::new(false),
                 #[cfg(feature = "tokio-dispatch")]
@@ -182,6 +186,10 @@ impl Wake {
         self.signal_capacity_change();
     }
     pub fn close(&self) {
+        #[cfg(feature = "tokio-dispatch")]
+        self.progress
+            .waiting_for_claim
+            .store(false, Ordering::Release);
         if !self.closed.swap(true, Ordering::AcqRel) {
             #[cfg(feature = "tokio-dispatch")]
             if let Some(port) = self.short_pool.get() {

@@ -25,6 +25,7 @@ module owner_lifecycle {
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
     capacityArmed: Set[int], capacitySignalled: Set[int],
     shortWaiters: List[int], shortSignalled: Set[int],
+    progressDone: int -> Set[int], progressYielded: Set[int], shortDebt: int -> int,
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
@@ -46,6 +47,7 @@ module owner_lifecycle {
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
     capacityArmed: Set(), capacitySignalled: Set(),
     shortWaiters: List(), shortSignalled: Set(),
+    progressDone: JOBS.mapBy(_ => Set()), progressYielded: Set(), shortDebt: Set(1, 2).mapBy(_ => 0),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
   action init = s' = initial
@@ -434,7 +436,7 @@ module owner_lifecycle {
     producerActive(owner) < s.producerLimit,
     s.capacityHeld.filter(job => ownerOf(job) == owner).size() < s.capacityLimit,
     workUsed(owner) + units(r) <= s.workLimit,
-    s' = { ...s, poolPremature: s.poolPremature or not(s.poolReady), selected: s.selected.set(r, owner), committed: s.committed.set(r, owner),
+    s' = { ...s, progressYielded: s.progressYielded.exclude(Set(owner)), shortDebt: s.shortDebt.set(owner, 0), poolPremature: s.poolPremature or not(s.poolReady), selected: s.selected.set(r, owner), committed: s.committed.set(r, owner),
       poolStaged: s.poolStaged.exclude(Set(r)), producerJobs: s.producerJobs.union(Set(r)),
       shortWaiters: waitersWithout(owner), shortSignalled: if (s.poolStaged.size() == 1) Set() else s.shortSignalled.exclude(Set(owner)),
       accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)),
@@ -548,11 +550,11 @@ module owner_lifecycle {
   action armShort(owner: int): bool = all {
     s.phase == "open", s.producers.contains(owner),
     not(shortWaiterSet.union(s.shortSignalled).contains(owner)),
-    s' = { ...s, shortWaiters: s.shortWaiters.append(owner) }
+    s' = { ...s, shortDebt: s.shortDebt.set(owner, 0), shortWaiters: s.shortWaiters.append(owner) }
   }
   action resumeShort(owner: int): bool = all {
     shortWaiterSet.union(s.shortSignalled).contains(owner),
-    s' = { ...s, shortWaiters: waitersWithout(owner), shortSignalled: s.shortSignalled.exclude(Set(owner)) }
+    s' = { ...s, shortDebt: s.shortDebt.set(owner, 0), shortWaiters: waitersWithout(owner), shortSignalled: s.shortSignalled.exclude(Set(owner)) }
   }
   def shortEligible(owner: int): bool = and {
     s.producers.contains(owner), producerActive(owner) < s.producerLimit,
@@ -592,6 +594,90 @@ module owner_lifecycle {
   run selectiveArmAfterPublishTest = init.then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
     .then(offerShort(3)).then(armShort(2)).then(selectiveShortWake)
     .then(all { assert(s.shortSignalled == Set(2)), assert(safety), stutter })
+  // Native service progress is advisory: zero residual never returns capacity,
+  // root, producer or code ownership. Stable unit IDs are idempotent on replay.
+  def residual(owner: int): int = s.accepted.filter(r => ownerOf(r) == owner
+    and not(s.completed.union(s.serviceReady).contains(r))).fold(0,
+      (total, r) => total + units(r) - s.progressDone.get(r).size())
+  action reportProgress(r: int, unit: int): bool = all {
+    s.servicePending.contains(r), not(s.serviceReady.contains(r)), 0 <= unit, unit < units(r),
+    s' = { ...s, progressDone: s.progressDone.set(r, s.progressDone.get(r).union(Set(unit))) }
+  }
+  def eligibleFor(owner: int, amount: int): bool = and {
+    shortEligible(owner), s.parked.contains(owner), workUsed(owner) + amount <= s.workLimit }
+  action yieldProgress(r: int, owner: int, peer: int): bool = all {
+    s.phase == "open", s.poolStaged.contains(r), owner != peer,
+    s.producers.contains(owner), eligibleFor(peer, units(r)),
+    not(s.progressYielded.contains(owner)), residual(owner) > residual(peer) + units(r),
+    s' = { ...s, progressYielded: s.progressYielded.union(Set(owner)),
+      wakeOwed: s.wakeOwed.union(Set(peer)) }
+  }
+  action claimProgressPool(r: int, owner: int): bool = all {
+    s.progressYielded.contains(owner) or Set(1, 2).forall(peer => peer == owner
+      or not(eligibleFor(peer, units(r))) or residual(owner) <= residual(peer) + units(r)),
+    claimPool(r, owner)
+  }
+  action progressShortWake = {
+    val eligible = s.shortWaiters.foldl(List(), (kept, o) => if (shortEligible(o)) kept.append(o) else kept)
+    val promoted = eligible.foldl(List(), (kept, o) => if (s.shortDebt.get(o) >= 2) kept.append(o) else kept)
+    nondet chosen = Set(1, 2).oneOf()
+    all {
+      s.phase == "open", s.poolStaged.size() > s.shortSignalled.size(), eligible.length() > 0,
+      eligible.foldl(Set(), (seen, o) => seen.union(Set(o))).contains(chosen),
+      if (promoted.length() > 0) chosen == promoted.head()
+      else eligible.foldl(Set(), (seen, o) => seen.union(Set(o))).forall(o => residual(chosen) <= residual(o)),
+      s' = { ...s, shortWaiters: waitersWithout(chosen),
+        shortDebt: Set(1, 2).mapBy(o => if (o == chosen) 0 else
+          if (shortWaiterSet.contains(o) and shortEligible(o)) s.shortDebt.get(o) + 1 else s.shortDebt.get(o)),
+        shortSignalled: s.shortSignalled.union(Set(chosen)), wakeOwed: s.wakeOwed.union(Set(chosen)) }
+    }
+  }
+  val progressSafety = and { safety, s.progressYielded.subseteq(Set(1, 2)),
+    JOBS.forall(r => s.progressDone.get(r).forall(unit => 0 <= unit and unit < units(r))),
+    Set(1, 2).forall(o => residual(o) >= 0 and s.shortDebt.get(o) <= 2) }
+  action progressStep = {
+    nondet r = JOBS.oneOf(); nondet unit = Set(0, 1, 2, 3, 4, 5, 6, 7).oneOf()
+    nondet owner = Set(1, 2).oneOf(); nondet peer = Set(1, 2).oneOf()
+    any { selectiveShortStep, reportProgress(r, unit), yieldProgress(r, owner, peer), claimProgressPool(r, owner), progressShortWake }
+  }
+  action unsafeProgressRelease(r: int): bool = all {
+    s.servicePending.contains(r), s.progressDone.get(r).size() > 0,
+    s' = { ...s, capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)) }
+  }
+  action unsafeProgressReleaseStep = { nondet r = JOBS.oneOf(); any { progressStep, unsafeProgressRelease(r) } }
+  run progressReceiptKeepsCreditTest = init.then(configureCapacity(1)).then(configureWork(8))
+    .then(admit(1)).then(submitService(1)).then(reportProgress(1, 0)).then(reportProgress(1, 0))
+    .then(all { assert(residual(1) == 7), assert(workUsed(1) == 8), assert(s.serviceRoots == Set(1)), assert(progressSafety), stutter })
+    .then(observeTimeout(1)).then(close).then(readyService(1, true)).then(complete(1)).then(join)
+    .then(all { assert(progressSafety), stutter })
+  run progressPeerOpportunityTest = init.then(stagePool(1)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(claimPool(1, 1)).then(submitService(1)).then(park(2)).then(yieldProgress(3, 1, 2))
+    .then(all { assert(not(s.capacityHeld.contains(3))), assert(s.committed.get(3) == 0), assert(progressSafety), stutter })
+    .then(claimProgressPool(3, 1)).then(submitService(3))
+    .then(all { assert(ownerOf(3) == 1), assert(s.progressYielded.size() == 0), assert(progressSafety), stutter })
+    .then(close).then(readyService(1, false)).then(readyService(3, false)).then(complete(1)).then(complete(3))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join).then(all { assert(progressSafety), stutter })
+  run progressBusyPeerClaimTest = init.then(stagePool(1)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(claimPool(1, 1)).then(submitService(1))
+    .then(all { assert(not(s.parked.contains(2))), assert(residual(1) > residual(2)), stutter })
+    .then(claimProgressPool(3, 1)).then(submitService(3))
+    .then(all { assert(ownerOf(3) == 1), assert(s.progressYielded.size() == 0), assert(progressSafety), stutter })
+    .then(close).then(readyService(1, false)).then(readyService(3, false)).then(complete(1)).then(complete(3))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join).then(all { assert(progressSafety), stutter })
+  run progressShortPromotionTest = init.then(admit(1)).then(submitService(1))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(offerShort(3))
+    .then(armShort(1)).then(armShort(2)).then(progressShortWake)
+    .then(all { assert(s.shortSignalled == Set(2)), assert(progressSafety), stutter })
+    .then(resumeShort(2)).then(armShort(2)).then(progressShortWake)
+    .then(resumeShort(2)).then(armShort(2)).then(progressShortWake)
+    .then(all { assert(s.shortSignalled == Set(1)), assert(progressSafety), stutter })
+    .then(claimPool(3, 2)).then(submitService(3)).then(close)
+    .then(readyService(3, false)).then(complete(3)).then(readyService(1, false)).then(complete(1))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join).then(all { assert(progressSafety), stutter })
+  run progressReleaseMutationTest = init.then(admit(1)).then(submitService(1)).then(reportProgress(1, 0))
+    .then(unsafeProgressRelease(1)).then(all { assert(not(progressSafety)), stutter })
   action shortPoolStep = { nondet r = JOBS.oneOf(); any { poolStep, offerShort(r) } }
   run dynamicShortClaimAndCloseTest = init.then(configureCapacity(1)).then(admit(1))
     .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(offerShort(3))

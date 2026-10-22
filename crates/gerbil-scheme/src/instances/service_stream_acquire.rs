@@ -24,6 +24,9 @@ pub enum SchemeServiceSupplyAdmission {
     /// Experimental bounded refill after the complete result snapshot is retired.
     /// Retains `OwnerLocal` bounds; short publication takes priority over bulk.
     RetirementRefill,
+    /// Scheme-progress weighted bulk claims with one bounded peer opportunity.
+    /// This changes neither refill order nor native resource-retirement rules.
+    ProgressFair,
 }
 type Pair = (OwnedSemaphorePermit, CapacityPermit);
 type Waiting = Pin<Box<dyn Future<Output = Result<Pair, InstanceError>> + Send>>;

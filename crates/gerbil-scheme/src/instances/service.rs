@@ -187,6 +187,7 @@ pub(super) trait Job: Send {
         image: &super::image::Image,
         input: usize,
         output: usize,
+        progress: bool,
     ) -> Result<JobId, InstanceError>;
     fn may_have_entered(&self) -> bool;
     fn complete(
@@ -221,6 +222,7 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
         image: &super::image::Image,
         input: usize,
         output: usize,
+        progress: bool,
     ) -> Result<JobId, InstanceError> {
         let mut result = None;
         super::native_dispatch::run_native(
@@ -233,8 +235,21 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
                 }
                 let value = self.message.construct(session)?;
                 let lane = self.lane.map_or(-1, |lane| i64::try_from(lane.0).unwrap());
-                let header = [1, lane, 1];
-                let length = if self.short { 3 } else { 2 };
+                let header = [
+                    1,
+                    lane,
+                    i64::from(self.short),
+                    i64::try_from(self.message.work_units()).map_err(|_| {
+                        InstanceError::InvalidConfig("native progress unit overflow")
+                    })?,
+                ];
+                let length = if progress {
+                    4
+                } else if self.short {
+                    3
+                } else {
+                    2
+                };
                 let input = envelope(session, &header[..length], Some(&value))?;
                 self.submitted = true;
                 let token = call(session, &input)?;

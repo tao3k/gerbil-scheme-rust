@@ -74,6 +74,7 @@ fn run(
         .configure_owner_budgets(4, Some(32))
         .unwrap();
     settings::short_pool(&pool, comparison);
+    settings::progress(&pool, comparison);
     if observation.full() {
         for owner in 0..4 {
             pool.dispatcher().observe_scheme_service_on(owner).unwrap();
@@ -153,7 +154,9 @@ fn cleanup(pool: &mut InstancePool) {
     );
 }
 fn select_comparison(args: &[String]) -> Comparison {
-    if args.iter().any(|s| s == "--retirement-refill-ab") {
+    if args.iter().any(|s| s == "--progress-fair-ab") {
+        Comparison::ProgressFair
+    } else if args.iter().any(|s| s == "--retirement-refill-ab") {
         Comparison::RetirementRefill
     } else if args.iter().any(|s| s == "--selective-wake-ab") {
         Comparison::SelectiveWake
@@ -244,6 +247,7 @@ fn main() {
         || s == "--pool-protocol-ab"
         || s == "--selective-wake-ab"
         || s == "--retirement-refill-ab"
+        || s == "--progress-fair-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"

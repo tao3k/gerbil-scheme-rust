@@ -35,18 +35,22 @@ pub(super) enum Comparison {
     PoolProtocol,
     SelectiveWake,
     RetirementRefill,
+    ProgressFair,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
         self != Self::Service
     }
     fn supply_admission(self, arm: bool) -> gerbil_scheme::instances::SchemeServiceSupplyAdmission {
+        if self == Self::ProgressFair && arm {
+            return gerbil_scheme::instances::SchemeServiceSupplyAdmission::ProgressFair;
+        }
         if self == Self::RetirementRefill && arm {
             return gerbil_scheme::instances::SchemeServiceSupplyAdmission::RetirementRefill;
         }
         if matches!(
             self,
-            Self::PoolProtocol | Self::SelectiveWake | Self::RetirementRefill
+            Self::PoolProtocol | Self::SelectiveWake | Self::RetirementRefill | Self::ProgressFair
         ) || self == Self::SupplyAdmission && arm
         {
             gerbil_scheme::instances::SchemeServiceSupplyAdmission::OwnerLocal
@@ -56,6 +60,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::ProgressFair => {
+                "same native progress receipts; FIFO versus residual-service joint fairness"
+            }
             Self::RetirementRefill => {
                 "same selective wake and native work; ordinary refill versus retirement-bounded refill"
             }
@@ -138,6 +145,7 @@ impl Strategy {
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
                     | Comparison::RetirementRefill
+                    | Comparison::ProgressFair
             ) && (arm
                 || matches!(
                     comparison,
@@ -156,6 +164,7 @@ impl Strategy {
                         | Comparison::PoolProtocol
                         | Comparison::SelectiveWake
                         | Comparison::RetirementRefill
+                        | Comparison::ProgressFair
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -186,6 +195,7 @@ impl Strategy {
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
                     | Comparison::RetirementRefill
+                    | Comparison::ProgressFair
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -233,6 +243,7 @@ pub(super) fn run(
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
                 | Comparison::RetirementRefill
+                | Comparison::ProgressFair
         ) {
             None
         } else {
@@ -257,7 +268,9 @@ pub(super) fn run(
             (comparison == Comparison::PoolProtocol && arm
                 || matches!(
                     comparison,
-                    Comparison::SelectiveWake | Comparison::RetirementRefill
+                    Comparison::SelectiveWake
+                        | Comparison::RetirementRefill
+                        | Comparison::ProgressFair
                 ))
             .then(|| pool.dispatcher().scheme_short_pool().unwrap()),
         ));
@@ -310,6 +323,7 @@ async fn run_bulk(
             | Comparison::PoolProtocol
             | Comparison::SelectiveWake
             | Comparison::RetirementRefill
+            | Comparison::ProgressFair
     ) || comparison == Comparison::Pooled && arm
     {
         super::pooled::bulk(dispatch, inputs, released, comparison.supply_admission(arm)).await
@@ -345,7 +359,7 @@ fn router(
         if comparison == Comparison::PoolProtocol && arm
             || matches!(
                 comparison,
-                Comparison::SelectiveWake | Comparison::RetirementRefill
+                Comparison::SelectiveWake | Comparison::RetirementRefill | Comparison::ProgressFair
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgressNotified
@@ -361,6 +375,7 @@ fn router(
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
                 | Comparison::RetirementRefill
+                | Comparison::ProgressFair
         ) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
@@ -376,6 +391,7 @@ fn router(
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
                     | Comparison::RetirementRefill
+                    | Comparison::ProgressFair
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -418,6 +434,7 @@ fn append_policy(
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
                     | Comparison::RetirementRefill
+                    | Comparison::ProgressFair
             )
     );
     value["owner_resident_supply"] = json!(
@@ -431,6 +448,7 @@ fn append_policy(
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
                 | Comparison::RetirementRefill
+                | Comparison::ProgressFair
         ) || comparison == Comparison::Resident && arm
     );
     value["pool_resident_supply"] = json!(
@@ -443,6 +461,7 @@ fn append_policy(
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
                 | Comparison::RetirementRefill
+                | Comparison::ProgressFair
         ) || comparison == Comparison::Pooled && arm
     );
     value["producer_progress_routing"] = json!(
@@ -456,6 +475,7 @@ fn append_policy(
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
                 | Comparison::RetirementRefill
+                | Comparison::ProgressFair
         ) && !(comparison == Comparison::ShortRouteLoad && arm)
     );
     append_short_policy(value, pool, comparison, arm);
@@ -470,16 +490,25 @@ fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Compa
     let deferred = comparison == Comparison::PoolProtocol && arm
         || matches!(
             comparison,
-            Comparison::SelectiveWake | Comparison::RetirementRefill
+            Comparison::SelectiveWake | Comparison::RetirementRefill | Comparison::ProgressFair
         );
+    value["native_progress_receipts"] = json!(
+        pool.dispatcher()
+            .scheme_service_progress_on(0)
+            .unwrap()
+            .enabled
+    );
+    value["joint_progress_fairness"] = json!(comparison == Comparison::ProgressFair && arm);
     value["short_wake_policy"] = json!(
         pool.dispatcher()
             .scheme_short_pool()
             .map(|p| format!("{:?}", p.wake_policy()))
     );
     value["selective_short_wake"] = json!(
-        comparison == Comparison::RetirementRefill
-            || comparison == Comparison::SelectiveWake && arm
+        matches!(
+            comparison,
+            Comparison::RetirementRefill | Comparison::ProgressFair
+        ) || comparison == Comparison::SelectiveWake && arm
     );
     value["short_admission_boundary"] = json!(if deferred {
         "owner claim"

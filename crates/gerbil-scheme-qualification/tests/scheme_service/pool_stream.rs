@@ -84,11 +84,13 @@ async fn producer_free(dispatch: &InstanceDispatcher, owners: &[usize]) {
     }
 }
 pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>) {
+    super::service_progress::enable(dispatch).await;
     progress_route(dispatch).await;
     for mode in [
         SchemeServiceSupplyAdmission::Queued,
         SchemeServiceSupplyAdmission::OwnerLocal,
         SchemeServiceSupplyAdmission::RetirementRefill,
+        SchemeServiceSupplyAdmission::ProgressFair,
     ] {
         recovery(dispatch, mode).await;
         redistribute(dispatch, mode).await;

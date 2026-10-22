@@ -140,6 +140,7 @@ fn owner_protocol_scenarios_and_controls() {
     );
     capacity_protocol(source);
     shared_protocol(source);
+    progress_protocol(source);
 }
 fn capacity_protocol(source: &str) {
     for step in [
@@ -166,6 +167,52 @@ fn capacity_protocol(source: &str) {
             "1",
         ]);
     }
+}
+#[test]
+#[ignore = "explicit targeted native progress model gate"]
+fn owner_progress_scenarios_and_control() {
+    let source = "specs/owner_lifecycle.qnt";
+    success(&["typecheck", source]);
+    for domain in ["owner_lifecycle_small", "owner_lifecycle_wide"] {
+        success(&[
+            "test",
+            source,
+            "--main",
+            domain,
+            "--match",
+            "progress.*Test",
+            "--seed",
+            "1",
+        ]);
+    }
+    progress_protocol(source);
+}
+fn progress_protocol(source: &str) {
+    success(&[
+        "run",
+        source,
+        "--main",
+        "owner_lifecycle_small",
+        "--step",
+        "progressStep",
+        "--invariant",
+        "progressSafety",
+        "--seed",
+        "42",
+        "--max-samples",
+        "1000",
+        "--max-steps",
+        "64",
+        "--verbosity",
+        "1",
+    ]);
+    mutation_counterexample(
+        source,
+        "owner_lifecycle_small",
+        "init",
+        "unsafeProgressReleaseStep",
+        "progressSafety",
+    );
 }
 fn symbolic(bound: &str) {
     // Keep solver output, including incomplete attempts, outside the checkout.

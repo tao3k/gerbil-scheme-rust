@@ -49,6 +49,20 @@ impl ServiceProducer {
         cancelled: Arc<AtomicBool>,
         mode: SchemeServiceSupplyAdmission,
     ) -> Self {
+        let active = Arc::new(Semaphore::new(maximum));
+        if let super::service_stream_source::Source::Pool(source) = &requests {
+            if let Some(fair) = source.fair.get() {
+                fair.register(
+                    registration.owner,
+                    registration
+                        .wake
+                        .as_ref()
+                        .map_or_else(Weak::new, Arc::downgrade),
+                    Arc::clone(&registration.capacity),
+                    Arc::downgrade(&active),
+                );
+            }
+        }
         Self {
             admission: Arc::downgrade(&dispatch.admission),
             accepting: Arc::clone(&dispatch.admission.accepting),
@@ -57,7 +71,7 @@ impl ServiceProducer {
             capacity: registration.capacity,
             _registration: registration.permit,
             requests,
-            active: Arc::new(Semaphore::new(maximum)),
+            active,
             maximum,
             acquiring: Acquisition::new(mode),
             deadline: registration.deadline,
@@ -161,8 +175,9 @@ impl Producer for ServiceProducer {
             self.reject(error);
             return ProducerStep::Progress;
         }
-        let Some(mut request) = self.requests.take(units) else {
-            // Another owner advanced the shared FIFO while credits were pending.
+        let Some(mut request) = self.requests.take(units, self.owner) else {
+            // Another owner advanced the FIFO, or a progress-weighted peer gets
+            // one nonexclusive opportunity. No reservation survives that turn.
             // Return speculative credits; never consume a differently priced job.
             drop(capacity);
             drop(active);
@@ -205,8 +220,12 @@ impl Job for StreamJob {
         image: &Image,
         input: usize,
         output: usize,
+        progress: bool,
     ) -> Result<JobId, InstanceError> {
-        self.job.as_mut().unwrap().start(image, input, output)
+        self.job
+            .as_mut()
+            .unwrap()
+            .start(image, input, output, progress)
     }
     fn complete(mut self: Box<Self>, image: &Image, id: JobId, input: usize, output: usize) {
         self.job.take().unwrap().complete(image, id, input, output);

@@ -82,6 +82,10 @@ pub use service_metrics::{SchemePhaseObservation, SchemeServiceObservation, Sche
 
 #[cfg(feature = "tokio-dispatch")]
 mod service_feed;
+#[cfg(feature = "tokio-dispatch")]
+mod service_progress;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_progress::SchemeServiceProgress;
 
 #[cfg(feature = "tokio-dispatch")]
 mod service_budget;
@@ -126,9 +130,13 @@ pub use service_stream::{SchemeServiceStream, SchemeServiceStreamConfig};
 #[cfg(feature = "tokio-dispatch")]
 mod service_pool_stream;
 #[cfg(feature = "tokio-dispatch")]
+mod service_progress_fair;
+#[cfg(feature = "tokio-dispatch")]
 mod service_stream_source;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_pool_stream::SchemeServicePoolStreamConfig;
+#[cfg(feature = "tokio-dispatch")]
+pub(super) use service_progress_fair::Fair;
 
 #[cfg(feature = "tokio-dispatch")]
 mod service_settings;

@@ -374,3 +374,21 @@ checks use the existing admission fence; old class quotas cannot silently cross
 into a differently configured pool capacity epoch.
 
 See the [native and matched qualification](30-39-status/30.42-capacity-reserved-owner-reselection.org).
+
+
+### Explicit bounded service supply
+
+`InstanceDispatcher::submit_scheme_service_stream_on` stages a count/work-bounded
+sequence of independent stateless typed requests on a fixed owner. Its
+`SchemeServiceStreamConfig` separates aggregate staged work from active native
+requests. It shares the existing single-producer registration, native work/slot
+budgets, capacity epoch and close fence. `SchemeServiceStream::cancel` or handle
+drop rejects unadmitted work; already committed Scheme jobs drain through the
+original typed service, projection and root retirement. `next` consumes FIFO
+owned results; its wait timeout is not native cancellation. Affine/dependent
+requests retain their ordinary owner-pinned APIs. No default changes.
+
+This supplies Scheme's native service without returning to Tokio for each refill;
+Scheme continues to schedule its Actors and green threads. See
+[bounded supply qualification](30-39-status/30.44-bounded-owner-resident-service.org)
+for bounds, cancellation races, validation and retained performance negatives.

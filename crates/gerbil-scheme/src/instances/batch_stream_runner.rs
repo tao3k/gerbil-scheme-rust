@@ -1,6 +1,6 @@
 //! Bounded producer state lives on the native owner; no Tokio runtime enters Scheme.
 use super::{
-    BatchAdmission, InstanceDispatcher, InstanceError,
+    InstanceDispatcher, InstanceError,
     batch_stream::{BatchStreamRow, OutputBytes, RunBatch},
     capacity::{Capacity, CapacityPermit, acquire_pair},
     dispatch::Admission,
@@ -20,10 +20,11 @@ pub(super) enum ProducerStep {
     Progress,
     Waiting,
     Finished,
+    Service(super::Request),
 }
 pub(super) trait Producer: Send {
     fn step(&mut self, image: &Image) -> ProducerStep;
-    fn deadline(&self) -> Instant;
+    fn deadline(&self) -> Option<Instant>;
     fn reject(&mut self, error: InstanceError);
 }
 type Acquiring = Pin<Box<dyn Future<Output = Result<CapacityPermit, InstanceError>> + Send>>;
@@ -31,9 +32,14 @@ type Reply<R> = oneshot::Sender<super::types::Completed<Vec<BatchStreamRow<R>>>>
 pub(super) struct Registration {
     pub capacity: Arc<Capacity>,
     pub permit: OwnedSemaphorePermit,
-    pub admission: BatchAdmission,
+    pub owner: usize,
     pub deadline: Instant,
     pub waker: Waker,
+}
+pub(super) struct BatchOperation<T, R> {
+    pub run: RunBatch<T, R>,
+    pub output_bytes: OutputBytes<R>,
+    pub quantum: usize,
 }
 pub(super) struct BatchProducer<T, R> {
     admission: Weak<Admission>,
@@ -60,21 +66,20 @@ impl<T, R> BatchProducer<T, R> {
         dispatch: &InstanceDispatcher,
         registration: Registration,
         batches: Vec<Vec<Vec<T>>>,
-        run: RunBatch<T, R>,
-        output_bytes: OutputBytes<R>,
+        operation: &BatchOperation<T, R>,
         reply: Reply<R>,
     ) -> Self {
         let Registration {
             capacity,
             permit,
-            admission,
+            owner,
             deadline,
             waker,
         } = registration;
         let offered = Instant::now();
         Self {
             admission: Arc::downgrade(&dispatch.admission),
-            owner: admission.owner,
+            owner,
             capacity,
             _registration: permit,
             rows: Vec::with_capacity(batches.len()),
@@ -84,12 +89,12 @@ impl<T, R> BatchProducer<T, R> {
             offered,
             waker,
             deadline,
-            quantum: admission.yield_every,
+            quantum: operation.quantum,
             maximum_input: dispatch.maximum_input(),
             maximum_output: dispatch.maximum_output(),
             projected: 0,
-            run,
-            output_bytes,
+            run: operation.run,
+            output_bytes: operation.output_bytes,
             reply: Some(reply),
         }
     }
@@ -136,8 +141,8 @@ where
     T: NumericElement + Send + 'static,
     R: Send + 'static,
 {
-    fn deadline(&self) -> Instant {
-        self.deadline
+    fn deadline(&self) -> Option<Instant> {
+        Some(self.deadline)
     }
     fn reject(&mut self, error: InstanceError) {
         self.acquiring = None;

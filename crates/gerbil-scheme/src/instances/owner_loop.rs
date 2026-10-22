@@ -68,9 +68,19 @@ pub(super) fn run(image: &Image, requests: &mpsc::Receiver<Request>, maximum_rep
                     producer = None;
                     continue;
                 }
+                ProducerStep::Service(_) => {
+                    unreachable!("service producer requires Scheme service")
+                }
                 ProducerStep::Waiting => {}
             }
-            let remaining = current.deadline().saturating_duration_since(Instant::now());
+            let Some(deadline) = current.deadline() else {
+                match requests.recv() {
+                    Ok(request) => received = Some(request),
+                    Err(_) => break,
+                }
+                continue;
+            };
+            let remaining = deadline.saturating_duration_since(Instant::now());
             match requests.recv_timeout(remaining) {
                 Ok(request) => received = Some(request),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}

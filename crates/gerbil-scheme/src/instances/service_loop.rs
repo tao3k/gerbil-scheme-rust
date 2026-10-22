@@ -10,7 +10,7 @@ use std::{
     collections::BTreeMap,
     os::fd::AsRawFd,
     sync::{atomic::Ordering, mpsc},
-    time::Instant,
+    time::{Duration, Instant},
 };
 fn dequeue(requests: &mpsc::Receiver<Request>, wake: &Wake) -> Result<Request, mpsc::TryRecvError> {
     let request = requests.try_recv()?;
@@ -262,6 +262,10 @@ impl Pump<'_> {
             let mut waiting = false;
             if let Some(producer) = self.producer.as_mut() {
                 match producer.step(self.image) {
+                    ProducerStep::Service(request) => {
+                        self.receive(request)?;
+                        continue;
+                    }
                     ProducerStep::Progress => continue,
                     ProducerStep::Finished => {
                         self.producer = None;
@@ -302,16 +306,15 @@ impl Pump<'_> {
             let remaining = if waiting {
                 self.producer
                     .as_ref()
-                    .unwrap()
-                    .deadline()
-                    .saturating_duration_since(Instant::now())
+                    .and_then(|producer| producer.deadline())
+                    .map(|deadline| deadline.saturating_duration_since(Instant::now()))
             } else {
-                std::time::Duration::ZERO
+                None
             };
-            if waiting && remaining.is_zero() {
+            if remaining.is_some_and(|value| value.is_zero()) {
                 continue;
             }
-            let micros = i64::try_from(remaining.as_micros()).unwrap_or(i64::MAX);
+            let micros = wait_timeout(remaining);
             observed(
                 self.image,
                 self.wake,
@@ -356,3 +359,15 @@ pub(super) fn run(
         }
     }
 }
+
+// Zero is the Scheme ABI's infinite-wait sentinel, never a finite deadline.
+fn wait_timeout(remaining: Option<Duration>) -> i64 {
+    remaining.map_or(0, |value| {
+        i64::try_from(value.as_nanos().div_ceil(1000))
+            .unwrap_or(i64::MAX)
+            .max(1)
+    })
+}
+#[cfg(test)]
+#[path = "../../tests/unit/service_wait.rs"]
+mod tests;

@@ -198,13 +198,13 @@ pub(super) trait Job: Send {
     );
     fn fail(self: Box<Self>, error: InstanceError);
 }
-struct TypedJob<M: SchemeServiceRequest> {
-    message: M,
-    send: oneshot::Sender<super::types::Completed<M::Output>>,
-    submitted: bool,
-    lane: Option<SchemeServiceLane>,
-    short: bool,
-    trace: Option<Arc<super::SchemeServiceEntryTrace>>,
+pub(super) struct TypedJob<M: SchemeServiceRequest> {
+    pub(super) message: M,
+    pub(super) send: oneshot::Sender<super::types::Completed<M::Output>>,
+    pub(super) submitted: bool,
+    pub(super) lane: Option<SchemeServiceLane>,
+    pub(super) short: bool,
+    pub(super) trace: Option<Arc<super::SchemeServiceEntryTrace>>,
 }
 impl<M: SchemeServiceRequest> Job for TypedJob<M> {
     fn entry_trace(&self) -> Option<&Arc<super::SchemeServiceEntryTrace>> {

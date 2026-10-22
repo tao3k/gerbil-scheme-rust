@@ -11,6 +11,8 @@ mod measurement;
 mod native_wait;
 #[path = "scheme_service/observation.rs"]
 mod observation;
+#[path = "scheme_service/resident.rs"]
+mod resident;
 #[path = "scheme_service/workload.rs"]
 mod workload;
 use gerbil_scheme::instances::{InstanceConfig, InstancePool, IsolatedProgram};
@@ -137,6 +139,7 @@ fn main() {
         || s == "--notification-ab"
         || s == "--reselection-ab"
         || s == "--owner-qos-ab"
+        || s == "--resident-ab"
         || s == "--ingress-ab"
         || s == "--budget-ab"
         || s == "--feed-ab"));
@@ -161,6 +164,7 @@ fn main() {
                 "--notification-ab"
                     | "--reselection-ab"
                     | "--owner-qos-ab"
+                    | "--resident-ab"
                     | "--ingress-ab"
                     | "--budget-ab"
                     | "--feed-ab"
@@ -172,7 +176,9 @@ fn main() {
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--owner-qos-ab") {
+    let comparison = if args.iter().any(|s| s == "--resident-ab") {
+        Comparison::Resident
+    } else if args.iter().any(|s| s == "--owner-qos-ab") {
         Comparison::OwnerQos
     } else if args.iter().any(|s| s == "--reselection-ab") {
         Comparison::Reselection

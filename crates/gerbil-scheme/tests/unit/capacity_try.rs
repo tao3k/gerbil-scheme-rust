@@ -12,6 +12,7 @@ fn capacity() -> (Arc<Capacity>, watch::Receiver<()>) {
         Arc::new(Capacity {
             changed: Arc::new(OnceLock::from(changed)),
             slots: Arc::new(Semaphore::new(1)),
+            slot_limit: 1,
             work: Some(Arc::new(Semaphore::new(8))),
             work_limit: 8,
             producer: Arc::new(Semaphore::new(1)),

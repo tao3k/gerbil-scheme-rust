@@ -302,3 +302,18 @@ gate also samples the reselection step and requires the owner-move mutation to
 produce an invariant counterexample. This does not model Tokio FIFO scheduling,
 watch-channel internals, kernel wake latency or Scheme execution/GC. Real
 semaphore, native multi-VM and matched benchmark controls remain separate gates.
+
+
+### Bounded service producer refinement
+
+The existing producer fields also cover `submit_scheme_service_stream_on`.
+`producerLimit` bounds accepted, not-yet-retired producer requests independently
+from pool `capacityLimit` and `workLimit`. Both immediate and reserved admission
+check it; completed native projection returns the credit. `cancelProducer` may
+reject staged work while open as well as during close, without removing accepted
+Scheme graphs or the registration needed to drain them. `streamStep` samples
+these transitions; the missing-window mutation starts from the separately
+validated safe `producerMutationInit`. The Rust driver retains the required
+negative counterexample control. Staged generic Rust byte size, partial internal
+semaphore permits, weak FD lifetime, native errors/GC and OS latency are native
+or application obligations, not finite-model guarantees.

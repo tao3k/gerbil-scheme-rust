@@ -13,6 +13,8 @@ mod reselection_contract;
 mod routing;
 #[path = "scheme_service/short.rs"]
 mod short;
+#[path = "scheme_service/stream.rs"]
+mod stream;
 use gerbil_scheme::instances::{
     InstanceConfig, InstanceDispatcher, InstanceError, InstancePool, IsolatedProgram, NativeRoot,
     NativeSession, NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest,
@@ -274,6 +276,25 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
                 .unwrap(),
         );
     }
+    command(&dispatch, 1, 9);
+    let mut closing_stream = dispatch
+        .submit_scheme_service_stream_on(
+            (0..4).map(|_| batch(true)).collect(),
+            gerbil_scheme::instances::SchemeServiceStreamConfig {
+                owner: 1,
+                maximum_active: 2,
+                maximum_staged_work: 32,
+                timeout: GATE,
+            },
+        )
+        .await
+        .unwrap();
+    let stream_start = Instant::now();
+    while command(&dispatch, 1, 10)[0] < 8 {
+        assert!(stream_start.elapsed() < GATE);
+        tokio::task::yield_now().await;
+    }
+    let partial_tickets = stream::partial_wait(&dispatch).await;
     let rejected = dispatch
         .submit_scheme_service_backpressured_on(0, batch(false), Duration::from_millis(1))
         .await;
@@ -298,6 +319,18 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
     reselection::empty(&router);
     assert!(closed.is_clean(), "{closed:?}");
     assert_eq!(closed.joined, 4);
+    for _ in 0..2 {
+        assert_eq!(closing_stream.next(GATE).await.unwrap().unwrap().0.len(), 8);
+    }
+    for _ in 0..2 {
+        assert_eq!(
+            closing_stream.next(GATE).await.unwrap().unwrap_err(),
+            InstanceError::Closed
+        );
+    }
+    for ticket in partial_tickets {
+        assert!(!ticket.wait_completed(GATE).await.unwrap().0.is_empty());
+    }
     for ticket in tickets {
         let (values, _) = ticket.wait_completed(GATE).await.unwrap();
         assert_eq!(values.len(), 8);
@@ -399,14 +432,16 @@ fn scheme_owns_waits_roots_continuations_and_close() {
         hidden,
         "service lifecycle/roots must not be exposed by ordinary export lookup"
     );
-    runtime.block_on(async {
+    let finished_stream = runtime.block_on(async {
         capabilities(&dispatch, &progress).await;
         wake_and_timeout(&dispatch, &progress).await;
         short::completion_ready(&dispatch, &progress).await;
         routing::contract(&dispatch, &progress).await;
         reselection::contract(&dispatch, &progress).await;
         reselection_contract::contract(&dispatch).await;
+        let finished_stream = stream::contract(&dispatch, &progress).await;
         close_full(&mut pool, &progress).await;
+        finished_stream
     });
     drop(pool);
     drop(dispatch);
@@ -415,6 +450,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
         before,
         "service pipe/port descriptors leaked"
     );
+    drop(finished_stream);
     println!(
         "SCHEME-SERVICE-PASS native-types GC continuation-affinity exceptions backpressure wake drain FD-return"
     );

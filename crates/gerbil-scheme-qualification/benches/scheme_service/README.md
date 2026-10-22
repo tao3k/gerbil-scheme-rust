@@ -261,3 +261,24 @@ neither immediate owner execution nor which descriptor woke a native select.
 QoS is an experimental OS intervention, not a Scheme scheduling algorithm or
 a portable latency guarantee. Preserve throughput, short/batch tails and owner
 fairness regressions. `--test --owner-qos-ab` is a correctness smoke only.
+
+
+## Bounded owner-resident supply
+
+`just bridge-scheme-service-benchmark --resident-ab` compares the existing host
+refill with `submit_scheme_service_stream_on` on the same four Scheme VMs and
+two Tokio workers. Both arms retain the same fixed bulk partition, three active
+bulk callbacks per owner, native short/reselection probe path, native port wake,
+budget one, feed one, coalesced notifications, slots four and work 32. No owner
+OS priority changes. Candidate staging is 32 original batches/owner, 256 declared
+work units/owner, at most 128 staged callbacks; control retains the existing
+128-ticket flow ceiling. These are distinct bounds, not an equal-memory claim.
+Each original input, native constructor, Scheme handler and projection is kept.
+
+`--test --resident-ab` is an exclusive correctness smoke. Add
+`--phase-observation` for matching native phase/entry diagnostics in both arms;
+these measurements are distinct from unobserved performance. `owner_resident_supply`
+identifies the candidate. Shutdown must join all four owners, balance roots and
+remove copied files. Preserve throughput, short/batch p99, scheduled-probe,
+overlap and owner/Actor fairness negatives. See the maintained
+[protocol and evidence](../../../../docs/30-39-status/30.44-bounded-owner-resident-service.org).

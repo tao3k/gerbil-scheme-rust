@@ -19,14 +19,14 @@ module owner_lifecycle {
     unsafeCodeRelease: bool,
     capacityLimit: int, capacityHeld: Set[int], reserved: Set[int],
     workLimit: int, workHeld: Set[int],
-    producers: Set[int], staged: Set[int], producerJobs: Set[int],
+    producerLimit: int, producers: Set[int], staged: Set[int], producerJobs: Set[int],
     servicePending: Set[int], serviceReady: Set[int], serviceRoots: Set[int], serviceFailed: Set[int],
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
   var s: State
 
-  action init = s' = {
+  val initial = {
     selected: ASSIGNED, committed: JOBS.mapBy(_ => 0),
     phase: "open", accepted: Set(), completed: Set(), ready: Set(),
     roots: Set(), registry: Set(), timedOut: Set(), executor: "absent",
@@ -35,11 +35,12 @@ module owner_lifecycle {
     unsafeCodeRelease: false,
     capacityLimit: JOBS.size(), capacityHeld: Set(), reserved: Set(),
     workLimit: JOBS.size() + 7, workHeld: Set(),
-    producers: Set(), staged: Set(), producerJobs: Set(),
+    producerLimit: JOBS.size(), producers: Set(), staged: Set(), producerJobs: Set(),
     servicePending: Set(), serviceReady: Set(), serviceRoots: Set(), serviceFailed: Set(),
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
+  action init = s' = initial
   def ownerOf(r: int): int = s.selected.get(r)
   // Only unreserved, unpublished stateless requests can select another owner.
   // Affine requests use the existing fixed-owner path and never this action.
@@ -86,7 +87,7 @@ module owner_lifecycle {
     s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   action admitReserved(r: int): bool = all {
-    s.phase == "open", s.reserved.contains(r),
+    s.phase == "open", s.reserved.contains(r), canProducerEnter(r),
     s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)) }
   }
   action releaseReservation(r: int): bool = all {
@@ -97,10 +98,17 @@ module owner_lifecycle {
     s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, s.producers.size() == 0, limit > 0,
     s' = { ...s, capacityLimit: limit }
   }
-  action admit(r: int): bool = all {
+  action admitUnchecked(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
     s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
+  }
+  action admit(r: int): bool = all { canProducerEnter(r), admitUnchecked(r) }
+  def producerActive(owner: int): int = s.producerJobs.intersect(s.accepted).exclude(s.completed).filter(r => ownerOf(r) == owner).size()
+  def canProducerEnter(r: int): bool = not(s.producerJobs.contains(r)) or producerActive(ownerOf(r)) < s.producerLimit
+  action configureProducer(limit: int): bool = all {
+    s.phase == "open", s.producers.size() == 0, limit > 0,
+    s' = { ...s, producerLimit: limit }
   }
   action registerProducer(owner: int): bool = all {
     s.phase == "open", Set(1, 2).contains(owner), not(s.producers.contains(owner)),
@@ -112,7 +120,7 @@ module owner_lifecycle {
     s' = { ...s, staged: s.staged.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)) }
   }
   action cancelProducer(owner: int): bool = all {
-    s.phase == "closing", s.producers.contains(owner),
+    Set("open", "closing").contains(s.phase), s.producers.contains(owner),
     all {
       val pending = s.staged.filter(job => ownerOf(job) == owner)
       s' = { ...s, staged: s.staged.exclude(pending), producerJobs: s.producerJobs.exclude(pending),
@@ -259,6 +267,7 @@ module owner_lifecycle {
     s.parked.forall(owner => implies(
       s.inbox.exists(r => ownerOf(r) == owner) or s.serviceReady.exists(r => ownerOf(r) == owner),
       s.notified.contains(owner) or s.wakeOwed.contains(owner))),
+    s.producerLimit > 0, Set(1, 2).forall(owner => producerActive(owner) <= s.producerLimit),
     s.producers.subseteq(Set(1, 2)), s.staged.subseteq(s.producerJobs), s.producerJobs.subseteq(JOBS),
     s.producerJobs.subseteq(s.staged.union(s.accepted)), s.staged.intersect(s.accepted).size() == 0,
     s.producerJobs.forall(job => s.producers.contains(ownerOf(job))),
@@ -394,6 +403,28 @@ module owner_lifecycle {
     .then(all { assert(not(safety)), stutter })
   run foreignHandleMutationTest = init.then(admit(1)).then(complete(1)).then(publish(1))
     .then(unsafeForeignUse).then(all { assert(not(safety)), stutter })
+  action streamStep = any { step, configureProducer(1), configureProducer(2) }
+  action producerMutationInit = s' = { ...initial, producerLimit: 1,
+    producers: Set(1), producerJobs: Set(1, 3), staged: Set(3), accepted: Set(1),
+    committed: JOBS.mapBy(r => if (r == 1) ASSIGNED.get(r) else 0),
+    capacityHeld: Set(1), workHeld: Set(1), inbox: Set(1), wakeOwed: Set(1) }
+  action unsafeProducerActiveStep = {
+    nondet r = JOBS.oneOf()
+    any { streamStep, admitUnchecked(r) }
+  }
+  run serviceProducerWindowTest = init.then(configureProducer(1)).then(registerProducer(1))
+    .then(stage(1)).then(stage(3)).then(admit(1)).then(submitService(1))
+    .then(all { assert(not(canProducerEnter(3))), assert(s.workHeld.contains(1)), assert(safety), stutter })
+    .then(readyService(1, false)).then(complete(1)).then(admit(3)).then(complete(3)).then(finishProducer(1))
+    .then(all { assert(s.producers.size() == 0), assert(safety), stutter })
+  run serviceProducerCancelDrainTest = init.then(registerProducer(1)).then(stage(1)).then(stage(3))
+    .then(admit(1)).then(submitService(1)).then(reserveWork(3)).then(cancelProducer(1))
+    .then(all { assert(s.producers.contains(1)), assert(s.staged.size() == 0), assert(s.serviceRoots.contains(1)), assert(s.workHeld == Set(1)), assert(safety), stutter })
+    .then(close).then(readyService(1, true)).then(complete(1)).then(finishProducer(1)).then(join)
+    .then(all { assert(safety), stutter })
+  run serviceProducerWindowMutationTest = init.then(configureProducer(1)).then(registerProducer(1))
+    .then(stage(1)).then(stage(3)).then(admit(1)).then(admitUnchecked(3))
+    .then(all { assert(not(safety)), stutter })
   action reselectionStep = {
     nondet r = JOBS.oneOf()
     nondet owner = Set(1, 2).oneOf()

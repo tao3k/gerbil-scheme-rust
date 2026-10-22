@@ -40,6 +40,8 @@ pub enum InstanceError {
     },
     /// Owner queue has reached its configured bound; request was not admitted.
     QueueFull,
+    /// An unadmitted staged service request was cancelled; entered Scheme is not preempted.
+    Cancelled,
     /// Admission was closed or the selected owner is no longer running.
     Closed,
     /// Wait expired. Accepted Scheme work remains live; this is not cancellation.

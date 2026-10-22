@@ -132,6 +132,35 @@ impl InstanceDispatcher {
         for items in &batches {
             capacity.units(items.len())?;
         }
+        let (reply, response) = tokio::sync::oneshot::channel();
+        self.register_producer(admission.owner, capacity, deadline, |registration| {
+            Box::new(super::batch_stream_runner::BatchProducer::new(
+                self,
+                registration,
+                batches,
+                &super::batch_stream_runner::BatchOperation {
+                    quantum: admission.yield_every,
+                    run,
+                    output_bytes,
+                },
+                reply,
+            ))
+        })
+        .await?;
+        Ok(AsyncInstanceTicket { response })
+    }
+    pub(super) async fn register_producer(
+        &self,
+        owner: usize,
+        capacity: Arc<Capacity>,
+        deadline: Instant,
+        make: impl FnOnce(
+            super::batch_stream_runner::Registration,
+        ) -> Box<dyn super::batch_stream_runner::Producer>,
+    ) -> Result<(), InstanceError> {
+        if !crate::instance_backend::images_ready() {
+            return Err(InstanceError::Closed);
+        }
         let registration = tokio::time::timeout(
             deadline.saturating_duration_since(Instant::now()),
             Arc::clone(&capacity.producer).acquire_owned(),
@@ -147,36 +176,24 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let current = senders
-            .owners
-            .get(admission.owner)
-            .ok_or(InstanceError::Closed)?;
+        let current = senders.owners.get(owner).ok_or(InstanceError::Closed)?;
         if !current
             .capacity
             .as_ref()
             .is_some_and(|c| Arc::ptr_eq(c, &capacity))
         {
-            drop(senders);
             return Err(InstanceError::Closed);
         }
-        let (reply, response) = tokio::sync::oneshot::channel();
-        let producer = super::batch_stream_runner::BatchProducer::new(
-            self,
-            super::batch_stream_runner::Registration {
-                capacity: Arc::clone(&capacity),
-                permit: registration,
-                admission,
-                deadline,
-                waker: super::owner_loop::waker(current.sender.clone(), current.wake.clone()),
-            },
-            batches,
-            run,
-            output_bytes,
-            reply,
-        );
+        let producer = make(super::batch_stream_runner::Registration {
+            capacity,
+            permit: registration,
+            owner,
+            deadline,
+            waker: super::owner_loop::waker(current.sender.clone(), current.wake.clone()),
+        });
         let request = super::Request {
             started: Arc::new(AtomicBool::new(false)),
-            work: Work::Producer(Box::new(producer)),
+            work: Work::Producer(producer),
             capacity: None,
             work_units: 0,
         };
@@ -190,10 +207,9 @@ impl InstanceDispatcher {
         sent.map_err(|error| match error {
             mpsc::TrySendError::Full(_) => InstanceError::QueueFull,
             mpsc::TrySendError::Disconnected(_) => InstanceError::Closed,
-        })?;
-        Ok(AsyncInstanceTicket { response })
+        })
     }
-    fn producer_owner(&self, owner: usize) -> Result<Arc<Capacity>, InstanceError> {
+    pub(super) fn producer_owner(&self, owner: usize) -> Result<Arc<Capacity>, InstanceError> {
         let senders = self
             .admission
             .senders

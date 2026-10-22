@@ -42,7 +42,7 @@ pub(super) struct Reply {
     pub diagnostics: Option<[[f64; 6]; 3]>,
     pub entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
 }
-struct Orders {
+pub(super) struct Orders {
     request: NumericServiceBatch<i64>,
     entered: Option<Instant>,
     constructed: Option<Instant>,
@@ -115,7 +115,7 @@ impl SchemeServiceRequest for Orders {
         })
     }
 }
-fn orders(
+pub(super) fn orders(
     items: Vec<Vec<i64>>,
     short_mode: ShortMode,
     bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,

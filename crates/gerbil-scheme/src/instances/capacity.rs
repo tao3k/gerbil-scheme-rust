@@ -34,6 +34,7 @@ pub struct BatchAdmission {
 pub(super) struct Capacity {
     pub(super) changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
     pub slots: Arc<Semaphore>,
+    pub slot_limit: usize,
     pub work: Option<Arc<Semaphore>>,
     pub work_limit: usize,
     pub producer: Arc<Semaphore>,
@@ -283,6 +284,7 @@ fn configure(
         previous.extend(owner.capacity.replace(Arc::new(Capacity {
             changed: Arc::clone(changed),
             slots: Arc::new(Semaphore::new(maximum_in_flight)),
+            slot_limit: maximum_in_flight,
             work: maximum_work.map(|n| Arc::new(Semaphore::new(n))),
             work_limit: maximum_work.unwrap_or(0),
             producer: Arc::new(Semaphore::new(1)),

@@ -72,13 +72,13 @@ impl Source {
         &self,
         owner: usize,
         units: usize,
-        admission: &Weak<super::Admission>,
+        accepting: &AtomicBool,
         cancelled: &AtomicBool,
         deadline: std::time::Instant,
     ) -> bool {
         match self {
             Self::Owner(_) => false,
-            Self::Pool(s) => super::route_progress(s, owner, units, admission, cancelled, deadline),
+            Self::Pool(s) => super::route_progress(s, owner, units, accepting, cancelled, deadline),
         }
     }
     pub(super) fn take(&mut self, units: usize) -> Option<Request> {

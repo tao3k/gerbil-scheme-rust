@@ -21,12 +21,18 @@ fn actual_peer_capacity_and_queued_work_replace_wait_marker() {
     let a1 = Arc::new(Semaphore::new(3));
     for (i, w, a) in [(0, &w0, &a0), (1, &w1, &a1)] {
         w.progress.enabled.store(true, Ordering::Release);
-        fair.register(i, Arc::downgrade(w), capacity(), Arc::downgrade(a));
+        fair.register(
+            i,
+            Arc::downgrade(w),
+            capacity(),
+            Arc::downgrade(a),
+            std::sync::Weak::new(),
+        );
     }
     assert!(fair.target(0, 8).is_none());
     w0.progress.charge(24, false);
     let target = fair.target(0, 8).unwrap();
-    assert_eq!(target.owner, 1);
+    assert!(Arc::ptr_eq(&target.wake, &w1));
     assert!(!w1.progress.waiting_for_claim.load(Ordering::Acquire));
     let held = Arc::clone(&a1).try_acquire_many_owned(3).unwrap();
     assert!(fair.target(0, 8).is_none());

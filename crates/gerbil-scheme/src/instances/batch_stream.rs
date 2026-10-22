@@ -189,8 +189,9 @@ impl InstanceDispatcher {
             permit: registration,
             owner,
             deadline,
-            waker: super::owner_loop::waker(current.sender.clone(), current.wake.clone()),
+            waker: super::owner_loop::waker((*current.sender).clone(), current.wake.clone()),
             wake: current.wake.clone(),
+            mailbox: Arc::downgrade(&current.sender),
         });
         let request = super::Request {
             started: Arc::new(AtomicBool::new(false)),

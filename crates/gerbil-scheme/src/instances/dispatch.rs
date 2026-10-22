@@ -31,7 +31,7 @@ pub(super) struct Senders {
 }
 #[derive(Debug)]
 pub(super) struct OwnerSender {
-    pub(super) sender: mpsc::SyncSender<Request>,
+    pub(super) sender: Arc<mpsc::SyncSender<Request>>,
     pub(super) wake: Option<Arc<super::service_wake::Wake>>,
     #[cfg(feature = "tokio-dispatch")]
     pub(super) capacity: Option<Arc<super::capacity::Capacity>>,
@@ -82,7 +82,7 @@ impl InstanceDispatcher {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .owners
             .push(OwnerSender {
-                sender,
+                sender: Arc::new(sender),
                 wake,
                 #[cfg(feature = "tokio-dispatch")]
                 capacity: None,

@@ -13,13 +13,14 @@ struct Peer {
     capacity: Arc<Capacity>,
     active: Weak<Semaphore>,
     staged: Arc<AtomicU64>,
+    mailbox: Weak<std::sync::mpsc::SyncSender<super::Request>>,
 }
 pub(super) struct RouteTarget {
-    pub owner: usize,
     pub wake: Arc<Wake>,
     pub capacity: Arc<Capacity>,
     pub active: Arc<Semaphore>,
     pub staged: Arc<AtomicU64>,
+    pub mailbox: Weak<std::sync::mpsc::SyncSender<super::Request>>,
 }
 /// An inbox hint, never release authority for active/work/slot/root ownership.
 #[derive(Debug)]
@@ -49,6 +50,7 @@ impl Fair {
         wake: Weak<Wake>,
         capacity: Arc<Capacity>,
         active: Weak<Semaphore>,
+        mailbox: Weak<std::sync::mpsc::SyncSender<super::Request>>,
     ) {
         let staged = wake
             .upgrade()
@@ -62,6 +64,7 @@ impl Fair {
                 capacity,
                 active,
                 staged,
+                mailbox,
             });
     }
     pub(super) fn target(&self, owner: usize, units: usize) -> Option<RouteTarget> {
@@ -85,11 +88,11 @@ impl Fair {
             return None;
         }
         Some(RouteTarget {
-            owner: peer.owner,
             wake,
             active,
             capacity: Arc::clone(&peer.capacity),
             staged: Arc::clone(&peer.staged),
+            mailbox: peer.mailbox.clone(),
         })
     }
 }

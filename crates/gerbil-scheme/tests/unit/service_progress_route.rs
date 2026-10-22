@@ -40,11 +40,11 @@ impl Fixture {
         let source = PoolSource::new(VecDeque::from([request(8)]));
         source.fair.set(Fair::default()).ok().unwrap();
         let target = RouteTarget {
-            owner: 0,
             wake,
             capacity,
             active: Arc::new(Semaphore::new(3)),
             staged: Arc::default(),
+            mailbox: Arc::downgrade(&dispatch.admission.senders.lock().unwrap().owners[0].sender),
         };
         Self {
             dispatch,
@@ -59,7 +59,7 @@ impl Fixture {
         let result = deliver(
             &self.source,
             &self.target,
-            &self.dispatch.admission,
+            &self.dispatch.admission.accepting,
             &mut permit,
             &AtomicBool::new(cancelled),
             if expired {
@@ -160,7 +160,7 @@ fn full_or_disconnected_inbox_restores_fifo_and_all_credits() {
     assert!(!deliver(
         &source,
         &target,
-        &dispatch.admission,
+        &dispatch.admission.accepting,
         &mut permit,
         &AtomicBool::new(false),
         Instant::now() + Duration::from_secs(1)
@@ -182,6 +182,15 @@ fn cancellation_expiry_and_closed_peer_do_not_bind_work() {
     assert!(!f.deliver(false, true));
     f.refunded();
     f.target.wake.close();
+    assert!(!f.deliver(false, false));
+    f.refunded();
+}
+
+#[test]
+fn expired_registration_mailbox_cannot_bind_a_replacement_owner() {
+    let f = Fixture::new();
+    f.dispatch.admission.senders.lock().unwrap().owners.clear();
+    assert!(f.target.mailbox.upgrade().is_none());
     assert!(!f.deliver(false, false));
     f.refunded();
 }

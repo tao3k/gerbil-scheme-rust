@@ -1,8 +1,8 @@
 //! Bounded cross-owner admission; no foreign code or user callback under locks.
-use super::{Admission, CapacityPermit, PoolSource, RouteTarget, StagedWork, pool::Work};
+use super::{CapacityPermit, PoolSource, RouteTarget, StagedWork, pool::Work};
 use std::{
     sync::{
-        Arc, Weak,
+        Arc,
         atomic::{AtomicBool, Ordering},
     },
     time::Instant,
@@ -12,28 +12,18 @@ pub(super) fn assist(
     source: &PoolSource,
     owner: usize,
     units: usize,
-    admission: &Weak<Admission>,
+    accepting: &AtomicBool,
     cancelled: &AtomicBool,
     deadline: Instant,
 ) -> bool {
     let Some(target) = source.fair.get().and_then(|f| f.target(owner, units)) else {
         return false;
     };
-    let Some(admission) = admission.upgrade() else {
-        return false;
-    };
     let Some(permit) = reserve(&target, units) else {
         return false;
     };
     let mut permit = Some(permit);
-    let sent = deliver(
-        source,
-        &target,
-        &admission,
-        &mut permit,
-        cancelled,
-        deadline,
-    );
+    let sent = deliver(source, &target, accepting, &mut permit, cancelled, deadline);
     // Rollback returns capacity outside both the source and admission fences.
     drop(permit);
     sent
@@ -47,32 +37,22 @@ fn reserve(target: &RouteTarget, units: usize) -> Option<CapacityPermit> {
 fn deliver(
     source: &PoolSource,
     target: &RouteTarget,
-    admission: &Admission,
+    accepting: &AtomicBool,
     permit: &mut Option<CapacityPermit>,
     cancelled: &AtomicBool,
     deadline: Instant,
 ) -> bool {
-    let mut senders = admission
-        .senders
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let Some(sender) = senders.owners.get(target.owner) else {
+    // This capability was issued under the registration/close fence. A weak
+    // mailbox never keeps an old owner inbox alive and cannot target a new one.
+    let Some(mailbox) = target.mailbox.upgrade() else {
         return false;
     };
     if !crate::instance_backend::images_ready()
-        || !admission.accepting.load(Ordering::Acquire)
+        || !accepting.load(Ordering::Acquire)
         || target.wake.closed.load(Ordering::Acquire)
         || target.wake.failed.load(Ordering::Acquire)
         || cancelled.load(Ordering::Acquire)
         || Instant::now() >= deadline
-        || !sender
-            .capacity
-            .as_ref()
-            .is_some_and(|c| Arc::ptr_eq(c, &target.capacity))
-        || !sender
-            .wake
-            .as_ref()
-            .is_some_and(|w| Arc::ptr_eq(w, &target.wake))
     {
         return false;
     }
@@ -94,7 +74,7 @@ fn deliver(
     if let Some(trace) = &trace {
         trace.mark(super::SchemeServiceEntryPhase::Published);
     }
-    let result = sender.sender.try_send(request);
+    let result = mailbox.try_send(request);
     let sent = match result {
         Ok(()) => {
             target
@@ -102,7 +82,6 @@ fn deliver(
                 .progress
                 .peer_deliveries
                 .fetch_add(1, Ordering::AcqRel);
-            senders.ever_admitted = true;
             true
         }
         Err(
@@ -116,7 +95,6 @@ fn deliver(
     };
     let head_changed = sent && requests.front().map(|r| r.work_units) != Some(units);
     drop(requests);
-    drop(senders);
     if head_changed {
         source.wake();
     }

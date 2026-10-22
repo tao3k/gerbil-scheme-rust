@@ -1,6 +1,10 @@
 #+title: Capacity-backed peer delivery and the owner pipeline
 #+options: toc:nil num:nil
 
+This report retains the first failed architecture capture and the final
+per-owner mailbox-capability revision. The initial lifecycle-fence algorithm
+below is superseded by the final data-path revision; its negative evidence stays.
+
 * Architecture decision
 
 The previous reports show tradeoffs rather than general performance admission.
@@ -200,3 +204,103 @@ verified unchanged before publication.
 CPU short owner counts (control / candidate): =[156, 167, 156, 161]= / =[159, 183, 142, 156]=.
 
 Mixed short owner counts (control / candidate): =[176, 140, 157, 167]= / =[157, 185, 142, 156]=.
+
+* Final revision: registration capabilities separate the data path
+
+The first implementation performs peer inbox admission while holding the global
+Admission.senders table lock. Short client admission also needs that lock. The
+code therefore reintroduces lifecycle-table serialization into the execution hot
+path, despite removing donor-only yielding. The shared lock is a concrete cost;
+the first experiment does not quantify its isolated contribution to p99.
+
+Producer registration already runs under that table fence after taking the
+registration permit and verifying capacity identity. It now issues a weak typed
+mailbox capability alongside the fixed wake/capacity identity. A live
+registration freezes that capacity; configuration cannot replace its budgets.
+Routing needs no repeated owner-index lookup or global table lock. A private
+RouteTarget contains the capability itself, rather than an integer used for a
+new lookup. The existing registered admission has already marked ever_admitted.
+
+The owner table owns the Arc wrapping the sender. Pool close first invalidates
+the cached accepting flag, closes budgets/wakes and removes that table. A stored
+Weak cannot keep the endpoint alive, revive an old endpoint, or redirect to a
+replacement owner with the same index. A short-lived successful upgrade only
+keeps that channel object alive for the attempt. Failed upgrade/send returns
+all permits outside the shared-source lock and preserves the FIFO head.
+
+The final hot path retains the shared-source FIFO lock and its existing atomic
+lifecycle/cancel/deadline fences, like OwnerLocal admission. It does not acquire
+the pool lifecycle table. Close racing after that fence follows the existing
+accepted-work drain contract; disconnected delivery rolls back before native
+construction. The destination still performs all native work itself. This does
+not introduce a second executor, weaken native affinity or establish an OS time
+bound. Actual capacity, receiver claim and first native entry remain distinct.
+
+An additional unit retires the issued endpoint while retaining the old target
+capability and proves it cannot commit work, including complete quota/hint
+refund. The existing routeProgress model transition and close scenarios remain
+the same abstract atomic admission contract; weak pointer lifetime/reuse is
+checked in Rust, not claimed proven by Quint. The final changed comparison keeps
+the first capture's configuration and oracle. It is not an unchanged recapture
+or an expanded thread/load matrix. The first failure remains rejected.
+
+* Final capability capture and architecture verdict
+
+The changed capability capture =service-progress-mailbox= completes 40 samples
+in 6.58 seconds. Each candidate sample executes real peer admissions: totals are
+1948 CPU / 886 mixed, with zero in every control sample. The native image is
+identical to the first routing capture and to both arms of this capture. Four
+owners join, external roots are zero, services quiesce and copied files disappear.
+
+| Workload | Metric | FIFO control | Mailbox-capability joint policy | Change |
+|----------+--------+--------------+---------------------------------+--------|
+| CPU | Orders/s | 315339.710212 | 307887.454958 | -2.36% |
+| CPU | Bulk service p99, ms | 1.457458 | 0.816333 | -43.99% |
+| CPU | Native-completion short p99, ms | 0.465708 | 0.458500 | -1.55% |
+| CPU | Scheduled-probe p99, ms | 28.706916 | 1.886208 | -93.43% |
+| CPU | Maximum owner finish spread, ms | 0.520500 | 0.544708 | +4.65% |
+| Mixed | Orders/s | 65456.819242 | 65045.384520 | -0.63% |
+| Mixed | Bulk service p99, ms | 1.867375 | 1.960833 | +5.00% |
+| Mixed | Native-completion short p99, ms | 0.473583 | 0.474541 | +0.20% |
+| Mixed | Scheduled-probe p99, ms | 1.938416 | 1.863917 | -3.84% |
+| Mixed | Maximum owner finish spread, ms | 1.378625 | 1.871792 | +35.77% |
+
+CPU minimum owner progress is 98.6486% / 98.7013%; mixed is 98.8095% in both
+arms. Minimum Actor peer count is 0 / 0 in both workloads. The comparison removes
+a concrete global-lock dependency, but still rejects overall performance
+promotion: CPU and mixed throughput regress, both maximum finish spreads regress,
+and mixed bulk p99 regresses. CPU bulk p99 improves and its short p99 changes
+little; the very large scheduled-probe difference is retained without attributing
+it to a specific OS state or the removed mutex. The first capture is not an
+isolated old-binary control for this one; absolute cross-capture comparisons are
+not admitted. No unchanged rerun or wider parameter matrix follows.
+
+The resulting library decision is to retain the existing owner-pull baseline and
+unchanged defaults. ProgressFair remains an explicit experimental policy, not a
+recommended general-purpose optimization. Two distinct architectural facts are
+now explicit: lifecycle authority need not serialize each data-path delivery;
+and even an actual capacity-backed inbox entry is not receiver execution
+readiness. More eager binding or another yield threshold does not close the
+second boundary. Further algorithm work needs a separate transferable Rust-offer,
+receiver-claim and irrevocable-native-entry contract; this change does not claim
+that contract or native-state migration implemented.
+
+The capability version passes 36 instance units, all three native service tests,
+focused warnings-denied Clippy and a release build. The existing refined model
+receipt remains 23.08 seconds: its abstract atomic claim and close contract is
+unchanged by replacing the table lookup with a registration-issued capability.
+Weak endpoint expiry/reuse is checked by Rust controls, not mislabeled a Quint
+proof. All timed runtime, benchmark, native-control and model sources are checked
+against the private frozen manifest; only this report is completed afterward.
+
+Final binary SHA-256:
+=dc8b63b8d52fa801c4cf4fbc43ae54fa51592f34447ac0fced79e2ad27611e98=.
+Native image SHA-256:
+=eb9d61706ec0c047967aec39c298d20d0952da56074ffbeba1a56b19ae8e9412=.
+Both complete source archives, all failed attempts and raw samples stay private.
+The predecessor at =1b4036d= completes all six supported CI jobs successfully;
+SMP is explicitly skipped. New-head CI remains separate from those receipts.
+
+CPU short owner counts (control / candidate): =[145, 144, 183, 168]= / =[192, 145, 146, 157]=.
+
+Mixed short owner counts (control / candidate): =[156, 169, 161, 154]= / =[186, 159, 166, 129]=.

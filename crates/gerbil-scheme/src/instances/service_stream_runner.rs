@@ -60,6 +60,7 @@ impl ServiceProducer {
                         .map_or_else(Weak::new, Arc::downgrade),
                     Arc::clone(&registration.capacity),
                     Arc::downgrade(&active),
+                    registration.mailbox.clone(),
                 );
             }
         }
@@ -150,7 +151,7 @@ impl Producer for ServiceProducer {
         if self.requests.assist(
             self.owner,
             units,
-            &self.admission,
+            &self.accepting,
             &self.cancelled,
             self.deadline,
         ) && self.requests.units() != Some(units)

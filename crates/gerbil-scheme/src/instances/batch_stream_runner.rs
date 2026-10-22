@@ -39,6 +39,7 @@ pub(super) struct Registration {
     pub deadline: Instant,
     pub waker: Waker,
     pub wake: Option<Arc<super::service_wake::Wake>>,
+    pub mailbox: Weak<std::sync::mpsc::SyncSender<super::Request>>,
 }
 pub(super) struct BatchOperation<T, R> {
     pub run: RunBatch<T, R>,
@@ -80,6 +81,7 @@ impl<T, R> BatchProducer<T, R> {
             deadline,
             waker,
             wake: _,
+            mailbox: _,
         } = registration;
         let offered = Instant::now();
         Self {

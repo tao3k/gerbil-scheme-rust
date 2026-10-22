@@ -50,7 +50,7 @@ fn cancelled_slot_wait_returns_work_and_notifies() {
             drop(waiting);
             assert_eq!(capacity.work.as_ref().unwrap().available_permits(), 8);
             assert!(changes.has_changed().unwrap());
-            changes.borrow_and_update();
+            changes.mark_unchanged();
             drop(slot);
             let reserved = capacity.try_pair(8).unwrap();
             drop(reserved); // delivery precedes registration of changed(): version persists
@@ -86,6 +86,31 @@ fn cancelled_partial_work_acquisition_notifies_reselection() {
             assert_eq!(capacity.slots.available_permits(), 1);
             assert!(changes.has_changed().unwrap());
             drop(work);
+            assert!(capacity.try_pair(8).is_ok());
+        });
+}
+
+#[test]
+fn version_mark_before_scan_preserves_concurrent_return() {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let (capacity, mut changes) = capacity();
+            let held = capacity.try_pair(8).unwrap();
+            // An earlier notification can be discarded only before the live scan.
+            capacity.changed.get().unwrap().send_replace(());
+            changes.mark_unchanged();
+            assert!(capacity.try_pair(8).is_err());
+            drop(held); // after scan, before registration of changed()
+            tokio::time::timeout(std::time::Duration::from_secs(1), changes.changed())
+                .await
+                .unwrap()
+                .unwrap();
+            let returned = capacity.try_pair(8).unwrap();
+            drop(returned);
+            changes.mark_unchanged(); // return before mark: scan observes real credits
             assert!(capacity.try_pair(8).is_ok());
         });
 }

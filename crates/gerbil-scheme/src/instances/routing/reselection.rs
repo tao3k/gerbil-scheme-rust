@@ -38,7 +38,11 @@ impl SchemeServiceRouter {
                 .map_err(|_| InstanceError::Closed)?;
             let mut changes = self.state.changed.get().unwrap().subscribe();
             loop {
-                changes.borrow_and_update();
+                // This channel carries only a version, not application data.
+                // Do not take its payload read lock on a host worker: native
+                // owners publish capacity with the matching write lock. Mark
+                // before scanning so a concurrent return remains observable.
+                changes.mark_unchanged();
                 if gate.is_closed() {
                     return Err(InstanceError::Closed);
                 }

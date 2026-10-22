@@ -1,0 +1,193 @@
+#+title: Service Owner Wake Boundary and OS Scheduling Control
+#+date: 2026-10-22
+
+* Scope and admission decision
+
+Continue the native service from [[file:30.42-capacity-reserved-owner-reselection.org][capacity-reserved owner reselection]].
+Four independent Scheme VMs remain on their fixed OS owners. Rust admits and
+distributes requests across instances; Scheme retains native types, Actors,
+green threads, continuations, exception handling and GC. The Scheme/C build
+remains O2. No SMP, JSON transport, default, timeout or thread matrix changes.
+
+This iteration separates three claims: the existing reselection lifecycle
+contract, a version-observation synchronization repair, and a targeted OS
+scheduling experiment. Neither the repair nor the experiment closes general
+throughput/tail/fairness acceptance. Historical negative captures remain valid.
+
+* Correlated entry evidence
+
+An unchanged frozen predecessor benchmark ran =--reselection-ab
+--phase-observation=: 40 complete samples, ten per arm/load, the same four VMs
+and image, two Tokio workers, 8,192 native 48-line orders, batch eight, and 64
+four-line short probes per sample. Both arms use native port wake, cooperative
+budget one, feed one, coalesced notification and the same class/work bounds.
+The control pins admission; the candidate reselects. Four owners joined, roots
+were zero and copied image files were removed. No history overflow was observed.
+The observer is explicitly enabled in both arms; its timings are not substituted
+for the earlier unobserved performance results.
+
+For each arm/load, sort its 640 probes by actual request latency and retain the
+seven probes at indices =floor(640 * 99 / 100)= through 639. The following are
+medians of ratios computed on each *same request*, not ratios/subtractions of
+unrelated percentiles. Queue is publication through owner dequeue. Wait is the
+intersection of that interval with the owner's measured Wait phases. Select is
+the intersection with its nonoverlapping native select calls, excluding Scheme
+sleep records. Every overlap is bounded by the same queue interval.
+
+| Load/arm | Tail actual range ms | Queue/actual % | Wait/queue % | Select/queue % |
+|----------+----------------------+----------------+--------------+----------------|
+| CPU pinned | 46.988--134.111 | 99.74 | 99.84 | 95.48 |
+| CPU reselect | 59.754--93.733 | 99.83 | 100.00 | 99.74 |
+| Mixed pinned | 18.061--44.742 | 91.45 | 99.80 | 95.38 |
+| Mixed reselect | 24.378--35.162 | 99.56 | 99.53 | 96.21 |
+
+Several individual tails enclose a native descriptor-readiness return following
+a successful host write; another long tail has no overlapping select. Owner
+phase CPU can be tens of microseconds while its wall interval exceeds 90 ms,
+with zero GC in that phase. These receipts reject own type construction,
+projection and collector CPU as sufficient explanations for those requests.
+They locate the principal observed boundary at native wait and owner resumption.
+They do not prove that every tail has one cause or isolate kernel readiness,
+runnable delay, timer policy, Scheme work outside select, or the descriptor
+that actually returned ready. A write-return timestamp is not a kernel wakeup
+or owner-resumption timestamp. SDK GC CPU remains process-scoped; it is not
+summed across owners or subtracted from owner wall time to estimate OS delay.
+
+* Version-only capacity observation
+
+The pool capacity event uses =watch::Sender<()>=. Its payload carries no value
+that admission needs. Tokio 1.53.1 =borrow_and_update()= takes the payload read
+lock; native owners' =send_replace()= takes the corresponding write lock.
+Reselection now calls =mark_unchanged()=, which observes the version without
+borrowing payload data. This removes an unnecessary reader/writer dependency.
+It is not evidence that this lock caused the above native select tails.
+
+The ordering remains mark, scan live capacity, then await a version change.
+A return before marking is visible to the subsequent real-capacity scan; a
+return after marking remains a changed version even if delivery precedes await
+registration. The test exercises both windows with actual semaphores. FIFO class
+heads, capacity-object epoch fencing, cancellation, close and publication
+ownership remain unchanged. This refines the same existing model protocol;
+there is no new model or claim of OS liveness/latency from finite model checks.
+
+* Targeted OS class experiment
+
+The exclusive =--owner-qos-ab= pair uses reselection in both arms. Only the
+four fixed owners' requested OS class changes, from the saved original to
+Darwin =USER_INITIATED=. The existing native qualification control saves class
+and relative priority; successful application and exact original requested-class
+restoration are checked after every sample, outside the timed workload. An
+unspecified original class fails instead of inventing a restoration policy.
+Only these test-owned threads change. Other tasks are not paused or configured.
+The implementation is benchmark-only; no new production QoS API or default is
+promoted from this experiment.
+
+Two final unobserved captures use the repaired version-observation source,
+40 complete samples each, ten per arm/load in AB/BA order. Startup/configuration
+are untimed. Actual short latency begins before submission; scheduled latency
+uses the existing serial nominal-500-us probe release policy, not a fixed
+open-loop arrival process. Both metrics are retained. No samples are filtered.
+No own compiler ran during these captures. Other desktop/tasks remained active;
+these matched interventions are not quiet-host or portable service guarantees.
+
+| Capture/load | Orders/s original -> explicit | Change | Short actual p99 ms | Scheduled p99 ms | Batch service p99 ms | Minimum normalized owner progress % |
+|--------------+-------------------------------+--------+---------------------+------------------+----------------------+-------------------------------------|
+| A CPU | 40,422.62 -> 53,382.63 | +32.06% | 26.994 -> 24.756 | 318.576 -> 337.296 | 17.333 -> 9.262 | 98.347 -> 97.414 |
+| A mixed | 12,391.47 -> 12,509.04 | +0.95% | 20.918 -> 25.518 | 244.458 -> 196.335 | 44.124 -> 37.719 | 98.400 -> 98.394 |
+| B CPU | 30,381.27 -> 29,439.16 | -3.10% | 28.071 -> 46.326 | 288.460 -> 331.057 | 17.717 -> 16.732 | 98.723 -> 98.039 |
+| B mixed | 11,924.92 -> 12,346.08 | +3.53% | 18.666 -> 29.719 | 226.759 -> 420.097 | 42.365 -> 52.126 | 98.406 -> 98.760 |
+
+Mixed actual short p99 regresses 21.99% and 59.21%. B CPU short p99 regresses
+65.03%; B mixed batch p99 regresses 23.04%. A CPU probe overlap minimum is
+64 -> 47, all other final arm/load minima are 64. Its improved actual tail
+therefore does not establish all-probes-under-load improvement. Maximum owner
+finish spread changes 31.190 -> 31.125, 60.655 -> 13.161, 14.857 -> 14.819 and
+54.924 -> 18.014 ms, respectively. Actor-peer minima are one in both A CPU
+arms and zero elsewhere. None of these observations is a fairness guarantee.
+
+A separate final-source diagnostic capture also completed 40 samples and clean
+shutdown. The same-request tail overlap ratios are:
+
+| Load/OS class | Tail actual range ms | Queue/actual % | Wait/queue % | Select/queue % |
+|---------------+----------------------+----------------+--------------+----------------|
+| CPU original | 50.747--158.929 | 99.76 | 99.77 | 88.02 |
+| CPU explicit | 29.607--266.311 | 99.85 | 99.89 | 5.67 |
+| Mixed original | 13.987--73.789 | 98.45 | 99.94 | 86.96 |
+| Mixed explicit | 9.550--21.424 | 99.25 | 99.99 | 99.33 |
+
+The CPU explicit-class tail can remain inside the native Wait phase but outside
+recorded select calls. Therefore neither select-duration optimization alone nor
+an OS-class change is sufficient. The instrumented mixed improvement is retained
+alongside the contradictory unobserved mixed regressions, not substituted for
+them. Exact descriptor readiness and kernel runnable timestamps remain absent.
+
+* Earlier controls retained
+
+Before the version-only observation repair, two complete same-VM QoS captures
+used binary =18ef8f1688b64f1b20ca751336f7ce6887a0972c5bf517e17d89bf26ad8fda0b=.
+CPU throughput changed +9.47%/+41.64%, CPU actual short p99 +0.93%/+100.17%;
+mixed throughput -7.08%/+8.47%, mixed actual short p99 -21.33%/-21.19%.
+Mixed owner finish spread worsened 97.09%/138.12%. Both had 40 samples and clean
+shutdown. The earlier traced reselection capture and both release smoke controls
+are also retained. These separate-source captures do not isolate the version
+repair's performance effect, and are not relabeled as final-source acceptance.
+The repair removes a known unnecessary synchronization dependency; no isolated
+speedup claim is made for it.
+
+* Native and source closure
+
+- Eight real semaphore/pipe controls pass, including release before scan and
+  release after scan/before wait registration, partial cancellation, close and
+  independent notification failure controls.
+- The full four-VM native Scheme service fixture passes in 6.39 seconds of test
+  execution with unchanged five-second progress/request gates: initialization
+  failures, native GC and multi-shot continuations, Scheme exceptions, injected
+  constructor/projection panic controls, reselection cancellation/timeout,
+  router/pool close, equal-limit capacity reconfiguration and complete teardown.
+- Final release smoke and all three final full captures validate every QoS
+  application/restoration receipt, four owner joins, zero roots, service
+  quiescence and removal of copied image files. RSS convergence and unrelated
+  lifetime suites are not re-certified by this directed test.
+- Focused core and qualification Clippy gates pass with warnings denied; format
+  and diff checks pass. The existing native CI job gains the exclusive QoS smoke,
+  not a new matrix or timeout. Remote CI remains a distinct gate.
+
+Final frozen binary SHA-256:
+=dabf8e310fe4b50269d3347215618e334cef747ccbb0b809da6f968eaecc5c25=.
+Native image SHA-256:
+=306ac7a148bc4e444ae210ee1f734150beba352bca4789d32c8f629d97b22f46=,
+identical to the predecessor's image. Frozen source archive SHA-256:
+=f480ad8baa5d2944b1231c05d784adfa3c2259913766fc34e96a40c3e2ae1729=.
+Runtime source inputs and the actual executed image were checked unchanged after
+capture. Final report prose is added afterward. Raw JSON, logs, frozen binaries,
+images and source archives remain private and are not repository artifacts.
+
+#+begin_src sh
+just bridge-scheme-service-benchmark --test --owner-qos-ab
+just bridge-scheme-service-benchmark --owner-qos-ab
+just bridge-scheme-service-benchmark --owner-qos-ab --phase-observation
+cargo test -p gerbil-scheme --features tokio-dispatch --lib instances:: --locked
+cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+#+end_src
+
+* Architectural consequence and remaining gate
+
+Credit availability describes admission ownership, not whether an owner is
+running or when it will resume. A short queue in Scheme cannot prioritize a
+request that has not reached Scheme. QoS, queue scoring, GC accounting and
+native completion notification address different boundaries; combining them
+under one latency claim obscures the actual missing evidence.
+
+The next algorithmic candidate must reduce host-refill-dependent empty pipeline
+transitions through bounded owner-resident service production, while preserving
+short admission, Scheme cooperative execution and native result/root retirement.
+It must reuse existing producer/capacity machinery rather than invent an
+independent runtime. This is a candidate, not an implemented or validated fix in
+this iteration. It requires an explicit source-of-work/output bound, cancellation
+and close protocol, and a same-VM comparison against the current service.
+
+Do not revive the rejected wait-phase boolean hint, infer readiness from free
+credits, add polling sleeps/spinning, raise watchdogs, or promote OS priority.
+The version protocol and directed native lifecycle checks are closed here;
+the throughput/p99/fairness objective remains open. Preserve the negative rows
+as the starting control for the next actual algorithm change.

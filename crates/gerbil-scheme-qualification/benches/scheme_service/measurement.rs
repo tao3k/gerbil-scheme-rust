@@ -28,6 +28,7 @@ pub(super) enum Comparison {
     Ingress,
     Notification,
     Reselection,
+    OwnerQos,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -40,6 +41,9 @@ impl Comparison {
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
             Self::Reselection => {
                 "same native work/queues/quotas; pinned versus capacity-reserved owner reselection"
+            }
+            Self::OwnerQos => {
+                "same reselected native service; restored original versus explicit owner OS QoS"
             }
             Self::Notification => {
                 "same native port/budget/work; coalesced versus independent short notification"
@@ -77,6 +81,7 @@ impl Strategy {
                     | Comparison::Ingress
                     | Comparison::Notification
                     | Comparison::Reselection
+                    | Comparison::OwnerQos
             ) && (arm
                 || matches!(
                     comparison,
@@ -85,6 +90,7 @@ impl Strategy {
                         | Comparison::Ingress
                         | Comparison::Notification
                         | Comparison::Reselection
+                        | Comparison::OwnerQos
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -105,6 +111,7 @@ impl Strategy {
                     | Comparison::Ingress
                     | Comparison::Notification
                     | Comparison::Reselection
+                    | Comparison::OwnerQos
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -131,7 +138,7 @@ pub(super) fn run(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if comparison == Comparison::Reselection && arm {
+        if (comparison == Comparison::Reselection && arm) || comparison == Comparison::OwnerQos {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
         } else {
             gerbil_scheme::instances::SchemeRoutingAdmission::Pinned
@@ -144,6 +151,7 @@ pub(super) fn run(
         None
     };
     configure(pool, comparison, arm);
+    let qos = (comparison == Comparison::OwnerQos).then(|| super::native_wait::qos(pool, arm));
     let before = observation.then(|| super::observation::snapshot(pool));
     if observation {
         super::native_wait::begin(pool);
@@ -197,6 +205,10 @@ pub(super) fn run(
         value["owner_phases"] =
             super::observation::delta(&before, &super::observation::snapshot(pool));
     }
+    if let Some(qos) = qos {
+        value["owner_qos_receipts"] = qos;
+        value["owner_qos_restored"] = super::native_wait::qos(pool, false);
+    }
     append_policy(&mut value, pool, comparison, arm, inputs, probes);
     if observation && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
@@ -217,18 +229,22 @@ fn append_policy(
             | Comparison::Ingress
             | Comparison::Notification
             | Comparison::Reselection
+            | Comparison::OwnerQos
     ) {
         value["scheme_budget"] = json!(usize::from(
             arm || matches!(
                 comparison,
-                Comparison::Ingress | Comparison::Notification | Comparison::Reselection
+                Comparison::Ingress
+                    | Comparison::Notification
+                    | Comparison::Reselection
+                    | Comparison::OwnerQos
             )
         ));
         value["native_port_wake"] = json!(
             (comparison == Comparison::Ingress && arm)
                 || matches!(
                     comparison,
-                    Comparison::Notification | Comparison::Reselection
+                    Comparison::Notification | Comparison::Reselection | Comparison::OwnerQos
                 )
         );
         value["independent_short_notifications"] =
@@ -237,13 +253,17 @@ fn append_policy(
             pool,
             arm || matches!(
                 comparison,
-                Comparison::Ingress | Comparison::Notification | Comparison::Reselection
+                Comparison::Ingress
+                    | Comparison::Notification
+                    | Comparison::Reselection
+                    | Comparison::OwnerQos
             ),
             inputs,
             probes,
         );
     }
-    value["owner_reselection"] = json!(comparison == Comparison::Reselection && arm);
+    value["owner_reselection"] =
+        json!((comparison == Comparison::Reselection && arm) || comparison == Comparison::OwnerQos);
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
     } else {
@@ -263,14 +283,17 @@ fn configure(pool: &InstancePool, comparison: Comparison, arm: bool) {
     }
     if matches!(
         comparison,
-        Comparison::Ingress | Comparison::Notification | Comparison::Reselection
+        Comparison::Ingress
+            | Comparison::Notification
+            | Comparison::Reselection
+            | Comparison::OwnerQos
     ) {
         super::budget::configure(pool, true);
         super::budget::wake(
             pool,
             arm || matches!(
                 comparison,
-                Comparison::Notification | Comparison::Reselection
+                Comparison::Notification | Comparison::Reselection | Comparison::OwnerQos
             ),
         );
         super::budget::notification(pool, comparison == Comparison::Notification && arm);

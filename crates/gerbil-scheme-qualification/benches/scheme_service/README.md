@@ -240,3 +240,24 @@ A remains blocked, FIFO follower progress, declaration reads, cancellation,
 timeout, native capacity-epoch invalidation and router/pool close conservation. Successful model or smoke checks are
 not throughput/p99 acceptance. Keep raw captures outside the repository and
 retain negative and incomplete results under distinct source identities.
+
+
+## Owner OS scheduling diagnostic
+
+`just bridge-scheme-service-benchmark --owner-qos-ab` selects one exclusive
+pair on the same four native VMs and two Tokio workers. Both arms use capacity
+reselection, native short execution, native port wake, cooperative budget one,
+feed one, coalesced notifications, and identical request/work/class bounds.
+Only the fixed owners' requested Darwin OS class changes: original versus
+`USER_INITIATED`. The existing qualification image control saves each owner's
+original class and relative priority and restores it after every sample.
+Application and restoration return codes and requested classes are asserted;
+an unspecified original class is rejected. No library default is changed.
+
+Add `--phase-observation` for matching request-entry, owner-phase and native
+select observations in both arms. This observer perturbs execution and is not
+interchangeable with an unobserved capture. A successful pipe write proves
+neither immediate owner execution nor which descriptor woke a native select.
+QoS is an experimental OS intervention, not a Scheme scheduling algorithm or
+a portable latency guarantee. Preserve throughput, short/batch tails and owner
+fairness regressions. `--test --owner-qos-ab` is a correctness smoke only.

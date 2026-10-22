@@ -67,3 +67,19 @@ pub(super) fn finish(pool: &InstancePool, inputs: &[Vec<i64>]) -> Value {
     assert_eq!(sleeps, inputs.iter().filter(|row| row[1] == 1).count());
     json!(events)
 }
+
+// Reuse the existing image control; only the fixed owner OS class changes.
+pub(super) fn qos(pool: &InstancePool, elevated: bool) -> Value {
+    let receipts = control(pool, &[12, i64::from(elevated)]);
+    assert!(
+        receipts.iter().all(|row| row.len() == 3
+            && row[0] == 0
+            && if elevated {
+                row[1] == 25
+            } else {
+                row[1] == row[2]
+            }),
+        "owner QoS application/restoration failed: {receipts:?}"
+    );
+    json!(receipts)
+}

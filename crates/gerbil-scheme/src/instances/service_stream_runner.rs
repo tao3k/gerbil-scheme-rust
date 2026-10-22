@@ -145,6 +145,11 @@ impl Producer for ServiceProducer {
         if !self.requests.ready() {
             return ProducerStep::Waiting;
         }
+        // A peer opportunity owns no active, slot or work credit. Never disturb
+        // a queued acquisition: it may already hold partial credits/FIFO position.
+        if !self.acquiring.waiting() && !self.requests.allow(self.owner, units) {
+            return ProducerStep::Progress;
+        }
         let mut context = Context::from_waker(&self.signal.0);
         let (active, capacity) =
             match self
@@ -175,10 +180,9 @@ impl Producer for ServiceProducer {
             self.reject(error);
             return ProducerStep::Progress;
         }
-        let Some(mut request) = self.requests.take(units, self.owner) else {
-            // Another owner advanced the FIFO, or a progress-weighted peer gets
-            // one nonexclusive opportunity. No reservation survives that turn.
-            // Return speculative credits; never consume a differently priced job.
+        let Some(mut request) = self.requests.take(units) else {
+            // Another owner advanced the FIFO. Return speculative credits;
+            // never consume a differently priced job.
             drop(capacity);
             drop(active);
             return ProducerStep::Progress;

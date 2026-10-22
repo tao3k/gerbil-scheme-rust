@@ -27,6 +27,10 @@ fn peer_opportunity_is_bounded_and_never_migrates_a_request() {
     // Free credits alone cannot identify a peer inside arbitrary native work.
     assert!(fair.allow(0, 8));
     w1.progress.waiting_for_claim.store(true, Ordering::Release);
+    // Exhausted local credits are not donated opportunities; no debt is consumed.
+    let held = Arc::clone(&a0).try_acquire_many_owned(3).unwrap();
+    assert!(fair.allow(0, 8));
+    drop(held);
     assert!(!fair.allow(0, 8));
     // The peer may never run: a second attempt must still be allowed.
     assert!(fair.allow(0, 8));

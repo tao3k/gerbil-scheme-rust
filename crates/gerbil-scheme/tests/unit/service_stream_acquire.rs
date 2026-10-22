@@ -60,7 +60,9 @@ fn ready_attempt_does_not_steal_from_an_older_work_waiter() {
     let mut older = Acquisition::new(SchemeServiceSupplyAdmission::Queued);
     let mut younger = Acquisition::new(SchemeServiceSupplyAdmission::OwnerLocal);
     let mut context = Context::from_waker(Waker::noop());
+    assert!(!older.waiting());
     assert!(older.poll(&active, &capacity, 8, &mut context).is_pending());
+    assert!(older.waiting());
     assert!(
         younger
             .poll(&active, &capacity, 1, &mut context)
@@ -73,6 +75,7 @@ fn ready_attempt_does_not_steal_from_an_older_work_waiter() {
             .is_pending()
     );
     let pair = completed(older.poll(&active, &capacity, 8, &mut context));
+    assert!(!older.waiting());
     assert!(
         younger
             .poll(&active, &capacity, 1, &mut context)

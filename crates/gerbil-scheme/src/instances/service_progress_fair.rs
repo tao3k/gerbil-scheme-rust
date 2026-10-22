@@ -39,6 +39,11 @@ impl Fair {
             let Some(index) = peers.iter().position(|p| p.owner == owner) else {
                 return true;
             };
+            // Capacity-blocked owners have no claim opportunity to donate.
+            // This is only a hint; real acquisition still arbitrates all credit.
+            if !available(&peers[index], units) {
+                return true;
+            }
             if peers[index].yielded {
                 peers[index].yielded = false;
                 return true;
@@ -48,8 +53,8 @@ impl Fair {
             };
             let least = peers
                 .iter()
-                .filter(|p| p.owner != owner && eligible(p, units))
-                .filter_map(|p| p.wake.upgrade().map(|w| (w.progress.load(), w)))
+                .filter(|p| p.owner != owner)
+                .filter_map(|p| eligible(p, units).map(|w| (w.progress.load(), w)))
                 .min_by_key(|(pending, _)| *pending);
             let Some((remaining, wake)) = least else {
                 return true;
@@ -67,13 +72,18 @@ impl Fair {
         false
     }
 }
-fn eligible(peer: &Peer, units: usize) -> bool {
-    peer.wake.upgrade().is_some_and(|w| {
-        !w.closed.load(Ordering::Acquire)
-            && !w.failed.load(Ordering::Acquire)
-            && w.progress.waiting_for_claim.load(Ordering::Acquire)
-    }) && peer
-        .active
+fn eligible(peer: &Peer, units: usize) -> Option<Arc<Wake>> {
+    if !available(peer, units) {
+        return None;
+    }
+    let wake = peer.wake.upgrade()?;
+    (!wake.closed.load(Ordering::Acquire)
+        && !wake.failed.load(Ordering::Acquire)
+        && wake.progress.waiting_for_claim.load(Ordering::Acquire))
+    .then_some(wake)
+}
+fn available(peer: &Peer, units: usize) -> bool {
+    peer.active
         .upgrade()
         .is_some_and(|a| a.available_permits() > 0)
         && peer.capacity.slots.available_permits() > 0

@@ -607,7 +607,8 @@ module owner_lifecycle {
     shortEligible(owner), s.parked.contains(owner), workUsed(owner) + amount <= s.workLimit }
   action yieldProgress(r: int, owner: int, peer: int): bool = all {
     s.phase == "open", s.poolStaged.contains(r), owner != peer,
-    s.producers.contains(owner), eligibleFor(peer, units(r)),
+    s.producers.contains(owner), shortEligible(owner),
+    workUsed(owner) + units(r) <= s.workLimit, eligibleFor(peer, units(r)),
     not(s.progressYielded.contains(owner)), residual(owner) > residual(peer) + units(r),
     s' = { ...s, progressYielded: s.progressYielded.union(Set(owner)),
       wakeOwed: s.wakeOwed.union(Set(peer)) }
@@ -653,7 +654,7 @@ module owner_lifecycle {
   run progressPeerOpportunityTest = init.then(stagePool(1)).then(stagePool(3))
     .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
     .then(claimPool(1, 1)).then(submitService(1)).then(park(2)).then(yieldProgress(3, 1, 2))
-    .then(all { assert(not(s.capacityHeld.contains(3))), assert(s.committed.get(3) == 0), assert(progressSafety), stutter })
+    .then(all { assert(not(s.capacityHeld.contains(3))), assert(not(s.workHeld.contains(3))), assert(s.committed.get(3) == 0), assert(progressSafety), stutter })
     .then(claimProgressPool(3, 1)).then(submitService(3))
     .then(all { assert(ownerOf(3) == 1), assert(s.progressYielded.size() == 0), assert(progressSafety), stutter })
     .then(close).then(readyService(1, false)).then(readyService(3, false)).then(complete(1)).then(complete(3))

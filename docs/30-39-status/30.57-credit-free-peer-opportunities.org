@@ -1,0 +1,155 @@
+#+title: Credit-free peer opportunities before owner admission
+#+options: toc:nil num:nil
+
+* Evidence and attribution
+
+Report 30.56 retains the failed performance qualification at commit =73b6165=:
+CPU throughput fell 8.95%, short native-completion p99 rose 104.35%, and bulk
+service p99 rose 41.86% / 30.96% in CPU / mixed load. Mixed throughput and finish
+spread improved. Those measurements compare two joint policies; they do not
+isolate the short selection algorithm, native bookkeeping or OS scheduling.
+
+| Cost | Source evidence | Admitted conclusion |
+|------+-----------------+---------------------|
+| Progress bookkeeping | Both arms use the same Scheme mutex, stable-ID table, native receipt and cached atomics | Common cost; its disabled-default overhead is unqualified |
+| Peer opportunity | Old source checks fairness after acquiring active/work/slot credits, then drops them on deferral | An uncommitted opportunity publishes a real capacity-return event unnecessarily |
+| Peer selection | Old eligible-peer scan upgrades the same weak wake twice | Avoidable reference-count operations under the fairness mutex |
+| Owner waiting | Deferral returns Progress and revisits the existing Scheme pump; waiting_for_claim marks an armed/rechecked protocol path | Not proof of OS blocking, runnable delay or GC CPU time |
+
+No claim assigns the full prior p99 regression to the credit-return path. Short
+residual ranking and promotion, native receipt cost and host scheduling remain
+possible contributors. The native-completion clock precedes Tokio caller
+resumption; service wall time includes execution, GC, waits and interleaving.
+Do not subtract pooled quantiles or process-wide GC CPU to infer missing phases.
+
+* Protocol and ownership
+
+A fresh acquisition asks the shared source for one peer opportunity before
+obtaining any active, work or slot permit. Only a claimant with observed free
+capacity may donate that opportunity. A capacity-blocked claimant proceeds to
+ordinary bounded acquisition without changing opportunity debt. A deferral
+retains no request, reservation or credit and therefore causes no capacity-return
+publication. It notifies the selected peer and takes the existing owner turn.
+The next eligible attempt remains runnable if that peer never executes.
+
+An acquisition that has already queued bypasses the advisory fairness check.
+It retains FIFO position and any partially acquired credits until ordinary
+completion, cancellation, deadline, close or a differently priced FIFO head.
+Fairness never cancels or restarts that acquisition. The actual acquire and final
+lifecycle fence still decide admission; availability snapshots grant no rights.
+A concurrent head-price change still refunds speculative credits normally.
+
+The peer scan upgrades each eligible wake once and keeps weak producer-lifetime
+ownership. This is not a permanent strong reference to a retired producer.
+The shared source never moves accepted Scheme values or resumes continuations.
+Resource credits still span native root projection; each returned credit is
+published before a later arbitrary projector can wait for it.
+
+This refines the existing ProgressFair implementation and owner_lifecycle model;
+it introduces no policy, configuration default, polling thread or native ABI.
+Short wake ranking and Scheme progress representation are unchanged, allowing
+this capture to test the changed candidate without a new parameter matrix.
+Scheme owns execution budgets, Actors, green threads, continuations, GC and
+exceptions. Rust distributes uncommitted cross-instance messages only.
+
+* Verification boundary
+
+The existing model now requires local claim capacity before donating an
+opportunity and explicitly asserts that the staged head owns neither work nor
+slot credit after deferral. The required premature-credit-release mutation must
+still produce a counterexample. Finite-model safety is separate from native
+qualification and does not establish an OS scheduling or arbitrary-owner bound.
+
+Focused unit controls cover exhausted local active capacity without consumed
+opportunity debt, bounded fallback when a peer never runs, close eligibility,
+and preservation of a pending acquisition's FIFO position. Native tests exercise
+the real API through GC, multishot continuation replay, Scheme exceptions,
+construction/projection failures, cancellation, timeout and accepted-work drain.
+
+* Directed comparison
+
+Reproduce with the repository's existing Rust benchmark entrypoint:
+
+#+begin_src text
+just bridge-scheme-service-benchmark --progress-fair-ab
+#+end_src
+
+One capture compares FIFO OwnerLocal / Selective with the changed ProgressFair
+bulk / short policy, using identical progress instrumentation in both arms.
+It uses the same four live VMs, native O2 image, two Tokio workers, slot/work
+budgets 4/32, batch 8, quantum 1, feed 1, Scheme budget 1 and NativePort waits.
+Each sample executes 8192 real orders plus 64 short probes; five AB/BA blocks
+produce ten samples per arm/load. VM identity, oracle and cleanup are asserted.
+The native progress watchdog remains five seconds; the outer bound is 120 seconds.
+Other host tasks remain untouched; no quiet-host or OS-state attribution is made.
+
+This compares current policies within one capture. It does not isolate the new
+protocol's speedup over the old ProgressFair binary: absolute values from the
+previous capture must not be used as that control. Raw evidence, complete source
+hashes, image identities and failed results remain outside the repository.
+
+* Capture result and decision
+
+The single changed capture =service-progress-preclaim= completes 40 samples
+and exits normally in 6.61 seconds. Four owners join, external roots are all zero,
+Scheme services quiesce and copied image files are removed.
+
+| Workload | Metric | FIFO control | Credit-free joint policy | Change |
+|----------+--------+--------------+--------------------------+--------|
+| CPU | Orders/s | 374933.481574 | 364698.746237 | -2.73% |
+| CPU | Bulk service p99, ms | 0.560250 | 0.582000 | +3.88% |
+| CPU | Native-completion short p99, ms | 0.347833 | 0.360750 | +3.71% |
+| CPU | Scheduled-probe p99, ms | 2.146959 | 2.070041 | -3.58% |
+| CPU | Maximum owner finish spread, ms | 0.495750 | 0.297541 | -39.98% |
+| Mixed | Orders/s | 65963.951956 | 65744.123806 | -0.33% |
+| Mixed | Bulk service p99, ms | 1.918625 | 1.855209 | -3.31% |
+| Mixed | Native-completion short p99, ms | 0.462500 | 0.416750 | -9.89% |
+| Mixed | Scheduled-probe p99, ms | 1.850167 | 1.971041 | +6.53% |
+| Mixed | Maximum owner finish spread, ms | 1.522041 | 1.658375 | +8.96% |
+
+CPU minimum owner progress is 98.7654% / 98.7395%; mixed is 98.8189% / 98.8142%.
+Minimum Actor peer count remains 1 / 1 for CPU and 0 / 0 for mixed. The mixed
+short-tail benefit does not establish a general fairness improvement: owner
+finish spread worsens in mixed load and minimum progress is slightly lower in
+both loads. CPU throughput, bulk p99 and short p99 regress. Mixed throughput
+also falls slightly. This capture does not justify changing any default.
+
+The previous twofold short-tail penalty is absent in this capture, but host
+conditions and controls differ substantially. That observation is not a measured
+speedup over the previous binary. The established fix is removal of speculative
+credit-return events on peer deferral; its frequency and isolated latency impact
+were not measured. The remaining fairness mutex, native-turn deferral, advisory
+progress staleness and short wake selection still have costs. A further protocol
+change should address those ownership boundaries rather than repeat this run.
+
+Final code passes 32 instance unit tests, three native service tests and focused
+warnings-denied Clippy. The refined model gate passes in 17.69 seconds including
+the required premature-release counterexample. No finite-model or local receipt
+is reported as completed remote CI or sustained-memory qualification.
+
+Binary SHA-256:
+=c87505366342513623e99365c05e6009bbbaf4f660d8c01242aff491a9e8a371=.
+The native image is unchanged from report 30.56:
+=0e9b13d5701d719407d142ca9bdd013d7a7f12d11cd87c7adc0cba55301c2160=.
+Whole source and artifact hashes are retained in the private capture manifest.
+
+CPU short owner counts (control / candidate): =[166, 153, 150, 171]= / =[163, 159, 165, 153]=.
+
+Mixed short owner counts (control / candidate): =[130, 149, 190, 171]= / =[158, 144, 185, 153]=.
+
+* Predecessor CI failure and native generation repair
+
+The exact predecessor CI run =39788561545= fails both macOS and Ubuntu Bazel
+bindings with the same typed error: the tracked generated SCM input receipt does
+not match. The earlier build.ss include dependency change altered the complete
+input fingerprint without refreshing the external provenance files. This is a
+build-input failure, not a peer scheduling or native service test failure.
+
+The canonical =just bridge-regenerate= command succeeds. The compiler emits
+byte-identical runtime.scm and utf8.scm files; only their external input hashes
+change. Their whole-file SHA-256 values remain unchanged. No generated comment
+hash is inserted and validation is not bypassed. A separate check-only Cargo
+build with =GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1 succeeds in 27.14 seconds.
+The generation repair follows the timed capture and changes no benchmarked Rust
+or Scheme execution source. Its verification receipt is retained separately.
+Remote CI at the new commit remains a separate obligation.

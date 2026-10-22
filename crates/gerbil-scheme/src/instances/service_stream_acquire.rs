@@ -51,6 +51,9 @@ impl Acquisition {
     pub(super) fn retirement_refill(&self) -> bool {
         self.mode == SchemeServiceSupplyAdmission::RetirementRefill
     }
+    pub(super) fn waiting(&self) -> bool {
+        self.pending.is_some()
+    }
     pub(super) fn clear(&mut self) {
         self.pending = None;
     }

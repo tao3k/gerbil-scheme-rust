@@ -56,12 +56,13 @@ impl Source {
     pub(super) fn units(&mut self) -> Option<usize> {
         self.with(|q| q.front().map(|r| r.work_units))
     }
-    pub(super) fn take(&mut self, units: usize, owner: usize) -> Option<Request> {
-        if let Self::Pool(s) = self {
-            if s.fair.get().is_some_and(|f| !f.allow(owner, units)) {
-                return None;
-            }
+    pub(super) fn allow(&self, owner: usize, units: usize) -> bool {
+        match self {
+            Self::Owner(_) => true,
+            Self::Pool(s) => s.fair.get().is_none_or(|f| f.allow(owner, units)),
         }
+    }
+    pub(super) fn take(&mut self, units: usize) -> Option<Request> {
         let request = self.with(|q| {
             if q.front().is_some_and(|r| r.work_units == units) {
                 q.pop_front()

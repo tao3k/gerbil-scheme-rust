@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-/// Explicit supply admission policy; neither mode schedules Scheme execution.
+/// Explicit supply admission policy; no policy schedules Scheme execution.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SchemeServiceSupplyAdmission {
     /// Existing asynchronous FIFO reservation path.
@@ -21,6 +21,9 @@ pub enum SchemeServiceSupplyAdmission {
     /// retirement guard. Ready credits need no temporary future; genuine waits
     /// retain FIFO position. Scheme execution and native bounds are unchanged.
     OwnerLocal,
+    /// Experimental bounded refill after the complete result snapshot is retired.
+    /// Retains `OwnerLocal` bounds; short publication takes priority over bulk.
+    RetirementRefill,
 }
 type Pair = (OwnedSemaphorePermit, CapacityPermit);
 type Waiting = Pin<Box<dyn Future<Output = Result<Pair, InstanceError>> + Send>>;
@@ -40,7 +43,10 @@ impl Acquisition {
         }
     }
     pub(super) fn owner_local(&self) -> bool {
-        self.mode == SchemeServiceSupplyAdmission::OwnerLocal
+        self.mode != SchemeServiceSupplyAdmission::Queued
+    }
+    pub(super) fn retirement_refill(&self) -> bool {
+        self.mode == SchemeServiceSupplyAdmission::RetirementRefill
     }
     pub(super) fn clear(&mut self) {
         self.pending = None;
@@ -60,7 +66,7 @@ impl Acquisition {
             self.clear();
         }
         if self.pending.is_none() {
-            if self.mode == SchemeServiceSupplyAdmission::OwnerLocal {
+            if self.mode != SchemeServiceSupplyAdmission::Queued {
                 match ready(active, capacity, units) {
                     Ok(Some(pair)) => return Poll::Ready(Ok(pair)),
                     Ok(None) => {}

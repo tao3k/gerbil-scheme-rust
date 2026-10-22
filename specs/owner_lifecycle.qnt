@@ -458,6 +458,32 @@ module owner_lifecycle {
   }
   run poolBarrierMutationTest = init.then(stagePool(3)).then(registerProducer(1)).then(claimPoolUnchecked(3, 1))
     .then(all { assert(not(safety)), stutter })
+  // Refill one released slot while the other ready result keeps its root and
+  // credit. Reuse the pool claim and retirement transitions, not a new scheduler.
+  run poolRetirementRefillTest = init.then(configureCapacity(2)).then(configureProducer(2))
+    .then(stagePool(1)).then(stagePool(2)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(claimPool(1, 1)).then(submitService(1)).then(readyService(1, false))
+    .then(claimPool(2, 1)).then(submitService(2)).then(readyService(2, false))
+    .then(all { assert(producerActive(1) == 2), assert(safety), stutter })
+    .then(complete(1)).then(claimPool(3, 1)).then(submitService(3))
+    .then(all { assert(s.serviceRoots == Set(2, 3)), assert(s.serviceReady == Set(2)),
+      assert(producerActive(1) == 2), assert(safety), stutter })
+    .then(close).then(readyService(3, true)).then(complete(3)).then(complete(2))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
+  run poolRetirementSnapshotRefillTest = init.then(configureCapacity(2)).then(configureProducer(2))
+    .then(stagePool(1)).then(stagePool(2)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(claimPool(1, 1)).then(submitService(1)).then(readyService(1, false))
+    .then(claimPool(2, 1)).then(submitService(2)).then(readyService(2, false))
+    .then(all { assert(producerActive(1) == 2), assert(safety), stutter })
+    .then(complete(1)).then(complete(2)).then(claimPool(3, 1)).then(submitService(3))
+    .then(all { assert(s.serviceRoots == Set(3)), assert(s.serviceReady.size() == 0),
+      assert(producerActive(1) == 1), assert(safety), stutter })
+    .then(close).then(readyService(3, true)).then(complete(3))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
   run poolBusyOwnerBypassTest = init.then(configureCapacity(1)).then(admit(1))
     .then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
     .then(claimPool(3, 2)).then(submitService(3))

@@ -182,12 +182,18 @@ impl Pump<'_> {
             return Ok(());
         }
 
-        for raw in observed(
+        let completed = observed(
             self.image,
             self.wake,
             super::SchemeServicePhase::Advance,
             || control(self.image, &[3]),
-        )? {
+        )?;
+        let refill = completed.len().min(
+            self.producer
+                .as_ref()
+                .map_or(0, |p| p.retirement_refill_budget()),
+        );
+        for raw in completed {
             let id = JobId(raw);
             let pending = self.jobs.remove(&id).ok_or(InstanceError::InvalidConfig(
                 "unknown Scheme service completion",
@@ -210,7 +216,48 @@ impl Pump<'_> {
                 || drop(pending.permit),
             );
         }
+        // Retire the full snapshot before constructing new payloads. Refill is
+        // bounded by both released results and the registered active budget.
+        for _ in 0..refill {
+            if !self.refill_retired()? {
+                break;
+            }
+        }
         Ok(())
+    }
+    fn refill_retired(&mut self) -> Result<bool, InstanceError> {
+        use super::batch_stream_runner::ProducerStep;
+        // No recursive collect or native wait; Scheme owns execution. Never
+        // retain returned credit behind a later constructor or projector.
+        if let Some(request) = self
+            .wake
+            .short_pool
+            .get()
+            .and_then(super::short_pool::Port::claim)
+        {
+            self.receive(request)?;
+            return Ok(true);
+        }
+        let Some(producer) = self.producer.as_mut() else {
+            return Ok(false);
+        };
+        let step = observed(
+            self.image,
+            self.wake,
+            super::SchemeServicePhase::Supply,
+            || producer.step(self.image),
+        );
+        match step {
+            ProducerStep::Service(request) => {
+                self.receive(request)?;
+                Ok(true)
+            }
+            ProducerStep::Finished => {
+                self.producer = None;
+                Ok(false)
+            }
+            ProducerStep::Progress | ProducerStep::Waiting => Ok(false),
+        }
     }
     fn feed(
         &mut self,

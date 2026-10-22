@@ -88,15 +88,16 @@ pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sen
     for mode in [
         SchemeServiceSupplyAdmission::Queued,
         SchemeServiceSupplyAdmission::OwnerLocal,
+        SchemeServiceSupplyAdmission::RetirementRefill,
     ] {
         recovery(dispatch, mode).await;
         redistribute(dispatch, mode).await;
-        progress.send("pooled supply: both admission policies preserve recovery, heterogeneous charges, FIFO identity and native affinity").unwrap();
+        progress.send("pooled supply: all admission policies preserve recovery, heterogeneous charges, FIFO identity and native affinity").unwrap();
         registration(dispatch, mode).await;
-        progress.send("pooled supply: both admission policies cancel and expire partial registration before native entry").unwrap();
+        progress.send("pooled supply: all admission policies cancel and expire partial registration before native entry").unwrap();
         cancellation(dispatch, false, mode).await;
         cancellation(dispatch, true, mode).await;
-        progress.send("pooled supply: both admission policies preserve active bounds, cancellation/expiry and accepted drain").unwrap();
+        progress.send("pooled supply: all admission policies preserve active bounds, cancellation/expiry and accepted drain").unwrap();
     }
 }
 async fn recovery(dispatch: &InstanceDispatcher, mode: SchemeServiceSupplyAdmission) {

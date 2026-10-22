@@ -20,7 +20,8 @@ fn requested(comparison: Comparison, arm: bool) -> SchemeServiceSettings {
         | Comparison::ShortRouteLoad
         | Comparison::SupplyAdmission
         | Comparison::PoolProtocol
-        | Comparison::SelectiveWake => (true, true),
+        | Comparison::SelectiveWake
+        | Comparison::RetirementRefill => (true, true),
         Comparison::PooledWake => (true, !arm),
     };
     SchemeServiceSettings {
@@ -70,7 +71,7 @@ fn read(pool: &InstancePool) -> Vec<SchemeServiceSettings> {
 pub(super) fn short_pool(pool: &InstancePool, comparison: Comparison) {
     if matches!(
         comparison,
-        Comparison::PoolProtocol | Comparison::SelectiveWake
+        Comparison::PoolProtocol | Comparison::SelectiveWake | Comparison::RetirementRefill
     ) {
         pool.dispatcher()
             .configure_scheme_short_pool(gerbil_scheme::instances::SchemeShortPoolConfig {
@@ -83,12 +84,15 @@ pub(super) fn short_pool(pool: &InstancePool, comparison: Comparison) {
 }
 
 pub(super) fn short_wake(pool: &InstancePool, comparison: Comparison, arm: bool) {
-    if comparison == Comparison::SelectiveWake {
+    if matches!(
+        comparison,
+        Comparison::SelectiveWake | Comparison::RetirementRefill
+    ) {
         use gerbil_scheme::instances::SchemeShortWake;
         pool.dispatcher()
             .scheme_short_pool()
             .unwrap()
-            .configure_wake(if arm {
+            .configure_wake(if arm || comparison == Comparison::RetirementRefill {
                 SchemeShortWake::Selective
             } else {
                 SchemeShortWake::Broadcast
@@ -96,7 +100,7 @@ pub(super) fn short_wake(pool: &InstancePool, comparison: Comparison, arm: bool)
             .unwrap();
         assert_eq!(
             pool.dispatcher().scheme_short_pool().unwrap().wake_policy(),
-            if arm {
+            if arm || comparison == Comparison::RetirementRefill {
                 SchemeShortWake::Selective
             } else {
                 SchemeShortWake::Broadcast

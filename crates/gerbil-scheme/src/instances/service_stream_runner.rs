@@ -98,6 +98,13 @@ impl ServiceProducer {
     }
 }
 impl Producer for ServiceProducer {
+    fn retirement_refill_budget(&self) -> usize {
+        if self.acquiring.retirement_refill() {
+            self.maximum
+        } else {
+            0
+        }
+    }
     fn deadline(&self) -> Option<Instant> {
         (!self.requests.is_empty()).then_some(self.deadline)
     }

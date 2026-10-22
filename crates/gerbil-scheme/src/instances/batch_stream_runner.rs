@@ -25,6 +25,9 @@ pub(super) enum ProducerStep {
 pub(super) trait Producer: Send {
     fn step(&mut self, image: &Image) -> ProducerStep;
     fn deadline(&self) -> Option<Instant>;
+    fn retirement_refill_budget(&self) -> usize {
+        0
+    }
     fn reject(&mut self, error: InstanceError);
 }
 type Acquiring = Pin<Box<dyn Future<Output = Result<CapacityPermit, InstanceError>> + Send>>;

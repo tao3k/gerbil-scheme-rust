@@ -57,6 +57,10 @@ impl InstanceDispatcher {
     /// contention retains the existing FIFO waiter and wake protocol. A held
     /// producer registration stabilizes capacity identity; cached admission is
     /// invalidated inside the pool close fence. This mode is experimental.
+    /// `RetirementRefill` additionally refills after projecting the full completion
+    /// snapshot, bounded by retired count and active limit. Shared short work
+    /// takes priority. Each attempt is bounded; Scheme owns execution. Existing
+    /// active/native limits and immediate credit publication remain unchanged.
     /// # Errors
     /// The same validation, registration, expiry and close errors as ordinary supply.
     pub async fn submit_scheme_service_pool_stream_with_admission<M: SchemeServiceRequest>(

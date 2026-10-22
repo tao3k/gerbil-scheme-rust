@@ -377,3 +377,15 @@ interrupted-wait relay, cancellation and accepted-timeout close drain. The aggre
 Rust gate samples this step alongside existing capacity/source transitions and
 retains the old migration/root mutations. OS delivery latency and equal-count
 placement are not implied by finite safety admission.
+
+## Retirement-bounded refill ordering
+
+The existing pool actions also cover `poolRetirementRefillTest` (interleaved
+retirement/claim) and `poolRetirementSnapshotRefillTest` (snapshot retirement
+before refill). Both retain producer, slot and work bounds. The first keeps the
+other ready graph rooted while a released slot is reused; the second retires
+both ready graphs before publishing a replacement, then verifies exception/close
+drain. The first ordering is a measured negative performance candidate, despite
+its valid safety scenario. The runtime uses the second only under the explicit
+`RetirementRefill` supply policy. The aggregate model test discovers both runs.
+No scheduler, fairness theorem, native GC proof or performance claim is added.

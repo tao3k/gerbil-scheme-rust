@@ -34,14 +34,20 @@ pub(super) enum Comparison {
     SupplyAdmission,
     PoolProtocol,
     SelectiveWake,
+    RetirementRefill,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
         self != Self::Service
     }
     fn supply_admission(self, arm: bool) -> gerbil_scheme::instances::SchemeServiceSupplyAdmission {
-        if matches!(self, Self::PoolProtocol | Self::SelectiveWake)
-            || self == Self::SupplyAdmission && arm
+        if self == Self::RetirementRefill && arm {
+            return gerbil_scheme::instances::SchemeServiceSupplyAdmission::RetirementRefill;
+        }
+        if matches!(
+            self,
+            Self::PoolProtocol | Self::SelectiveWake | Self::RetirementRefill
+        ) || self == Self::SupplyAdmission && arm
         {
             gerbil_scheme::instances::SchemeServiceSupplyAdmission::OwnerLocal
         } else {
@@ -50,6 +56,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::RetirementRefill => {
+                "same selective wake and native work; ordinary refill versus retirement-bounded refill"
+            }
             Self::SelectiveWake => {
                 "same owner-claimed short supply; broadcast versus FIFO registered selective wake"
             }
@@ -128,6 +137,7 @@ impl Strategy {
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
+                    | Comparison::RetirementRefill
             ) && (arm
                 || matches!(
                     comparison,
@@ -145,6 +155,7 @@ impl Strategy {
                         | Comparison::SupplyAdmission
                         | Comparison::PoolProtocol
                         | Comparison::SelectiveWake
+                        | Comparison::RetirementRefill
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -174,6 +185,7 @@ impl Strategy {
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
+                    | Comparison::RetirementRefill
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -220,6 +232,7 @@ pub(super) fn run(
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
+                | Comparison::RetirementRefill
         ) {
             None
         } else {
@@ -242,8 +255,11 @@ pub(super) fn run(
             strategy.short_mode,
             active_router,
             (comparison == Comparison::PoolProtocol && arm
-                || comparison == Comparison::SelectiveWake)
-                .then(|| pool.dispatcher().scheme_short_pool().unwrap()),
+                || matches!(
+                    comparison,
+                    Comparison::SelectiveWake | Comparison::RetirementRefill
+                ))
+            .then(|| pool.dispatcher().scheme_short_pool().unwrap()),
         ));
         (bulk.await.unwrap(), probes.await.unwrap())
     });
@@ -293,6 +309,7 @@ async fn run_bulk(
             | Comparison::SupplyAdmission
             | Comparison::PoolProtocol
             | Comparison::SelectiveWake
+            | Comparison::RetirementRefill
     ) || comparison == Comparison::Pooled && arm
     {
         super::pooled::bulk(dispatch, inputs, released, comparison.supply_admission(arm)).await
@@ -325,7 +342,11 @@ fn router(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if comparison == Comparison::PoolProtocol && arm || comparison == Comparison::SelectiveWake
+        if comparison == Comparison::PoolProtocol && arm
+            || matches!(
+                comparison,
+                Comparison::SelectiveWake | Comparison::RetirementRefill
+            )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgressNotified
         } else if comparison == Comparison::ShortRouteLoad && arm {
@@ -339,6 +360,7 @@ fn router(
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
+                | Comparison::RetirementRefill
         ) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
@@ -353,6 +375,7 @@ fn router(
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
+                    | Comparison::RetirementRefill
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -394,6 +417,7 @@ fn append_policy(
                     | Comparison::SupplyAdmission
                     | Comparison::PoolProtocol
                     | Comparison::SelectiveWake
+                    | Comparison::RetirementRefill
             )
     );
     value["owner_resident_supply"] = json!(
@@ -406,6 +430,7 @@ fn append_policy(
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
+                | Comparison::RetirementRefill
         ) || comparison == Comparison::Resident && arm
     );
     value["pool_resident_supply"] = json!(
@@ -417,6 +442,7 @@ fn append_policy(
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
+                | Comparison::RetirementRefill
         ) || comparison == Comparison::Pooled && arm
     );
     value["producer_progress_routing"] = json!(
@@ -429,34 +455,42 @@ fn append_policy(
                 | Comparison::SupplyAdmission
                 | Comparison::PoolProtocol
                 | Comparison::SelectiveWake
+                | Comparison::RetirementRefill
         ) && !(comparison == Comparison::ShortRouteLoad && arm)
     );
-    value["short_wake_policy"] = json!(
-        pool.dispatcher()
-            .scheme_short_pool()
-            .map(|p| format!("{:?}", p.wake_policy()))
-    );
-    value["selective_short_wake"] = json!(comparison == Comparison::SelectiveWake && arm);
-    value["short_admission_boundary"] = json!(if comparison == Comparison::PoolProtocol && arm
-        || comparison == Comparison::SelectiveWake
-    {
-        "owner claim"
-    } else {
-        "host publication"
-    });
-    value["deferred_short_owner_claim"] = json!(
-        comparison == Comparison::PoolProtocol && arm || comparison == Comparison::SelectiveWake
-    );
-    if comparison == Comparison::PoolProtocol && arm || comparison == Comparison::SelectiveWake {
-        value["producer_progress_routing"] = json!(false);
-        value["owner_reselection"] = json!(false);
-    }
+    append_short_policy(value, pool, comparison, arm);
     value["supply_admission"] = json!(format!("{:?}", comparison.supply_admission(arm)));
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
     } else {
         1
     });
+}
+fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Comparison, arm: bool) {
+    let deferred = comparison == Comparison::PoolProtocol && arm
+        || matches!(
+            comparison,
+            Comparison::SelectiveWake | Comparison::RetirementRefill
+        );
+    value["short_wake_policy"] = json!(
+        pool.dispatcher()
+            .scheme_short_pool()
+            .map(|p| format!("{:?}", p.wake_policy()))
+    );
+    value["selective_short_wake"] = json!(
+        comparison == Comparison::RetirementRefill
+            || comparison == Comparison::SelectiveWake && arm
+    );
+    value["short_admission_boundary"] = json!(if deferred {
+        "owner claim"
+    } else {
+        "host publication"
+    });
+    value["deferred_short_owner_claim"] = json!(deferred);
+    if deferred {
+        value["producer_progress_routing"] = json!(false);
+        value["owner_reselection"] = json!(false);
+    }
 }
 fn summarize(
     rows: Vec<gerbil_scheme_python::owner_dispatch::OwnerResult<workload::Reply>>,

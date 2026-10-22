@@ -149,3 +149,25 @@ fn closing_a_partial_wait_returns_its_active_and_work_credits() {
     assert!(changes.has_changed().unwrap());
     drop(held);
 }
+
+#[test]
+fn retirement_refill_reuses_only_released_credit() {
+    let (capacity, _) = capacity();
+    let active = Arc::new(Semaphore::new(1));
+    let mut acquisition = Acquisition::new(SchemeServiceSupplyAdmission::RetirementRefill);
+    assert!(acquisition.retirement_refill());
+    let mut context = Context::from_waker(Waker::noop());
+    let (credit, native) = completed(acquisition.poll(&active, &capacity, 8, &mut context));
+    let guard = native.retain_active(credit);
+    assert!(
+        acquisition
+            .poll(&active, &capacity, 8, &mut context)
+            .is_pending()
+    );
+    drop(guard);
+    let (credit, native) = completed(acquisition.poll(&active, &capacity, 8, &mut context));
+    drop(native.retain_active(credit));
+    assert_eq!(active.available_permits(), 1);
+    assert_eq!(capacity.slots.available_permits(), 1);
+    assert_eq!(capacity.work.as_ref().unwrap().available_permits(), 8);
+}

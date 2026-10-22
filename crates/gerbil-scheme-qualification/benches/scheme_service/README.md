@@ -650,3 +650,24 @@ Maximum short-owner shares fell from 47.19%/35.63% to 26.25%/26.56% (CPU/mixed).
 This is a placement improvement, not overall/default admission. `probe_actual`
 uses the native completion timestamp, not caller resume time; scheduled-probe
 latency remains separate. All captures retain their original identities.
+
+## Retirement-bounded refill
+
+```text
+just bridge-scheme-service-benchmark --retirement-refill-ab
+```
+
+Both arms retain the same four live VMs, two Tokio workers, native O2 image,
+selective short wake, owner-claimed short API, slot/work limits and three active
+bulk requests per owner. Only supply admission differs: `OwnerLocal` versus
+`RetirementRefill`. The latter projects the complete native completion snapshot
+and immediately releases each result's credits, then attempts at most the smaller
+of retired count and registered active limit in new publications. Each attempt
+prefers available short work; a failed acquisition stops the burst. No recursive
+Scheme advance or wait occurs inside this refill phase. Scheme retains execution,
+Actors, green threads, continuations and GC. Defaults are unchanged.
+
+An earlier candidate interleaved construction between completed projections;
+its separately frozen negative capture is retained in report 30.55. It is not
+this algorithm. This pair does not change thread counts or claim an OS time slice,
+a GC CPU attribution, equal bulk assignment, or a bound on arbitrary callbacks.

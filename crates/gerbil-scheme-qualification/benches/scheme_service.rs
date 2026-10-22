@@ -153,7 +153,9 @@ fn cleanup(pool: &mut InstancePool) {
     );
 }
 fn select_comparison(args: &[String]) -> Comparison {
-    if args.iter().any(|s| s == "--selective-wake-ab") {
+    if args.iter().any(|s| s == "--retirement-refill-ab") {
+        Comparison::RetirementRefill
+    } else if args.iter().any(|s| s == "--selective-wake-ab") {
         Comparison::SelectiveWake
     } else if args.iter().any(|s| s == "--pool-protocol-ab") {
         Comparison::PoolProtocol
@@ -241,6 +243,7 @@ fn main() {
         || s == "--supply-admission-ab"
         || s == "--pool-protocol-ab"
         || s == "--selective-wake-ab"
+        || s == "--retirement-refill-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"

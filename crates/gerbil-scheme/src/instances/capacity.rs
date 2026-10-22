@@ -70,9 +70,21 @@ pub(super) struct CapacityPermit {
     // Partial immediate acquisition stays in Request until outside the admission lock.
     pub(super) slot: Option<OwnedSemaphorePermit>,
     pub(super) work: Option<OwnedSemaphorePermit>,
+    pub(super) active: Option<OwnedSemaphorePermit>,
+}
+impl CapacityPermit {
+    pub(super) fn retain_active(mut self, active: OwnedSemaphorePermit) -> Self {
+        assert!(
+            self.active.is_none(),
+            "native active credit already attached"
+        );
+        self.active = Some(active);
+        self
+    }
 }
 impl Drop for CapacityPermit {
     fn drop(&mut self) {
+        drop(self.active.take());
         drop(self.work.take());
         drop(self.slot.take());
         // A pending acquire_many future can hold partial work internally even
@@ -96,6 +108,7 @@ pub(super) fn attach(owner: &OwnerSender, request: &mut Request) -> Result<(), I
                 capacity: Arc::clone(capacity),
                 slot: None,
                 work: None,
+                active: None,
             };
             // Immediate APIs never wait or bypass FIFO work waiters.
             let result = (|| {
@@ -233,6 +246,7 @@ pub(super) async fn acquire_pair(
         capacity: Arc::clone(&capacity),
         slot: None,
         work: None,
+        active: None,
     };
     if let Some(work) = &capacity.work {
         permit.work = Some(

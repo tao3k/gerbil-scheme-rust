@@ -272,6 +272,32 @@ async fn wake_and_timeout(dispatch: &InstanceDispatcher, progress: &mpsc::Sender
         .send("host wake/short request bypasses Scheme wait; timeout keeps work")
         .unwrap();
 }
+async fn closing_supply(
+    dispatch: &InstanceDispatcher,
+    owner: usize,
+    mode: gerbil_scheme::instances::SchemeServiceSupplyAdmission,
+) -> gerbil_scheme::instances::SchemeServiceStream<Vec<Vec<i64>>> {
+    command(dispatch, owner, 9);
+    let stream = dispatch
+        .submit_scheme_service_pool_stream_with_admission(
+            (0..4).map(|_| batch(true)).collect(),
+            gerbil_scheme::instances::SchemeServicePoolStreamConfig {
+                owners: vec![owner],
+                maximum_active_per_owner: 2,
+                maximum_staged_work: 32,
+                timeout: GATE,
+            },
+            mode,
+        )
+        .await
+        .unwrap();
+    let start = Instant::now();
+    while command(dispatch, owner, 10)[0] < 8 {
+        assert!(start.elapsed() < GATE);
+        tokio::task::yield_now().await;
+    }
+    stream
+}
 async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static str>) {
     let dispatch = pool.dispatcher();
     command(&dispatch, 0, 9);
@@ -284,24 +310,18 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
                 .unwrap(),
         );
     }
-    command(&dispatch, 1, 9);
-    let mut closing_stream = dispatch
-        .submit_scheme_service_pool_stream(
-            (0..4).map(|_| batch(true)).collect(),
-            gerbil_scheme::instances::SchemeServicePoolStreamConfig {
-                owners: vec![1],
-                maximum_active_per_owner: 2,
-                maximum_staged_work: 32,
-                timeout: GATE,
-            },
-        )
-        .await
-        .unwrap();
-    let stream_start = Instant::now();
-    while command(&dispatch, 1, 10)[0] < 8 {
-        assert!(stream_start.elapsed() < GATE);
-        tokio::task::yield_now().await;
-    }
+    let mut closing_stream = closing_supply(
+        &dispatch,
+        1,
+        gerbil_scheme::instances::SchemeServiceSupplyAdmission::Queued,
+    )
+    .await;
+    let mut local_stream = closing_supply(
+        &dispatch,
+        3,
+        gerbil_scheme::instances::SchemeServiceSupplyAdmission::OwnerLocal,
+    )
+    .await;
     let partial_tickets = stream::partial_wait(&dispatch).await;
     let rejected = dispatch
         .submit_scheme_service_backpressured_on(0, batch(false), Duration::from_millis(1))
@@ -327,14 +347,16 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
     reselection::empty(&router);
     assert!(closed.is_clean(), "{closed:?}");
     assert_eq!(closed.joined, 4);
-    for _ in 0..2 {
-        assert_eq!(closing_stream.next(GATE).await.unwrap().unwrap().0.len(), 8);
-    }
-    for _ in 0..2 {
-        assert_eq!(
-            closing_stream.next(GATE).await.unwrap().unwrap_err(),
-            InstanceError::Closed
-        );
+    for stream in [&mut closing_stream, &mut local_stream] {
+        for _ in 0..2 {
+            assert_eq!(stream.next(GATE).await.unwrap().unwrap().0.len(), 8);
+        }
+        for _ in 0..2 {
+            assert_eq!(
+                stream.next(GATE).await.unwrap().unwrap_err(),
+                InstanceError::Closed
+            );
+        }
     }
     for ticket in partial_tickets {
         assert!(!ticket.wait_completed(GATE).await.unwrap().0.is_empty());

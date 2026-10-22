@@ -35,6 +35,7 @@ pub(super) struct Registration {
     pub owner: usize,
     pub deadline: Instant,
     pub waker: Waker,
+    pub wake: Option<Arc<super::service_wake::Wake>>,
 }
 pub(super) struct BatchOperation<T, R> {
     pub run: RunBatch<T, R>,
@@ -75,6 +76,7 @@ impl<T, R> BatchProducer<T, R> {
             owner,
             deadline,
             waker,
+            wake: _,
         } = registration;
         let offered = Instant::now();
         Self {

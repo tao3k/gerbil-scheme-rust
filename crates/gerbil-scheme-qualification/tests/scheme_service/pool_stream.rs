@@ -3,7 +3,7 @@ use super::{GATE, batch, command, idle, reselection, short};
 use gerbil_scheme::instances::{
     InstanceDispatcher, InstanceError, NativeRoot, NativeSession, NumericServiceBatch,
     SchemeRoutingAdmission, SchemeServicePoolStreamConfig, SchemeServiceRequest,
-    SchemeServiceStreamConfig,
+    SchemeServiceStreamConfig, SchemeServiceSupplyAdmission,
 };
 use std::{
     sync::{
@@ -84,19 +84,22 @@ async fn producer_free(dispatch: &InstanceDispatcher, owners: &[usize]) {
     }
 }
 pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static str>) {
-    recovery(dispatch).await;
     progress_route(dispatch).await;
-    redistribute(dispatch).await;
-    progress.send("pooled supply: busy owner bypass, heterogeneous charges, exact FIFO identity and native owner affinity").unwrap();
-    registration(dispatch).await;
-    progress.send("pooled supply: registration barrier, cancellation and timeout refund without native entry").unwrap();
-    cancellation(dispatch, false).await;
-    cancellation(dispatch, true).await;
-    progress
-        .send("pooled supply: multi-owner active bounds, cancellation/expiry and accepted drain")
-        .unwrap();
+    for mode in [
+        SchemeServiceSupplyAdmission::Queued,
+        SchemeServiceSupplyAdmission::OwnerLocal,
+    ] {
+        recovery(dispatch, mode).await;
+        redistribute(dispatch, mode).await;
+        progress.send("pooled supply: both admission policies preserve recovery, heterogeneous charges, FIFO identity and native affinity").unwrap();
+        registration(dispatch, mode).await;
+        progress.send("pooled supply: both admission policies cancel and expire partial registration before native entry").unwrap();
+        cancellation(dispatch, false, mode).await;
+        cancellation(dispatch, true, mode).await;
+        progress.send("pooled supply: both admission policies preserve active bounds, cancellation/expiry and accepted drain").unwrap();
+    }
 }
-async fn recovery(dispatch: &InstanceDispatcher) {
+async fn recovery(dispatch: &InstanceDispatcher, mode: SchemeServiceSupplyAdmission) {
     let messages = [
         (vec![0, 1], false),
         (vec![-1], false),
@@ -108,7 +111,11 @@ async fn recovery(dispatch: &InstanceDispatcher) {
     .map(|(input, panic)| super::stream::Independent(super::VectorRequest { input, panic }))
     .collect();
     let mut stream = dispatch
-        .submit_scheme_service_pool_stream(messages, config(vec![0, 1, 2, 3], GATE))
+        .submit_scheme_service_pool_stream_with_admission(
+            messages,
+            config(vec![0, 1, 2, 3], GATE),
+            mode,
+        )
         .await
         .unwrap();
     assert_eq!(stream.next(GATE).await.unwrap().unwrap().0, [10]);
@@ -168,14 +175,15 @@ async fn progress_route(dispatch: &InstanceDispatcher) {
     producer_free(dispatch, &[0]).await;
     idle(dispatch).await;
 }
-async fn redistribute(dispatch: &InstanceDispatcher) {
+async fn redistribute(dispatch: &InstanceDispatcher, mode: SchemeServiceSupplyAdmission) {
     idle(dispatch).await;
     let (release, occupied) = reselection::fill(dispatch, 0);
     let entered = Arc::new(AtomicUsize::new(0));
     let mut stream = dispatch
-        .submit_scheme_service_pool_stream(
+        .submit_scheme_service_pool_stream_with_admission(
             messages(24, false, &entered),
             config(vec![0, 1, 2, 3], GATE),
+            mode,
         )
         .await
         .unwrap();
@@ -202,7 +210,7 @@ async fn redistribute(dispatch: &InstanceDispatcher) {
     producer_free(dispatch, &[0]).await;
     idle(dispatch).await;
 }
-async fn registration(dispatch: &InstanceDispatcher) {
+async fn registration(dispatch: &InstanceDispatcher, mode: SchemeServiceSupplyAdmission) {
     command(dispatch, 3, 9);
     let held = dispatch
         .submit_scheme_service_stream_on(
@@ -217,11 +225,11 @@ async fn registration(dispatch: &InstanceDispatcher) {
         .await
         .unwrap();
     let entered = Arc::new(AtomicUsize::new(0));
-    let mut pending =
-        Box::pin(dispatch.submit_scheme_service_pool_stream(
-            messages(2, false, &entered),
-            config(vec![3, 0], GATE),
-        ));
+    let mut pending = Box::pin(dispatch.submit_scheme_service_pool_stream_with_admission(
+        messages(2, false, &entered),
+        config(vec![3, 0], GATE),
+        mode,
+    ));
     reselection::registered(pending.as_mut()).await;
     assert_eq!(dispatch.owner_capacity()[0].producer_available, 0);
     assert_eq!(
@@ -233,9 +241,10 @@ async fn registration(dispatch: &InstanceDispatcher) {
     producer_free(dispatch, &[0]).await;
     assert_eq!(entered.load(Ordering::SeqCst), 0);
     let timed = dispatch
-        .submit_scheme_service_pool_stream(
+        .submit_scheme_service_pool_stream_with_admission(
             messages(2, false, &entered),
             config(vec![0, 3], Duration::from_millis(20)),
+            mode,
         )
         .await;
     assert!(matches!(timed, Err(InstanceError::Timeout)));
@@ -246,7 +255,11 @@ async fn registration(dispatch: &InstanceDispatcher) {
     producer_free(dispatch, &[3]).await;
     idle(dispatch).await;
 }
-async fn cancellation(dispatch: &InstanceDispatcher, expire: bool) {
+async fn cancellation(
+    dispatch: &InstanceDispatcher,
+    expire: bool,
+    mode: SchemeServiceSupplyAdmission,
+) {
     for owner in [0, 1] {
         command(dispatch, owner, 9);
     }
@@ -259,7 +272,11 @@ async fn cancellation(dispatch: &InstanceDispatcher, expire: bool) {
     let mut settings = config(vec![0, 1], timeout);
     settings.maximum_active_per_owner = 1;
     let mut stream = dispatch
-        .submit_scheme_service_pool_stream(messages(6, true, &entered), settings)
+        .submit_scheme_service_pool_stream_with_admission(
+            messages(6, true, &entered),
+            settings,
+            mode,
+        )
         .await
         .unwrap();
     let start = Instant::now();

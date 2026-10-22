@@ -10,6 +10,8 @@ use std::sync::{
 pub(super) struct Admission {
     pub(super) senders: Mutex<Senders>,
     #[cfg(feature = "tokio-dispatch")]
+    pub(super) accepting: Arc<AtomicBool>,
+    #[cfg(feature = "tokio-dispatch")]
     pub(super) queue_capacity: usize,
     #[cfg(feature = "tokio-dispatch")]
     pub(super) capacity_changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
@@ -46,6 +48,8 @@ impl InstanceDispatcher {
         Self {
             admission: Arc::new(Admission {
                 senders: Mutex::new(Senders::default()),
+                #[cfg(feature = "tokio-dispatch")]
+                accepting: Arc::new(AtomicBool::new(true)),
                 #[cfg(feature = "tokio-dispatch")]
                 queue_capacity,
                 #[cfg(feature = "tokio-dispatch")]
@@ -87,6 +91,10 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Invalidate registered owner-local admission at the same fence as table
+        // removal. No semaphore callback or foreign waker runs under this lock.
+        #[cfg(feature = "tokio-dispatch")]
+        self.admission.accepting.store(false, Ordering::Release);
         let owners = std::mem::take(&mut senders.owners);
         drop(senders);
         #[cfg(feature = "tokio-dispatch")]
@@ -232,3 +240,7 @@ impl InstanceDispatcher {
         })
     }
 }
+
+#[cfg(all(test, feature = "tokio-dispatch"))]
+#[path = "../../tests/unit/producer_admission.rs"]
+mod tests;

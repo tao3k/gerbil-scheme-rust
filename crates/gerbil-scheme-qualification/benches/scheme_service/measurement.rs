@@ -31,13 +31,24 @@ pub(super) enum Comparison {
     PooledWake,
     ObserverCost,
     ShortRouteLoad,
+    SupplyAdmission,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
         self != Self::Service
     }
+    fn supply_admission(self, arm: bool) -> gerbil_scheme::instances::SchemeServiceSupplyAdmission {
+        if self == Self::SupplyAdmission && arm {
+            gerbil_scheme::instances::SchemeServiceSupplyAdmission::OwnerLocal
+        } else {
+            gerbil_scheme::instances::SchemeServiceSupplyAdmission::Queued
+        }
+    }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::SupplyAdmission => {
+                "same pooled supply; queued/wrapped versus owner-local native credit ownership"
+            }
             Self::ShortRouteLoad => {
                 "same pooled supply; short owner occupancy versus class-load routing"
             }
@@ -104,6 +115,7 @@ impl Strategy {
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
+                    | Comparison::SupplyAdmission
             ) && (arm
                 || matches!(
                     comparison,
@@ -118,6 +130,7 @@ impl Strategy {
                         | Comparison::PooledWake
                         | Comparison::ObserverCost
                         | Comparison::ShortRouteLoad
+                        | Comparison::SupplyAdmission
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -144,6 +157,7 @@ impl Strategy {
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
+                    | Comparison::SupplyAdmission
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -183,38 +197,21 @@ pub(super) fn run(
                 | Comparison::PooledWake
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
+                | Comparison::SupplyAdmission
         ) {
             None
         } else {
             active_router.clone()
         };
-        let bulk = runtime.spawn(async move {
-            if matches!(
-                comparison,
-                Comparison::PooledWake | Comparison::ObserverCost | Comparison::ShortRouteLoad
-            ) {
-                super::pooled::bulk(dispatch, bulk_inputs, released).await
-            } else if comparison == Comparison::Pooled {
-                if arm {
-                    super::pooled::bulk(dispatch, bulk_inputs, released).await
-                } else {
-                    super::resident::bulk(dispatch, bulk_inputs, released).await
-                }
-            } else if comparison == Comparison::Resident && arm {
-                super::resident::bulk(dispatch, bulk_inputs, released).await
-            } else {
-                workload::bulk(
-                    dispatch,
-                    bulk_inputs,
-                    asynchronous,
-                    released,
-                    strategy.ready_completion,
-                    comparison.is_split(),
-                    bulk_router,
-                )
-                .await
-            }
-        });
+        let bulk = runtime.spawn(run_bulk(
+            dispatch,
+            bulk_inputs,
+            released,
+            comparison,
+            arm,
+            strategy,
+            bulk_router,
+        ));
         let probes = runtime.spawn(workload::probes(
             probe_dispatch,
             probes,
@@ -254,6 +251,39 @@ pub(super) fn run(
     }
     value
 }
+async fn run_bulk(
+    dispatch: gerbil_scheme::instances::InstanceDispatcher,
+    inputs: Arc<Vec<Vec<i64>>>,
+    released: Instant,
+    comparison: Comparison,
+    arm: bool,
+    strategy: Strategy,
+    router: Option<gerbil_scheme::instances::SchemeServiceRouter>,
+) -> Vec<gerbil_scheme_python::owner_dispatch::OwnerResult<workload::Reply>> {
+    if matches!(
+        comparison,
+        Comparison::PooledWake
+            | Comparison::ObserverCost
+            | Comparison::ShortRouteLoad
+            | Comparison::SupplyAdmission
+    ) || comparison == Comparison::Pooled && arm
+    {
+        super::pooled::bulk(dispatch, inputs, released, comparison.supply_admission(arm)).await
+    } else if comparison == Comparison::Pooled || comparison == Comparison::Resident && arm {
+        super::resident::bulk(dispatch, inputs, released).await
+    } else {
+        workload::bulk(
+            dispatch,
+            inputs,
+            comparison != Comparison::Service || arm,
+            released,
+            strategy.ready_completion,
+            comparison.is_split(),
+            router,
+        )
+        .await
+    }
+}
 fn router(
     pool: &InstancePool,
     comparison: Comparison,
@@ -276,6 +306,7 @@ fn router(
                 | Comparison::PooledWake
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
+                | Comparison::SupplyAdmission
         ) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
@@ -287,6 +318,7 @@ fn router(
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
+                    | Comparison::SupplyAdmission
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -325,6 +357,7 @@ fn append_policy(
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
                     | Comparison::ShortRouteLoad
+                    | Comparison::SupplyAdmission
             )
     );
     value["owner_resident_supply"] = json!(
@@ -334,12 +367,16 @@ fn append_policy(
                 | Comparison::PooledWake
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
+                | Comparison::SupplyAdmission
         ) || comparison == Comparison::Resident && arm
     );
     value["pool_resident_supply"] = json!(
         matches!(
             comparison,
-            Comparison::PooledWake | Comparison::ObserverCost | Comparison::ShortRouteLoad
+            Comparison::PooledWake
+                | Comparison::ObserverCost
+                | Comparison::ShortRouteLoad
+                | Comparison::SupplyAdmission
         ) || comparison == Comparison::Pooled && arm
     );
     value["producer_progress_routing"] = json!(
@@ -349,8 +386,10 @@ fn append_policy(
                 | Comparison::PooledWake
                 | Comparison::ObserverCost
                 | Comparison::ShortRouteLoad
+                | Comparison::SupplyAdmission
         ) && !(comparison == Comparison::ShortRouteLoad && arm)
     );
+    value["supply_admission"] = json!(format!("{:?}", comparison.supply_admission(arm)));
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
     } else {

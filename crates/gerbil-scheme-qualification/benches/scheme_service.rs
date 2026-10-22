@@ -152,7 +152,9 @@ fn cleanup(pool: &mut InstancePool) {
     );
 }
 fn select_comparison(args: &[String]) -> Comparison {
-    if args.iter().any(|s| s == "--short-route-load-ab") {
+    if args.iter().any(|s| s == "--supply-admission-ab") {
+        Comparison::SupplyAdmission
+    } else if args.iter().any(|s| s == "--short-route-load-ab") {
         Comparison::ShortRouteLoad
     } else if args.iter().any(|s| s == "--observer-ab") {
         Comparison::ObserverCost
@@ -231,6 +233,7 @@ fn main() {
         || s == "--state-observation"
         || s == "--observer-ab"
         || s == "--short-route-load-ab"
+        || s == "--supply-admission-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"

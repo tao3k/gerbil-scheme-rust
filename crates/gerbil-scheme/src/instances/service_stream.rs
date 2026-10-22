@@ -108,6 +108,7 @@ impl InstanceDispatcher {
                 config.maximum_active,
                 super::service_stream_source::Source::Owner(requests),
                 Arc::clone(&cancelled),
+                super::SchemeServiceSupplyAdmission::Queued,
             );
             signal = Arc::downgrade(&producer.signal);
             Box::new(producer)

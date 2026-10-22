@@ -225,7 +225,8 @@ not an admitted routing speedup:
 | Mixed | 66643 -> 66774 | 0.540584 -> 0.525375 | 98.77% -> 98.78% |
 
 CPU p99 regressed 12.2%; small throughput differences do not establish observer
-transparency. The 34 ms p99 did not recur. An actual 6.223916 ms State mixed
+transparency. Off/State changes both entry marks and polling, so this is not an
+isolated sampler-cost measurement. The 34 ms p99 did not recur. An actual 6.223916 ms State mixed
 request nevertheless has same-run evidence: 6.082541 ms before construction,
 3.459 us construction, 134 us pending and 3.916 us projection. Admission was
 12.083 us. Published-to-dequeued was 6.070958 ms and wake delivery was

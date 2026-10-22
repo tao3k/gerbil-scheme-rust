@@ -23,6 +23,7 @@ impl Capacity {
             capacity: Arc::clone(self),
             slot: Some(slot),
             work,
+            active: None,
         })
     }
 }

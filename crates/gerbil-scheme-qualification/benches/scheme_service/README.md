@@ -357,8 +357,9 @@ just bridge-scheme-service-benchmark --test --observer-ab --state-observation
 just bridge-scheme-service-benchmark --observer-ab --state-observation
 ```
 
-This is an Off/State observer-cost pair on the same VMs and pooled workload,
-not a routing optimization. `--blocks=50` explicitly increases repetitions for
+This is an Off/State observer-cost pair on the same VMs and pooled workload.
+It changes entry marks and polling together, so it cannot isolate the sampler's
+individual effect. It is not a routing optimization. `--blocks=50` explicitly increases repetitions for
 rare-event capture; it retains native inputs and the five-second progress gate.
 
 `os_thread_samples` schema version 2 has ten-column rows:
@@ -557,3 +558,36 @@ creation. The original native watchdog starts after this acquisition barrier;
 no native progress is fabricated and the default invocation has no barrier.
 An attached trace still needs the same identity, clock, coverage and cleanup
 checks and is not proof that unprofiled extreme tails have been reproduced.
+
+## Owner-local supply ownership comparison
+
+```text
+just bridge-scheme-service-benchmark --test --supply-admission-ab
+just bridge-scheme-service-benchmark --supply-admission-ab
+```
+
+Both arms use the same four live VMs, native O2 image, pooled source, two Tokio
+workers, NativePort, cooperative budget one, feed one, per-owner slots four/work
+32 and three active bulk callbacks. Routing, input order, batch eight, native
+constructors, Scheme handlers, result projection and bounds are identical.
+Observation is Off by default in both arms; this is not the observer-cost pair.
+`supply_admission` declares the actual API argument for every sample.
+
+The control uses `SchemeServiceSupplyAdmission::Queued`. The opt-in `OwnerLocal`
+policy is passed to `submit_scheme_service_pool_stream_with_admission`. It keeps
+pending work units with their waiter, takes ready credits without creating a
+waiter, and retains stream active credit inside the native capacity guard rather
+than allocating a second boxed `StreamJob`. A registered producer caches immutable
+owner identity and reads a pool-close token instead of upgrading/locking the global
+admission table per step. Close invalidates that token under the same table fence;
+callbacks still run outside the lock. Genuine waits keep their FIFO future;
+unit changes cancel and refund the old reservation. Projection/failure must finish
+before the native guard returns active/work/slot credits. No rooted work migrates.
+The ordinary pool and fixed-owner APIs keep the existing policy/defaults.
+
+This is a combined ownership/acquisition comparison. Fewer boxes do not establish
+end-to-end speedup. A full pipeline can add failed immediate attempts before the
+normal wait, and the capacity guard has an additional optional credit field.
+Retain CPU p99 and owner finish-spread regressions alongside any throughput gains.
+See [the optimization audit](../../../../docs/30-39-status/30.52-owner-supply-ownership-and-optimization-audit.org)
+for the targeted result and the remaining early-owner-binding/notification work.

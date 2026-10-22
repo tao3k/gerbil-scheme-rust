@@ -157,6 +157,7 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --observer-ab --entry-observation
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --observer-ab --state-observation
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --short-route-load-ab
+          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --supply-admission-ab
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --pooled-wake-ab
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --pooled-ab --phase-observation
           cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --notification-ab --phase-observation

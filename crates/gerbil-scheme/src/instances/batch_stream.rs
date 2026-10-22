@@ -190,6 +190,7 @@ impl InstanceDispatcher {
             owner,
             deadline,
             waker: super::owner_loop::waker(current.sender.clone(), current.wake.clone()),
+            wake: current.wake.clone(),
         });
         let request = super::Request {
             started: Arc::new(AtomicBool::new(false)),

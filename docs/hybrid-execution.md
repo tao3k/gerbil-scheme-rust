@@ -429,6 +429,21 @@ Scheme execution, wake, budget and feed defaults remain unchanged.
 
 See [pooled supply qualification](30-39-status/30.45-pooled-resident-service.org).
 
+`submit_scheme_service_pool_stream_with_admission` adds the explicit
+`SchemeServiceSupplyAdmission::OwnerLocal` experiment. Pending work units and
+their FIFO waiter form one state. Free active/work/slot credits can be acquired
+without a temporary future; genuine contention keeps the existing waiter.
+Accepted stream active credit is retained by the native capacity guard through
+projection/failure, removing the redundant per-job wrapper. Registered producers
+cache their validated wake identity and read a pool-close token. Registration
+prevents capacity replacement; close invalidates cached admission inside the
+existing table fence, with callbacks outside that lock. This removes per-step
+global admission upgrades/locks in the opt-in path. The ordinary API
+continues to select `Queued`; no bounds or runtime defaults change. Both policies
+still execute on the same fixed Scheme owners. This is not short-input stealing,
+a new executor, preemption, or a complete tail-latency repair. See the
+[ownership audit](30-39-status/30.52-owner-supply-ownership-and-optimization-audit.org).
+
 ### Native configuration readback
 
 `InstanceDispatcher::scheme_service_settings_on` returns typed native

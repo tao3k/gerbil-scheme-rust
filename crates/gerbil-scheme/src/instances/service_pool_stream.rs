@@ -1,7 +1,7 @@
 //! A bounded pool source feeds existing fixed-owner native service producers.
 use super::{
     InstanceDispatcher, InstanceError, SchemeServiceRequest, SchemeServiceStream,
-    SchemeServiceStreamConfig,
+    SchemeServiceStreamConfig, SchemeServiceSupplyAdmission,
     service_stream_runner::ServiceProducer,
     service_stream_source::{Shared, Source},
 };
@@ -41,7 +41,29 @@ impl InstanceDispatcher {
     pub async fn submit_scheme_service_pool_stream<M: SchemeServiceRequest>(
         &self,
         messages: Vec<M>,
+        config: SchemeServicePoolStreamConfig,
+    ) -> Result<SchemeServiceStream<M::Output>, InstanceError> {
+        self.submit_scheme_service_pool_stream_with_admission(
+            messages,
+            config,
+            SchemeServiceSupplyAdmission::Queued,
+        )
+        .await
+    }
+    /// Explicit reservation policy for bounded pool supply. All lifecycle,
+    /// capacity, affinity and Scheme execution contracts match the ordinary API.
+    /// `OwnerLocal` avoids the per-job wrapper by retaining active credit in the
+    /// native retirement guard. Ready credits need no temporary future; genuine
+    /// contention retains the existing FIFO waiter and wake protocol. A held
+    /// producer registration stabilizes capacity identity; cached admission is
+    /// invalidated inside the pool close fence. This mode is experimental.
+    /// # Errors
+    /// The same validation, registration, expiry and close errors as ordinary supply.
+    pub async fn submit_scheme_service_pool_stream_with_admission<M: SchemeServiceRequest>(
+        &self,
+        messages: Vec<M>,
         mut config: SchemeServicePoolStreamConfig,
+        mode: SchemeServiceSupplyAdmission,
     ) -> Result<SchemeServiceStream<M::Output>, InstanceError> {
         let (source, mut stream, capacities, deadline) =
             self.prepare_pool(messages, &mut config)?;
@@ -53,6 +75,7 @@ impl InstanceDispatcher {
                     config.maximum_active_per_owner,
                     Source::Pool(Arc::clone(&source)),
                     Arc::clone(&stream.cancelled),
+                    mode,
                 );
                 stream.signals.push(Arc::downgrade(&producer.signal));
                 source

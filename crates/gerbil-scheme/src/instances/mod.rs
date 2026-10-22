@@ -109,6 +109,10 @@ pub use service_notify::SchemeServiceNotification;
 #[cfg(feature = "tokio-dispatch")]
 mod service_stream;
 #[cfg(feature = "tokio-dispatch")]
+mod service_stream_acquire;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_stream_acquire::SchemeServiceSupplyAdmission;
+#[cfg(feature = "tokio-dispatch")]
 mod service_stream_runner;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_stream::{SchemeServiceStream, SchemeServiceStreamConfig};

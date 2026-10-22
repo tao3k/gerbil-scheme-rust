@@ -17,7 +17,8 @@ fn requested(comparison: Comparison, arm: bool) -> SchemeServiceSettings {
         | Comparison::Resident
         | Comparison::Pooled
         | Comparison::ObserverCost
-        | Comparison::ShortRouteLoad => (true, true),
+        | Comparison::ShortRouteLoad
+        | Comparison::SupplyAdmission => (true, true),
         Comparison::PooledWake => (true, !arm),
     };
     SchemeServiceSettings {

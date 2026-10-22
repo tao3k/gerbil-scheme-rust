@@ -145,7 +145,6 @@ pub(super) fn run(
 ) -> Value {
     let strategy = Strategy::for_arm(comparison, arm, observation);
     let asynchronous = comparison != Comparison::Service || arm;
-    let split_pair = comparison.is_split();
     idle(pool);
     let router = router(pool, comparison, arm);
     let active_router = if strategy.class_routing {
@@ -160,6 +159,7 @@ pub(super) fn run(
     if observation {
         super::native_wait::begin(pool);
     }
+    let sampling = observation.then(super::os_sampling::Sampler::start);
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -191,7 +191,7 @@ pub(super) fn run(
                     asynchronous,
                     released,
                     strategy.ready_completion,
-                    split_pair,
+                    comparison.is_split(),
                     bulk_router,
                 )
                 .await
@@ -208,6 +208,7 @@ pub(super) fn run(
         (bulk.await.unwrap(), probes.await.unwrap())
     });
     let elapsed = released.elapsed().as_nanos();
+    let points = sampling.map(super::os_sampling::Sampler::finish);
     idle(pool);
     assert!(
         router
@@ -225,9 +226,9 @@ pub(super) fn run(
         asynchronous,
         strategy,
     );
+    super::os_sampling::append(&mut value, points);
     if observation {
-        value["native_wait_events"] = super::native_wait::finish(pool, inputs);
-        value["native_wait_event_width"] = json!(6);
+        super::native_wait::append(&mut value, pool, inputs);
     }
     if let Some(before) = before {
         value["owner_phases"] =

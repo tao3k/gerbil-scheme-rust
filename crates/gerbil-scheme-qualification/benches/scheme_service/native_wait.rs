@@ -8,22 +8,25 @@ pub(super) struct Anchor {
     clock: u64,
     uncertainty: u64,
 }
-pub(super) fn anchor() -> Anchor {
-    let before = Instant::now();
+pub(super) fn clock() -> u64 {
     let mut now = libc::timespec {
         tv_sec: 0,
         tv_nsec: 0,
     };
-    // SAFETY: initialized writable timespec; same clock as the native observer.
+    // SAFETY: writable timespec using the native trace's monotonic clock.
     assert_eq!(
         unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &raw mut now) },
         0
     );
+    u64::try_from(now.tv_sec).unwrap() * 1_000_000_000 + u64::try_from(now.tv_nsec).unwrap()
+}
+pub(super) fn anchor() -> Anchor {
+    let before = Instant::now();
+    let clock = clock();
     let after = Instant::now();
     Anchor {
         at: before,
-        clock: u64::try_from(now.tv_sec).unwrap() * 1_000_000_000
-            + u64::try_from(now.tv_nsec).unwrap(),
+        clock,
         uncertainty: u64::try_from(after.duration_since(before).as_nanos()).unwrap(),
     }
 }
@@ -91,4 +94,9 @@ pub(super) fn qos(pool: &InstancePool, elevated: bool) -> Value {
         "owner QoS application/restoration failed: {receipts:?}"
     );
     json!(receipts)
+}
+
+pub(super) fn append(value: &mut Value, pool: &InstancePool, inputs: &[Vec<i64>]) {
+    value["native_wait_events"] = finish(pool, inputs);
+    value["native_wait_event_width"] = json!(6);
 }

@@ -27,12 +27,13 @@ pub(super) fn snapshot(pool: &InstancePool, inputs: &[Vec<i64>]) -> Vec<Vec<i64>
     }
     for (owner, trace) in events.iter().enumerate() {
         assert_eq!(&trace[..2], &[0, 0], "native wait trace overflow/error");
-        assert_eq!((trace.len() - 2) % 4, 0);
+        assert_eq!((trace.len() - 2) % 6, 0);
         let mut sleeps = 0;
         let mut selects = 0;
-        for row in trace[2..].chunks_exact(4) {
+        for row in trace[2..].chunks_exact(6) {
             assert!((1..=5).contains(&row[0]));
             assert!(row[1] > 0 && row[2] >= row[1] && row[3] >= 0);
+            assert!(row[4] >= 0 && (0..=15).contains(&row[5]));
             if row[0] == 2 {
                 sleeps += 1;
                 assert_eq!(row[3], 1_000_000);

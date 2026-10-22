@@ -261,7 +261,12 @@ impl Pump<'_> {
             }
             let mut waiting = false;
             if let Some(producer) = self.producer.as_mut() {
-                match producer.step(self.image) {
+                match observed(
+                    self.image,
+                    self.wake,
+                    super::SchemeServicePhase::Supply,
+                    || producer.step(self.image),
+                ) {
                     ProducerStep::Service(request) => {
                         self.receive(request)?;
                         continue;

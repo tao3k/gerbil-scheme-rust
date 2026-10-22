@@ -120,7 +120,7 @@ pub(super) fn run(
         .zip(&probe.admission)
         .map(|(delivery, admission)| delivery.checked_sub(*admission).unwrap())
         .collect();
-    json!({"owner_qos": case.owner_qos, "owner_qos_receipts": qos_receipts, "owner_qos_restored": qos_restored, "wait_events": wait_events, "elapsed_ns": elapsed, "bulk_elapsed_ns": bulk.elapsed,
+    json!({"owner_qos": case.owner_qos, "owner_qos_receipts": qos_receipts, "owner_qos_restored": qos_restored, "wait_event_width": 6, "wait_events": wait_events, "elapsed_ns": elapsed, "bulk_elapsed_ns": bulk.elapsed,
         "bulk_orders": inputs.len(), "probe_orders": probes,
         "bulk_owner_native_ns": bulk_owner_ns, "probe_native_ns": probe.native,
         "probe_delivery_ns": probe.delivery, "probe_admission_ns": probe.admission,

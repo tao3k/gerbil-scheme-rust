@@ -11,6 +11,10 @@ mod measurement;
 mod native_wait;
 #[path = "scheme_service/observation.rs"]
 mod observation;
+#[path = "scheme_service/os_sampling.rs"]
+mod os_sampling;
+#[path = "scheme_service/os_threads.rs"]
+mod os_threads;
 #[path = "scheme_service/pooled.rs"]
 mod pooled;
 #[path = "scheme_service/resident.rs"]

@@ -139,7 +139,8 @@ Scheme; it never waits to fill a batch. Defaults stay at one. Accepted permits
 remain held until native completion/projection.
 
 `--phase-observation` enables owner-side counters for advance, native wait,
-submit/construction and take/projection/retirement. Samples carry per-owner wall,
+submit/construction, take/projection/retirement and resident supply. Samples carry
+per-owner wall,
 SDK thread CPU and GC deltas, plus native diagnostic snapshots around each short
 constructor. Without this flag, no phase clock or native counter reads are added.
 Snapshot APIs themselves use the existing owner queue; treat observed runs as
@@ -337,3 +338,31 @@ a ready-set return gives an upper bound on notification-to-return delay, not pur
 scheduler latency. Outside-select non-CPU wall time remains unattributed unless
 additional evidence identifies its blocking/descheduling cause. Keep all
 instrumented negatives separate from unobserved throughput and p99 acceptance.
+
+### Resident supply and OS point observations
+
+The phase array appends `Supply` after the original Advance/Wait/Submit/Retire
+indices. It covers owner-local producer steps, including lifecycle and capacity
+checks; previously these Rust-side intervals had no separate phase. Disabled
+observation still takes no phase clocks.
+
+On the Darwin qualification target, `--phase-observation` also takes bounded
+one-millisecond nominal point samples of the four named owners in this process.
+`os_thread_samples` reports overflow/error counts and seven-column rows:
+`[owner, query_start_ns, query_end_ns, run_state, cumulative_cpu_us, flags,
+suspend_count]`. The clocks match the native select trace. Inspection send rights
+and the task-thread array are released; the sampler joins before native shutdown,
+including unwinding. No owner is suspended, reprioritized or migrated.
+
+Run states use Darwin `THREAD_BASIC_INFO`: 1 running normally, 2 stopped,
+3 waiting, 4 uninterruptible wait, 5 halted. A state is a point observation,
+not the state of the surrounding interval. CPU is kernel cumulative thread CPU
+in microseconds; its sampling quantization differs from the enclosing phase
+clock. RUNNING does not provide an exact runnable-to-running timestamp.
+GC wall time and enclosing owner CPU remain overlapping, not additive counters;
+collector CPU cannot be derived by subtracting process GC CPU from wall time.
+These diagnostic captures do not qualify unobserved throughput.
+
+`owner_capacity --wait-trace` consumes the same six-column native wait rows as
+this service bench and emits `wait_event_width: 6`; historical four-column
+consumers must not reinterpret those records silently.

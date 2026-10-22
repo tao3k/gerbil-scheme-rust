@@ -254,7 +254,11 @@ Scheme code, migrate Actors or schedule Scheme green threads in Rust.
 
 `observe_scheme_service_on(owner)` enables optional owner phase diagnostics;
 `scheme_service_observation_on(owner)` returns a ticket for an owned snapshot.
-Counters cover advance, wait, submit and retire wall/SDK thread CPU/GC spans.
+Counters cover advance, wait, submit, retire and owner-resident supply
+wall/thread CPU/GC spans. Supply appends the fifth phase; prior indices remain
+unchanged. The Rust bench can additionally sample own-owner OS run states;
+these are point observations, not exact kernel dispatch timestamps. See
+[the directed supply and OS qualification](30-39-status/30.47-owner-supply-and-os-run-state.org).
 Native waits may include Scheme work, blocked select and OS descheduling; these
 spans do not identify pure OS delay. Observation is disabled by default.
 

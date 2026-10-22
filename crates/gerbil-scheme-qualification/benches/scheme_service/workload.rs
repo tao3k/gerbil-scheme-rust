@@ -28,6 +28,12 @@ impl ShortMode {
             Self::Native(mode) | Self::Dedicated(mode) => mode.enabled(),
         }
     }
+    fn counters(self) -> bool {
+        match self {
+            Self::Batch => false,
+            Self::Native(mode) | Self::Dedicated(mode) => mode.counters(),
+        }
+    }
     pub(super) fn dedicated(self) -> bool {
         matches!(self, Self::Dedicated(_))
     }
@@ -70,7 +76,7 @@ impl SchemeServiceRequest for Orders {
         session: &NativeSession<'vm>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.entered = Some(Instant::now());
-        if self.short_mode.observed() {
+        if self.short_mode.counters() {
             (self.construction_before, self.snapshot_ns[0]) = super::observation::counter(session);
         }
         let value = if self.short_mode.native() {
@@ -81,7 +87,7 @@ impl SchemeServiceRequest for Orders {
         } else {
             self.request.construct(session)?
         };
-        if self.short_mode.observed() {
+        if self.short_mode.counters() {
             (self.construction_after, self.snapshot_ns[1]) = super::observation::counter(session);
         }
         self.constructed = Some(Instant::now());
@@ -93,7 +99,7 @@ impl SchemeServiceRequest for Orders {
         output: &NativeRoot<'_>,
     ) -> Result<Reply, InstanceError> {
         let projection = Instant::now();
-        let diagnostics = if self.short_mode.observed() {
+        let diagnostics = if self.short_mode.counters() {
             let (last, cost) = super::observation::counter(session);
             self.snapshot_ns[2] = cost;
             self.construction_before
@@ -115,7 +121,7 @@ impl SchemeServiceRequest for Orders {
             constructed: self.constructed.unwrap(),
             projection,
             diagnostics,
-            snapshot_ns: self.short_mode.observed().then_some(self.snapshot_ns),
+            snapshot_ns: self.short_mode.counters().then_some(self.snapshot_ns),
             entry: self.entry,
         })
     }
@@ -262,6 +268,7 @@ pub(super) async fn bulk(
     }
 }
 pub(super) struct Probes {
+    pub owners: Vec<usize>,
     pub actual: Vec<u128>,
     pub scheduled: Vec<u128>,
     pub admission: Vec<u128>,
@@ -284,6 +291,7 @@ pub(super) async fn probes(
     router: Option<SchemeServiceRouter>,
 ) -> Probes {
     let mut values = Probes {
+        owners: Vec::new(),
         actual: Vec::new(),
         scheduled: Vec::new(),
         admission: Vec::new(),
@@ -364,6 +372,7 @@ pub(super) async fn probes(
         values.diagnostics.push(reply.diagnostics);
         values.snapshot_ns.push(reply.snapshot_ns);
         values.completed.push(completed);
+        values.owners.push(reply.owner);
     }
     values
 }

@@ -3,6 +3,10 @@ use super::GATE;
 use gerbil_scheme::instances::InstancePool;
 use serde_json::{Value, json};
 use std::time::Instant;
+#[cfg(target_vendor = "apple")]
+const TRACE_CLOCK: libc::clockid_t = libc::CLOCK_UPTIME_RAW;
+#[cfg(not(target_vendor = "apple"))]
+const TRACE_CLOCK: libc::clockid_t = libc::CLOCK_MONOTONIC;
 pub(super) struct Anchor {
     at: Instant,
     clock: u64,
@@ -14,10 +18,7 @@ pub(super) fn clock() -> u64 {
         tv_nsec: 0,
     };
     // SAFETY: writable timespec using the native trace's monotonic clock.
-    assert_eq!(
-        unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &raw mut now) },
-        0
-    );
+    assert_eq!(unsafe { libc::clock_gettime(TRACE_CLOCK, &raw mut now) }, 0);
     u64::try_from(now.tv_sec).unwrap() * 1_000_000_000 + u64::try_from(now.tv_nsec).unwrap()
 }
 fn resolution() -> u64 {
@@ -27,7 +28,7 @@ fn resolution() -> u64 {
     };
     // SAFETY: writable timespec for the same clock as the native marker.
     assert_eq!(
-        unsafe { libc::clock_getres(libc::CLOCK_MONOTONIC, &raw mut value) },
+        unsafe { libc::clock_getres(TRACE_CLOCK, &raw mut value) },
         0
     );
     u64::try_from(value.tv_sec).unwrap() * 1_000_000_000 + u64::try_from(value.tv_nsec).unwrap()
@@ -51,6 +52,9 @@ impl Anchor {
             self.clock
                 .saturating_sub(u64::try_from(self.at.duration_since(at).as_nanos()).unwrap())
         }
+    }
+    pub(super) fn instant(&self, at: Instant) -> Value {
+        json!({"at_ns":self.clock(at),"uncertainty_ns":self.uncertainty})
     }
     pub(super) fn marks(&self, marks: &[Option<Instant>; 9]) -> Value {
         json!({"uncertainty_ns":self.uncertainty,"marks_ns":marks.map(|at|at.map(|at|self.clock(at)))})
@@ -125,6 +129,11 @@ pub(super) fn append_anchors(value: &mut Value, pool: &InstancePool) {
     );
     value["kernel_clock_anchors"] = json!(anchors);
     value["kernel_clock_resolution_ns"] = json!(resolution());
+    value["kernel_clock_domain"] = json!(if cfg!(target_vendor = "apple") {
+        "CLOCK_UPTIME_RAW"
+    } else {
+        "CLOCK_MONOTONIC"
+    });
 }
 
 pub(super) fn append_probe_anchors(value: &mut Value, pool: &InstancePool) {

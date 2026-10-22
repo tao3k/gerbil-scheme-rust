@@ -465,3 +465,12 @@ tails; some large construction wall spans had little thread CPU and zero GC.
 [The low-intrusion report](30-39-status/30.50-low-intrusion-owner-tail-qualification.org)
 keeps the degraded runs and distinguishes those spans from actual GC CPU work.
 No production routing/supply change is admitted from that attribution alone.
+
+
+Entry-only qualification now omits every per-request native diagnostic read.
+An outside-timing sample clock plus actual reply owner IDs also locates Off
+requests in the same kernel recording. Darwin capture timestamps use raw uptime
+to match Rust `Instant`; longer adjusted-clock captures that fail offset bounds
+are rejected. [The follow-up report](30-39-status/30.51-diagnostic-free-owner-tail-and-route-qualification.org)
+records same-run owner states, an unsuccessful short-route ranking experiment
+and the feed-configuration retirement fence. Production defaults remain unchanged.

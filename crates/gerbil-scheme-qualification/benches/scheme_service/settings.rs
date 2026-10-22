@@ -16,7 +16,8 @@ fn requested(comparison: Comparison, arm: bool) -> SchemeServiceSettings {
         | Comparison::OwnerQos
         | Comparison::Resident
         | Comparison::Pooled
-        | Comparison::ObserverCost => (true, true),
+        | Comparison::ObserverCost
+        | Comparison::ShortRouteLoad => (true, true),
         Comparison::PooledWake => (true, !arm),
     };
     SchemeServiceSettings {
@@ -38,6 +39,8 @@ pub(super) fn configure(
     budget::wake(pool, expected.wake == SchemeServiceWake::NativePort);
     budget::notification(pool, comparison == Comparison::Notification && arm);
     if comparison == Comparison::Feed {
+        // Native delivery precedes permit retirement; feed changes require both.
+        super::measurement::idle(pool);
         for owner in 0..4 {
             pool.dispatcher()
                 .configure_scheme_service_feed_on(owner, if arm { 4 } else { 1 })

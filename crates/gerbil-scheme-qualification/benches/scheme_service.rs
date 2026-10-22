@@ -150,7 +150,9 @@ fn cleanup(pool: &mut InstancePool) {
     );
 }
 fn select_comparison(args: &[String]) -> Comparison {
-    if args.iter().any(|s| s == "--observer-ab") {
+    if args.iter().any(|s| s == "--short-route-load-ab") {
+        Comparison::ShortRouteLoad
+    } else if args.iter().any(|s| s == "--observer-ab") {
         Comparison::ObserverCost
     } else if args.iter().any(|s| s == "--pooled-wake-ab") {
         Comparison::PooledWake
@@ -199,6 +201,19 @@ fn repetitions(args: &[String]) -> usize {
     assert!((1..=50).contains(&blocks), "block count must be 1..=50");
     blocks
 }
+fn await_trace_start(args: &[String]) {
+    if args.iter().any(|s| s == "--await-trace-start") {
+        use std::io::{Read, Write};
+        println!(
+            "{}",
+            json!({"event":"trace_attach_ready","pid":std::process::id()})
+        );
+        std::io::stdout().flush().unwrap();
+        let mut start = [0_u8];
+        std::io::stdin().read_exact(&mut start).unwrap();
+        assert_eq!(start, [b'R'], "trace start token");
+    }
+}
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     assert!(args.iter().all(|s| s.starts_with("--blocks=")
@@ -210,8 +225,11 @@ fn main() {
         || s == "--short-service-ab"
         || s == "--phase-observation"
         || s == "--probe-observation"
+        || s == "--entry-observation"
         || s == "--observer-ab"
+        || s == "--short-route-load-ab"
         || s == "--trace-once"
+        || s == "--await-trace-start"
         || s == "--notification-ab"
         || s == "--reselection-ab"
         || s == "--owner-qos-ab"
@@ -222,19 +240,13 @@ fn main() {
         || s == "--budget-ab"
         || s == "--feed-ab"));
     let trace_once = args.iter().any(|s| s == "--trace-once");
-    assert!(
-        !(args.iter().any(|s| s == "--phase-observation")
-            && args.iter().any(|s| s == "--probe-observation"))
-    );
-    let observation = if args.iter().any(|s| s == "--phase-observation") {
-        Mode::Phase
-    } else if args.iter().any(|s| s == "--probe-observation") {
-        Mode::Probe
-    } else {
-        Mode::Off
-    };
+    let observation = observation::select(&args);
     assert!(!trace_once || observation.enabled());
-    assert!(!args.iter().any(|s| s == "--observer-ab") || observation == Mode::Off);
+    assert!(
+        !args.iter().any(|s| s == "--observer-ab")
+            || matches!(observation, Mode::Off | Mode::Entry)
+    );
+    await_trace_start(&args);
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
         let mut last = "start";
@@ -255,6 +267,7 @@ fn main() {
                 s.as_str(),
                 "--notification-ab"
                     | "--observer-ab"
+                    | "--short-route-load-ab"
                     | "--reselection-ab"
                     | "--owner-qos-ab"
                     | "--resident-ab"

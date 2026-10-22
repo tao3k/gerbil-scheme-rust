@@ -1,0 +1,214 @@
+#+title: Diagnostic-free owner tail attribution and short-route qualification
+#+date: 2026-10-22
+
+* Exact-head CI and a real feed configuration race
+
+The starting PR #18 head was =6d8b2deea7751ce04cd3be2624e35c8d6f167c02=,
+run =39756564837=. Its fixed-owner native lifecycle job failed in the dispatcher
+bench smoke, specifically =--test --feed-ab --phase-observation=. Retirement,
+failure controls, native Scheme capabilities and reuse had passed. The error
+was =InvalidConfig("service feed bound or active capacity")= at the existing
+idle-only feed configuration call, not a progress timeout or missing Scheme VM.
+The failure is retained; later local results do not rewrite that CI attempt.
+
+Native result delivery occurs inside =run_native=; the owner loop drops its
+capacity guard after that call returns. Waiting for a control result therefore
+does not establish work/slot retirement. The bench reconfigured feed immediately
+after control tickets arrived, racing the permit destructor. It now uses the
+existing bounded =idle= check immediately before feed configuration. All native
+work, slots and producer registrations must have returned. The five-second
+progress gate and library idle-only validation remain unchanged; no rejected
+configuration is retried. The exact CI dev-profile command passed locally.
+
+This changes the real qualification call sequence, not production default feed
+limits or the meaning of ordinary result tickets. New-head remote CI remains
+a separate gate. The predecessor run completed with that one supported job failed; both Cargo
+platforms, both Bazel platforms and Quint passed. The unsupported SMP job was
+explicitly skipped. No failed job is silently relabeled as passed.
+
+* Remove diagnostic reads from request execution
+
+The explicit =--entry-observation= mode records request entry marks but performs
+zero per-request native diagnostic, GC or thread-CPU reads. Its data asserts
+zero native snapshots and null diagnostic/cost entries. Existing Probe/Phase
+modes retain their three actual snapshots and strict availability assertions.
+Observation is still off by default.
+
+=--observer-ab --entry-observation= compares timed Off versus Entry on the same
+four complete Scheme runtimes. Both arms use the same pooled supply, two Tokio
+workers, NativePort, budget one, coalesced notification, feed one, four slots and
+work 32 per owner, and three active bulk callbacks per owner. Control clock
+fences remain balanced outside timing. No existing Scheme execution capability,
+Actor/green-thread scheduler, native type constructor or projector is replaced.
+
+A sample-level native clock bridge is acquired outside timing. Actual reply
+owner IDs are emitted for all probes, including Off. Existing scheduled/actual
+and stage durations reconstruct each request's start/end and construction/
+projection intervals for Off without a per-request native clock or diagnostic
+read.
+Entry's independent request anchors cross-check that reconstruction. Ordinary
+Off runs do not enable this clock bridge. Default repeat counts are unchanged.
+
+* Correct the clock domain instead of accepting a drifting fit
+
+An instrument-only recorder uses a Blank template with Thread State Trace and
+Points of Interest, removing Time Profiler from acquisition. A 50-block deferred
+capture completed all 400 native samples and clean shutdown but failed recorder
+finalization within its 120-second diagnostic controller. A 40-sample capture
+with a 15-second window saved/exported successfully, but its clock validation
+failed: start/end offset bounds drifted by approximately 24 us over 3.13 s and
+had no common fixed-offset intersection. That trace is rejected for bounded
+interval attribution; a fitted or widened offset was not substituted.
+
+The earlier native =CLOCK_MONOTONIC= domain did not match macOS Rust =Instant=.
+The qualification C/Rust clocks now both use =CLOCK_UPTIME_RAW= on Darwin,
+with =kernel_clock_domain= and measured resolution emitted. Rust's
+[[https://doc.rust-lang.org/src/std/sys/time/unix.rs.html][standard library implementation]] uses this same raw uptime clock for Apple =Instant=.
+Production timeouts, Scheme clocks and GC counters are unchanged. Historical
+clock domains and source/artifact identities remain distinct.
+
+The first corrected 40-sample raw-clock target also exited normally, but recorder
+finalization did not complete within its controller; it is not accepted as a
+scheduling capture. Its maximum request was 0.681 ms and does not reproduce the
+historical 20-39 ms tails. All three larger attempts retained correct native
+results, four joined owners, zero roots and removed copied image files.
+Recorder/controller failures remain separate from native workload success.
+
+* Accepted same-run evidence, including observation Off
+
+The smaller corrected capture used eight full-size samples, not smoke inputs:
+8192 48-line orders and 64 serial four-line short requests per sample. It kept
+the same live VMs, AB/BA order and native settings. Recorder saved successfully
+in 13.72 s, target exited zero, and export succeeded. All four owner TIDs,
+32 timed anchors and 512 complete request windows passed identity/coverage
+checks; measured coverage gaps were zero. Raw-clock resolution was 42 ns.
+
+The intersected kernel offset uncertainty was +/-313 ns. Sample clock bridge
+uncertainty was at most 209 ns, and independent Entry bridge disagreement at
+most 125 ns. Including the raw clock tick, the sample-window alignment boundary
+was below 0.6 us. The native setting and counter-scope assertions still passed.
+No per-request diagnostic reads occur in either arm.
+
+An actual Entry mixed request took 495.708 us: 476.292 us after admission before
+construction, 1.375 us construction, 14.375 us pending and 0.708 us projection.
+Its owner was Running throughout the complete request. Published-to-dequeued
+was 476.500 us, also entirely Running. The other three owners were Blocked in
+=select= for that same complete 495.708 us interval. This establishes an owner
+selection opportunity in that request, not an OS ready-queue or diagnostic-read
+explanation for its delay. Blocking in the other VMs is not CPU consumption.
+
+An actual Off mixed request took 433.083 us: 7.667 us before construction,
+1.167 us construction, 418.541 us pending and 1.042 us projection. Its owner
+was Running throughout. Another Entry CPU request took 469.625 us: 460.271 us
+Running, 5.937 us Blocked and 3.417 us Runnable. Its published-to-dequeued span
+included 1.520 us Blocked and 3.417 us Runnable, while most latency was the
+436.833 us pending span, entirely Running. These are clipped intervals from
+the same requests, not state percentages from a different run.
+
+The observed getrusage calls do not identify complete GC boundaries: their
+recorded native callers do not provide sufficient GC stack attribution. No
+per-request GC or allocation count is claimed for Entry/Off. Running may include
+Scheme work and GC. The historical 20-39 ms requests were not reproduced in
+this admitted recording, so their exact blocking/runnable cause remains open.
+
+* Unobserved extreme tails and attachment control
+
+A separate unprofiled, five-block final-source Off/Entry control again produced
+extreme tails despite zero per-request native diagnostics in both arms:
+
+| Load | Orders/s Off -> Entry | Actual short p99 ms Off -> Entry | Minimum progress Off -> Entry |
+|------+-----------------------+----------------------------------+-------------------------------|
+| CPU | 139571 -> 211718 | 34.143083 -> 11.302334 | 49.75% -> 6.36% |
+| Mixed | 32788 -> 33685 | 6.404292 -> 5.761958 | 98.67% -> 98.71% |
+
+This reproduces the existence of extreme tails with diagnostics removed. The
+large differences between arms are not accepted as an observer speedup or a
+universal overhead bound. They do not identify whether their own off-core time
+was blocked or runnable, because that run had no kernel recording.
+
+To test the process launch-path difference, =--await-trace-start= holds stdin
+before any VM or native progress watchdog starts. It emits the real PID, and
+accepts exactly one =R= byte after the recorder's actual tracing-started
+notification. EOF/bad tokens fail before VM creation. The native five-second
+watchdog then starts normally; this is an explicit acquisition handshake, not
+a synthetic native-progress event or a relaxed native timeout.
+
+An attached-before-VM capture through the original parent path completed target
+and recorder with exit zero in 12.26 s. It retained eight full-size samples and
+clean four-owner shutdown; maximum requests were 0.543 ms Off and 0.495 ms Entry.
+All four TIDs, 32 timed anchors and 512 complete request windows passed the
+same validation. Offset uncertainty was +/-271 ns and independent bridge
+disagreement at most 125 ns. Its 0.543 ms Off request spent 0.529 ms Running,
+0.011 ms Interrupted and 0.003 ms Preempted; its 0.522 ms pending span dominated.
+This does not reproduce the unprofiled extreme tails, nor prove that profiling
+or parent QoS caused their absence. Timing/observer and host-state effects remain
+unseparated until a covered extreme request exists in the recording itself.
+A read-only direct ktrace availability check failed with a system error; no
+trace session was reset or another recorder taken over.
+
+* Directed short-route algorithm control through the actual API
+
+Native occupied slots are a capacity signal, not expected response time.
+In a mixed sleeping/CPU workload, a VM with fewer jobs can be on-CPU while other
+VMs are waiting in the Scheme event loop. Removing occupancy ordering is a
+specific hypothesis to test, not a proven fix from the one request above.
+
+=--short-route-load-ab= uses the existing =SchemeServiceRouter::with_admission=
+API: control =ReselectProgress= versus candidate =Reselect=. Both keep real
+capacity reservation, class quotas, deadlines, cancellation/root ownership and
+close/drain protocols. Independent bulk work keeps the same bounded pool source;
+only its separate short router changes. No rooted state migrates. This is not
+a claim that changing an arbitrary mixed-use router leaves its batch policy intact.
+
+Two unobserved five-block captures each kept the same live four VMs within their
+pair, alternated AB/BA, and retained ten samples per arm/load. No profiler,
+request entry observer or native diagnostic reads ran. Existing constructors,
+full Scheme computation, inputs and resource bounds were identical.
+
+| Capture/load | Orders/s control -> candidate | Actual short p99 ms control -> candidate | Minimum progress control -> candidate |
+|--------------+-------------------------------+------------------------------------------+---------------------------------------|
+| A CPU | 433163 -> 431368 | 0.401875 -> 0.415000 | 98.79% -> 96.27% |
+| A mixed | 67204 -> 65672 | 0.535709 -> 0.497709 | 98.80% -> 98.80% |
+| B CPU | 426715 -> 426900 | 0.401417 -> 0.408583 | 98.79% -> 98.79% |
+| B mixed | 67035 -> 67047 | 0.442583 -> 0.472125 | 98.80% -> 98.82% |
+
+A's mixed p99 improved about 7.1%, but throughput fell 2.28%. B's mixed p99
+regressed 6.7%. CPU p99 regressed in both; A's CPU fairness and finish spread
+also worsened. The candidate is not admitted as an optimization and no new
+production router variant/default is added. The explicit existing-API control
+remains reproducible. A cheap occupancy proxy is insufficient, but indiscriminately
+removing it is also insufficient. Capacity safety remains necessary in both.
+
+* Acceptance and remaining protocol work
+
+The feed quiescence race and capture clock-domain mismatch are repaired. The
+accepted capture closes same-run Off/Entry scheduling attribution for its own
+512 requests. It does not close historical extreme-tail attribution. No current
+measurement makes projection the dominant cost of those requests, and no
+production routing/supply policy change is promoted from the inconsistent A/B.
+
+Native capacity, producer and Scheme service fixtures passed locally (2.58 s,
+2.09 s and 4.94 s). They retain GC, continuations, exceptions, cancellation,
+timeout and shutdown controls. The final modes and targeted feed CI command
+also require clean four-owner shutdown with zero roots and removed files.
+Focused warnings-denied Clippy passed after extracting the existing router-drain
+check; a preliminary function-length failure is retained privately. No lint
+suppression, Bash driver, new build system, SDK change or timeout relaxation is added.
+
+Further routing/supply work must distinguish an uncommitted Rust input from
+accepted owner-rooted Scheme work. Any future shared short-source/readiness
+protocol must preserve bounded work/slots, class fairness, cancellation, expiry
+and close before claiming its next input; it cannot move an already rooted job
+or infer readiness merely from a completed wake. Existing models and producer
+contracts should be reused. This remains an implementation/performance gate,
+not a model-only or documentation-only success claim.
+
+Frozen private artifact SHA256 identities:
+
+- Accepted raw-clock capture executable: =484eba36994bfb616bd5e5a6c48b8dc34fbf197316131559a81fdf5a3cd80116=.
+- Attached-before-VM executable: =6d59be13ae5cbc8f1261f17e01536780abdeaa1e065525a97388291d70cba6c5=.
+- Directed routing executable: =fc05ff88df335392f7ce31295824eebf02c76ec3aa03b83060acf10254041e6d=.
+- Raw-clock native image: =0e79bb79f9686fc36e13e1be76deda04ae1877e370a081a096f32a61e53c3d16=.
+
+Raw traces/logs, rejected captures, source archives and the failed CI log remain
+outside Git. No private absolute path appears in the public reproduction recipe.

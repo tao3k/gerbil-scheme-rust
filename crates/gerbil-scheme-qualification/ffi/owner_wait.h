@@ -35,7 +35,7 @@ static uint64_t owner_wait_qos_set(uint64_t elevated) {
 }
 static uint64_t owner_wait_clock(void) {
   struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
+  clock_gettime(CLOCK_UPTIME_RAW, &now);
   return (uint64_t)now.tv_sec * 1000000000ULL + (uint64_t)now.tv_nsec;
 }
 static void owner_wait_mark(void) {

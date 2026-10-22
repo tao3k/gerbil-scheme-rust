@@ -386,7 +386,7 @@ Unobserved performance runs execute neither calibration nor OS sampling.
 
 ### Complete owner scheduling capture
 
-`--trace-once` requires `--phase-observation` or `--probe-observation`. It runs one A/B per CPU/mixed
+`--trace-once` requires `--phase-observation`, `--probe-observation` or `--entry-observation`. It runs one A/B per CPU/mixed
 load, retaining the normal 8192-order inputs, 64 short probes, warmups, four live
 VMs, two Tokio workers, capacity bounds and original progress watchdog. It does
 not shorten the input to the smoke workload. Configuration emits `trace_once`;
@@ -395,8 +395,9 @@ these four diagnostic samples are not performance repetitions. Normal runs and
 
 Observation resets emit an `OwnerClock` Points of Interest signpost from each
 fixed owner. `kernel_clock_anchors` contains one `[before_ns, after_ns, tid]` row
-per owner, bracketing emission with the native monotonic clock.
-`kernel_clock_resolution_ns` reports that clock's resolution. The native wait
+per owner, bracketing emission with the declared native trace clock.
+`kernel_clock_domain` declares the domain; Darwin now uses `CLOCK_UPTIME_RAW`,
+matching Rust `Instant`, and `kernel_clock_resolution_ns` reports its resolution. The native wait
 trace remains six columns and its existing event kinds are unchanged. A tiny
 host-Clang object uses Apple's standard signpost macros; Gambit-generated C
 continues through its configured native compiler. Each marker releases its log
@@ -424,9 +425,10 @@ the directed pair on the qualified host, not as a universal duration guarantee.
 
 Resolve XML references within their exported node. Match markers by `(tid,
 monotonic_ns)`, since different owners can share a clock tick. Intersect their
-clock-offset bounds, accounting for measured monotonic resolution (1 us here).
+clock-offset bounds, accounting for the declared clock and measured resolution.
 Add each request's reported anchor uncertainty and one native clock tick when
-aligning its entry marks; the qualified total was below 3 us.
+aligning its entry marks; the older short-capture qualified total was below 3 us. Longer adjusted-clock
+captures can drift; reject an empty intersection rather than widening it.
 Clip scheduling/syscall intervals only after validating full per-owner coverage;
 reject unknown/missing/overlapping intervals. Native CPU counters enclose their
 whole measured phase and cannot be clipped by prorating wall overlap.
@@ -452,7 +454,7 @@ read three; do not attribute their full wall spans to type conversion. These
 costs also include any off-core delay inside the read.
 `native_probe_snapshots` checks actual snapshot availability; missing native
 counters reject an observed native-short sample. `observation_mode` distinguishes
-Off, Probe and Phase. Native trace reset/readback asserts no wait events in Probe.
+Off, Entry, Probe and Phase. Native trace reset/readback asserts no wait events in Probe.
 
 `--observer-ab` compares observation Off with Probe on the same live VMs, using
 pooled supply, native short layout, progress-aware routing, NativePort wake and
@@ -472,3 +474,59 @@ For one reduced kernel capture, replace `--phase-observation` with
 and cleanup gates still apply. Kernel acquisition remains intrusive and is not
 an unobserved throughput result. See [low-intrusion tail qualification](../../../../docs/30-39-status/30.50-low-intrusion-owner-tail-qualification.org)
 for reproduced unobserved tails, GC-associated construction and remaining limits.
+
+
+### Diagnostic-free request windows and short-route control
+
+```text
+just bridge-scheme-service-benchmark --observer-ab --entry-observation
+just bridge-scheme-service-benchmark --short-route-load-ab
+```
+
+Entry records request entry marks and no per-request native diagnostics or CPU/GC
+reads. Off/Entry uses the same pooled supply in both arms. The explicit
+observer-cost comparison records one `sample_native_clock` outside timing in both
+arms. `probe_owners` comes from the actual completed reply. In these samples,
+request end is sample native release time plus `index * 500000` plus
+`probe_scheduled_ns[index]`; start subtracts `probe_actual_ns[index]`. Existing
+stage spans then locate construction and projection. Check this bridge against
+Entry's independently anchored marks before attributing observation-Off requests.
+Ordinary observation-Off runs do not enable native clock collection.
+
+For a small full-size capture without Time Profiler, use the already built
+`SERVICE_BENCH` and an external `STATE_DIR`:
+
+```text
+xcrun xctrace record --no-prompt --instrument 'Thread State Trace' --instrument 'Points of Interest' --time-limit 15s --window 5s --target-stdout "$STATE_DIR/entry.jsonl" --output "$STATE_DIR/entry.trace" --launch -- "$SERVICE_BENCH" --observer-ab --entry-observation --blocks=1
+```
+
+The instrument-only command uses a Blank template. Preserve the normal sample
+payload and five-second native progress gate; validate owner identities, every
+clock anchor and complete request coverage. This is diagnostic acquisition,
+not an unobserved throughput result. Larger windows/runs are not automatically
+qualified, and a normal target exit does not establish recorder finalization.
+
+`--short-route-load-ab` uses pooled native bulk supply in both arms, comparing
+`ReselectProgress` with `Reselect` for the short router. Both still reserve real
+native capacity before publication. This isolates occupancy ranking, not credit
+safety, migration or Scheme scheduling. Results were inconsistent, including
+negative throughput/fairness results; do not promote a new default.
+
+Feed configuration requires a separate bounded native-retirement fence after
+control results arrive. A result ticket can arrive before the control's host
+capacity permit drops. The bench now waits for all work/slot/producer credits
+before the existing idle-only feed API; it does not retry rejected settings or
+weaken the API's validation.
+
+See [same-run diagnostic-free attribution and retained route negatives](../../../../docs/30-39-status/30.51-diagnostic-free-owner-tail-and-route-qualification.org).
+
+
+`--await-trace-start` is an explicit pre-VM attachment handshake. It emits
+`trace_attach_ready` with the real PID and waits for one stdin byte `R`. An
+external controller can launch the benchmark normally, attach the instrument-only
+recorder before owner creation, wait for `--notify-tracing-started`, then release
+that byte. Bound the controller wait separately. EOF/bad tokens fail before VM
+creation. The original native watchdog starts after this acquisition barrier;
+no native progress is fabricated and the default invocation has no barrier.
+An attached trace still needs the same identity, clock, coverage and cleanup
+checks and is not proof that unprofiled extreme tails have been reproduced.

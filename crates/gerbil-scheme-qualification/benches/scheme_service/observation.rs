@@ -55,19 +55,31 @@ pub(super) fn append(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Mode {
     Off,
+    Entry,
     Probe,
     Phase,
 }
 impl Mode {
     pub(super) fn paired(self, comparison: super::measurement::Comparison, arm: bool) -> Self {
         if comparison == super::measurement::Comparison::ObserverCost {
-            if arm { Self::Probe } else { Self::Off }
+            if arm {
+                if self == Self::Entry {
+                    Self::Entry
+                } else {
+                    Self::Probe
+                }
+            } else {
+                Self::Off
+            }
         } else {
             self
         }
     }
     pub(super) fn enabled(self) -> bool {
         self != Self::Off
+    }
+    pub(super) fn counters(self) -> bool {
+        matches!(self, Self::Probe | Self::Phase)
     }
     pub(super) fn full(self) -> bool {
         self == Self::Phase
@@ -80,6 +92,7 @@ pub(super) struct Capture {
     anchored: bool,
     before: Option<Vec<SchemeServiceObservation>>,
     sampling: Option<super::os_sampling::Sampler>,
+    clock: Option<super::native_wait::Anchor>,
 }
 impl Capture {
     pub(super) fn start(pool: &InstancePool, mode: Mode, balanced_fence: bool) -> Self {
@@ -95,6 +108,7 @@ impl Capture {
             anchored,
             before,
             sampling: mode.full().then(super::os_sampling::Sampler::start),
+            clock: anchored.then(super::native_wait::anchor),
         }
     }
     pub(super) fn finish(
@@ -103,6 +117,7 @@ impl Capture {
         pool: &InstancePool,
         inputs: &[Vec<i64>],
         snapshots: usize,
+        released: std::time::Instant,
     ) {
         super::os_sampling::append(
             value,
@@ -115,15 +130,19 @@ impl Capture {
         }
         append(value, pool, self.before);
         value["observation_mode"] = json!(format!("{:?}", self.mode));
-        if self.mode.enabled() && value["short_layout"] == true {
+        if self.mode.counters() && value["short_layout"] == true {
             assert_eq!(
                 snapshots,
                 value["probe_actual_ns"].as_array().unwrap().len() * 3,
                 "native probe counters unavailable"
             );
         }
+        if !self.mode.counters() {
+            assert_eq!(snapshots, 0, "unexpected native diagnostic reads");
+        }
         value["native_probe_snapshots"] = json!(snapshots);
         value["native_clock_bridge"] = json!(self.anchored);
+        value["sample_native_clock"] = json!(self.clock.map(|clock| clock.instant(released)));
     }
 }
 
@@ -134,4 +153,26 @@ pub(super) fn counter(
     let start = std::time::Instant::now();
     let value = session.diagnostics();
     (value, start.elapsed().as_nanos())
+}
+
+pub(super) fn select(args: &[String]) -> Mode {
+    assert!(
+        args.iter()
+            .filter(|s| matches!(
+                s.as_str(),
+                "--phase-observation" | "--probe-observation" | "--entry-observation"
+            ))
+            .count()
+            <= 1,
+        "observation modes are exclusive"
+    );
+    if args.iter().any(|s| s == "--phase-observation") {
+        Mode::Phase
+    } else if args.iter().any(|s| s == "--probe-observation") {
+        Mode::Probe
+    } else if args.iter().any(|s| s == "--entry-observation") {
+        Mode::Entry
+    } else {
+        Mode::Off
+    }
 }

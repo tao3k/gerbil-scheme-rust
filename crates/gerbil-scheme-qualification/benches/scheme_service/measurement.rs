@@ -30,6 +30,7 @@ pub(super) enum Comparison {
     Pooled,
     PooledWake,
     ObserverCost,
+    ShortRouteLoad,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -37,7 +38,12 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
-            Self::ObserverCost => "same pooled native workload; observation off versus probe-only",
+            Self::ShortRouteLoad => {
+                "same pooled supply; short owner occupancy versus class-load routing"
+            }
+            Self::ObserverCost => {
+                "same pooled native workload; observation off versus request observation"
+            }
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
@@ -97,6 +103,7 @@ impl Strategy {
                     | Comparison::Pooled
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
+                    | Comparison::ShortRouteLoad
             ) && (arm
                 || matches!(
                     comparison,
@@ -110,6 +117,7 @@ impl Strategy {
                         | Comparison::Pooled
                         | Comparison::PooledWake
                         | Comparison::ObserverCost
+                        | Comparison::ShortRouteLoad
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -135,6 +143,7 @@ impl Strategy {
                     | Comparison::Pooled
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
+                    | Comparison::ShortRouteLoad
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -173,6 +182,7 @@ pub(super) fn run(
                 | Comparison::Pooled
                 | Comparison::PooledWake
                 | Comparison::ObserverCost
+                | Comparison::ShortRouteLoad
         ) {
             None
         } else {
@@ -181,7 +191,7 @@ pub(super) fn run(
         let bulk = runtime.spawn(async move {
             if matches!(
                 comparison,
-                Comparison::PooledWake | Comparison::ObserverCost
+                Comparison::PooledWake | Comparison::ObserverCost | Comparison::ShortRouteLoad
             ) {
                 super::pooled::bulk(dispatch, bulk_inputs, released).await
             } else if comparison == Comparison::Pooled {
@@ -217,13 +227,7 @@ pub(super) fn run(
     });
     let elapsed = released.elapsed().as_nanos();
     idle(pool);
-    assert!(
-        router
-            .loads()
-            .iter()
-            .all(|l| l.short_requests == 0 && l.batch_requests == 0 && l.batch_work == 0)
-    );
-    router.close();
+    close_router(&router);
     let mut value = summarize(
         rows,
         inputs,
@@ -238,6 +242,7 @@ pub(super) fn run(
         pool,
         inputs,
         probe.diagnostics.iter().flatten().count() * 3,
+        released,
     );
     if let Some(qos) = qos {
         value["owner_qos_receipts"] = qos;
@@ -263,9 +268,14 @@ fn router(
             short_max_work: 1,
             batch_max_work: 8,
         },
-        if matches!(
+        if comparison == Comparison::ShortRouteLoad && arm {
+            gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
+        } else if matches!(
             comparison,
-            Comparison::Pooled | Comparison::PooledWake | Comparison::ObserverCost
+            Comparison::Pooled
+                | Comparison::PooledWake
+                | Comparison::ObserverCost
+                | Comparison::ShortRouteLoad
         ) {
             gerbil_scheme::instances::SchemeRoutingAdmission::ReselectProgress
         } else if (comparison == Comparison::Reselection && arm)
@@ -276,6 +286,7 @@ fn router(
                     | Comparison::Pooled
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
+                    | Comparison::ShortRouteLoad
             )
         {
             gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
@@ -313,24 +324,33 @@ fn append_policy(
                     | Comparison::Pooled
                     | Comparison::PooledWake
                     | Comparison::ObserverCost
+                    | Comparison::ShortRouteLoad
             )
     );
     value["owner_resident_supply"] = json!(
         matches!(
             comparison,
-            Comparison::Pooled | Comparison::PooledWake | Comparison::ObserverCost
+            Comparison::Pooled
+                | Comparison::PooledWake
+                | Comparison::ObserverCost
+                | Comparison::ShortRouteLoad
         ) || comparison == Comparison::Resident && arm
     );
     value["pool_resident_supply"] = json!(
         matches!(
             comparison,
-            Comparison::PooledWake | Comparison::ObserverCost
+            Comparison::PooledWake | Comparison::ObserverCost | Comparison::ShortRouteLoad
         ) || comparison == Comparison::Pooled && arm
     );
-    value["producer_progress_routing"] = json!(matches!(
-        comparison,
-        Comparison::Pooled | Comparison::PooledWake | Comparison::ObserverCost
-    ));
+    value["producer_progress_routing"] = json!(
+        matches!(
+            comparison,
+            Comparison::Pooled
+                | Comparison::PooledWake
+                | Comparison::ObserverCost
+                | Comparison::ShortRouteLoad
+        ) && !(comparison == Comparison::ShortRouteLoad && arm)
+    );
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
     } else {
@@ -417,10 +437,19 @@ fn summarize(
     json!({"orders":count,"asynchronous":asynchronous,"short_layout":strategy.short_mode.native(),"ready_completion":strategy.ready_completion,"class_routing":strategy.class_routing,"short_service":strategy.short_mode.dedicated(),"elapsed_ns":elapsed,"bulk_elapsed_ns":end.duration_since(released).as_nanos(),
         "bulk_owner_native_ns":owner_native_ns,"bulk_service_ns":service,"bulk_construct_ns":construct,
         "bulk_pending_before_projection_ns":pending,"bulk_projection_retirement_ns":projection,
-        "probe_entry":probe.entry,"probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_native_snapshot_ns":probe.snapshot_ns,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
+        "probe_owners":probe.owners,"probe_entry":probe.entry,"probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_admission_ns":probe.admission,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_native_snapshot_ns":probe.snapshot_ns,"probe_post_admission_wait_ns":probe.post_admission,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
         "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"unused_owners":unused_owners,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer})
 }
+fn close_router(router: &gerbil_scheme::instances::SchemeServiceRouter) {
+    assert!(
+        router.loads().iter().all(|load| load.short_requests == 0
+            && load.batch_requests == 0
+            && load.batch_work == 0)
+    );
+    router.close();
+}
+
 fn quantile(samples: &[Value], field: &str, percent: usize) -> u128 {
     let mut data: Vec<_> = samples
         .iter()

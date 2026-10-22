@@ -122,18 +122,6 @@ struct Pump<'a> {
 }
 impl Pump<'_> {
     fn receive(&mut self, mut request: Request) -> Result<(), InstanceError> {
-        let offer = if let Work::Offer(offer) = &request.work {
-            Some(std::sync::Arc::clone(offer))
-        } else {
-            None
-        };
-        if let Some(offer) = &offer {
-            // Receipt remains retractable until the native entry fence.
-            let Some(entered) = offer.claim(self.wake).enter() else {
-                return Ok(());
-            };
-            request = entered;
-        }
         if let Some(port) = self.wake.short_pool.get() {
             port.interrupted();
         }
@@ -150,18 +138,12 @@ impl Pump<'_> {
                 self.wake,
                 super::SchemeServicePhase::Submit,
                 || {
-                    let result = job.start(
+                    job.start(
                         self.image,
                         self.input,
                         self.output,
                         self.wake.progress.enabled.load(Ordering::Acquire),
-                    );
-                    // Source notification must not insert scheduling work between
-                    // the ownership fence and the first native constructor.
-                    if let Some(offer) = &offer {
-                        offer.wake_source();
-                    }
-                    result
+                    )
                 },
             ) {
                 Ok(id) => {
@@ -329,11 +311,40 @@ impl Pump<'_> {
             Ok(false)
         }
     }
+    fn claim_offer(&mut self) -> Result<bool, InstanceError> {
+        let Some(offer) = self.wake.offers.peek() else {
+            return Ok(false);
+        };
+        let Some(request) = offer.claim(self.wake).enter() else {
+            return Ok(false);
+        };
+        let result = self.receive(request);
+        // Source fanout follows native construction, and only a price/EOF event.
+        offer.wake_source();
+        result.map(|()| true)
+    }
     fn wait_remaining(&self, waiting: bool) -> Option<Duration> {
         waiting
             .then(|| self.producer.as_ref().and_then(|p| p.deadline()))
             .flatten()
             .map(|deadline| deadline.saturating_duration_since(Instant::now()))
+    }
+    fn shutdown_turn(&self, draining: &mut bool) -> Result<bool, InstanceError> {
+        if self.wake.closed.load(Ordering::Acquire) {
+            if !*draining {
+                control(self.image, &[7])?;
+                *draining = true;
+            }
+            if self.jobs.is_empty() && self.producer.is_none() {
+                return Ok(true);
+            }
+        }
+        if self.wake.failed.load(Ordering::Acquire) {
+            return Err(InstanceError::Loader(
+                "Scheme service wake write failed".into(),
+            ));
+        }
+        Ok(false)
     }
     fn drive(
         &mut self,
@@ -381,6 +392,11 @@ impl Pump<'_> {
                 self.receive(request)?;
                 continue;
             }
+            // A separate bulk slot must not overtake ordinary queued short or
+            // lifecycle messages. Shared short claims already had their turn.
+            if self.claim_offer()? {
+                continue;
+            }
             let mut waiting = false;
             if let Some(producer) = self.producer.as_mut() {
                 match observed(
@@ -422,20 +438,12 @@ impl Pump<'_> {
                 short_turn = false;
                 continue;
             }
-            register_short_wait(wake);
-            if wake.closed.load(Ordering::Acquire) {
-                if !draining {
-                    control(self.image, &[7])?;
-                    draining = true;
-                }
-                if self.jobs.is_empty() && self.producer.is_none() {
-                    return Ok(());
-                }
+            if self.claim_offer()? {
+                continue;
             }
-            if wake.failed.load(Ordering::Acquire) {
-                return Err(InstanceError::Loader(
-                    "Scheme service wake write failed".into(),
-                ));
+            register_short_wait(wake);
+            if self.shutdown_turn(&mut draining)? {
+                return Ok(());
             }
             let remaining = self.wait_remaining(waiting);
             if remaining.is_some_and(|value| value.is_zero()) {

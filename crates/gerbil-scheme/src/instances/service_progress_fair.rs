@@ -29,9 +29,6 @@ pub(super) struct StagedWork {
     units: u64,
 }
 impl StagedWork {
-    pub(super) fn units(&self) -> usize {
-        usize::try_from(self.units).unwrap()
-    }
     pub(super) fn new(counter: Arc<AtomicU64>, units: usize) -> Self {
         let units = u64::try_from(units).unwrap();
         counter.fetch_add(units, Ordering::AcqRel);
@@ -97,7 +94,8 @@ impl Fair {
     }
 }
 fn eligible(peer: &Peer, wake: &Wake, active: &Semaphore, units: usize) -> bool {
-    !wake.closed.load(Ordering::Acquire)
+    !wake.offers.pending()
+        && !wake.closed.load(Ordering::Acquire)
         && !wake.failed.load(Ordering::Acquire)
         && active.available_permits() > 0
         && peer.capacity.slots.available_permits() > 0

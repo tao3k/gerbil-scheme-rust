@@ -1,5 +1,5 @@
 //! Bounded cross-owner admission; no foreign code or user callback under locks.
-use super::{CapacityPermit, PoolSource, RouteTarget, StagedWork, pool::Work};
+use super::{PoolSource, RouteTarget, pool::Work};
 use std::{
     sync::{
         Arc,
@@ -19,32 +19,19 @@ pub(super) fn assist(
     let Some(target) = source.fair.get().and_then(|f| f.target(owner, units)) else {
         return false;
     };
-    let Some(permit) = reserve(&target, units) else {
-        return false;
-    };
-    let mut permit = Some(permit);
-    let sent = deliver(source, &target, accepting, &mut permit, cancelled, deadline);
-    // Rollback returns capacity outside both the source and admission fences.
-    drop(permit);
-    sent
-}
-fn reserve(target: &RouteTarget, units: usize) -> Option<CapacityPermit> {
-    let active = Arc::clone(&target.active).try_acquire_owned().ok()?;
-    let mut permit = target.capacity.try_pair(units).ok()?.retain_active(active);
-    permit.staged = Some(StagedWork::new(Arc::clone(&target.staged), units));
-    Some(permit)
+    deliver(source, &target, units, accepting, cancelled, deadline)
 }
 fn deliver(
     source: &Arc<PoolSource>,
     target: &RouteTarget,
+    units: usize,
     accepting: &Arc<AtomicBool>,
-    permit: &mut Option<CapacityPermit>,
     cancelled: &Arc<AtomicBool>,
     deadline: Instant,
 ) -> bool {
     // This capability was issued under the registration/close fence. A weak
     // mailbox never keeps an old owner inbox alive and cannot target a new one.
-    let Some(mailbox) = target.mailbox.upgrade() else {
+    let Some(_mailbox) = target.mailbox.upgrade() else {
         return false;
     };
     if !crate::instance_backend::images_ready()
@@ -60,12 +47,13 @@ fn deliver(
         .requests
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let units = permit.as_ref().unwrap().staged.as_ref().unwrap().units();
+    if target.wake.offers.pending() {
+        return false;
+    }
     if requests.front().is_none_or(|r| r.work_units != units) {
         return false;
     }
-    let mut request = requests.pop_front().unwrap();
-    request.capacity = permit.take();
+    let request = requests.pop_front().unwrap();
     let Work::Service(job) = &request.work else {
         unreachable!("typed pooled service");
     };
@@ -77,18 +65,12 @@ fn deliver(
     let offer = super::Offer::new(
         request,
         source,
-        &target.wake,
+        target,
         Arc::clone(accepting),
         Arc::clone(cancelled),
         deadline,
     );
-    let marker = super::Request {
-        started: Arc::new(AtomicBool::new(false)),
-        work: Work::Offer(Arc::clone(&offer)),
-        capacity: None,
-        work_units: units,
-    };
-    let sent = mailbox.try_send(marker).is_ok();
+    let sent = target.wake.offers.publish(Arc::clone(&offer), &target.wake);
     if sent {
         source
             .offers
@@ -101,16 +83,11 @@ fn deliver(
             .peer_deliveries
             .fetch_add(1, Ordering::AcqRel);
     } else {
-        let mut request = offer.withdraw().unwrap();
-        *permit = request.capacity.take();
-        requests.push_front(request);
+        requests.push_front(offer.withdraw().unwrap());
     }
-    let head_changed = sent && requests.front().map(|r| r.work_units) != Some(units);
     drop(requests);
-    if head_changed {
-        source.wake();
-    }
-    // Provisional credits precede notification; the payload remains revocable.
+    // A source request moved into an offer without changing source work/price.
+    // Only the target slot's empty-to-full transition needs a notification.
     super::service_entry::notify(Some(Arc::clone(&target.wake)), sent, trace, short);
     sent
 }

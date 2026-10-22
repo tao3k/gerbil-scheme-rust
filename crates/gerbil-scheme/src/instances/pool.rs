@@ -43,8 +43,6 @@ pub(super) enum Work {
     #[cfg(feature = "tokio-dispatch")]
     Service(Box<dyn super::service::Job>),
     #[cfg(feature = "tokio-dispatch")]
-    Offer(Arc<super::Offer>),
-    #[cfg(feature = "tokio-dispatch")]
     Producer(Box<dyn super::batch_stream_runner::Producer>),
     #[cfg(feature = "tokio-dispatch")]
     Wake,
@@ -56,8 +54,6 @@ impl std::fmt::Debug for Work {
             Self::Native(_) => "NativeTypeJob",
             #[cfg(feature = "tokio-dispatch")]
             Self::Service(_) => "SchemeServiceJob",
-            #[cfg(feature = "tokio-dispatch")]
-            Self::Offer(_) => "RevocableSchemeOffer",
             #[cfg(feature = "tokio-dispatch")]
             Self::Producer(_) => "BoundedBatchProducer",
             #[cfg(feature = "tokio-dispatch")]

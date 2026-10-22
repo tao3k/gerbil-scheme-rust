@@ -11,15 +11,19 @@ pub struct SchemeServiceProgress {
     /// Owner has armed/rechecked its inbox and declared the native wait path.
     /// This is not kernel blocked/runnable state or an OS time guarantee.
     pub waiting_for_claim: bool,
-    /// Capacity-backed peer reservations/inbox work not yet submitted to Scheme.
-    /// A provisional reservation can roll back; this is not a delivery receipt.
+    /// Rust offer and constructing work not yet submitted to Scheme.
+    /// Offered units hold no native credits; this hint is not release authority.
     pub inbox_remaining: u64,
-    /// Cumulative capacity-backed offer notifications, not native acceptance.
+    /// Cumulative bounded offer-slot publications, not native acceptance.
     pub peer_deliveries: u64,
     /// Offers reclaimed by a ready owner before first native entry.
     pub peer_withdrawals: u64,
     /// Target claims that passed the irrevocable first-entry fence.
     pub peer_entries: u64,
+    /// Explicit producer signals, read outside timing in qualification.
+    pub source_wake_signals: u64,
+    /// One dedicated Rust offer slot; it never consumes an ordinary inbox slot.
+    pub pending_offer: bool,
     pub bulk_remaining: u32,
     pub short_remaining: u32,
 }
@@ -32,6 +36,7 @@ pub(super) struct Progress {
     pub peer_deliveries: AtomicU64,
     pub peer_withdrawals: AtomicU64,
     pub peer_entries: AtomicU64,
+    pub source_wake_signals: AtomicU64,
 }
 impl Progress {
     pub(super) fn snapshot(&self) -> SchemeServiceProgress {
@@ -43,16 +48,19 @@ impl Progress {
             peer_deliveries: self.peer_deliveries.load(Ordering::Acquire),
             peer_withdrawals: self.peer_withdrawals.load(Ordering::Acquire),
             peer_entries: self.peer_entries.load(Ordering::Acquire),
+            source_wake_signals: self.source_wake_signals.load(Ordering::Acquire),
+            pending_offer: false,
             bulk_remaining: u32::try_from(bits >> 32).unwrap(),
             short_remaining: u32::try_from(bits & u64::from(u32::MAX)).unwrap(),
         }
     }
     pub(super) fn load(&self) -> u64 {
         let before = self.queued.load(Ordering::Acquire);
-        let s = self.snapshot();
-        // Submission charges native progress before clearing the inbox hint.
-        // Retain the larger inbox observation across that advisory transition.
-        u64::from(s.bulk_remaining) + u64::from(s.short_remaining) + before.max(s.inbox_remaining)
+        let bits = self.remaining.load(Ordering::Acquire);
+        let after = self.queued.load(Ordering::Acquire);
+        // Routing reads only conservative work hints, not unrelated diagnostic
+        // counters or the explicit offer-slot snapshot.
+        (bits >> 32) + (bits & u64::from(u32::MAX)) + before.max(after)
     }
     pub(super) fn charge(&self, units: usize, short: bool) {
         if self.enabled.load(Ordering::Acquire) {
@@ -163,7 +171,9 @@ impl InstanceDispatcher {
             .get(owner)
             .and_then(|o| o.wake.as_ref())
             .ok_or(InstanceError::Closed)?;
-        Ok(wake.progress.snapshot())
+        let mut snapshot = wake.progress.snapshot();
+        snapshot.pending_offer = wake.offers.pending();
+        Ok(snapshot)
     }
 }
 #[cfg(test)]

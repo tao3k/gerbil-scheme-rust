@@ -25,7 +25,7 @@ module owner_lifecycle {
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
     capacityArmed: Set[int], capacitySignalled: Set[int],
     shortWaiters: List[int], shortSignalled: Set[int],
-    offers: Set[int], offerEpoch: int -> int, receivedEpoch: int -> int,
+    offerSlots: int -> int, offers: Set[int], offerEpoch: int -> int, receivedEpoch: int -> int,
     progressDone: int -> Set[int], progressYielded: Set[int], shortDebt: int -> int,
     latePublication: bool, lateExecutor: bool, foreignUse: bool
   }
@@ -48,7 +48,7 @@ module owner_lifecycle {
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
     capacityArmed: Set(), capacitySignalled: Set(),
     shortWaiters: List(), shortSignalled: Set(),
-    offers: Set(), offerEpoch: JOBS.mapBy(_ => 0), receivedEpoch: JOBS.mapBy(_ => -1),
+    offerSlots: Set(1, 2).mapBy(_ => 0), offers: Set(), offerEpoch: JOBS.mapBy(_ => 0), receivedEpoch: JOBS.mapBy(_ => -1),
     progressDone: JOBS.mapBy(_ => Set()), progressYielded: Set(), shortDebt: Set(1, 2).mapBy(_ => 0),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
@@ -58,7 +58,7 @@ module owner_lifecycle {
   // Affine requests use the existing fixed-owner path and never this action.
   action selectOwner(r: int, owner: int): bool = all {
     s.phase == "open", JOBS.contains(r), Set(1, 2).contains(owner),
-    not(s.workHeld.contains(r)), not(s.accepted.contains(r)), not(s.producerJobs.contains(r)),
+    not(s.workHeld.contains(r)), not(s.offers.contains(r)), not(s.accepted.contains(r)), not(s.producerJobs.contains(r)),
     s' = { ...s, selected: s.selected.set(r, owner) }
   }
   action unsafeOwnerMove(r: int, owner: int): bool = all {
@@ -78,7 +78,7 @@ module owner_lifecycle {
   // Full work acquisition can precede slot acquisition. Partial semaphore
   // allocation is an implementation detail covered by native cancellation tests.
   action reserveWork(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), not(s.poolStaged.contains(r)), not(s.workHeld.contains(r)), not(s.accepted.contains(r)), hasWork(r),
+    s.phase == "open", JOBS.contains(r), not(s.poolStaged.contains(r)), not(s.offers.contains(r)), not(s.workHeld.contains(r)), not(s.accepted.contains(r)), hasWork(r),
     s' = { ...s, workHeld: s.workHeld.union(Set(r)) }
   }
   action reserveSlot(r: int): bool = all {
@@ -87,14 +87,14 @@ module owner_lifecycle {
   }
   action cancelWork(r: int): bool = all {
     s.workHeld.contains(r), not(s.capacityHeld.contains(r)), not(s.accepted.contains(r)),
-    s' = { ...s, workHeld: s.workHeld.exclude(Set(r)) }
+    s' = { ...s, workHeld: s.workHeld.exclude(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))) }
   }
   action configureWork(limit: int): bool = all {
     s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, s.producers.size() == 0, limit > 0,
     s' = { ...s, workLimit: limit }
   }
   action reserve(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)), not(s.poolStaged.contains(r)),
+    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)), not(s.poolStaged.contains(r)), not(s.offers.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
     s' = { ...s, reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
@@ -104,19 +104,19 @@ module owner_lifecycle {
   }
   action releaseReservation(r: int): bool = all {
     s.reserved.contains(r), not(s.offers.contains(r)),
-    s' = { ...s, reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)) }
+    s' = { ...s, reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))) }
   }
   action configureCapacity(limit: int): bool = all {
     s.phase == "open", s.capacityHeld.size() == 0, s.workHeld.size() == 0, s.producers.size() == 0, limit > 0,
     s' = { ...s, capacityLimit: limit }
   }
   action admitUnchecked(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)), not(s.poolStaged.contains(r)),
+    s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)), not(s.poolStaged.contains(r)), not(s.offers.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
     s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   action admit(r: int): bool = all { canProducerEnter(r), admitUnchecked(r) }
-  def producerActive(owner: int): int = s.producerJobs.intersect(s.accepted.union(s.offers)).exclude(s.completed).filter(r => ownerOf(r) == owner).size()
+  def producerActive(owner: int): int = s.producerJobs.intersect(s.accepted).exclude(s.completed).filter(r => ownerOf(r) == owner).size()
   def canProducerEnter(r: int): bool = not(s.producerJobs.contains(r)) or producerActive(ownerOf(r)) < s.producerLimit
   action configureProducer(limit: int): bool = all {
     s.phase == "open", s.producers.size() == 0, limit > 0,
@@ -128,14 +128,14 @@ module owner_lifecycle {
   }
   action stage(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.poolStaged.contains(r)), s.producers.contains(ownerOf(r)),
-    not(s.accepted.contains(r)), not(s.staged.contains(r)), not(s.workHeld.contains(r)),
+    not(s.accepted.contains(r)), not(s.offers.contains(r)), not(s.staged.contains(r)), not(s.workHeld.contains(r)),
     s' = { ...s, staged: s.staged.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)) }
   }
   action cancelProducer(owner: int): bool = all {
     Set("open", "closing").contains(s.phase), s.producers.contains(owner),
     all {
       val pending = s.staged.filter(job => ownerOf(job) == owner)
-      s' = { ...s, offers: s.offers.exclude(pending), staged: s.staged.exclude(pending), producerJobs: s.producerJobs.exclude(pending),
+      s' = { ...s, offerSlots: s.offerSlots.set(owner, 0), offers: s.offers.filter(r => ownerOf(r) != owner), staged: s.staged.exclude(pending), producerJobs: s.producerJobs.exclude(pending),
         reserved: s.reserved.exclude(pending), capacityHeld: s.capacityHeld.exclude(pending), workHeld: s.workHeld.exclude(pending) }
     }
   }
@@ -151,7 +151,7 @@ module owner_lifecycle {
     s.accepted.contains(r), not(s.completed.contains(r)),
     not(s.servicePending.contains(r)) or s.serviceReady.contains(r),
     s' = { ...s, servicePending: s.servicePending.exclude(Set(r)), serviceReady: s.serviceReady.exclude(Set(r)), serviceRoots: s.serviceRoots.exclude(Set(r)), inbox: s.inbox.exclude(Set(r)), completed: s.completed.union(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)),
-      roots: s.roots.union(Set(r)), ready: s.ready.union(Set(r)) }
+      roots: s.roots.union(Set(r)), ready: s.ready.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))) }
   }
   // Observation timeout leaves accepted native work and roots unchanged.
   action observeTimeout(r: int): bool = all {
@@ -250,7 +250,8 @@ module owner_lifecycle {
   def canPark(owner: int): bool = and {
     s.phase == "open", not(s.notified.contains(owner)),
     not(s.inbox.exists(r => ownerOf(r) == owner)),
-    not(s.serviceReady.exists(r => ownerOf(r) == owner))
+    not(s.serviceReady.exists(r => ownerOf(r) == owner)),
+    not(s.offers.exists(r => ownerOf(r) == owner and offerRunnable(r)))
   }
   action park(owner: int): bool = all { canPark(owner), s' = { ...s, parked: s.parked.union(Set(owner)) } }
   action unsafePark(owner: int): bool = s' = { ...s, parked: s.parked.union(Set(owner)) }
@@ -426,7 +427,7 @@ module owner_lifecycle {
   // Speculative partial credits and OS wake delivery are native obligations.
   action stagePool(r: int): bool = all {
     s.phase == "open", not(s.poolReady), JOBS.contains(r),
-    not(s.poolStaged.union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
+    not(s.poolStaged.union(s.offers).union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
     s' = { ...s, poolStaged: s.poolStaged.union(Set(r)) }
   }
   action enablePool = all {
@@ -543,7 +544,7 @@ module owner_lifecycle {
   // facility does not consume the native bulk producer registration semaphore.
   action offerShort(r: int): bool = all {
     s.phase == "open", s.poolReady, s.producers == Set(1, 2), units(r) == 1,
-    not(s.poolStaged.union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
+    not(s.poolStaged.union(s.offers).union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
     s' = { ...s, poolStaged: s.poolStaged.union(Set(r)) }
   }
   // Wait registration and notification duty are distinct from committed owner
@@ -601,6 +602,7 @@ module owner_lifecycle {
   def residual(owner: int): int = s.accepted.filter(r => ownerOf(r) == owner
     and not(s.completed.union(s.serviceReady).contains(r))).fold(0,
       (total, r) => total + units(r) - s.progressDone.get(r).size())
+    + s.offers.filter(r => ownerOf(r) == owner).fold(0, (total, r) => total + units(r))
   action reportProgress(r: int, unit: int): bool = all {
     s.servicePending.contains(r), not(s.serviceReady.contains(r)), 0 <= unit, unit < units(r),
     s' = { ...s, progressDone: s.progressDone.set(r, s.progressDone.get(r).union(Set(unit))) }
@@ -641,46 +643,65 @@ module owner_lifecycle {
         shortSignalled: s.shortSignalled.union(Set(chosen)), wakeOwed: s.wakeOwed.union(Set(chosen)) }
     }
   }
-  // Offers hold provisional credits, not an accepted native job. The received
-  // epoch is a mailbox claim receipt; it cannot authorize a later incarnation.
+  // Dedicated Rust offer slots never consume native active/work/request credit.
+  // A source head uses canonical input identity order in these finite domains.
+  def sourcePrice(entries: Set[int]): int = {
+    val first = entries.fold(0, (old, r) => if (old == 0 or r < old) r else old)
+    if (first == 0) 0 else units(first)
+  }
   action offerProgress(r: int, target: int): bool = all {
     s.phase == "open", s.poolReady, s.poolStaged.contains(r), s.producers.contains(target),
-    s.offerEpoch.get(r) < 2, producerActive(target) < s.producerLimit,
-    s.capacityHeld.filter(j => ownerOf(j) == target).size() < s.capacityLimit,
-    workUsed(target) + units(r) <= s.workLimit,
-    s' = { ...s, offers: s.offers.union(Set(r)), offerEpoch: s.offerEpoch.set(r, s.offerEpoch.get(r) + 1),
+    s.offerEpoch.get(r) < 2, s.offerSlots.get(target) == 0,
+    s' = { ...s, offerSlots: s.offerSlots.set(target, r), offers: s.offers.union(Set(r)),
+      offerEpoch: s.offerEpoch.set(r, s.offerEpoch.get(r) + 1),
       selected: s.selected.set(r, target), poolStaged: s.poolStaged.exclude(Set(r)),
-      staged: s.staged.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)),
-      reserved: s.reserved.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)),
-      workHeld: s.workHeld.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(target)) }
+      wakeOwed: s.wakeOwed.union(Set(target)) }
   }
   action receiveOffer(r: int): bool = all {
     s.offers.contains(r), s' = { ...s, receivedEpoch: s.receivedEpoch.set(r, s.offerEpoch.get(r)) }
   }
   action withdrawOffer(r: int): bool = all {
     s.offers.contains(r), not(s.accepted.contains(r)),
-    s' = { ...s, offers: s.offers.exclude(Set(r)), poolStaged: s.poolStaged.union(Set(r)),
-      staged: s.staged.exclude(Set(r)), producerJobs: s.producerJobs.exclude(Set(r)),
-      reserved: s.reserved.exclude(Set(r)), capacityHeld: s.capacityHeld.exclude(Set(r)), workHeld: s.workHeld.exclude(Set(r)) }
+    s' = { ...s, offerSlots: s.offerSlots.set(ownerOf(r), 0),
+      offers: s.offers.exclude(Set(r)), poolStaged: s.poolStaged.union(Set(r)) }
   }
-  def canEnterOffer(r: int): bool = and { s.phase == "open", s.offers.contains(r),
+  def offerRunnable(r: int): bool = and { s.phase == "open", s.offers.contains(r),
+    producerActive(ownerOf(r)) < s.producerLimit, hasCapacity(r) }
+  def canEnterOffer(r: int): bool = and { offerRunnable(r),
     s.receivedEpoch.get(r) == s.offerEpoch.get(r) }
-  // Atomic Rust entry fence precedes construction of any Scheme graph. Native
-  // roots here conservatively include the whole constructor/submit operation.
+  // The running owner acquires all native credits at the unique entry fence.
+  // Roots conservatively include the whole constructor/submit operation.
   action enterOffer(r: int): bool = all {
     canEnterOffer(r),
-    s' = { ...s, offers: s.offers.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)),
-      staged: s.staged.exclude(Set(r)), accepted: s.accepted.union(Set(r)),
-      committed: s.committed.set(r, ownerOf(r)), servicePending: s.servicePending.union(Set(r)),
-      serviceRoots: s.serviceRoots.union(Set(r)) }
+    all {
+      val before = s.poolStaged.union(s.offers)
+      val repriced = sourcePrice(before) != sourcePrice(before.exclude(Set(r)))
+      s' = { ...s, offerSlots: s.offerSlots.set(ownerOf(r), 0), offers: s.offers.exclude(Set(r)),
+        accepted: s.accepted.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)),
+        capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)),
+        committed: s.committed.set(r, ownerOf(r)), servicePending: s.servicePending.union(Set(r)),
+        serviceRoots: s.serviceRoots.union(Set(r)),
+        wakeOwed: if (repriced) s.wakeOwed.union(s.producers) else s.wakeOwed }
+    }
+  }
+  action unsafeOfferHoldCredit(r: int): bool = all {
+    s.offers.contains(r), s' = { ...s, workHeld: s.workHeld.union(Set(r)) }
+  }
+  action unsafeRetainOfferSlot(r: int): bool = all {
+    s.offers.contains(r), s' = { ...s, offers: s.offers.exclude(Set(r)), poolStaged: s.poolStaged.union(Set(r)) }
   }
   action unsafeStaleOfferEntry(r: int): bool = all {
     s.receivedEpoch.get(r) > 0, not(s.offers.contains(r)), not(s.accepted.contains(r)),
     s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)),
       servicePending: s.servicePending.union(Set(r)), serviceRoots: s.serviceRoots.union(Set(r)) }
   }
-  val progressSafety = and { safety, s.offers.subseteq(s.reserved.intersect(s.staged)),
-    s.offers.intersect(s.accepted.union(s.serviceRoots)).size() == 0,
+  val progressSafety = and { safety,
+    s.offers.intersect(s.poolStaged.union(s.producerJobs).union(s.workHeld).union(s.capacityHeld).union(s.accepted).union(s.serviceRoots)).size() == 0,
+    implies(s.offers.size() > 0, s.producers == Set(1, 2)),
+    s.parked.forall(o => implies(s.offers.exists(r => ownerOf(r) == o and offerRunnable(r)),
+      s.notified.contains(o) or s.wakeOwed.contains(o))),
+    Set(1, 2).forall(o => if (s.offerSlots.get(o) == 0) not(s.offers.exists(r => ownerOf(r) == o))
+      else s.offers.filter(r => ownerOf(r) == o) == Set(s.offerSlots.get(o))),
     s.offers.forall(r => s.committed.get(r) == 0), s.progressYielded.subseteq(Set(1, 2)),
     JOBS.forall(r => s.progressDone.get(r).forall(unit => 0 <= unit and unit < units(r))),
     Set(1, 2).forall(o => residual(o) >= 0 and s.shortDebt.get(o) <= 2) }
@@ -747,6 +768,48 @@ module owner_lifecycle {
     .then(all { assert(not(canEnterOffer(3))), assert(progressSafety), stutter })
     .then(withdrawOffer(3)).then(cancelPool).then(finishProducer(1)).then(finishProducer(2)).then(join)
     .then(all { assert(s.workHeld.size() == 0), assert(progressSafety), stutter })
+  run progressOfferDoesNotCompeteWithShortCreditTest = init.then(configureCapacity(1)).then(configureWork(8))
+    .then(stagePool(1)).then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(1, 2)).then(receiveOffer(1))
+    .then(all { assert(s.workHeld.size() == 0), assert(s.capacityHeld.size() == 0), assert(progressSafety), stutter })
+    .then(claimPool(3, 2)).then(submitService(3))
+    .then(all { assert(not(canEnterOffer(1))), assert(s.offerSlots.get(2) == 1), assert(progressSafety), stutter })
+    .then(readyService(3, false)).then(complete(3)).then(enterOffer(1))
+    .then(close).then(readyService(1, false)).then(complete(1)).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(progressSafety), stutter })
+  run progressOfferSlotReuseTest = init.then(stagePool(1)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(3, 2)).then(receiveOffer(3)).then(withdrawOffer(3)).then(offerProgress(1, 2))
+    .then(all { assert(s.offerSlots.get(2) == 1), assert(not(canEnterOffer(3))), assert(progressSafety), stutter })
+    .then(receiveOffer(1)).then(enterOffer(1)).then(close).then(cancelPool)
+    .then(readyService(1, false)).then(complete(1)).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(progressSafety), stutter })
+  run progressSourcePriceNotificationTest = init.then(stagePool(2)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(2, 2)).then(receiveOffer(2)).then(notify(2)).then(enterOffer(2))
+    .then(all { assert(s.wakeOwed.size() == 0), assert(progressSafety), stutter })
+    .then(offerProgress(3, 1)).then(receiveOffer(3)).then(notify(1)).then(enterOffer(3))
+    .then(all { assert(s.wakeOwed == Set(1, 2)), assert(progressSafety), stutter })
+    .then(close).then(readyService(2, false)).then(readyService(3, false)).then(complete(2)).then(complete(3))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join).then(all { assert(progressSafety), stutter })
+  // Resource return wakes the already registered owner acquisition, even if
+  // no new source publication occurs while its Rust offer remains pending.
+  run progressOfferCapacityReturnWakeTest = init.then(configureCapacity(1)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(offerProgress(3, 2)).then(receiveOffer(3)).then(notify(2)).then(clearWake(2))
+    .then(selectOwner(2, 2)).then(reserve(2)).then(park(2)).then(releaseReservation(2))
+    .then(all { assert(s.wakeOwed.contains(2)), assert(progressSafety), stutter })
+    .then(enterOffer(3)).then(close).then(readyService(3, false)).then(complete(3))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join).then(all { assert(progressSafety), stutter })
+  run progressOfferLostWakeMutationTest = init.then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2))
+    .then(enablePool).then(offerProgress(3, 2)).then(notify(2)).then(clearWake(2)).then(unsafePark(2))
+    .then(all { assert(not(progressSafety)), stutter })
+  run progressOfferCreditMutationTest = init.then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2))
+    .then(enablePool).then(offerProgress(3, 2)).then(unsafeOfferHoldCredit(3))
+    .then(all { assert(not(progressSafety)), stutter })
+  run progressOfferStaleSlotMutationTest = init.then(stagePool(3)).then(registerProducer(1)).then(registerProducer(2))
+    .then(enablePool).then(offerProgress(3, 2)).then(unsafeRetainOfferSlot(3))
+    .then(all { assert(not(progressSafety)), stutter })
   run progressStaleOfferMutationTest = init.then(stagePool(3))
     .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
     .then(offerProgress(3, 2)).then(receiveOffer(3)).then(withdrawOffer(3)).then(unsafeStaleOfferEntry(3))

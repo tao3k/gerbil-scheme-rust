@@ -1,6 +1,9 @@
 #+title: Revocable Rust offers and irrevocable Scheme entry
 #+options: toc:nil num:nil
 
+The provisional-native-credit/mailbox protocol below is historical;
+[[file:30.60-dedicated-offer-ports.org][30.60]] refines notification storage and moves native admission to the owner.
+
 * Architecture decision
 
 Report [[file:30.58-capacity-backed-peer-delivery.org][30.58]] retains two failed performance captures. Its weak-mailbox

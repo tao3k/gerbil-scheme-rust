@@ -15,6 +15,26 @@ pub(super) struct Shared {
     pub signals: Mutex<Vec<Weak<super::service_stream_runner::Signal>>>,
 }
 impl Shared {
+    pub(super) fn head_units(&self) -> Option<usize> {
+        let requests = self
+            .requests
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let offers = self
+            .offers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        offers
+            .iter()
+            .find(|o| o.pending())
+            .map(|o| o.units)
+            .or_else(|| requests.front().map(|r| r.work_units))
+    }
+    pub(super) fn wake_if_changed(&self, previous: usize) {
+        if self.head_units() != Some(previous) {
+            self.wake();
+        }
+    }
     pub(super) fn wake(&self) {
         let signals = self
             .signals
@@ -137,7 +157,9 @@ impl Source {
         };
         if let Some(mut request) = reclaimed {
             drop(request.capacity.take());
-            self.wake();
+            if self.units() != Some(units) {
+                self.wake();
+            }
             return Some(request);
         }
         let request = self.with(|q| {

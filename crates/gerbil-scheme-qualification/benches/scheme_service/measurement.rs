@@ -305,6 +305,7 @@ pub(super) fn run(
     let outcomes = offer_outcomes(pool);
     value["peer_offer_withdrawals"] = json!(outcomes[0] - outcomes_before[0]);
     value["peer_offer_entries"] = json!(outcomes[1] - outcomes_before[1]);
+    value["source_wake_signals"] = json!(outcomes[2] - outcomes_before[2]);
     append_policy(&mut value, pool, comparison, arm, &settings, inputs, probes);
     if observation.full() && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
@@ -665,11 +666,13 @@ fn peer_deliveries(pool: &InstancePool) -> u64 {
         .sum()
 }
 
-fn offer_outcomes(pool: &InstancePool) -> [u64; 2] {
-    (0..4).fold([0, 0], |mut total, owner| {
+fn offer_outcomes(pool: &InstancePool) -> [u64; 3] {
+    (0..4).fold([0, 0, 0], |mut total, owner| {
         let p = pool.dispatcher().scheme_service_progress_on(owner).unwrap();
         total[0] += p.peer_withdrawals;
+        assert!(!p.pending_offer, "offer slot survived sample drain");
         total[1] += p.peer_entries;
+        total[2] += p.source_wake_signals;
         total
     })
 }

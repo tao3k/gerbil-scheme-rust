@@ -7,13 +7,15 @@ pub use async_dispatch::AsyncInstanceTicket;
 #[cfg(feature = "tokio-dispatch")]
 mod capacity;
 #[cfg(feature = "tokio-dispatch")]
-use capacity::{Capacity, CapacityPermit};
+use capacity::Capacity;
 #[cfg(feature = "tokio-dispatch")]
 mod capacity_event;
 #[cfg(feature = "tokio-dispatch")]
 mod capacity_try;
 #[cfg(feature = "tokio-dispatch")]
 pub use capacity::{BatchAdmission, OwnerCapacitySnapshot};
+#[cfg(feature = "tokio-dispatch")]
+use capacity_try::EntryCredits;
 mod batch;
 mod batch_trace;
 mod batch_types;
@@ -145,6 +147,10 @@ mod service_offer;
 mod service_progress_route;
 #[cfg(feature = "tokio-dispatch")]
 use service_offer::Offer;
+#[cfg(feature = "tokio-dispatch")]
+mod service_offer_port;
+#[cfg(feature = "tokio-dispatch")]
+use service_offer_port::OfferPort;
 #[cfg(feature = "tokio-dispatch")]
 use service_progress_route::assist as route_progress;
 #[cfg(feature = "tokio-dispatch")]

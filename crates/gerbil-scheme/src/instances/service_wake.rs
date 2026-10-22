@@ -47,6 +47,8 @@ pub(super) struct Wake {
     >,
     #[cfg(feature = "tokio-dispatch")]
     pub short_pool: std::sync::OnceLock<super::short_pool::Port>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub offers: super::OfferPort,
     pending: AtomicBool,
     pub closed: AtomicBool,
     pub failed: AtomicBool,
@@ -106,6 +108,8 @@ impl Wake {
                 capacity_changed: std::sync::OnceLock::new(),
                 #[cfg(feature = "tokio-dispatch")]
                 short_pool: std::sync::OnceLock::new(),
+                #[cfg(feature = "tokio-dispatch")]
+                offers: super::OfferPort::default(),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
                 failed: AtomicBool::new(false),
@@ -179,6 +183,8 @@ impl Wake {
     fn fail(&self) {
         self.failed.store(true, Ordering::Release);
         #[cfg(feature = "tokio-dispatch")]
+        self.offers.close();
+        #[cfg(feature = "tokio-dispatch")]
         if let Some(port) = self.short_pool.get() {
             port.source.owner_closed();
         }
@@ -191,6 +197,8 @@ impl Wake {
             .waiting_for_claim
             .store(false, Ordering::Release);
         if !self.closed.swap(true, Ordering::AcqRel) {
+            #[cfg(feature = "tokio-dispatch")]
+            self.offers.close();
             #[cfg(feature = "tokio-dispatch")]
             if let Some(port) = self.short_pool.get() {
                 port.source.owner_closed();

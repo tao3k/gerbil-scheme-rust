@@ -19,9 +19,17 @@ use std::{
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 #[derive(Debug)]
-pub(super) struct Signal(Waker);
+pub(super) struct Signal(Waker, Weak<super::service_wake::Wake>);
 impl Signal {
+    pub(super) fn new(waker: Waker, wake: Weak<super::service_wake::Wake>) -> Self {
+        Self(waker, wake)
+    }
     pub(super) fn wake(&self) {
+        if let Some(wake) = self.1.upgrade() {
+            wake.progress
+                .source_wake_signals
+                .fetch_add(1, Ordering::AcqRel);
+        }
         self.0.wake_by_ref();
     }
 }
@@ -64,6 +72,13 @@ impl ServiceProducer {
                 );
             }
         }
+        let signal = Arc::new(Signal::new(
+            registration.waker,
+            registration
+                .wake
+                .as_ref()
+                .map_or_else(Weak::new, Arc::downgrade),
+        ));
         Self {
             admission: Arc::downgrade(&dispatch.admission),
             accepting: Arc::clone(&dispatch.admission.accepting),
@@ -77,7 +92,7 @@ impl ServiceProducer {
             acquiring: Acquisition::new(mode),
             deadline: registration.deadline,
             cancelled,
-            signal: Arc::new(Signal(registration.waker)),
+            signal,
         }
     }
     fn open(&self) -> bool {

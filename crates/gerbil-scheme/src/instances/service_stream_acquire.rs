@@ -26,8 +26,8 @@ pub enum SchemeServiceSupplyAdmission {
     RetirementRefill,
     /// Experimental progress-weighted offers when local capacity is exhausted.
     /// Offers remain revocable until the owner starts native construction. Ready
-    /// owners may reclaim them; entered Scheme state never migrates. Provisional
-    /// credits are returned on withdrawal; native credits span result projection.
+    /// owners may reclaim them; entered Scheme state never migrates. Dedicated
+    /// offer slots hold no native credit; entered credits span result projection.
     ProgressFair,
 }
 type Pair = (OwnedSemaphorePermit, CapacityPermit);

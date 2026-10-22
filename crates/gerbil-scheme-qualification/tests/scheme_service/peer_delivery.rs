@@ -102,11 +102,9 @@ async fn case(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static st
             .unwrap()
             .waiting_for_claim
     );
-    let occupied = dispatch.owner_capacity()[1].clone();
-    assert_eq!(occupied.available, occupied.limit - 2);
-    assert_eq!(occupied.work_available, occupied.work_limit.map(|n| n - 16));
-    // The mailbox accepted only an offer. Cancellation must return its credits
-    // while the target remains blocked inside its earlier native constructor.
+    only_entered_credit_is_reserved(dispatch);
+    // The dedicated slot holds only Rust input. Native capacity remains available
+    // while the target is blocked inside its earlier native constructor.
     if reclaim {
         let before = dispatch
             .scheme_service_progress_on(1)
@@ -128,7 +126,7 @@ async fn case(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static st
         }
     }
     stream.cancel();
-    refund_before_release(dispatch).await;
+    slot_cleared_before_release(dispatch).await;
     release.send(()).unwrap();
     for owner in [0, 1] {
         command(dispatch, owner, 8);
@@ -151,15 +149,16 @@ async fn case(dispatch: &InstanceDispatcher, progress: &mpsc::Sender<&'static st
             .inbox_remaining,
         0
     );
-    progress.send("revocable peer offer: blocked native owner, cancellation refunds unentered work before release; entered Scheme work drains").unwrap();
+    progress.send("dedicated peer slot: blocked native owner retains all unentered credits; cancel/reclaim clears slot before release; entered Scheme work drains").unwrap();
 }
 
-async fn refund_before_release(dispatch: &InstanceDispatcher) {
+async fn slot_cleared_before_release(dispatch: &InstanceDispatcher) {
     let start = Instant::now();
     loop {
         let p = dispatch.scheme_service_progress_on(1).unwrap();
         let capacity = dispatch.owner_capacity()[1].clone();
         if p.inbox_remaining == 0
+            && !p.pending_offer
             && capacity.available == capacity.limit - 1
             && capacity.work_available == capacity.work_limit.map(|n| n - 8)
         {
@@ -171,4 +170,16 @@ async fn refund_before_release(dispatch: &InstanceDispatcher) {
         );
         tokio::task::yield_now().await;
     }
+}
+
+fn only_entered_credit_is_reserved(dispatch: &InstanceDispatcher) {
+    assert!(
+        dispatch
+            .scheme_service_progress_on(1)
+            .unwrap()
+            .pending_offer
+    );
+    let occupied = dispatch.owner_capacity()[1].clone();
+    assert_eq!(occupied.available, occupied.limit - 1);
+    assert_eq!(occupied.work_available, occupied.work_limit.map(|n| n - 8));
 }

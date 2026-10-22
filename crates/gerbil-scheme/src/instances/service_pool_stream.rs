@@ -63,10 +63,14 @@ impl InstanceDispatcher {
     /// active/native limits and immediate credit publication remain unchanged.
     /// `ProgressFair` offers work to a less loaded peer only when local capacity
     /// is exhausted. Mailbox receipt is a revocable Rust claim: a ready owner
-    /// may withdraw it and return the provisional target credits. The first
+    /// may withdraw it and immediately clear the dedicated target offer slot.
+    /// Offers hold no native credit and consume no ordinary inbox space. Short
+    /// claims precede offer entry; the running owner acquires native credits. The first
     /// native entry fence, before input construction, fixes ownership. Cancel,
     /// deadline and close reject unentered offers; entered Scheme work drains.
-    /// Stale mailbox notifications own no payload or credit and cannot execute.
+    /// Withdrawal clears the slot immediately; an old claim cannot clear its
+    /// replacement or execute a withdrawn payload. Source signals follow price
+    /// changes and terminal depletion rather than every offer transition.
     /// It requires explicitly enabled native progress on every configured owner;
     /// it does not use retirement refill or change native execution budgets.
     /// # Errors

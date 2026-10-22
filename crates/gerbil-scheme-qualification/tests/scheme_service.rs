@@ -387,6 +387,16 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
         .send("close releases application latch and drains accepted graphs")
         .unwrap();
 }
+// Bypass libtest's capture only on failure: exit(70) otherwise loses the last
+// real progress event. Passing workloads perform no additional diagnostic I/O.
+fn native_stall(last: &str) -> ! {
+    use std::io::Write;
+    let _ = writeln!(
+        std::io::stderr().lock(),
+        "SERVICE-STALL last={last} cleanup=UNVERIFIED"
+    );
+    std::process::exit(70);
+}
 #[test]
 fn scheme_owns_waits_roots_continuations_and_close() {
     let (progress, events) = mpsc::channel();
@@ -399,10 +409,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
                     last = event;
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    eprintln!("SERVICE-STALL last={last} cleanup=UNVERIFIED");
-                    std::process::exit(70);
-                }
+                Err(mpsc::RecvTimeoutError::Timeout) => native_stall(last),
             }
         }
     });

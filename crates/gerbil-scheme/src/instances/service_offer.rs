@@ -1,5 +1,8 @@
-//! Mailbox notifications are revocable; only the native entry fence binds work.
-use super::{InstanceError, PoolSource, Request, pool::Work, service_wake::Wake};
+//! Rust offer lifetime is independent of native credit and Scheme graph lifetime.
+use super::{
+    Capacity, EntryCredits, InstanceError, PoolSource, Request, RouteTarget, StagedWork,
+    pool::Work, service_wake::Wake,
+};
 use std::{
     sync::{
         Arc, Mutex, Weak,
@@ -7,16 +10,23 @@ use std::{
     },
     time::Instant,
 };
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+struct Payload {
+    request: Request,
+    staged: StagedWork,
+}
 pub(super) struct Offer {
-    request: Mutex<Option<Request>>,
+    payload: Mutex<Option<Payload>>,
     source: Weak<PoolSource>,
     target: Weak<Wake>,
+    capacity: Arc<Capacity>,
+    active: Weak<Semaphore>,
     accepting: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
     deadline: Instant,
     pub(super) units: usize,
 }
-/// Owner receipt conveys a chance to enter, not ownership of Scheme state.
+/// An actual owner receipt is still revocable until the entry fence succeeds.
 pub(super) struct Claim<'a> {
     offer: &'a Offer,
     wake: &'a Wake,
@@ -33,34 +43,50 @@ impl Offer {
     pub(super) fn new(
         request: Request,
         source: &Arc<PoolSource>,
-        target: &Arc<Wake>,
+        target: &RouteTarget,
         accepting: Arc<AtomicBool>,
         cancelled: Arc<AtomicBool>,
         deadline: Instant,
     ) -> Arc<Self> {
+        let units = request.work_units;
+        debug_assert!(
+            request.capacity.is_none(),
+            "offer cannot hold native credits"
+        );
         Arc::new(Self {
-            units: request.work_units,
-            request: Mutex::new(Some(request)),
+            units,
+            payload: Mutex::new(Some(Payload {
+                request,
+                staged: StagedWork::new(Arc::clone(&target.staged), units),
+            })),
             source: Arc::downgrade(source),
-            target: Arc::downgrade(target),
+            target: Arc::downgrade(&target.wake),
+            capacity: Arc::clone(&target.capacity),
+            active: Arc::downgrade(&target.active),
             accepting,
             cancelled,
             deadline,
         })
     }
     pub(super) fn pending(&self) -> bool {
-        self.request
+        self.payload
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_some()
     }
-    /// Withdrawal and native entry compete for the single Rust payload. A stale
-    /// mailbox marker owns neither the request nor any capacity credit.
+    fn detach(&self) {
+        if let Some(wake) = self.target.upgrade() {
+            wake.offers.remove(self);
+        }
+    }
     pub(super) fn withdraw(&self) -> Option<Request> {
-        self.request
+        let payload = self
+            .payload
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .take()
+            .take();
+        self.detach(); // no offer lock is held while touching its notification slot
+        payload.map(|p| p.request)
     }
     pub(super) fn reclaim(&self) -> Option<Request> {
         let request = self.withdraw();
@@ -74,12 +100,8 @@ impl Offer {
         }
         request
     }
-    fn enter(&self, wake: &Wake) -> Option<Request> {
-        let mut guard = self
-            .request
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let error = if !crate::instance_backend::images_ready()
+    fn error(&self, wake: &Wake) -> Option<InstanceError> {
+        if !crate::instance_backend::images_ready()
             || !self.accepting.load(Ordering::Acquire)
             || wake.closed.load(Ordering::Acquire)
             || wake.failed.load(Ordering::Acquire)
@@ -95,31 +117,80 @@ impl Offer {
             Some(InstanceError::Timeout)
         } else {
             None
-        };
-        // This take is the irrevocable entry fence, before M::construct can
-        // allocate native roots or call arbitrary Scheme. No lock crosses FFI.
-        let request = guard.take();
-        drop(guard);
-        if let Some(error) = error {
-            self.wake_source();
-            if let Some(request) = request {
-                Self::reject(request, error);
+        }
+    }
+    fn reserve_active(&self) -> Result<OwnedSemaphorePermit, InstanceError> {
+        let active = self.active.upgrade().ok_or(InstanceError::Closed)?;
+        active
+            .try_acquire_owned()
+            .map_err(|e| super::capacity::immediate_error(&e))
+    }
+    fn enter(&self, wake: &Wake) -> Option<Request> {
+        let mut guard = self
+            .payload
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        guard.as_ref()?;
+        if let Some(error) = self.error(wake) {
+            drop(guard);
+            self.cancel(error);
+            return None;
+        }
+        let active = match self.reserve_active() {
+            Ok(active) => active,
+            Err(InstanceError::QueueFull) => return None,
+            Err(error) => {
+                drop(guard);
+                self.cancel(error);
+                return None;
             }
+        };
+        // Immediate semaphore attempts do not invoke application callbacks.
+        // Retain every acquired part until after the payload fence is released.
+        // Withdrawal cannot win between native acquisition and payload take.
+        let mut credits = EntryCredits::new(Arc::clone(&self.capacity), active);
+        let error = credits
+            .acquire(self.units)
+            .err()
+            .or_else(|| self.error(wake));
+        let payload = if matches!(error, Some(InstanceError::QueueFull)) {
             None
         } else {
-            if request.is_some() {
-                wake.progress.peer_entries.fetch_add(1, Ordering::AcqRel);
-            }
-            request
+            guard.take()
+        };
+        drop(guard);
+        let Payload {
+            mut request,
+            staged,
+        } = payload?;
+        self.detach();
+        if let Some(error) = error {
+            drop((credits, staged));
+            Self::reject(request, error);
+            self.wake_source();
+            return None;
+        }
+        // Unique entry fence precedes M::construct and fixes native ownership.
+        request.capacity = Some(credits.finish(staged));
+        wake.progress.peer_entries.fetch_add(1, Ordering::AcqRel);
+        Some(request)
+    }
+    #[cfg(test)]
+    pub(super) fn entry_fence_is_free(&self) -> bool {
+        self.payload.try_lock().is_ok()
+    }
+    pub(super) fn cancel(&self, error: InstanceError) {
+        if let Some(request) = self.withdraw() {
+            Self::reject(request, error);
+            self.wake_source();
         }
     }
     pub(super) fn wake_source(&self) {
         if let Some(source) = self.source.upgrade() {
-            source.wake();
+            source.wake_if_changed(self.units);
         }
     }
     pub(super) fn reject(mut request: Request, error: InstanceError) {
-        // Return credit before invoking application-owned destructors.
         drop(request.capacity.take());
         if let Work::Service(job) = request.work {
             job.fail(error);

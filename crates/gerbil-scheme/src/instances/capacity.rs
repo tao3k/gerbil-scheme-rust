@@ -48,7 +48,7 @@ impl Capacity {
         }
         self.signal();
     }
-    fn signal(&self) {
+    pub(super) fn signal(&self) {
         if let Some(changed) = self.changed.get() {
             changed.publish();
         }

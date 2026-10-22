@@ -37,6 +37,9 @@ filegroup(
     srcs = glob([
         "build-support/**/*",
         "crates/**/*.rs",
+        "crates/**/ffi/**/*.c",
+        "crates/**/ffi/**/*.h",
+        "crates/**/scheme/**/*.ss",
         "crates/**/Cargo.toml",
         "crates/**/tests/unit/scenarios/**",
         "build-support/**/*.rs",

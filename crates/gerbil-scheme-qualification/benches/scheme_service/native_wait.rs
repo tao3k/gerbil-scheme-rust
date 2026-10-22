@@ -20,6 +20,18 @@ pub(super) fn clock() -> u64 {
     );
     u64::try_from(now.tv_sec).unwrap() * 1_000_000_000 + u64::try_from(now.tv_nsec).unwrap()
 }
+fn resolution() -> u64 {
+    let mut value = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: writable timespec for the same clock as the native marker.
+    assert_eq!(
+        unsafe { libc::clock_getres(libc::CLOCK_MONOTONIC, &raw mut value) },
+        0
+    );
+    u64::try_from(value.tv_sec).unwrap() * 1_000_000_000 + u64::try_from(value.tv_nsec).unwrap()
+}
 pub(super) fn anchor() -> Anchor {
     let before = Instant::now();
     let clock = clock();
@@ -98,5 +110,13 @@ pub(super) fn qos(pool: &InstancePool, elevated: bool) -> Value {
 
 pub(super) fn append(value: &mut Value, pool: &InstancePool, inputs: &[Vec<i64>]) {
     value["native_wait_events"] = finish(pool, inputs);
+    let anchors = control(pool, &[13]);
+    assert!(
+        anchors
+            .iter()
+            .all(|a| a.len() == 3 && a[0] > 0 && a[1] >= a[0] && a[2] > 0)
+    );
+    value["kernel_clock_anchors"] = json!(anchors);
+    value["kernel_clock_resolution_ns"] = json!(resolution());
     value["native_wait_event_width"] = json!(6);
 }

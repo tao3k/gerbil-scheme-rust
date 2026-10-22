@@ -38,6 +38,7 @@ fn run(
     smoke: bool,
     comparison: Comparison,
     observation: bool,
+    trace_once: bool,
 ) {
     let split = comparison.is_split();
     // SAFETY: the build-owned image exports the admitted native service protocol.
@@ -77,7 +78,7 @@ fn run(
     println!(
         "{}",
         json!({"event":"service_configuration","pool_startup_ns":startup.elapsed().as_nanos(),"sdk_setup_ns":pool.owners().iter().map(|r|r.setup_time.as_nanos()).collect::<Vec<_>>(),"owners":4,"states":identities,"rust_workers":2,"slots":4,"work":32,"batch":8,
-        "quantum":1,"scheme_service_workers":4,"actor_workers_per_batch":4,"probe_interval_us":500,"defaults_changed":false,"phase_observation":observation,
+        "quantum":1,"scheme_service_workers":4,"actor_workers_per_batch":4,"probe_interval_us":500,"defaults_changed":false,"phase_observation":observation,"trace_once":trace_once,
         "split_layout_ab":split,"short_layout_only":comparison==Comparison::ShortLayout,"class_route_ab":comparison==Comparison::ClassRouting,"client_bulk_callbacks_per_owner":if split { Some(3) } else { None },"comparison":comparison.label()})
     );
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -100,8 +101,11 @@ fn run(
             progress.send("service warmup validated").unwrap();
         }
         let mut samples = [Vec::new(), Vec::new()];
-        for block in 0..if smoke { 1 } else { 5 } {
-            for reverse in [false, true] {
+        for block in 0..if smoke || trace_once { 1 } else { 5 } {
+            for reverse in [false, true]
+                .into_iter()
+                .take(if trace_once { 1 } else { 2 })
+            {
                 for arm in if reverse { [1, 0] } else { [0, 1] } {
                     let sample = measurement::run(
                         &pool,
@@ -129,6 +133,9 @@ fn run(
             pool.owners().iter().map(|r| r.state).collect::<Vec<_>>()
         );
     }
+    cleanup(&mut pool);
+}
+fn cleanup(pool: &mut InstancePool) {
     let closed = pool.shutdown(GATE);
     assert!(closed.is_clean(), "{closed:?}");
     assert_eq!(closed.joined, 4);
@@ -149,6 +156,7 @@ fn main() {
         || s == "--class-route-ab"
         || s == "--short-service-ab"
         || s == "--phase-observation"
+        || s == "--trace-once"
         || s == "--notification-ab"
         || s == "--reselection-ab"
         || s == "--owner-qos-ab"
@@ -158,6 +166,8 @@ fn main() {
         || s == "--ingress-ab"
         || s == "--budget-ab"
         || s == "--feed-ab"));
+    let trace_once = args.iter().any(|s| s == "--trace-once");
+    assert!(!trace_once || args.iter().any(|s| s == "--phase-observation"));
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || {
         let mut last = "start";
@@ -227,6 +237,7 @@ fn main() {
         args.iter().any(|s| s == "--test"),
         comparison,
         args.iter().any(|s| s == "--phase-observation"),
+        trace_once,
     );
     drop(progress);
     watchdog.join().unwrap();

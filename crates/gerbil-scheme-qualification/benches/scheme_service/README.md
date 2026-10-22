@@ -382,3 +382,52 @@ Scheme call, assert unchanged GC wall counters, and retain the original progress
 watchdog. These known controls validate CPU/state observation and expose
 non-CPU wall time in a CPU-demanding control; they are not Scheme throughput or a substitute workload.
 Unobserved performance runs execute neither calibration nor OS sampling.
+
+
+### Complete owner scheduling capture
+
+`--trace-once` requires `--phase-observation`. It runs one A/B per CPU/mixed
+load, retaining the normal 8192-order inputs, 64 short probes, warmups, four live
+VMs, two Tokio workers, capacity bounds and original progress watchdog. It does
+not shorten the input to the smoke workload. Configuration emits `trace_once`;
+these four diagnostic samples are not performance repetitions. Normal runs and
+`--test` retain their existing repetition counts unless this flag is explicit.
+
+Observation resets emit an `OwnerClock` Points of Interest signpost from each
+fixed owner. `kernel_clock_anchors` contains one `[before_ns, after_ns, tid]` row
+per owner, bracketing emission with the native monotonic clock.
+`kernel_clock_resolution_ns` reports that clock's resolution. The native wait
+trace remains six columns and its existing event kinds are unchanged. A tiny
+host-Clang object uses Apple's standard signpost macros; Gambit-generated C
+continues through its configured native compiler. Each marker releases its log
+object. No marker executes in unobserved runs.
+
+Build through Cargo; use the executable printed by `--no-run` as `SERVICE_BENCH`
+and choose an external evidence directory as `STATE_DIR`:
+
+```text
+cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked --no-run
+xcrun xctrace record --no-prompt --template 'Time Profiler' --instrument 'Thread State Trace' --time-limit 20s --window 5s --target-stdout "$STATE_DIR/service.jsonl" --output "$STATE_DIR/service.trace" --launch -- "$SERVICE_BENCH" --pooled-ab --phase-observation --trace-once
+xcrun xctrace export --input "$STATE_DIR/service.trace" --toc --output "$STATE_DIR/service-toc.xml"
+xcrun xctrace export --input "$STATE_DIR/service.trace" --xpath '/trace-toc/run[@number="1"]/data/table[@schema="os-signpost"]' --output "$STATE_DIR/service-clocks.xml"
+xcrun xctrace export --input "$STATE_DIR/service.trace" --xpath '/trace-toc/run[@number="1"]/data/table[@schema="thread-state"]' --output "$STATE_DIR/service-states.xml"
+xcrun xctrace export --input "$STATE_DIR/service.trace" --xpath '/trace-toc/run[@number="1"]/data/table[@schema="syscall"]' --output "$STATE_DIR/service-syscalls.xml"
+```
+
+Require recorder/export success, target exit zero, clean native shutdown and
+four owner TIDs in the scheduling table. A readable file alone is insufficient:
+a rolling window can discard owner creation metadata and leave unassigned
+thread rows. Do not attribute those rows to guessed owners. The window must
+retain creation plus workload through recorder flush; five seconds worked for
+the directed pair on the qualified host, not as a universal duration guarantee.
+
+Resolve XML references within their exported node. Match markers by `(tid,
+monotonic_ns)`, since different owners can share a clock tick. Intersect their
+clock-offset bounds, accounting for measured monotonic resolution (1 us here).
+Add each request's reported anchor uncertainty and one native clock tick when
+aligning its entry marks; the qualified total was below 3 us.
+Clip scheduling/syscall intervals only after validating full per-owner coverage;
+reject unknown/missing/overlapping intervals. Native CPU counters enclose their
+whole measured phase and cannot be clipped by prorating wall overlap.
+
+See [complete scheduling evidence and rejected phase routing](../../../../docs/30-39-status/30.49-owner-scheduling-and-gc-cpu-qualification.org).

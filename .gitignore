@@ -11,6 +11,7 @@
 !crates/gerbil-scheme-python/tests/fixtures/owned_exports.c
 !crates/gerbil-scheme-qualification/ffi/instance_probe.c
 !crates/gerbil-scheme-qualification/ffi/owner_instance.c
+!crates/gerbil-scheme-qualification/ffi/owner_signpost.c
 !scheme/runtime.ssi
 !scheme/generated/
 !scheme/generated/runtime.scm

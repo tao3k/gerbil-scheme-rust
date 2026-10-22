@@ -181,10 +181,24 @@ fn build_image(
     )
     .expect("instance adapter compilation");
     let compiler = discover_native_c_compiler().expect("selected host C linker");
+    let marker_source = package.join("ffi/owner_signpost.c");
+    println!("cargo:rerun-if-changed={}", marker_source.display());
+    let marker_object = out.join("owner_signpost.o");
+    run_native_process(
+        Command::new(&compiler.program)
+            .args(["-O2", "-c"])
+            .arg(&marker_source)
+            .arg("-o")
+            .arg(&marker_object),
+        "compile qualification clock marker",
+        true,
+    )
+    .expect("qualification clock marker compilation");
     let mut link = Command::new(compiler.program);
     link.args(["-dynamiclib", "-o"])
         .arg(&image)
         .arg(&object)
+        .arg(&marker_object)
         .arg(&receipt.archive_file);
     for directive in &receipt.cargo_directives {
         match directive.kind {

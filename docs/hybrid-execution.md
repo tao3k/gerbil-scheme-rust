@@ -443,3 +443,15 @@ The Rust bench now configures every comparison through an exhaustive policy map,
 reads every owner's settings and asserts them before starting the clock. See
 [native policy and wake qualification](30-39-status/30.46-native-policy-readback-and-wake-boundaries.org)
 for the historical configuration correction and the separate rebuilt baseline.
+
+
+### Correlated kernel scheduling qualification
+
+The Rust service bench now supports `--phase-observation --trace-once` for one
+full-size diagnostic pair per load. Native clock signposts provide bounded
+alignment to owner Running/Runnable/Blocked intervals. This is separate from
+unobserved throughput qualification. Readable traces with missing owner TIDs
+are rejected. [The scheduling report](30-39-status/30.49-owner-scheduling-and-gc-cpu-qualification.org)
+records complete captures, genuine select blocking, GC-associated CPU work and
+the withdrawn advisory phase-routing experiment. No routing or supply defaults
+changed, and no phase-routing API is retained.

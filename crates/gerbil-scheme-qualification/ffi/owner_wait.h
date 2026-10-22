@@ -12,6 +12,11 @@ static struct {
   uint64_t count, overflow, errors;
 } owner_wait;
 static _Thread_local int owner_wait_enabled;
+static uint64_t owner_wait_anchor[3];
+/* Qualification-only bridge between native monotonic time and kernel trace time.
+ * Create/release one log per observation reset; no retained logging resource. */
+static void owner_wait_mark(void);
+extern void gerbil_owner_clock_signpost(uint64_t monotonic);
 static qos_class_t owner_wait_qos;
 static int owner_wait_relative, owner_wait_qos_saved;
 static uint64_t owner_wait_qos_set(uint64_t elevated) {
@@ -32,6 +37,12 @@ static uint64_t owner_wait_clock(void) {
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
   return (uint64_t)now.tv_sec * 1000000000ULL + (uint64_t)now.tv_nsec;
+}
+static void owner_wait_mark(void) {
+  pthread_threadid_np(NULL, &owner_wait_anchor[2]);
+  owner_wait_anchor[0] = owner_wait_clock();
+  gerbil_owner_clock_signpost(owner_wait_anchor[0]);
+  owner_wait_anchor[1] = owner_wait_clock();
 }
 static uint64_t owner_wait_cpu(void) {
   struct timespec now;
@@ -105,11 +116,13 @@ static uint64_t gerbil_owner_wait_observe(int operation, uint64_t value) {
       owner_wait_enabled = 0;
       owner_wait.count = owner_wait.overflow = owner_wait.errors = 0;
       owner_wait_enabled = value != 0;
+      if (owner_wait_enabled) owner_wait_mark();
       return 0;
     case 8:
       owner_wait_pipe_known = fstat((int)value, &owner_wait_pipe) == 0 && S_ISFIFO(owner_wait_pipe.st_mode);
       owner_wait_pipe_fd = -1;
       return owner_wait_pipe_known ? 0 : UINT64_MAX;
+    case 9: return value < 3 ? owner_wait_anchor[value] : UINT64_MAX;
     case 5: return owner_wait_qos_set(value);
     case 6: return (uint64_t)qos_class_self();
     case 7: return (uint64_t)owner_wait_qos;

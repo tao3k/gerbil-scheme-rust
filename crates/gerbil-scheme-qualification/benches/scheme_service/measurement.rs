@@ -227,6 +227,7 @@ pub(super) fn run(
         observation,
         comparison == Comparison::ObserverCost,
     );
+    let deliveries_before = peer_deliveries(pool);
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -299,6 +300,7 @@ pub(super) fn run(
         value["owner_qos_receipts"] = qos;
         value["owner_qos_restored"] = super::native_wait::qos(pool, false);
     }
+    value["peer_inbox_deliveries"] = json!(peer_deliveries(pool) - deliveries_before);
     append_policy(&mut value, pool, comparison, arm, &settings, inputs, probes);
     if observation.full() && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
@@ -644,4 +646,15 @@ pub(super) fn emit(samples: &[Value], arm: usize, mixed: bool) {
         "actor_peer_min":samples.iter().map(|s|s["actor_peer_min"].as_u64().unwrap()).min(),
         "probe_overlap_min":samples.iter().map(|s|s["probe_overlap"].as_u64().unwrap()).min()})
     );
+}
+
+fn peer_deliveries(pool: &InstancePool) -> u64 {
+    (0..4)
+        .map(|owner| {
+            pool.dispatcher()
+                .scheme_service_progress_on(owner)
+                .unwrap()
+                .peer_deliveries
+        })
+        .sum()
 }

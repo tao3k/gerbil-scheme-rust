@@ -71,8 +71,12 @@ pub(super) struct CapacityPermit {
     pub(super) slot: Option<OwnedSemaphorePermit>,
     pub(super) work: Option<OwnedSemaphorePermit>,
     pub(super) active: Option<OwnedSemaphorePermit>,
+    pub(super) staged: Option<super::StagedWork>,
 }
 impl CapacityPermit {
+    pub(super) fn entered(&mut self) {
+        drop(self.staged.take());
+    }
     pub(super) fn retain_active(mut self, active: OwnedSemaphorePermit) -> Self {
         assert!(
             self.active.is_none(),
@@ -84,6 +88,7 @@ impl CapacityPermit {
 }
 impl Drop for CapacityPermit {
     fn drop(&mut self) {
+        self.entered();
         drop(self.active.take());
         drop(self.work.take());
         drop(self.slot.take());
@@ -109,6 +114,7 @@ pub(super) fn attach(owner: &OwnerSender, request: &mut Request) -> Result<(), I
                 slot: None,
                 work: None,
                 active: None,
+                staged: None,
             };
             // Immediate APIs never wait or bypass FIFO work waiters.
             let result = (|| {
@@ -265,6 +271,7 @@ pub(super) async fn acquire_pair(
         slot: None,
         work: None,
         active: None,
+        staged: None,
     };
     if let Some(work) = &capacity.work {
         permit.work = Some(

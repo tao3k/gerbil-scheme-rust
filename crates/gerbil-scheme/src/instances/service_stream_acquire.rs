@@ -24,7 +24,8 @@ pub enum SchemeServiceSupplyAdmission {
     /// Experimental bounded refill after the complete result snapshot is retired.
     /// Retains `OwnerLocal` bounds; short publication takes priority over bulk.
     RetirementRefill,
-    /// Scheme-progress weighted bulk claims with one bounded peer opportunity.
+    /// Scheme-progress weighted, capacity-backed peer delivery before local claims.
+    /// Rust routes unentered work; Scheme executes only on the selected owner.
     /// This changes neither refill order nor native resource-retirement rules.
     ProgressFair,
 }

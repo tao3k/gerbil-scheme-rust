@@ -121,7 +121,7 @@ struct Pump<'a> {
     wake: &'a Wake,
 }
 impl Pump<'_> {
-    fn receive(&mut self, request: Request) -> Result<(), InstanceError> {
+    fn receive(&mut self, mut request: Request) -> Result<(), InstanceError> {
         if let Some(port) = self.wake.short_pool.get() {
             port.interrupted();
         }
@@ -148,6 +148,11 @@ impl Pump<'_> {
             ) {
                 Ok(id) => {
                     self.wake.progress.charge(units, job.short_service());
+                    // Move advisory inbox work to native progress only after
+                    // submission. Resource credits still span projection.
+                    if let Some(permit) = request.capacity.as_mut() {
+                        permit.entered();
+                    }
                     if self.jobs.contains_key(&id) {
                         job.fail(InstanceError::InvalidConfig(
                             "duplicate Scheme service identity",

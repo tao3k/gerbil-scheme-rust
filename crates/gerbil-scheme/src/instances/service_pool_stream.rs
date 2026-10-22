@@ -62,7 +62,9 @@ impl InstanceDispatcher {
     /// takes priority. Each attempt is bounded; Scheme owns execution. Existing
     /// active/native limits and immediate credit publication remain unchanged.
     /// `ProgressFair` ranks shared claims using Scheme-owned residual units and
-    /// permits only one peer-opportunity deferral before a claim remains runnable.
+    /// commits at most one capacity-backed peer delivery before a local attempt.
+    /// Pending native inbox work is counted until Scheme submission. A failed
+    /// delivery retains the FIFO head and local acquisition remains runnable.
     /// It requires explicitly enabled native progress on every configured owner;
     /// it does not use retirement refill or change native execution budgets.
     /// # Errors

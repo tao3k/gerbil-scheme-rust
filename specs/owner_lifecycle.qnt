@@ -613,6 +613,12 @@ module owner_lifecycle {
     s' = { ...s, progressYielded: s.progressYielded.union(Set(owner)),
       wakeOwed: s.wakeOwed.union(Set(peer)) }
   }
+  // Unlike historical yieldProgress, this commits an actual target inbox entry.
+  // residual includes inbox units already, then native progress replaces them.
+  action routeProgress(r: int, from: int, target: int): bool = all {
+    from != target, s.producers.contains(from),
+    residual(from) > residual(target) + units(r), claimPool(r, target)
+  }
   action claimProgressPool(r: int, owner: int): bool = all {
     s.progressYielded.contains(owner) or Set(1, 2).forall(peer => peer == owner
       or not(eligibleFor(peer, units(r))) or residual(owner) <= residual(peer) + units(r)),
@@ -639,7 +645,7 @@ module owner_lifecycle {
   action progressStep = {
     nondet r = JOBS.oneOf(); nondet unit = Set(0, 1, 2, 3, 4, 5, 6, 7).oneOf()
     nondet owner = Set(1, 2).oneOf(); nondet peer = Set(1, 2).oneOf()
-    any { selectiveShortStep, reportProgress(r, unit), yieldProgress(r, owner, peer), claimProgressPool(r, owner), progressShortWake }
+    any { selectiveShortStep, reportProgress(r, unit), yieldProgress(r, owner, peer), routeProgress(r, owner, peer), claimProgressPool(r, owner), progressShortWake }
   }
   action unsafeProgressRelease(r: int): bool = all {
     s.servicePending.contains(r), s.progressDone.get(r).size() > 0,
@@ -667,6 +673,16 @@ module owner_lifecycle {
     .then(all { assert(ownerOf(3) == 1), assert(s.progressYielded.size() == 0), assert(progressSafety), stutter })
     .then(close).then(readyService(1, false)).then(readyService(3, false)).then(complete(1)).then(complete(3))
     .then(finishProducer(1)).then(finishProducer(2)).then(join).then(all { assert(progressSafety), stutter })
+  run progressActualPeerDeliveryTest = init.then(stagePool(1)).then(stagePool(3))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool)
+    .then(claimPool(1, 1)).then(submitService(1)).then(routeProgress(3, 1, 2))
+    .then(all { assert(s.inbox.contains(3)), assert(ownerOf(3) == 2),
+      assert(s.capacityHeld.contains(3)), assert(workUsed(2) == 1), assert(residual(2) == 1),
+      assert(s.servicePending == Set(1)), assert(s.progressYielded.size() == 0), assert(progressSafety), stutter })
+    .then(observeTimeout(3)).then(close).then(submitService(3))
+    .then(readyService(3, true)).then(complete(3)).then(readyService(1, false)).then(complete(1))
+    .then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(progressSafety), stutter })
   run progressShortPromotionTest = init.then(admit(1)).then(submitService(1))
     .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(offerShort(3))
     .then(armShort(1)).then(armShort(2)).then(progressShortWake)

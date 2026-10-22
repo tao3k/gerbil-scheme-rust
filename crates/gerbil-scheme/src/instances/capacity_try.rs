@@ -24,6 +24,7 @@ impl Capacity {
             slot: Some(slot),
             work,
             active: None,
+            staged: None,
         })
     }
 }

@@ -7,7 +7,7 @@ pub use async_dispatch::AsyncInstanceTicket;
 #[cfg(feature = "tokio-dispatch")]
 mod capacity;
 #[cfg(feature = "tokio-dispatch")]
-use capacity::Capacity;
+use capacity::{Capacity, CapacityPermit};
 #[cfg(feature = "tokio-dispatch")]
 mod capacity_event;
 #[cfg(feature = "tokio-dispatch")]
@@ -137,6 +137,14 @@ mod service_stream_source;
 pub use service_pool_stream::SchemeServicePoolStreamConfig;
 #[cfg(feature = "tokio-dispatch")]
 pub(super) use service_progress_fair::Fair;
+#[cfg(feature = "tokio-dispatch")]
+use service_progress_fair::{RouteTarget, StagedWork};
+#[cfg(feature = "tokio-dispatch")]
+mod service_progress_route;
+#[cfg(feature = "tokio-dispatch")]
+use service_progress_route::assist as route_progress;
+#[cfg(feature = "tokio-dispatch")]
+use service_stream_source::Shared as PoolSource;
 
 #[cfg(feature = "tokio-dispatch")]
 mod service_settings;

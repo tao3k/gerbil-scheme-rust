@@ -10,10 +10,22 @@ use std::{
 pub(super) struct Shared {
     pub ready: AtomicBool,
     pub fair: OnceLock<super::Fair>,
-    requests: Mutex<VecDeque<Request>>,
+    pub(super) requests: Mutex<VecDeque<Request>>,
     pub signals: Mutex<Vec<Weak<super::service_stream_runner::Signal>>>,
 }
 impl Shared {
+    pub(super) fn wake(&self) {
+        let signals = self
+            .signals
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for signal in signals {
+            if let Some(signal) = signal.upgrade() {
+                signal.wake();
+            }
+        }
+    }
     pub(super) fn new(requests: VecDeque<Request>) -> Arc<Self> {
         Arc::new(Self {
             ready: AtomicBool::new(false),
@@ -56,10 +68,17 @@ impl Source {
     pub(super) fn units(&mut self) -> Option<usize> {
         self.with(|q| q.front().map(|r| r.work_units))
     }
-    pub(super) fn allow(&self, owner: usize, units: usize) -> bool {
+    pub(super) fn assist(
+        &self,
+        owner: usize,
+        units: usize,
+        admission: &Weak<super::Admission>,
+        cancelled: &AtomicBool,
+        deadline: std::time::Instant,
+    ) -> bool {
         match self {
-            Self::Owner(_) => true,
-            Self::Pool(s) => s.fair.get().is_none_or(|f| f.allow(owner, units)),
+            Self::Owner(_) => false,
+            Self::Pool(s) => super::route_progress(s, owner, units, admission, cancelled, deadline),
         }
     }
     pub(super) fn take(&mut self, units: usize) -> Option<Request> {
@@ -77,16 +96,7 @@ impl Source {
     }
     fn wake(&self) {
         if let Self::Pool(source) = self {
-            let signals = source
-                .signals
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            for signal in signals {
-                if let Some(signal) = signal.upgrade() {
-                    signal.wake();
-                }
-            }
+            source.wake();
         }
     }
     pub(super) fn reject(&mut self, error: &InstanceError) {

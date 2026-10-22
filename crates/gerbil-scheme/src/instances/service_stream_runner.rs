@@ -145,9 +145,19 @@ impl Producer for ServiceProducer {
         if !self.requests.ready() {
             return ProducerStep::Waiting;
         }
-        // A peer opportunity owns no active, slot or work credit. Never disturb
-        // a queued acquisition: it may already hold partial credits/FIFO position.
-        if !self.acquiring.waiting() && !self.requests.allow(self.owner, units) {
+        // One actual remote admission per producer turn; never sacrifice a local
+        // native turn to an unacknowledged wake. Partial local waits retain FIFO.
+        if self.requests.assist(
+            self.owner,
+            units,
+            &self.admission,
+            &self.cancelled,
+            self.deadline,
+        ) && self.requests.units() != Some(units)
+        {
+            if self.acquiring.waiting() {
+                self.acquiring.clear();
+            }
             return ProducerStep::Progress;
         }
         let mut context = Context::from_waker(&self.signal.0);

@@ -11,6 +11,11 @@ pub struct SchemeServiceProgress {
     /// Owner has armed/rechecked its inbox and declared the native wait path.
     /// This is not kernel blocked/runnable state or an OS time guarantee.
     pub waiting_for_claim: bool,
+    /// Capacity-backed peer reservations/inbox work not yet submitted to Scheme.
+    /// A provisional reservation can roll back; this is not a delivery receipt.
+    pub inbox_remaining: u64,
+    /// Cumulative successful capacity-backed peer inbox admissions.
+    pub peer_deliveries: u64,
     pub bulk_remaining: u32,
     pub short_remaining: u32,
 }
@@ -19,6 +24,8 @@ pub(super) struct Progress {
     pub enabled: AtomicBool,
     pub waiting_for_claim: AtomicBool,
     remaining: AtomicU64,
+    pub queued: Arc<AtomicU64>,
+    pub peer_deliveries: AtomicU64,
 }
 impl Progress {
     pub(super) fn snapshot(&self) -> SchemeServiceProgress {
@@ -26,13 +33,18 @@ impl Progress {
         SchemeServiceProgress {
             enabled: self.enabled.load(Ordering::Acquire),
             waiting_for_claim: self.waiting_for_claim.load(Ordering::Acquire),
+            inbox_remaining: self.queued.load(Ordering::Acquire),
+            peer_deliveries: self.peer_deliveries.load(Ordering::Acquire),
             bulk_remaining: u32::try_from(bits >> 32).unwrap(),
             short_remaining: u32::try_from(bits & u64::from(u32::MAX)).unwrap(),
         }
     }
     pub(super) fn load(&self) -> u64 {
+        let before = self.queued.load(Ordering::Acquire);
         let s = self.snapshot();
-        u64::from(s.bulk_remaining) + u64::from(s.short_remaining)
+        // Submission charges native progress before clearing the inbox hint.
+        // Retain the larger inbox observation across that advisory transition.
+        u64::from(s.bulk_remaining) + u64::from(s.short_remaining) + before.max(s.inbox_remaining)
     }
     pub(super) fn charge(&self, units: usize, short: bool) {
         if self.enabled.load(Ordering::Acquire) {

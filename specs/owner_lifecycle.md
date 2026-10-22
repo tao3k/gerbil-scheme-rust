@@ -32,8 +32,10 @@ GC implementation, Actor/green-thread scheduler, Tokio scheduler or SMP policy.
 
 ## Safety and abstraction boundaries
 
-- Each request has one immutable assigned owner. A handle can be used only on
-  that owner while the host is open. Foreign library identity validation is an
+- Each request starts with an assigned owner. `selectOwner` can change it only
+  before reservation/publication, for the stateless route. The selected owner is
+  fixed while credits are held and committed immutably at publication. A handle
+  can be used only on that committed owner while the host is open. Foreign library identity validation is an
   additional native gate, not modeled as a second host here.
 - Timeout changes observation state without withdrawing admitted native work.
 - A join requires all accepted native tasks to finish. Registry metadata is
@@ -284,3 +286,19 @@ full-pipe and reader-close controls validate the actual descriptor boundary.
 Every independent publisher discharges its own notification duty; inbox recheck,
 root conservation and close remain the existing protocol. No additional
 scheduler model or assumed OS fairness is substituted for native acceptance.
+
+## Stateless admission reselection refinement
+
+The existing lifecycle model now stores `selected` and `committed` owner maps.
+`reselectionStep` adds `selectOwner` to the existing lifecycle transitions, with
+all original per-owner work/slot, root and close invariants retained. Selection
+cannot move a reserved, staged producer or accepted request. Publication records
+the committed owner, and safety requires it never to change for an accepted job.
+The original `step` retains fixed-assignment traces for historical controls.
+
+Scenarios cover an available other owner, reservation cancellation/reselection,
+close/drain and an unsafe post-publication owner move. The aggregate Rust model
+gate also samples the reselection step and requires the owner-move mutation to
+produce an invariant counterexample. This does not model Tokio FIFO scheduling,
+watch-channel internals, kernel wake latency or Scheme execution/GC. Real
+semaphore, native multi-VM and matched benchmark controls remain separate gates.

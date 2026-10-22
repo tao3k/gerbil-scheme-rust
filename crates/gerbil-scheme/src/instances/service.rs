@@ -93,6 +93,19 @@ impl InstanceDispatcher {
         message: M,
         timeout: Duration,
     ) -> Result<AsyncInstanceTicket<M::Output>, InstanceError> {
+        let message = super::service_contract::Checked::new(message)?;
+        self.validate_service_on(owner, &message)?;
+        let reservation = self
+            .reserve_owner(owner, timeout, message.work_units())
+            .await?;
+        self.publish_reserved_service(message, reservation)
+    }
+    pub(super) fn publish_reserved_service<M: SchemeServiceRequest>(
+        &self,
+        message: M,
+        reservation: super::capacity::ReservedOwner,
+    ) -> Result<AsyncInstanceTicket<M::Output>, InstanceError> {
+        let owner = reservation.owner;
         let trace = message.entry_trace();
         let lane = message.lane();
         let short = message.short_service();
@@ -102,6 +115,39 @@ impl InstanceDispatcher {
                 "short service requires one stateless work unit",
             ));
         }
+        self.validate_service_on(owner, &message)?;
+        if units != reservation.units {
+            return Err(InstanceError::InvalidConfig(
+                "Scheme reservation work mismatch",
+            ));
+        }
+        if let Some(trace) = &trace {
+            trace.mark(super::SchemeServiceEntryPhase::CapacityReady);
+        }
+        let (send, response) = oneshot::channel();
+        let request = Request {
+            started: Arc::new(AtomicBool::new(false)),
+            capacity: Some(reservation.permit),
+            work_units: units,
+            work: Work::Service(Box::new(TypedJob {
+                message,
+                send,
+                lane,
+                short,
+                trace,
+                submitted: false,
+            })),
+        };
+        self.enqueue(owner, request)?;
+        Ok(AsyncInstanceTicket { response })
+    }
+    pub(super) fn validate_service_on<M: SchemeServiceRequest>(
+        &self,
+        owner: usize,
+        message: &M,
+    ) -> Result<(), InstanceError> {
+        let short = message.short_service();
+        let lane = message.lane();
         {
             let senders = self
                 .admission
@@ -127,26 +173,7 @@ impl InstanceDispatcher {
                 ));
             }
         }
-        let reservation = self.reserve_owner(owner, timeout, units).await?;
-        if let Some(trace) = &trace {
-            trace.mark(super::SchemeServiceEntryPhase::CapacityReady);
-        }
-        let (send, response) = oneshot::channel();
-        let request = Request {
-            started: Arc::new(AtomicBool::new(false)),
-            capacity: Some(reservation.permit),
-            work_units: units,
-            work: Work::Service(Box::new(TypedJob {
-                message,
-                send,
-                lane,
-                short,
-                trace,
-                submitted: false,
-            })),
-        };
-        self.enqueue(owner, request)?;
-        Ok(AsyncInstanceTicket { response })
+        Ok(())
     }
 }
 /// Opaque owner-local identity; never a Scheme pointer or cross-owner authority.

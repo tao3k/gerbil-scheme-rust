@@ -32,6 +32,7 @@ pub struct BatchAdmission {
 /// Work units are application declarations, not elapsed-time predictions.
 #[derive(Debug)]
 pub(super) struct Capacity {
+    pub(super) changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
     pub slots: Arc<Semaphore>,
     pub work: Option<Arc<Semaphore>>,
     pub work_limit: usize,
@@ -43,6 +44,12 @@ impl Capacity {
         self.producer.close();
         if let Some(work) = &self.work {
             work.close();
+        }
+        self.signal();
+    }
+    fn signal(&self) {
+        if let Some(changed) = self.changed.get() {
+            changed.send_replace(());
         }
     }
     pub(super) fn units(&self, units: usize) -> Result<u32, InstanceError> {
@@ -58,20 +65,24 @@ impl Capacity {
 }
 #[derive(Debug)]
 pub(super) struct CapacityPermit {
-    capacity: Arc<Capacity>,
+    pub(super) capacity: Arc<Capacity>,
     // Partial immediate acquisition stays in Request until outside the admission lock.
-    slot: Option<OwnedSemaphorePermit>,
-    work: Option<OwnedSemaphorePermit>,
+    pub(super) slot: Option<OwnedSemaphorePermit>,
+    pub(super) work: Option<OwnedSemaphorePermit>,
 }
 impl Drop for CapacityPermit {
     fn drop(&mut self) {
         drop(self.work.take());
         drop(self.slot.take());
+        // A pending acquire_many future can hold partial work internally even
+        // before work becomes Some. Its cancellation returns those credits too.
+        self.capacity.signal();
     }
 }
 pub(super) struct ReservedOwner {
     pub owner: usize,
     pub permit: CapacityPermit,
+    pub units: usize,
 }
 pub(super) fn attach(owner: &OwnerSender, request: &mut Request) -> Result<(), InstanceError> {
     match (&owner.capacity, &request.capacity) {
@@ -106,7 +117,7 @@ pub(super) fn attach(owner: &OwnerSender, request: &mut Request) -> Result<(), I
         }
     }
 }
-fn immediate_error(error: &tokio::sync::TryAcquireError) -> InstanceError {
+pub(super) fn immediate_error(error: &tokio::sync::TryAcquireError) -> InstanceError {
     match error {
         tokio::sync::TryAcquireError::Closed => InstanceError::Closed,
         tokio::sync::TryAcquireError::NoPermits => InstanceError::QueueFull,
@@ -149,7 +160,12 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let previous = configure(&mut senders, maximum_in_flight, maximum_work)?;
+        let previous = configure(
+            &mut senders,
+            maximum_in_flight,
+            maximum_work,
+            &self.admission.capacity_changed,
+        )?;
         drop(senders);
         retire(previous);
         Ok(())
@@ -198,7 +214,11 @@ impl InstanceDispatcher {
             drop(permit);
             return Err(InstanceError::Timeout);
         }
-        Ok(ReservedOwner { owner, permit })
+        Ok(ReservedOwner {
+            owner,
+            permit,
+            units,
+        })
     }
 }
 
@@ -208,30 +228,33 @@ pub(super) async fn acquire_pair(
     units: usize,
 ) -> Result<CapacityPermit, InstanceError> {
     let units = capacity.units(units)?;
-    let work = match &capacity.work {
-        Some(work) => Some(
+    let mut permit = CapacityPermit {
+        capacity: Arc::clone(&capacity),
+        slot: None,
+        work: None,
+    };
+    if let Some(work) = &capacity.work {
+        permit.work = Some(
             Arc::clone(work)
                 .acquire_many_owned(units)
                 .await
                 .map_err(|_| InstanceError::Closed)?,
-        ),
-        None => None,
-    };
-    let slot = Arc::clone(&capacity.slots)
-        .acquire_owned()
-        .await
-        .map_err(|_| InstanceError::Closed)?;
-    Ok(CapacityPermit {
-        capacity,
-        slot: Some(slot),
-        work,
-    })
+        );
+    }
+    permit.slot = Some(
+        Arc::clone(&capacity.slots)
+            .acquire_owned()
+            .await
+            .map_err(|_| InstanceError::Closed)?,
+    );
+    Ok(permit)
 }
 
 fn configure(
     senders: &mut super::dispatch::Senders,
     maximum_in_flight: usize,
     maximum_work: Option<usize>,
+    changed: &Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
 ) -> Result<Vec<Arc<Capacity>>, InstanceError> {
     if senders.owners.is_empty() {
         return Err(InstanceError::Closed);
@@ -258,6 +281,7 @@ fn configure(
     let mut previous = Vec::new();
     for owner in &mut senders.owners {
         previous.extend(owner.capacity.replace(Arc::new(Capacity {
+            changed: Arc::clone(changed),
             slots: Arc::new(Semaphore::new(maximum_in_flight)),
             work: maximum_work.map(|n| Arc::new(Semaphore::new(n))),
             work_limit: maximum_work.unwrap_or(0),

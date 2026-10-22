@@ -333,3 +333,44 @@ CPU is a separate clock. See the linked report for the verified clock sources.
 ### Targeted algorithm and contract audit
 
 See the [routing, Scheme queue and contract audit](30-39-status/30.41-targeted-routing-and-scheme-queue-audit.org) for source-confirmed costs, admission reselection, eligible FIFO equivalence, cooperative unit semantics and directed acceptance obligations. These are candidate changes; the audit does not claim a measured performance improvement.
+
+### Capacity-reserved stateless owner reselection (explicit opt-in)
+
+`SchemeServiceRouter::new` and `SchemeRoutingAdmission::default()` retain
+`Pinned`. Select `SchemeServiceRouter::with_admission(dispatch, config,
+SchemeRoutingAdmission::Reselect)` to re-evaluate the existing class-specific
+owner score whenever shared native capacity changes. Scheme still owns all
+execution, native waits, green threads and continuations.
+
+Reselection serializes admission within each class in FIFO order. It reserves
+one owner's class quota, declared work credits and request slot before native
+publication. A failed scan releases all partial credits before waiting on a
+versioned capacity change; it does not hold reservations on every VM, poll on a
+timer, or move accepted Scheme state. Direct dispatcher completions, partial
+fixed-owner reservation cancellation, reconfiguration, owner failure and pool
+close participate in that notification. Independent routers continue to have
+independent class quotas, under shared pool native limits.
+
+Application work/lane/execution declarations are sampled once before waiting.
+`RoutedSchemeTicket::route_class` (`SchemeRouteClass`) and `execution_class`
+(`SchemeServiceExecution`) describe separate choices. Existing route/general
+execution controls remain valid. A short native execution declaration still
+requires one nonzero stateless work unit and an admitted service capability.
+An Actor lane must continue to use an explicit fixed owner.
+
+Admission timeout/drop returns unpublished reservations. Accepted request/work
+credits remain held through Scheme completion and native projection even after
+a caller times out or abandons its ticket. The class FIFO prevents overtaking
+within one router/class; it does not promise fairness between unrelated routers
+or bypass an earlier large request in that same FIFO. Counted work is not a
+wall-clock service bound. Unassigned reselection waiters are absent from
+per-owner `loads()`; pinned owner-specific admission waiters remain included.
+
+A router holds the exact capacity objects validated with its class budgets.
+Quiescent native capacity reconfiguration invalidates old routers and unassigned
+waiters, even when numeric limits stay the same. Create a new router against the
+new capacity scope. Both constructor validation/capture and reservation identity
+checks use the existing admission fence; old class quotas cannot silently cross
+into a differently configured pool capacity epoch.
+
+See the [native and matched qualification](30-39-status/30.42-capacity-reserved-owner-reselection.org).

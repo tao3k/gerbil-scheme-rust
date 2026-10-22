@@ -76,6 +76,7 @@ impl InstanceDispatcher {
         F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
     {
         let mut request = self.native_work(job, deliver);
+        request.work_units = reservation.units;
         request.capacity = Some(reservation.permit);
         self.enqueue(reservation.owner, request)
     }

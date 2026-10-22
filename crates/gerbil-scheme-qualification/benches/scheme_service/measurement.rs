@@ -27,6 +27,7 @@ pub(super) enum Comparison {
     Budget,
     Ingress,
     Notification,
+    Reselection,
 }
 impl Comparison {
     pub(super) fn is_split(self) -> bool {
@@ -37,6 +38,9 @@ impl Comparison {
             Self::Service => "synchronous versus Scheme-owned service",
             Self::Combined => "batch-short/FIFO versus native short/ready completion",
             Self::ShortLayout => "same FIFO completion; batch-short versus native short",
+            Self::Reselection => {
+                "same native work/queues/quotas; pinned versus capacity-reserved owner reselection"
+            }
             Self::Notification => {
                 "same native port/budget/work; coalesced versus independent short notification"
             }
@@ -72,6 +76,7 @@ impl Strategy {
                     | Comparison::Budget
                     | Comparison::Ingress
                     | Comparison::Notification
+                    | Comparison::Reselection
             ) && (arm
                 || matches!(
                     comparison,
@@ -79,6 +84,7 @@ impl Strategy {
                         | Comparison::Budget
                         | Comparison::Ingress
                         | Comparison::Notification
+                        | Comparison::Reselection
                 )) {
                 ShortMode::Dedicated(observation)
             } else if matches!(
@@ -98,6 +104,7 @@ impl Strategy {
                     | Comparison::Budget
                     | Comparison::Ingress
                     | Comparison::Notification
+                    | Comparison::Reselection
             ) || (comparison == Comparison::ClassRouting && arm),
         }
     }
@@ -115,7 +122,7 @@ pub(super) fn run(
     let asynchronous = comparison != Comparison::Service || arm;
     let split_pair = comparison.is_split();
     idle(pool);
-    let router = gerbil_scheme::instances::SchemeServiceRouter::new(
+    let router = gerbil_scheme::instances::SchemeServiceRouter::with_admission(
         pool.dispatcher(),
         gerbil_scheme::instances::SchemeRoutingConfig {
             owners: vec![0, 1, 2, 3],
@@ -123,6 +130,11 @@ pub(super) fn run(
             batch_slots: 3,
             short_max_work: 1,
             batch_max_work: 8,
+        },
+        if comparison == Comparison::Reselection && arm {
+            gerbil_scheme::instances::SchemeRoutingAdmission::Reselect
+        } else {
+            gerbil_scheme::instances::SchemeRoutingAdmission::Pinned
         },
     )
     .unwrap();
@@ -201,23 +213,37 @@ fn append_policy(
 ) {
     if matches!(
         comparison,
-        Comparison::Budget | Comparison::Ingress | Comparison::Notification
+        Comparison::Budget
+            | Comparison::Ingress
+            | Comparison::Notification
+            | Comparison::Reselection
     ) {
         value["scheme_budget"] = json!(usize::from(
-            arm || matches!(comparison, Comparison::Ingress | Comparison::Notification)
+            arm || matches!(
+                comparison,
+                Comparison::Ingress | Comparison::Notification | Comparison::Reselection
+            )
         ));
         value["native_port_wake"] = json!(
-            (comparison == Comparison::Ingress && arm) || comparison == Comparison::Notification
+            (comparison == Comparison::Ingress && arm)
+                || matches!(
+                    comparison,
+                    Comparison::Notification | Comparison::Reselection
+                )
         );
         value["independent_short_notifications"] =
             json!(comparison == Comparison::Notification && arm);
         value["scheme_budget_counters"] = super::budget::snapshot(
             pool,
-            arm || matches!(comparison, Comparison::Ingress | Comparison::Notification),
+            arm || matches!(
+                comparison,
+                Comparison::Ingress | Comparison::Notification | Comparison::Reselection
+            ),
             inputs,
             probes,
         );
     }
+    value["owner_reselection"] = json!(comparison == Comparison::Reselection && arm);
     value["feed_limit"] = json!(if comparison == Comparison::Feed && arm {
         4
     } else {
@@ -235,9 +261,18 @@ fn configure(pool: &InstancePool, comparison: Comparison, arm: bool) {
     if comparison == Comparison::Budget {
         super::budget::configure(pool, arm);
     }
-    if matches!(comparison, Comparison::Ingress | Comparison::Notification) {
+    if matches!(
+        comparison,
+        Comparison::Ingress | Comparison::Notification | Comparison::Reselection
+    ) {
         super::budget::configure(pool, true);
-        super::budget::wake(pool, arm || comparison == Comparison::Notification);
+        super::budget::wake(
+            pool,
+            arm || matches!(
+                comparison,
+                Comparison::Notification | Comparison::Reselection
+            ),
+        );
         super::budget::notification(pool, comparison == Comparison::Notification && arm);
     }
 }

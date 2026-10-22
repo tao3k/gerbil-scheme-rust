@@ -135,6 +135,7 @@ fn main() {
         || s == "--short-service-ab"
         || s == "--phase-observation"
         || s == "--notification-ab"
+        || s == "--reselection-ab"
         || s == "--ingress-ab"
         || s == "--budget-ab"
         || s == "--feed-ab"));
@@ -157,6 +158,7 @@ fn main() {
             .filter(|s| matches!(
                 s.as_str(),
                 "--notification-ab"
+                    | "--reselection-ab"
                     | "--ingress-ab"
                     | "--budget-ab"
                     | "--feed-ab"
@@ -168,7 +170,9 @@ fn main() {
             .count()
             <= 1
     );
-    let comparison = if args.iter().any(|s| s == "--notification-ab") {
+    let comparison = if args.iter().any(|s| s == "--reselection-ab") {
+        Comparison::Reselection
+    } else if args.iter().any(|s| s == "--notification-ab") {
         Comparison::Notification
     } else if args.iter().any(|s| s == "--ingress-ab") {
         Comparison::Ingress

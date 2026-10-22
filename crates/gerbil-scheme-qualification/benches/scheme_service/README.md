@@ -221,3 +221,22 @@ Observed candidate probes must have real Written/Full notification receipts.
 Paired owner history now retains enclosing GC CPU as well as GC wall time; old
 captures lacking this field have unknown GC CPU, not zero. These clocks still
 do not isolate kernel wake delivery from runnable-thread scheduling delay.
+
+## Capacity-reserved owner reselection
+
+`just bridge-scheme-service-benchmark --reselection-ab` compares pinned admission
+with explicit `SchemeRoutingAdmission::Reselect` on the same four native VMs and
+two Tokio workers. Both arms use native short execution, class routing, FIFO
+result observation, feed one, cooperative budget one, native port wake and
+coalesced notification. Only the admission strategy changes; no default changes.
+The same existing CPU/mixed corpus, 8,192 orders, batch eight and 64 probes with
+nominal serial 500-us releases run in AB/BA order (ten samples per arm/load).
+`owner_reselection` records the strategy in each sample. The opt-in versioned
+capacity notification is initialized during warmup and remains enabled in both
+timed arms, avoiding an asymmetric pool activation cost.
+
+The native service fixture separately checks direct capacity release on B while
+A remains blocked, FIFO follower progress, declaration reads, cancellation,
+timeout, native capacity-epoch invalidation and router/pool close conservation. Successful model or smoke checks are
+not throughput/p99 acceptance. Keep raw captures outside the repository and
+retain negative and incomplete results under distinct source identities.

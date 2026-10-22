@@ -1,5 +1,5 @@
 //! Shared class-routing contract and load ledger; no scheduling implementation.
-use crate::instances::AsyncInstanceTicket;
+use crate::instances::{AsyncInstanceTicket, SchemeServiceExecution};
 use std::sync::{Arc, Mutex};
 use tokio::sync::Semaphore;
 /// Explicit router contract, checked against existing owner slot/work budgets.
@@ -13,7 +13,9 @@ pub struct SchemeRoutingConfig {
     pub short_max_work: usize,
     pub batch_max_work: usize,
 }
-/// Queueing/reserved/accepted router load, not a prediction of runtime duration.
+/// Router load through projection, not a prediction of runtime duration.
+/// Pinned includes per-owner admission waiters; Reselect charges an owner only
+/// after all credits are reserved. Unassigned FIFO waiters have no owner charge.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SchemeRouteLoad {
     pub owner: usize,
@@ -26,14 +28,27 @@ pub struct SchemeRouteLoad {
 pub struct RoutedSchemeTicket<R: Send + 'static> {
     pub owner: usize,
     pub ticket: AsyncInstanceTicket<R>,
+    pub route_class: SchemeRouteClass,
+    pub execution_class: SchemeServiceExecution,
 }
-#[derive(Clone, Copy)]
-pub(super) enum Class {
+/// Host admission/routing class; independent of the native execution queue.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SchemeRouteClass {
     Short,
     Batch,
 }
+pub(super) use SchemeRouteClass as Class;
+/// Existing pinned admission remains the default. Reselect commits an owner
+/// only after class and native work/slot credits have all been reserved.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SchemeRoutingAdmission {
+    #[default]
+    Pinned,
+    Reselect,
+}
 pub(super) struct Destination {
     pub(super) owner: usize,
+    pub(super) capacity: Arc<crate::instances::capacity::Capacity>,
     pub(super) short: Arc<Semaphore>,
     pub(super) batch: Arc<Semaphore>,
 }
@@ -43,6 +58,9 @@ pub(super) struct Ledger {
     pub(super) batch_cursor: usize,
 }
 pub(super) struct State {
+    pub(super) changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
+    pub(super) short_gate: Arc<Semaphore>,
+    pub(super) batch_gate: Arc<Semaphore>,
     pub(super) destinations: Vec<Destination>,
     pub(super) ledger: Mutex<Ledger>,
     pub(super) short_slots: usize,

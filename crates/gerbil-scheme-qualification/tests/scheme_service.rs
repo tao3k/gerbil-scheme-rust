@@ -5,6 +5,10 @@ mod budget;
 mod corpus;
 #[path = "scheme_service/priority.rs"]
 mod priority;
+#[path = "scheme_service/reselection.rs"]
+mod reselection;
+#[path = "scheme_service/reselection_contract.rs"]
+mod reselection_contract;
 #[path = "scheme_service/routing.rs"]
 mod routing;
 #[path = "scheme_service/short.rs"]
@@ -274,8 +278,24 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
         .submit_scheme_service_backpressured_on(0, batch(false), Duration::from_millis(1))
         .await;
     assert!(matches!(rejected, Err(InstanceError::Timeout)));
+    let router = gerbil_scheme::instances::SchemeServiceRouter::with_admission(
+        dispatch.clone(),
+        gerbil_scheme::instances::SchemeRoutingConfig {
+            owners: vec![0],
+            short_slots: 1,
+            batch_slots: 3,
+            short_max_work: 1,
+            batch_max_work: 8,
+        },
+        gerbil_scheme::instances::SchemeRoutingAdmission::Reselect,
+    )
+    .unwrap();
+    let mut waiter = Box::pin(router.submit_short(short::Short(vec![0, 0, 1, 1, 1]), GATE));
+    reselection::registered(waiter.as_mut()).await;
     let start = Instant::now();
     let closed = pool.shutdown(GATE);
+    assert!(matches!(waiter.await, Err(InstanceError::Closed)));
+    reselection::empty(&router);
     assert!(closed.is_clean(), "{closed:?}");
     assert_eq!(closed.joined, 4);
     for ticket in tickets {
@@ -384,6 +404,8 @@ fn scheme_owns_waits_roots_continuations_and_close() {
         wake_and_timeout(&dispatch, &progress).await;
         short::completion_ready(&dispatch, &progress).await;
         routing::contract(&dispatch, &progress).await;
+        reselection::contract(&dispatch, &progress).await;
+        reselection_contract::contract(&dispatch).await;
         close_full(&mut pool, &progress).await;
     });
     drop(pool);

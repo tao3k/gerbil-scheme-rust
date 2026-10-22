@@ -11,6 +11,8 @@ pub(super) struct Admission {
     pub(super) senders: Mutex<Senders>,
     #[cfg(feature = "tokio-dispatch")]
     pub(super) queue_capacity: usize,
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) capacity_changed: Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>,
     next: AtomicUsize,
     maximum_request: usize,
     maximum_reply: usize,
@@ -46,6 +48,8 @@ impl InstanceDispatcher {
                 senders: Mutex::new(Senders::default()),
                 #[cfg(feature = "tokio-dispatch")]
                 queue_capacity,
+                #[cfg(feature = "tokio-dispatch")]
+                capacity_changed: Arc::default(),
                 next: AtomicUsize::new(0),
                 maximum_request,
                 maximum_reply,
@@ -57,6 +61,12 @@ impl InstanceDispatcher {
         sender: mpsc::SyncSender<Request>,
         wake: Option<Arc<super::service_wake::Wake>>,
     ) {
+        #[cfg(feature = "tokio-dispatch")]
+        if let Some(wake) = &wake {
+            let _ = wake
+                .capacity_changed
+                .set(Arc::clone(&self.admission.capacity_changed));
+        }
         self.admission
             .senders
             .lock()
@@ -91,6 +101,10 @@ impl InstanceDispatcher {
             }
         }
         drop(owners);
+        #[cfg(feature = "tokio-dispatch")]
+        if let Some(changed) = self.admission.capacity_changed.get() {
+            changed.send_replace(());
+        }
     }
     /// Round-robin admission of an owned, stateless request.
     /// # Errors

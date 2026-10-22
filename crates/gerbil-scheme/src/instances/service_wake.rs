@@ -39,6 +39,9 @@ pub(super) struct Wake {
     pub independent_short: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
     pub observation: std::sync::OnceLock<Arc<super::service_metrics::Monitor>>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub capacity_changed:
+        std::sync::OnceLock<Arc<std::sync::OnceLock<tokio::sync::watch::Sender<()>>>>,
     pending: AtomicBool,
     pub closed: AtomicBool,
     pub failed: AtomicBool,
@@ -92,6 +95,8 @@ impl Wake {
                 independent_short: AtomicBool::new(false),
                 #[cfg(feature = "tokio-dispatch")]
                 observation: std::sync::OnceLock::new(),
+                #[cfg(feature = "tokio-dispatch")]
+                capacity_changed: std::sync::OnceLock::new(),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
                 failed: AtomicBool::new(false),
@@ -114,7 +119,8 @@ impl Wake {
                     return SchemeWakeDelivery::Full;
                 }
                 _ => {
-                    self.failed.store(true, Ordering::Release);
+                    drop(writer);
+                    self.fail();
                     return SchemeWakeDelivery::Failed;
                 }
             }
@@ -143,7 +149,7 @@ impl Wake {
                 },
                 _ => {}
             }
-            self.failed.store(true, Ordering::Release);
+            self.fail();
             return SchemeWakeDelivery::Failed;
         }
     }
@@ -151,8 +157,25 @@ impl Wake {
     pub fn arm(&self) {
         self.pending.store(false, Ordering::Release);
     }
+    #[cfg(feature = "tokio-dispatch")]
+    fn signal_capacity_change(&self) {
+        if let Some(changed) = self
+            .capacity_changed
+            .get()
+            .and_then(|changed| changed.get())
+        {
+            changed.send_replace(());
+        }
+    }
+    fn fail(&self) {
+        self.failed.store(true, Ordering::Release);
+        #[cfg(feature = "tokio-dispatch")]
+        self.signal_capacity_change();
+    }
     pub fn close(&self) {
         if !self.closed.swap(true, Ordering::AcqRel) {
+            #[cfg(feature = "tokio-dispatch")]
+            self.signal_capacity_change();
             #[cfg(feature = "tokio-dispatch")]
             if self.independent_short.load(Ordering::Acquire) {
                 self.notify_independent();

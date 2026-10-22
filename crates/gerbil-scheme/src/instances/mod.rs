@@ -7,6 +7,8 @@ pub use async_dispatch::AsyncInstanceTicket;
 #[cfg(feature = "tokio-dispatch")]
 mod capacity;
 #[cfg(feature = "tokio-dispatch")]
+mod capacity_try;
+#[cfg(feature = "tokio-dispatch")]
 pub use capacity::{BatchAdmission, OwnerCapacitySnapshot};
 mod batch;
 mod batch_trace;
@@ -48,6 +50,10 @@ pub use types::{
 #[cfg(feature = "tokio-dispatch")]
 mod service;
 #[cfg(feature = "tokio-dispatch")]
+mod service_contract;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_contract::SchemeServiceExecution;
+#[cfg(feature = "tokio-dispatch")]
 mod service_loop;
 mod service_wake;
 #[cfg(feature = "tokio-dispatch")]
@@ -56,7 +62,10 @@ pub use service::{NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest};
 #[cfg(feature = "tokio-dispatch")]
 mod routing;
 #[cfg(feature = "tokio-dispatch")]
-pub use routing::{RoutedSchemeTicket, SchemeRouteLoad, SchemeRoutingConfig, SchemeServiceRouter};
+pub use routing::{
+    RoutedSchemeTicket, SchemeRouteClass, SchemeRouteLoad, SchemeRoutingAdmission,
+    SchemeRoutingConfig, SchemeServiceRouter,
+};
 
 #[cfg(feature = "tokio-dispatch")]
 mod service_metrics;

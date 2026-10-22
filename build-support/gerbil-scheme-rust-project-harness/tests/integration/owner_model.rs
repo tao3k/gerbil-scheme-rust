@@ -63,6 +63,31 @@ fn owner_protocol_scenarios_and_controls() {
     ] {
         mutation_counterexample(source, "owner_lifecycle_small", "init", mutation, "safety");
     }
+    success(&[
+        "run",
+        source,
+        "--main",
+        "owner_lifecycle_small",
+        "--step",
+        "reselectionStep",
+        "--invariant",
+        "safety",
+        "--seed",
+        "1",
+        "--max-samples",
+        "1000",
+        "--max-steps",
+        "64",
+        "--verbosity",
+        "1",
+    ]);
+    mutation_counterexample(
+        source,
+        "owner_lifecycle_small",
+        "init",
+        "unsafeOwnerMoveStep",
+        "safety",
+    );
     shared_protocol(source);
 }
 fn symbolic(bound: &str) {

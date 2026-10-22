@@ -71,6 +71,10 @@ fn concurrent_independent_publish_preserves_every_byte() {
 #[test]
 fn full_pipe_is_an_existing_wake_and_closed_reader_is_failure() {
     let (reader, wake) = Wake::create().unwrap();
+    let (notifier, changes) = tokio::sync::watch::channel(());
+    wake.capacity_changed
+        .set(Arc::new(std::sync::OnceLock::from(notifier)))
+        .unwrap();
     wake.independent_short.store(true, Ordering::Release);
     // Fill to the actual kernel capacity, including the byte after 64 KiB.
     // The finite safety guard is not a configured pipe size or timing budget.
@@ -91,4 +95,19 @@ fn full_pipe_is_an_existing_wake_and_closed_reader_is_failure() {
         SchemeWakeDelivery::Failed
     ));
     assert!(wake.failed.load(Ordering::Acquire));
+    assert!(
+        changes.has_changed().unwrap(),
+        "owner failure must wake capacity reselection"
+    );
+}
+
+#[test]
+fn owner_close_publishes_durable_capacity_change() {
+    let (_reader, wake) = Wake::create().unwrap();
+    let (notifier, changes) = tokio::sync::watch::channel(());
+    wake.capacity_changed
+        .set(Arc::new(std::sync::OnceLock::from(notifier)))
+        .unwrap();
+    wake.close();
+    assert!(changes.has_changed().unwrap());
 }

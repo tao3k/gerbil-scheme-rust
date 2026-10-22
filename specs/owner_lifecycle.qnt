@@ -11,6 +11,7 @@ module owner_lifecycle {
   const ASSIGNED: int -> int
   type State = {
     phase: str,
+    selected: int -> int, committed: int -> int,
     accepted: Set[int], completed: Set[int], ready: Set[int],
     roots: Set[int], registry: Set[int], timedOut: Set[int],
     executor: str, filesPresent: bool, imagesRetained: bool,
@@ -26,6 +27,7 @@ module owner_lifecycle {
   var s: State
 
   action init = s' = {
+    selected: ASSIGNED, committed: JOBS.mapBy(_ => 0),
     phase: "open", accepted: Set(), completed: Set(), ready: Set(),
     roots: Set(), registry: Set(), timedOut: Set(), executor: "absent",
     filesPresent: true, imagesRetained: true,
@@ -38,15 +40,27 @@ module owner_lifecycle {
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
     latePublication: false, lateExecutor: false, foreignUse: false
   }
+  def ownerOf(r: int): int = s.selected.get(r)
+  // Only unreserved, unpublished stateless requests can select another owner.
+  // Affine requests use the existing fixed-owner path and never this action.
+  action selectOwner(r: int, owner: int): bool = all {
+    s.phase == "open", JOBS.contains(r), Set(1, 2).contains(owner),
+    not(s.workHeld.contains(r)), not(s.accepted.contains(r)), not(s.producerJobs.contains(r)),
+    s' = { ...s, selected: s.selected.set(r, owner) }
+  }
+  action unsafeOwnerMove(r: int, owner: int): bool = all {
+    s.accepted.contains(r), ownerOf(r) != owner,
+    s' = { ...s, selected: s.selected.set(r, owner) }
+  }
   // Job 1 is a batch of eight; the other requests have unit cost.
   def units(r: int): int = if (r == 1) 8 else 1
   def workUsed(owner: int): int = {
-    val held = s.workHeld.filter(job => ASSIGNED.get(job) == owner)
+    val held = s.workHeld.filter(job => ownerOf(job) == owner)
     held.size() + (if (held.contains(1)) 7 else 0)
   }
   def hasSlot(r: int): bool =
-    s.capacityHeld.filter(job => ASSIGNED.get(job) == ASSIGNED.get(r)).size() < s.capacityLimit
-  def hasWork(r: int): bool = workUsed(ASSIGNED.get(r)) + units(r) <= s.workLimit
+    s.capacityHeld.filter(job => ownerOf(job) == ownerOf(r)).size() < s.capacityLimit
+  def hasWork(r: int): bool = workUsed(ownerOf(r)) + units(r) <= s.workLimit
   def hasCapacity(r: int): bool = hasSlot(r) and hasWork(r)
   // Full work acquisition can precede slot acquisition. Partial semaphore
   // allocation is an implementation detail covered by native cancellation tests.
@@ -73,7 +87,7 @@ module owner_lifecycle {
   }
   action admitReserved(r: int): bool = all {
     s.phase == "open", s.reserved.contains(r),
-    s' = { ...s, accepted: s.accepted.union(Set(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ASSIGNED.get(r))), staged: s.staged.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)) }
+    s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), reserved: s.reserved.exclude(Set(r)) }
   }
   action releaseReservation(r: int): bool = all {
     s.reserved.contains(r),
@@ -86,30 +100,30 @@ module owner_lifecycle {
   action admit(r: int): bool = all {
     s.phase == "open", JOBS.contains(r), not(s.accepted.contains(r)),
     not(s.reserved.contains(r)), not(s.workHeld.contains(r)), hasCapacity(r),
-    s' = { ...s, accepted: s.accepted.union(Set(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ASSIGNED.get(r))), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
+    s' = { ...s, accepted: s.accepted.union(Set(r)), committed: s.committed.set(r, ownerOf(r)), inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(ownerOf(r))), staged: s.staged.exclude(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)) }
   }
   action registerProducer(owner: int): bool = all {
     s.phase == "open", Set(1, 2).contains(owner), not(s.producers.contains(owner)),
     s' = { ...s, producers: s.producers.union(Set(owner)) }
   }
   action stage(r: int): bool = all {
-    s.phase == "open", JOBS.contains(r), s.producers.contains(ASSIGNED.get(r)),
+    s.phase == "open", JOBS.contains(r), s.producers.contains(ownerOf(r)),
     not(s.accepted.contains(r)), not(s.staged.contains(r)), not(s.workHeld.contains(r)),
     s' = { ...s, staged: s.staged.union(Set(r)), producerJobs: s.producerJobs.union(Set(r)) }
   }
   action cancelProducer(owner: int): bool = all {
     s.phase == "closing", s.producers.contains(owner),
     all {
-      val pending = s.staged.filter(job => ASSIGNED.get(job) == owner)
+      val pending = s.staged.filter(job => ownerOf(job) == owner)
       s' = { ...s, staged: s.staged.exclude(pending), producerJobs: s.producerJobs.exclude(pending),
         reserved: s.reserved.exclude(pending), capacityHeld: s.capacityHeld.exclude(pending), workHeld: s.workHeld.exclude(pending) }
     }
   }
   action finishProducer(owner: int): bool = all {
     Set("open", "closing").contains(s.phase), s.producers.contains(owner),
-    s.producerJobs.filter(job => ASSIGNED.get(job) == owner).subseteq(s.completed),
+    s.producerJobs.filter(job => ownerOf(job) == owner).subseteq(s.completed),
     s' = { ...s, producers: s.producers.exclude(Set(owner)),
-      producerJobs: s.producerJobs.filter(job => ASSIGNED.get(job) != owner) }
+      producerJobs: s.producerJobs.filter(job => ownerOf(job) != owner) }
   }
   // Completion is an externally validated owner action, not Rust computation.
   action complete(r: int): bool = all {
@@ -128,7 +142,7 @@ module owner_lifecycle {
   def canPublish(r: int): bool = s.phase == "open" and s.ready.contains(r)
   def canUse(r: int, owner: int): bool = and {
     s.phase == "open", s.registry.contains(r), s.roots.contains(r),
-    ASSIGNED.get(r) == owner
+    ownerOf(r) == owner
   }
   // This helper deliberately exposes the missing-close-check mutation below.
   action publishUnchecked(r: int): bool = all {
@@ -139,7 +153,7 @@ module owner_lifecycle {
   action publish(r: int): bool = all { canPublish(r), publishUnchecked(r) }
   action use(r: int, owner: int): bool = all { canUse(r, owner), s' = s }
   action release(r: int, owner: int): bool = all {
-    Set("open", "closing").contains(s.phase), s.roots.contains(r), ASSIGNED.get(r) == owner,
+    Set("open", "closing").contains(s.phase), s.roots.contains(r), ownerOf(r) == owner,
     s' = { ...s, roots: s.roots.exclude(Set(r)), registry: s.registry.exclude(Set(r)),
       ready: s.ready.exclude(Set(r)) }
   }
@@ -200,7 +214,7 @@ module owner_lifecycle {
   }
   action readyService(r: int, failed: bool): bool = all {
     s.servicePending.contains(r), not(s.serviceReady.contains(r)),
-    s' = { ...s, serviceReady: s.serviceReady.union(Set(r)), notified: s.notified.union(Set(ASSIGNED.get(r))),
+    s' = { ...s, serviceReady: s.serviceReady.union(Set(r)), notified: s.notified.union(Set(ownerOf(r))),
       serviceFailed: if (failed) s.serviceFailed.union(Set(r)) else s.serviceFailed }
   }
   // Enqueue and OS notification publication are deliberately separate actions.
@@ -215,8 +229,8 @@ module owner_lifecycle {
   }
   def canPark(owner: int): bool = and {
     s.phase == "open", not(s.notified.contains(owner)),
-    not(s.inbox.exists(r => ASSIGNED.get(r) == owner)),
-    not(s.serviceReady.exists(r => ASSIGNED.get(r) == owner))
+    not(s.inbox.exists(r => ownerOf(r) == owner)),
+    not(s.serviceReady.exists(r => ownerOf(r) == owner))
   }
   action park(owner: int): bool = all { canPark(owner), s' = { ...s, parked: s.parked.union(Set(owner)) } }
   action unsafePark(owner: int): bool = s' = { ...s, parked: s.parked.union(Set(owner)) }
@@ -236,23 +250,25 @@ module owner_lifecycle {
       reserveWork(r), reserveSlot(r), cancelWork(r), configureWork(8), configureWork(9), reserve(r), admitReserved(r), releaseReservation(r), configureCapacity(1), configureCapacity(2), stutter }
   }
   val safety = and {
+    JOBS.forall(r => Set(1, 2).contains(ownerOf(r))),
+    s.accepted.forall(r => ownerOf(r) == s.committed.get(r)),
     s.servicePending.subseteq(s.accepted.exclude(s.completed)), s.serviceRoots == s.servicePending,
     s.serviceReady.subseteq(s.servicePending), s.serviceFailed.subseteq(s.accepted),
     s.inbox.subseteq(s.accepted.exclude(s.completed)), s.inbox.intersect(s.servicePending).size() == 0,
     s.parked.subseteq(Set(1, 2)), s.notified.subseteq(Set(1, 2)), s.wakeOwed.subseteq(Set(1, 2)),
     s.parked.forall(owner => implies(
-      s.inbox.exists(r => ASSIGNED.get(r) == owner) or s.serviceReady.exists(r => ASSIGNED.get(r) == owner),
+      s.inbox.exists(r => ownerOf(r) == owner) or s.serviceReady.exists(r => ownerOf(r) == owner),
       s.notified.contains(owner) or s.wakeOwed.contains(owner))),
     s.producers.subseteq(Set(1, 2)), s.staged.subseteq(s.producerJobs), s.producerJobs.subseteq(JOBS),
     s.producerJobs.subseteq(s.staged.union(s.accepted)), s.staged.intersect(s.accepted).size() == 0,
-    s.producerJobs.forall(job => s.producers.contains(ASSIGNED.get(job))),
+    s.producerJobs.forall(job => s.producers.contains(ownerOf(job))),
     s.workLimit > 0, s.workHeld.subseteq(JOBS), s.capacityHeld.subseteq(s.workHeld),
     s.workHeld.intersect(s.completed).size() == 0,
     Set(1, 2).forall(owner => workUsed(owner) <= s.workLimit),
     s.capacityLimit > 0, s.capacityHeld.subseteq(JOBS), s.reserved.subseteq(JOBS),
     s.reserved.intersect(s.accepted).size() == 0,
     s.capacityHeld == s.reserved.union(s.accepted.exclude(s.completed)),
-    Set(1, 2).forall(owner => s.capacityHeld.filter(job => ASSIGNED.get(job) == owner).size() <= s.capacityLimit),
+    Set(1, 2).forall(owner => s.capacityHeld.filter(job => ownerOf(job) == owner).size() <= s.capacityLimit),
     s.accepted.subseteq(JOBS), s.completed.subseteq(s.accepted),
     s.timedOut.subseteq(s.accepted), s.ready.subseteq(s.completed),
     s.roots.subseteq(s.completed), s.registry.subseteq(s.completed),
@@ -269,7 +285,7 @@ module owner_lifecycle {
   }
 
   action unsafeProducerExit(owner: int): bool = all {
-    s.producers.contains(owner), s.producerJobs.filter(job => ASSIGNED.get(job) == owner).size() > 0,
+    s.producers.contains(owner), s.producerJobs.filter(job => ownerOf(job) == owner).size() > 0,
     s' = { ...s, producers: s.producers.exclude(Set(owner)) }
   }
   action unsafeProducerExitStep = { nondet owner = Set(1, 2).oneOf(); any { step, unsafeProducerExit(owner) } }
@@ -285,7 +301,7 @@ module owner_lifecycle {
   action unsafeForeignUse = {
     nondet r = JOBS.oneOf()
     nondet owner = Set(1, 2).oneOf()
-    all { s.phase == "open", s.registry.contains(r), ASSIGNED.get(r) != owner,
+    all { s.phase == "open", s.registry.contains(r), ownerOf(r) != owner,
       s' = { ...s, foreignUse: true } }
   }
   action unsafeForeignStep = any { step, unsafeForeignUse }
@@ -303,9 +319,9 @@ module owner_lifecycle {
   run servicePartialRetirementTest = init
     .then(admit(1)).then(submitService(1)).then(readyService(1, false))
     .then(admit(2)).then(submitService(2)).then(readyService(2, true))
-    .then(complete(2)).then(clearWake(ASSIGNED.get(1)))
+    .then(complete(2)).then(clearWake(ownerOf(1)))
     .then(all { assert(s.serviceRoots == Set(1)), assert(s.serviceReady == Set(1)),
-      assert(not(canPark(ASSIGNED.get(1)))), assert(safety), stutter })
+      assert(not(canPark(ownerOf(1)))), assert(safety), stutter })
     .then(close).then(complete(1)).then(join)
     .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
   run serviceEarlyRootMutationTest = init.then(admit(1)).then(submitService(1)).then(unsafeServiceRoot(1))
@@ -378,6 +394,28 @@ module owner_lifecycle {
     .then(all { assert(not(safety)), stutter })
   run foreignHandleMutationTest = init.then(admit(1)).then(complete(1)).then(publish(1))
     .then(unsafeForeignUse).then(all { assert(not(safety)), stutter })
+  action reselectionStep = {
+    nondet r = JOBS.oneOf()
+    nondet owner = Set(1, 2).oneOf()
+    any { step, selectOwner(r, owner) }
+  }
+  action unsafeOwnerMoveStep = {
+    nondet r = JOBS.oneOf()
+    nondet owner = Set(1, 2).oneOf()
+    any { reselectionStep, unsafeOwnerMove(r, owner) }
+  }
+  run freeOwnerReselectionTest = init.then(configureCapacity(1)).then(admit(1))
+    .then(all { assert(not(hasCapacity(3))), stutter })
+    .then(selectOwner(3, 2)).then(reserve(3)).then(admitReserved(3)).then(complete(3))
+    .then(all { assert(ownerOf(3) == 2), assert(s.capacityHeld == Set(1)), assert(safety), stutter })
+  run reselectedReservationCancelTest = init.then(selectOwner(3, 2)).then(reserve(3))
+    .then(releaseReservation(3)).then(selectOwner(3, 1))
+    .then(all { assert(s.workHeld.size() == 0), assert(s.capacityHeld.size() == 0), assert(safety), stutter })
+  run reselectedCloseDrainTest = init.then(selectOwner(3, 2)).then(reserve(3)).then(close)
+    .then(releaseReservation(3)).then(join).then(all { assert(safety), stutter })
+  run committedOwnerMutationTest = init.then(selectOwner(3, 2)).then(reserve(3)).then(admitReserved(3))
+    .then(unsafeOwnerMove(3, 1)).then(all { assert(not(safety)), stutter })
+
 }
 module owner_lifecycle_small {
   import owner_lifecycle(JOBS = Set(1, 2, 3), ASSIGNED = Set(1, 2, 3).mapBy(r => if (r == 2) 2 else 1)).*

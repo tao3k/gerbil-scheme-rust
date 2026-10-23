@@ -278,6 +278,24 @@ and typed construction work, followed by one targeted matched comparison.
 
 Private evidence binds the executable, native image, exact measured source files,
 controller outcome, raw samples, failures and cleanup. The archive precedes this
-final report; runtime/build/model sources are checked unchanged at publication.
+final report. Runtime/build/model sources match the measured source apart from
+the preparation module/wake flag feature gates described below.
 No raw logs, binaries, captures, archives or private host paths are committed.
 New-head remote CI remains a distinct gate from these local receipts.
+
+* Feature boundary follow-up
+
+Post-push review found that =service_prepare= lacked the same =tokio-dispatch=
+module condition as the producer/offer types it uses. The isolated-only Clippy
+check then exposed the matching unguarded wake flag as dead code. Guard the
+module, flag and initialization with that same feature condition; check both
+isolated-instances without Tokio and the enabled qualification target. The
+failed isolated-only check is retained; no dead-code suppression is added.
+Both corrected Clippy targets pass: isolated-only in 1.51 seconds and enabled
+qualification in 2.49 seconds.
+The measured benchmark enables instance-dispatch, which enables tokio-dispatch;
+the preparation module is present in both measured and corrected builds. This
+is a conditional-compilation packaging repair, with no change to the measured
+algorithm, runtime code bodies, native image or workload. The frozen capture
+remains attached to its original source identity; no extra workload run or
+new performance claim is produced for these feature conditions.

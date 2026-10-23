@@ -60,6 +60,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::ProgressFair if super::settings::prepared_cycle_ab() => {
+                "same live VMs and typed work; native cycle versus bounded Rust preparation with ready retirement priority"
+            }
             Self::ProgressFair if super::settings::native_cycle_ab() => {
                 "same live VMs and typed work; snapshot versus native batched owner service cycle"
             }
@@ -238,9 +241,8 @@ pub(super) fn run(
     );
     let deliveries_before = peer_deliveries(pool);
     let outcomes_before = offer_outcomes(pool);
-    let completions_before = (super::settings::completion_coalesced_ab()
-        || super::settings::native_cycle_ab())
-    .then(|| super::settings::completions(pool));
+    let completions_before =
+        super::settings::batched_completion_ab().then(|| super::settings::completions(pool));
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -534,8 +536,11 @@ fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Compa
             .unwrap()
             .enabled
     );
+    value["prepared_cycle_ab"] = json!(super::settings::prepared_cycle_ab());
     value["native_cycle_ab"] = json!(super::settings::native_cycle_ab());
-    value["native_service_cycle"] = json!(super::settings::native_cycle_ab() && arm);
+    value["native_service_cycle"] =
+        json!(super::settings::prepared_cycle_ab() || (super::settings::native_cycle_ab() && arm));
+    value["prepared_input_cycle"] = json!(super::settings::prepared_cycle_ab() && arm);
     value["completion_coalesced_ab"] = json!(super::settings::completion_coalesced_ab());
     value["coalesced_completion_handoff"] =
         json!(super::settings::completion_coalesced_ab() && arm);

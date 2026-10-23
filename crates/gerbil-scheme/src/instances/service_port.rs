@@ -60,9 +60,11 @@ pub enum SchemeServiceCompletion {
     CoalescedHandoff,
     /// Batch native take, independently clear result slots, and refill between projections.
     NativeCycle,
+    /// Prepare one root-free Rust input while retiring ready results; construct afterward.
+    PreparedCycle,
 }
 impl InstanceDispatcher {
-    /// Configure an idle fixed owner (v7 handoff, v8 coalesced, v9 native cycle).
+    /// Configure an idle fixed owner (v7 handoff, v8 coalesced, v9 cycle, v10 preparation).
     /// Scheme retains result graphs until projection; Rust never moves native tasks.
     /// # Errors
     /// Closed/unsupported service, non-idle work, or invalid native receipt.
@@ -87,6 +89,7 @@ impl InstanceDispatcher {
             }
             if wake.service_version.load(Ordering::Acquire)
                 < match policy {
+                    SchemeServiceCompletion::PreparedCycle => 10,
                     SchemeServiceCompletion::NativeCycle => 9,
                     SchemeServiceCompletion::CoalescedHandoff => 8,
                     _ => 7,
@@ -103,9 +106,10 @@ impl InstanceDispatcher {
             SchemeServiceCompletion::FairHandoff => 1,
             SchemeServiceCompletion::CoalescedHandoff => 2,
             SchemeServiceCompletion::NativeCycle => 3,
+            SchemeServiceCompletion::PreparedCycle => 4,
         };
         self.submit_control_on(owner, move |session| {
-            if mode == 3 && session.image.native.result_slot_take.is_none() {
+            if mode >= 3 && session.image.native.result_slot_take.is_none() {
                 return Err(InstanceError::InvalidConfig(
                     "native result slot ABI unavailable",
                 ));
@@ -116,7 +120,8 @@ impl InstanceDispatcher {
                     "native completion handoff receipt",
                 ));
             }
-            wake.native_cycle.store(mode == 3, Ordering::Release);
+            wake.native_cycle.store(mode >= 3, Ordering::Release);
+            wake.prepared_cycle.store(mode == 4, Ordering::Release);
             Ok(())
         })
     }
@@ -153,7 +158,7 @@ impl InstanceDispatcher {
 impl SchemeCompletionProgress {
     fn parse(values: &[i64]) -> Result<Self, InstanceError> {
         let [
-            mode @ 0..=3,
+            mode @ 0..=4,
             epoch @ 0..=i64::MAX,
             token @ -1..=i64::MAX,
             claimed @ 0..=65536,
@@ -181,7 +186,8 @@ impl SchemeCompletionProgress {
                 0 => SchemeServiceCompletion::Snapshot,
                 1 => SchemeServiceCompletion::FairHandoff,
                 2 => SchemeServiceCompletion::CoalescedHandoff,
-                _ => SchemeServiceCompletion::NativeCycle,
+                3 => SchemeServiceCompletion::NativeCycle,
+                _ => SchemeServiceCompletion::PreparedCycle,
             },
             epoch: u64::try_from(*epoch)
                 .map_err(|_| InstanceError::InvalidConfig("negative completion epoch"))?,

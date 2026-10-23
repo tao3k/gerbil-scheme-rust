@@ -23,6 +23,12 @@ pub(super) enum ProducerStep {
     Service(super::Request),
 }
 pub(super) trait Producer: Send {
+    // Preparation may reserve existing credits and move owned Rust input only.
+    // Synchronous native producers deliberately have no preparation hook.
+    fn prepare(&mut self) -> Option<super::service_prepare::Prepared> {
+        None
+    }
+
     fn step(&mut self, image: &Image) -> ProducerStep;
     fn deadline(&self) -> Option<Instant>;
     fn retirement_refill_budget(&self) -> usize {

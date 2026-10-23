@@ -33,6 +33,7 @@ pub(super) struct Wake {
     pub service_version: AtomicUsize,
     #[cfg(feature = "tokio-dispatch")]
     pub native_cycle: AtomicBool,
+    pub prepared_cycle: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
     pub feed_limit: AtomicUsize,
     #[cfg(feature = "tokio-dispatch")]
@@ -100,6 +101,7 @@ impl Wake {
                 feed_limit: AtomicUsize::new(1),
                 #[cfg(feature = "tokio-dispatch")]
                 native_cycle: AtomicBool::new(false),
+                prepared_cycle: AtomicBool::new(false),
                 #[cfg(feature = "tokio-dispatch")]
                 progress: super::service_progress::Progress::default(),
                 #[cfg(feature = "tokio-dispatch")]

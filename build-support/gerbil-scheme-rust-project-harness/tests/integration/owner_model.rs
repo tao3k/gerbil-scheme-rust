@@ -306,7 +306,7 @@ fn owner_completion_scenarios_and_control() {
             "--main",
             domain,
             "--match",
-            "(completion|coalesced|nativeCycle).*Test",
+            "(completion|coalesced|nativeCycle|preparedCycle).*Test",
             "--seed",
             "1",
         ]);
@@ -339,29 +339,43 @@ fn owner_completion_scenarios_and_control() {
         );
     }
     native_cycle_scenarios(source);
+    for domain in ["service_completion_small", "service_completion_wide"] {
+        prepared_cycle_control(source, domain);
+    }
+}
+fn prepared_cycle_control(source: &str, domain: &str) {
+    mutation_counterexample(
+        source,
+        domain,
+        "preparedCycleHeldStart",
+        "preparedCycleOvertakeMutationStep",
+        "sharedSafety",
+    );
 }
 fn native_cycle_scenarios(source: &str) {
     for domain in ["service_completion_small", "service_completion_wide"] {
-        success(&[
-            "run",
-            source,
-            "--main",
-            domain,
-            "--init",
-            "nativeCycleStart",
-            "--step",
-            "sharedStep",
-            "--invariant",
-            "sharedSafety",
-            "--seed",
-            "42",
-            "--max-samples",
-            "1000",
-            "--max-steps",
-            "64",
-            "--verbosity",
-            "1",
-        ]);
+        for init in ["nativeCycleStart", "preparedCycleStart"] {
+            success(&[
+                "run",
+                source,
+                "--main",
+                domain,
+                "--init",
+                init,
+                "--step",
+                "sharedStep",
+                "--invariant",
+                "sharedSafety",
+                "--seed",
+                "42",
+                "--max-samples",
+                "1000",
+                "--max-steps",
+                "64",
+                "--verbosity",
+                "1",
+            ]);
+        }
         mutation_counterexample(
             source,
             domain,

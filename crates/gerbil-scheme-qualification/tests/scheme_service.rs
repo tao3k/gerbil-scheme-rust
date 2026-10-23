@@ -13,6 +13,8 @@ mod os_attribution;
 mod os_attribution_tests;
 #[path = "scheme_service/pool_stream.rs"]
 mod pool_stream;
+#[path = "scheme_service/prepared.rs"]
+mod prepared;
 #[path = "scheme_service/priority.rs"]
 mod priority;
 #[path = "scheme_service/reselection.rs"]
@@ -499,4 +501,5 @@ fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Send
         .unwrap();
     priority::contract(runtime, progress);
     native_cycle::contract(runtime, progress);
+    prepared::contract(runtime, progress);
 }

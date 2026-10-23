@@ -67,7 +67,10 @@ impl InstanceDispatcher {
     /// Actor-affine or dependent requests must use ordinary owner-pinned APIs.
     /// Cancel/expiry/close rejects unadmitted work; committed entries retain roots and
     /// credits through projection. Commitment is the final capacity/owner/close
-    /// fence, before construction; cancellation racing after it cannot retract
+    /// fence, before construction. `PreparedCycle` may hold one Rust input and its
+    /// reserved credits before that fence; it rechecks cancellation/deadline/close
+    /// after ready-result retirement and creates no Scheme roots in preparation.
+    /// Cancellation racing after the final fence cannot retract
     /// that entry. Registration stays occupied until all accepted work drains.
     /// # Errors
     /// Invalid counts/work/affinity, missing native service/work budget, exhausted

@@ -92,7 +92,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=9)
+        || !matches!(initialized[1], 1..=10)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -153,6 +153,7 @@ struct Pump<'a> {
     completed: Option<ReadyToken<'a>>,
     retirement_drain: Vec<DeferredCredits>,
     deferred: Option<Request>,
+    prepared: Option<super::service_prepare::Prepared>,
     producer: Option<Box<dyn super::batch_stream_runner::Producer>>,
     wake: &'a Wake,
 }
@@ -348,6 +349,9 @@ impl Pump<'_> {
         {
             return Ok(());
         }
+        if self.wake.prepared_cycle.load(Ordering::Acquire) {
+            return self.prepare_refill(requests);
+        }
         let request = self.next_request(requests);
         if let Some(request) = request {
             if matches!(&request.work, Work::Control(_)) {
@@ -359,6 +363,37 @@ impl Pump<'_> {
             self.claim_offer()?;
         }
         Ok(())
+    }
+    fn prepare_refill(&mut self, requests: &mpsc::Receiver<Request>) -> Result<(), InstanceError> {
+        // Ordinary owner callbacks may run; fresh Scheme construction cannot
+        // overtake any remaining slot in this harvested snapshot. Preserve FIFO.
+        if let Some(request) = self.next_request(requests) {
+            if matches!(&request.work, Work::Service(_) | Work::Control(_)) {
+                self.deferred = Some(request);
+            } else {
+                self.receive(request)?;
+            }
+        }
+        if self.prepared.is_none() && self.deferred.is_none() {
+            self.prepared = observed(
+                self.image,
+                self.wake,
+                super::SchemeServicePhase::Supply,
+                || self.producer.as_mut().and_then(|p| p.prepare()),
+            );
+        }
+        // Offers remain in their existing revocable port: no claim/entry fence,
+        // active credit or native work credit is consumed during preparation.
+        Ok(())
+    }
+    fn enter_prepared(&mut self) -> Result<bool, InstanceError> {
+        let Some(prepared) = self.prepared.take() else {
+            return Ok(false);
+        };
+        if let Some(request) = prepared.enter(self.wake) {
+            self.receive(request)?;
+        }
+        Ok(true)
     }
     fn refill_retired(&mut self) -> Result<bool, InstanceError> {
         use super::batch_stream_runner::ProducerStep;
@@ -501,6 +536,7 @@ impl Pump<'_> {
             let incoming = self.next_request(requests);
             let feed_limit = wake.feed_limit.load(Ordering::Acquire);
             if feed_limit > 1
+                && !wake.prepared_cycle.load(Ordering::Acquire)
                 && incoming
                     .as_ref()
                     .is_some_and(|request| matches!(&request.work, Work::Service(_)))
@@ -522,6 +558,9 @@ impl Pump<'_> {
             self.collect(requests)?;
             if let Some(request) = self.next_request(requests) {
                 self.receive(request)?;
+                continue;
+            }
+            if self.enter_prepared()? {
                 continue;
             }
             // A separate bulk slot must not overtake ordinary queued short or
@@ -606,6 +645,7 @@ pub(super) fn run(
         completed: None,
         retirement_drain: Vec::new(),
         deferred: None,
+        prepared: None,
         producer: None,
         wake,
     };
@@ -615,6 +655,9 @@ pub(super) fn run(
     // Close joins every accepted Scheme child and clears results before any
     // SDK cleanup. Failure marks non-quiescence, keeping the heap/code quarantined.
     close(image);
+    if let Some(prepared) = pump.prepared.take() {
+        prepared.reject(result.clone().err().unwrap_or(InstanceError::Closed));
+    }
     if let Err(error) = result {
         if let Some(Request {
             work: Work::Service(job),

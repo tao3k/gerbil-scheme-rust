@@ -33,3 +33,9 @@ fn malformed_or_conflicting_custody_is_rejected() {
         );
     }
 }
+
+#[test]
+fn prepared_cycle_metadata() {
+    let actual = SchemeCompletionProgress::parse(&[4, 2, 1, 1, 1, 1, 2, 1]).unwrap();
+    assert_eq!(actual.policy, SchemeServiceCompletion::PreparedCycle);
+}

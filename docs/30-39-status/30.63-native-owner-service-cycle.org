@@ -295,3 +295,9 @@ source-archive 7c432e3f94a942c7ae29a57a491255833a092a0595441b74fd6a2186e7873270
 Execution, model, build and benchmark sources match the frozen archive. Only
 status reports finish after timing. New-head remote CI is separate from these
 local semantic/native receipts and the unpromoted performance result.
+
+* Follow-up
+
+[[file:30.64-bounded-input-preparation.org][30.64]] separates bounded root-free Rust preparation from native entry and
+compares NativeCycle with PreparedCycle. The CPU throughput/tail negative result
+is retained; neither experiment changes the default.

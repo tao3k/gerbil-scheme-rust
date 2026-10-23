@@ -143,6 +143,22 @@ impl Producer for ServiceProducer {
         self.requests.reject(&error);
     }
     fn step(&mut self, _: &Image) -> ProducerStep {
+        self.next()
+    }
+    fn prepare(&mut self) -> Option<super::service_prepare::Prepared> {
+        match self.next() {
+            ProducerStep::Service(request) => Some(super::service_prepare::Prepared::new(
+                request,
+                Arc::clone(&self.accepting),
+                Arc::clone(&self.cancelled),
+                self.deadline,
+            )),
+            _ => None,
+        }
+    }
+}
+impl ServiceProducer {
+    fn next(&mut self) -> ProducerStep {
         if !self.open() {
             self.reject(InstanceError::Closed);
         } else if self.cancelled.load(Ordering::Acquire) {
@@ -185,8 +201,9 @@ impl Producer for ServiceProducer {
                 }
                 Poll::Ready(Ok(pair)) => pair,
             };
-        // The same admission/close fence used by producers commits exactly one
-        // entry. A racing close after this check drains it as accepted Scheme work.
+        // Acquire one owned Rust input under the existing producer lifecycle fence.
+        // PreparedCycle repeats these checks after retiring the ready snapshot,
+        // immediately before native construction; no graph is created here.
         let error = if !self.open() {
             Some(InstanceError::Closed)
         } else if self.cancelled.load(Ordering::Acquire) {

@@ -251,6 +251,7 @@ fn validate_arguments(args: &[String]) {
         || s == "--completion-fair-ab"
         || s == "--completion-coalesced-ab"
         || s == "--native-cycle-ab"
+        || s == "--prepared-cycle-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"
@@ -272,7 +273,8 @@ fn validate_arguments(args: &[String]) {
         [
             settings::completion_fair_ab(),
             settings::completion_coalesced_ab(),
-            settings::native_cycle_ab()
+            settings::native_cycle_ab(),
+            settings::prepared_cycle_ab()
         ]
         .into_iter()
         .filter(|&x| x)

@@ -306,7 +306,7 @@ fn owner_completion_scenarios_and_control() {
             "--main",
             domain,
             "--match",
-            "(completion|coalesced|nativeCycle|preparedCycle).*Test",
+            "(completion|coalesced|nativeCycle|preparedCycle|pipeline).*Test",
             "--seed",
             "1",
         ]);
@@ -347,6 +347,13 @@ fn prepared_cycle_control(source: &str, domain: &str) {
     mutation_counterexample(
         source,
         domain,
+        "pipelineCreditMutationStart",
+        "pipelineCreditMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
         "preparedCycleHeldStart",
         "preparedCycleOvertakeMutationStep",
         "sharedSafety",
@@ -354,7 +361,11 @@ fn prepared_cycle_control(source: &str, domain: &str) {
 }
 fn native_cycle_scenarios(source: &str) {
     for domain in ["service_completion_small", "service_completion_wide"] {
-        for init in ["nativeCycleStart", "preparedCycleStart"] {
+        for init in [
+            "nativeCycleStart",
+            "preparedCycleStart",
+            "pipelineCycleStart",
+        ] {
             success(&[
                 "run",
                 source,

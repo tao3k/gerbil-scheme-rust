@@ -198,7 +198,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
 
 pub(super) fn policy(owner: usize) -> gerbil_scheme::instances::SchemeServiceCompletion {
     if owner == 1 {
-        gerbil_scheme::instances::SchemeServiceCompletion::NativeCycle
+        gerbil_scheme::instances::SchemeServiceCompletion::PipelineCycle
     } else {
         gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff
     }

@@ -60,6 +60,7 @@
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-numeric-span gerbil-rs-numeric-create gerbil-rs-numeric-size gerbil-rs-numeric-copy
    gerbil-rs-numeric-value gerbil-rs-numeric-batch-create
+   gerbil-rs-numeric-batch-value gerbil-rs-numeric-header-at gerbil-rs-numeric-service-create
    gerbil-rs-numeric-row-pointer gerbil-rs-numeric-row-size))
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-identifier-create gerbil-rs-identifiers-prepare gerbil-rs-identifiers-copy
@@ -183,24 +184,43 @@ END-C
  (define gerbil-rs-numeric-row-size
    (c-lambda ((pointer unsigned-int64) unsigned-int64) unsigned-int64
      "___return(___arg1[___arg2]);"))
+ (define (gerbil-rs-numeric-batch-value kind pointers sizes count quantum)
+   (and (<= 0 kind 8) (<= 1 count 256) (<= 0 quantum 256)
+     (let ((input (make-vector count)))
+       (let loop ((index 0))
+         (if (= index count)
+           (vector (make-s64vector 1 quantum) input)
+           (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-value
+                          kind
+                          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-pointer pointers index)
+                          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-size sizes index))))
+             (and value (begin (vector-set! input index value) (loop (+ index 1))))))))))
  (c-define (gerbil-rs-numeric-batch-create kind pointers sizes count quantum)
    (int32 (pointer void) (pointer unsigned-int64) unsigned-int64 unsigned-int64) int64
    "gerbil_scheme_rust_numeric_batch_create" "extern"
    (with-exception-catcher (lambda (_exception) 0)
      (lambda ()
-       (if (not (and (<= 0 kind 8) (<= 1 count 256) (<= 0 quantum 256))) 0
-         (let ((input (make-vector count)))
+       (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-batch-value kind pointers sizes count quantum)))
+         (if value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! value) 0)))))
+ (define gerbil-rs-numeric-header-at
+   (c-lambda ((pointer int64) unsigned-int64) int64 "___return(___arg1[___arg2]);"))
+ (c-define (gerbil-rs-numeric-service-create kind pointers sizes count quantum header length)
+   (int32 (pointer void) (pointer unsigned-int64) unsigned-int64 unsigned-int64 (pointer int64) unsigned-int64) int64
+   "gerbil_scheme_rust_numeric_service_create" "extern"
+   (with-exception-catcher (lambda (_exception) 0)
+     (lambda ()
+       (if (not (<= 2 length 4)) 0
+         (let ((operation (make-s64vector length)))
            (let loop ((index 0))
-             (if (= index count)
-               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-                 (vector (make-s64vector 1 quantum) input))
-               (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-value
-                              kind
-                              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-pointer pointers index)
-                              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-size sizes index))))
-                 (if value
-                   (begin (vector-set! input index value) (loop (+ index 1)))
-                   0)))))))))
+             (when (< index length)
+               (s64vector-set! operation index (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at header index))
+               (loop (+ index 1))))
+           (if (not (and (= (s64vector-ref operation 0) 1) (>= (s64vector-ref operation 1) -1)
+                         (or (< length 3) (<= 0 (s64vector-ref operation 2) 1))
+                         (or (< length 4) (positive? (s64vector-ref operation 3))))) 0
+             (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-batch-value kind pointers sizes count quantum)))
+               (if value
+                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! (vector operation value)) 0))))))))
  (c-define (gerbil-rs-numeric-size root index kind) (int64 int64 int32) int64
    "gerbil_scheme_rust_numeric_size" "extern"
    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span

@@ -118,6 +118,7 @@ const OWNER_EXPORTS: &[&str] = &[
     "gerbil_owner_json_call",
     "gerbil_scheme_rust_numeric_create",
     "gerbil_scheme_rust_numeric_batch_create",
+    "gerbil_scheme_rust_numeric_service_create",
     "gerbil_scheme_rust_numeric_size",
     "gerbil_scheme_rust_numeric_copy",
     "gerbil_scheme_rust_scalar_object",

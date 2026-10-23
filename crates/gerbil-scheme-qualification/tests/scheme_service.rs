@@ -11,6 +11,8 @@ mod native_cycle;
 mod os_attribution;
 #[path = "scheme_service/os_attribution.rs"]
 mod os_attribution_tests;
+#[path = "scheme_service/pipeline.rs"]
+mod pipeline;
 #[path = "scheme_service/pool_stream.rs"]
 mod pool_stream;
 #[path = "scheme_service/prepared.rs"]
@@ -502,4 +504,5 @@ fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Send
     priority::contract(runtime, progress);
     native_cycle::contract(runtime, progress);
     prepared::contract(runtime, progress);
+    pipeline::contract(runtime, progress);
 }

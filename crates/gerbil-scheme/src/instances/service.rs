@@ -43,6 +43,18 @@ pub trait SchemeServiceRequest: Send + 'static {
         &mut self,
         session: &NativeSession<'vm>,
     ) -> Result<NativeRoot<'vm>, InstanceError>;
+    /// Construct the complete service input. Override only with equivalent
+    /// payload semantics; generic Scheme requests retain their normal constructor.
+    /// # Errors
+    /// Native construction, input bounds or application validation failure.
+    fn construct_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &super::SchemeServiceInput,
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
+        let value = self.construct(session)?;
+        input.wrap(session, &value)
+    }
     /// Project a completed Scheme value before releasing its temporary root.
     /// # Errors
     /// Native type/bounds or application result-validation failures.
@@ -68,6 +80,13 @@ impl<T: NumericElement + Send + 'static> SchemeServiceRequest for NumericService
         session: &NativeSession<'vm>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         session.numeric_batch_envelope(&self.items, self.yield_every)
+    }
+    fn construct_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &super::SchemeServiceInput,
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
+        input.numeric_batch(session, &self.items, self.yield_every)
     }
     fn project(
         self,
@@ -187,15 +206,19 @@ pub(super) enum Retirement {
     Returned,
     Drain(Vec<tokio::sync::OwnedSemaphorePermit>),
 }
+pub(super) struct Start {
+    pub input: usize,
+    pub output: usize,
+    pub progress: bool,
+    pub fused: bool,
+}
 pub(super) trait Job: Send {
     fn entry_trace(&self) -> Option<&Arc<super::SchemeServiceEntryTrace>>;
     fn short_service(&self) -> bool;
     fn start(
         &mut self,
         image: &super::image::Image,
-        input: usize,
-        output: usize,
-        progress: bool,
+        start: &super::service::Start,
     ) -> Result<JobId, InstanceError>;
     fn may_have_entered(&self) -> bool;
     fn complete(
@@ -228,20 +251,17 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
     fn start(
         &mut self,
         image: &super::image::Image,
-        input: usize,
-        output: usize,
-        progress: bool,
+        start: &super::service::Start,
     ) -> Result<JobId, InstanceError> {
         let mut result = None;
         super::native_dispatch::run_native(
             image,
-            input,
-            output,
+            start.input,
+            start.output,
             |session| {
                 if let Some(trace) = &self.trace {
                     trace.mark(super::SchemeServiceEntryPhase::Construct);
                 }
-                let value = self.message.construct(session)?;
                 let lane = self.lane.map_or(-1, |lane| i64::try_from(lane.0).unwrap());
                 let header = [
                     1,
@@ -251,14 +271,15 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
                         InstanceError::InvalidConfig("native progress unit overflow")
                     })?,
                 ];
-                let length = if progress {
+                let length = if start.progress {
                     4
                 } else if self.short {
                     3
                 } else {
                     2
                 };
-                let input = envelope(session, &header[..length], Some(&value))?;
+                let context = super::SchemeServiceInput::new(header, length, start.fused);
+                let input = self.message.construct_service(session, &context)?;
                 self.submitted = true;
                 let token = call(session, &input)?;
                 let ids = session.copy_numeric::<i64>(&token)?;
@@ -315,7 +336,7 @@ pub(super) fn command<'vm>(
     call(session, &envelope)
 }
 
-fn envelope<'vm>(
+pub(super) fn envelope<'vm>(
     session: &NativeSession<'vm>,
     header: &[i64],
     payload: Option<&NativeRoot<'_>>,

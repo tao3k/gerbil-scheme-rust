@@ -4,6 +4,9 @@ use gerbil_scheme_sys::GerbilScalarProjection;
 use std::ffi::c_void;
 
 type NumericBatchCreate = unsafe extern "C" fn(i32, *const *const u8, *const u64, u64, u64) -> i64;
+#[cfg(feature = "tokio-dispatch")]
+type NumericServiceCreate =
+    unsafe extern "C" fn(i32, *const *const u8, *const u64, u64, u64, *const i64, u64) -> i64;
 #[derive(Debug)]
 pub(super) struct NativeApi {
     pub setup_diagnostic: Option<unsafe extern "C" fn(*mut i64) -> i32>,
@@ -11,6 +14,8 @@ pub(super) struct NativeApi {
     pub objects: Option<super::object_api::ObjectApi>,
     pub numeric_create: unsafe extern "C" fn(i32, *const u8, u64) -> i64,
     pub numeric_batch_create: Option<NumericBatchCreate>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub numeric_service_create: Option<NumericServiceCreate>,
     pub numeric_size: unsafe extern "C" fn(i64, i64, i32) -> i64,
     pub numeric_copy: unsafe extern "C" fn(i64, i64, i32, *mut u8, u64, u64) -> i64,
     pub scalar_create: unsafe extern "C" fn(i32, i64, f64) -> i64,
@@ -70,6 +75,8 @@ impl NativeApi {
                 numeric_batch_create: symbol(handle, c"gerbil_scheme_rust_numeric_batch_create")
                     .ok()
                     .map(|address| std::mem::transmute::<*mut c_void, NumericBatchCreate>(address)),
+                #[cfg(feature = "tokio-dispatch")]
+                numeric_service_create: numeric_service(handle),
                 numeric_create: std::mem::transmute::<
                     *mut c_void,
                     unsafe extern "C" fn(i32, *const u8, u64) -> i64,
@@ -133,5 +140,15 @@ impl NativeApi {
                 ),
             })
         }
+    }
+}
+
+#[cfg(feature = "tokio-dispatch")]
+unsafe fn numeric_service(handle: *mut c_void) -> Option<NumericServiceCreate> {
+    // SAFETY: same audited image-local symbol contract as NativeApi::load.
+    unsafe {
+        symbol(handle, c"gerbil_scheme_rust_numeric_service_create")
+            .ok()
+            .map(|address| std::mem::transmute::<*mut c_void, NumericServiceCreate>(address))
     }
 }

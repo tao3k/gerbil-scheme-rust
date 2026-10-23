@@ -57,7 +57,13 @@ pub(super) fn configure(
         super::measurement::idle(pool);
         for owner in 0..4 {
             use gerbil_scheme::instances::SchemeServiceCompletion;
-            let policy = if prepared_cycle_ab() {
+            let policy = if pipeline_cycle_ab() {
+                if arm {
+                    SchemeServiceCompletion::PipelineCycle
+                } else {
+                    SchemeServiceCompletion::PreparedCycle
+                }
+            } else if prepared_cycle_ab() {
                 if arm {
                     SchemeServiceCompletion::PreparedCycle
                 } else {
@@ -179,7 +185,11 @@ pub(super) fn completion_coalesced_ab() -> bool {
     std::env::args().any(|arg| arg == "--completion-coalesced-ab")
 }
 pub(super) fn completion_ab() -> bool {
-    completion_fair_ab() || completion_coalesced_ab() || native_cycle_ab() || prepared_cycle_ab()
+    completion_fair_ab()
+        || completion_coalesced_ab()
+        || native_cycle_ab()
+        || prepared_cycle_ab()
+        || pipeline_cycle_ab()
 }
 /// Outside the timing interval; actual native counters and quiescence checks.
 pub(super) fn completions(pool: &InstancePool) -> [u64; 3] {
@@ -216,5 +226,9 @@ pub(super) fn prepared_cycle_ab() -> bool {
 }
 
 pub(super) fn batched_completion_ab() -> bool {
-    completion_coalesced_ab() || native_cycle_ab() || prepared_cycle_ab()
+    completion_coalesced_ab() || native_cycle_ab() || prepared_cycle_ab() || pipeline_cycle_ab()
+}
+
+pub(super) fn pipeline_cycle_ab() -> bool {
+    std::env::args().any(|arg| arg == "--pipeline-cycle-ab")
 }

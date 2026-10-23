@@ -64,9 +64,13 @@ pub use service_contract::SchemeServiceExecution;
 #[cfg(feature = "tokio-dispatch")]
 mod service_cycle;
 #[cfg(feature = "tokio-dispatch")]
+mod service_input;
+#[cfg(feature = "tokio-dispatch")]
 mod service_loop;
 #[cfg(feature = "tokio-dispatch")]
 mod service_prepare;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_input::SchemeServiceInput;
 mod service_wake;
 #[cfg(feature = "tokio-dispatch")]
 pub use service::{NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest};

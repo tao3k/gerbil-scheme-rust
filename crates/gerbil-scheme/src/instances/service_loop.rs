@@ -92,7 +92,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=10)
+        || !matches!(initialized[1], 1..=11)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -182,9 +182,12 @@ impl Pump<'_> {
                 || {
                     job.start(
                         self.image,
-                        self.input,
-                        self.output,
-                        self.wake.progress.enabled.load(Ordering::Acquire),
+                        &service::Start {
+                            input: self.input,
+                            output: self.output,
+                            progress: self.wake.progress.enabled.load(Ordering::Acquire),
+                            fused: self.wake.pipeline_cycle.load(Ordering::Acquire),
+                        },
                     )
                 },
             ) {
@@ -275,6 +278,7 @@ impl Pump<'_> {
                 .as_ref()
                 .map_or(0, |p| p.retirement_refill_budget()),
         );
+        let retired_count = completed.len();
         for (index, raw) in completed.into_iter().enumerate() {
             let id = JobId(raw);
             let pending = self.jobs.remove(&id).ok_or(InstanceError::InvalidConfig(
@@ -322,6 +326,9 @@ impl Pump<'_> {
         // Only readiness custody is deferred. Every result's native permit has
         // already returned before any later arbitrary projector ran.
         self.completed = token;
+        if self.wake.pipeline_cycle.load(Ordering::Acquire) {
+            self.pipeline_fill(requests, retired_count)?;
+        }
         // Retire the full snapshot before constructing new payloads. Refill is
         // bounded by both released results and the registered active budget.
         for _ in 0..if cycle { 0 } else { refill } {
@@ -384,6 +391,44 @@ impl Pump<'_> {
         }
         // Offers remain in their existing revocable port: no claim/entry fence,
         // active credit or native work credit is consumed during preparation.
+        Ok(())
+    }
+    fn pipeline_fill(
+        &mut self,
+        requests: &mpsc::Receiver<Request>,
+        retired: usize,
+    ) -> Result<(), InstanceError> {
+        // Each opportunity comes from an independently retired result. Never
+        // harvest recursively, wait for input, or hold more than one prepared input.
+        for _ in 0..retired {
+            if self.wake.closed.load(Ordering::Acquire) {
+                break;
+            }
+            if let Some(request) = self.next_request(requests) {
+                self.deferred = Some(request);
+                break; // preserve ordinary FIFO/control and short routing precedence
+            }
+            if let Some(request) = self
+                .wake
+                .short_pool
+                .get()
+                .and_then(super::short_pool::Port::claim)
+            {
+                self.deferred = Some(request);
+                break;
+            }
+            if self.prepared.is_none() {
+                self.prepared = observed(
+                    self.image,
+                    self.wake,
+                    super::SchemeServicePhase::Supply,
+                    || self.producer.as_mut().and_then(|p| p.prepare()),
+                );
+            }
+            if !self.enter_prepared()? && !self.claim_offer()? {
+                break;
+            }
+        }
         Ok(())
     }
     fn enter_prepared(&mut self) -> Result<bool, InstanceError> {

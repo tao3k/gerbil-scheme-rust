@@ -14,6 +14,18 @@ struct Message {
     reached: mpsc::Sender<()>,
     release: Arc<std::sync::Mutex<mpsc::Receiver<()>>>,
 }
+impl Message {
+    fn mark_construction(&self) {
+        if self.last {
+            assert_eq!(
+                self.projected.load(Ordering::Acquire),
+                3,
+                "ready results precede new native construction"
+            );
+        }
+        self.constructed.fetch_add(1, Ordering::AcqRel);
+    }
+}
 impl SchemeServiceRequest for Message {
     type Output = Vec<Vec<i64>>;
     fn work_units(&self) -> usize {
@@ -23,15 +35,16 @@ impl SchemeServiceRequest for Message {
         &mut self,
         session: &NativeSession<'vm>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
-        if self.last {
-            assert_eq!(
-                self.projected.load(Ordering::Acquire),
-                3,
-                "ready results precede new native construction"
-            );
-        }
-        self.constructed.fetch_add(1, Ordering::AcqRel);
+        self.mark_construction();
         self.value.construct(session)
+    }
+    fn construct_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &gerbil_scheme::instances::SchemeServiceInput,
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
+        self.mark_construction();
+        self.value.construct_service(session, input)
     }
     fn project(
         self,
@@ -54,26 +67,36 @@ impl SchemeServiceRequest for Message {
     }
 }
 pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>) {
-    for action in ["continue", "cancel", "expire", "close"] {
-        progress
-            .send(match action {
-                "continue" => "PHASE prepared continue",
-                "cancel" => "PHASE prepared cancel",
-                "expire" => "PHASE prepared expire",
-                _ => "PHASE prepared close",
-            })
-            .unwrap();
-        run(runtime, progress, action);
+    for policy in [
+        SchemeServiceCompletion::PreparedCycle,
+        SchemeServiceCompletion::PipelineCycle,
+    ] {
+        for action in ["continue", "cancel", "expire", "close"] {
+            progress
+                .send(match action {
+                    "continue" => "PHASE prepared continue",
+                    "cancel" => "PHASE prepared cancel",
+                    "expire" => "PHASE prepared expire",
+                    _ => "PHASE prepared close",
+                })
+                .unwrap();
+            run(runtime, progress, action, policy);
+        }
     }
 }
-fn run(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>, action: &str) {
+fn run(
+    runtime: &tokio::runtime::Runtime,
+    progress: &mpsc::Sender<&'static str>,
+    action: &str,
+    policy: SchemeServiceCompletion,
+) {
     let mut cfg = config();
     cfg.owners = 1;
     let mut pool = InstancePool::start(&descriptor(false), cfg).unwrap();
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
     dispatch
-        .configure_scheme_service_completion_on(0, SchemeServiceCompletion::PreparedCycle)
+        .configure_scheme_service_completion_on(0, policy)
         .unwrap()
         .wait(GATE)
         .unwrap();

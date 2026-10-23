@@ -261,14 +261,9 @@ impl Job for StreamJob {
     fn start(
         &mut self,
         image: &Image,
-        input: usize,
-        output: usize,
-        progress: bool,
+        start: &super::service::Start,
     ) -> Result<JobId, InstanceError> {
-        self.job
-            .as_mut()
-            .unwrap()
-            .start(image, input, output, progress)
+        self.job.as_mut().unwrap().start(image, start)
     }
     fn complete(
         self: Box<Self>,

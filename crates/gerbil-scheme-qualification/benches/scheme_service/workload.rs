@@ -93,6 +93,26 @@ impl SchemeServiceRequest for Orders {
         self.constructed = Some(Instant::now());
         Ok(value)
     }
+    fn construct_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &gerbil_scheme::instances::SchemeServiceInput,
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
+        if self.short_mode.native() {
+            let value = self.construct(session)?;
+            return input.wrap(session, &value);
+        }
+        self.entered = Some(Instant::now());
+        if self.short_mode.counters() {
+            (self.construction_before, self.snapshot_ns[0]) = super::observation::counter(session);
+        }
+        let value = input.numeric_batch(session, &self.request.items, self.request.yield_every)?;
+        if self.short_mode.counters() {
+            (self.construction_after, self.snapshot_ns[1]) = super::observation::counter(session);
+        }
+        self.constructed = Some(Instant::now());
+        Ok(value)
+    }
     fn project(
         mut self,
         session: &NativeSession<'_>,

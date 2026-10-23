@@ -49,6 +49,8 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         SchemeServiceCompletion::FairHandoff,
         SchemeServiceCompletion::CoalescedHandoff,
         SchemeServiceCompletion::NativeCycle,
+        SchemeServiceCompletion::PreparedCycle,
+        SchemeServiceCompletion::PipelineCycle,
     ] {
         contract_policy(runtime, progress, policy);
     }

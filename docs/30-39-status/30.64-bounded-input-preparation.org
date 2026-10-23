@@ -299,3 +299,9 @@ is a conditional-compilation packaging repair, with no change to the measured
 algorithm, runtime code bodies, native image or workload. The frozen capture
 remains attached to its original source identity; no extra workload run or
 new performance claim is produced for these feature conditions.
+
+* Follow-up
+
+[[file:30.65-native-service-construction-pipeline.org][30.65]] retains this negative result and compares PreparedCycle with fused
+native service-input construction and retirement-bounded refill. CPU gains and
+mixed-throughput regression are both retained; defaults stay unchanged.

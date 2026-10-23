@@ -38,4 +38,7 @@ fn malformed_or_conflicting_custody_is_rejected() {
 fn prepared_cycle_metadata() {
     let actual = SchemeCompletionProgress::parse(&[4, 2, 1, 1, 1, 1, 2, 1]).unwrap();
     assert_eq!(actual.policy, SchemeServiceCompletion::PreparedCycle);
+    let pipeline = SchemeCompletionProgress::parse(&[5, 2, 1, 1, 1, 1, 2, 1]).unwrap();
+    assert_eq!(pipeline.policy, SchemeServiceCompletion::PipelineCycle);
+    assert!(SchemeCompletionProgress::parse(&[6, 0, -1, 0, 0, 0, 0, 0]).is_err());
 }

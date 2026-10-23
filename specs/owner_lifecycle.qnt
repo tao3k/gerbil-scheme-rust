@@ -903,7 +903,7 @@ module service_sharing {
     blocked: Set[int], gc: Set[int], paused: Set[int], age: int -> int, overtakes: int -> int,
     feedUsed: int -> int, feedMax: int,
     split: bool, eager: bool, reserved: bool, fairCpu: bool, bounded: bool,
-    completionFair: bool, coalesced: bool, nativeCycle: bool, readyFirst: bool, prepared: Set[int], harvested: Set[int], batchSlots: Set[int],
+    completionFair: bool, coalesced: bool, nativeCycle: bool, readyFirst: bool, pipeline: bool, fillBudget: int -> int, prepared: Set[int], harvested: Set[int], batchSlots: Set[int],
     completionEpoch: int -> int, tokenEpoch: int -> int, completionDue: Set[int],
     entryGap: bool, cpuGap: bool, resourceViolation: bool
   }
@@ -923,7 +923,7 @@ module service_sharing {
       blocked: Set(), gc: Set(), paused: Set(), age: JOBS.mapBy(_ => 0), overtakes: JOBS.mapBy(_ => 0),
       feedUsed: owners.mapBy(_ => 0), feedMax: feed0,
       split: split0, eager: eager0, reserved: reserved0, fairCpu: cpu0, bounded: bounded0,
-      completionFair: false, coalesced: false, nativeCycle: false, readyFirst: false, prepared: Set(), harvested: Set(), batchSlots: Set(),
+      completionFair: false, coalesced: false, nativeCycle: false, readyFirst: false, pipeline: false, fillBudget: owners.mapBy(_ => 0), prepared: Set(), harvested: Set(), batchSlots: Set(),
       completionEpoch: owners.mapBy(_ => 0), tokenEpoch: owners.mapBy(_ => -1), completionDue: Set(),
       entryGap: false, cpuGap: false, resourceViolation: false }
   }
@@ -1079,13 +1079,21 @@ module service_sharing {
     q.batchSlots.filter(r => ASSIGNED.get(r) == owner).size() == 0
   action enableNativeCycle = all { life::s.accepted.size() == 0, life::stutter, q' = { ...q, nativeCycle: true } }
   action enablePreparedCycle = all { q.nativeCycle, life::stutter, q' = { ...q, readyFirst: true } }
+  action enablePipeline = all { q.readyFirst, life::stutter, q' = { ...q, pipeline: true } }
+  action endFill(owner: int): bool = all { life::stutter, q' = { ...q, fillBudget: q.fillBudget.set(owner, 0) } }
+  action unsafeFillWithoutRetirement(r: int): bool = all {
+    q.pipeline, q.prepared.contains(r), q.fillBudget.get(ASSIGNED.get(r)) == 0,
+    life::admitReserved(r), q' = { ...q, prepared: q.prepared.exclude(Set(r)), host: q.host.append(r), resourceViolation: true }
+  }
   action prepareInput(r: int): bool = all {
     q.readyFirst, q.prepared.filter(j => ASSIGNED.get(j) == ASSIGNED.get(r)).size() == 0,
     life::reserve(r), q' = { ...q, prepared: q.prepared.union(Set(r)) }
   }
   action enterPrepared(r: int): bool = all {
     q.prepared.contains(r), q.batchSlots.filter(j => ASSIGNED.get(j) == ASSIGNED.get(r)).size() == 0,
-    life::admitReserved(r), q' = { ...q, prepared: q.prepared.exclude(Set(r)), host: q.host.append(r) }
+    not(q.pipeline) or q.fillBudget.get(ASSIGNED.get(r)) > 0,
+    life::admitReserved(r), q' = { ...q, prepared: q.prepared.exclude(Set(r)), host: q.host.append(r),
+      fillBudget: if (q.pipeline) q.fillBudget.set(ASSIGNED.get(r), q.fillBudget.get(ASSIGNED.get(r)) - 1) else q.fillBudget }
   }
   action discardPrepared(r: int): bool = all {
     q.prepared.contains(r), life::releaseReservation(r), q' = { ...q, prepared: q.prepared.exclude(Set(r)) }
@@ -1106,10 +1114,11 @@ module service_sharing {
   action project(r: int): bool = all {
     life::s.serviceReady.contains(r), not(q.completionFair) or q.harvested.contains(r),
     not(q.nativeCycle) or q.batchSlots.contains(r),
-    life::complete(r), q' = { ...q, harvested: q.harvested.exclude(Set(r)), batchSlots: q.batchSlots.exclude(Set(r)) }
+    life::complete(r), q' = { ...q, harvested: q.harvested.exclude(Set(r)), batchSlots: q.batchSlots.exclude(Set(r)),
+      fillBudget: if (q.pipeline and life::s.phase == "open") q.fillBudget.set(ASSIGNED.get(r), q.fillBudget.get(ASSIGNED.get(r)) + 1) else q.fillBudget }
   }
   action abandon(r: int): bool = all { life::observeTimeout(r), q' = q }
-  action resourceClose = all { life::close, q' = q }
+  action resourceClose = all { life::close, q' = { ...q, fillBudget: owners.mapBy(_ => 0) } }
   action resourceJoin = all {
     q.gc.size() == 0, q.paused.size() == 0, workers.forall(w => q.jobs.get(w) == 0),
     not(q.coalesced) or (q.completionDue.size() == 0 and owners.forall(o => q.tokenEpoch.get(o) == -1)),
@@ -1124,6 +1133,8 @@ module service_sharing {
     workers.forall(w => implies(q.jobs.get(w) != 0, ASSIGNED.get(q.jobs.get(w)) == workerOwner(w))),
     owners.forall(o => implies(q.cpu.get(o) != 0, workerOwner(q.cpu.get(o)) == o and runnable(q.cpu.get(o)))),
     q.blocked.forall(w => q.jobs.get(w) != 0), q.gc.subseteq(owners), q.paused.subseteq(owners),
+    owners.forall(o => q.fillBudget.get(o) >= 0 and
+      q.fillBudget.get(o) <= life::s.completed.filter(r => ASSIGNED.get(r) == o).size()),
     q.prepared.subseteq(life::s.reserved), q.prepared.intersect(rootedJobs).size() == 0,
     owners.forall(o => q.prepared.filter(r => ASSIGNED.get(r) == o).size() <= 1),
     q.harvested.subseteq(readyJobs), q.batchSlots.subseteq(q.harvested), q.batchSlots.subseteq(rootedJobs),
@@ -1164,7 +1175,7 @@ module service_sharing {
     nondet r = JOBS.oneOf()
     nondet w = workers.oneOf()
     nondet owner = owners.oneOf()
-    any { prepareInput(r), enterPrepared(r), discardPrepared(r), offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
+    any { endFill(owner), prepareInput(r), enterPrepared(r), discardPrepared(r), offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
       block(w), wakeTask(w), gcStart(owner), gcFinish(owner), osPause(owner), osResume(owner), delayTick,
       harvest(owner, Set(r)), batchTransfer(owner), completionAck(owner, q.tokenEpoch.get(owner)), project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
   }
@@ -1219,6 +1230,18 @@ module service_sharing_cases {
     .then(offer(2)).then(boundary(1)).then(feed(2)).then(assignWorker(2, 2)).then(acquireCpu(2)).then(compute(2))
   action nativeCycleTransferredStart = nativeCycleBulkReadyStart.then(harvest(1, Set(1, 2))).then(batchTransfer(1))
   action preparedCycleStart = nativeCycleStart.then(enablePreparedCycle)
+  action pipelineCycleStart = preparedCycleStart.then(enablePipeline)
+  action pipelineHeldStart = nativeCycleTransferredStart.then(enablePreparedCycle).then(enablePipeline)
+  action pipelineCreditMutationStart = pipelineCycleStart.then(prepareInput(3))
+  action pipelineCreditMutationStep = { nondet r = CASE_JOBS.oneOf(); any { sharedStep, unsafeFillWithoutRetirement(r) } }
+  action pipelineRefillProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(project(2))
+    .then(completionAck(1,1)).then(enterPrepared(3)).then(prepareInput(4)).then(enterPrepared(4))
+    .then(all { assert(q.fillBudget.get(1) == 0), assert(q.prepared.size() == 0), assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  action pipelineCancelCloseProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(resourceClose)
+    .then(discardPrepared(3)).then(project(2)).then(completionAck(1,1)).then(resourceJoin)
+    .then(all { assert(q.fillBudget.get(1) == 0), assert(resourceSafety), resourceStutter })
+  action pipelineCreditMutationProof = pipelineCreditMutationStart.then(unsafeFillWithoutRetirement(3))
+    .then(all { assert(not(resourceSafety)), resourceStutter })
   action preparedCycleHeldStart = nativeCycleTransferredStart.then(enablePreparedCycle).then(prepareInput(3))
   action preparedCycleOvertakeMutationStep = { nondet r = CASE_JOBS.oneOf(); any { sharedStep, unsafePreparedOvertake(r) } }
   action nativeCycleEarlyCreditMutationStep = { nondet r = CASE_JOBS.oneOf(); any { sharedStep, unsafeCreditBeforeSlotClear(r) } }
@@ -1325,6 +1348,9 @@ module service_completion_small {
   import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4), CASE_ASSIGNED = Set(1, 2, 3, 4).mapBy(_ => 1)).*
   run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
   // These witnesses require two bulk jobs assigned to one owner.
+  run pipelineRefillTest = pipelineRefillProof
+  run pipelineCancelCloseTest = pipelineCancelCloseProof
+  run pipelineCreditMutationTest = pipelineCreditMutationProof
   run preparedCycleReadyPriorityTest = preparedCycleReadyPriorityProof
   run preparedCycleCancelCloseTest = preparedCycleCancelCloseProof
   run preparedCycleOvertakeMutationTest = preparedCycleOvertakeMutationProof
@@ -1337,6 +1363,9 @@ module service_completion_wide {
   import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4, 5), CASE_ASSIGNED = Set(1, 2, 3, 4, 5).mapBy(r => if (r == 5) 2 else 1)).*
   run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
   // These witnesses require two bulk jobs assigned to one owner.
+  run pipelineRefillTest = pipelineRefillProof
+  run pipelineCancelCloseTest = pipelineCancelCloseProof
+  run pipelineCreditMutationTest = pipelineCreditMutationProof
   run preparedCycleReadyPriorityTest = preparedCycleReadyPriorityProof
   run preparedCycleCancelCloseTest = preparedCycleCancelCloseProof
   run preparedCycleOvertakeMutationTest = preparedCycleOvertakeMutationProof

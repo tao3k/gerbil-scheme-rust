@@ -11,6 +11,8 @@ pub(super) fn execute(image: &Image, request: Request, maximum_reply: usize) {
     request.started.store(true, Ordering::Release);
     match request.work {
         Work::Native(job) => job(image),
+        #[cfg(feature = "tokio-dispatch")]
+        Work::Control(job) => job(image),
         Work::Bytes { bytes, response } => {
             let value = if crate::instance_backend::images_ready() {
                 image

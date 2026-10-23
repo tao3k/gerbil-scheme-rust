@@ -9,6 +9,8 @@ fn older_owned_token_can_coexist_with_newer_ready_epoch() {
         (actual.epoch, actual.claimed, actual.ready_queued),
         (2, 1, 1)
     );
+    let cycle = SchemeCompletionProgress::parse(&[3, 2, 1, 1, 1, 1, 2, 1]).unwrap();
+    assert_eq!(cycle.policy, SchemeServiceCompletion::NativeCycle);
     let idle = SchemeCompletionProgress::parse(&[2, 2, -1, 0, 0, 2, 3, 0]).unwrap();
     assert!(!idle.token_owned && !idle.opportunity_pending);
 }

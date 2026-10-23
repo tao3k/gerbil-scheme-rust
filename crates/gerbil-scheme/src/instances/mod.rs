@@ -62,6 +62,8 @@ mod service_contract;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_contract::SchemeServiceExecution;
 #[cfg(feature = "tokio-dispatch")]
+mod service_cycle;
+#[cfg(feature = "tokio-dispatch")]
 mod service_loop;
 mod service_wake;
 #[cfg(feature = "tokio-dispatch")]

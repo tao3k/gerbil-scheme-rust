@@ -119,6 +119,9 @@
            (s64vector 0))
          (begin (thread-yield!) (loop)))))
     ((19) (orders-completion-carry-contract))
+    ((20) (orders-endpoint (vector (s64vector 15))))
+    ;; Failure control: close the service with an outstanding native snapshot.
+    ((21) (orders-endpoint (vector (s64vector 5))))
     ((10) (thread-yield!) (##gc) (s64vector orders-latch-blocked))
     (else (error "invalid service observation"))))
 (begin-foreign

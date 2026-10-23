@@ -30,6 +30,8 @@
       ((5) (s64vector native-before native-after))
       ((6) (instance-green-call value))
       ((7) (instance-orders-close!))
+      ((8) (##gc) #f)
+      ((9) (##gc) #!void)
       (else (##gc) value))))
 (begin-foreign
  (c-define (owner-native-call root) (int64) int64 "gerbil_owner_native_call" "extern"

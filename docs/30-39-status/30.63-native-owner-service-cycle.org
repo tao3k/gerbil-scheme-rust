@@ -1,0 +1,297 @@
+#+title: Native owner service cycle and independent result retirement
+#+options: toc:nil num:nil
+
+* Decision and scope
+
+[[file:30.62-completion-opportunity-custody.org][30.62]] rejects identity coalescence as a sufficient performance improvement.
+The remaining structural boundary is per-result Scheme command construction,
+rooted take and projection, followed by a separate owner admission/supply turn.
+This change implements that boundary in the actual library, with one native
+batch transfer and an input opportunity after each individual retirement.
+
+The explicit experimental policy is =SchemeServiceCompletion::NativeCycle=.
+Snapshot remains the default. Rust distributes work across fixed owners; each
+owner retains a complete Gerbil/Gambit runtime. Scheme selects Actor/green-thread
+execution, owns continuations, exceptions and GC, and keeps affine state local.
+This does not translate Scheme to Rust, replace its scheduler, or introduce SMP.
+
+#+begin_src rust
+dispatcher
+    .configure_scheme_service_completion_on(owner, SchemeServiceCompletion::NativeCycle)?
+    .wait(timeout)?;
+// Existing SchemeServiceRequest construction, projection and submission stay intact.
+#+end_src
+
+* One ownership protocol across transfer, projection and supply
+
+| State | Native graph authority | Credit authority | Next operation |
+|-------+------------------------+------------------+----------------|
+| Accepted/executing | Existing Scheme job and worker | Existing native/stream permit | Scheme execution |
+| Ready/harvested | Owner epoch and claimed IDs | Same permits remain held | One native batch transfer |
+| Transferred | Owner-local batch slots | Same permits remain held | Move one slot into a strong NativeRoot |
+| Projecting | That result's NativeRoot; other slots remain rooted | This result's permits remain held | Existing typed application projection |
+| Retired | Result root dropped; its slot is empty | Return that result's permits | One bounded admission/supply opportunity |
+| Snapshot consumed | Empty batch metadata and linear ready token | No deferred completed-result credits | Piggyback epoch acknowledgement |
+
+ABI v9 adds completion mode 3 and command 16. It acknowledges any old consumed
+token, harvests readiness using the existing epoch/carry protocol, and takes the
+harvested results in one Scheme call. The returned native packet contains the
+identity/progress receipt, per-result success/error statuses and native result
+slots. This is a typed Scheme object packet, not JSON or serialized application
+data. Exceptions are caught per result and use the same bounded formatter as
+rooted calls. A failed result does not discard successful peers.
+
+The batch is =[remaining, slots]=, with each slot =[occupied?, payload]=.
+Occupancy is independent of payload, preserving false and void as real values.
+The optional compiled slot-move ABI checks the owner/root/index and occupancy,
+creates a strong root first, then clears the slot and decrements the count.
+The native job record's value/failure fields are detached on take, preventing a
+yielded worker's old bookkeeping record from retaining a consumed payload.
+
+Rust holds the batch through a non-Send, non-Clone owner guard in the existing
+retained arena. Each typed job moves exactly one slot and runs the unchanged
+SchemeServiceRequest::project API. Its NativeRoot is dropped and root balance is
+checked before its native capacity permit returns. One ready result cannot hold
+an earlier result's graph through the batch container after that slot is cleared.
+Explicit application retention/shared references retain their existing semantics.
+
+After every retirement, the owner admits at most one eligible queued request,
+short-pool input, existing producer step or revocable pool offer. It reuses the
+current producer and capacity protocols. There is no recursive collect while the
+ready token is owned, no timer, larger window or tuned yield threshold. New work
+can enter Scheme before a later arbitrary projector runs; Scheme chooses its
+execution. Arbitrary synchronous application projection/foreign code remains
+non-preemptible on its owner.
+
+Native service controls have an explicit Work::Control type, distinct from
+ordinary native application work. A FIFO head is retained when collect temporarily
+removes it. Controls defer until the whole snapshot has retired and its token is
+acknowledged; later inbox input cannot overtake that head. Ordinary typed input,
+producer supply and safe native application work can still use retirement
+opportunities. This prevents an idle setter racing a still-owned empty token.
+A real setter queued from the last projector must complete successfully after
+the barrier, rather than fail an incidental non-idle check. The existing model
+also checks the control barrier before/after final projection and acknowledgement.
+
+Acknowledgement cannot consume a live batch. Native idle configuration and
+admission count transferred slots as well as job-table entries. The previous
+fresh carry-epoch and stale/duplicate acknowledgement guards remain intact.
+
+* Root quota, errors, cancellation and close
+
+One internal batch root is tagged in the existing arena, separately from the
+public 65536 application-root quota. There is at most one such root per owner.
+Rollback, explicit release and teardown clear the tag together with the canonical
+arena entry. No parallel root registry is introduced. The batch does not silently
+reduce the application's usable retained-root capacity.
+
+Application reply bounds do not truncate/replace Scheme exception diagnostics:
+the existing 4096-character/16384-byte diagnostic bound is independent of an
+application's output quota. Older native images reject NativeCycle before changing
+policy if ABI v9 or the slot-move symbol is unavailable. Production and qualification
+image export lists include that actual symbol. The qualification image exposes
+the existing full object ABI so void is validated through native type inspection.
+The intra-package runtime dependency uses Gerbil's relative module import.
+
+Unentered cancellation returns only unentered Rust admission. Entered observer
+timeout/cancellation does not discard Scheme execution, its result graph or the
+native permit. Delivery abandonment preserves normal per-result cleanup and
+rolls back only roots created by that application projector, not the older batch.
+
+A native slot-transfer failure is distinct from a failed application projector.
+The former cannot return native or stream credit while native ownership is
+unresolved. Those credits move to the owner's drain custody; close joins/clears
+native work before the credits drop. Ordinary Scheme exceptions and Rust projection
+panics after a successful slot move still retire individually and preserve peers.
+
+Closing owners claim no new pool supply from an inter-projection opportunity.
+Accepted work drains; native close clears any remaining batch slots before joins,
+the service-owned reference protects the graph if Rust's batch arena guard has
+already unwound. Drain credits drop after native close. Failed native quiescence retains the existing quarantine rules. No graph, continuation or root
+becomes transferable to another OS owner.
+
+* Existing model and actual native controls
+
+The existing service_sharing lifecycle refinement adds NativeCycle and logical
+owner-held batch slots. Transfer preserves existing roots and capacity; individual
+project clears one logical slot and uses the original complete/credit transition.
+A positive witness admits a short request between two bulk retirements while a
+peer root remains protected, then drains timeout/close. A required mutation returns
+credit before clearing its slot and must violate the original root/capacity safety.
+This extends the existing model rather than creating another scheduler model.
+
+The initial focused gate passes in 86.96 seconds (85.26 seconds in the test).
+The final expanded gate including the control barrier passes in 226.46 seconds
+(225.95 seconds in the test), alongside other build activity; these durations
+are verification receipts, not performance comparisons.
+Original completion, coalesced/carry and native-cycle scenarios remain included;
+sampling uses 1000 x 64 traces for each of the original, coalesced and native-cycle
+initializations in their two existing finite instantiations. Required bounded-class,
+stale-ack and early-credit mutations produce counterexamples. Two bounded epochs
+and finite samples do not establish unbounded liveness, wall-clock fairness, OS
+scheduling attribution or performance.
+
+Actual native controls cover:
+
+- Three real latched Actor batches made ready together and transferred as one batch.
+- Strong root count 2 during each projector (batch plus current result), count 1
+  between projectors, and native pending-slot counts decreasing independently.
+- A queued real owner request runs after the first retirement and before later
+  projectors, observing that the prior native root and slot/work credits returned.
+- GC while two results remain protected; full 65536 application retained roots
+  coexist with the internal batch root (65537), reject the next application root,
+  release back to the single batch root, and preserve remaining result contents.
+- False/void payloads through the actual native type API; Scheme diagnostics under
+  an eight-byte application reply quota.
+- Real service closure invalidates an outstanding snapshot: failed slot transfer
+  skips later projectors and follows clean owner drain with no roots/credit leak.
+- Existing four-VM conversion, GC, multishot continuation, Scheme exception, Rust
+  construction/projection panic, cancellation, timeout and close tests use the
+  new policy on actual owners. Default and previous completion controls remain.
+
+These are separate from the historical unattributed exit-70 watchdog. Its exact
+failed native image/last progress was not retained, so current model/native passes
+cannot explain it. The dedicated failure control still proves the unchanged
+five-second deadline, raw failure evidence and phase messages that do not renew
+progress. No new timeout is widened.
+
+* Reproducible directed comparison
+
+#+begin_src text
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-scheme-service-benchmark --progress-fair-ab --fixed-short-selective --native-cycle-ab
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_completion_scenarios_and_control --locked -- --ignored --exact --nocapture
+#+end_src
+
+Both arms use the same four live VMs and native image, two Tokio workers,
+ProgressFair bulk/Selective short routing, slots 4/work 32, active bulk 3,
+batch 8, quantum/feed/Scheme budget 1, NativePort and observation Off. Each sample
+uses 8192 real orders plus 64 short probes. Five AB/BA blocks give 40 samples.
+Snapshot is the control; NativeCycle is the candidate. No executor/load matrix is
+expanded. Gerbil 1cfb032/Gambit ea114fc and dynamic C module O2 are retained; this
+does not claim a rebuilt O2 SDK or an exclusive host. Other tasks are untouched.
+
+Final native/build receipts, frozen artifact identities, matched results and
+exact-head CI follow. Raw logs, source archives,
+binaries and all earlier failures remain private outside Git. Report completion
+is separate from execution-source capture; runtime defaults remain unchanged.
+
+* Final receipts and matched negative result
+
+At base 4268058, PR #18 run 39880339296 completes all six supported checks
+successfully; the unsupported SMP job remains skipped. This confirms the previous
+FD/compilation fixes at that head, not acceptance of this new change. The original
+unattributed watchdog remains open.
+
+Final local Clippy passes with warnings denied (12.04 seconds). The native test
+binary passes 3/3 in 21.10 seconds, including the full-root-quota, control-barrier,
+slot-failure and real service-cycle fixtures; the dedicated watchdog passes 1/1
+in 5.01 seconds. Native gate wall time includes compilation/package-cache locking
+(90.93 seconds). The final O2 release build passes in 25.75 seconds. Two typed
+metadata controls pass; that parser remains unchanged at capture.
+
+The first native attempt correctly rejects a missing slot-move image export;
+both production and qualification export lists are repaired. An observer fixture
+initially supplies an envelope where its existing API expects a raw numeric
+vector, then is corrected. Earlier compiler/import, parameter-shape and lint
+failures are retained. A consumed-job cleanup edit's extra closing parenthesis
+is retained as a compile failure, not a watchdog failure. These are not erased
+by later native/model passes.
+
+One frozen A/B capture exits 0 in 6.31 seconds without controller timeout.
+All 40 samples satisfy matched workload and actual native-policy checks, four
+participating owners, offer publications = withdrawals + entries, 1088 results
+per candidate sample and unique epoch/harvest conservation. Native readback
+verifies zero owned token, claimed slot, queued ready result or pending
+opportunity after each sample. Final cleanup joins all four owners, reports
+roots [0,0,0,0], quiesces the services and removes image files. This is not a
+claim that every SDK mapping unloads or a long-run RSS test.
+
+Throughput uses median bulk completion duration. Latency p99 pools ten samples
+per arm/load; owner finish spread is the maximum sample spread. All ratios below
+are within this one capture.
+
+| Load | Metric | Snapshot | NativeCycle | Change |
+|------+--------+----------+-------------+--------|
+| cpu | Orders/s | 297551.884 | 296191.845 | -0.46% |
+| cpu | Native short p99 (us) | 518.375 | 607.625 | +17.22% |
+| cpu | Scheduled short p99 (us) | 5397.167 | 17199.875 | +218.68% |
+| cpu | Short admission p99 (us) | 1249.084 | 1768.667 | +41.60% |
+| cpu | Short pending p99 (us) | 452.875 | 571.417 | +26.18% |
+| cpu | Short construction p99 (us) | 24.083 | 23.291 | -3.29% |
+| cpu | Short projection p99 (us) | 3.792 | 3.000 | -20.89% |
+| cpu | Bulk service p99 (us) | 1314.583 | 1347.000 | +2.47% |
+| cpu | Bulk pending p99 (us) | 1223.584 | 1314.791 | +7.45% |
+| cpu | Owner finish spread (us) | 720.291 | 488.666 | -32.16% |
+| mixed | Orders/s | 65020.431 | 63461.958 | -2.40% |
+| mixed | Native short p99 (us) | 474.375 | 584.792 | +23.28% |
+| mixed | Scheduled short p99 (us) | 2032.625 | 2039.292 | +0.33% |
+| mixed | Short admission p99 (us) | 289.750 | 150.083 | -48.20% |
+| mixed | Short pending p99 (us) | 449.000 | 564.167 | +25.65% |
+| mixed | Short construction p99 (us) | 16.083 | 23.667 | +47.16% |
+| mixed | Short projection p99 (us) | 3.500 | 3.291 | -5.97% |
+| mixed | Bulk service p99 (us) | 2139.541 | 2328.208 | +8.82% |
+| mixed | Bulk pending p99 (us) | 2065.000 | 2276.125 | +10.22% |
+| mixed | Owner finish spread (us) | 1299.375 | 1580.208 | +21.61% |
+
+Candidate CPU transfer groups 10880 results in 4121 batches (2.64 per token);
+mixed groups 10880 in 4741 (2.29 per token). Snapshot's zero coalescence counter
+is not evidence of zero native calls. Minimum owner progress fractions at first
+owner completion are 0.986301/0.986900 for CPU and 0.988048/0.987805 for mixed.
+Raw completed-order minima there are 1728/1744 and 1976/1944, without filtering
+owners or normalizing away unequal totals. Overlapping short probes are at least
+47/50 of 64 for CPU and 64/64 for mixed. Actor-peer minima are 0/1 for CPU and
+0/0 for mixed; no universal Actor starvation-freedom claim follows.
+
+Decision: NOT PROMOTED. CPU throughput -0.46% is not an improvement; mixed
+throughput -2.40%, short p99 +17.22%/+23.28% and mixed owner finish spread +21.61%
+fail joint performance admission. CPU finish spread improves -32.16%, but that
+is not a uniform fairness result. CPU utilization itself is not labeled a
+regression; these are workload throughput/tail measurements. Defaults stay intact.
+
+* Next structural boundary from this evidence
+
+Mixed admission p99 improves from 289.750 to 150.083 us while short pending p99
+rises from 449.000 to 564.167 us and end-to-end native short p99 rises from
+474.375 to 584.792 us. Earlier admission is not sufficient for earlier completion.
+Do not subtract pooled quantiles to manufacture an execution or OS-wait duration.
+
+The captured stage intervals provide a further bounded comparison:
+
+| Load | Stage | Snapshot p50/p99 (us) | NativeCycle p50/p99 (us) |
+|------+-------+-----------------------+-------------------------|
+| cpu | Bulk construction | 2.333/404.917 | 2.375/420.459 |
+| cpu | Bulk application projection/retirement | 5.417/20.458 | 5.750/23.667 |
+| mixed | Bulk construction | 2.500/444.750 | 2.500/448.250 |
+| mixed | Bulk application projection/retirement | 5.708/24.542 | 6.042/22.667 |
+
+There is no broad projection-stage improvement: bulk medians rise in both loads,
+while only mixed bulk projection p99 falls. Construction has sub-3-us medians
+and roughly 400-450-us p99 intervals in both arms. Those wall intervals can include
+allocation, GC and scheduling; they do not identify which caused a particular
+spike. The capture contains no same-spike OS attribution evidence.
+
+The code now makes the remaining ordering conflict explicit: immediately after
+one result retires, native construction/entry of fresh input can occur before
+other already-ready results project. Correct root/credit return and fewer Scheme
+take commands do not by themselves prevent this contention.
+
+The next protocol should separate preparing owned Rust input from entering native
+construction, and define precedence for ready-result retirement versus new bulk
+construction. Reuse existing producers, revocable offers and capacity reservations;
+staged input must stay bounded, cancellable before entry and free of Scheme roots.
+Native batch construction/projection capabilities should preserve the generic
+Scheme request path and full native types. This is the next design/implementation
+boundary, not a claimed root cause or an implemented speedup. No additional matrix,
+unchanged capture or yield-threshold tuning is admitted by this report.
+
+Whole-artifact SHA-256 provenance:
+
+#+begin_src text
+benchmark-binary bee02d7d50bcc3e1236c970f1b5aed9172709374ce0570a18facfd7571165c3c
+native-image ec7c0683be272cf11e4f96094198eabbd87f9109601320bc872c7ff03cf9d281
+source-archive 7c432e3f94a942c7ae29a57a491255833a092a0595441b74fd6a2186e7873270
+#+end_src
+
+Execution, model, build and benchmark sources match the frozen archive. Only
+status reports finish after timing. New-head remote CI is separate from these
+local semantic/native receipts and the unpromoted performance result.

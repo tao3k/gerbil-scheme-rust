@@ -1,6 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(export gerbil-rs-root-string gerbil-rs-root-bytevector
+(export gerbil-rs-exception-message gerbil-rs-result-batch-pending gerbil-rs-clear-result-batch!
+        gerbil-rs-root-string gerbil-rs-root-bytevector
         gerbil-rs-root-object gerbil-rs-rooted-call
         gerbil-rs-abi-version
         gerbil-rs-add-i64
@@ -41,16 +42,16 @@
   (gerbil-rs-rooted-value-store! value))
 ;; A consumed owner-local diagnostic does not retain the exception graph.
 (def gerbil-rs-call-error #f)
+(def (gerbil-rs-exception-message exception)
+  (with-catch (lambda (_) "Scheme exception (formatting failed)")
+    (lambda ()
+      (let (message (call-with-output-string (lambda (port) (display-exception exception port))))
+        (substring message 0 (min 4096 (string-length message)))))))
 (def (gerbil-rs-rooted-call root procedure)
   (set! gerbil-rs-call-error #f)
   (with-catch
     (lambda (exception)
-      (set! gerbil-rs-call-error
-        (with-catch (lambda (_) "Scheme exception (formatting failed)")
-          (lambda ()
-            (let (message (call-with-output-string
-                           (lambda (port) (display-exception exception port))))
-              (substring message 0 (min 4096 (string-length message)))))))
+      (set! gerbil-rs-call-error (gerbil-rs-exception-message exception))
       0)
     (lambda ()
       (let (value (gerbil-rs-rooted-value-ref root))

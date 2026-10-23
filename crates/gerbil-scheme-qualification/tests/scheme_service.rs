@@ -5,6 +5,8 @@ mod budget;
 mod corpus;
 #[path = "scheme_service/deferred.rs"]
 mod deferred;
+#[path = "scheme_service/native_cycle.rs"]
+mod native_cycle;
 #[path = "../benches/scheme_service/os_attribution.rs"]
 mod os_attribution;
 #[path = "scheme_service/os_attribution.rs"]
@@ -442,10 +444,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     budget::configure(&dispatch, &progress);
     for owner in [1, 3] {
         dispatch
-            .configure_scheme_service_completion_on(
-                owner,
-                gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff,
-            )
+            .configure_scheme_service_completion_on(owner, native_cycle::policy(owner))
             .unwrap()
             .wait(GATE)
             .unwrap();
@@ -499,4 +498,5 @@ fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Send
         .send("PHASE single-worker completion contract")
         .unwrap();
     priority::contract(runtime, progress);
+    native_cycle::contract(runtime, progress);
 }

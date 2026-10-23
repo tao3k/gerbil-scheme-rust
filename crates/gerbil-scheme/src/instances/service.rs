@@ -179,6 +179,14 @@ impl InstanceDispatcher {
 /// Opaque owner-local identity; never a Scheme pointer or cross-owner authority.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub(super) struct JobId(pub i64);
+pub(super) struct Completion {
+    pub(super) id: JobId,
+    pub(super) ready: Option<super::service_cycle::ReadyResult>,
+}
+pub(super) enum Retirement {
+    Returned,
+    Drain(Vec<tokio::sync::OwnedSemaphorePermit>),
+}
 pub(super) trait Job: Send {
     fn entry_trace(&self) -> Option<&Arc<super::SchemeServiceEntryTrace>>;
     fn short_service(&self) -> bool;
@@ -193,10 +201,10 @@ pub(super) trait Job: Send {
     fn complete(
         self: Box<Self>,
         image: &super::image::Image,
-        id: JobId,
+        completed: Completion,
         input: usize,
         output: usize,
-    );
+    ) -> Retirement;
     fn fail(self: Box<Self>, error: InstanceError);
 }
 pub(super) struct TypedJob<M: SchemeServiceRequest> {
@@ -269,21 +277,30 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
     fn complete(
         self: Box<Self>,
         image: &super::image::Image,
-        id: JobId,
+        completed: Completion,
         input: usize,
         output: usize,
-    ) {
+    ) -> Retirement {
         let Self { message, send, .. } = *self;
+        let slot_taken = std::cell::Cell::new(completed.ready.is_none());
         super::native_dispatch::run_native(
             image,
             input,
             output,
             |session| {
-                let value = command(session, &[2, id.0], None)?;
+                let value = match completed.ready {
+                    Some(ready) => ready.project(session, &slot_taken)?,
+                    None => command(session, &[2, completed.id.0], None)?,
+                };
                 message.project(session, &value)
             },
             |value| send.send(value).is_ok(),
         );
+        if slot_taken.get() {
+            Retirement::Returned
+        } else {
+            Retirement::Drain(Vec::new())
+        }
     }
     fn fail(self: Box<Self>, error: InstanceError) {
         let _ = self.send.send((Err(error), Instant::now()));

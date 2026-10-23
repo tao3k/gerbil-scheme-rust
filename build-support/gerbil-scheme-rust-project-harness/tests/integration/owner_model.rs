@@ -306,7 +306,7 @@ fn owner_completion_scenarios_and_control() {
             "--main",
             domain,
             "--match",
-            "(completion|coalesced).*Test",
+            "(completion|coalesced|nativeCycle).*Test",
             "--seed",
             "1",
         ]);
@@ -335,6 +335,38 @@ fn owner_completion_scenarios_and_control() {
             domain,
             "completionLateReadyStart",
             "completionStaleAckMutationStep",
+            "sharedSafety",
+        );
+    }
+    native_cycle_scenarios(source);
+}
+fn native_cycle_scenarios(source: &str) {
+    for domain in ["service_completion_small", "service_completion_wide"] {
+        success(&[
+            "run",
+            source,
+            "--main",
+            domain,
+            "--init",
+            "nativeCycleStart",
+            "--step",
+            "sharedStep",
+            "--invariant",
+            "sharedSafety",
+            "--seed",
+            "42",
+            "--max-samples",
+            "1000",
+            "--max-steps",
+            "64",
+            "--verbosity",
+            "1",
+        ]);
+        mutation_counterexample(
+            source,
+            domain,
+            "nativeCycleTransferredStart",
+            "nativeCycleEarlyCreditMutationStep",
             "sharedSafety",
         );
     }

@@ -35,6 +35,14 @@
                          (u8vector-set! kinds index kind)
                          (prepare (+ index 1) next)))))))))))
 
+;; Occupancy is independent of payload: #f and #!void are valid result values.
+;; One owner mutates [remaining, slots]; the count is constant-time admission data.
+(def (gerbil-rs-result-batch-pending batch) (if batch (vector-ref batch 0) 0))
+(def (gerbil-rs-clear-result-batch! batch)
+  (when batch
+    (vector-for-each (lambda (slot) (vector-set! slot 1 #f) (vector-set! slot 0 #f)) (vector-ref batch 1))
+    (vector-set! batch 0 0)))
+
 (begin-foreign
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-root-id-at gerbil-rs-write-root-id gerbil-rs-scalar-copy-c gerbil-rs-object-scalar-raw
@@ -410,3 +418,21 @@ END-C
    "gerbil_scheme_rust_bigint_copy_indexed" "extern"
    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-copy-integer-value
      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value root index) output size)))
+
+
+(begin-foreign
+ (namespace ("gerbil-scheme-rust/scheme/runtime#" gerbil-rs-result-slot-take))
+ (c-define (gerbil-rs-result-slot-take root index) (int64 unsigned-int64) int64
+   "gerbil_scheme_rust_result_slot_take" "extern"
+   (with-exception-catcher (lambda (_) 0)
+     (lambda ()
+       (let ((batch (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
+         (if (and (vector? batch) (= (vector-length batch) 2) (positive? (vector-ref batch 0))
+                  (vector? (vector-ref batch 1)) (< index (vector-length (vector-ref batch 1))))
+           (let ((slot (vector-ref (vector-ref batch 1) index)))
+             (if (and (vector? slot) (= (vector-length slot) 2) (eq? (vector-ref slot 0) #t))
+               (let ((result (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! (vector-ref slot 1))))
+                 (vector-set! slot 1 #f) (vector-set! slot 0 #f)
+                 (vector-set! batch 0 (- (vector-ref batch 0) 1)) result)
+               0))
+           0))))))

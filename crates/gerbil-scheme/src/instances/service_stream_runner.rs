@@ -220,7 +220,7 @@ impl Producer for ServiceProducer {
         } else {
             request.work = Work::Service(Box::new(StreamJob {
                 job: Some(job),
-                _active: active,
+                active,
             }));
             request.capacity = Some(capacity);
         }
@@ -229,7 +229,7 @@ impl Producer for ServiceProducer {
 }
 struct StreamJob {
     job: Option<Box<dyn Job>>,
-    _active: OwnedSemaphorePermit,
+    active: OwnedSemaphorePermit,
 }
 impl Job for StreamJob {
     fn entry_trace(&self) -> Option<&Arc<super::SchemeServiceEntryTrace>> {
@@ -253,8 +253,21 @@ impl Job for StreamJob {
             .unwrap()
             .start(image, input, output, progress)
     }
-    fn complete(mut self: Box<Self>, image: &Image, id: JobId, input: usize, output: usize) {
-        self.job.take().unwrap().complete(image, id, input, output);
+    fn complete(
+        self: Box<Self>,
+        image: &Image,
+        completed: super::service::Completion,
+        input: usize,
+        output: usize,
+    ) -> super::service::Retirement {
+        let Self { job, active } = *self;
+        match job.unwrap().complete(image, completed, input, output) {
+            super::service::Retirement::Returned => super::service::Retirement::Returned,
+            super::service::Retirement::Drain(mut held) => {
+                held.push(active);
+                super::service::Retirement::Drain(held)
+            }
+        }
     }
     fn fail(mut self: Box<Self>, error: InstanceError) {
         self.job.take().unwrap().fail(error);

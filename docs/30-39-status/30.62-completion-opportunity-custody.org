@@ -297,3 +297,9 @@ source-archive 9b00d097cc24c507094233b03ffc5d231a91565695ed9fd83388f2e95de1f655
 Execution, benchmark, model, build and workflow sources match the frozen archive.
 Only status reports are completed after timing. The native image is separately
 identified because changing Scheme can leave the Rust executable hash unchanged.
+
+* Native service-cycle follow-up
+
+[[file:30.63-native-owner-service-cycle.org][30.63]] implements batched native take, independently releasable result slots and
+retirement-linked owner admission/supply. The negative captures above remain
+unchanged and are not reclassified by that later protocol.

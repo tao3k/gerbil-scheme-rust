@@ -39,7 +39,7 @@ impl InstanceDispatcher {
             Arc::clone(wake)
         };
         let direct = matches!(mode, SchemeServiceWake::NativePort);
-        self.submit_native_on(owner, move |session| {
+        self.submit_control_on(owner, move |session| {
             let value = super::service::command(session, &[10, i64::from(direct)], None)?;
             if session.copy_numeric::<i64>(&value)? != [i64::from(direct)] {
                 return Err(InstanceError::InvalidConfig("native port wake receipt"));
@@ -58,9 +58,11 @@ pub enum SchemeServiceCompletion {
     FairHandoff,
     /// Coalesce ready graphs behind a consumed owner token; retain per-result credit return.
     CoalescedHandoff,
+    /// Batch native take, independently clear result slots, and refill between projections.
+    NativeCycle,
 }
 impl InstanceDispatcher {
-    /// Configure completion handoff on an idle fixed owner (v7; coalesced requires v8).
+    /// Configure an idle fixed owner (v7 handoff, v8 coalesced, v9 native cycle).
     /// Scheme retains result graphs until projection; Rust never moves native tasks.
     /// # Errors
     /// Closed/unsupported service, non-idle work, or invalid native receipt.
@@ -69,7 +71,7 @@ impl InstanceDispatcher {
         owner: usize,
         policy: SchemeServiceCompletion,
     ) -> Result<InstanceTicket<()>, InstanceError> {
-        {
+        let wake = {
             let senders = self
                 .admission
                 .senders
@@ -84,29 +86,37 @@ impl InstanceDispatcher {
                 return Err(InstanceError::Closed);
             }
             if wake.service_version.load(Ordering::Acquire)
-                < if policy == SchemeServiceCompletion::CoalescedHandoff {
-                    8
-                } else {
-                    7
+                < match policy {
+                    SchemeServiceCompletion::NativeCycle => 9,
+                    SchemeServiceCompletion::CoalescedHandoff => 8,
+                    _ => 7,
                 }
             {
                 return Err(InstanceError::InvalidConfig(
                     "Scheme service lacks completion handoff",
                 ));
             }
-        }
+            std::sync::Arc::clone(wake)
+        };
         let mode = match policy {
             SchemeServiceCompletion::Snapshot => 0,
             SchemeServiceCompletion::FairHandoff => 1,
             SchemeServiceCompletion::CoalescedHandoff => 2,
+            SchemeServiceCompletion::NativeCycle => 3,
         };
-        self.submit_native_on(owner, move |session| {
+        self.submit_control_on(owner, move |session| {
+            if mode == 3 && session.image.native.result_slot_take.is_none() {
+                return Err(InstanceError::InvalidConfig(
+                    "native result slot ABI unavailable",
+                ));
+            }
             let value = super::service::command(session, &[13, mode], None)?;
             if session.copy_numeric::<i64>(&value)? != [mode] {
                 return Err(InstanceError::InvalidConfig(
                     "native completion handoff receipt",
                 ));
             }
+            wake.native_cycle.store(mode == 3, Ordering::Release);
             Ok(())
         })
     }
@@ -132,7 +142,7 @@ impl InstanceDispatcher {
         &self,
         owner: usize,
     ) -> Result<InstanceTicket<SchemeCompletionProgress>, InstanceError> {
-        self.submit_native_on(owner, |session| {
+        self.submit_control_on(owner, |session| {
             let value = super::service::command(session, &[15], None)?;
             let values = session.copy_numeric::<i64>(&value)?;
             SchemeCompletionProgress::parse(&values)
@@ -143,7 +153,7 @@ impl InstanceDispatcher {
 impl SchemeCompletionProgress {
     fn parse(values: &[i64]) -> Result<Self, InstanceError> {
         let [
-            mode @ 0..=2,
+            mode @ 0..=3,
             epoch @ 0..=i64::MAX,
             token @ -1..=i64::MAX,
             claimed @ 0..=65536,
@@ -159,8 +169,8 @@ impl SchemeCompletionProgress {
             || claimed + ready > 65536
             || (*claimed > 0 && *token < 0)
             || (*token >= 0 && *due != 1)
-            || (*mode != 2 && (*token >= 0 || *claimed > 0 || *due != 0))
-            || (*mode == 2 && *ready > 0 && *due != 1)
+            || (*mode < 2 && (*token >= 0 || *claimed > 0 || *due != 0))
+            || (*mode >= 2 && *ready > 0 && *due != 1)
         {
             return Err(InstanceError::InvalidConfig(
                 "inconsistent completion custody",
@@ -170,7 +180,8 @@ impl SchemeCompletionProgress {
             policy: match mode {
                 0 => SchemeServiceCompletion::Snapshot,
                 1 => SchemeServiceCompletion::FairHandoff,
-                _ => SchemeServiceCompletion::CoalescedHandoff,
+                2 => SchemeServiceCompletion::CoalescedHandoff,
+                _ => SchemeServiceCompletion::NativeCycle,
             },
             epoch: u64::try_from(*epoch)
                 .map_err(|_| InstanceError::InvalidConfig("negative completion epoch"))?,

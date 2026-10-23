@@ -36,7 +36,7 @@ impl InstanceDispatcher {
         owner: usize,
     ) -> Result<InstanceTicket<SchemeServiceSettings>, InstanceError> {
         self.require_service_settings(owner)?;
-        self.submit_native_on(owner, |session| {
+        self.submit_control_on(owner, |session| {
             let value = super::service::command(session, &[11], None)?;
             SchemeServiceSettings::parse(&session.copy_numeric::<i64>(&value)?)
         })

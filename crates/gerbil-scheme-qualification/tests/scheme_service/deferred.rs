@@ -212,7 +212,7 @@ fn policy_contract(
         dispatch
             .configure_scheme_service_completion_on(
                 owner,
-                gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff,
+                gerbil_scheme::instances::SchemeServiceCompletion::NativeCycle,
             )
             .unwrap()
             .wait(GATE)

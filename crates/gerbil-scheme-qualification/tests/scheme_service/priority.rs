@@ -48,6 +48,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         SchemeServiceCompletion::Snapshot,
         SchemeServiceCompletion::FairHandoff,
         SchemeServiceCompletion::CoalescedHandoff,
+        SchemeServiceCompletion::NativeCycle,
     ] {
         contract_policy(runtime, progress, policy);
     }
@@ -99,7 +100,11 @@ fn contract_policy(
         .unwrap();
     assert_eq!(custody.policy, policy);
     assert!(!custody.token_owned && !custody.opportunity_pending && custody.claimed == 0);
-    if policy == gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff {
+    if matches!(
+        policy,
+        gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff
+            | gerbil_scheme::instances::SchemeServiceCompletion::NativeCycle
+    ) {
         assert!(custody.batches > 0 && custody.results >= custody.batches);
     }
     let shutdown = pool.shutdown(GATE);
@@ -185,7 +190,11 @@ async fn order_fixture(
     );
     assert!(
         observed[1]
-            <= if policy == gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff {
+            <= if matches!(
+                policy,
+                gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff
+                    | gerbil_scheme::instances::SchemeServiceCompletion::NativeCycle
+            ) {
                 5
             } else {
                 2

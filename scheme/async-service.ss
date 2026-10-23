@@ -1,11 +1,13 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Scheme owns tasks, continuations, native waits and wake delivery.
-(import :gerbil-scheme-rust/scheme/service-budget)
+(import :gerbil-scheme-rust/scheme/service-budget
+        (only-in "runtime" gerbil-rs-exception-message
+          gerbil-rs-result-batch-pending gerbil-rs-clear-result-batch!))
 (export make-gerbil-rs-service gerbil-rs-service-submit! gerbil-rs-service-ready!
         gerbil-rs-service-take! gerbil-rs-service-wait! gerbil-rs-service-stop! gerbil-rs-service-close! make-gerbil-rs-service-endpoint)
 
 (defstruct service-job (id input value failure failed done lane short progress claimed-epoch))
-(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing budget direct notified write-fd progress completion-mode completion-epoch completion-due completion-token completion-claimed completion-batches completion-items))
+(defstruct scheme-service (handler limit jobs next workers idle queued ready short-queued short-ready short-count turns lock event port output watcher wake broken closing budget direct notified write-fd progress completion-mode completion-epoch completion-due completion-token completion-claimed completion-batches completion-items completion-batch))
 
 ;; Completion queues have amortized constant-time push/pop. A bounded host
 ;; turn must not repeatedly reverse every remaining completion under pressure.
@@ -72,7 +74,7 @@
          (handoff?
           (service-locked service
             (lambda ()
-              (let (new-opportunity? (and (= mode 2)
+              (let (new-opportunity? (and (>= mode 2)
                       (or (not (scheme-service-completion-due service))
                           (and (service-job-short job)
                                (service-fifo-empty? (scheme-service-short-ready service))))))
@@ -81,7 +83,7 @@
                     (error "completion epoch exhausted"))
                   (set! (scheme-service-completion-epoch service)
                     (1+ (scheme-service-completion-epoch service))))
-                (when (= mode 2) (set! (scheme-service-completion-due service) #t))
+                (when (>= mode 2) (set! (scheme-service-completion-due service) #t))
                 (service-finished! service job)
                 (if (and (or (= mode 1) new-opportunity?)
                          (or (service-eligible? (scheme-service-short-queued service) worker)
@@ -141,7 +143,7 @@
                    (lambda () (open-output-file (string-append "/dev/fd/" (number->string write-fd))))))
          (service (make-scheme-service handler limit (make-table test: eqv?) 1
                     (make-vector count) [] [] (make-service-fifo [] []) [] (make-service-fifo [] []) 0 (make-vector count #f) (make-mutex)
-                    (make-condition-variable) port output #f #f #f #f (make-gerbil-rs-budget) #f #f write-fd #f 0 0 #f -1 0 0 0)))
+                    (make-condition-variable) port output #f #f #f #f (make-gerbil-rs-budget) #f #f write-fd #f 0 0 #f -1 0 0 0 #f)))
     ;; Construction failure joins already-created children before propagating.
     (with-catch
       (lambda (failure)
@@ -172,7 +174,9 @@
       (unless (and (integer? lane) (<= -1 lane) (< lane (vector-length (scheme-service-workers service))))
         (error "invalid Scheme service lane"))
       (when (and short? (not (= lane -1))) (error "short service cannot move an affine Actor"))
-      (when (>= (table-length (scheme-service-jobs service)) (scheme-service-limit service))
+      (when (>= (+ (table-length (scheme-service-jobs service))
+                 (gerbil-rs-result-batch-pending (scheme-service-completion-batch service)))
+              (scheme-service-limit service))
         (error "Scheme service capacity"))
       (let* ((id (scheme-service-next service)) (job (make-service-job id input #f #f #f #f lane short?
                  (and (scheme-service-progress service)
@@ -199,18 +203,18 @@
     (thread-yield!))
   (service-locked service
     (lambda ()
-      (when (and (= (scheme-service-completion-mode service) 2)
+      (when (and (>= (scheme-service-completion-mode service) 2)
                  (not (= (scheme-service-completion-token service) -1)))
         (error "completion token still owned"))
       (let* ((short (service-fifo-pop! (scheme-service-short-ready service)))
-             (bulk (if (or (= (scheme-service-completion-mode service) 2)
+             (bulk (if (or (>= (scheme-service-completion-mode service) 2)
                            (and (zero? (scheme-service-completion-mode service))
                                 (zero? (scheme-service-short-count service))))
                      (service-fifo-drain! (scheme-service-ready service))
                      (let (id (service-fifo-pop! (scheme-service-ready service)))
                        (if id (list id) []))))
              (ids (append (if short (list short) []) bulk)))
-        (when (and (= (scheme-service-completion-mode service) 2)
+        (when (and (>= (scheme-service-completion-mode service) 2)
                    (scheme-service-completion-due service))
           (unless (pair? ids) (error "completion opportunity has no ready graph"))
           (set! (scheme-service-completion-batches service) (1+ (scheme-service-completion-batches service)))
@@ -227,20 +231,22 @@
 (def (gerbil-rs-service-ready! service)
   (let* ((ids (service-ready-ids! service)) (totals (scheme-service-progress service))
          (receipt (if totals (gerbil-rs-progress-receipt totals ids) ids)))
-    (if (and (= (scheme-service-completion-mode service) 2)
+    (if (and (>= (scheme-service-completion-mode service) 2)
              (not (= (scheme-service-completion-token service) -1)))
       (list->s64vector (append (list -8 (scheme-service-completion-token service)) (s64vector->list receipt)))
       receipt)))
 (def (service-completion-ack! service epoch)
   (service-locked service
     (lambda ()
-      (unless (and (= (scheme-service-completion-mode service) 2)
+      (unless (and (>= (scheme-service-completion-mode service) 2)
                    (integer? epoch) (>= epoch 0)) (error "invalid completion acknowledgement"))
       (if (not (= epoch (scheme-service-completion-token service)))
         0
         (begin
-          (unless (zero? (scheme-service-completion-claimed service))
+          (unless (and (zero? (scheme-service-completion-claimed service))
+                       (zero? (gerbil-rs-result-batch-pending (scheme-service-completion-batch service))))
             (error "completion graphs still claimed"))
+          (set! (scheme-service-completion-batch service) #f)
           (set! (scheme-service-completion-token service) -1)
           (if (= epoch (scheme-service-completion-epoch service))
             (if (and (service-fifo-empty? (scheme-service-ready service))
@@ -259,7 +265,7 @@
           (lambda ()
             (let (job (table-ref (scheme-service-jobs service) id #f))
               (unless (and job (service-job-done job)) (error "Scheme service result not ready"))
-              (when (= (scheme-service-completion-mode service) 2)
+              (when (>= (scheme-service-completion-mode service) 2)
                 (unless (and (>= (scheme-service-completion-token service) 0)
                              (positive? (scheme-service-completion-claimed service))
                              (= (service-job-claimed-epoch job) (scheme-service-completion-token service)))
@@ -270,7 +276,28 @@
               (when (service-job-short job)
                 (set! (scheme-service-short-count service) (1- (scheme-service-short-count service))))
               job))))
-    (if (service-job-failed job) (raise (service-job-failure job)) (service-job-value job))))
+    ;; A yielded worker may still hold the consumed job record. Detach payloads
+    ;; here so that record cannot retain a result after its root/slot retires.
+    (let ((value (service-job-value job)) (failure (service-job-failure job)))
+      (set! (service-job-value job) #f)
+      (set! (service-job-failure job) #f)
+      (if (service-job-failed job) (raise failure) value))))
+(def (service-result-batch! service)
+  (let* ((receipt (gerbil-rs-service-ready! service))
+         (start (if (and (> (s64vector-length receipt) 0) (= (s64vector-ref receipt 0) -8)) 2 0))
+         (offset (if (and (< start (s64vector-length receipt)) (= (s64vector-ref receipt start) -6)) (+ start 3) start))
+         (count (- (s64vector-length receipt) offset)) (statuses (make-s64vector count 0))
+         (slots (and (positive? count) (make-vector count #f))))
+    (let loop ((index 0))
+      (when (< index count)
+        (let (value (with-catch
+                      (lambda (failure) (s64vector-set! statuses index 1) (gerbil-rs-exception-message failure))
+                      (lambda () (gerbil-rs-service-take! service (s64vector-ref receipt (+ offset index))))))
+          (vector-set! slots index (vector #t value)))
+        (loop (1+ index))))
+    (let (batch (and slots (vector count slots)))
+      (set! (scheme-service-completion-batch service) batch)
+      (vector receipt statuses batch))))
 (def (gerbil-rs-service-wait! service microseconds)
   (if (scheme-service-direct service) (service-port-wait! service microseconds)
       (service-condition-wait! service microseconds)))
@@ -312,6 +339,8 @@
           (service-fifo-drain! (scheme-service-short-ready service))
           (set! (scheme-service-short-queued service) [])
           (set! (scheme-service-short-count service) 0)
+          (gerbil-rs-clear-result-batch! (scheme-service-completion-batch service))
+          (set! (scheme-service-completion-batch service) #f)
           (set! (scheme-service-completion-claimed service) 0)
           (set! (scheme-service-completion-token service) -1)
           (set! (scheme-service-completion-due service) #f)
@@ -333,6 +362,7 @@
 ;; Rooted unary command protocol: [s64 header, optional native payload].
 ;; 0=open(read-fd,write-fd,limit), 1=submit(lane, optional short-class=1), 2=take(id), 3=ready,
 ;; 4=wait(host-deadline-microseconds or zero), 7=prepare-close, 5=drain/close.
+;; ABI v9 adds 16=batched native result transfer; slots retire independently.
 ;; ABI v8 adds coalesced completion epochs/claims and 14=acknowledge.
 ;; ABI v7 adds 13=idle completion handoff configuration (default zero).
 ;; ABI v6 adds optional declared units, progress receipts and 12=idle progress configuration.
@@ -359,7 +389,7 @@
            (on-open)
            (set! service (make-gerbil-rs-service handler workers (s64vector-ref header 3)
                           (s64vector-ref header 1) (s64vector-ref header 2)))
-           (s64vector 0 8 workers (s64vector-ref header 3)))
+           (s64vector 0 9 workers (s64vector-ref header 3)))
           ((1)
            (unless service (error "Scheme service not open"))
            (unless (or (= (s64vector-length header) 2)
@@ -372,8 +402,9 @@
                         (if (= (s64vector-length header) 4) (s64vector-ref header 3) 1))))
           ((13)
            (unless (and service (= (s64vector-length header) 2) (not preparing)
-                        (memv (s64vector-ref header 1) '(0 1 2))
-                        (zero? (table-length (scheme-service-jobs service)))
+                        (memv (s64vector-ref header 1) '(0 1 2 3))
+                        (and (zero? (table-length (scheme-service-jobs service)))
+                             (zero? (gerbil-rs-result-batch-pending (scheme-service-completion-batch service))))
                         (gerbil-rs-budget-idle? (scheme-service-budget service)))
              (error "completion policy requires idle service"))
            (unless (and (= (scheme-service-completion-token service) -1)
@@ -388,7 +419,8 @@
           ((12)
            (unless (and service (= (s64vector-length header) 2) (not preparing)
                         (= (s64vector-ref header 1) 1)
-                        (zero? (table-length (scheme-service-jobs service))))
+                        (and (zero? (table-length (scheme-service-jobs service)))
+                             (zero? (gerbil-rs-result-batch-pending (scheme-service-completion-batch service)))))
              (error "progress configuration requires an idle service"))
            (unless (scheme-service-progress service)
              (set! (scheme-service-progress service) (make-gerbil-rs-progress-ledger)))
@@ -399,12 +431,20 @@
            (when (= (s64vector-length header) 2)
              (service-completion-ack! service (s64vector-ref header 1)))
            (gerbil-rs-service-ready! service))
+          ((16)
+           (unless (and service (= (scheme-service-completion-mode service) 3)
+                        (memv (s64vector-length header) '(1 2)))
+             (error "invalid native service cycle"))
+           (when (= (s64vector-length header) 2)
+             (service-completion-ack! service (s64vector-ref header 1)))
+           (service-result-batch! service))
           ((15)
            (unless (and service (= (s64vector-length header) 1)) (error "invalid completion query"))
            (service-locked service (lambda ()
            (s64vector (scheme-service-completion-mode service)
              (scheme-service-completion-epoch service) (scheme-service-completion-token service)
-             (scheme-service-completion-claimed service)
+             (+ (scheme-service-completion-claimed service)
+                (gerbil-rs-result-batch-pending (scheme-service-completion-batch service)))
              (if (scheme-service-completion-due service) 1 0)
              (scheme-service-completion-batches service) (scheme-service-completion-items service)
              (+ (length (service-fifo-front (scheme-service-ready service)))
@@ -425,7 +465,8 @@
              (error "invalid cooperative scheduling configuration"))
            (service-locked service
              (lambda ()
-               (unless (zero? (table-length (scheme-service-jobs service)))
+               (unless (and (zero? (table-length (scheme-service-jobs service)))
+                             (zero? (gerbil-rs-result-batch-pending (scheme-service-completion-batch service))))
                  (error "Scheme service must be idle to configure scheduling"))
                (gerbil-rs-budget-configure! (scheme-service-budget service) (s64vector-ref header 1))))
            (s64vector 0))

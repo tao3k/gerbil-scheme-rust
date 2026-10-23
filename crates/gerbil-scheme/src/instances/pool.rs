@@ -41,6 +41,8 @@ pub(super) enum Work {
     },
     Native(Box<dyn FnOnce(&Image) + Send>),
     #[cfg(feature = "tokio-dispatch")]
+    Control(Box<dyn FnOnce(&Image) + Send>),
+    #[cfg(feature = "tokio-dispatch")]
     Service(Box<dyn super::service::Job>),
     #[cfg(feature = "tokio-dispatch")]
     Producer(Box<dyn super::batch_stream_runner::Producer>),
@@ -52,6 +54,8 @@ impl std::fmt::Debug for Work {
         f.write_str(match self {
             Self::Bytes { .. } => "ByteRequest",
             Self::Native(_) => "NativeTypeJob",
+            #[cfg(feature = "tokio-dispatch")]
+            Self::Control(_) => "NativeControl",
             #[cfg(feature = "tokio-dispatch")]
             Self::Service(_) => "SchemeServiceJob",
             #[cfg(feature = "tokio-dispatch")]

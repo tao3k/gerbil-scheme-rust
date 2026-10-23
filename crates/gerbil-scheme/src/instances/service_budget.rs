@@ -55,7 +55,7 @@ impl InstanceDispatcher {
             .ok_or(InstanceError::InvalidConfig(
                 "cooperative unit budget bound",
             ))?;
-        self.submit_native_on(owner, move |session| {
+        self.submit_control_on(owner, move |session| {
             let value = super::service::command(session, &[8, maximum], None)?;
             if session.copy_numeric::<i64>(&value)? != [0] {
                 return Err(InstanceError::InvalidConfig("cooperative budget receipt"));
@@ -71,7 +71,7 @@ impl InstanceDispatcher {
         owner: usize,
     ) -> Result<InstanceTicket<SchemeCooperativeBudgetObservation>, InstanceError> {
         self.require_service_budget(owner)?;
-        self.submit_native_on(owner, |session| {
+        self.submit_control_on(owner, |session| {
             let value = super::service::command(session, &[9], None)?;
             let values = session.copy_numeric::<i64>(&value)?;
             let row: Vec<_> = values.into_iter().map(u64::try_from).collect();

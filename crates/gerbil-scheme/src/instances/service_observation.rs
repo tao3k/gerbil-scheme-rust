@@ -50,6 +50,6 @@ impl InstanceDispatcher {
                     ))?,
             )
         };
-        self.submit_native_on(owner, move |_| Ok(monitor.snapshot()))
+        self.submit_control_on(owner, move |_| Ok(monitor.snapshot()))
     }
 }

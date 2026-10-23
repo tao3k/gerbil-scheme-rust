@@ -22,6 +22,26 @@ impl InstanceDispatcher {
     {
         self.submit_native_units_on(owner, 1, job)
     }
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) fn submit_control_on<R, F>(
+        &self,
+        owner: usize,
+        job: F,
+    ) -> Result<InstanceTicket<R>, InstanceError>
+    where
+        R: Send + 'static,
+        F: for<'vm> FnOnce(&NativeSession<'vm>) -> Result<R, InstanceError> + Send + 'static,
+    {
+        let (send, response) = mpsc::channel();
+        let mut request = self.native_work(job, move |value| send.send(value).is_ok());
+        let Work::Native(job) = request.work else {
+            unreachable!("native work constructor")
+        };
+        request.work = Work::Control(job);
+        let started = Arc::clone(&request.started);
+        self.enqueue(owner, request)?;
+        Ok(InstanceTicket { started, response })
+    }
     pub(super) fn submit_native_units_on<R, F>(
         &self,
         owner: usize,

@@ -24,6 +24,10 @@ fn dequeue(requests: &mpsc::Receiver<Request>, wake: &Wake) -> Result<Request, m
     }
     Ok(request)
 }
+struct DeferredCredits {
+    _native: Option<super::capacity::CapacityPermit>,
+    _stream: Vec<tokio::sync::OwnedSemaphorePermit>,
+}
 struct Pending {
     job: Box<dyn Job>,
     permit: Option<super::capacity::CapacityPermit>,
@@ -88,7 +92,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=8)
+        || !matches!(initialized[1], 1..=9)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -113,7 +117,7 @@ pub(super) fn close(image: &Image) {
         }));
 }
 // Linear, owner-borrowed custody of handed-out identities, never Scheme values.
-// Credits have already returned per result; the next advance consumes this token.
+// Projection returns each credit before the next advance consumes this token.
 struct ReadyToken<'a> {
     image: &'a Image,
     epoch: i64,
@@ -147,11 +151,18 @@ struct Pump<'a> {
     output: usize,
     jobs: BTreeMap<JobId, Pending>,
     completed: Option<ReadyToken<'a>>,
+    retirement_drain: Vec<DeferredCredits>,
+    deferred: Option<Request>,
     producer: Option<Box<dyn super::batch_stream_runner::Producer>>,
     wake: &'a Wake,
 }
 impl Pump<'_> {
     fn receive(&mut self, mut request: Request) -> Result<(), InstanceError> {
+        if matches!(&request.work, Work::Control(_))
+            && let Some(token) = self.completed.take()
+        {
+            control(token.image, &[14, token.epoch])?;
+        }
         if let Some(port) = self.wake.short_pool.get() {
             port.interrupted();
         }
@@ -221,7 +232,7 @@ impl Pump<'_> {
         }
         Ok(())
     }
-    fn collect(&mut self) -> Result<(), InstanceError> {
+    fn collect(&mut self, requests: &mpsc::Receiver<Request>) -> Result<(), InstanceError> {
         if self.wake.direct.load(Ordering::Acquire)
             && self.jobs.is_empty()
             && self.completed.is_none()
@@ -229,37 +240,72 @@ impl Pump<'_> {
             return Ok(());
         }
 
-        let mut completed = observed(
+        let cycle = self.wake.native_cycle.load(Ordering::Acquire);
+        let (mut completed, batch) = observed(
             self.image,
             self.wake,
             super::SchemeServicePhase::Advance,
-            || match self.completed.take() {
-                Some(token) => token.advance(),
-                None => control(self.image, &[3]),
+            || {
+                if cycle {
+                    super::service_cycle::harvest(
+                        self.image,
+                        self.completed.take().map(|t| t.epoch),
+                    )
+                } else {
+                    let completed = match self.completed.take() {
+                        Some(token) => token.advance(),
+                        None => control(self.image, &[3]),
+                    }?;
+                    Ok((completed, None))
+                }
             },
         )?;
         let token = ReadyToken::parse(self.image, &mut completed)?;
         self.wake.progress.receipt(&mut completed)?;
+        if let Some(batch) = &batch {
+            batch.validate(completed.len())?;
+        } else if cycle && !completed.is_empty() {
+            return Err(InstanceError::InvalidConfig(
+                "native completion missing result slots",
+            ));
+        }
         let refill = completed.len().min(
             self.producer
                 .as_ref()
                 .map_or(0, |p| p.retirement_refill_budget()),
         );
-        for raw in completed {
+        for (index, raw) in completed.into_iter().enumerate() {
             let id = JobId(raw);
             let pending = self.jobs.remove(&id).ok_or(InstanceError::InvalidConfig(
                 "unknown Scheme service completion",
             ))?;
-            observed(
+            let retired = observed(
                 self.image,
                 self.wake,
                 super::SchemeServicePhase::Retire,
                 || {
-                    pending
-                        .job
-                        .complete(self.image, id, self.input, self.output);
+                    pending.job.complete(
+                        self.image,
+                        service::Completion {
+                            id,
+                            ready: batch.as_ref().map(|b| b.slot(index)),
+                        },
+                        self.input,
+                        self.output,
+                    )
                 },
             );
+            if let service::Retirement::Drain(stream) = retired {
+                // The native graph is still owned. Close joins/clears it before
+                // either native or stream credit can return, even on failed take.
+                self.retirement_drain.push(DeferredCredits {
+                    _native: pending.permit,
+                    _stream: stream,
+                });
+                return Err(InstanceError::InvalidConfig(
+                    "native result slot transfer failed",
+                ));
+            }
             // The retained work/slot permit drops only after projection/root balance.
             observed(
                 self.image,
@@ -267,16 +313,50 @@ impl Pump<'_> {
                 super::SchemeServicePhase::Release,
                 || drop(pending.permit),
             );
+            if cycle {
+                self.cycle_refill(requests)?;
+            }
         }
+        drop(batch);
         // Only readiness custody is deferred. Every result's native permit has
         // already returned before any later arbitrary projector ran.
         self.completed = token;
         // Retire the full snapshot before constructing new payloads. Refill is
         // bounded by both released results and the registered active budget.
-        for _ in 0..refill {
+        for _ in 0..if cycle { 0 } else { refill } {
             if !self.refill_retired()? {
                 break;
             }
+        }
+        Ok(())
+    }
+    fn next_request(&mut self, requests: &mpsc::Receiver<Request>) -> Option<Request> {
+        self.deferred
+            .take()
+            .or_else(|| dequeue(requests, self.wake).ok())
+    }
+    fn cycle_refill(&mut self, requests: &mpsc::Receiver<Request>) -> Result<(), InstanceError> {
+        // One returned result's opportunity, never recursively collect while the
+        // native token is owned. Closing owners admit no fresh pool supply.
+        if self.wake.closed.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        if self
+            .deferred
+            .as_ref()
+            .is_some_and(|r| matches!(&r.work, Work::Control(_)))
+        {
+            return Ok(());
+        }
+        let request = self.next_request(requests);
+        if let Some(request) = request {
+            if matches!(&request.work, Work::Control(_)) {
+                self.deferred = Some(request);
+            } else {
+                self.receive(request)?;
+            }
+        } else if !self.refill_retired()? {
+            self.claim_offer()?;
         }
         Ok(())
     }
@@ -324,20 +404,31 @@ impl Pump<'_> {
         for index in 0..maximum {
             self.receive(request)?;
             if index + 1 == maximum {
-                return self.collect();
+                return self.collect(requests);
             }
             match dequeue(requests, self.wake) {
                 Ok(next) if matches!(&next.work, Work::Service(_)) => request = next,
                 Ok(next) => {
-                    self.collect()?;
-                    return self.receive(next);
+                    self.deferred = Some(next);
+                    self.collect(requests)?;
+                    if let Some(next) = self.deferred.take() {
+                        self.receive(next)?;
+                    }
+                    return Ok(());
                 }
-                Err(_) => return self.collect(),
+                Err(_) => return self.collect(requests),
             }
         }
         unreachable!("positive validated feed bound")
     }
-    fn claim_short(&mut self) -> Result<bool, InstanceError> {
+    fn claim_short(&mut self, requests: &mpsc::Receiver<Request>) -> Result<bool, InstanceError> {
+        if self
+            .deferred
+            .as_ref()
+            .is_some_and(|r| matches!(&r.work, Work::Control(_)))
+        {
+            return Ok(false);
+        }
         let request = self
             .wake
             .short_pool
@@ -345,7 +436,7 @@ impl Pump<'_> {
             .and_then(super::short_pool::Port::claim);
         if let Some(request) = request {
             self.receive(request)?;
-            self.collect()?;
+            self.collect(requests)?;
             Ok(true)
         } else {
             Ok(false)
@@ -400,14 +491,14 @@ impl Pump<'_> {
                     .waiting_for_claim
                     .store(false, Ordering::Release);
             }
-            if short_turn && self.claim_short()? {
+            if short_turn && self.claim_short(requests)? {
                 short_turn = false;
                 continue;
             }
             // One shared short claim alternates with one ordinary owner turn.
             // Scheme still owns green-thread execution and class fairness.
             short_turn = true;
-            let incoming = dequeue(requests, self.wake).ok();
+            let incoming = self.next_request(requests);
             let feed_limit = wake.feed_limit.load(Ordering::Acquire);
             if feed_limit > 1
                 && incoming
@@ -424,11 +515,12 @@ impl Pump<'_> {
                 |request| matches!(&request.work, Work::Service(job) if job.short_service()),
             ) {
                 self.receive(incoming.unwrap())?;
-                self.collect()?;
+                self.collect(requests)?;
                 continue;
             }
-            self.collect()?;
-            if let Some(request) = incoming.or_else(|| dequeue(requests, self.wake).ok()) {
+            self.deferred = incoming;
+            self.collect(requests)?;
+            if let Some(request) = self.next_request(requests) {
                 self.receive(request)?;
                 continue;
             }
@@ -474,7 +566,7 @@ impl Pump<'_> {
             }
             // Work conservation: try visible work before entering native wait.
             // Registration then checks publication under the shared queue lock.
-            if self.claim_short()? {
+            if self.claim_short(requests)? {
                 short_turn = false;
                 continue;
             }
@@ -512,6 +604,8 @@ pub(super) fn run(
         output: maximum_output,
         jobs: BTreeMap::new(),
         completed: None,
+        retirement_drain: Vec::new(),
+        deferred: None,
         producer: None,
         wake,
     };
@@ -522,6 +616,13 @@ pub(super) fn run(
     // SDK cleanup. Failure marks non-quiescence, keeping the heap/code quarantined.
     close(image);
     if let Err(error) = result {
+        if let Some(Request {
+            work: Work::Service(job),
+            ..
+        }) = pump.deferred.take()
+        {
+            job.fail(error.clone());
+        }
         for (_, pending) in pump.jobs {
             pending.job.fail(error.clone());
         }

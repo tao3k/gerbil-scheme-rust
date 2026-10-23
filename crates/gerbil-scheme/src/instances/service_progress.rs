@@ -142,7 +142,7 @@ impl InstanceDispatcher {
             }
             Arc::clone(wake)
         };
-        self.submit_native_on(owner, move |session| {
+        self.submit_control_on(owner, move |session| {
             let value = super::service::command(session, &[12, 1], None)?;
             if session.copy_numeric::<i64>(&value)? != [0, 1] {
                 return Err(InstanceError::InvalidConfig(

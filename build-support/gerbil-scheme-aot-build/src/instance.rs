@@ -131,6 +131,7 @@ const INSTANCE_EXPORTS: &[&str] = &[
     "gerbil_scheme_rust_root_string_to_utf8_raw",
     "gerbil_scheme_rust_collection_create_raw",
     "gerbil_scheme_rust_collection_element_raw",
+    "gerbil_scheme_rust_result_slot_take",
     "gerbil_scheme_rust_force_gc_raw",
     "gerbil_scheme_rust_object_kind",
     "gerbil_scheme_rust_bigint_create_raw",

@@ -250,6 +250,7 @@ fn validate_arguments(args: &[String]) {
         || s == "--fixed-short-selective"
         || s == "--completion-fair-ab"
         || s == "--completion-coalesced-ab"
+        || s == "--native-cycle-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"
@@ -268,7 +269,15 @@ fn validate_arguments(args: &[String]) {
         "completion comparison requires identical bulk and short routing"
     );
     assert!(
-        !(settings::completion_fair_ab() && settings::completion_coalesced_ab()),
+        [
+            settings::completion_fair_ab(),
+            settings::completion_coalesced_ab(),
+            settings::native_cycle_ab()
+        ]
+        .into_iter()
+        .filter(|&x| x)
+        .count()
+            <= 1,
         "choose one completion comparison"
     );
 }

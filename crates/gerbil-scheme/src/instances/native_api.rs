@@ -19,6 +19,8 @@ pub(super) struct NativeApi {
     pub string_utf8: unsafe extern "C" fn(i64) -> i64,
     pub collection: unsafe extern "C" fn(*const i64, u64, i32) -> i64,
     pub element: unsafe extern "C" fn(i64, i32, u64) -> i64,
+    #[cfg(feature = "tokio-dispatch")]
+    pub result_slot_take: Option<unsafe extern "C" fn(i64, u64) -> i64>,
     pub force_gc: unsafe extern "C" fn() -> i32,
     pub diagnostics: Option<unsafe extern "C" fn(*mut f64) -> i32>,
     pub usage: unsafe extern "C" fn(*mut f64) -> i32,
@@ -54,6 +56,14 @@ impl NativeApi {
                     .ok()
                     .map(|address| {
                         std::mem::transmute::<*mut c_void, unsafe extern "C" fn(*mut f64) -> i32>(
+                            address,
+                        )
+                    }),
+                #[cfg(feature = "tokio-dispatch")]
+                result_slot_take: symbol(handle, c"gerbil_scheme_rust_result_slot_take")
+                    .ok()
+                    .map(|address| {
+                        std::mem::transmute::<*mut c_void, unsafe extern "C" fn(i64, u64) -> i64>(
                             address,
                         )
                     }),

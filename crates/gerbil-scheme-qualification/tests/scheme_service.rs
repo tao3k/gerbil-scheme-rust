@@ -7,6 +7,8 @@ mod corpus;
 mod deferred;
 #[path = "scheme_service/native_cycle.rs"]
 mod native_cycle;
+#[path = "scheme_service/native_entry.rs"]
+mod native_entry;
 #[path = "../benches/scheme_service/os_attribution.rs"]
 mod os_attribution;
 #[path = "scheme_service/os_attribution.rs"]
@@ -135,8 +137,8 @@ fn command(dispatch: &InstanceDispatcher, owner: usize, operation: i64) -> Vec<i
             session.collect()?;
             assert_eq!(
                 session.usage()?[3].to_bits(),
-                0_f64.to_bits(),
-                "pending Scheme tasks use strong internal graphs"
+                f64::from(session.scheme_service_native_entry_enabled()).to_bits(),
+                "only the declared native-entry capability may be externally rooted"
             );
             Ok(result)
         })
@@ -476,6 +478,11 @@ fn scheme_owns_waits_roots_continuations_and_close() {
             .wait(GATE)
             .unwrap();
     }
+    dispatch
+        .configure_scheme_service_native_entry_on(1, true)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
     let hidden = dispatch
         .submit_native_on(0, |session| {
             let header = session.numeric_vector(&[5_i64])?;
@@ -528,4 +535,5 @@ fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Send
     native_cycle::contract(runtime, progress);
     prepared::contract(runtime, progress);
     pipeline::contract(runtime, progress);
+    native_entry::contract(runtime, progress);
 }

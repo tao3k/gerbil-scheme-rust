@@ -133,6 +133,7 @@ impl InstanceDispatcher {
             wake.prepared_cycle.store(mode >= 4, Ordering::Release);
             wake.pipeline_cycle.store(mode == 5, Ordering::Release);
             wake.coupled_refill.store(false, Ordering::Release);
+            session.clear_entry()?;
             Ok(())
         })
     }

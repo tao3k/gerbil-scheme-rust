@@ -6,6 +6,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 struct CycleBatch {
+    phase: mpsc::Sender<&'static str>,
     input: NumericServiceBatch<i64>,
     projected: Arc<AtomicUsize>,
     admitted: Arc<AtomicBool>,
@@ -28,6 +29,9 @@ impl SchemeServiceRequest for CycleBatch {
         session: &NativeSession<'_>,
         value: &NativeRoot<'_>,
     ) -> Result<Self::Output, InstanceError> {
+        self.phase
+            .send("PHASE native-cycle projecting result")
+            .unwrap();
         let index = self.projected.fetch_add(1, Ordering::AcqRel);
         assert!(
             (session.diagnostics().unwrap()[4] - 2.0).abs() < f64::EPSILON,
@@ -47,7 +51,11 @@ impl SchemeServiceRequest for CycleBatch {
         if index == 0 {
             let admitted = Arc::clone(&self.admitted);
             let dispatch = self.dispatch.clone();
+            let phase = self.phase.clone();
             let ticket = self.dispatch.submit_native_on(0, move |session| {
+                phase
+                    .send("PHASE native-cycle queued arena callback")
+                    .unwrap();
                 assert!(
                     (session.diagnostics().unwrap()[4] - 1.0).abs() < f64::EPSILON,
                     "previous result root already released"
@@ -58,7 +66,14 @@ impl SchemeServiceRequest for CycleBatch {
                         && capacity[0].work_available.is_some_and(|units| units >= 8),
                     "previous result credit already returned"
                 );
+                phase
+                    .send("PHASE native-cycle full application arena")
+                    .unwrap();
                 full_application_arena(session)?;
+                phase
+                    .send("native-cycle full application arena verified and released")
+                    .unwrap();
+                phase.send("PHASE native-cycle post-arena GC").unwrap();
                 session.collect()?;
                 admitted.store(true, Ordering::Release);
                 Ok(())
@@ -114,18 +129,9 @@ impl SchemeServiceRequest for Immediate {
     }
 }
 pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>) {
-    let mut config = config();
-    config.owners = 1;
-    let mut pool = InstancePool::start(&descriptor(false), config).unwrap();
-    let dispatch = pool.dispatcher();
-    dispatch.configure_owner_budgets(4, Some(32)).unwrap();
-    dispatch
-        .configure_scheme_service_completion_on(
-            0,
-            gerbil_scheme::instances::SchemeServiceCompletion::NativeCycle,
-        )
-        .unwrap()
-        .wait(GATE)
+    let (mut pool, dispatch) = start_cycle(progress);
+    progress
+        .send("PHASE native-cycle submit and latch")
         .unwrap();
     let projected = Arc::new(AtomicUsize::new(0));
     let admitted = Arc::new(AtomicBool::new(false));
@@ -138,6 +144,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
                     .submit_scheme_service_backpressured_on(
                         0,
                         CycleBatch {
+                            phase: progress.clone(),
                             input: batch(true),
                             projected: Arc::clone(&projected),
                             admitted: Arc::clone(&admitted),
@@ -155,6 +162,9 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             assert!(start.elapsed() < GATE);
             tokio::task::yield_now().await;
         }
+        progress
+            .send("PHASE native-cycle release ready barrier")
+            .unwrap();
         command(&dispatch, 0, 18);
         for ticket in tickets {
             let (values, _) = ticket.wait_completed(GATE).await.unwrap();
@@ -176,6 +186,9 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         }
         idle(&dispatch).await;
     });
+    progress
+        .send("native-cycle snapshot projections and callback receipts verified")
+        .unwrap();
     let actual = dispatch
         .scheme_service_completion_on(0)
         .unwrap()
@@ -183,6 +196,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         .unwrap();
     assert!(!actual.token_owned && !actual.opportunity_pending);
     assert_eq!((actual.claimed, actual.ready_queued), (0, 0));
+    progress.send("PHASE native-cycle shutdown").unwrap();
     let close = pool.shutdown(GATE);
     assert!(close.is_clean(), "{close:?}");
     assert!(
@@ -191,7 +205,13 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             .iter()
             .all(|o| o.roots_before_cleanup == 0 && o.image_file_removed)
     );
+    progress
+        .send("native-cycle first owner cleanly retired")
+        .unwrap();
     narrow_error_quota(runtime);
+    progress
+        .send("native-cycle narrow output quota contract completed")
+        .unwrap();
     invalidated_slots(runtime);
     progress.send("native cycle clears each slot/root/credit before next projection; queued admission and GC preserve remaining graphs; false/void and close pass").unwrap();
 }
@@ -357,4 +377,23 @@ fn invalidated_slots(runtime: &tokio::runtime::Runtime) {
             .iter()
             .all(|c| c.available == c.limit && c.work_available == c.work_limit)
     );
+}
+
+fn start_cycle(progress: &mpsc::Sender<&'static str>) -> (InstancePool, InstanceDispatcher) {
+    progress.send("PHASE native-cycle owner startup").unwrap();
+    let mut config = config();
+    config.owners = 1;
+    let pool = InstancePool::start(&descriptor(false), config).unwrap();
+    progress.send("native-cycle owner initialized").unwrap();
+    let dispatch = pool.dispatcher();
+    dispatch.configure_owner_budgets(4, Some(32)).unwrap();
+    dispatch
+        .configure_scheme_service_completion_on(
+            0,
+            gerbil_scheme::instances::SchemeServiceCompletion::NativeCycle,
+        )
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    (pool, dispatch)
 }

@@ -78,6 +78,12 @@ pub(super) fn project<T: NumericElement>(
     output: &super::NativeRoot<'_>,
     count: usize,
 ) -> Result<Vec<Vec<T>>, InstanceError> {
+    #[cfg(feature = "tokio-dispatch")]
+    if session.entry_id().is_some() {
+        return session
+            .numeric_batch_snapshot::<T>(output, count)?
+            .copy(session);
+    }
     let mut total = 0_usize;
     (0..count)
         .map(|index| {

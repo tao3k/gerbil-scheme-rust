@@ -6,6 +6,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 struct Message {
+    roots: f64,
     value: NumericServiceBatch<i64>,
     last: bool,
     projected: Arc<AtomicUsize>,
@@ -41,10 +42,18 @@ impl SchemeServiceRequest for Message {
     fn construct_service<'vm>(
         &mut self,
         session: &NativeSession<'vm>,
-        input: &gerbil_scheme::instances::SchemeServiceInput,
+        input: &gerbil_scheme::instances::SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.mark_construction();
         self.value.construct_service(session, input)
+    }
+    fn enter_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &gerbil_scheme::instances::SchemeServiceInput<'_>,
+    ) -> Result<gerbil_scheme::instances::SchemeServiceSubmission<'vm>, InstanceError> {
+        self.mark_construction();
+        self.value.enter_service(session, input)
     }
     fn project(
         self,
@@ -57,7 +66,7 @@ impl SchemeServiceRequest for Message {
             if index == 1 {
                 // Two native jobs plus one prepared input hold three credits.
                 assert_eq!(self.dispatch.owner_capacity()[0].available, 1);
-                assert!((session.diagnostics().unwrap()[4] - 2.0).abs() < f64::EPSILON);
+                assert!((session.diagnostics().unwrap()[4] - self.roots).abs() < f64::EPSILON);
                 session.collect()?;
                 self.reached.send(()).unwrap();
                 self.release.lock().unwrap().recv_timeout(GATE).unwrap();
@@ -95,12 +104,7 @@ fn run(
     let mut pool = InstancePool::start(&descriptor(false), cfg).unwrap();
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
-    dispatch
-        .configure_scheme_service_completion_on(0, policy)
-        .unwrap()
-        .wait(GATE)
-        .unwrap();
-    configure_refill(&dispatch, 0, policy);
+    configure_input(&dispatch, policy);
     let projected = Arc::new(AtomicUsize::new(0));
     let constructed = Arc::new(AtomicUsize::new(0));
     let (reached, ready) = mpsc::channel();
@@ -108,6 +112,11 @@ fn run(
     let wait = Arc::new(std::sync::Mutex::new(wait));
     let messages = (0..4)
         .map(|index| Message {
+            roots: if policy == SchemeServiceCompletion::PipelineCycle {
+                3.0
+            } else {
+                2.0
+            },
             value: batch(index < 3),
             last: index == 3,
             projected: Arc::clone(&projected),
@@ -196,5 +205,21 @@ async fn credits_restored(dispatch: &InstanceDispatcher) {
             "prepared producer registration did not return"
         );
         tokio::task::yield_now().await;
+    }
+}
+
+fn configure_input(dispatch: &InstanceDispatcher, policy: SchemeServiceCompletion) {
+    dispatch
+        .configure_scheme_service_completion_on(0, policy)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    configure_refill(dispatch, 0, policy);
+    if policy == SchemeServiceCompletion::PipelineCycle {
+        dispatch
+            .configure_scheme_service_native_entry_on(0, true)
+            .unwrap()
+            .wait(GATE)
+            .unwrap();
     }
 }

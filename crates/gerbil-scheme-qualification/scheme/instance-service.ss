@@ -53,7 +53,7 @@
   (set! orders-lanes #()))
 (def orders-endpoint
   (make-gerbil-rs-service-endpoint orders-service-handler 4 orders-lanes-open!
-    orders-latch-release! orders-lanes-close!))
+    orders-latch-release! orders-lanes-close! #t))
 (def (orders-service-command command)
   (when (and (vector? command) (positive? (vector-length command))
              (s64vector? (vector-ref command 0)) (>= (s64vector-length (vector-ref command 0)) 2)

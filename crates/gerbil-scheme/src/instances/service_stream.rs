@@ -160,7 +160,7 @@ impl InstanceDispatcher {
                 work: super::pool::Work::Service(Box::new(super::service::TypedJob {
                     message,
                     send,
-                    submitted: false,
+                    submitted: std::cell::Cell::new(false),
                     lane: None,
                     short,
                     trace,

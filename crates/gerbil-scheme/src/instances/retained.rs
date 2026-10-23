@@ -9,6 +9,14 @@ pub struct RetainedValue {
     id: u64,
     owner: usize,
 }
+#[derive(Clone, Copy)]
+enum Retention {
+    Application,
+    #[cfg(feature = "tokio-dispatch")]
+    Batch,
+    #[cfg(feature = "tokio-dispatch")]
+    Entry,
+}
 impl RetainedValue {
     #[must_use]
     pub fn owner(self) -> usize {
@@ -20,17 +28,27 @@ impl<'vm> NativeSession<'vm> {
     /// # Errors
     /// Rejects foreign roots, exhausted identities and the 65,536-root arena limit.
     pub fn retain(&self, value: NativeRoot<'vm>) -> Result<RetainedValue, InstanceError> {
-        self.retain_root(value, false)
+        self.retain_root(value, Retention::Application)
     }
     fn retain_root(
         &self,
         value: NativeRoot<'vm>,
-        service: bool,
+        kind: Retention,
     ) -> Result<RetainedValue, InstanceError> {
         self.local(&value)?;
         let mut roots = self.image.retained.borrow_mut();
-        let occupied = self.image.service_root.get().is_some();
-        if (service && occupied) || (!service && roots.len() - usize::from(occupied) >= 65536) {
+        let internal = usize::from(self.image.service_root.get().is_some())
+            + usize::from(self.image.entry_root.get().is_some());
+        let slot: Option<&std::cell::Cell<Option<u64>>> = match kind {
+            Retention::Application => None,
+            #[cfg(feature = "tokio-dispatch")]
+            Retention::Batch => Some(&self.image.service_root),
+            #[cfg(feature = "tokio-dispatch")]
+            Retention::Entry => Some(&self.image.entry_root),
+        };
+        if slot.is_some_and(|slot| slot.get().is_some())
+            || (slot.is_none() && roots.len() - internal >= 65536)
+        {
             return Err(InstanceError::InvalidConfig("retained root bound"));
         }
         let id = self.image.next_retained.get();
@@ -39,8 +57,8 @@ impl<'vm> NativeSession<'vm> {
                 .ok_or(InstanceError::InvalidConfig("retained identity exhausted"))?,
         );
         roots.insert(id, value.root);
-        if service {
-            self.image.service_root.set(Some(id));
+        if let Some(slot) = slot {
+            slot.set(Some(id));
         }
         std::mem::forget(value);
         Ok(RetainedValue {
@@ -77,6 +95,9 @@ impl<'vm> NativeSession<'vm> {
         self.image.retained.borrow_mut().remove(&value.id);
         if self.image.service_root.get() == Some(value.id) {
             self.image.service_root.set(None);
+        }
+        if self.image.entry_root.get() == Some(value.id) {
+            self.image.entry_root.set(None);
         }
         // SAFETY: unique arena ownership was removed immediately before release.
         if unsafe { (self.image.release)(root) } != 1 {
@@ -145,7 +166,26 @@ impl<'vm> NativeSession<'vm> {
         &self,
         value: NativeRoot<'vm>,
     ) -> Result<RetainedValue, InstanceError> {
-        self.retain_root(value, true)
+        self.retain_root(value, Retention::Batch)
+    }
+    pub(super) fn retain_entry(&self, value: NativeRoot<'vm>) -> Result<(), InstanceError> {
+        self.retain_root(value, Retention::Entry).map(|_| ())
+    }
+    pub(super) fn entry_id(&self) -> Option<i64> {
+        self.image
+            .entry_root
+            .get()
+            .and_then(|id| self.image.retained.borrow().get(&id).copied())
+    }
+    pub(super) fn clear_entry(&self) -> Result<(), InstanceError> {
+        if let Some(id) = self.image.entry_root.get() {
+            self.release_retained(RetainedValue {
+                image: self.image.identity,
+                id,
+                owner: self.owner_index(),
+            })?;
+        }
+        Ok(())
     }
     pub(super) fn take_result_slot(
         &self,

@@ -57,7 +57,7 @@ pub(super) fn configure(
         super::measurement::idle(pool);
         for owner in 0..4 {
             use gerbil_scheme::instances::SchemeServiceCompletion;
-            let policy = if coupled_refill_ab() {
+            let policy = if coupled_refill_ab() || native_entry_ab() {
                 SchemeServiceCompletion::PipelineCycle
             } else if pipeline_cycle_ab() {
                 if arm {
@@ -94,6 +94,16 @@ pub(super) fn configure(
                     .policy,
                 policy
             );
+            if native_entry_ab() {
+                assert_eq!(
+                    pool.dispatcher()
+                        .configure_scheme_service_native_entry_on(owner, arm)
+                        .unwrap()
+                        .wait(GATE)
+                        .unwrap(),
+                    arm
+                );
+            }
             if coupled_refill_ab() {
                 assert_eq!(
                     pool.dispatcher()
@@ -203,6 +213,7 @@ pub(super) fn completion_ab() -> bool {
         || prepared_cycle_ab()
         || pipeline_cycle_ab()
         || coupled_refill_ab()
+        || native_entry_ab()
 }
 /// Outside the timing interval; actual native counters and quiescence checks.
 pub(super) fn completions(pool: &InstancePool) -> [u64; 3] {
@@ -244,6 +255,7 @@ pub(super) fn batched_completion_ab() -> bool {
         || prepared_cycle_ab()
         || pipeline_cycle_ab()
         || coupled_refill_ab()
+        || native_entry_ab()
 }
 
 pub(super) fn pipeline_cycle_ab() -> bool {
@@ -253,4 +265,8 @@ pub(super) fn pipeline_cycle_ab() -> bool {
 /// Same native constructor and completion ABI; only owner refill arbitration differs.
 pub(super) fn coupled_refill_ab() -> bool {
     std::env::args().any(|arg| arg == "--coupled-refill-ab")
+}
+
+pub(super) fn native_entry_ab() -> bool {
+    std::env::args().any(|arg| arg == "--native-entry-ab")
 }

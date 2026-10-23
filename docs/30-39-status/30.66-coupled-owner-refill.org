@@ -196,3 +196,9 @@ ordinary defaults stay as before.
 
 Frozen executable SHA256: =6d1ed4ace9c610ff87d750a2ca1bb3271ad3628e79b7a9165308e7d7793e6770=.
 Frozen source archive SHA256: =0b5106f2e3d62056a7811b7a392988d790fc0a1624a87fccdf06f05b9920e3f7=.
+
+* Follow-up
+
+[[file:30.67-scheme-owned-native-roundtrip.org][30.67]] implements an explicit Scheme-owned numeric round trip, retaining the
+failed input-only experiment, mixed-tail negatives and distinct watchdog records.
+The current default is unchanged.

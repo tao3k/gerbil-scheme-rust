@@ -201,7 +201,7 @@ fn prepare<M: SchemeServiceRequest>(
             work: Work::Service(Box::new(TypedJob {
                 message,
                 send,
-                submitted: false,
+                submitted: std::cell::Cell::new(false),
                 lane: None,
                 short: true,
                 trace,

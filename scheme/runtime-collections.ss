@@ -61,7 +61,7 @@
    gerbil-rs-numeric-span gerbil-rs-numeric-create gerbil-rs-numeric-size gerbil-rs-numeric-copy
    gerbil-rs-numeric-value gerbil-rs-numeric-batch-create
    gerbil-rs-numeric-batch-value gerbil-rs-numeric-header-at gerbil-rs-numeric-service-create
-   gerbil-rs-numeric-row-pointer gerbil-rs-numeric-row-size))
+   gerbil-rs-numeric-row-pointer gerbil-rs-numeric-row-size gerbil-rs-numeric-service-enter gerbil-rs-numeric-batch-snapshot gerbil-rs-numeric-batch-copy gerbil-rs-numeric-write-size))
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-identifier-create gerbil-rs-identifiers-prepare gerbil-rs-identifiers-copy
    gerbil-rs-object-identical
@@ -221,6 +221,61 @@ END-C
              (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-batch-value kind pointers sizes count quantum)))
                (if value
                  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! (vector operation value)) 0))))))))
+ (c-define (gerbil-rs-numeric-service-enter kind pointers sizes count quantum header length capability)
+   (int32 (pointer void) (pointer unsigned-int64) unsigned-int64 unsigned-int64 (pointer int64) unsigned-int64 int64) int64
+   "gerbil_scheme_rust_numeric_service_enter" "extern"
+   (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error #f)
+   (with-exception-catcher
+     (lambda (exception)
+       (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error
+         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message exception)) 0)
+     (lambda ()
+       (let ((entry (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref capability)))
+         (if (not (and (procedure? entry) (<= 2 length 4))) 0
+           (let* ((op (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at header 0))
+                  (lane (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at header 1))
+                  (short (if (>= length 3) (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at header 2) 0))
+                  (units (if (= length 4) (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at header 3) 1)))
+             (if (not (and (= op 1) (>= lane -1) (<= 0 short 1) (positive? units))) 0
+               (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-batch-value kind pointers sizes count quantum)))
+                 (if value
+                   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! (entry value lane (= short 1) units)) 0)))))))))
+ (define gerbil-rs-numeric-write-size
+   (c-lambda ((pointer unsigned-int64) unsigned-int64 unsigned-int64) void "___arg1[___arg2]=___arg3;"))
+ (c-define (gerbil-rs-numeric-batch-snapshot root kind sizes count)
+   (int64 int32 (pointer unsigned-int64) unsigned-int64) int64
+   "gerbil_scheme_rust_numeric_batch_snapshot" "extern"
+   (with-exception-catcher (lambda (_) 0)
+     (lambda ()
+       (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
+         (if (not (and (<= 1 count 256) (vector? value) (= count (vector-length value)))) 0
+           (let ((snapshot (##vector-copy value)))
+             (let scan ((index 0))
+               (if (= index count)
+                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! snapshot)
+                 (let ((size (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span (vector-ref snapshot index) kind #f 0 0 2)))
+                   (if (< size 0) 0
+                     (begin (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-write-size sizes index size)
+                       (scan (+ index 1)))))))))))))
+ (c-define (gerbil-rs-numeric-batch-copy root kind pointers sizes count)
+   (int64 int32 (pointer void) (pointer unsigned-int64) unsigned-int64) int32
+   "gerbil_scheme_rust_numeric_batch_copy" "extern"
+   (with-exception-catcher (lambda (_) -1)
+     (lambda ()
+       (let ((snapshot (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref root)))
+         (if (not (and (<= 1 count 256) (vector? snapshot) (= count (vector-length snapshot)))) -1
+           (let validate ((index 0))
+             (if (= index count)
+               (let copy ((index 0))
+                 (if (= index count) 0
+                   (if (= 0 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span
+                              (vector-ref snapshot index) kind
+                              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-pointer pointers index) 0
+                              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-size sizes index) 0))
+                     (copy (+ index 1)) -1)))
+               (if (= (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span (vector-ref snapshot index) kind #f 0 0 2)
+                      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-row-size sizes index))
+                 (validate (+ index 1)) -1))))))))
  (c-define (gerbil-rs-numeric-size root index kind) (int64 int64 int32) int64
    "gerbil_scheme_rust_numeric_size" "extern"
    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-span

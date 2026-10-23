@@ -22,9 +22,9 @@ impl<T: NumericElement + PartialEq + Debug + Send + 'static> SchemeServiceReques
     fn construct_service<'vm>(
         &mut self,
         session: &NativeSession<'vm>,
-        context: &SchemeServiceInput,
+        context: &SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
-        {
+        let snapshot = {
             let packet = context.numeric_batch(session, &self.items, 1)?;
             session.collect()?;
             let header = session.vector_element(&packet, 0)?;
@@ -36,7 +36,29 @@ impl<T: NumericElement + PartialEq + Debug + Send + 'static> SchemeServiceReques
             for (index, expected) in self.items.iter().enumerate() {
                 assert_eq!(&session.copy_numeric_element::<T>(&rows, index)?, expected);
             }
-        }
+            assert!(
+                session
+                    .numeric_batch_snapshot::<T>(&rows, self.items.len() + 1)
+                    .is_err()
+            );
+            if T::KIND == 7 {
+                assert!(
+                    session
+                        .numeric_batch_snapshot::<f64>(&rows, self.items.len())
+                        .is_err()
+                );
+            } else {
+                assert!(
+                    session
+                        .numeric_batch_snapshot::<i64>(&rows, self.items.len())
+                        .is_err()
+                );
+            }
+            session.numeric_batch_snapshot::<T>(&rows, self.items.len())?
+        };
+        // Only the private snapshot now pins the child identities.
+        session.collect()?;
+        assert_eq!(snapshot.copy(session)?, self.items);
         let value = self.construct(session)?;
         context.wrap(session, &value)
     }
@@ -85,7 +107,12 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     ] {
         let mut cfg = config();
         cfg.owners = 1;
-        let mut pool = InstancePool::start(&descriptor(false), cfg).unwrap();
+        let mut pool = InstancePool::start_observed(&descriptor(false), cfg, |_| {
+            progress
+                .send("typed numeric native owner initialized")
+                .unwrap();
+        })
+        .unwrap();
         let dispatch = pool.dispatcher();
         dispatch.configure_owner_budgets(4, Some(32)).unwrap();
         dispatch
@@ -111,11 +138,15 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             idle(&dispatch).await;
         });
         clean(&mut pool);
-        quota(runtime, policy);
+        quota(runtime, policy, progress);
         progress.send("native service envelope: nine numeric families, empty rows, GC, metadata, generic fallback and exact cumulative quota passed").unwrap();
     }
 }
-fn quota(runtime: &tokio::runtime::Runtime, policy: SchemeServiceCompletion) {
+fn quota(
+    runtime: &tokio::runtime::Runtime,
+    policy: SchemeServiceCompletion,
+    progress: &mpsc::Sender<&'static str>,
+) {
     let input = batch(false);
     let bytes = input
         .items
@@ -127,7 +158,12 @@ fn quota(runtime: &tokio::runtime::Runtime, policy: SchemeServiceCompletion) {
         let mut cfg = config();
         cfg.owners = 1;
         cfg.maximum_request_bytes = limit;
-        let mut pool = InstancePool::start(&descriptor(false), cfg).unwrap();
+        let mut pool = InstancePool::start_observed(&descriptor(false), cfg, |_| {
+            progress
+                .send("typed numeric native owner initialized")
+                .unwrap();
+        })
+        .unwrap();
         let dispatch = pool.dispatcher();
         dispatch.configure_owner_budgets(4, Some(32)).unwrap();
         dispatch
@@ -135,6 +171,13 @@ fn quota(runtime: &tokio::runtime::Runtime, policy: SchemeServiceCompletion) {
             .unwrap()
             .wait(GATE)
             .unwrap();
+        if policy == SchemeServiceCompletion::PipelineCycle {
+            dispatch
+                .configure_scheme_service_native_entry_on(0, true)
+                .unwrap()
+                .wait(GATE)
+                .unwrap();
+        }
         runtime.block_on(async {
             let value = dispatch
                 .submit_scheme_service_backpressured_on(0, batch(false), GATE)

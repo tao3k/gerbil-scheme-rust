@@ -50,10 +50,23 @@ pub trait SchemeServiceRequest: Send + 'static {
     fn construct_service<'vm>(
         &mut self,
         session: &NativeSession<'vm>,
-        input: &super::SchemeServiceInput,
+        input: &super::SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         let value = self.construct(session)?;
         input.wrap(session, &value)
+    }
+    /// Construct and admit one service input. The returned root is the native
+    /// identity receipt, not the payload. Use the context's submission methods
+    /// so an attempted entry remains visible even if native code fails.
+    /// # Errors
+    /// Construction, quotas, service admission or caught Scheme exceptions.
+    fn enter_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &super::SchemeServiceInput<'_>,
+    ) -> Result<super::SchemeServiceSubmission<'vm>, InstanceError> {
+        let value = self.construct_service(session, input)?;
+        input.submit(session, &value)
     }
     /// Project a completed Scheme value before releasing its temporary root.
     /// # Errors
@@ -84,9 +97,16 @@ impl<T: NumericElement + Send + 'static> SchemeServiceRequest for NumericService
     fn construct_service<'vm>(
         &mut self,
         session: &NativeSession<'vm>,
-        input: &super::SchemeServiceInput,
+        input: &super::SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         input.numeric_batch(session, &self.items, self.yield_every)
+    }
+    fn enter_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &super::SchemeServiceInput<'_>,
+    ) -> Result<super::SchemeServiceSubmission<'vm>, InstanceError> {
+        input.enter_numeric(session, &self.items, self.yield_every)
     }
     fn project(
         self,
@@ -154,7 +174,7 @@ impl InstanceDispatcher {
                 lane,
                 short,
                 trace,
-                submitted: false,
+                submitted: std::cell::Cell::new(false),
             })),
         };
         self.enqueue(owner, request)?;
@@ -233,7 +253,7 @@ pub(super) trait Job: Send {
 pub(super) struct TypedJob<M: SchemeServiceRequest> {
     pub(super) message: M,
     pub(super) send: oneshot::Sender<super::types::Completed<M::Output>>,
-    pub(super) submitted: bool,
+    pub(super) submitted: std::cell::Cell<bool>,
     pub(super) lane: Option<SchemeServiceLane>,
     pub(super) short: bool,
     pub(super) trace: Option<Arc<super::SchemeServiceEntryTrace>>,
@@ -246,7 +266,7 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
         self.short
     }
     fn may_have_entered(&self) -> bool {
-        self.submitted
+        self.submitted.get()
     }
     fn start(
         &mut self,
@@ -278,11 +298,10 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
                 } else {
                     2
                 };
-                let context = super::SchemeServiceInput::new(header, length, start.fused);
-                let input = self.message.construct_service(session, &context)?;
-                self.submitted = true;
-                let token = call(session, &input)?;
-                let ids = session.copy_numeric::<i64>(&token)?;
+                let context =
+                    super::SchemeServiceInput::new(header, length, start.fused, &self.submitted);
+                let token = self.message.enter_service(session, &context)?;
+                let ids = session.copy_numeric::<i64>(&token.receipt)?;
                 if ids.len() != 1 || ids[0] <= 0 {
                     return Err(InstanceError::InvalidConfig("Scheme service identity"));
                 }
@@ -350,7 +369,7 @@ pub(super) fn envelope<'vm>(
     Ok(value)
 }
 
-fn call<'vm>(
+pub(super) fn call<'vm>(
     session: &NativeSession<'vm>,
     input: &NativeRoot<'_>,
 ) -> Result<NativeRoot<'vm>, InstanceError> {

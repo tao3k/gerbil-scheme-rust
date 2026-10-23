@@ -96,7 +96,7 @@ impl SchemeServiceRequest for Orders {
     fn construct_service<'vm>(
         &mut self,
         session: &NativeSession<'vm>,
-        input: &gerbil_scheme::instances::SchemeServiceInput,
+        input: &gerbil_scheme::instances::SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         if self.short_mode.native() {
             let value = self.construct(session)?;
@@ -112,6 +112,20 @@ impl SchemeServiceRequest for Orders {
         }
         self.constructed = Some(Instant::now());
         Ok(value)
+    }
+    fn enter_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &gerbil_scheme::instances::SchemeServiceInput<'_>,
+    ) -> Result<gerbil_scheme::instances::SchemeServiceSubmission<'vm>, InstanceError> {
+        if self.short_mode.native() || !super::settings::native_entry_ab() {
+            let value = self.construct_service(session, input)?;
+            return input.submit(session, &value);
+        }
+        self.entered = Some(Instant::now());
+        let receipt = self.request.enter_service(session, input)?;
+        self.constructed = Some(Instant::now());
+        Ok(receipt)
     }
     fn project(
         mut self,

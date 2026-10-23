@@ -306,7 +306,7 @@ fn owner_completion_scenarios_and_control() {
             "--main",
             domain,
             "--match",
-            "(completion|coalesced|nativeCycle|preparedCycle|pipeline).*Test",
+            "(completion|coalesced|nativeCycle|nativeEntry|preparedCycle|pipeline).*Test",
             "--seed",
             "1",
         ]);

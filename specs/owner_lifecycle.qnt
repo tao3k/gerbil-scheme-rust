@@ -903,7 +903,7 @@ module service_sharing {
     blocked: Set[int], gc: Set[int], paused: Set[int], age: int -> int, overtakes: int -> int,
     feedUsed: int -> int, feedMax: int,
     split: bool, eager: bool, reserved: bool, fairCpu: bool, bounded: bool,
-    completionFair: bool, coalesced: bool, nativeCycle: bool, readyFirst: bool, pipeline: bool, fillBudget: int -> int, prepared: Set[int], harvested: Set[int], batchSlots: Set[int],
+    completionFair: bool, coalesced: bool, nativeCycle: bool, readyFirst: bool, pipeline: bool, submitCapabilities: Set[int], fillBudget: int -> int, prepared: Set[int], harvested: Set[int], batchSlots: Set[int],
     completionEpoch: int -> int, tokenEpoch: int -> int, completionDue: Set[int],
     entryGap: bool, cpuGap: bool, resourceViolation: bool
   }
@@ -923,7 +923,7 @@ module service_sharing {
       blocked: Set(), gc: Set(), paused: Set(), age: JOBS.mapBy(_ => 0), overtakes: JOBS.mapBy(_ => 0),
       feedUsed: owners.mapBy(_ => 0), feedMax: feed0,
       split: split0, eager: eager0, reserved: reserved0, fairCpu: cpu0, bounded: bounded0,
-      completionFair: false, coalesced: false, nativeCycle: false, readyFirst: false, pipeline: false, fillBudget: owners.mapBy(_ => 0), prepared: Set(), harvested: Set(), batchSlots: Set(),
+      completionFair: false, coalesced: false, nativeCycle: false, readyFirst: false, pipeline: false, submitCapabilities: Set(), fillBudget: owners.mapBy(_ => 0), prepared: Set(), harvested: Set(), batchSlots: Set(),
       completionEpoch: owners.mapBy(_ => 0), tokenEpoch: owners.mapBy(_ => -1), completionDue: Set(),
       entryGap: false, cpuGap: false, resourceViolation: false }
   }
@@ -1083,6 +1083,19 @@ module service_sharing {
   action endFill(owner: int): bool = all { life::stutter, q' = { ...q, fillBudget: q.fillBudget.set(owner, 0) } }
   // A notification carries no request, reservation or root. It consumes one
   // bounded owner turn rather than discarding all remaining refill opportunity.
+  // One owner-local native entry capability; application inputs never become
+  // reusable buffers. Revocation does not refund or move request reservations.
+  action acquireSubmitCapability(owner: int): bool = all {
+    q.pipeline, life::s.phase == "open", not(q.submitCapabilities.contains(owner)),
+    rootedJobs.filter(r => ASSIGNED.get(r) == owner).size() == 0,
+    life::stutter, q' = { ...q, submitCapabilities: q.submitCapabilities.union(Set(owner)) }
+  }
+  action revokeSubmitCapability(owner: int): bool = all {
+    life::stutter, q' = { ...q, submitCapabilities: q.submitCapabilities.exclude(Set(owner)) }
+  }
+  action nativeEntry(r: int): bool = all {
+    q.submitCapabilities.contains(ASSIGNED.get(r)), enterPrepared(r)
+  }
   action refillWake(owner: int): bool = all {
     q.pipeline, q.fillBudget.get(owner) > 0, life::stutter,
     q' = { ...q, fillBudget: q.fillBudget.set(owner, q.fillBudget.get(owner) - 1) }
@@ -1128,11 +1141,12 @@ module service_sharing {
   action resourceJoin = all {
     q.gc.size() == 0, q.paused.size() == 0, workers.forall(w => q.jobs.get(w) == 0),
     not(q.coalesced) or (q.completionDue.size() == 0 and owners.forall(o => q.tokenEpoch.get(o) == -1)),
-    life::join, q' = q
+    life::join, q' = { ...q, submitCapabilities: Set() }
   }
   action resourceStutter = all { life::stutter, q' = q }
   val resourceSafety = and {
-    life::safety, entries(q.host) == life::s.inbox,
+    life::safety, q.submitCapabilities.subseteq(owners),
+    implies(life::s.phase == "joined", q.submitCapabilities.size() == 0), entries(q.host) == life::s.inbox,
     q.host.length() == entries(q.host).size(), q.queued.length() == entries(q.queued).size(),
     entries(q.queued).union(workers.map(w => q.jobs.get(w)).exclude(Set(0))) == life::s.servicePending.exclude(life::s.serviceReady),
     workers.map(w => q.jobs.get(w)).filter(r => r != 0).size() == workers.filter(w => q.jobs.get(w) != 0).size(),
@@ -1181,7 +1195,7 @@ module service_sharing {
     nondet r = JOBS.oneOf()
     nondet w = workers.oneOf()
     nondet owner = owners.oneOf()
-    any { endFill(owner), refillWake(owner), prepareInput(r), enterPrepared(r), discardPrepared(r), offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
+    any { acquireSubmitCapability(owner), revokeSubmitCapability(owner), nativeEntry(r), endFill(owner), refillWake(owner), prepareInput(r), enterPrepared(r), discardPrepared(r), offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
       block(w), wakeTask(w), gcStart(owner), gcFinish(owner), osPause(owner), osResume(owner), delayTick,
       harvest(owner, Set(r)), batchTransfer(owner), completionAck(owner, q.tokenEpoch.get(owner)), project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
   }
@@ -1249,6 +1263,15 @@ module service_sharing_cases {
   action pipelineWakeControlProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(project(2))
     .then(completionAck(1,1)).then(refillWake(1)).then(endFill(1)).then(resourceClose).then(discardPrepared(3))
     .then(all { assert(q.fillBudget.get(1) == 0), assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  action nativeEntryCapabilityProof = pipelineHeldStart.then(project(1)).then(project(2)).then(completionAck(1,1))
+    .then(acquireSubmitCapability(1)).then(prepareInput(3)).then(nativeEntry(3))
+    .then(all { assert(q.submitCapabilities == Set(1)), assert(q.fillBudget.get(1) == 1), assert(resourceSafety), resourceStutter })
+  action nativeEntryCancelCloseProof = pipelineCycleStart.then(acquireSubmitCapability(1)).then(prepareInput(3))
+    .then(resourceClose).then(discardPrepared(3)).then(resourceJoin)
+    .then(all { assert(q.submitCapabilities.size() == 0), assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  action nativeEntryRevokeProof = pipelineCycleStart.then(acquireSubmitCapability(1)).then(prepareInput(3))
+    .then(revokeSubmitCapability(1)).then(all { assert(q.prepared == Set(3)), assert(q.submitCapabilities.size() == 0), assert(resourceSafety), resourceStutter })
+    .then(resourceClose).then(discardPrepared(3)).then(resourceJoin)
   action pipelineCancelCloseProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(resourceClose)
     .then(discardPrepared(3)).then(project(2)).then(completionAck(1,1)).then(resourceJoin)
     .then(all { assert(q.fillBudget.get(1) == 0), assert(resourceSafety), resourceStutter })
@@ -1360,6 +1383,9 @@ module service_completion_small {
   import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4), CASE_ASSIGNED = Set(1, 2, 3, 4).mapBy(_ => 1)).*
   run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
   // These witnesses require two bulk jobs assigned to one owner.
+  run nativeEntryCapabilityTest = nativeEntryCapabilityProof
+  run nativeEntryCancelCloseTest = nativeEntryCancelCloseProof
+  run nativeEntryRevokeTest = nativeEntryRevokeProof
   run pipelineRefillTest = pipelineRefillProof
   run pipelineWakeRefillTest = pipelineWakeRefillProof
   run pipelineWakeControlTest = pipelineWakeControlProof
@@ -1377,6 +1403,9 @@ module service_completion_wide {
   import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4, 5), CASE_ASSIGNED = Set(1, 2, 3, 4, 5).mapBy(r => if (r == 5) 2 else 1)).*
   run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
   // These witnesses require two bulk jobs assigned to one owner.
+  run nativeEntryCapabilityTest = nativeEntryCapabilityProof
+  run nativeEntryCancelCloseTest = nativeEntryCancelCloseProof
+  run nativeEntryRevokeTest = nativeEntryRevokeProof
   run pipelineRefillTest = pipelineRefillProof
   run pipelineWakeRefillTest = pipelineWakeRefillProof
   run pipelineWakeControlTest = pipelineWakeControlProof

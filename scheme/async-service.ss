@@ -369,7 +369,7 @@
 ;; ABI v5 adds 11=read actual cooperative budget and native wake mode.
 ;; ABI v3 adds 8=configure cooperative units (zero disables), 9=unit counters.
 ;; Hooks remain Scheme-owned; open/close track partially allocated app resources.
-(def (make-gerbil-rs-service-endpoint handler workers on-open on-prepare on-close)
+(def (make-gerbil-rs-service-endpoint handler workers on-open on-prepare on-close (native-entry? #f))
   (let ((service #f) (opened #f) (preparing #f))
     (def (prepare!)
       (unless preparing
@@ -389,7 +389,7 @@
            (on-open)
            (set! service (make-gerbil-rs-service handler workers (s64vector-ref header 3)
                           (s64vector-ref header 1) (s64vector-ref header 2)))
-           (s64vector 0 11 workers (s64vector-ref header 3)))
+           (s64vector 0 12 workers (s64vector-ref header 3)))
           ((1)
            (unless service (error "Scheme service not open"))
            (unless (or (= (s64vector-length header) 2)
@@ -400,6 +400,17 @@
            (s64vector (gerbil-rs-service-submit! service (vector-ref command 1) (s64vector-ref header 1)
                         (and (>= (s64vector-length header) 3) (= (s64vector-ref header 2) 1))
                         (if (= (s64vector-length header) 4) (s64vector-ref header 3) 1))))
+          ((19)
+           (unless (and native-entry? service (not preparing) (= (s64vector-length header) 1)
+                        (= (scheme-service-completion-mode service) 5)
+                        (zero? (table-length (scheme-service-jobs service)))
+                        (zero? (gerbil-rs-result-batch-pending (scheme-service-completion-batch service)))
+                        (= (scheme-service-completion-token service) -1)
+                        (not (scheme-service-completion-due service)))
+             (error "native entry requires idle PipelineCycle"))
+           (lambda (input lane short? units)
+             (unless (and service (not preparing)) (error "native service entry closed"))
+             (s64vector (gerbil-rs-service-submit! service input lane short? units))))
           ((13)
            (unless (and service (= (s64vector-length header) 2) (not preparing)
                         (memv (s64vector-ref header 1) '(0 1 2 3 4 5))

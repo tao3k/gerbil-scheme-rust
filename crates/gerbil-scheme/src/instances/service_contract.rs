@@ -66,9 +66,16 @@ impl<M: SchemeServiceRequest> SchemeServiceRequest for Checked<M> {
     fn construct_service<'vm>(
         &mut self,
         session: &NativeSession<'vm>,
-        input: &super::SchemeServiceInput,
+        input: &super::SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.message.construct_service(session, input)
+    }
+    fn enter_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &super::SchemeServiceInput<'_>,
+    ) -> Result<super::SchemeServiceSubmission<'vm>, InstanceError> {
+        self.message.enter_service(session, input)
     }
     fn project(
         self,

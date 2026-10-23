@@ -60,6 +60,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::ProgressFair if super::settings::native_entry_ab() => {
+                "same VMs, native payload and refill; rooted envelope handoff versus Scheme-owned construction/admission capability"
+            }
             Self::ProgressFair if super::settings::coupled_refill_ab() => {
                 "same VMs and fused native inputs; barrier refill versus bounded FIFO/short/supply owner turns"
             }
@@ -542,22 +545,30 @@ fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Compa
             .unwrap()
             .enabled
     );
+    value["native_entry_ab"] = json!(super::settings::native_entry_ab());
+    value["native_entry"] = json!(super::settings::native_entry_ab() && arm);
+    value["native_bulk_projection"] = json!(super::settings::native_entry_ab() && arm);
+    value["bulk_construct_includes_submit"] = json!(super::settings::native_entry_ab());
     value["coupled_refill_ab"] = json!(super::settings::coupled_refill_ab());
     value["coupled_refill"] = json!(super::settings::coupled_refill_ab() && arm);
     value["pipeline_cycle_ab"] = json!(super::settings::pipeline_cycle_ab());
     value["pipeline_service_cycle"] = json!(
-        super::settings::coupled_refill_ab() || (super::settings::pipeline_cycle_ab() && arm)
+        super::settings::native_entry_ab()
+            || super::settings::coupled_refill_ab()
+            || (super::settings::pipeline_cycle_ab() && arm)
     );
     value["prepared_cycle_ab"] = json!(super::settings::prepared_cycle_ab());
     value["native_cycle_ab"] = json!(super::settings::native_cycle_ab());
     value["native_service_cycle"] = json!(
-        super::settings::coupled_refill_ab()
+        super::settings::native_entry_ab()
+            || super::settings::coupled_refill_ab()
             || super::settings::pipeline_cycle_ab()
             || super::settings::prepared_cycle_ab()
             || (super::settings::native_cycle_ab() && arm)
     );
     value["prepared_input_cycle"] = json!(
-        super::settings::coupled_refill_ab()
+        super::settings::native_entry_ab()
+            || super::settings::coupled_refill_ab()
             || super::settings::pipeline_cycle_ab()
             || (super::settings::prepared_cycle_ab() && arm)
     );

@@ -62,15 +62,19 @@ mod service_contract;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_contract::SchemeServiceExecution;
 #[cfg(feature = "tokio-dispatch")]
+mod numeric_snapshot;
+#[cfg(feature = "tokio-dispatch")]
 mod service_cycle;
 #[cfg(feature = "tokio-dispatch")]
 mod service_input;
+#[cfg(feature = "tokio-dispatch")]
+pub use numeric_snapshot::NativeNumericSnapshot;
 #[cfg(feature = "tokio-dispatch")]
 mod service_loop;
 #[cfg(feature = "tokio-dispatch")]
 mod service_prepare;
 #[cfg(feature = "tokio-dispatch")]
-pub use service_input::SchemeServiceInput;
+pub use service_input::{SchemeServiceInput, SchemeServiceSubmission};
 mod service_wake;
 #[cfg(feature = "tokio-dispatch")]
 pub use service::{NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest};

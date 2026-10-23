@@ -127,9 +127,16 @@ impl<M: SchemeServiceRequest> SchemeServiceRequest for RoutedRequest<M> {
     fn construct_service<'vm>(
         &mut self,
         session: &NativeSession<'vm>,
-        input: &super::super::SchemeServiceInput,
+        input: &super::super::SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.message.construct_service(session, input)
+    }
+    fn enter_service<'vm>(
+        &mut self,
+        session: &NativeSession<'vm>,
+        input: &super::super::SchemeServiceInput<'_>,
+    ) -> Result<super::super::SchemeServiceSubmission<'vm>, InstanceError> {
+        self.message.enter_service(session, input)
     }
     fn project(
         self,

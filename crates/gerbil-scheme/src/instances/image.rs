@@ -53,6 +53,7 @@ pub(super) struct Image {
     pub(super) retained: RefCell<BTreeMap<u64, i64>>,
     pub(super) next_retained: Cell<u64>,
     pub(super) service_root: Cell<Option<u64>>,
+    pub(super) entry_root: Cell<Option<u64>>,
     live: bool,
     file: PathBuf,
     _owner: PhantomData<Rc<()>>,
@@ -211,6 +212,7 @@ impl Image {
                 retained: RefCell::new(BTreeMap::new()),
                 next_retained: Cell::new(1),
                 service_root: Cell::new(None),
+                entry_root: Cell::new(None),
                 roots,
                 gc,
                 input,
@@ -351,6 +353,9 @@ impl Image {
         if self.service_root.get().is_some_and(|id| id >= first) {
             self.service_root.set(None);
         }
+        if self.entry_root.get().is_some_and(|id| id >= first) {
+            self.entry_root.set(None);
+        }
         for (_, root) in roots {
             // SAFETY: each removed arena entry owns exactly one local native root.
             if unsafe { (self.release)(root) } != 1 {
@@ -360,6 +365,7 @@ impl Image {
     }
     fn release_retained(&self) {
         self.service_root.set(None);
+        self.entry_root.set(None);
         for (_, root) in std::mem::take(&mut *self.retained.borrow_mut()) {
             // SAFETY: store exclusively owns these roots on this fixed owner.
             if unsafe { (self.release)(root) } != 1 {

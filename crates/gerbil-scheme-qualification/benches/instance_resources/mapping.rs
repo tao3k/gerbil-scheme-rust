@@ -24,6 +24,9 @@ pub(super) fn release(observer: &Observer, progress: &Progress) {
             observed(progress, "observed successful native owner initialization");
         })
         .unwrap();
+        let (resource, path) = super::leases::owned_file(cycle);
+        pool.retain_owner_resource(&resource).unwrap();
+        drop(resource);
         eprintln!(
             "POOL-READY cycle={cycle} startup-ns={}",
             startup.elapsed().as_nanos()
@@ -39,6 +42,11 @@ pub(super) fn release(observer: &Observer, progress: &Progress) {
         }
         let receipt = pool.shutdown(GATE);
         assert!(receipt.is_clean(), "{receipt:?}");
+        assert!(
+            !path.exists(),
+            "host resource must retire before clean join publication"
+        );
+        assert!(pool.retain_owner_resource(&Arc::new(())).is_err());
         assert_eq!(receipt.mappings.len(), 4);
         assert!(
             receipt

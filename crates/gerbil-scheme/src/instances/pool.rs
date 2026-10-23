@@ -1,7 +1,9 @@
 //! Fixed native owner construction, queue draining and bounded joins.
 use super::{
     InstanceConfig, InstanceDispatcher, InstanceError, InstanceReply, InstanceTicket,
-    IsolatedProgram, OwnerReceipt, OwnerShutdown, ShutdownReceipt, image::Image,
+    IsolatedProgram, OwnerReceipt, OwnerShutdown, ShutdownReceipt,
+    image::Image,
+    mapping::{ImageMappingState, Mapping},
 };
 use std::os::unix::fs::DirBuilderExt;
 use std::{
@@ -22,7 +24,8 @@ static GENERATION: AtomicUsize = AtomicUsize::new(0);
 #[derive(Debug)]
 struct OwnerThread {
     worker: thread::JoinHandle<()>,
-    mapping: Arc<super::mapping::Mapping>,
+    mapping: Arc<Mapping>,
+    resources: Vec<Arc<dyn std::fmt::Debug + Send + Sync>>,
 }
 
 #[derive(Debug)]
@@ -247,7 +250,11 @@ impl InstancePool {
             })?;
         self.dispatcher.add_sender(sender, wake);
         self.mappings.push(Arc::clone(&mapping));
-        self.threads.push(Some(OwnerThread { worker, mapping }));
+        self.threads.push(Some(OwnerThread {
+            worker,
+            mapping,
+            resources: Vec::new(),
+        }));
         let receipt = initialized
             .recv_timeout(config.startup_timeout)
             .map_err(|_| InstanceError::Timeout)??;
@@ -257,6 +264,26 @@ impl InstancePool {
             ));
         }
         self.receipts.push(receipt);
+        Ok(())
+    }
+
+    /// Retain Rust-owned data until every owner completes its actual native join.
+    /// Register resources before admitting work that uses them. Destructors must
+    /// not re-enter the retiring VM. Failed cleanup/panic retains its resources
+    /// with the quarantined owner; this never authorizes native code unload.
+    /// Destructor panics are reported as retirement failures, without abandoning peers.
+    /// # Errors
+    /// Rejects registration after owner joining has started.
+    pub fn retain_owner_resource<T>(&mut self, resource: &Arc<T>) -> Result<(), InstanceError>
+    where
+        T: std::fmt::Debug + Send + Sync + 'static,
+    {
+        if self.joins.is_some() || self.threads.iter().any(Option::is_none) {
+            return Err(InstanceError::Closed);
+        }
+        for owner in self.threads.iter_mut().flatten() {
+            owner.resources.push(resource.clone());
+        }
         Ok(())
     }
 
@@ -323,8 +350,29 @@ impl InstancePool {
     ) {
         let Ok(workers) = workers.recv() else { return };
         for (_, worker) in workers {
-            let panicked = worker.worker.join().is_err();
+            let mut panicked = worker.worker.join().is_err();
             worker.mapping.joined(panicked);
+            if matches!(
+                worker.mapping.snapshot().state,
+                ImageMappingState::Quarantined
+                    | ImageMappingState::Unloading
+                    | ImageMappingState::ReleaseFailed(_)
+            ) {
+                // Losing the host wrapper must not free data reachable by an
+                // owner whose native retirement was not verified.
+                std::mem::forget(worker.resources);
+            } else {
+                // Drop arbitrary host data outside every lifecycle/state lock,
+                // and before publishing completion to the shutdown observer.
+                for resource in worker.resources {
+                    panicked |=
+                        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(resource)))
+                            .is_err();
+                }
+                if panicked {
+                    worker.mapping.quarantine();
+                }
+            }
             let _ = reports.send(panicked);
         }
     }
@@ -386,3 +434,7 @@ impl Drop for InstancePool {
         self.begin_joining();
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/owner_resources.rs"]
+mod resource_tests;

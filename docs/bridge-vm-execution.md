@@ -303,3 +303,26 @@ retirement while another image continues, and actual `dlclose`. A test-only
 notifier return tail checks that teardown waits for thread exit. These controls
 complement application semantic tests; they are not latency or source-refinement
 proofs. The existing code-lease and quarantined-image rules remain in force.
+
+### Rust-owned VM resources
+
+`InstancePool::retain_owner_resource` attaches ordinary `Send + Sync` Rust data
+before requests using that data are admitted. The existing join coordinator
+retains one lease for every owner and retires the data only after actual native
+thread return, outside lifecycle/state locks and before publishing completion.
+This supports private compiler-carrier directories without another scheduler,
+cleanup thread, VM entry, or native-unload assertion. VM roots remain owner-local;
+this API does not make Scheme values transferable.
+
+Unverified cleanup and quarantined mappings retain their data leases. Resource
+destructor panics report retirement failure without losing join notification or
+abandoning peers. Destructors must not re-enter the retiring VM. Code that can
+outlive VM ownership still requires its separate native code lease.
+
+Controls cover two independent native-return tails, last-owner shared data
+retirement, quarantined cleanup and a panicking host destructor. The unchanged
+32-owner mapping-release qualification also leases a real file on each pool,
+checks its retirement before clean shutdown is published, and rejects registration
+after joining starts. Original FD, thread, actual-unmap and five-second gates
+remain in effect. These executable controls do not establish complete Rust/C/SDK
+source refinement.

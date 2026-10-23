@@ -9,6 +9,8 @@ mod capture_failure;
 mod contracts;
 #[path = "instance_resources/green.rs"]
 mod green;
+#[path = "instance_resources/leases.rs"]
+mod leases;
 #[path = "instance_resources/mapping.rs"]
 mod mapping;
 #[path = "instance_resources/observe.rs"]

@@ -22,3 +22,7 @@ mod toolchain_program;
 mod value_surface;
 #[path = "unit/vm_capabilities.rs"]
 mod vm_capabilities;
+
+#[cfg(all(target_os = "macos", feature = "isolated-instances"))]
+#[path = "unit/instance_timer.rs"]
+mod instance_timer;

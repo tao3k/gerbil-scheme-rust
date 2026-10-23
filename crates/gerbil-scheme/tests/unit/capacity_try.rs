@@ -153,9 +153,9 @@ fn cancellation_publishes_after_internal_partial_work_is_returned() {
                 visible: AtomicUsize::new(usize::MAX),
             });
             let waker = Waker::from(Arc::clone(&probe));
-            let mut changed = Box::pin(changes.changed());
+            let mut notification = Box::pin(changes.changed());
             assert!(
-                changed
+                notification
                     .as_mut()
                     .poll(&mut Context::from_waker(&waker))
                     .is_pending()

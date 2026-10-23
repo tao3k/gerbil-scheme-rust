@@ -257,3 +257,49 @@ The [tail attribution and paired same-VM A/B](30-39-status/30.08-native-batch-ta
 separates owner dispatch, native construction/GC, Scheme execution and result
 projection. It retains a small Scheme scheduling repair and documents the
 rejected coordinator-reuse experiment and the remaining p99 boundary.
+
+
+## Private-image heartbeat ownership
+
+The paired Darwin SDK uses `ITIMER_REAL` and `SIGALRM`. These are process-wide,
+while each statically linked image has its own Gambit interrupt state. Installing
+a second image's signal handler directed heartbeats to the last image; cleaning
+up an image could disable every image's timer. A bounded downstream control
+passed with one VM and failed with two live VMs before either VM was retired.
+
+`ffi/instance_timer.h` supplies image-local bindings for this SDK timer seam.
+Host callers still resolve libc's original timer and signal functions. Each
+image owns one joinable OS notifier in addition to its single Scheme execution
+and GC owner. The notifier only calls the SDK's asynchronous interrupt primitive;
+it never enters Scheme or allocates Scheme objects. Its complete thread return
+is joined before native heap cleanup and image retirement. All notifier threads
+must therefore be included in process resource accounting.
+
+Heartbeat masking, pending notification coalescing, periodic and one-shot timer
+state remain private to the image. Only the VM owner changes the virtual mask;
+foreign OS threads retain their own signal mask. The adapter targets the paired
+SDK's ordinary `sigaction` handler, and rejects incompatible handler modes.
+Clock, thread creation and join failures cannot establish clean native teardown.
+This does not prove the SDK interrupt implementation or general-purpose signal
+handler equivalence for arbitrary foreign modules.
+
+The first candidate used libdispatch. It was rejected: the unchanged five-second
+mapping resource gate retained two global workqueue threads after all VM owners
+had exited. A separate delayed-return control also distinguished a signaled
+completion from complete callback return. Neither gate was relaxed. The joinable
+notifier returns process thread counts to their original baseline, including
+repeated native initialization, GC, typed calls, continuation use and unmapping.
+
+Reproducible controls are part of the existing native CI job:
+
+```sh
+cargo test -p gerbil-scheme --features tokio-dispatch --test unit_test instance_timer --locked -- --test-threads=12
+cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --profile dev --locked -- --mapping-release
+```
+
+The standalone timer control preserves a live host `SIGALRM` timer, checks two
+independent images, owner masking and pending delivery, invalid intervals,
+retirement while another image continues, and actual `dlclose`. A test-only
+notifier return tail checks that teardown waits for thread exit. These controls
+complement application semantic tests; they are not latency or source-refinement
+proofs. The existing code-lease and quarantined-image rules remain in force.

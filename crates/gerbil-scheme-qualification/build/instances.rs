@@ -39,6 +39,7 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
             "../../../ffi/host_io.h",
             "../../../ffi/instance.h",
             "../../../ffi/instance_loader.h",
+            "../../../ffi/instance_timer.h",
             "../../../ffi/instance.c",
             "owner_memory.h",
             "owner_wait.h",

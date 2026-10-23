@@ -3,6 +3,9 @@
 #include "runtime.c"
 #include "instance.h"
 #include "instance_loader.h"
+#if defined(__APPLE__)
+#include "instance_timer.h"
+#endif
 #include <time.h>
 #if defined(__APPLE__)
 /* Darwin private pthread SPI, available since macOS 10.12. This backend
@@ -41,9 +44,20 @@ int32_t gerbil_scheme_instance_setup(uint32_t owner) {
   }
 #endif
   setup_phase = 1;
+#if defined(__APPLE__)
+  gerbil_timer_init_owner();
+#endif
   int32_t status = gerbil_scheme_rust_runtime_init_program_single_processor(GERBIL_INSTANCE_LINKER);
+#if defined(__APPLE__)
+  if (status == 0 && gerbil_timer_status() != 0) {
+    if (gerbil_timer_cleanup() != 0) return 4;
+    gerbil_scheme_rust_runtime_cleanup();
+    status = 4;
+  }
+#endif
   if (status != 0) {
 #if defined(__APPLE__)
+    gerbil_timer_cleanup();
     pthread_fchdir_np(-1);
 #endif
     return status;
@@ -85,6 +99,9 @@ uint64_t gerbil_scheme_instance_io_retired_bytes(void) { return retired_io_bytes
 int32_t gerbil_scheme_instance_cleanup(void) {
   if (gerbil_scheme_rust_state != 1 || ___VMSTATE->processor_count != 1)
     return -1;
+#if defined(__APPLE__)
+  if (gerbil_timer_cleanup() != 0) return -4;
+#endif
   ___fdset *set = &___PSTATE->os.fdset;
   void *owned[] = { set->readfds, set->writefds, set->exceptfds };
   uint64_t bytes = ((uint64_t)set->size + 7) / 8;
@@ -92,6 +109,9 @@ int32_t gerbil_scheme_instance_cleanup(void) {
   set->size = 0;
   __atomic_store_n(&gerbil_loader_retiring, 1, __ATOMIC_SEQ_CST);
   int32_t status = gerbil_scheme_rust_runtime_cleanup();
+#if defined(__APPLE__)
+  if (status == 0 && gerbil_timer_status() != 0) status = -4;
+#endif
   __atomic_store_n(&gerbil_loader_retiring, 0, __ATOMIC_SEQ_CST);
   os_unfair_lock_lock(&gerbil_module_lock);
   int capture_failed = gerbil_module_capture_failures != 0;

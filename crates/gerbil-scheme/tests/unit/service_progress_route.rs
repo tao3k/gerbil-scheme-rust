@@ -105,7 +105,7 @@ fn request(units: usize) -> Request {
                 yield_every: 1,
             },
             send,
-            submitted: false,
+            submitted: false.into(),
             lane: None,
             short: false,
             trace: None,

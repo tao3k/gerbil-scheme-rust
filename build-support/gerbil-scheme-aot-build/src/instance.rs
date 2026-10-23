@@ -49,6 +49,7 @@ pub fn build_native_instance_image(
         "ffi/instance.c",
         "ffi/instance.h",
         "ffi/instance_loader.h",
+        "ffi/instance_timer.h",
         "ffi/runtime.c",
         "ffi/host_io.h",
     ] {

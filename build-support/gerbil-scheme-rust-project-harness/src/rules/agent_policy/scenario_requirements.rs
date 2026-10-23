@@ -264,7 +264,7 @@ const POLICY_SCENARIO_REQUIREMENTS: &[RustPolicyScenarioRequirement] = policy_sc
         RUST_AGENT_POLICY_NATIVE_ABI_CONTRACT_V1,
         "native-abi-contract-surface-v1",
         "RUST-AGENT-NATIVE-ABI-001",
-        "tests/unit/scenarios/software_criteria/native_abi_contract_surface_v1"
+        "tests/unit/scenarios/software_criteria/abi_contract_surface_v1"
     ),
     (
         RUST_PROJ_R023,

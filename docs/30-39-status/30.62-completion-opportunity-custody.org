@@ -1,0 +1,305 @@
+#+title: Completion opportunity custody and coalesced retirement
+#+options: toc:nil num:nil
+
+* Architectural decision from the accumulated evidence
+
+The previous reports establish distinct boundaries, not a sequence of admitted
+speedups. [[file:30.58-capacity-backed-peer-delivery.org][30.58]], [[file:30.59-revocable-offer-native-entry.org][30.59]] and [[file:30.60-dedicated-offer-ports.org][30.60]] separate Rust offers from native admission;
+[[file:30.61-scheme-completion-handoff.org][30.61]] establishes real late short admission before Scheme successor selection,
+but its explicit handoff candidates fail throughput/tail admission. There is no
+basis for promoting them by choosing a favorable workload or percentage.
+
+| Plane | Authority | Required invariant |
+|-------+-----------+--------------------|
+| Unentered input | Rust pool/owner claim protocol | Revocable owned input; no Scheme roots or sleeping native credits |
+| Entered execution | Complete owner-local Scheme runtime | Actors, green threads, GC and continuations stay on that VM |
+| Completion opportunity | Scheme publication epoch | Acknowledging old work cannot erase a later publication |
+| Ready result custody | One fixed-owner token | Every handed ID remains rooted until native take/projection |
+| Resource retirement | Existing per-result native permit | Projection/root balance returns this result's credit immediately |
+
+Queue separation alone cannot isolate shared VM CPU, GC or synchronous foreign
+calls. Conversely, making every completed bulk graph yield to Rust adds crossings
+without creating more Scheme execution capacity. The architectural correction is
+to coalesce completion opportunities while keeping result custody and resource
+retirement independent. No timer, yield count, larger input window or changed
+runtime default is used as a substitute for this ownership protocol.
+
+Rust continues to distribute across fixed owners. Scheme retains the complete
+native language/runtime, Actor scheduler, green threads, continuations, native
+types, exceptions and GC. No Scheme translation or SMP change is introduced.
+
+* Explicit CoalescedHandoff API and native protocol
+
+The experimental library policy is =SchemeServiceCompletion::CoalescedHandoff=,
+configured on an idle native service by the existing completion-policy API.
+Snapshot remains the default; FairHandoff remains an unpromoted historical
+control. Service ABI v8 adds epoch envelopes, acknowledgement and typed readback.
+Older endpoints reject the new policy instead of inferring support from a host
+executor name.
+
+- On the first outstanding completion, Scheme publishes a new epoch and an owner
+  opportunity. If an eligible successor exists it yields before selecting that
+  successor; otherwise the worker's existing blocking receive is the handoff.
+- Further bulk completions share the outstanding opportunity. The first newly
+  ready short result can publish a newer epoch even while bulk custody remains
+  outstanding. Scheme's existing FIFO, class budget and Actor-lane rules apply.
+- A harvest returns at most one ready short ID and the current bulk snapshot.
+  Native jobs remain in Scheme's existing job table. Each job's typed claimed
+  epoch plus an aggregate count records custody; no parallel ID registry or
+  duplicate per-result hash lookup is added. A second harvest cannot overwrite a live token.
+- Rust holds a non-Clone token borrowing the exact native image. Its zero-sized
+  owner marker forbids Send/Sync. The token contains metadata, not Scheme objects.
+  Each result is taken and projected through the existing native type API, and
+  its permit returns immediately before any later application projector runs.
+- After the entire snapshot is projected, Rust retains only acknowledgement
+  custody. The next advance consumes the token and piggybacks its acknowledgement
+  before acquiring another snapshot. It does not add a separate crossing per bulk
+  result or defer any resource return. The owner cannot park or skip an advance
+  merely because its job map is empty while this token remains outstanding.
+- An acknowledgement consumes its matching token only after all claimed IDs have
+  been taken. It clears the opportunity only if the epoch is still current and
+  both native ready queues are empty. A later publication or stale/duplicate
+  acknowledgement cannot clear another token or lose a ready opportunity.
+  If acknowledgement leaves ready graphs in its current epoch, carry them to a
+  fresh epoch before another harvest. Reusing that consumed epoch would let a
+  delayed duplicate acknowledgement consume a later fully projected token.
+
+Cancellation and observation timeout preserve entered graphs and claimed roots.
+Normal close drains accepted work, consumes pending custody, joins Scheme workers
+and retires roots. Error drain retains the existing native cleanup/quarantine
+rules; dropping a Rust metadata token is not authority to free a Scheme graph.
+Epochs do not wrap or reset across idle policy switches. Exhaustion is rejected.
+
+The typed =scheme_service_completion_on= readback reports actual policy, epoch,
+token custody, claimed/queued counts and native batch/result counters. Benchmark
+reads occur outside timing and assert no pending custody after each sample. A
+progress-aware maximum reply includes both epoch and progress headers plus the
+full 65536-job identity bound. Readiness receipts never release capacity.
+
+This establishes scheduling opportunities and custody, not preemption of an
+arbitrary synchronous constructor, projector or foreign function. Coalesced
+snapshots remain bounded by the existing native capacity. No universal p99 or
+arbitrary-owner fairness theorem follows from a finite model.
+
+* Existing model refinement and native controls
+
+The existing service_sharing model now tracks per-owner publication epochs,
+claimed epochs, outstanding opportunities and harvested identities. Its original
+root, capacity, execution, cancellation and lifecycle transitions are reused.
+Only ready-token custody can be deferred; project still uses the original
+per-result completion/credit transition.
+
+New scenarios demonstrate multiple bulk IDs under one token, capacity return
+before a later result is projected, a new short epoch while an old token is held,
+old/duplicate acknowledgement, observation timeout and close drain. A mutation
+that clears a newer opportunity with an older token must violate safety. Existing
+unbounded-class-harvest mutations remain required. Additional finite domain
+bindings put both bulk identities on one owner; no second scheduler model is
+created. Epochs are bounded to two publications, including ready carry, for sampling, so this is not an
+unbounded liveness proof.
+
+The initial targeted gate passes in 67.18 seconds: original completion cases in two
+existing domains, coalesced cases in two finite instantiations, sampled traces of
+1000 x 64 steps per domain/init, and required mutation counterexamples. After adding fresh carry epochs, the
+expanded targeted gate passes in 64.22 seconds, including duplicate old ack after
+a later token is fully projected. Epoch and harvest counts are distinct: several
+publications can coalesce before a harvest, but a consumed token epoch cannot be
+issued again. The first
+scope-binding/typecheck failure is retained; existing root/capacity assertions remain. The one-bulk bound continues to apply
+only to FairHandoff; CoalescedHandoff explicitly permits a capacity-bounded bulk
+snapshot while requiring linear epoch custody.
+
+Native controls cover all three policies, actual late-short ordering, active
+policy-switch rejection, GC/continuations/exceptions and close drain. A real
+Scheme fixture releases three latched batches and drives them until all three
+are ready without harvesting on Rust's behalf. The real library must recover
+three results using one token, project them normally, consume acknowledgement,
+and report no claimed/queued graph or pending opportunity. Before harvest the fixture
+also attempts a raw take of a genuinely ready graph: two absent -1 sentinels
+cannot authorize custody. It must reject the take without changing the three
+queued graphs. This closes a concrete native implementation gap that the abstract
+harvest precondition alone did not expose. Shared-short controls
+exercise unentered cancellation, accepted observation timeout and closing drain
+with CoalescedHandoff enabled. A second actual endpoint control submits two native typed short jobs, leaves both
+ready before harvest, takes one per bounded harvest, and injects the first token's
+acknowledgement after the second token is fully projected. The second token must
+remain owned until its own acknowledgement, then drain with zero queued/claimed
+graphs. Final gate results are recorded below.
+
+* CI and watchdog: distinct failures and resource ownership
+
+Exact head 7a2439b, run 39816542171, fails two supported jobs; four pass and SMP is
+skipped. The failures must not be relabeled as model/native acceptance.
+
+The complete native log identifies a descriptor assertion, 8 before / 10 after,
+not a watchdog exit. The newly added watchdog child-process control runs beside
+the native contract under default libtest parallelism. Its captured stdout/stderr
+own two pipe descriptors in that same process; the five-second child overlaps the
+native contract's FD observation. That is diagnostic resource interference.
+
+The failure control now runs in a dedicated Cargo test binary, sharing the same
+five-second gate implementation. On Darwin it proves its own capture adds exactly
+two descriptors and collection returns to baseline. The native FD assertion is
+unchanged, and native tests continue using default parallelism. The CI command
+includes the dedicated target. Serialization of the native suite is not used to
+hide the interference.
+
+The old historical exit-70 watchdog has no captured last event, native stack or
+exact failed image. It remains UNATTRIBUTED; neither this identified FD failure
+nor a later pass explains it. Failure-only raw stderr retains last progress and
+phase. Phase messages cannot renew the absolute five-second progress deadline;
+the deliberate stalled child must still fail at that deadline.
+
+The macOS Bazel failure is a cold workspace cargo_check compile at its 300-second
+moderate timeout. Its last output still shows compiler activity; subsequent
+cargo_test (884.9 seconds), Clippy (254.9 seconds) and native Bazel validation pass.
+The full cold workspace check is classified large/long (900 seconds), matching a
+build-backed workspace gate rather than a small unit check. This is an explicit
+compilation-budget correction requiring new-head remote CI; it is not a passed
+native test or a workaround for a stalled runtime. Native progress remains five
+seconds and the performance capture controller remains 120 seconds.
+
+* Reproducible directed comparison
+
+#+begin_src text
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-scheme-service-benchmark --progress-fair-ab --fixed-short-selective --completion-coalesced-ab
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_completion_scenarios_and_control --locked -- --ignored --exact --nocapture
+#+end_src
+
+Both arms use the same four live native VMs and the same native image, ProgressFair
+bulk offers, Selective short claims, two Tokio workers, slots 4/work 32, active
+bulk 3, batch 8, feed 1, quantum 1 and Scheme cooperative budget 1. Each sample
+uses 8192 real orders and 64 short probes. Five AB/BA blocks yield ten samples per
+arm/load. Snapshot is the control; CoalescedHandoff is the candidate. No executor
+or workload matrix is expanded, and the old failed candidates are not resampled.
+
+The SDK is Gerbil 1cfb032 / Gambit ea114fc on aarch64 Darwin 25.6. O2 refers to the
+dynamic C module; it does not claim a rebuilt O2 SDK. Native short completion
+precedes caller resumption. Do not subtract pooled latency quantiles, sum
+process-wide GC CPU across owners, or infer an OS blocking cause from wall time.
+No profiler or OS polling is added to the timed run; other user tasks are untouched.
+
+Native protocol, finite model, performance and remote CI remain separate evidence.
+Raw logs, failed gates, binaries and source archives stay private and outside Git.
+
+* Direction: one native owner service cycle
+
+This protocol coalesces ready identity custody and scheduling handoffs. It does
+not yet batch native take/projection: Pump::collect still invokes Job::complete
+and the rooted native command for each result. Arbitrary user projection also
+runs synchronously on the owner before the next short claim/supply turn. Thus a
+larger ready snapshot can reduce handoff count while lengthening the interval
+before input admission. These are current code boundaries, not an attribution
+of an observed OS or GC spike.
+
+The next architectural unit should be one owner-local service cycle joining
+Scheme execution progress, bounded ready transfer, result retirement and fresh
+input opportunity. Its batch result interface needs individually releasable
+native roots; simply retaining an aggregate Scheme vector until the last
+projector finishes would delay reclamation and defeat per-result credit return.
+The existing typed request/project API and affine Scheme state must survive that
+change. Complete/probe timing remains distinct from client resumption.
+
+The admission condition is joint: preserve throughput, bound short waiting and
+avoid reducing actual owner progress. Fewer notifications or successful finite
+traces alone do not satisfy it. Do not continue tuning yield thresholds or expand
+the executor matrix before resolving this service-cycle ownership boundary.
+
+* Final local receipts and performance decision
+
+The expanded final model gate passes in 64.22 seconds. The focused typed metadata
+controls pass 2/2; final Clippy passes with warnings denied (31.69 seconds). Native
+contract tests pass 3/3 in 14.84 seconds, including the real sentinel/carry controls,
+then the dedicated watchdog control passes 1/1 in 5.01 seconds. Default libtest
+parallelism is retained. The O2 release benchmark build completes in 34.89 seconds.
+These local receipts do not declare new-head remote CI green.
+
+The final frozen capture exits 0 in 6.48 seconds without controller timeout.
+All 40 samples pass workload/policy checks: 8192 orders, 64 short probes, four
+participating owners, identical ProgressFair/Selective policies, feed/budget 1,
+no timed phase/profiler observation, and offer publications = withdrawals +
+entries. Each candidate sample retires 1088 results. Epoch deltas are at least
+harvest deltas: no consumed token epoch is reused. Typed native readback verifies
+no outstanding token, claimed graph, queued ready graph or opportunity after each
+sample. Final cleanup joins all four owners, reports roots [0,0,0,0], quiesces the
+service and removes image files. This does not imply all SDK mappings unload.
+
+Throughput uses the median bulk completion duration; latency p99 pools the ten
+samples per arm/load. Owner finish spread is the maximum sample spread. Values
+below are from the same final capture, not cross-build ratios.
+
+| Load | Metric | Snapshot | Coalesced | Change |
+|------+--------+----------+-----------+--------|
+| cpu | Orders/s | 330307.051 | 321850.755 | -2.56% |
+| cpu | Native short p99 (us) | 427.875 | 596.917 | +39.51% |
+| cpu | Scheduled short p99 (us) | 3649.666 | 8872.417 | +143.10% |
+| cpu | Short admission p99 (us) | 308.917 | 630.583 | +104.13% |
+| cpu | Short pending p99 (us) | 408.292 | 442.708 | +8.43% |
+| cpu | Short construction p99 (us) | 10.667 | 13.750 | +28.90% |
+| cpu | Short projection p99 (us) | 2.667 | 3.000 | +12.49% |
+| cpu | Bulk service p99 (us) | 706.167 | 676.416 | -4.21% |
+| cpu | Bulk pending p99 (us) | 677.333 | 660.417 | -2.50% |
+| cpu | Owner finish spread (us) | 560.708 | 599.708 | +6.96% |
+| mixed | Orders/s | 64554.492 | 65103.862 | +0.85% |
+| mixed | Native short p99 (us) | 487.209 | 493.375 | +1.27% |
+| mixed | Scheduled short p99 (us) | 1873.000 | 1994.667 | +6.50% |
+| mixed | Short admission p99 (us) | 102.291 | 158.750 | +55.19% |
+| mixed | Short pending p99 (us) | 464.542 | 469.333 | +1.03% |
+| mixed | Short construction p99 (us) | 4.833 | 5.125 | +6.04% |
+| mixed | Short projection p99 (us) | 3.208 | 1.875 | -41.55% |
+| mixed | Bulk service p99 (us) | 1898.166 | 1975.084 | +4.05% |
+| mixed | Bulk pending p99 (us) | 1874.417 | 1952.625 | +4.17% |
+| mixed | Owner finish spread (us) | 1293.541 | 1470.917 | +13.71% |
+
+CPU candidate retirement groups 10880 results in 4491 harvests (2.42 per token);
+mixed groups 10880 in 5101 (2.13 per token). The deterministic native fixture
+proves three real bulk results in one token. Snapshot has no coalescence counters;
+zero there is not evidence of zero native crossings.
+
+Minimum owner progress fraction at first owner completion is 0.986957/0.987448
+for CPU control/candidate and 0.988095/0.987854 for mixed. Raw minimum completed
+orders at that point are 1776/1864 and 1976/1952 respectively; these are not
+normalized for unequal owner totals. No owner is filtered out. Minimum overlapping
+short probes are 45/47 of 64 for CPU and 64/64 for mixed. Actor-peer minima are 1/1
+for CPU and 0/0 for mixed; no strict Actor starvation-freedom claim is admitted.
+
+Decision: NOT PROMOTED. The mixed throughput gain (+0.85%) does not offset CPU
+throughput loss (-2.56%), CPU short p99 (+39.51%), mixed short p99 (+1.27%), bulk
+mixed p99 (+4.05%) and owner finish spread regressions in both loads. Coalescing
+works as a custody protocol but does not establish a joint performance improvement.
+Snapshot and all existing runtime defaults remain unchanged.
+
+Two earlier frozen captures remain distinct, immutable negative evidence. They
+were repeated only after concrete custody corrections, not to select a favorable
+sample. The first precedes the absent-sentinel guard; the second includes that
+guard but precedes fresh carry epochs. Neither is native acceptance of the final
+protocol, and ratios between their absolute timings are not causal estimates.
+
+| Retained pre-final capture | CPU throughput | Mixed throughput | Mixed short p99 | Mixed finish spread |
+|----------------------------+----------------+------------------+-----------------+---------------------|
+| Before sentinel guard | -4.81% | +0.24% | +1.63% | -8.62% |
+| Before unique carry epoch | -1.68% | -1.48% | -59.92% | +529.70% |
+
+The first admission-script attempt incorrectly equated epoch and harvest counts;
+it is retained as a diagnostic error, not a native failure. Multiple publications
+can precede one harvest. Conversely, the pre-carry mixed capture had more harvests
+than publication epochs, exposing the reused-token case now closed by native and
+model controls. The final capture enforces unique carry epochs.
+
+Final provenance (SHA-256 of whole artifacts):
+
+#+begin_src text
+benchmark-binary 471ff58a31c99038218a8186e00978c2a06bfd6cdd69c873ca8c9e72fa4e67ba
+native-image 261b9f16f632a719040e800b5268d890023f14dd0cc947224c4b77b1ebc0ed15
+source-archive 9b00d097cc24c507094233b03ffc5d231a91565695ed9fd83388f2e95de1f655
+#+end_src
+
+Execution, benchmark, model, build and workflow sources match the frozen archive.
+Only status reports are completed after timing. The native image is separately
+identified because changing Scheme can leave the Rust executable hash unchanged.
+
+* Native service-cycle follow-up
+
+[[file:30.63-native-owner-service-cycle.org][30.63]] implements batched native take, independently releasable result slots and
+retirement-linked owner admission/supply. The negative captures above remain
+unchanged and are not reclassified by that later protocol.

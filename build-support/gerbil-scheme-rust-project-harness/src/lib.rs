@@ -149,24 +149,24 @@ mod parser_source_path_tests;
 mod parser_reasoning_tree_tests;
 
 #[cfg(test)]
-#[path = "../tests/unit/parser_native_syntax.rs"]
-mod parser_native_syntax_tests;
+#[path = "../tests/unit/parser_syntax.rs"]
+mod parser_syntax_tests;
 
 #[cfg(test)]
-#[path = "../tests/unit/parser_native_syntax/control_flow.rs"]
-mod parser_native_syntax_control_flow_tests;
+#[path = "../tests/unit/parser_syntax/control_flow.rs"]
+mod parser_syntax_control_flow_tests;
 
 #[cfg(test)]
-#[path = "../tests/unit/parser_native_syntax/signature.rs"]
-mod parser_native_syntax_signature_tests;
+#[path = "../tests/unit/parser_syntax/signature.rs"]
+mod parser_syntax_signature_tests;
 
 #[cfg(test)]
-#[path = "../tests/unit/parser_native_syntax/api_shape.rs"]
-mod parser_native_syntax_api_shape_tests;
+#[path = "../tests/unit/parser_syntax/api_shape.rs"]
+mod parser_syntax_api_shape_tests;
 
 #[cfg(test)]
-#[path = "../tests/unit/parser_native_syntax/data_shape.rs"]
-mod parser_native_syntax_data_shape_tests;
+#[path = "../tests/unit/parser_syntax/data_shape.rs"]
+mod parser_syntax_data_shape_tests;
 
 pub use agent_snapshot::{
     render_rust_project_harness_agent_snapshot,

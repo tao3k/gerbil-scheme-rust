@@ -1,0 +1,112 @@
+#+TITLE: Post-cursor UTF-8 audit: reject regressions and preserve fc4562c
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Baseline and matched controls
+
+Production entering and leaving this audit is exactly
+=fc4562c91af0c8ed81840b5ceaaf40712555e0aa=. Generated SCM is unchanged.
+The caller-owned test control now freezes that output-cursor algorithm rather
+than =345b172='s output-index algorithm. Otherwise a comparison would wrongly
+attribute the already-admitted cursor improvement to the next candidate.
+Historical =6ad680c6311957eadf2529765ab1efd751132554= remains retained.
+
+Each actual source candidate runs the existing same-process ABBA =--codec=
+comparison, twenty samples per variant/load, alternating four current texts,
+complete content comparison and UTF-8 validation. Full scalar parity,
+surrogate rejection, live-string mutation, pointer tags, empty/null leaf and
+capacity/root contracts pass before timing. Admission remains a paired ratio
+no greater than one at every load; no tolerance or timeout is widened.
+
+* Source research and rejected changes
+
+The matching local official Gambit =lib/c_intf.c:1270-1300= uses a bounded
+input cursor in its stream encoder. The input-cursor candidate adapts this
+local iteration convention, preserving the output cursor and every guard.
+
+The no-alias candidate follows
+[[https://gcc.gnu.org/onlinedocs/gcc/Restricted-Pointers.html][GCC's restricted-pointer documentation]]
+for the already-disjoint typed Scheme input and Rust output. The installed
+SDK's compiler recipe uses =-fno-strict-aliasing=; this explicit local contract
+was tested without changing that flag or the SDK.
+
+The packed candidate follows
+[[https://gcc.gnu.org/onlinedocs/gcc/Library-Builtins.html][GCC's C-library builtin documentation]],
+expressing exact two/three/four-byte output through fixed-size byte arrays and
+=__builtin_memcpy=. This avoids alignment casts, endian assumptions and
+overwriting a fourth byte for a three-byte scalar. The documentation does not
+promise every builtin expression will be faster.
+
+| Candidate | Requests | Control ms | Candidate ms | Paired ratio | Decision |
+|-----------+----------+------------+--------------+--------------+----------|
+| Input cursor | 1000 | 4.863 | 4.753 | 0.963868 | No regression |
+| Input cursor | 10000 | 45.941 | 46.347 | 1.006728 | Reject |
+| Input cursor | 100000 | 467.719 | 465.709 | 1.002374 | Reject |
+| No alias | 1000 | 4.720 | 4.748 | 0.994438 | No regression |
+| No alias | 10000 | 46.298 | 46.135 | 1.000719 | Reject |
+| No alias | 100000 | 458.062 | 459.032 | 1.001473 | Reject |
+| Packed output | 1000 | 4.677 | 5.827 | 1.239226 | Reject |
+| Packed output | 10000 | 46.108 | 58.152 | 1.263632 | Reject |
+| Packed output | 100000 | 468.655 | 590.693 | 1.265118 | Reject |
+
+All three finish every load and return exit 101. Independent medians cannot
+replace the paired admission statistic. All source changes are rolled back.
+The complete 360 sample rows and replayable source-only patches are retained:
+
+- Input-cursor receipt, patch.
+- No-alias receipt, patch.
+- Packed receipt, patch.
+
+Packed and frozen leaf machine code in the same binary
+shows halfword/word stores with additional packing operations. There is no
+out-of-line memcpy call or stack temporary in these optimized leaves. Even
+with fewer stores, extra computation/ordering costs can dominate. At 100,000,
+packed CPU is 587.049 versus 465.810 ms, while GC CPU is 11.708 versus 11.632
+ms; both have 1,237 collections. This is not a GC or heap-allocation regression.
+
+* Restored allocation and GC diagnosis
+
+Restored production cost matrix
+contains all 420 rows: seven phases, three loads, twenty samples each, exit
+zero. Two earlier successful diagnostic executions had truncated stdout
+captures; this complete repeat, not a selected subset, is the authoritative
+raw receipt. No failed admission is removed or relabeled.
+
+| Requests | Owned wall ms | Owned CPU ms | GC CPU ms |
+|----------+---------------+--------------+-----------|
+| 1000 | 4.680 | 4.661 | 0.153 |
+| 10000 | 45.967 | 45.824 | 1.061 |
+| 100000 | 462.074 | 459.653 | 10.785 |
+
+At 100,000 the encoding diagnostic CPU is 376.814 ms, full validation
+96.452 ms, allocation request/release 2.686 ms, empty public entry 15.662 ms,
+and empty leaf dispatch 32.310 ms. Independent phases are not additive;
+total CPU already includes GC. GC is approximately 2.3% of owned CPU here,
+so eliminating GC alone cannot promise another large speedup.
+
+The pinned =simdutf8 0.1.5= source selects NEON when either its feature or
+=target_feature="neon"= is present. The current Rust target reports NEON;
+an extra Cargo feature is not a missing optimization switch. Full validation
+must stay, not be replaced by a provenance assumption or cached text.
+
+Rust still reserves 13,660 bytes for 8,196 output bytes: 5,464 spare bytes,
+40% of capacity, one live output in this fixture. Cumulative reservation
+traffic at 100,000 is 1,366,000,000 bytes, not resident or simultaneously
+live memory. No candidate increases reserve or introduces another heap
+allocation. Counting to exact size or shrinking adds work; neither is admitted
+without matched wall-time benefit. Reuse or retained-many-results workloads
+would require their own explicit memory/lifetime and throughput qualification.
+
+No production optimization is admitted this round. The retained test control
+and negative evidence prevent false attribution and repeat regressions.
+These results are bridge transfers, not Org parsing or Scheme parallelism.
+SMP remains explicitly skipped; no kernel/SDK change or acceptance relaxation
+is made. Remote CI must be checked separately on the exact pushed head.
+
+Final local checks pass: matched Scheme conformance for four routes, executed
+OS-counter resolution, actor-AOT all-target warning-denying lint, formatting,
+filename policy and whitespace checks. All three replay patches pass
+=git apply --check= independently against restored production. Raw-row
+accounting confirms twenty samples in every retained group, 780 complete rows.

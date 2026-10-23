@@ -38,6 +38,11 @@ fn public_header_matches_the_live_scalar_abi() {
     assert!(header.contains("gerbil_scheme_rust_bytevector_to_sint("));
     assert!(header.contains("gerbil_scheme_rust_uint_to_bytevector_root("));
     assert!(header.contains("gerbil_scheme_rust_sint_to_bytevector_root("));
+    assert!(header.contains("gerbil_scheme_rust_root_bytevector_copy("));
+    assert!(header.contains("gerbil_scheme_rust_scheme_object_bytevector_copy("));
+    assert!(header.contains("gerbil_scheme_rust_bytes_to_bytevector_root("));
+    assert!(header.contains("gerbil_scheme_rust_root_string_to_utf8("));
+    assert!(header.contains("gerbil_scheme_rust_root_utf8_to_string("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_is_exact_integer("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_i64("));
     assert!(header.contains("gerbil_scheme_rust_scheme_object_exact_integer_to_u64("));
@@ -49,12 +54,42 @@ fn public_header_matches_the_live_scalar_abi() {
 }
 
 #[test]
+fn hex_input_rejects_unrepresentable_lengths_before_slice_or_ffi() {
+    for length in [isize::MAX as usize, usize::MAX] {
+        let input = GerbilBorrowedUtf8 {
+            ptr: std::ptr::NonNull::<u8>::dangling().as_ptr().cast(),
+            len: length,
+        };
+        let mut root = super::GerbilRootId(987_654);
+        // SAFETY: these impossible spans are rejected before pointer access.
+        // No runtime is initialized: a regression must not reach the raw FFI.
+        assert_eq!(
+            unsafe {
+                super::gerbil_scheme_rust_bytestring_to_bytevector_root(input, -1, &raw mut root)
+            },
+            GerbilStatus::InvalidValue
+        );
+        assert_eq!(root, super::GerbilRootId(987_654));
+    }
+}
+
+#[test]
 fn status_values_are_stable() {
     assert_eq!(GerbilStatus::Ok as i32, 0);
     assert_eq!(GerbilStatus::Panic as i32, 5);
     assert_eq!(GerbilStatus::AlreadyInitialized as i32, 6);
     assert_eq!(GerbilStatus::NotInitialized as i32, 7);
     assert_eq!(GerbilStatus::RuntimeFinalized as i32, 8);
+}
+
+#[test]
+fn scalar_projection_layout_is_stable() {
+    use crate::GerbilScalarProjection;
+    assert_eq!(core::mem::size_of::<GerbilScalarProjection>(), 16);
+    assert_eq!(core::mem::offset_of!(GerbilScalarProjection, tag), 0);
+    assert_eq!(core::mem::offset_of!(GerbilScalarProjection, reserved), 4);
+    assert_eq!(core::mem::offset_of!(GerbilScalarProjection, bits), 8);
+    assert!(crate::GERBIL_SCHEME_RUST_HEADER_SOURCE.contains("GerbilScalarProjection"));
 }
 
 #[test]

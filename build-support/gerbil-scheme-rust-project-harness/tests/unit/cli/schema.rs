@@ -420,8 +420,8 @@ fn semantic_schema_files() -> &'static [SemanticSchemaFile] {
         },
         SemanticSchemaFile {
             schema_id: "agent.semantic-protocols.semantic-native-syntax-fact-index",
-            file_name: "semantic-native-syntax-fact-index.v1.schema.json",
-            registry_path: "schemas/semantic-native-syntax-fact-index.v1.schema.json",
+            file_name: "semantic-syntax-fact-index.v1.schema.json",
+            registry_path: "schemas/semantic-syntax-fact-index.v1.schema.json",
             identity_pointer: &["properties", "schemaId", "const"],
             syncs_with_protocol_repository: true,
         },

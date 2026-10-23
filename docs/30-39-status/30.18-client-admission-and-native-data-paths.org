@@ -1,0 +1,168 @@
+#+TITLE: Client admission, bounded dispatch and native Scheme data reuse
+#+STARTUP: overview
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Scope and execution contract
+
+The Python Rust backend keeps four complete Scheme runtimes on four fixed owner OS threads. Rust admits and distributes requests; Scheme executes the application, expansion, Actors, green threads, GC and continuations. The native Gerbil/Gambit/C O2 compilation path is unchanged. All 78 packaged resources, including the runtime image and module bundles, are byte-identical to the previous O2 wheel. No Scheme algorithm was translated to Rust.
+
+Final wheel SHA-256: =803abb4d17f44d46fdde1794c00819d2a695bacd372f729a37eb31b10ded852e=.
+
+Default owner count, dispatcher choice and =admission_window=128= remain unchanged. New performance controls are explicit. The tests exercise Scheme capabilities; they do not establish universal Scheme conformance, native crash containment or long-duration leak freedom.
+
+* Actual API changes
+
+| API | Contract |
+|-----+----------|
+| =library.prepare_request(value)= | An immutable owned Rust input snapshot, containing no Python objects or Scheme references |
+| Existing call APIs accepting a prepared request | Share the host snapshot; construct fresh native Scheme input on every invocation |
+| =call_many(..., dispatch="tokio-pipeline", admission_window=L)= | Completion-driven admission with global bound L and owner bound ceil(L / owners); result order follows input order |
+| =library.session(owner).value(data)= | Existing API: retain a native Scheme object on its original owner |
+| =session.call(...) / session.call_many(...)= with a native handle | Existing owner-affine API: reuse the actual Scheme object; references never migrate between VMs |
+
+Prepared requests are explicit snapshots. Later Python mutations do not affect them. Native references are rejected before preparation, cycles are rejected, composed snapshots preserve the 128-level nesting bound, and repeated preparation of an already prepared request does not add wrappers. Regular opaque Scheme values, procedures, cyclic graphs and continuations retain their original interfaces. A snapshot is typed data, not code generation, evaluation or a Scheme-to-Rust representation of program execution.
+
+The pipeline keeps each VM on its original thread. Tokio tasks only submit owned work and observe completion. The original groups of 128 inputs keep their five-second observation deadline and timing origin. Smaller turns do not reset that deadline. Errors stop new admission and every accepted future is observed before partial published outputs are retired. Accepted Scheme work can continue after observation timeout; there is no forced cancellation or automatic retry.
+
+Stateless calls retain round-robin owner assignment and reject native references. Sessions remain owner-affine and share that owner's Scheme module state. Output ordering is preserved; the stateless contract does not promise execution ordering for mutable application state.
+
+* Measured root causes
+
+The first traced input A/B records the following median wall durations:
+
+| Stage | Raw Python graph | Prepared host snapshot |
+|-------+------------------+------------------------|
+| Python input conversion while holding the GIL | 1205.281 ms | 0.020 ms |
+| Rust deep clone for one 16-request turn | 0.717 ms | 0.001 ms |
+| Bulk observer GIL reacquisition | 0.003 ms | 0.002 ms |
+
+The conversion timer measures wall time inside the PyO3 method while it holds the GIL, including OS descheduling. Client planned-arrival lateness includes OS wakeup and GIL admission before method entry. The intervention removes repeated traversal of the same typed input graph while retaining identical native Scheme work. It supports conversion as a major admission bottleneck. It does not measure pure Python CPU time or assign every late client wakeup solely to the GIL.
+
+The ordinary path reads the whole batch before detached native work starts and deep-clones each input for dispatch. A prepared immutable host description removes those repeated operations from warm calls. Native input construction, Scheme execution and native output projection still occur. This fast path is most useful when an input description is reused; preparing every unique request merely moves much of its conversion cost and cannot be advertised as free end-to-end parsing.
+
+The old small-window implementation waits for every job in a turn before admitting the next turn. In the retained prepared-input window trace, exposure to this barrier had median 8.34 ms and p99 143.67 ms across owner/turn observations. This is time unavailable to following bulk work, not measured CPU idle time: owners may serve short requests during it.
+
+An initial completion-driven prototype limited only global in-flight work. Trace maxima reached [6,7,6,5] queued/executing bulk jobs by owner versus [4,4,4,4] for the barrier control. Short tails regressed. The final scheduler adds per-owner quotas and round-robin selection of eligible owners. At global window 16 the owner ceiling is four; at window four with four VMs it is one. Continuous refill can still delay successive call/projection/release operations, so quotas alone do not establish a tail-latency improvement.
+
+* Final matched A/B results
+
+Each row below is a separate capture. Both arms share the same four live VMs, Scheme image, logical inputs, Actor work, output checks and scheduled short-request cohort. Compare arms within a capture; do not form speedup ratios across different captures or artifacts. Primary timings disable tracing. One host snapshot or one positive local run is not a quiet-machine or optimal-thread-count claim.
+
+| Capture | Arm | Actor items/s median | Main response p99 ms | Short response p99 ms |
+|---------+-----+----------------------+----------------------+-----------------------|
+| Mixed input, window 16 | raw | 2891.6 | 2437.69 | 1017.74 |
+| Mixed input, window 16 | prepared | 4850.7 | 1374.66 | 294.83 |
+| Mixed dispatch, window 16 | tokio | 4677.1 | 1291.79 | 297.56 |
+| Mixed dispatch, window 16 | tokio-pipeline | 4774.3 | 1060.26 | 539.50 |
+| CPU dispatch, window 16 | tokio | 4577.3 | 1364.80 | 328.72 |
+| CPU dispatch, window 16 | tokio-pipeline | 5697.7 | 1373.07 | 595.03 |
+| Mixed dispatch, window 4 | tokio | 4989.6 | 2234.58 | 165.45 |
+| Mixed dispatch, window 4 | tokio-pipeline | 4921.3 | 1185.26 | 227.42 |
+| Mixed policy 16 versus 4 | tokio | 5114.8 | 1100.76 | 284.25 |
+| Mixed policy 16 versus 4 | tokio-pipeline | 4973.7 | 1280.66 | 221.89 |
+| CPU policy 16 versus 4 | tokio | 5439.9 | 1275.08 | 283.84 |
+| CPU policy 16 versus 4 | tokio-pipeline | 5317.6 | 1010.53 | 318.71 |
+
+The prepared-input comparison uses direct admission in both arms with the same window. Dispatch comparisons use prepared input in both arms. A fixed-window dispatch comparison changes Tokio barrier versus pipeline only. Policy comparisons use Tokio barrier at 16 versus pipeline at four and therefore change both admission policy and bound. All pipeline comparisons include the per-owner ceiling.
+
+There is no universal scheduling win. The final window-16 pipeline raises CPU throughput but worsens short p99; mixed policy 16 versus four reduces short p99 with a throughput/main-tail cost. CPU policy 16 versus four worsens short p99. No scheduler or window default is promoted. The accepted improvement is explicit input reuse; the scheduler remains an experimental trade-off control.
+
+** Pairing, p99 and fairness
+
+There are two warmup rounds and 16 balanced paired measured rounds; trace captures use four. Each arm executes 128 main requests per batch, 32 Actor items per request, 48 pairs per item, quantum one and four Scheme workers per VM. Short requests are eight Echo calls per owner, due at 0,20,...,140 ms. The full cohort drains before the next arm. This is a finite in-process client load, not a sustained network capacity test.
+
+All primary arms complete 512 short requests, 128 per owner, and assign 32 main requests per owner per batch. Actor worker counts are checked independently in every result batch. These are finite count and completion observations, not starvation freedom. Per-owner short p99 remains material:
+
+| Capture | Arm | Owner 0 ms | Owner 1 ms | Owner 2 ms | Owner 3 ms |
+|---------+-----+------------+------------+------------+------------|
+| Input 16 | raw | 1019.49 | 1017.49 | 1017.74 | 1016.36 |
+| Input 16 | prepared | 314.78 | 311.12 | 224.44 | 269.46 |
+| Mixed 16/4 | tokio | 293.49 | 292.21 | 204.97 | 284.25 |
+| Mixed 16/4 | tokio-pipeline | 208.37 | 221.89 | 245.47 | 216.90 |
+| CPU 16/4 | tokio | 312.64 | 306.11 | 283.38 | 258.00 |
+| CPU 16/4 | tokio-pipeline | 324.92 | 192.72 | 298.74 | 441.39 |
+
+The full JSON summary retains median paired ratios and descriptive bootstrap intervals (4,000 resamples of 16 paired rounds). A ratio of marginal medians is not a median paired ratio. Main response p99 pools correlated bulk responses: 128 results become visible together, not as independent arrivals. Intervals describe these local rounds, not independent-host replication.
+
+* Highest measured data path: owner-local Scheme objects
+
+The existing native type API was exercised directly:
+
+#+begin_src python
+session = library.session(owner)
+payload = session.value(items)       # one native graph on this owner
+result = session.call(("actors", payload, 1))
+rows = result.to_python()
+result.close()
+payload.close()                      # retire when its application lifetime ends
+#+end_src
+
+The read-only CPU Actor comparison uses four pinned API clients, 32 requests per owner and the same 128 requests / 32 Actor items / 48 pairs. Both arms use session.call_many and the same owner-batched projection/release. The fresh arm reconstructs inputs; the native arm reuses one rooted Scheme payload per owner. There is no Scheme-object sharing between owners and no result cache. All arithmetic, Actor work and output validation are unchanged.
+
+| CPU data path | Actor items/s median | Main batch p99 ms | Short p99 ms |
+|---------------+----------------------+-------------------+--------------|
+| fresh | 5768.3 | 969.11 | 785.61 |
+| native | 122175.9 | 66.58 | 79.40 |
+
+The throughput ratio of medians is 21.18. Units are Actor work items: the native result corresponds to about 3818 requests/s, because each request contains 32 work items. This is not a pure Gambit arithmetic benchmark, a 21x intrinsic VM speedup or evidence of linear scaling from one VM to four. It measures application data placement and boundary amortization on a read-only reusable workload.
+
+Four-VM setup took 2.955 s in this capture. Preparing the four native payloads took 34.097 ms. Both are outside warm per-batch timing and are reported explicitly. The native payloads survived forced GC and a subsequent real Scheme call; retirement then ended with roots [0,0,0,0] and removed resource files.
+
+A unique or mutable request stream cannot assume the same reuse benefit. Native object identity and state are application-visible: callers explicitly choose owner-affine lifetime and reuse. Late scheduled probes may arrive after the faster main arm finishes; identical offered cohorts do not establish identical saturation. Finite probe counts stay equal. Do not compare this CPU/stateful-client result directly with an earlier mixed/stateless-client p99.
+
+* Scalar cycle calibration and the meaning of 819 ms
+
+The scalar calibration uses one outstanding request, 512 balanced paired samples, the same four VMs and the same native Scheme Echo. Ordinary session call/project/close and direct batch/project/release are different public API paths; their difference cannot be attributed solely to Tokio.
+
+| Scalar path | Full client cycle p50 us | Full client cycle p99 us |
+|-------------+-------------------------+-------------------------|
+| ordinary | 350.77 | 21144.08 |
+| direct-batch | 188.15 | 17239.54 |
+
+A separate 32-call traced subset on the same VMs reports native encode/call/retain wall median 6.021 us and Scheme-call-boundary median 1.042 us. The boundary includes C FFI entry/exit; it is not pure instruction time. Input-stage timing includes the initial diagnostic snapshot. The timed 512 samples have tracing disabled. Earlier calibration p99 values were lower; the observed tail variability is retained.
+
+An 819 ms scheduled mixed-load p99 is a complete arrival-to-response observation. It combines client admission, conversion, queued native work, projection/release and result consumption. It is not Gambit execution time. The large end-to-end value is a library/workload issue to investigate, not excused by fast native execution.
+
+* Performance architecture and next gate
+
+1. Keep complete Scheme runtimes and their Actor/green-thread state resident on fixed owners. Rust routes owned work to them; it does not implement Scheme evaluation or schedule Scheme continuations.
+2. Keep reusable application objects in their Scheme owner when ownership permits it. Use explicit portable host snapshots for reusable descriptions that must be constructed independently in multiple VMs. Measure preparation and retained memory.
+3. Amortize boundary costs with native types, coarse tasks and owner-batched projection. Typed numerical buffers and native handles are appropriate tools; repeated large Python object graphs are expensive.
+4. Bound global admission and each owner backlog. Choose throughput versus latency from matched measurements. Four Scheme processors provide four CPU execution slots; increasing Tokio or Rayon dispatch-worker counts does not create more Scheme CPU slots.
+5. The short call/project/release cycle still involves separate owner admissions. A future fused owned-result operation requires an explicit projection/failure/lifetime contract; this work does not claim it exists. A Scheme ingress protocol for concurrently live external requests or Rust I/O completions also remains unqualified.
+
+There is no admitted optimum across thread counts or workloads. The next scaling control needs owner-local data and compute-dense Scheme loads before varying owner/dispatcher counts; existing warm-data results show why copying overhead must first be removed. No native source, GC semantics, Actor quantum or optimization level was weakened to produce the measurements.
+
+* Qualification and retained negatives
+
+- Final native routing, snapshots, global/per-owner bounds, ordering and failure recovery: 15/15.
+- Existing native backend GC/closures/continuations/types/exceptions tests: 10/10.
+- Hygienic full-expander qualification on all four owners: pass.
+- Original five-second deadline and clean retirement with direct and pipeline: pass in fresh one-owner Actor fixtures. Timeout remains observation rather than cancellation.
+- Strict bridge Clippy with -D warnings: pass.
+- Root counts [0,0,0,0], stable VM identities and copied-file removal are checked in the four-owner benchmarks. These checks are not proof of full RSS return or indefinite leak freedom.
+
+Retained failures include initial PyO3 multiple-method and redundant-match lint failures, the global-only pipeline tail regression, the window-16 pipeline tail regressions, the CPU/mixed policy trade-offs and a syntax error in added scalar diagnostic output. The scalar script failed before VM startup; its original source/error and exit 1 remain, followed by a corrected successful run. Older unqualified sleep probes remain documented in 30.17; they were not relabeled as passes.
+
+Native image bytes are shared in identity comparisons, not mutable heaps. Source and harness snapshots identify the prepared-only, global-only and owner-bounded artifacts separately. A metadata string was corrected after the first input capture; its original harness is retained. A later candidate-window parser option has a separate snapshot from the already completed window-16 captures. Raw captures are not rewritten.
+
+Evidence: final artifact identity, all matched summaries, negative outcomes, final policy exits and receipt hashes.
+
+* Reproduction
+
+Use the installed wheel's actual interpreter as =PYTHON=. Build through the existing native project system; no alternative Python build pipeline is introduced.
+
+#+begin_src sh
+just bridge-python-owner-routing-tests "$PYTHON"
+just bridge-python-owner-deadline "$PYTHON"
+just bridge-python-owner-tests "$PYTHON"
+just bridge-python-owner-full "$PYTHON"
+just bridge-python-projection-ab "$PYTHON" --scheduled-probes --short-baseline --input-ab --admission-window 16 --rounds 16
+just bridge-python-projection-ab "$PYTHON" --scheduled-probes --short-baseline --dispatch-ab --prepared-inputs --admission-window 16 --candidate-window 4 --rounds 16
+just bridge-python-projection-ab "$PYTHON" --scheduled-probes --short-baseline --dispatch-ab --prepared-inputs --admission-window 16 --candidate-window 4 --rounds 16 --cpu
+just bridge-python-native-payload-ab "$PYTHON"
+just bridge-python-scalar-cycle "$PYTHON"
+#+end_src

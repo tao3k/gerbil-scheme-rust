@@ -1,0 +1,93 @@
+#+TITLE: UTF-8 width-dispatch audit and cross-corpus regression closure
+
+* Production identity and official-source basis
+
+Production remains exactly =fc4562c91af0c8ed81840b5ceaaf40712555e0aa=.
+No generated SCM, capacity policy, FFI ABI, SDK, kernel or SMP admission changes.
+Official local Gambit =lib/c_intf.c:1270-1360= uses bounded stream dispatch;
+=lib/gambit/string/string.scm:560-669= separates width classification, exact
+sizing and emission. The experiments below adapt those ideas, not a claim that
+the official implementation already contains these proposed optimizations.
+
+The stream-run candidate removes repeated lower-width dispatch within adjacent
+three-byte scalars. The partition candidate groups one/two-byte scalars before
+three/four-byte emission, changing decision-tree depth without changing bytes.
+Both are actual production-source experiments, not benchmark-only adjustments.
+Every leaf remains allocation-free and bounded to 256 characters. Full scalar,
+surrogate, mutation, pointer, bounds and root contracts run before each trial.
+
+* Complete matched results and rollback
+
+All rows below use three loads, twenty samples per variant/load, same-process
+ABBA, unchanged allocation and complete UTF-8/content validation. The original
+four alternating mixed texts are unchanged. ASCII uses four different current
+texts with the same character count and embedded NUL, not an encoded snapshot.
+
+| Candidate/corpus | Requests | Control ms | Candidate ms | Paired ratio |
+|------------------+----------+------------+--------------+--------------|
+| Width run / mixed | 1000 | 4.664 | 5.876 | 1.247035 |
+| Width run / mixed | 10000 | 45.899 | 58.340 | 1.270865 |
+| Width run / mixed | 100000 | 461.967 | 584.597 | 1.269004 |
+| Partition / mixed | 1000 | 4.666 | 4.263 | 0.921643 |
+| Partition / mixed | 10000 | 47.403 | 43.765 | 0.910592 |
+| Partition / mixed | 100000 | 489.794 | 445.516 | 0.908907 |
+| Partition / ASCII | 1000 | 2.055 | 2.362 | 1.195275 |
+| Partition / ASCII | 10000 | 20.008 | 23.382 | 1.155514 |
+| Partition / ASCII | 100000 | 198.983 | 227.515 | 1.144457 |
+
+The mixed partition result passes its unchanged gate, but ASCII regresses.
+It is therefore rejected as a general replacement; neither candidate remains
+in production. The run variant increases non-GC CPU with equal 100,000-load
+collection counts (1,237 each). Width dispatch can improve one distribution
+while hurting another; no universal improvement is admitted.
+
+Replay patches and all 360 sample rows are retained in =benchmarks/20261011-
+utf8-width-*= receipts. Both patches pass independent =git apply --check=
+against restored production. The harness retains explicit mixed/ASCII/two-byte/
+BMP/supplementary corpus selection; only mixed and ASCII timing are claimed
+here. Cargo's appended =--bench= marker is excluded from corpus selection.
+The initial argument failure is fixed, not counted as an acceptance result.
+New contracts cover width transitions and 255/256/257/511/512/513-character tails.
+
+* Restored public ABI, allocation, GC and memory
+
+A complete restored public-ABI run suffered contention and rejected at 10,000.
+It remains in =20261011-utf8-restored-owned-interference.log=, including the
+pre-timing argument failure. No negative sample is removed. A separate complete
+serialized repeat passes all three gates; it is qualification of the unchanged
+baseline, not evidence of a newly faster encoder.
+
+| Requests | Frozen wall ms | Public ABI wall ms | Paired ratio |
+|----------+----------------+--------------------+--------------|
+| 1000 | 4.698 | 4.639 | 0.981076 |
+| 10000 | 46.120 | 46.156 | 0.999239 |
+| 100000 | 463.204 | 461.811 | 0.997998 |
+
+The restored diagnostic matrix contains seven phases, three loads and twenty
+samples each (420 raw rows, exit zero). At 100,000, owned CPU is 468.967 ms;
+GC CPU is 10.947 ms (approximately 2.3%). Encoding diagnostic CPU is 376.738 ms,
+full validation 96.407 ms, Rust allocation/release 2.690 ms, empty public entry
+15.425 ms and empty leaf dispatch 32.636 ms. Independent phases are NOT additive,
+and owned CPU already includes GC. Wall minus CPU remains relevant: diagnostic
+owned wall is 478.232 ms, not an encoder-only algorithm metric. An earlier
+successful phase execution had an incomplete captured transcript; the full
+file-backed repeat is the authoritative 420-row receipt.
+
+Official =c_intf.c:2825-2855= shows Scheme-foreign-to-C pointer conversion without
+allocation; =5156-5193= shows the opposite non-null conversion allocating a
+foreign object. The latter and Scheme entry/control allocations are not removed
+by shrinking a Rust buffer. Rust capacity remains 13,660 bytes per result:
+8,196 output bytes / 40% spare for mixed text, 3,415 / 75% spare for ASCII.
+One result is live in this fixture; cumulative capacity traffic is not RSS.
+Exact-size pre-counting adds a pass; caller-owned reuse suits consumed/discarded
+results, not independently retained results. Neither tradeoff is silently
+installed as a universal policy or a text cache.
+
+* Evidence boundary
+
+The five complete matched executions plus complete phase receipt retain 1,020
+sample rows. Production and generated SCM match the entering baseline.
+Local conformance, warning-denying actor-AOT lint, formatting and path checks
+are separate from exact-head remote CI and from Org parsing. PR #18 head
+=fc4562c= passed Linux/macOS CI; SMP remains explicitly skipped, not passed.
+No supported test, scalar validation or performance threshold is relaxed.

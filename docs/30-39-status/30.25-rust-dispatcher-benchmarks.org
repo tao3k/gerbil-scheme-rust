@@ -1,0 +1,244 @@
+#+TITLE: Rust dispatcher qualification on fixed native Scheme owners
+#+STARTUP: overview
+
+* Scope and identity
+
+Source parent is =e6640d32954f6d82fff19ea6b827429f052319b3=. All six active
+remote CI jobs pass at that exact head; SMP is explicitly skipped. The new
+dispatcher/API/native-test changes require their own exact-head CI. This change adds
+=owner_dispatch= under the existing Rust qualification crate's =benches= and
+=submit_numeric_batch_async_on= under the existing =tokio-dispatch= feature. The
+asynchronous entry reuses the synchronous batch validation, Scheme execution,
+projection and owner root-retirement implementation. No Scheme compiler flags,
+Scheme execution algorithms, production defaults or native deadlines change.
+Rust dispatches across fixed owners; Scheme retains its Actor, green-thread,
+macro, GC, exception and continuation capabilities. SMP is outside this work.
+
+All native order work still follows Gerbil -> Gambit C -> native O2 with native
+=s64vector= input/output types. The existing Cargo build produces the image; no
+Python build/benchmark driver, Bash wrapper, JSON payload transport or translated
+Rust workload is introduced. The independent Rust invoice oracle and corpus are
+shared with =owner_costs= and the existing resource bench.
+
+Evidence and manifests remain outside Git in
+a caller-selected directory (see the repository-relative
+[[file:../../crates/gerbil-scheme-qualification/benches/owner_dispatch/README.md][benchmark reproduction instructions]]).
+=rust-dispatch-manifest.json= records the source/API, executable and native image
+hashes, SDK path and separate capture identities. These results are not the
+Python ledger/resident-input application baseline and do not replace it.
+
+* Reproduction and workload
+
+Run =just bridge-owner-dispatch-benchmark --test= for smoke and
+=just bridge-owner-dispatch-benchmark= for the full release-profile matrix.
+Redirect standard output and standard error to separate external files. The
+bench directory's English README defines the complete boundaries and schema.
+
+Each owner cohort retains exactly the same live Scheme VM state identities across
+all cases. One/four native owners each retain four Scheme Actor workers. Direct
+uses no additional dispatcher workers; Tokio and Rayon separately use one, two
+and four. Each case creates only its own executor, verifies worker-start hooks,
+warms on 128 orders, measures, then verifies matching exit-hook identities before
+the next case. Setup/retirement are reported outside sample timing. Exit hooks
+are not process-wide thread sampling or a Rayon OS-thread join receipt; native
+owner joins are separately required at final close.
+
+Tokio tasks submit through the real asynchronous native batch API and await
+oneshot delivery without blocking a worker. Rayon performs indexed parallel
+submission, then the caller waits on native tickets. The distinct blocking-Rayon
+variant is not in this matrix. Parallel stateless submissions do not promise
+stateful session enqueue ordering.
+
+Each full sample has 1,024 orders of 48 invoice lines. Windows release 128 orders
+with identical owner routes and batch size one or 32; cooperative quantum is one.
+Mixed inputs request a 1 ms Scheme green-thread wait every seventh order. Five
+rotating forward/reverse blocks produce ten samples per case. All returned totals
+and Actor metadata are validated; no phase diagnostics are enabled. Input corpus
+generation is outside timing; input cloning, dispatch, native conversion,
+execution, projection, retirement and Rust validation remain inside.
+
+* Completed local qualification and retained failures
+
+Two full cohorts B/C each complete 56 summaries and 560 measured samples, with
+574 executor startup/exit receipts. Every mode/worker count propagates real Scheme
+handler failure and recovers on every owner; C has all 35 typed exception rows in
+its separated capture. Both cohorts close with zero external roots, clean native
+joins and removed private image files. The exact CI development-profile smoke
+also completes its 56 summaries, 112 samples and all 35 Scheme exception rows.
+Strict core and all three related benchmark lints pass without suppression.
+
+The initial strict-lint argument-count failure is preserved and repaired by
+passing the dispatcher configuration together. Initial full run A stops before
+measurement: its assertion expected the internal order-line error text, while
+the established Scheme Actor protocol returns the drained worker-batch failure.
+The fixed assertion requires =InstanceError::Scheme= with the actual public
+handler-failure message; a timeout, closed channel or generic error cannot pass.
+Run A receives no performance or cleanup admission. Cohort B's merged stdout and
+stderr interleave five exception receipt lines with Scheme diagnostics; all
+560 sample rows and 56 summary rows remain intact. C retains clean separated
+streams and validates all JSON rows. These capture limits are not hidden retries
+of a native failure and no runtime exception policy changes.
+
+Both full cohorts retain separate results below. Before C, this 12-logical-CPU
+host reports load averages 12.15 / 8.17 / 7.16 and other active GUI/shell processes.
+No other task is paused or cancelled. No quiet-host certification or attribution
+of variation to a specific process is made. Absolute CPU throughput differs
+substantially between cohorts, so neither a fixed speedup nor a universal winner
+is admitted.
+
+* Native capability gate repair
+
+After the matched dispatcher runs, the existing =instance_resources --smoke=
+gate failed after its complete native type check. Its panic hook hid unexpected
+assertions along with injected Rust panics. Restoring the previous hook for
+unexpected panics exposed the exact cause: the reuse test expected the historical
+=Native { operation: "native root", code: 0 }= instead of the current explicit
+=InstanceError::Scheme= diagnostic. The Scheme source intentionally raises
+="injected Scheme task failure"= after GC inside =dynamic-wind=; the native API
+consumes that error diagnostic. This was a stale test expectation, not a newly
+observed loss of continuations or a reason to downgrade typed error reporting.
+Both original failed captures remain outside Git and receive no complete native
+acceptance. The repair requires the correct typed exception and injected message;
+a generic zero root, unrelated Scheme error or timeout cannot satisfy it. Only
+intentional injected Rust panics increment the test's panic counter.
+
+The unchanged six-epoch/128-job gate now passes under =instance-dispatch= with
+720 successful tasks, 42 injected Scheme failures and six injected Rust panics.
+This short reuse shape injects faults only on owner zero; the dispatcher controls
+separately require real Scheme failure/recovery on every owner for all seven
+mode/worker configurations. All four owners pass capture, two resumptions across
+FFI returns, forced GC, dynamic bindings and multi-shot =dynamic-wind= checks.
+Native type checks include nine numeric and four scalar families, Unicode, NUL,
+mixed vectors, NaN payloads and signed zero. The post-GC tail live values are
+both 4,376,864 raw SDK units. A positive Scheme retention control detects and
+then clears 134,219,264 raw units despite zero external roots. All four owners
+join with zero roots and removed files; FDs/threads return to baseline. Four
+base images remain under the unchanged retention policy and post-close RSS is
+nonzero. This bounded gate is not a replacement for the earlier one-hour memory
+qualification, arbitrary unload or zero-residue proof. CI now runs this native
+capability smoke in addition to the dispatcher smoke and strict Rust lint.
+
+* Matched result summaries
+
+Rates are complete orders/s, not Actor messages/s. Native response p99 is from
+common window release to native completion; window-delivery p99 includes Rust
+executor/caller result collection. Batch members share completion clocks. These
+are closed-loop burst statistics, not independently arriving requests or an
+open-loop service SLO. Columns B/C retain the separate ten-sample cohorts.
+
+** 1 native owner(s), CPU order aggregation
+
+| Batch | Dispatcher | Workers | B orders/s | C orders/s | B native p99 ms | C native p99 ms | C delivery p99 ms | C least owner progress |
+|-------+------------+---------+------------+------------+-----------------+-----------------+-------------------+------------------------|
+| 1 | direct | 0 | 95,801 | 87,258 | 1.468 | 1.738 | 2.015 | 128 |
+| 1 | tokio | 1 | 92,158 | 84,092 | 1.590 | 1.707 | 2.185 | 128 |
+| 1 | rayon | 1 | 95,202 | 91,125 | 6.972 | 1.607 | 1.869 | 128 |
+| 1 | tokio | 2 | 91,457 | 85,805 | 3.650 | 3.296 | 5.186 | 128 |
+| 1 | rayon | 2 | 98,688 | 90,524 | 1.452 | 2.321 | 4.123 | 128 |
+| 1 | tokio | 4 | 89,857 | 84,556 | 1.575 | 1.655 | 1.839 | 128 |
+| 1 | rayon | 4 | 98,249 | 92,305 | 1.461 | 1.543 | 1.711 | 128 |
+| 32 | direct | 0 | 211,895 | 205,957 | 0.796 | 1.137 | 1.790 | 128 |
+| 32 | tokio | 1 | 209,013 | 204,349 | 0.799 | 0.891 | 1.040 | 128 |
+| 32 | rayon | 1 | 211,961 | 200,359 | 0.776 | 0.885 | 1.743 | 128 |
+| 32 | tokio | 2 | 204,262 | 192,897 | 0.804 | 0.890 | 1.022 | 128 |
+| 32 | rayon | 2 | 208,381 | 194,830 | 0.750 | 1.992 | 2.598 | 128 |
+| 32 | tokio | 4 | 205,457 | 193,843 | 0.764 | 2.037 | 3.018 | 128 |
+| 32 | rayon | 4 | 201,878 | 188,168 | 0.789 | 2.559 | 3.818 | 128 |
+
+** 1 native owner(s), mixed Scheme wait
+
+| Batch | Dispatcher | Workers | B orders/s | C orders/s | B native p99 ms | C native p99 ms | C delivery p99 ms | C least owner progress |
+|-------+------------+---------+------------+------------+-----------------+-----------------+-------------------+------------------------|
+| 1 | direct | 0 | 5,247 | 5,174 | 34.565 | 26.067 | 29.771 | 128 |
+| 1 | tokio | 1 | 5,237 | 5,133 | 43.678 | 25.264 | 27.976 | 128 |
+| 1 | rayon | 1 | 5,227 | 5,160 | 45.116 | 24.971 | 27.243 | 128 |
+| 1 | tokio | 2 | 5,208 | 5,107 | 104.799 | 25.610 | 36.248 | 128 |
+| 1 | rayon | 2 | 5,216 | 5,149 | 58.945 | 25.589 | 40.552 | 128 |
+| 1 | tokio | 4 | 5,220 | 5,165 | 43.451 | 25.606 | 34.442 | 128 |
+| 1 | rayon | 4 | 5,243 | 5,163 | 44.833 | 25.230 | 30.460 | 128 |
+| 32 | direct | 0 | 9,735 | 14,746 | 28.860 | 11.013 | 15.381 | 128 |
+| 32 | tokio | 1 | 8,707 | 14,803 | 44.576 | 9.785 | 9.997 | 128 |
+| 32 | rayon | 1 | 8,948 | 14,678 | 37.327 | 9.769 | 10.010 | 128 |
+| 32 | tokio | 2 | 6,970 | 14,642 | 42.005 | 9.885 | 10.068 | 128 |
+| 32 | rayon | 2 | 8,204 | 14,556 | 52.508 | 9.941 | 10.023 | 128 |
+| 32 | tokio | 4 | 10,005 | 14,766 | 32.431 | 9.782 | 10.046 | 128 |
+| 32 | rayon | 4 | 8,255 | 14,685 | 40.091 | 10.202 | 10.969 | 128 |
+
+** 4 native owner(s), CPU order aggregation
+
+| Batch | Dispatcher | Workers | B orders/s | C orders/s | B native p99 ms | C native p99 ms | C delivery p99 ms | C least owner progress |
+|-------+------------+---------+------------+------------+-----------------+-----------------+-------------------+------------------------|
+| 1 | direct | 0 | 62,083 | 256,302 | 7.730 | 0.747 | 1.014 | 0 |
+| 1 | tokio | 1 | 52,354 | 227,024 | 5.528 | 0.758 | 0.890 | 14 |
+| 1 | rayon | 1 | 54,305 | 260,262 | 14.570 | 0.698 | 1.474 | 9 |
+| 1 | tokio | 2 | 46,291 | 221,731 | 10.242 | 0.750 | 0.855 | 15 |
+| 1 | rayon | 2 | 61,834 | 250,168 | 28.471 | 0.692 | 0.887 | 12 |
+| 1 | tokio | 4 | 49,512 | 211,736 | 5.288 | 0.753 | 0.930 | 12 |
+| 1 | rayon | 4 | 44,090 | 236,010 | 12.312 | 0.717 | 0.975 | 6 |
+| 32 | direct | 0 | 129,211 | 557,899 | 2.944 | 0.800 | 1.077 | 0 |
+| 32 | tokio | 1 | 117,944 | 530,421 | 4.552 | 0.890 | 1.120 | 0 |
+| 32 | rayon | 1 | 87,787 | 560,609 | 19.270 | 1.200 | 1.384 | 0 |
+| 32 | tokio | 2 | 106,328 | 510,861 | 15.147 | 0.913 | 1.548 | 0 |
+| 32 | rayon | 2 | 79,643 | 539,066 | 9.481 | 0.955 | 1.158 | 0 |
+| 32 | tokio | 4 | 117,508 | 452,455 | 5.418 | 0.798 | 0.953 | 0 |
+| 32 | rayon | 4 | 77,172 | 517,815 | 10.673 | 1.035 | 1.282 | 0 |
+
+** 4 native owner(s), mixed Scheme wait
+
+| Batch | Dispatcher | Workers | B orders/s | C orders/s | B native p99 ms | C native p99 ms | C delivery p99 ms | C least owner progress |
+|-------+------------+---------+------------+------------+-----------------+-----------------+-------------------+------------------------|
+| 1 | direct | 0 | 18,683 | 18,613 | 17.435 | 7.125 | 8.755 | 21 |
+| 1 | tokio | 1 | 18,259 | 18,601 | 30.021 | 7.166 | 8.266 | 21 |
+| 1 | rayon | 1 | 18,566 | 18,035 | 33.775 | 7.354 | 10.247 | 21 |
+| 1 | tokio | 2 | 18,359 | 18,464 | 26.610 | 7.130 | 7.649 | 16 |
+| 1 | rayon | 2 | 18,494 | 18,595 | 32.886 | 7.258 | 9.480 | 21 |
+| 1 | tokio | 4 | 18,475 | 18,575 | 15.267 | 7.100 | 7.708 | 17 |
+| 1 | rayon | 4 | 18,594 | 18,539 | 12.445 | 7.144 | 9.760 | 17 |
+| 32 | direct | 0 | 45,462 | 46,094 | 5.186 | 5.357 | 7.073 | 0 |
+| 32 | tokio | 1 | 45,868 | 44,154 | 4.243 | 9.446 | 24.301 | 0 |
+| 32 | rayon | 1 | 45,490 | 45,963 | 5.875 | 4.577 | 6.601 | 0 |
+| 32 | tokio | 2 | 45,798 | 45,790 | 5.360 | 4.276 | 4.939 | 0 |
+| 32 | rayon | 2 | 45,258 | 45,859 | 4.018 | 3.333 | 3.578 | 0 |
+| 32 | tokio | 4 | 45,262 | 45,640 | 4.969 | 7.522 | 13.626 | 0 |
+| 32 | rayon | 4 | 40,239 | 45,447 | 9.867 | 3.933 | 4.114 | 0 |
+
+* Fairness and negative conclusions
+
+Least owner progress is the minimum number of completed orders among owners when
+the first owner finishes its complete window share. The offered per-owner count
+is 128 / owners. A single owner's value 128 is necessarily trivial. At batch 32,
+a value zero can mean that another owner has not returned its first batch yet;
+it does not establish no internal Scheme progress or starvation. Per-owner p99
+vectors and complete sample clocks are retained in the external captures.
+
+For four-owner C, single-item CPU direct has minimum progress 0/32, versus
+14/32 for Tokio one worker and 9/32 for Rayon one worker; their throughput and
+response tails must also be considered. Single-item mixed direct has 21/32,
+Tokio two has 16/32 and Rayon four has 17/32. These burst progress observations
+are not a proof of long-running fairness or cross-session service guarantees.
+Batch-32 CPU Actor peer minimum is seven throughout C. Mixed Actor peer minimum
+is two except four-owner Tokio two, where it is one. In B, four-owner CPU Tokio
+two and Rayon four reach six instead of seven. These regressions are retained.
+
+No dispatcher dominates throughput, native tail, delivery tail and fairness:
+
+- Four-owner C CPU batch 32: direct 557,899 orders/s, Tokio four 452,455 and
+  Rayon four 517,815. Additional Rust workers do not multiply native VM capacity.
+- Four-owner C mixed batch 32: Tokio one has native p99 9.446 ms and delivery
+  p99 24.301 ms versus direct 5.357 / 7.073 ms. Rayon two has lower observed
+  tails (3.333 / 3.578 ms) but slightly lower throughput than direct. This is
+  a cohort observation, not a default-promotion decision.
+- B's four-owner CPU batch-32 Rayon one native p99 is 19.270 ms versus direct
+  2.944 ms; B's single-item Rayon two delivery p99 is 48.902 ms. C does not
+  reproduce those magnitudes, so negative B results remain separate.
+
+Production defaults remain unchanged. The competing-probe =QueueFull= failure,
+Python/GIL costs, resident Scheme input placement, arbitrary mutable sessions,
+long-term memory growth and general module unloading remain separate gates.
+This benchmark has no competing probes and does not repair global admission or
+prove zero RSS. Further optimization requires a repeated workload-specific
+bottleneck, followed by the same semantic and native acceptance controls.
+
+The subsequent stage attribution and optional owner-grouped A/B are recorded in
+[[file:30.26-rust-dispatch-costs-and-grouped-candidate.org][Rust dispatch costs and grouped candidate qualification]]. Cohorts and negative
+results are source/artifact-bound and do not replace the results above.

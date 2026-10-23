@@ -1,0 +1,83 @@
+#+TITLE: Exact local request latency percentiles for the frozen UTF-8 bridge
+
+* Scope and reproducible entry
+
+Run =just bridge-utf8-matched --latency all= with the installed SDK. Production
+=scheme/utf8.ss= and =scheme/generated= match =fc4562c=. No encoder, kernel,
+SDK or Rust production capacity policy changes accompany this measurement.
+
+This measures one request from synchronous FFI conversion start to its owned,
+fully validated Rust String. It includes querying current length, allocating
+Rust output, Scheme entry, fresh encoding and complete UTF-8 validation.
+It excludes consumer destruction, content assertions and sample recording,
+which happen after the per-request clock. Batch throughput includes those
+activities, but excludes sorting, aggregation and log output.
+
+It is a closed-loop, single-Scheme-owner bridge-service measurement, not
+concurrent queue/response latency, actual parallel parsing or Org parsing.
+Do not apply a request latency SLO or a production throughput claim beyond
+this declared boundary. The batch request count is not a concurrency setting.
+No latency SLO threshold is invented or labelled passed by this diagnostic.
+
+Each of seven character distributions completes twenty batches at each of
+1,000, 10,000 and 100,000 requests: 420 batches, 15,540,000 actual requests,
+zero failed content/ABI assertions. Each load's pooled distribution contains
+20,000, 200,000 or 2,000,000 observations respectively, not twenty batch times.
+Twenty per-batch distributions are also reported rather than hidden by pooling.
+All four current texts alternate on requests and are encoded anew.
+
+* Percentile method and measurement overhead
+
+P50/P95/P99 use exact nearest-rank order statistics:
+=sorted[ceil(N * percentile / 100) - 1]=. No averaging of batch percentiles,
+interpolation, slow-sample removal or timer subtraction is used. Contract
+fixtures cover exact ranks, small counts and boundary percentiles.
+
+The log retains lossless nanosecond/count histograms for independent
+recomputation. A separate awk recount verified all 21 histograms, all 420
+batches, all 15,540,000 requests and exact agreement with P50/P95/P99.
+
+Timer-only observations at every corpus/load are recorded separately. The
+100,000-request reverse-prefix timer P95/P99 are 42/42 ns; no correction is
+subtracted from the measured service distribution. A preallocated observation
+vector avoids histogram insertion/allocation in each service clock. Peak
+declared diagnostic sample capacity is 17,600,000 bytes at the largest load,
+separate from production output capacity and not a process RSS measurement.
+Sorting, exact histogram construction and output happen outside batch timing.
+The host is non-isolated; these are local receipts, not exact-head remote CI.
+
+* Complete service P95/P99 results
+
+Each cell is =P95 / P99= in microseconds, pooled over twenty batches at that
+request count. The source log uses integer nanoseconds to avoid rounding loss.
+
+| Corpus | 1,000/batch | 10,000/batch | 100,000/batch |
+|--------+-------------+--------------+---------------|
+| Mixed | 4.334 / 5.167 | 4.334 / 5.000 | 4.334 / 5.500 |
+| ASCII | 1.792 / 1.917 | 1.792 / 2.083 | 1.792 / 2.125 |
+| Two-byte | 4.084 / 4.292 | 4.125 / 4.958 | 4.125 / 6.792 |
+| BMP | 4.209 / 4.875 | 4.250 / 9.375 | 4.250 / 5.375 |
+| Supplementary | 4.708 / 5.875 | 4.709 / 9.000 | 4.708 / 5.917 |
+| ASCII with wide prefix | 2.209 / 2.250 | 2.209 / 2.667 | 2.250 / 3.833 |
+| Wide with ASCII prefix | 5.667 / 6.375 | 5.667 / 12.834 | 5.708 / 12.833 |
+
+Do not compare different corpus sizes as an algorithmic speedup. Prefix
+fixtures have 4,096 Scheme characters; the other fixtures have 3,415.
+
+* Tail observations retained, not discarded
+
+At 100,000 requests/batch, maximum service times are mixed 6.231 ms, ASCII
+0.825 ms, two-byte 5.522 ms, BMP 1.320 ms, supplementary 0.632 ms,
+ASCII-with-wide-prefix 27.916 ms and wide-with-ASCII-prefix 29.406 ms.
+At 10,000 requests/batch, the reverse-prefix maximum is 45.871 ms.
+Thus microsecond P99 does not imply the absence of millisecond stalls.
+No allocation/GC/scheduling attribution is proven by a percentile alone.
+
+Observed batch throughput for mixed is approximately 215,972 / 216,529 /
+215,218 requests/s; reverse-prefix is 167,400 / 151,953 / 155,904 requests/s.
+These instrumentation-inclusive closed-loop throughputs do not replace the
+uninstrumented ABBA algorithm gates. No performance improvement is claimed.
+
+Raw receipt: =benchmarks/20261011-utf8-request-latency-all.log=.
+The next separate gate is scheduled-arrival concurrent queue/response latency;
+these owner-local percentiles neither close that gate nor relax the SMP gap.

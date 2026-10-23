@@ -1,0 +1,200 @@
+#+title: Installed Python Native Scheme Owners and Dispatch Qualification
+#+date: 2026-10-19
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Follow-up
+
+The expander failure in this receipt is preserved. The subsequent native-module
+packaging repair and four-way dispatcher observations are recorded separately in
+[[file:30.11-expander-startup-and-dispatch-benchmarks.org][30.11 Expander startup and dispatch benchmarks]].
+
+* Status and identity
+
+The ledger's default Python =rust= backend now enters real fixed-owner Scheme
+VMs. This is implemented and installed locally, not a contract-only change.
+Full Scheme admission remains incomplete: cold hygienic DSL expansion times out
+at the existing five-second native gate, and that owner remains pending during
+bounded shutdown. The same gate fails in the linked control and a one-image
+control. This does not establish an SMP defect or a Tokio-specific failure.
+
+Repository: =tao3k/gerbil-scheme-rust=, branch =codex/typed-fold-aot=, base HEAD
+=bb71bbb5ad91bbaef2035979319514c7ced4c4ca= plus dirty sources. Exact selected
+source hashes, SDK path and three wheel hashes are in
+identity.json. CPython 3.14.7 and cached offline maturin 1.15.0
+built and installed the wheels. The final wheel SHA256 is
+=f07b4025138b2b50f64e8b4cbd466c915ea950ccd25f72188953a0f7c6c4e496=.
+This is local evidence, not a published release, PR-head CI or portable wheel
+admission. Existing staged/unrelated work and earlier receipts are preserved.
+
+* Actual execution and ownership
+
+The actual path is:
+
+#+begin_example
+Python Library.call / call_on / call_many
+  -> shared gerbil-scheme-python instance host
+  -> Tokio admission/response futures
+  -> fixed Rust OS owner queue
+  -> owner-local Gerbil/Gambit runtime and native application export
+  -> opaque retained Scheme root or owned native projection
+#+end_example
+
+The default =open_library()= creates four distinct VM states on four fixed OS
+threads. Two Tokio runtime workers dispatch futures; Tokio tasks never enter a
+VM and never migrate a Scheme computation between native threads. Each VM is
+validated as having one processor. Scheme schedules its internal mailbox
+actors, cooperative green threads, closures and continuations. This does not
+use Gambit SMP and does not imply process-level crash isolation.
+
+=call= remains on owner 0 for stateful APIs. =call_on= pins an explicit owner.
+=call_many= distributes independent requests across owners with bounded windows
+of 128. Native values and persistent tokens remain owner and image-generation
+checked. A Scheme object cannot be transported into another VM by passing a
+handle. Lists, vectors, tables, binary integers, bytes and strings reuse the
+existing native ABI. Procedures, sharing and cycles retain native identity;
+JSON is used only for build inventories and qualification receipts.
+
+The maintainer build remains Gerbil -> Gambit C -> native archive/image. The
+shared native lifecycle adapter is =ffi/instance.c=; image construction uses
+=gerbil-scheme-aot-build=. The ledger no longer invokes Rust IR lowering. The
+old =scheme/rust-ledger.ss= is historical subset input. The separate ASCENT
+Python kernel adapter has not been migrated and is not a full Scheme provider.
+
+Retained roots live in a bounded owner arena. Failed jobs roll back newly
+retained roots. A queued reply whose receiver is already gone also rolls back.
+Cancellation after successful channel delivery is not qualified as immediate
+reclamation; remaining arena entries are bulk-retired at owner shutdown. An
+async timeout does not cancel accepted Scheme execution.
+
+Every owner gets private copied module-file identities from the verified
+package closure. Copies are hash checked. Owner files and the private module
+namespace are removed only after known-clean shutdown. An initialized image's
+mapping is deliberately retained; hot unloading is not qualified. An incomplete
+owner retains its resources rather than having code/files retired underneath it.
+
+* Executed semantic and lifecycle gates
+
+| Gate | Observation | Receipt |
+|------+-------------+---------|
+| Final installed API | 9 tests, zero skips, exit 0; 5.527s | final-installed-tests.log |
+| Native root lifetimes | 5 compile-fail doctests passed | native-root-doctests.log |
+| Python instance host lint | Strict Clippy passed, no suppressions | clippy-instance-4.log |
+| Persistent root ownership | GC survival, foreign owner and stale generation rejected; failed task and abandoned queued reply rollback | retained-native.log |
+| Initialization failure before setup | status 61, phase 0; peers drained; no retained files; retry rejected | failure-before.log |
+| Initialization failure after setup | status 62, phase 2; initialized image rollback clean; peers drained; no retained files; retry rejected | failure-after.log |
+| Existing owned Scheme callback path | Four owners, native types, GC, multi-shot continuation, exception, alias/release-once; roots zero | owned-vm-regression.log |
+| Full hygienic DSL | FAIL after 5.0036s; shutdown joined 3, pending 1 | final-full-scheme.log |
+| Linked full DSL control | Open 0.232s; DSL watchdog exit 70 | linked-expander.log |
+| Additional build-helper lint | Incomplete; stopped after observing elapsed 3m02s, beyond build budget; not a pass | clippy-build-helper-completed.log |
+
+All named receipts are under
+receipts/20261019-python-native-owners/. The installed suite exercises
+big integers and finite native collections, shared/cyclic graphs through GC,
+closures, per-owner state, exceptions/recovery, concurrent hosts, and actual
+Scheme Actors. In every VM a Python-retained Scheme delimited continuation is
+resumed twice, with GC before each resumption. No prior foreign stack frame is
+reentered. Successful suite shutdown invalidates a retained value, drains all
+four owners, reports =[0,0,0,0]= roots, and removes the private directory.
+
+* Same-load A/B: negative and not performance-admitted
+
+A/B used the profiled wheel in =identity.json=, preceding final formatting,
+module extraction and the extra continuation fixture. Both arms used the exact
+same four already-live VMs and source. No pool, Scheme algorithm, actor count,
+yield quantum, inputs or result validation changed between arms.
+
+Each cohort has 128 requests, each with 32 Scheme Actor items and 48 exact
+integer line calculations per item. Selected items sleep cooperatively for
+1ms; the yield quantum is 1. Four warmup cohorts precede four measured cohorts
+per arm in alternating ABBA order. Raw per-request timings and every negative
+observation are in =owner-dispatch-ab.jsonl=.
+
+| Observation | Direct owner admission | Tokio admission |
+|-------------+------------------------+-----------------|
+| Actor items/s, median cohort | 10,090.04 | 8,663.95 |
+| Pooled admission-to-native-ready p99 | 303.75ms | 368.39ms |
+| Projection + explicit release, median cohort | 83.73ms | 132.85ms |
+| Actor completion-rank displacement p99 | 9 | 9 |
+| Completions per actor worker per cohort | 1,024 each | 1,024 each |
+
+Tokio was worse in this observation: throughput -14.1%, native-ready p99 +21.3%.
+The native-ready clock starts inside each admission window and ends on the
+native owner. It excludes Python input reading and result projection; it is not
+an end-to-end Python request p99. API throughput includes synchronous input
+admission and return of retained results, but excludes subsequent projection.
+Fairness is a finite workload observation, not a starvation-freedom proof.
+
+The host was not isolated; independent native compiler activity was observed
+during this work, and host exclusivity was not captured per A/B round. Therefore
+these numbers are preserved as raw negative observations, not stable performance
+admission or evidence that either dispatcher is faster. No final-wheel speedup
+or clean-host comparison is claimed. The benchmark is wired for reproduction;
+it must not be rerun merely to replace these negatives with a favorable sample.
+
+* Reuse, allocator state and RSS
+
+Two runs each completed 8,320 native 64KiB bytevector calls on one four-VM pool.
+At every GC checkpoint all roots were zero, each VM had 517,312 live bytes and
+6,329,760 heap-capacity bytes. The allocator-instrumented run kept exactly 4,471
+malloc blocks and 29,525,760 live malloc bytes across all checkpoints. Those
+live allocations did not grow with call count.
+
+The instrumented pool opened in 2.609s, including copying/validating images and
+module namespaces, setup and configure. The observed close plus retained-handle
+invalidation took 42.291ms. After close, malloc live bytes fell to 2,914,000;
+all four native roots were zero and the entire private directory was absent.
+These observations are in =owner-reuse-malloc.jsonl=; the uninstrumented first
+run remains in =owner-reuse.jsonl=.
+
+RSS still grew from 73,104KiB to 105,616KiB during reuse and remained 105,600KiB
+after close. Allocator reserved bytes reached 117,440,512. A diagnostic
+=malloc_zone_pressure_relief(NULL,0)= after close returned zero and did not lower
+RSS. SDK heap release and stable live allocation counts do not imply immediate
+OS page return. Retained image mappings, allocator reservations and RSS are
+separate resources; exact attribution of all resident pages remains open.
+This is bounded no-growth evidence for native live allocations, not a universal
+leak-free claim, immediate cancellation cleanup, or hot-unload admission.
+
+* Rejected candidates and remaining gates
+
+- Eager expander initialization in configure timed out. Running it in a fresh
+  Scheme green thread did not fix it. The default returned to lazy expansion;
+  it did not substitute a Rust implementation or silently disable Scheme forms.
+- Removing the core-module filter failed because an installed syntax-only
+  static module had no native object. The change was reverted; no graph repair
+  is claimed. The canonical program-build source remains unchanged.
+- Private module-file namespaces did not fix expander startup. A phase trace
+  stopped before =gerbil-load-expander!= returned. The diagnostic sample showed
+  dynamic loading/dyld notification frames; that is not proof of a deadlock or
+  a specific SDK defect. Temporary trace code is absent from the final source.
+- The system Python 3.9 build failed PyO3's supported-version gate; the actual
+  installed qualification uses Python 3.14.7. Earlier syntax and borrow-check
+  failures and all intermediate lint findings remain in the receipts.
+- Full cold expander startup, bounded destruction after that stalled call,
+  clean-host final-wheel performance, external native dependency packaging and
+  the separate ASCENT adapter migration remain open. The final wheel still
+  depends on host Homebrew OpenSSL, SQLite and zlib; it is not a portable wheel.
+
+* Reproduction through existing build tooling
+
+Build the native wheel with Cargo/maturin and its existing Gerbil =build.ss=.
+Install that wheel into the Python interpreter passed below; no Python script
+replaces the native build system.
+
+#+begin_src sh
+just bridge-python-owner-tests /path/to/installed/venv/bin/python
+just bridge-python-owner-full /path/to/installed/venv/bin/python
+just bridge-python-owner-ab /path/to/installed/venv/bin/python
+just bridge-python-owner-reuse /path/to/installed/venv/bin/python
+just bridge-instance-resources --retained
+just bridge-instance-resources --before
+just bridge-instance-resources --after
+just bridge-instance-resources --owned-vm
+#+end_src
+
+=bridge-python-owner-full= currently fails and must remain a failing admission
+gate. Passing the other commands cannot override it. No SDK/SMP source changes,
+release, commit or push were performed as part of this integration run.

@@ -6,8 +6,8 @@ use crate::parser::{ParsedRustModule, rust_reasoning_tree_facts};
 use crate::{RustDiagnosticSeverity, RustHarnessFinding, RustHarnessRule, RustProjectHarnessScope};
 
 use super::{
-    algorithm_shape, api_shape, data_shape, dependency_graph, native_abi, process_command,
-    source_surface, tokio_runtime,
+    abi, algorithm_shape, api_shape, data_shape, dependency_graph, process_command, source_surface,
+    tokio_runtime,
 };
 use crate::rules::labels;
 
@@ -136,7 +136,7 @@ pub(crate) fn evaluate(
         findings.extend(tokio_runtime::tokio_runtime_boundary_findings(
             module, &rules,
         ));
-        findings.extend(native_abi::native_abi_contract_findings(module, &rules));
+        findings.extend(abi::abi_contract_findings(module, &rules));
     }
     findings.extend(source_surface::repeated_namespace_findings(
         &reasoning_tree,

@@ -1,0 +1,148 @@
+#+TITLE: UTF-8 stall attribution and Tokio queue/response qualification
+
+* Scope, counts and units
+
+Production encoding source and generated Scheme remain identical to =fc4562c=.
+No kernel, installed SDK or production reserve policy is modified. Tests run
+through =just bridge-utf8-matched --spikes wide-ascii-prefix= and
+=just bridge-utf8-matched --queued all=, not a new shell framework.
+
+The loads are 1,000 / 10,000 / 100,000 requests per batch, twenty batches per
+load: 20,000 / 200,000 / 2,000,000 requests per corpus. This is not 100,000
+batches. Tokio covers seven corpora: 420 batches and 15,540,000 requests.
+Spike diagnostics cover the reverse-prefix corpus: sixty batches and 2,220,000
+requests. All batches and exact-content assertions complete successfully.
+
+All raw per-request durations have =_ns= units, batch totals use =_ms= and
+throughput is requests/second. Tables below explicitly state their units.
+Total batch wall is the sum of timed batches, not the full command duration:
+compilation, initialization, warmup, sorting and report output are excluded.
+
+* Spike attribution from official-source counters
+
+The historical 45.871 ms sample has no contemporaneous CPU/GC counters, so its
+individual cause cannot be reconstructed conclusively. A separate diagnostic
+captures recurrences instead of retroactively assigning them a cause.
+
+Official =lib/_kernel.scm:4000-4030= reads =vm->mem.nb_gcs_=,
+=gc_user_time_=, =gc_sys_time_= and =gc_real_time_=. The qualification C helper
+reads those same fields on the initialized owner before and after a request.
+It neither allocates Scheme statistics vectors nor mutates the VM. OS
+=getrusage= and =CLOCK_THREAD_CPUTIME_ID= counters record context switches,
+faults and owner CPU. No handles or VM state cross Rust worker threads.
+
+Snapshots bracket the service clock; their syscall overhead can make measured
+thread CPU slightly larger than the precise service interval. This is a
+perturbed diagnostic, not a throughput improvement or a matched production
+regression. The 1 ms trace threshold controls reporting only, not admission.
+
+The complete diagnostic records 66 requests above 1 ms:
+
+- All 66 show context switches; one has a GC.
+- Summed service wall is 199.427 ms, summed bracketed thread CPU 2.359 ms.
+- Maximum wall is 16.931 ms; thread CPU is 0.073 ms, GC count/time zero,
+  zero minor/major faults and three involuntary context switches.
+- The one GC-associated spike is 1.427 ms wall, 0.311 ms thread CPU,
+  0.291 ms GC CPU and 1.410 ms GC wall, with two involuntary switches.
+
+Observed stalls are predominantly off-CPU, including the traced GC-associated
+pause; this is not evidence of tens of milliseconds of codec/allocator CPU.
+Context switches and CPU deficits support scheduling/descheduling as the
+dominant observed recurrence, without identifying which other process caused
+it or claiming the historical 45.871 ms instance was conclusively classified.
+No pure-allocation or encoding CPU explanation is supported by these traces.
+
+* Tokio protocol and limits
+
+Tokio worker count is =available_parallelism()= (12 on this host), with twice
+that many closed-loop callers (24) and a CPU-sized bounded queue (12). Values
+are machine-derived, not fixed at one or claimed universal optimum. Each caller
+has one request outstanding; total request count does not define concurrency.
+The benchmark prints these settings. An arrival-rate/open-loop SLO is not
+claimed by this closed-loop measurement.
+
+One dedicated Scheme owner initializes the AOT program, roots all current
+inputs, performs fresh checked encoding and publishes an owned Rust String.
+No rooted Scheme value crosses threads. The owner releases roots before
+runtime shutdown. Readiness/contracts and 1,000 warmup requests occur outside
+every load's measured batches. Request content checks occur after response
+timing; failures abort rather than being dropped from statistics.
+
+Per-request boundaries are:
+
+- Admission: attempt to reserve a bounded queue slot until successful reserve.
+- Queue: enqueue until the owner begins that request's conversion.
+- Service: owner conversion start until an owned validated String exists.
+- Response: admission attempt until the Tokio caller receives the result.
+
+Response includes scheduling/reply delivery, but excludes pre-issue request
+preparation and post-response content verification/destruction. Batch wall also
+includes task spawn/join and those checks. Every request asserts that response
+is at least admission + queue + service. Percentiles of different phases are
+not additive. Exact nearest-rank statistics are reported per batch and pooled.
+This is real concurrent Rust admission, not concurrent Scheme parsing or Org.
+
+An independent recount verifies 420 batches, 21 complete load/corpus groups,
+15,540,000 requests, 1,764 percentile reports and ordered P50/P95/P99/max.
+Aggregate observation retention is 64 MB at the largest load, plus transient
+batch/sort storage. This is diagnostic memory, not production result capacity
+or measured RSS. The observer and the non-isolated host influence absolute
+performance; post-run load average is 16.07 on the twelve-worker host.
+
+* Complete response P95/P99
+
+Each cell is =P95 / P99= in milliseconds, pooled over twenty batches.
+
+| Corpus | 1,000/batch | 10,000/batch | 100,000/batch |
+|--------+-------------+--------------+---------------|
+| Mixed | 0.302 / 0.469 | 0.346 / 0.713 | 0.481 / 1.772 |
+| ASCII | 0.251 / 0.738 | 0.237 / 0.658 | 0.236 / 0.732 |
+| Two-byte | 0.639 / 4.478 | 0.409 / 2.228 | 0.295 / 0.610 |
+| BMP | 0.323 / 0.532 | 0.341 / 0.894 | 0.578 / 2.896 |
+| Supplementary | 0.369 / 3.581 | 0.316 / 0.408 | 0.380 / 0.896 |
+| ASCII with wide prefix | 0.220 / 0.537 | 0.244 / 0.571 | 0.254 / 0.710 |
+| Wide with ASCII prefix | 0.403 / 0.519 | 0.416 / 0.821 | 0.932 / 3.966 |
+
+For reverse-prefix at 100,000 requests/batch, phase P95/P99 are:
+
+| Phase | P95 ms | P99 ms |
+|-------+--------+--------|
+| Admission | 0.439 | 1.999 |
+| Queue | 0.325 | 1.192 |
+| Service | 0.019 | 0.031 |
+| Response | 0.932 | 3.966 |
+
+Response max reaches 112.276 ms in that case. BMP response max reaches
+213.904 ms. All outliers remain in the distributions; microsecond service
+percentiles do not imply low millisecond transport tails.
+
+* Largest-load total time and performance interpretation
+
+Each row completes 100,000 requests/batch * 20 batches = 2,000,000 requests.
+
+| Corpus | Timed total seconds | Requests/second |
+|--------+---------------------+-----------------|
+| Mixed | 24.327 | 82,214 |
+| ASCII | 12.589 | 158,868 |
+| Two-byte | 15.418 | 129,720 |
+| BMP | 31.168 | 64,168 |
+| Supplementary | 20.397 | 98,053 |
+| ASCII with wide prefix | 14.785 | 135,272 |
+| Wide with ASCII prefix | 38.835 | 51,500 |
+
+Reverse-prefix timed totals for the three loads are 0.205 / 2.159 / 38.835
+seconds (20,000 / 200,000 / 2,000,000 requests respectively). These are
+instrumented single-owner transport observations, not a same-condition
+algorithm A/B or an accepted speedup/regression of the unchanged producer.
+
+The current concurrent path does not establish maximum multicore performance.
+Admission/queue/reply latency is much larger than encoding service latency;
+single-owner serialization and scheduling/transport costs need separate
+matched optimization. External QPS numbers with different bytes, concurrency,
+arrival pattern, timing boundaries and hardware are not acceptance controls.
+SMP stays explicitly skipped; no new latency threshold or kernel modification
+converts this diagnostic into a passed performance SLO.
+
+Receipts: =benchmarks/20261011-utf8-spikes-wide-ascii-prefix.log= and
+=benchmarks/20261011-utf8-tokio-queued-all.log=. Source-only production baseline
+identity, local assertions, remote exact-head CI and Org parsing remain separate.

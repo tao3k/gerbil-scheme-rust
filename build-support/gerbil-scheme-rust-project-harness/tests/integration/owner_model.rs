@@ -299,6 +299,45 @@ fn owner_completion_scenarios_and_control() {
             "sharedSafety",
         );
     }
+    for domain in ["service_completion_small", "service_completion_wide"] {
+        success(&[
+            "test",
+            source,
+            "--main",
+            domain,
+            "--match",
+            "(completion|coalesced).*Test",
+            "--seed",
+            "1",
+        ]);
+        success(&[
+            "run",
+            source,
+            "--main",
+            domain,
+            "--init",
+            "completionCoalescedStart",
+            "--step",
+            "sharedStep",
+            "--invariant",
+            "sharedSafety",
+            "--seed",
+            "42",
+            "--max-samples",
+            "1000",
+            "--max-steps",
+            "64",
+            "--verbosity",
+            "1",
+        ]);
+        mutation_counterexample(
+            source,
+            domain,
+            "completionLateReadyStart",
+            "completionStaleAckMutationStep",
+            "sharedSafety",
+        );
+    }
 }
 fn shared_protocol(source: &str) {
     for (domain, seed) in [

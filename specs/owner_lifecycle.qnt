@@ -903,7 +903,8 @@ module service_sharing {
     blocked: Set[int], gc: Set[int], paused: Set[int], age: int -> int, overtakes: int -> int,
     feedUsed: int -> int, feedMax: int,
     split: bool, eager: bool, reserved: bool, fairCpu: bool, bounded: bool,
-    completionFair: bool, harvested: Set[int],
+    completionFair: bool, coalesced: bool, harvested: Set[int],
+    completionEpoch: int -> int, tokenEpoch: int -> int, completionDue: Set[int],
     entryGap: bool, cpuGap: bool, resourceViolation: bool
   }
   def entries(values: List[int]): Set[int] = values.foldl(Set(), (seen, r) => seen.union(Set(r)))
@@ -922,7 +923,8 @@ module service_sharing {
       blocked: Set(), gc: Set(), paused: Set(), age: JOBS.mapBy(_ => 0), overtakes: JOBS.mapBy(_ => 0),
       feedUsed: owners.mapBy(_ => 0), feedMax: feed0,
       split: split0, eager: eager0, reserved: reserved0, fairCpu: cpu0, bounded: bounded0,
-      completionFair: false, harvested: Set(),
+      completionFair: false, coalesced: false, harvested: Set(),
+      completionEpoch: owners.mapBy(_ => 0), tokenEpoch: owners.mapBy(_ => -1), completionDue: Set(),
       entryGap: false, cpuGap: false, resourceViolation: false }
   }
   action resourceInit = resourceInitWith(false, false, false, false, false, 1)
@@ -989,10 +991,16 @@ module service_sharing {
           (if (q.overtakes.get(r) < 2) q.overtakes.get(r) + 1 else 2) else q.overtakes.get(r)),
       cpuGap: q.cpuGap or (preferShortCpu(workerOwner(w)) and not(shortJobs.contains(q.jobs.get(w)))) }
   }
+  def newCompletionOpportunity(r: int): bool = q.coalesced and
+    (not(q.completionDue.contains(ASSIGNED.get(r))) or
+      (shortJobs.contains(r) and readyJobs.exclude(q.harvested).filter(j =>
+        ASSIGNED.get(j) == ASSIGNED.get(r) and shortJobs.contains(j)).size() == 0))
   def canCompute(w: int): bool = and {
     q.cpu.get(workerOwner(w)) == w, runnable(w),
     not(q.gc.contains(workerOwner(w))), not(q.paused.contains(workerOwner(w))),
-    not(q.bounded) or q.spent.get(workerOwner(w)) < 1
+    not(q.bounded) or q.spent.get(workerOwner(w)) < 1,
+    not(q.coalesced and q.left.get(q.jobs.get(w)) == 1 and newCompletionOpportunity(q.jobs.get(w)))
+      or q.completionEpoch.get(workerOwner(w)) < 2
   }
   action compute(w: int): bool = {
     val r = q.jobs.get(w)
@@ -1000,7 +1008,9 @@ module service_sharing {
       canCompute(w), q.left.get(r) > 0,
       if (q.left.get(r) == 1) all {
         life::readyService(r, false),
-        q' = { ...q, left: q.left.set(r, 0), jobs: q.jobs.set(w, 0), cpu: q.cpu.set(workerOwner(w), 0), spent: q.spent.set(workerOwner(w), 0) }
+        q' = { ...q, left: q.left.set(r, 0), jobs: q.jobs.set(w, 0), cpu: q.cpu.set(workerOwner(w), 0), spent: q.spent.set(workerOwner(w), 0),
+          completionEpoch: if (newCompletionOpportunity(r)) q.completionEpoch.set(workerOwner(w), q.completionEpoch.get(workerOwner(w)) + 1) else q.completionEpoch,
+          completionDue: if (q.coalesced) q.completionDue.union(Set(workerOwner(w))) else q.completionDue }
       } else all {
         life::stutter,
         q' = { ...q, left: q.left.set(r, q.left.get(r) - 1), spent: q.spent.set(workerOwner(w), q.spent.get(workerOwner(w)) + 1) }
@@ -1029,13 +1039,40 @@ module service_sharing {
     life::s.accepted.size() == 0, life::stutter,
     q' = { ...q, completionFair: true }
   }
+  action completionCoalescedPolicy = all {
+    life::s.accepted.size() == 0, life::stutter,
+    q' = { ...q, completionFair: true, coalesced: true }
+  }
   def harvestClass(ids: Set[int], short: bool): Set[int] = ids.filter(r => shortJobs.contains(r) == short)
   action harvest(owner: int, ids: Set[int]): bool = all {
     q.completionFair, ids.size() > 0, ids.subseteq(readyJobs),
     ids.forall(r => ASSIGNED.get(r) == owner),
     q.harvested.filter(r => ASSIGNED.get(r) == owner).size() == 0,
-    harvestClass(ids, true).size() <= 1, harvestClass(ids, false).size() <= 1,
-    life::stutter, q' = { ...q, harvested: q.harvested.union(ids) }
+    harvestClass(ids, true).size() <= 1, q.coalesced or harvestClass(ids, false).size() <= 1,
+    not(q.coalesced) or (q.tokenEpoch.get(owner) == -1 and q.completionDue.contains(owner)),
+    life::stutter, q' = { ...q, harvested: q.harvested.union(ids),
+      tokenEpoch: if (q.coalesced) q.tokenEpoch.set(owner, q.completionEpoch.get(owner)) else q.tokenEpoch }
+
+  }
+  action completionAck(owner: int, epoch: int): bool = all {
+    q.coalesced, epoch >= 0, q.tokenEpoch.get(owner) == epoch,
+    q.harvested.filter(r => ASSIGNED.get(r) == owner).size() == 0,
+    not(q.completionEpoch.get(owner) == epoch and readyJobs.filter(r => ASSIGNED.get(r) == owner).size() > 0)
+      or epoch < 2,
+    life::stutter, q' = { ...q, tokenEpoch: q.tokenEpoch.set(owner, -1),
+      completionEpoch: if (q.completionEpoch.get(owner) == epoch and readyJobs.filter(r => ASSIGNED.get(r) == owner).size() > 0)
+        q.completionEpoch.set(owner, epoch + 1) else q.completionEpoch,
+      completionDue: if (q.completionEpoch.get(owner) == epoch and
+        readyJobs.filter(r => ASSIGNED.get(r) == owner).size() == 0)
+          q.completionDue.exclude(Set(owner)) else q.completionDue }
+  }
+  action completionIgnoreOldAck(owner: int, epoch: int): bool = all {
+    q.coalesced, epoch >= 0, epoch != q.tokenEpoch.get(owner), life::stutter, q' = q
+  }
+  action unsafeStaleCompletionAck(owner: int): bool = all {
+    q.coalesced, q.tokenEpoch.get(owner) >= 0,
+    q.tokenEpoch.get(owner) < q.completionEpoch.get(owner), life::stutter,
+    q' = { ...q, tokenEpoch: q.tokenEpoch.set(owner, -1), completionDue: q.completionDue.exclude(Set(owner)) }
   }
   action project(r: int): bool = all {
     life::s.serviceReady.contains(r), not(q.completionFair) or q.harvested.contains(r),
@@ -1045,6 +1082,7 @@ module service_sharing {
   action resourceClose = all { life::close, q' = q }
   action resourceJoin = all {
     q.gc.size() == 0, q.paused.size() == 0, workers.forall(w => q.jobs.get(w) == 0),
+    not(q.coalesced) or (q.completionDue.size() == 0 and owners.forall(o => q.tokenEpoch.get(o) == -1)),
     life::join, q' = q
   }
   action resourceStutter = all { life::stutter, q' = q }
@@ -1059,7 +1097,13 @@ module service_sharing {
     q.harvested.subseteq(readyJobs),
     owners.forall(o => and {
       harvestClass(q.harvested.filter(r => ASSIGNED.get(r) == o), true).size() <= 1,
-      harvestClass(q.harvested.filter(r => ASSIGNED.get(r) == o), false).size() <= 1 }),
+      q.coalesced or harvestClass(q.harvested.filter(r => ASSIGNED.get(r) == o), false).size() <= 1 }),
+    implies(q.coalesced, and {
+      owners.forall(o => q.completionEpoch.get(o) >= 0 and q.completionEpoch.get(o) <= 2),
+      owners.forall(o => implies(readyJobs.filter(r => ASSIGNED.get(r) == o).size() > 0 or q.tokenEpoch.get(o) >= 0,
+        q.completionDue.contains(o))),
+      q.harvested.forall(r => q.tokenEpoch.get(ASSIGNED.get(r)) >= 0),
+      owners.forall(o => q.tokenEpoch.get(o) <= q.completionEpoch.get(o)) }),
     q.feedMax > 0, owners.forall(o => q.feedUsed.get(o) <= q.feedMax),
     implies(q.reserved and q.fairCpu, shortJobs.forall(r => q.overtakes.get(r) <= 1)),
     implies(q.eager, not(q.entryGap)), implies(q.fairCpu, not(q.cpuGap)), not(q.resourceViolation)
@@ -1089,7 +1133,7 @@ module service_sharing {
     nondet owner = owners.oneOf()
     any { offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
       block(w), wakeTask(w), gcStart(owner), gcFinish(owner), osPause(owner), osResume(owner), delayTick,
-      harvest(owner, Set(r)), project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
+      harvest(owner, Set(r)), completionAck(owner, q.tokenEpoch.get(owner)), project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
   }
   action unsafeBoundaryStep = { nondet owner = owners.oneOf(); any { resourceStep, unsafeBoundary(owner) } }
   action unsafeCpuStep = { nondet w = workers.oneOf(); any { resourceStep, unsafeCpu(w) } }
@@ -1115,6 +1159,43 @@ module service_sharing_cases {
     .then(offer(3)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
     .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(1, 4)).then(acquireCpu(1)).then(compute(1))
   action completionMutationStep = any { sharedStep, unsafeCompletionSnapshot(readyJobs) }
+  action completionCoalescedStart = resourceInit.then(completionCoalescedPolicy)
+  action completionLateReadyStart = completionCoalescedStart
+    .then(offer(3)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
+    .then(harvest(1, Set(3)))
+    .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(1, 4)).then(acquireCpu(1)).then(compute(1))
+    .then(project(3))
+  action completionStaleAckMutationStep = any { sharedStep, unsafeStaleCompletionAck(1) }
+  action completionBulkReadyStart = completionCoalescedStart
+    .then(offer(1)).then(feed(1)).then(assignWorker(1, 1)).then(acquireCpu(1))
+    .then(compute(1)).then(compute(1)).then(compute(1)).then(compute(1))
+    .then(compute(1)).then(compute(1)).then(compute(1)).then(compute(1))
+    .then(offer(2)).then(boundary(1)).then(feed(2)).then(assignWorker(2, 2)).then(acquireCpu(2)).then(compute(2))
+  action completionBulkSnapshotProof = completionBulkReadyStart
+    .then(harvest(1, Set(1, 2))).then(project(1)).then(offer(3))
+    .then(all { assert(q.harvested == Set(2)), assert(rootedJobs == Set(2)), assert(q.completionEpoch.get(1) == 1),
+      assert(resourceSafety), resourceStutter })
+    .then(project(2)).then(completionAck(1, 1)).then(boundary(1)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
+    .then(harvest(1, Set(3))).then(project(3)).then(completionAck(1, 2)).then(resourceClose).then(resourceJoin)
+    .then(all { assert(resourceSafety), assert(rootedJobs.size() == 0), resourceStutter })
+  run completionNewEpochSurvivesOldAckTest = completionLateReadyStart.then(abandon(4)).then(resourceClose)
+    .then(completionAck(1, 1))
+    .then(all { assert(q.completionDue.contains(1)), assert(rootedJobs == Set(4)), assert(resourceSafety), resourceStutter })
+    .then(harvest(1, Set(4))).then(completionIgnoreOldAck(1, 1))
+    .then(all { assert(q.tokenEpoch.get(1) == 2), assert(rootedJobs == Set(4)), assert(resourceSafety), resourceStutter })
+    .then(project(4)).then(completionAck(1, 2)).then(resourceJoin)
+    .then(all { assert(q.completionDue.size() == 0), assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  run completionCarryReadyRejectsDuplicateAckTest = completionCoalescedStart
+    .then(offer(3)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
+    .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(1, 4)).then(acquireCpu(1)).then(compute(1))
+    .then(harvest(1, Set(3))).then(project(3)).then(completionAck(1, 1))
+    .then(all { assert(q.completionEpoch.get(1) == 2), assert(resourceSafety), resourceStutter })
+    .then(harvest(1, Set(4))).then(project(4)).then(completionIgnoreOldAck(1, 1))
+    .then(all { assert(q.tokenEpoch.get(1) == 2), assert(q.completionDue.contains(1)), assert(resourceSafety), resourceStutter })
+    .then(completionAck(1, 2)).then(resourceClose).then(resourceJoin)
+    .then(all { assert(resourceSafety), assert(rootedJobs.size() == 0), resourceStutter })
+  run completionStaleAckMutationTest = completionLateReadyStart.then(unsafeStaleCompletionAck(1))
+    .then(all { assert(not(resourceSafety)), resourceStutter })
   run completionBoundedHandoffTest = completionStart
     .then(offer(3)).then(feed(3)).then(assignWorker(1, 3)).then(acquireCpu(1)).then(compute(1))
     .then(offer(4)).then(boundary(1)).then(feed(4)).then(assignWorker(1, 4)).then(acquireCpu(1)).then(compute(1))
@@ -1169,6 +1250,14 @@ module service_sharing_cases {
     .then(offer(1)).then(offer(3)).then(feed(1)).then(unsafeFeed(3)).then(all { assert(not(resourceSafety)), resourceStutter })
   run gcExecutionMutationTest = resourceInit.then(offer(3)).then(feed(3)).then(assignWorker(2, 3)).then(gcStart(1))
     .then(unsafeCpu(2)).then(all { assert(not(resourceSafety)), resourceStutter })
+}
+module service_completion_small {
+  import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4), CASE_ASSIGNED = Set(1, 2, 3, 4).mapBy(_ => 1)).*
+  run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
+}
+module service_completion_wide {
+  import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4, 5), CASE_ASSIGNED = Set(1, 2, 3, 4, 5).mapBy(r => if (r == 5) 2 else 1)).*
+  run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
 }
 module service_sharing_small {
   import service_sharing_cases(CASE_JOBS = Set(1, 2, 3, 4), CASE_ASSIGNED = Set(1, 2, 3, 4).mapBy(r => if (r == 2) 2 else 1)).*

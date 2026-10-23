@@ -52,12 +52,14 @@ pub(super) fn configure(
                 .unwrap();
         }
     }
-    if completion_fair_ab() {
+    if completion_ab() {
         assert!(comparison == Comparison::ProgressFair && fixed_short_selective());
         super::measurement::idle(pool);
         for owner in 0..4 {
             use gerbil_scheme::instances::SchemeServiceCompletion;
-            let policy = if arm {
+            let policy = if arm && completion_coalesced_ab() {
+                SchemeServiceCompletion::CoalescedHandoff
+            } else if arm {
                 SchemeServiceCompletion::FairHandoff
             } else {
                 SchemeServiceCompletion::Snapshot
@@ -67,6 +69,15 @@ pub(super) fn configure(
                 .unwrap()
                 .wait(GATE)
                 .unwrap();
+            assert_eq!(
+                pool.dispatcher()
+                    .scheme_service_completion_on(owner)
+                    .unwrap()
+                    .wait(GATE)
+                    .unwrap()
+                    .policy,
+                policy
+            );
         }
     }
     let actual = read(pool);
@@ -154,4 +165,36 @@ pub(super) fn fixed_short_selective() -> bool {
 /// Isolate completion handoff with identical `ProgressFair` supply in both arms.
 pub(super) fn completion_fair_ab() -> bool {
     std::env::args().any(|arg| arg == "--completion-fair-ab")
+}
+
+pub(super) fn completion_coalesced_ab() -> bool {
+    std::env::args().any(|arg| arg == "--completion-coalesced-ab")
+}
+pub(super) fn completion_ab() -> bool {
+    completion_fair_ab() || completion_coalesced_ab()
+}
+/// Outside the timing interval; actual native counters and quiescence checks.
+pub(super) fn completions(pool: &InstancePool) -> [u64; 3] {
+    let mut result = [0; 3];
+    for owner in 0..4 {
+        let actual = pool
+            .dispatcher()
+            .scheme_service_completion_on(owner)
+            .unwrap()
+            .wait(GATE)
+            .unwrap();
+        assert!(
+            !actual.token_owned
+                && !actual.opportunity_pending
+                && actual.claimed == 0
+                && actual.ready_queued == 0
+        );
+        for (sum, value) in result
+            .iter_mut()
+            .zip([actual.epoch, actual.batches, actual.results])
+        {
+            *sum += value;
+        }
+    }
+    result
 }

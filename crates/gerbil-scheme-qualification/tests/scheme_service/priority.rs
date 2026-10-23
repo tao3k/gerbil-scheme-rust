@@ -47,9 +47,11 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     for policy in [
         SchemeServiceCompletion::Snapshot,
         SchemeServiceCompletion::FairHandoff,
+        SchemeServiceCompletion::CoalescedHandoff,
     ] {
         contract_policy(runtime, progress, policy);
     }
+    coalesced_snapshot(runtime, progress);
 }
 fn contract_policy(
     runtime: &tokio::runtime::Runtime,
@@ -83,12 +85,22 @@ fn contract_policy(
         .wait(GATE)
         .unwrap();
     let trace = std::sync::Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default());
-    runtime.block_on(order_fixture(&dispatch, &trace));
+    runtime.block_on(order_fixture(&dispatch, &trace, policy));
     check_observation(&dispatch);
     check_entry(&trace);
     runtime.block_on(bulk_fixture(&dispatch, policy));
-    if policy == gerbil_scheme::instances::SchemeServiceCompletion::FairHandoff {
+    if policy != gerbil_scheme::instances::SchemeServiceCompletion::Snapshot {
         runtime.block_on(late_short_fixture(&dispatch));
+    }
+    let custody = dispatch
+        .scheme_service_completion_on(0)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    assert_eq!(custody.policy, policy);
+    assert!(!custody.token_owned && !custody.opportunity_pending && custody.claimed == 0);
+    if policy == gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff {
+        assert!(custody.batches > 0 && custody.results >= custody.batches);
     }
     let shutdown = pool.shutdown(GATE);
     assert!(shutdown.is_clean(), "{shutdown:?}");
@@ -105,6 +117,7 @@ fn contract_policy(
 async fn order_fixture(
     dispatch: &InstanceDispatcher,
     trace: &std::sync::Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>,
+    policy: gerbil_scheme::instances::SchemeServiceCompletion,
 ) {
     for (units, affine) in [(2, false), (1, true)] {
         let invalid = PriorityRequest {
@@ -171,8 +184,13 @@ async fn order_fixture(
         "bounded short/general turns must preserve each FIFO"
     );
     assert!(
-        observed[1] <= 2,
-        "short-active completion turn exceeded its budget"
+        observed[1]
+            <= if policy == gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff {
+                5
+            } else {
+                2
+            },
+        "completion harvest exceeded its policy's bounded custody"
     );
 }
 async fn bulk_fixture(
@@ -388,4 +406,66 @@ fn check_entry(trace: &gerbil_scheme::instances::SchemeServiceEntryTrace) {
     assert!(chain.windows(2).all(|pair| pair[0] <= pair[1]));
     assert!(row.wake.is_some() && !row.history_lost);
     assert!(row.marks[4].unwrap() <= row.marks[5].unwrap());
+}
+
+fn coalesced_snapshot(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sender<&'static str>) {
+    let mut config = config();
+    config.owners = 1;
+    let mut pool = InstancePool::start(&descriptor(false), config).unwrap();
+    let dispatch = pool.dispatcher();
+    dispatch.configure_owner_budgets(4, Some(32)).unwrap();
+    dispatch
+        .configure_scheme_service_completion_on(
+            0,
+            gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff,
+        )
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    runtime.block_on(async {
+        let mut tickets = Vec::new();
+        for _ in 0..3 {
+            tickets.push(
+                dispatch
+                    .submit_scheme_service_backpressured_on(0, batch(true), GATE)
+                    .await
+                    .unwrap(),
+            );
+        }
+        let start = Instant::now();
+        while command(&dispatch, 0, 10)[0] < 3 {
+            assert!(start.elapsed() < GATE);
+            tokio::task::yield_now().await;
+        }
+        // Scheme releases the latch and drives real work until all three graphs
+        // are ready, without harvesting a token or projecting on Rust's behalf.
+        command(&dispatch, 0, 18);
+        for ticket in tickets {
+            let (values, _) = ticket.wait_completed(GATE).await.unwrap();
+            assert_eq!(values.len(), 8);
+            corpus::peers(&values);
+        }
+        idle(&dispatch).await;
+    });
+    let actual = dispatch
+        .scheme_service_completion_on(0)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    assert_eq!((actual.batches, actual.results), (1, 3));
+    assert_eq!(actual.claimed, 0);
+    assert_eq!(actual.ready_queued, 0);
+    assert!(!actual.token_owned && !actual.opportunity_pending);
+    command(&dispatch, 0, 19);
+    let carry = dispatch
+        .scheme_service_completion_on(0)
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    assert_eq!((carry.batches, carry.results), (3, 5));
+    assert!(!carry.token_owned && !carry.opportunity_pending);
+    assert_eq!((carry.claimed, carry.ready_queued), (0, 0));
+    let closed = pool.shutdown(GATE);
+    assert!(closed.is_clean(), "{closed:?}");
+    progress.send("native three-result snapshot uses one linear token, per-result projection, acknowledgement and clean close").unwrap();
 }

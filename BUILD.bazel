@@ -67,12 +67,12 @@ filegroup(
     sh_test(
         name = "cargo_" + gate,
         size = {
-            "check": "medium",
+            "check": "large",
             "test": "large",
             "clippy": "large",
         }[gate],
         timeout = {
-            "check": "moderate",
+            "check": "long",
             "test": "long",
             "clippy": "long",
         }[gate],

@@ -42,7 +42,7 @@ impl Comparison {
         self != Self::Service
     }
     fn supply_admission(self, arm: bool) -> gerbil_scheme::instances::SchemeServiceSupplyAdmission {
-        if self == Self::ProgressFair && (arm || super::settings::completion_fair_ab()) {
+        if self == Self::ProgressFair && (arm || super::settings::completion_ab()) {
             return gerbil_scheme::instances::SchemeServiceSupplyAdmission::ProgressFair;
         }
         if self == Self::RetirementRefill && arm {
@@ -60,6 +60,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::ProgressFair if super::settings::completion_coalesced_ab() => {
+                "same ProgressFair supply and Selective short routing; snapshot versus epoch-coalesced completion custody"
+            }
             Self::ProgressFair if super::settings::completion_fair_ab() => {
                 "same ProgressFair supply and Selective short routing; snapshot versus fair completion handoff"
             }
@@ -232,6 +235,8 @@ pub(super) fn run(
     );
     let deliveries_before = peer_deliveries(pool);
     let outcomes_before = offer_outcomes(pool);
+    let completions_before =
+        super::settings::completion_coalesced_ab().then(|| super::settings::completions(pool));
     let released = Instant::now();
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
@@ -304,11 +309,8 @@ pub(super) fn run(
         value["owner_qos_receipts"] = qos;
         value["owner_qos_restored"] = super::native_wait::qos(pool, false);
     }
-    value["peer_inbox_deliveries"] = json!(peer_deliveries(pool) - deliveries_before);
-    let outcomes = offer_outcomes(pool);
-    value["peer_offer_withdrawals"] = json!(outcomes[0] - outcomes_before[0]);
-    value["peer_offer_entries"] = json!(outcomes[1] - outcomes_before[1]);
-    value["source_wake_signals"] = json!(outcomes[2] - outcomes_before[2]);
+    append_offer_outcomes(&mut value, pool, deliveries_before, outcomes_before);
+    append_completions(&mut value, pool, completions_before);
     append_policy(&mut value, pool, comparison, arm, &settings, inputs, probes);
     if observation.full() && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
@@ -496,6 +498,26 @@ fn append_policy(
         1
     });
 }
+fn append_offer_outcomes(
+    value: &mut Value,
+    pool: &InstancePool,
+    deliveries_before: u64,
+    outcomes_before: [u64; 3],
+) {
+    value["peer_inbox_deliveries"] = json!(peer_deliveries(pool) - deliveries_before);
+    let outcomes = offer_outcomes(pool);
+    value["peer_offer_withdrawals"] = json!(outcomes[0] - outcomes_before[0]);
+    value["peer_offer_entries"] = json!(outcomes[1] - outcomes_before[1]);
+    value["source_wake_signals"] = json!(outcomes[2] - outcomes_before[2]);
+}
+fn append_completions(value: &mut Value, pool: &InstancePool, before: Option<[u64; 3]>) {
+    if let Some(before) = before {
+        let after = super::settings::completions(pool);
+        value["completion_opportunities"] = json!(after[0] - before[0]);
+        value["completion_batches"] = json!(after[1] - before[1]);
+        value["completion_results"] = json!(after[2] - before[2]);
+    }
+}
 fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Comparison, arm: bool) {
     let deferred = comparison == Comparison::PoolProtocol && arm
         || matches!(
@@ -508,6 +530,9 @@ fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Compa
             .unwrap()
             .enabled
     );
+    value["completion_coalesced_ab"] = json!(super::settings::completion_coalesced_ab());
+    value["coalesced_completion_handoff"] =
+        json!(super::settings::completion_coalesced_ab() && arm);
     value["completion_fair_ab"] = json!(super::settings::completion_fair_ab());
     value["fair_completion_handoff"] = json!(super::settings::completion_fair_ab() && arm);
     value["joint_progress_fairness"] = json!(

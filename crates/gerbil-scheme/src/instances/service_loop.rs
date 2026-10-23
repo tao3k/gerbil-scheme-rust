@@ -34,7 +34,7 @@ fn control(image: &Image, header: &[i64]) -> Result<Vec<i64>, InstanceError> {
     super::native_dispatch::run_native(
         image,
         1024,
-        (65536 + 3) * 8,
+        (65536 + 5) * 8,
         |session| {
             let value = service::command(session, header, None)?;
             session.copy_numeric::<i64>(&value)
@@ -88,7 +88,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=7)
+        || !matches!(initialized[1], 1..=8)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -112,11 +112,41 @@ pub(super) fn close(image: &Image) {
             -73
         }));
 }
+// Linear, owner-borrowed custody of handed-out identities, never Scheme values.
+// Credits have already returned per result; the next advance consumes this token.
+struct ReadyToken<'a> {
+    image: &'a Image,
+    epoch: i64,
+    _owner: std::marker::PhantomData<std::rc::Rc<()>>,
+}
+impl<'a> ReadyToken<'a> {
+    fn parse(image: &'a Image, completed: &mut Vec<i64>) -> Result<Option<Self>, InstanceError> {
+        if completed.first() != Some(&-8) {
+            return Ok(None);
+        }
+        if completed.len() < 2 || completed[1] < 0 {
+            return Err(InstanceError::InvalidConfig(
+                "invalid completion epoch receipt",
+            ));
+        }
+        let epoch = completed[1];
+        completed.drain(..2);
+        Ok(Some(Self {
+            image,
+            epoch,
+            _owner: std::marker::PhantomData,
+        }))
+    }
+    fn advance(self) -> Result<Vec<i64>, InstanceError> {
+        control(self.image, &[3, self.epoch])
+    }
+}
 struct Pump<'a> {
     image: &'a Image,
     input: usize,
     output: usize,
     jobs: BTreeMap<JobId, Pending>,
+    completed: Option<ReadyToken<'a>>,
     producer: Option<Box<dyn super::batch_stream_runner::Producer>>,
     wake: &'a Wake,
 }
@@ -192,7 +222,10 @@ impl Pump<'_> {
         Ok(())
     }
     fn collect(&mut self) -> Result<(), InstanceError> {
-        if self.wake.direct.load(Ordering::Acquire) && self.jobs.is_empty() {
+        if self.wake.direct.load(Ordering::Acquire)
+            && self.jobs.is_empty()
+            && self.completed.is_none()
+        {
             return Ok(());
         }
 
@@ -200,8 +233,12 @@ impl Pump<'_> {
             self.image,
             self.wake,
             super::SchemeServicePhase::Advance,
-            || control(self.image, &[3]),
+            || match self.completed.take() {
+                Some(token) => token.advance(),
+                None => control(self.image, &[3]),
+            },
         )?;
+        let token = ReadyToken::parse(self.image, &mut completed)?;
         self.wake.progress.receipt(&mut completed)?;
         let refill = completed.len().min(
             self.producer
@@ -231,6 +268,9 @@ impl Pump<'_> {
                 || drop(pending.permit),
             );
         }
+        // Only readiness custody is deferred. Every result's native permit has
+        // already returned before any later arbitrary projector ran.
+        self.completed = token;
         // Retire the full snapshot before constructing new payloads. Refill is
         // bounded by both released results and the registered active budget.
         for _ in 0..refill {
@@ -471,6 +511,7 @@ pub(super) fn run(
         input: maximum_input,
         output: maximum_output,
         jobs: BTreeMap::new(),
+        completed: None,
         producer: None,
         wake,
     };

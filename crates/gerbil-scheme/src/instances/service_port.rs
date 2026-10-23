@@ -56,9 +56,11 @@ pub enum SchemeServiceCompletion {
     Snapshot,
     /// One result per class per owner turn; native workers yield at job handoff.
     FairHandoff,
+    /// Coalesce ready graphs behind a consumed owner token; retain per-result credit return.
+    CoalescedHandoff,
 }
 impl InstanceDispatcher {
-    /// Configure completion handoff on an idle fixed owner (service ABI v7).
+    /// Configure completion handoff on an idle fixed owner (v7; coalesced requires v8).
     /// Scheme retains result graphs until projection; Rust never moves native tasks.
     /// # Errors
     /// Closed/unsupported service, non-idle work, or invalid native receipt.
@@ -81,13 +83,23 @@ impl InstanceDispatcher {
             if wake.closed.load(Ordering::Acquire) {
                 return Err(InstanceError::Closed);
             }
-            if wake.service_version.load(Ordering::Acquire) < 7 {
+            if wake.service_version.load(Ordering::Acquire)
+                < if policy == SchemeServiceCompletion::CoalescedHandoff {
+                    8
+                } else {
+                    7
+                }
+            {
                 return Err(InstanceError::InvalidConfig(
                     "Scheme service lacks completion handoff",
                 ));
             }
         }
-        let mode = i64::from(policy == SchemeServiceCompletion::FairHandoff);
+        let mode = match policy {
+            SchemeServiceCompletion::Snapshot => 0,
+            SchemeServiceCompletion::FairHandoff => 1,
+            SchemeServiceCompletion::CoalescedHandoff => 2,
+        };
         self.submit_native_on(owner, move |session| {
             let value = super::service::command(session, &[13, mode], None)?;
             if session.copy_numeric::<i64>(&value)? != [mode] {
@@ -99,3 +111,82 @@ impl InstanceDispatcher {
         })
     }
 }
+
+/// Native completion custody/counters read on a fixed owner.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchemeCompletionProgress {
+    pub policy: SchemeServiceCompletion,
+    pub epoch: u64,
+    pub token_owned: bool,
+    pub claimed: usize,
+    pub opportunity_pending: bool,
+    pub batches: u64,
+    pub results: u64,
+    pub ready_queued: usize,
+}
+impl InstanceDispatcher {
+    /// Read actual completion policy and coalescence counters (service ABI v8).
+    /// # Errors
+    /// Unsupported/closed endpoint, capacity exhaustion or invalid metadata.
+    pub fn scheme_service_completion_on(
+        &self,
+        owner: usize,
+    ) -> Result<InstanceTicket<SchemeCompletionProgress>, InstanceError> {
+        self.submit_native_on(owner, |session| {
+            let value = super::service::command(session, &[15], None)?;
+            let values = session.copy_numeric::<i64>(&value)?;
+            SchemeCompletionProgress::parse(&values)
+        })
+    }
+}
+
+impl SchemeCompletionProgress {
+    fn parse(values: &[i64]) -> Result<Self, InstanceError> {
+        let [
+            mode @ 0..=2,
+            epoch @ 0..=i64::MAX,
+            token @ -1..=i64::MAX,
+            claimed @ 0..=65536,
+            due @ 0..=1,
+            batches @ 0..=i64::MAX,
+            results @ 0..=i64::MAX,
+            ready @ 0..=65536,
+        ] = values
+        else {
+            return Err(InstanceError::InvalidConfig("native completion metadata"));
+        };
+        if token > epoch
+            || claimed + ready > 65536
+            || (*claimed > 0 && *token < 0)
+            || (*token >= 0 && *due != 1)
+            || (*mode != 2 && (*token >= 0 || *claimed > 0 || *due != 0))
+            || (*mode == 2 && *ready > 0 && *due != 1)
+        {
+            return Err(InstanceError::InvalidConfig(
+                "inconsistent completion custody",
+            ));
+        }
+        Ok(SchemeCompletionProgress {
+            policy: match mode {
+                0 => SchemeServiceCompletion::Snapshot,
+                1 => SchemeServiceCompletion::FairHandoff,
+                _ => SchemeServiceCompletion::CoalescedHandoff,
+            },
+            epoch: u64::try_from(*epoch)
+                .map_err(|_| InstanceError::InvalidConfig("negative completion epoch"))?,
+            token_owned: *token >= 0,
+            claimed: usize::try_from(*claimed)
+                .map_err(|_| InstanceError::InvalidConfig("completion count overflow"))?,
+            opportunity_pending: *due == 1,
+            batches: u64::try_from(*batches)
+                .map_err(|_| InstanceError::InvalidConfig("negative completion batches"))?,
+            results: u64::try_from(*results)
+                .map_err(|_| InstanceError::InvalidConfig("negative completion results"))?,
+            ready_queued: usize::try_from(*ready)
+                .map_err(|_| InstanceError::InvalidConfig("ready count overflow"))?,
+        })
+    }
+}
+#[cfg(test)]
+#[path = "../../tests/unit/service_completion.rs"]
+mod completion_tests;

@@ -228,8 +228,7 @@ fn await_trace_start(args: &[String]) {
         assert_eq!(start, [b'R'], "trace start token");
     }
 }
-fn main() {
-    let args: Vec<_> = std::env::args().skip(1).collect();
+fn validate_arguments(args: &[String]) {
     assert!(args.iter().all(|s| s.starts_with("--blocks=")
         || s == "--test"
         || s == "--bench"
@@ -250,6 +249,7 @@ fn main() {
         || s == "--progress-fair-ab"
         || s == "--fixed-short-selective"
         || s == "--completion-fair-ab"
+        || s == "--completion-coalesced-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"
@@ -262,11 +262,19 @@ fn main() {
         || s == "--budget-ab"
         || s == "--feed-ab"));
     assert!(
-        !settings::completion_fair_ab()
+        !settings::completion_ab()
             || (args.iter().any(|s| s == "--progress-fair-ab")
                 && settings::fixed_short_selective()),
         "completion comparison requires identical bulk and short routing"
     );
+    assert!(
+        !(settings::completion_fair_ab() && settings::completion_coalesced_ab()),
+        "choose one completion comparison"
+    );
+}
+fn main() {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    validate_arguments(&args);
     let trace_once = args.iter().any(|s| s == "--trace-once");
     let observation = observation::select(&args);
     assert!(!trace_once || observation.enabled());

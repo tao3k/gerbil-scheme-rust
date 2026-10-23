@@ -208,6 +208,16 @@ fn policy_contract(
     .unwrap();
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
+    for owner in 0..4 {
+        dispatch
+            .configure_scheme_service_completion_on(
+                owner,
+                gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff,
+            )
+            .unwrap()
+            .wait(GATE)
+            .unwrap();
+    }
     if policy == gerbil_scheme::instances::SchemeShortWake::ProgressFair {
         runtime.block_on(super::service_progress::enable(&dispatch));
     }

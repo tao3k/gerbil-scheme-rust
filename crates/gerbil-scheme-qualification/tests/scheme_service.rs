@@ -37,7 +37,7 @@ use std::{
     sync::mpsc,
     time::{Duration, Instant},
 };
-const GATE: Duration = Duration::from_secs(5);
+use watchdog::GATE;
 struct VectorRequest {
     input: Vec<i64>,
     panic: bool,
@@ -444,7 +444,7 @@ fn scheme_owns_waits_roots_continuations_and_close() {
         dispatch
             .configure_scheme_service_completion_on(
                 owner,
-                gerbil_scheme::instances::SchemeServiceCompletion::FairHandoff,
+                gerbil_scheme::instances::SchemeServiceCompletion::CoalescedHandoff,
             )
             .unwrap()
             .wait(GATE)

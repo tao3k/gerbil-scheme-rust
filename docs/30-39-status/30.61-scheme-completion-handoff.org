@@ -1,6 +1,9 @@
 #+title: Scheme completion handoff and owner service opportunities
 #+options: toc:nil num:nil
 
+Follow-up: [[file:30.62-completion-opportunity-custody.org][30.62]] separates completion opportunity, ready-token custody and per-result retirement.
+The two rejected captures and historical watchdog boundary below remain retained.
+
 * Evidence and protocol decision
 
 [[file:30.60-dedicated-offer-ports.org][30.60]] retains CPU native short p99 +18.20%, short pending p99 +17.81%,

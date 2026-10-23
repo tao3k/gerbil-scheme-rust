@@ -1,6 +1,6 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/utf8::timestamp 1792411114)
+  (define gerbil-scheme-rust/scheme/utf8::timestamp 1792760082)
   (begin
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8
       (lambda (_%str485%_)
@@ -17,12 +17,12 @@
                     (declare (not safe))
                     (##fx< _%start496%_ _%length487%_))
                   (let* ((_%end499%_
-                          (if (let ((__tmp5226
+                          (if (let ((__tmp6077
                                      (let ()
                                        (declare (not safe))
                                        (##fx- _%length487%_ _%start496%_))))
                                 (declare (not safe))
-                                (##fx< __tmp5226 '256))
+                                (##fx< __tmp6077 '256))
                               _%length487%_
                               (let ()
                                 (declare (not safe))
@@ -60,12 +60,12 @@
                   (declare (not safe))
                   (##fx< _%start477%_ _%length470%_))
                 (let* ((_%end480%_
-                        (if (let ((__tmp5227
+                        (if (let ((__tmp6078
                                    (let ()
                                      (declare (not safe))
                                      (##fx- _%length470%_ _%start477%_))))
                               (declare (not safe))
-                              (##fx< __tmp5227 '256))
+                              (##fx< __tmp6078 '256))
                             _%length470%_
                             (let ()
                               (declare (not safe))

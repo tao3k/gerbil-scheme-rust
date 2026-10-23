@@ -222,3 +222,40 @@ its preprocessor/assembly intermediates are removed. An initial invocation
 without the required =GERBIL_BUILD_VERBOSE= setting refused idle30 and remains
 a failed receipt. These local helper results do not qualify the downstream
 Source build or current-head CI.
+
+* Opt-in library metadata in linked programs
+
+The optional third argument to =gerbil-rs-stage-program= names library imports
+whose existing macro carriers should be linked. Omitting it or passing an empty
+list preserves the original graph and entry stub. A fresh SDK process imports
+these libraries and observes the official module registry and load order; no
+application DSL is compiled by this observation.
+
+The original startup graph and its order remain an exact prefix. Additional
+library runtime dependencies are deferred too: =compiler/base= constructs
+classes and cannot precede runtime/MOP initialization.
+
+Runtime objects already provided by the SDK are reused. Remaining carriers
+are copied under the compiler's qualified static module names. The manifest
+marks them =deferred=, and the archive uses Gambit's =link-incremental= API with
+=(preload . #f)= module flags. Registering a descriptor does not execute its body.
+The compiler's metadata C policy omits the runtime =-O2= override, preserving
+Gerbil's separate phi compilation policy and the selected SDK's compiler/ABI
+options. The object cache includes these exact options; the linker cache also
+includes each preload flag.
+
+The generated entry scopes compiled-carrier activation to the original
+=load-module= call. The SDK loader still resolves the installed carrier and
+owns its loading, cached-error and load-order state. Gambit's =##load-module=
+activates the registered code in that call's current expander context. Nested
+loads receive their own parameter extent. Empty reexports have no linked
+Gambit descriptor and retain the SDK's ordinary empty-file load. Ordinary
+user loads retain the original procedure. Macro objects remain VM-local; only immutable linked code
+is shared. Application DSL still loads through the original Scheme evaluator.
+
+The SDK linker control checks deferred initialization, the dynamic parameter
+context and exactly-once activation. The graph control checks duplicate
+identities, missing carriers, metadata/tool separation and empty-option
+compatibility. These checks do not establish downstream high-load throughput,
+complete source refinement or initialization equivalence for every library;
+those require the consuming program's unchanged semantic and resource suites.

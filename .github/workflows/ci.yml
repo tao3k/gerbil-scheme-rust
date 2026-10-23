@@ -48,6 +48,14 @@ jobs:
           cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
           cargo clippy --workspace --all-targets --locked -- -D warnings
 
+      - name: Qualify opt-in compiler-owned metadata carriers
+        run: |
+          export GERBIL_PATH="$RUNNER_TEMP/metadata-package"
+          export GERBIL_LOADPATH="$GERBIL_PATH/lib"
+          gxi build.ss compile
+          gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
+          gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"
+
       - name: Record unsupported SMP qualification
         run: |
           echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned SDK does not support. This is not an SMP pass.'

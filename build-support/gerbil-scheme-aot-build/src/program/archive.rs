@@ -2,10 +2,14 @@
 
 //! Compile a compiler-owned AOT program manifest without inspecting Scheme text.
 
-use super::process::{
+#[cfg(test)]
+use super::compile_program_module;
+use super::compile_program_modules;
+use super::{
     GSC_PROGRESS_OPTIONS, configured_gambit_gcc, gambit_progress_command,
     gcc_allocation_diagnostics, native_progress_enabled, run_process, run_with_compiler_artifacts,
 };
+use super::{add_link_input, scheme_string};
 use crate::{
     NativeArchiveLinkReceipt, NativeLinkLibrary, NativeStaticLinkPlan,
     build_static_archive_from_link_plan,
@@ -17,10 +21,6 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{
-    Mutex,
-    atomic::{AtomicUsize, Ordering},
-};
 use std::time::{Duration, Instant};
 
 /// Cargo-resolved source root containing `build.ss` and the Scheme modules.
@@ -47,6 +47,8 @@ struct ProgramModule {
     module: String,
     scm: PathBuf,
     system: bool,
+    #[serde(default)]
+    deferred: bool,
 }
 
 /// Named inputs for a compiler-owned linked program archive.
@@ -86,7 +88,7 @@ pub struct NativeHeaderInput<'a> {
     pub header_files: &'a [PathBuf],
 }
 
-use super::headers::native_compile_options;
+use super::native_compile_options;
 
 const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/runtime"];
 
@@ -302,7 +304,7 @@ fn read_manifest(
 
 struct StagedProgram {
     objects: Vec<PathBuf>,
-    compile_sources: Vec<(PathBuf, PathBuf, String)>,
+    compile_sources: Vec<(PathBuf, PathBuf, String, bool)>,
     linker_c: PathBuf,
     linker_object: PathBuf,
 }
@@ -316,8 +318,12 @@ fn stage_program(
     let linker_c = request.out_dir.join("program_link.c");
     let linker_object = request.out_dir.join("program_link.o");
     let mut link = gambit_progress_command(request.gsc);
-    link.args(["-link", "-linker-name", request.linker_name, "-o"])
-        .arg(&linker_c);
+    let deferred = plan.modules.iter().any(|module| module.deferred);
+    let mut linked_modules = Vec::new();
+    if !deferred {
+        link.args(["-link", "-linker-name", request.linker_name, "-o"])
+            .arg(&linker_c);
+    }
     let mut objects = Vec::new();
     let mut compile_sources = Vec::new();
     let mut linker_inputs = Vec::new();
@@ -353,7 +359,13 @@ fn stage_program(
                             module.module
                         ));
                     }
-                    link.arg(&c);
+                    add_link_input(
+                        &mut link,
+                        &mut linked_modules,
+                        &c,
+                        deferred,
+                        module.deferred,
+                    );
                     linker_inputs.push(c);
                     objects.push(object);
                 } else {
@@ -363,10 +375,21 @@ fn stage_program(
                     let staged = request.out_dir.join(file_name);
                     std::fs::copy(&module.scm, &staged).map_err(|e| e.to_string())?;
                     let source = generate_module_c(request.gsc, &staged, &module.module, observer)?;
-                    link.arg(&source);
+                    add_link_input(
+                        &mut link,
+                        &mut linked_modules,
+                        &source,
+                        deferred,
+                        module.deferred,
+                    );
                     linker_inputs.push(source.clone());
                     let object = request.out_dir.join(format!("module_{index}.o"));
-                    compile_sources.push((source, object.clone(), module.module.clone()));
+                    compile_sources.push((
+                        source,
+                        object.clone(),
+                        module.module.clone(),
+                        module.deferred,
+                    ));
                     objects.push(object);
                 }
             }
@@ -374,12 +397,27 @@ fn stage_program(
         },
     )?;
     let stub_source = generate_module_c(request.gsc, &plan.stub, "program-stub", observer)?;
-    link.arg(&stub_source);
+    add_link_input(
+        &mut link,
+        &mut linked_modules,
+        &stub_source,
+        deferred,
+        false,
+    );
+    if deferred {
+        // Use Gambit's public linker API: CLI -link has no per-module flags.
+        link.arg("-e").arg(format!(
+            "(link-incremental (quote ({})) output: {} linker-name: {})",
+            linked_modules.join(" "),
+            scheme_string(&linker_c),
+            scheme_string(Path::new(request.linker_name))
+        ));
+    }
     linker_inputs.push(stub_source);
     let linker_fingerprint = native_inputs_fingerprint(
         request.gsc,
-        "program-linker-source-v1",
-        request.linker_name,
+        "program-linker-source-v2",
+        &format!("{} {:?}", request.linker_name, linked_modules),
         &linker_inputs,
     )?;
     let linker_cached = match linker_fingerprint.as_deref() {
@@ -511,91 +549,6 @@ fn compile_program(
         link_search_dirs: search,
         link_libraries: libraries,
     })
-}
-
-fn compile_program_modules(
-    gsc: &Path,
-    sources: &[(PathBuf, PathBuf, String)],
-    cc_options: &str,
-    observer: &dyn ProgramArchiveObserver,
-) -> Result<(), String> {
-    let worker_count = native_build_parallelism(sources.len());
-    let batch = format!("jobs={} workers={worker_count}", sources.len());
-    observe_program_archive_operation(
-        observer,
-        ProgramArchiveOperation {
-            phase: "native-object-batch",
-            operation: "compile program module objects",
-            subject: Some(&batch),
-        },
-        || compile_program_modules_inner(gsc, sources, cc_options, observer, worker_count),
-    )
-}
-
-fn compile_program_modules_inner(
-    gsc: &Path,
-    sources: &[(PathBuf, PathBuf, String)],
-    cc_options: &str,
-    observer: &dyn ProgramArchiveObserver,
-    worker_count: usize,
-) -> Result<(), String> {
-    if worker_count <= 1 {
-        for (source, object, module) in sources {
-            compile_program_module(gsc, source, object, module, cc_options, observer)?;
-        }
-        return Ok(());
-    }
-
-    let next = AtomicUsize::new(0);
-    let failure = Mutex::new(None);
-    std::thread::scope(|scope| {
-        for _ in 0..worker_count {
-            scope.spawn(|| {
-                loop {
-                    if failure.lock().expect("native build failure lock").is_some() {
-                        return;
-                    }
-                    let index = next.fetch_add(1, Ordering::Relaxed);
-                    let Some((source, object, module)) = sources.get(index) else {
-                        return;
-                    };
-                    if let Err(error) =
-                        compile_program_module(gsc, source, object, module, cc_options, observer)
-                    {
-                        *failure.lock().expect("native build failure lock") = Some(error);
-                        return;
-                    }
-                }
-            });
-        }
-    });
-    failure
-        .into_inner()
-        .expect("native build failure lock")
-        .map_or(Ok(()), Err)
-}
-
-fn compile_program_module(
-    gsc: &Path,
-    source: &Path,
-    object: &Path,
-    module: &str,
-    cc_options: &str,
-    observer: &dyn ProgramArchiveObserver,
-) -> Result<(), String> {
-    compile_native_object(
-        gsc,
-        source,
-        object,
-        "program-module-object-v1",
-        cc_options,
-        ProgramArchiveOperation {
-            phase: "native-object",
-            operation: "compile program module",
-            subject: Some(module),
-        },
-        observer,
-    )
 }
 
 pub(crate) fn compile_native_object(

@@ -12,6 +12,7 @@
     (gxc: "scheme/service-budget" (extra-inputs: ("scheme/service-progress.ss")))
     "scheme/actor-batch"
     (gxc: "scheme/async-service" (extra-inputs: ("scheme/service-port-wake.ss")))
+    "scheme/program-metadata"
     "scheme/program-build"
     "scheme/python-runtime"
     "scheme/python-package")

@@ -87,6 +87,7 @@ fn contract_policy(
         .unwrap()
         .wait(GATE)
         .unwrap();
+    configure_refill(&dispatch, 0, policy);
     let trace = std::sync::Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default());
     runtime.block_on(order_fixture(&dispatch, &trace, policy));
     check_observation(&dispatch);

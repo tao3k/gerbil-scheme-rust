@@ -95,6 +95,8 @@ mod service_feed;
 #[cfg(feature = "tokio-dispatch")]
 mod service_progress;
 #[cfg(feature = "tokio-dispatch")]
+mod service_refill;
+#[cfg(feature = "tokio-dispatch")]
 pub use service_progress::SchemeServiceProgress;
 
 #[cfg(feature = "tokio-dispatch")]

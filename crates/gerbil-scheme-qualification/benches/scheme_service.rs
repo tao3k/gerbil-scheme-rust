@@ -253,6 +253,7 @@ fn validate_arguments(args: &[String]) {
         || s == "--native-cycle-ab"
         || s == "--prepared-cycle-ab"
         || s == "--pipeline-cycle-ab"
+        || s == "--coupled-refill-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"
@@ -276,7 +277,8 @@ fn validate_arguments(args: &[String]) {
             settings::completion_coalesced_ab(),
             settings::native_cycle_ab(),
             settings::prepared_cycle_ab(),
-            settings::pipeline_cycle_ab()
+            settings::pipeline_cycle_ab(),
+            settings::coupled_refill_ab()
         ]
         .into_iter()
         .filter(|&x| x)

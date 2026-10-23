@@ -405,8 +405,17 @@ impl Pump<'_> {
                 break;
             }
             if let Some(request) = self.next_request(requests) {
+                // An admitted service is work, not a reason to abandon all
+                // returned opportunities. A wake has no native ownership. Keep
+                // both inside this bounded turn; never bypass a FIFO barrier.
+                if self.wake.coupled_refill.load(Ordering::Acquire)
+                    && matches!(&request.work, Work::Service(_) | Work::Wake)
+                {
+                    self.receive(request)?;
+                    continue;
+                }
                 self.deferred = Some(request);
-                break; // preserve ordinary FIFO/control and short routing precedence
+                break; // controls/arbitrary callbacks remain FIFO barriers
             }
             if let Some(request) = self
                 .wake
@@ -414,6 +423,10 @@ impl Pump<'_> {
                 .get()
                 .and_then(super::short_pool::Port::claim)
             {
+                if self.wake.coupled_refill.load(Ordering::Acquire) {
+                    self.receive(request)?;
+                    continue;
+                }
                 self.deferred = Some(request);
                 break;
             }

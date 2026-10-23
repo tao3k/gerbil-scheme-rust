@@ -100,6 +100,7 @@ fn run(
         .unwrap()
         .wait(GATE)
         .unwrap();
+    configure_refill(&dispatch, 0, policy);
     let projected = Arc::new(AtomicUsize::new(0));
     let constructed = Arc::new(AtomicUsize::new(0));
     let (reached, ready) = mpsc::channel();

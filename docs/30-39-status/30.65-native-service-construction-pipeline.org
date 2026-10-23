@@ -245,3 +245,9 @@ controller/cleanup receipts. Only this final report is authored afterward;
 runtime/build/model/test/benchmark source hashes are checked unchanged at
 publication. No raw logs, binaries, archives, patches or private absolute paths
 are committed. New-head remote CI remains separate from local acceptance.
+
+* Follow-up
+
+[[file:30.66-coupled-owner-refill.org][30.66]] isolates bounded FIFO/short/supply refill arbitration with the same
+fused native constructor in both arms. Its remaining negative results do not
+replace this capture or justify default promotion.

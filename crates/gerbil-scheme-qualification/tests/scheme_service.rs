@@ -92,6 +92,29 @@ fn descriptor(fail: bool) -> IsolatedProgram {
         })
     }
 }
+fn configure_refill(
+    dispatch: &InstanceDispatcher,
+    owner: usize,
+    policy: gerbil_scheme::instances::SchemeServiceCompletion,
+) {
+    if policy == gerbil_scheme::instances::SchemeServiceCompletion::PipelineCycle {
+        assert!(
+            dispatch
+                .configure_scheme_service_refill_on(owner, true)
+                .unwrap()
+                .wait(GATE)
+                .unwrap()
+        );
+    } else {
+        assert!(matches!(
+            dispatch
+                .configure_scheme_service_refill_on(owner, true)
+                .unwrap()
+                .wait(GATE),
+            Err(InstanceError::InvalidConfig(_))
+        ));
+    }
+}
 fn config() -> InstanceConfig {
     InstanceConfig {
         owners: 4,

@@ -60,6 +60,9 @@ impl Comparison {
     }
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::ProgressFair if super::settings::coupled_refill_ab() => {
+                "same VMs and fused native inputs; barrier refill versus bounded FIFO/short/supply owner turns"
+            }
             Self::ProgressFair if super::settings::pipeline_cycle_ab() => {
                 "same VMs, typed inputs and routing; prepared cycle versus fused native construction and credit-bounded refill"
             }
@@ -539,17 +542,24 @@ fn append_short_policy(value: &mut Value, pool: &InstancePool, comparison: Compa
             .unwrap()
             .enabled
     );
+    value["coupled_refill_ab"] = json!(super::settings::coupled_refill_ab());
+    value["coupled_refill"] = json!(super::settings::coupled_refill_ab() && arm);
     value["pipeline_cycle_ab"] = json!(super::settings::pipeline_cycle_ab());
-    value["pipeline_service_cycle"] = json!(super::settings::pipeline_cycle_ab() && arm);
+    value["pipeline_service_cycle"] = json!(
+        super::settings::coupled_refill_ab() || (super::settings::pipeline_cycle_ab() && arm)
+    );
     value["prepared_cycle_ab"] = json!(super::settings::prepared_cycle_ab());
     value["native_cycle_ab"] = json!(super::settings::native_cycle_ab());
     value["native_service_cycle"] = json!(
-        super::settings::pipeline_cycle_ab()
+        super::settings::coupled_refill_ab()
+            || super::settings::pipeline_cycle_ab()
             || super::settings::prepared_cycle_ab()
             || (super::settings::native_cycle_ab() && arm)
     );
     value["prepared_input_cycle"] = json!(
-        super::settings::pipeline_cycle_ab() || (super::settings::prepared_cycle_ab() && arm)
+        super::settings::coupled_refill_ab()
+            || super::settings::pipeline_cycle_ab()
+            || (super::settings::prepared_cycle_ab() && arm)
     );
     value["completion_coalesced_ab"] = json!(super::settings::completion_coalesced_ab());
     value["coalesced_completion_handoff"] =

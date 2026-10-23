@@ -1081,6 +1081,12 @@ module service_sharing {
   action enablePreparedCycle = all { q.nativeCycle, life::stutter, q' = { ...q, readyFirst: true } }
   action enablePipeline = all { q.readyFirst, life::stutter, q' = { ...q, pipeline: true } }
   action endFill(owner: int): bool = all { life::stutter, q' = { ...q, fillBudget: q.fillBudget.set(owner, 0) } }
+  // A notification carries no request, reservation or root. It consumes one
+  // bounded owner turn rather than discarding all remaining refill opportunity.
+  action refillWake(owner: int): bool = all {
+    q.pipeline, q.fillBudget.get(owner) > 0, life::stutter,
+    q' = { ...q, fillBudget: q.fillBudget.set(owner, q.fillBudget.get(owner) - 1) }
+  }
   action unsafeFillWithoutRetirement(r: int): bool = all {
     q.pipeline, q.prepared.contains(r), q.fillBudget.get(ASSIGNED.get(r)) == 0,
     life::admitReserved(r), q' = { ...q, prepared: q.prepared.exclude(Set(r)), host: q.host.append(r), resourceViolation: true }
@@ -1175,7 +1181,7 @@ module service_sharing {
     nondet r = JOBS.oneOf()
     nondet w = workers.oneOf()
     nondet owner = owners.oneOf()
-    any { endFill(owner), prepareInput(r), enterPrepared(r), discardPrepared(r), offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
+    any { endFill(owner), refillWake(owner), prepareInput(r), enterPrepared(r), discardPrepared(r), offer(r), feed(r), boundary(owner), assignWorker(w, r), acquireCpu(w), compute(w), yieldCpu(w),
       block(w), wakeTask(w), gcStart(owner), gcFinish(owner), osPause(owner), osResume(owner), delayTick,
       harvest(owner, Set(r)), batchTransfer(owner), completionAck(owner, q.tokenEpoch.get(owner)), project(r), abandon(r), resourceClose, resourceJoin, resourceStutter }
   }
@@ -1237,6 +1243,12 @@ module service_sharing_cases {
   action pipelineRefillProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(project(2))
     .then(completionAck(1,1)).then(enterPrepared(3)).then(prepareInput(4)).then(enterPrepared(4))
     .then(all { assert(q.fillBudget.get(1) == 0), assert(q.prepared.size() == 0), assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  action pipelineWakeRefillProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(project(2))
+    .then(completionAck(1,1)).then(refillWake(1)).then(enterPrepared(3))
+    .then(all { assert(q.fillBudget.get(1) == 0), assert(resourceSafety), resourceStutter })
+  action pipelineWakeControlProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(project(2))
+    .then(completionAck(1,1)).then(refillWake(1)).then(endFill(1)).then(resourceClose).then(discardPrepared(3))
+    .then(all { assert(q.fillBudget.get(1) == 0), assert(rootedJobs.size() == 0), assert(resourceSafety), resourceStutter })
   action pipelineCancelCloseProof = pipelineHeldStart.then(prepareInput(3)).then(project(1)).then(resourceClose)
     .then(discardPrepared(3)).then(project(2)).then(completionAck(1,1)).then(resourceJoin)
     .then(all { assert(q.fillBudget.get(1) == 0), assert(resourceSafety), resourceStutter })
@@ -1349,6 +1361,8 @@ module service_completion_small {
   run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
   // These witnesses require two bulk jobs assigned to one owner.
   run pipelineRefillTest = pipelineRefillProof
+  run pipelineWakeRefillTest = pipelineWakeRefillProof
+  run pipelineWakeControlTest = pipelineWakeControlProof
   run pipelineCancelCloseTest = pipelineCancelCloseProof
   run pipelineCreditMutationTest = pipelineCreditMutationProof
   run preparedCycleReadyPriorityTest = preparedCycleReadyPriorityProof
@@ -1364,6 +1378,8 @@ module service_completion_wide {
   run coalescedBulkSnapshotReturnsCreditPerResultTest = completionBulkSnapshotProof
   // These witnesses require two bulk jobs assigned to one owner.
   run pipelineRefillTest = pipelineRefillProof
+  run pipelineWakeRefillTest = pipelineWakeRefillProof
+  run pipelineWakeControlTest = pipelineWakeControlProof
   run pipelineCancelCloseTest = pipelineCancelCloseProof
   run pipelineCreditMutationTest = pipelineCreditMutationProof
   run preparedCycleReadyPriorityTest = preparedCycleReadyPriorityProof

@@ -1,0 +1,198 @@
+#+title: Coupled owner refill after native result retirement
+#+options: toc:nil num:nil
+
+* Evidence and protocol decision
+
+This follows [[file:30.65-native-service-construction-pipeline.org][30.65]], retaining that experiment and all its negative results.
+The previous comparison changed native construction and refill together. Its
+CPU throughput gain was 12.24%, mixed throughput change was -2.42%, and bulk
+construction p99 worsened in both workloads. Those observations do not isolate
+the cost of either change or establish an OS/GC cause.
+
+Offline analysis of the existing five paired AB/BA blocks gives CPU throughput
+changes +14.574%, +9.482%, +6.943%, +11.353%, +12.345%. Mixed changes are
++21.812%, +32.816%, +12.016%, -5.946%, -2.240%. These block statistics differ
+from throughput computed from the overall median duration; neither replaces
+the other. The negative aggregate result remains part of the record.
+
+The actual refill code treated every ordinary inbox message as a barrier. An
+already-admitted service request, a payload-free wake and a lifecycle control
+all discarded the remaining opportunities from that retirement cycle. Claiming
+a shared short request also deferred it and ended refill. This is a concrete
+protocol distinction missing from the implementation, not proof that it caused
+the entire measured mixed regression or the construction tail.
+
+The candidate couples source arbitration to the same bounded owner cycle. It
+keeps the fused native constructor identical in both A/B arms, isolating this
+change from constructor selection. No new Scheme ABI, constructor, scheduler,
+capacity registry, timeout or default is introduced.
+
+* Ownership and bounded service turns
+
+| Boundary | Rule |
+|----------+------|
+| Ready snapshot | Project every harvested result; clear each native root/slot before returning that result's credits |
+| Prepared input | At most one owned Rust request per owner, under original active/slot/work budgets; no new Scheme root or NativeSession |
+| Cycle budget | At most one dispatch attempt per independently retired result; unused opportunities disappear at cycle end |
+| FIFO service | Construct/submit the already-admitted head request in this turn, then retain the remaining opportunities |
+| Pure wake | Consume one bounded turn, without constructing a value or abandoning the whole cycle |
+| Control or arbitrary callback | Preserve it as the FIFO head and end refill; never cross this barrier |
+| Shared short | After the inbox check, claim/submit one short request in this turn; keep remaining opportunities |
+| Producer or offer | Reuse original preparation, reservations and revocable offer/entry fence |
+| Next harvest | Return to Scheme's native service cycle after the bounded turns; never recursively harvest while projecting |
+
+Requests retain their independent slot and work permits. A turn is not a
+capacity permit, cost estimate or time slice. A wake cannot allocate credits,
+move an offer, create a Scheme root or reset a watchdog. Cancellation, deadline
+and close are rechecked at the original prepared/offer entry fence. Cancellation
+may consume an attempt without constructing; no replacement attempt is minted.
+
+All ready slots retire before fresh native construction. Native failures keep
+the existing per-result retirement/drain protocol. Closing joins native children
+before releasing held drain credits. The native scheduler still decides Actor,
+green-thread and continuation execution inside each fixed owner runtime.
+Arbitrary constructors and GC can exceed a dispatch turn in wall time; this
+protocol does not claim preemption, a hard latency bound or starvation freedom.
+
+* Actual library API
+
+#+begin_src rust
+dispatcher
+    .configure_scheme_service_completion_on(owner, SchemeServiceCompletion::PipelineCycle)?
+    .wait(timeout)?;
+let enabled = dispatcher
+    .configure_scheme_service_refill_on(owner, true)?
+    .wait(timeout)?;
+assert!(enabled);
+// Submit through the existing typed service/stream/pool APIs.
+#+end_src
+
+The new configuration executes as an owner FIFO control. It rejects completion
+policies other than PipelineCycle. Selecting any completion policy resets this
+option to false, including selecting PipelineCycle again. Both the ordinary
+Snapshot default and PipelineCycle's original refill remain unchanged unless
+explicitly configured. Service ABI 11 and native policy receipt 5 are unchanged:
+this is Rust admission arbitration, not a new Scheme execution mode.
+
+* Native and model acceptance
+
+The existing native suite exercises the opt-in on the PipelineCycle preparation
+frontier and single-worker priority/retirement fixtures. Other policies reject
+the new configuration. Continue/cancel/expiry/close tests retain the bound on
+prepared input, prevent construction before full ready retirement, and check
+credit/producer registration return, zero roots, joins and removed image files.
+Existing generic Scheme/GC/continuation/exception controls also run; these are
+native receipts, distinct from the finite model.
+
+The existing owner lifecycle model adds a bounded notification turn to its
+pipeline budget. Reused completion-domain witnesses show notification followed
+by prepared entry, and notification followed by control/close with budget and
+reservation drain. Sampled pipeline lanes include the new transition. Prior
+no-retirement-credit, early-slot-credit, stale-token and preparation-overtake
+negative controls remain required. This checks ownership/accounting, not native
+performance, OS scheduling or an elapsed-time fairness guarantee.
+
+The historical first-port watchdog exit remains UNATTRIBUTED with cleanup
+UNVERIFIED: its failed image, last meaningful event and native frames were not
+captured. Current failure reporting retains phase/last event independently of
+libtest capture; diagnostic phase messages do not renew the five-second progress
+deadline. A current pass cannot explain that historical failure.
+
+* Targeted same-VM comparison
+
+#+begin_src text
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-scheme-service-benchmark \
+  --progress-fair-ab --fixed-short-selective --coupled-refill-ab
+#+end_src
+
+Control and candidate both use PipelineCycle, the same complete four live
+Scheme runtimes and native image, the same fused public typed constructor,
+Tokio two workers, ProgressFair supply and Selective short routing. Only the
+explicit coupled refill option differs. The two existing CPU/mixed workloads,
+8192 orders plus 64 probes per sample, five AB/BA blocks, slot/work budgets
+4/32, active bulk 3, batch 8, quantum/feed/native budget 1 and NativePort remain
+unchanged. Observation is off. No thread/workload matrix is expanded.
+
+Construction intervals cover the full typed bulk service input in both arms.
+Existing phase arrays are analyzed offline, without enabling profiler/counter
+reads. Pooled stage quantiles are not subtracted to manufacture blocked/GC time.
+Raw evidence, executable/native-image/source identities, failed gate logs and
+controller receipts remain local; only the reproducible protocol and results
+are maintained here.
+
+* Results and non-promotion
+
+The frozen run exits 0 in 6.426 seconds with 40 samples and no controller
+expiry. Each arm/load projects 10,880 results. Every sample uses all four
+owners, conserves published offers as withdrawn plus entered offers, and ends
+with empty completion custody. Final cleanup joins four owners, reports roots
+=[0,0,0,0]=, quiesces the services and removes their owned image files. This is
+not an RSS soak or proof of unloading every native mapping.
+
+| Metric | CPU control | CPU candidate | Change | Mixed control | Mixed candidate | Change |
+|--------+-------------+---------------+--------+---------------+-----------------+--------|
+| Orders/s | 365846.987 | 363360.827 | -0.680% | 56925.439 | 57214.911 | +0.509% |
+| Short native p99 (us) | 416.792 | 451.083 | +8.227% | 502.916 | 506.625 | +0.737% |
+| Short admission p99 (us) | 63.750 | 99.291 | +55.751% | 632.833 | 49.417 | -92.191% |
+| Short pending p99 (us) | 385.875 | 431.334 | +11.781% | 447.166 | 491.583 | +9.933% |
+| Short scheduled p99 (us) | 2333.292 | 2173.292 | -6.857% | 3461.833 | 2295.458 | -33.692% |
+| Bulk service p99 (us) | 591.000 | 613.584 | +3.821% | 2144.042 | 2071.333 | -3.391% |
+| Owner finish spread max (us) | 364.834 | 386.417 | +5.916% | 1881.250 | 1725.542 | -8.277% |
+| Harvest groups, same result count | 4121.000 | 4112.000 | -0.218% | 4372.000 | 4310.000 | -1.418% |
+
+Bulk construction and projection use 10,240 intervals per arm/load:
+
+| Load/arm | Construction p50/p99 (us) | Construction over 100 us | Projection p50/p99 (us) |
+|----------+--------------------------+--------------------------+-------------------------|
+| CPU control | 2.500 / 375.209 | 368 | 5.625 / 10.875 |
+| CPU candidate | 2.500 / 378.708 | 405 | 5.625 / 14.000 |
+| Mixed control | 2.750 / 438.875 | 384 | 5.917 / 15.958 |
+| Mixed candidate | 2.667 / 430.083 | 389 | 5.875 / 12.250 |
+
+The candidate does not demonstrate an overall performance improvement. CPU
+throughput decreases 0.680%, its short native p99 increases 8.227%, and mixed
+short native p99 increases 0.737%. Mixed admission, bulk service p99 and owner
+finish spread improve, but short pending p99 worsens in both workloads. Harvest
+group counts barely change (-0.218% CPU, -1.418% mixed); construction p99 remains
+roughly 0.38/0.43 ms despite microsecond medians. Do not chain the earlier
+12.24% gain onto this separate capture or dismiss negative changes as noise.
+
+Minimum short overlap remains 42/42 CPU and 64/64 mixed. Actor peer minima are
+1/1 CPU and 0/0 mixed. Minimum owner progress fractions are 0.987755/0.987448
+CPU and 0.987952/0.987854 mixed; raw minima are 1936/1888 and 1968/1952. These
+bounded observations do not establish universal starvation freedom.
+
+The measured path uses the same native image SHA256
+=46483b633ba878384dca271118dd48942de7f4b93951315b801a722bccf4e6d2=
+as the preceding capture. Constructor selection cannot explain differences
+between these two new arms: both use exactly the same fused path. This rejects
+the claim that correcting inbox/short refill barriers alone solves the
+construction tail or guarantees preserved CPU throughput. It does not prove
+the tail is purely GC, allocation, OS runnable delay or native task execution.
+
+The next architectural boundary is native construction/allocation interacting
+with Scheme's service cycle. Any proposal there must account for input graph
+ownership through Actor completion and projection, and preserve generic
+constructors and complete Scheme execution. Neither a Rust dispatch threshold
+nor relabeling constructor wall time supplies that protocol. The new refill
+option remains explicit and unpromoted; the current native pipeline and all
+ordinary defaults stay as before.
+
+* Validation and source identity
+
+- Qualification and isolated-only Clippy pass with warnings denied. Two development lint
+  failures (documentation markup and a test function length) are retained;
+  both were fixed without suppressions.
+- Native integration tests pass 3/3 in 27.46 seconds; the independent watchdog
+  control passes 1/1 in 5.02 seconds. Controller time including compilation is
+  62.67 seconds. No new native watchdog failure occurred.
+- The reused focused Quint gate passes in 142.98 seconds with its ten required
+  counterexamples, two new notification/control witnesses in both completion
+  domains, and existing sampled ownership controls. This is finite-model
+  evidence, not a replacement for the native receipts above.
+- The O2 release benchmark build passes. The new code does not change Scheme
+  sources, native generated artifacts, optimization level, service ABI or the
+  production native compiler chain.
+
+Frozen executable SHA256: =6d1ed4ace9c610ff87d750a2ca1bb3271ad3628e79b7a9165308e7d7793e6770=.
+Frozen source archive SHA256: =0b5106f2e3d62056a7811b7a392988d790fc0a1624a87fccdf06f05b9920e3f7=.

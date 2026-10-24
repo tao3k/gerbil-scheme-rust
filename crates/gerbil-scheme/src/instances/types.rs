@@ -14,6 +14,8 @@ use std::{
 /// Failure at an explicit admission, execution or lifecycle boundary.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InstanceError {
+    /// Arrival clock I/O or monotonic eligibility validation failed.
+    ArrivalClock(String),
     /// Invalid finite resource configuration.
     InvalidConfig(&'static str),
     /// Native image/file operation failed.

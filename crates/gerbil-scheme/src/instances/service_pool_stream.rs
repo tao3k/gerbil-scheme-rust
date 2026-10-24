@@ -78,14 +78,41 @@ impl InstanceDispatcher {
     pub async fn submit_scheme_service_pool_stream_with_admission<M: SchemeServiceRequest>(
         &self,
         messages: Vec<M>,
+        config: SchemeServicePoolStreamConfig,
+        mode: SchemeServiceSupplyAdmission,
+    ) -> Result<SchemeServiceStream<M::Output>, InstanceError> {
+        self.pool_stream_delivery(messages, config, mode, false)
+            .await
+    }
+    /// Deliver results in ready-owner rotation with stable input indices, avoiding
+    /// cross-owner FIFO head-of-line blocking. Reuses the same bounded input,
+    /// native credits, revocable offers and producer registrations. Result queues
+    /// contain at most one output per original input, no native root credit.
+    /// Dropping the handle cancels staged work; accepted Scheme work still drains.
+    /// # Errors
+    /// The same validation, registration and close errors as FIFO pool supply.
+    pub async fn submit_scheme_service_pool_ready_stream<M: SchemeServiceRequest>(
+        &self,
+        messages: Vec<M>,
+        config: SchemeServicePoolStreamConfig,
+        mode: SchemeServiceSupplyAdmission,
+    ) -> Result<super::SchemeServiceReadyStream<M::Output>, InstanceError> {
+        self.pool_stream_delivery(messages, config, mode, true)
+            .await
+            .map(super::SchemeServiceReadyStream)
+    }
+    async fn pool_stream_delivery<M: SchemeServiceRequest>(
+        &self,
+        messages: Vec<M>,
         mut config: SchemeServicePoolStreamConfig,
         mode: SchemeServiceSupplyAdmission,
+        ready: bool,
     ) -> Result<SchemeServiceStream<M::Output>, InstanceError> {
         if mode == SchemeServiceSupplyAdmission::ProgressFair {
             self.require_progress_owners(&config.owners)?;
         }
         let (source, mut stream, capacities, deadline) =
-            self.prepare_pool(messages, &mut config)?;
+            self.prepare_pool(messages, &mut config, ready)?;
         if mode == SchemeServiceSupplyAdmission::ProgressFair {
             source
                 .fair
@@ -138,6 +165,7 @@ impl InstanceDispatcher {
         &self,
         messages: Vec<M>,
         config: &mut SchemeServicePoolStreamConfig,
+        ready: bool,
     ) -> Result<Prepared<M::Output>, InstanceError> {
         let deadline =
             Instant::now()
@@ -169,7 +197,9 @@ impl InstanceDispatcher {
             .iter()
             .map(|&owner| self.pool_capacity(owner, &messages, config.maximum_active_per_owner))
             .collect::<Result<Vec<_>, _>>()?;
-        let (requests, pending) = self.stage_service_requests(
+        let delivery =
+            ready.then(|| super::service_ready::channels(&config.owners, messages.len()));
+        let (requests, pending) = self.stage_service_delivery(
             messages,
             SchemeServiceStreamConfig {
                 owner: config.owners[0],
@@ -178,10 +208,12 @@ impl InstanceDispatcher {
                 timeout: config.timeout,
             },
             &capacities[0],
+            delivery.as_ref().map(|(send, _)| send),
         )?;
         let source = Shared::new(requests);
         let stream = SchemeServiceStream {
             pending,
+            ready: delivery.map(|(_, receive)| receive),
             cancelled: Arc::new(AtomicBool::new(false)),
             signals: Vec::new(),
         };

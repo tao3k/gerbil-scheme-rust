@@ -17,6 +17,7 @@ pub(super) struct Checked<M> {
     lane: Option<SchemeServiceLane>,
     pub(super) execution: SchemeServiceExecution,
     trace: Option<Arc<SchemeServiceEntryTrace>>,
+    completion: Option<Arc<super::SchemeCompletionTrace>>,
 }
 impl<M: SchemeServiceRequest> Checked<M> {
     pub(super) fn new(message: M) -> Result<Self, InstanceError> {
@@ -34,12 +35,14 @@ impl<M: SchemeServiceRequest> Checked<M> {
             ));
         }
         let trace = message.entry_trace();
+        let completion = message.completion_trace();
         Ok(Self {
             message,
             units,
             lane,
             execution,
             trace,
+            completion,
         })
     }
 }
@@ -56,6 +59,9 @@ impl<M: SchemeServiceRequest> SchemeServiceRequest for Checked<M> {
     }
     fn entry_trace(&self) -> Option<Arc<SchemeServiceEntryTrace>> {
         self.trace.clone()
+    }
+    fn completion_trace(&self) -> Option<Arc<super::SchemeCompletionTrace>> {
+        self.completion.clone()
     }
     fn construct<'vm>(
         &mut self,

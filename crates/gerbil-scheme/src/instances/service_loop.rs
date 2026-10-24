@@ -92,7 +92,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=12)
+        || !matches!(initialized[1], 1..=32)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -245,6 +245,7 @@ impl Pump<'_> {
         }
 
         let cycle = self.wake.native_cycle.load(Ordering::Acquire);
+        let retire_before_publish = self.wake.retire_before_publish.load(Ordering::Acquire);
         let (mut completed, batch) = observed(
             self.image,
             self.wake,
@@ -284,40 +285,16 @@ impl Pump<'_> {
             let pending = self.jobs.remove(&id).ok_or(InstanceError::InvalidConfig(
                 "unknown Scheme service completion",
             ))?;
-            let retired = observed(
-                self.image,
-                self.wake,
-                super::SchemeServicePhase::Retire,
-                || {
-                    pending.job.complete(
-                        self.image,
-                        service::Completion {
-                            id,
-                            ready: batch.as_ref().map(|b| b.slot(index)),
-                        },
-                        self.input,
-                        self.output,
-                    )
+            self.retire_one(
+                pending,
+                service::Completion {
+                    id,
+                    ready: batch.as_ref().map(|b| b.slot(index)),
+                    retire_before_publish,
+                    input: self.input,
+                    output: self.output,
                 },
-            );
-            if let service::Retirement::Drain(stream) = retired {
-                // The native graph is still owned. Close joins/clears it before
-                // either native or stream credit can return, even on failed take.
-                self.retirement_drain.push(DeferredCredits {
-                    _native: pending.permit,
-                    _stream: stream,
-                });
-                return Err(InstanceError::InvalidConfig(
-                    "native result slot transfer failed",
-                ));
-            }
-            // The retained work/slot permit drops only after projection/root balance.
-            observed(
-                self.image,
-                self.wake,
-                super::SchemeServicePhase::Release,
-                || drop(pending.permit),
-            );
+            )?;
             if cycle {
                 self.cycle_refill(requests)?;
             }
@@ -342,6 +319,52 @@ impl Pump<'_> {
         self.deferred
             .take()
             .or_else(|| dequeue(requests, self.wake).ok())
+    }
+    fn retire_one(
+        &mut self,
+        pending: Pending,
+        completion: service::Completion,
+    ) -> Result<(), InstanceError> {
+        let retire_before_publish = completion.retire_before_publish;
+        let trace = pending.job.completion_trace();
+        let mut permit = Some(pending.permit);
+        let mut retire = || {
+            observed(
+                self.image,
+                self.wake,
+                super::SchemeServicePhase::Release,
+                || drop(permit.take().expect("native credit returned once")),
+            );
+            if let Some(trace) = &trace {
+                trace.retired();
+            }
+        };
+        let retired = observed(
+            self.image,
+            self.wake,
+            super::SchemeServicePhase::Retire,
+            || pending.job.complete(self.image, completion, &mut retire),
+        );
+        if let service::Retirement::Drain(stream) = retired {
+            // The native graph is still owned. Close joins/clears it before
+            // either native or stream credit can return, even on failed take.
+            self.retirement_drain.push(DeferredCredits {
+                _native: permit.take().expect("failed slot kept native credit"),
+                _stream: stream,
+            });
+            return Err(InstanceError::InvalidConfig(
+                "native result slot transfer failed",
+            ));
+        }
+        // The retained work/slot permit drops only after projection/root balance.
+        if !retire_before_publish {
+            retire();
+        }
+        debug_assert!(
+            permit.is_none(),
+            "result must return exactly one native credit"
+        );
+        Ok(())
     }
     fn cycle_refill(&mut self, requests: &mpsc::Receiver<Request>) -> Result<(), InstanceError> {
         // One returned result's opportunity, never recursively collect while the

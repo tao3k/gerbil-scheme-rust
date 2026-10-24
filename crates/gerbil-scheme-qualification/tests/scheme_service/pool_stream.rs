@@ -1,6 +1,8 @@
 //! Pooled supply moves only independent Rust inputs, never accepted Scheme state.
 #[path = "peer_delivery.rs"]
 mod peer_delivery;
+#[path = "ready_delivery.rs"]
+mod ready_delivery;
 use super::{GATE, batch, command, idle, reselection, short};
 use gerbil_scheme::instances::{
     InstanceDispatcher, InstanceError, NativeRoot, NativeSession, NumericServiceBatch,
@@ -72,7 +74,7 @@ fn messages(count: usize, wait: bool, entered: &Arc<AtomicUsize>) -> Vec<Tagged>
         })
         .collect()
 }
-async fn producer_free(dispatch: &InstanceDispatcher, owners: &[usize]) {
+pub(super) async fn producer_free(dispatch: &InstanceDispatcher, owners: &[usize]) {
     let start = Instant::now();
     while owners
         .iter()
@@ -89,6 +91,8 @@ pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sen
     super::service_progress::enable(dispatch).await;
     progress_route(dispatch).await;
     peer_delivery::contract(dispatch, progress).await;
+    ready_delivery::contract(dispatch).await;
+    progress.send("ready-owner delivery: native indices, independent retirement, errors, timeout and cancellation").unwrap();
     for mode in [
         SchemeServiceSupplyAdmission::Queued,
         SchemeServiceSupplyAdmission::OwnerLocal,

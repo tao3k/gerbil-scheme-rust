@@ -1,0 +1,198 @@
+#+title: Scheme-owned bounded execution plans
+#+startup: overview
+
+* Status
+
+Uncommitted ABI 15 experiment. Performance admission FAILED. Defaults remain
+unchanged. The rejected strict-span experiment in [[file:30.70-executed-work-budget.org][30.70]] remains negative;
+this document does not replace its captures or the open watchdog investigation.
+
+* Architecture and cost contract
+
+Scheme selects an execution plan once at handler entry. The application declares
+its total logical work. If this fits the configured maximum and no opposite-class
+waiter, unstarted short dispatch or unoffered short-ready generation exists,
+Scheme selects the complete handler span. Otherwise it selects a contended span.
+The lexical =with-gerbil-rs-service-work-plan= macro expands the charge operation
+in Scheme; there is no per-record procedure allocation, Rust callback, modulo
+check or fixed four-record poll in a whole-handler arithmetic loop. Entry
+selection, one terminal charge and existing lease-release accounting remain.
+
+The directed workload uses contended work 4 and maximum uninterrupted work 48.
+A bulk order contains 48 records; a short order contains 4. A batch of eight
+orders is not one 384-record indivisible span. Each order retains the existing
+handler lease release and Actor scheduling boundary. Rust admission still retains
+8 bulk items or 1 short item through independent result retirement. Executed
+records, admission units and item completion IDs have separate authorities.
+
+A short request arriving after a whole span has already been selected can wait
+for that one span of at most 48 records. The protocol does not promise to preempt
+it after four records. At a contended boundary, existing Scheme suspension and
+class arbitration provide the short worker an execution opportunity. A terminal
+span proceeds to result publication without an unnecessary precompletion yield.
+Result harvesting, projection, root release and capacity retirement retain their
+existing ownership boundaries.
+
+This is a cooperative logical-work bound, not a wall-time deadline. Arbitrary
+Scheme handlers, allocation, result construction, GC, OS pauses and I/O are not
+preempted. Continuation reentry preserves the selected bounded span; replacing a
+policy makes old charges inert through its identity fence. Scheme retains its
+complete language/runtime capability. Rust only distributes across instances.
+
+* Actual API and evidence
+
+=SchemeWorkExecutionPolicy= configures contended and maximum uninterrupted work
+through =configure_scheme_service_work_plan_on=. ABI 15 validates the idle owner,
+cooperative class policy, ranges and exact native receipt. Operation 22 retains
+the earlier strict-span API. Operation 25 observes selected plans outside measured
+windows. Zero/zero disables the experiment; completion-policy changes reset it.
+
+Native qualification passed all three integration tests, including late short
+arrival after selection of a 48-record span, short execution before the next
+bulk span, ready-generation settlement, multishot continuation reentry, stale
+policy isolation, cancellation, expiry and close/drain. Callback diagnostics
+preserve their entry root count: callbacks can execute while a pipeline batch or
+an explicit typed value owns a root. A retained numeric value survives callback
+and GC. Final owner shutdown still requires global zero roots and file cleanup.
+Two earlier assertion failures remain recorded: a reply was compared with an idle
+capacity snapshot without a fence, and a callback helper incorrectly required a
+global zero-root baseline. The second failed run lacked an entry-root snapshot;
+its individual outstanding root is not retrospectively attributed or dismissed.
+
+The existing Runtime model explicitly separates plan selection, late arrival,
+actual compute, short execution and independent retirement. It includes both
+uncontended whole spans and contended slices, cancellation/close and a required
+counterexample for extending an exhausted plan across competition. Both domains
+and all 16 required mutation counterexamples passed. Model source SHA-256:
+=b77cd9a0a8f76905721cbcb28cdde329e65103c8e406370d25c3ef0096f2e646=.
+Finite model success is not native performance or historical watchdog closure.
+
+* Directed performance gate
+
+From the repository root, with the native SDK and Cargo available in PATH:
+
+#+begin_src text
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_completion_scenarios_and_control --locked -- --ignored --exact --nocapture
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --work-plan-ab
+#+end_src
+
+The incremental A/B reuses four live VMs, one optimized image, identical native
+types, numeric entry/projection, joint dispatch, Actor quantum, request/work
+limits, two Tokio workers and the original CPU/mixed load. Only the candidate
+enables plans. Five AB/BA blocks produce ten paired windows per load. Observation
+is off. Exact executed-work and selected-plan counts, independent retirement,
+owner participation and final cleanup must hold in the same capture.
+
+Incremental success alone cannot admit the entire unpublished protocol stack.
+Only after it passes, =--work-plan-protocol-ab= compares joint+plan against joint
+off/work off in the same image and live VMs, retaining identical native entry and
+projection. This is a configuration comparison, not a replay of an old binary.
+Do not expand the matrix or select favorable reruns. Retain aggregate and paired
+throughput, short/bulk p99 and owner finish spread, including adverse pairs.
+
+The native watchdog remains five seconds of meaningful progress; the controller
+remains 120 seconds. Historical unexplained failures remain open. Successful
+native qualification cannot identify their missing frames or cleanup state.
+
+* Capture and admission decision
+
+=service-scheme-plan-v15= completed 40 samples and clean four-owner teardown in
+7.117 s. No profiler was attached. Boundary process snapshots found no compiler
+processes; this does not establish an interference-free host throughout the run.
+The same four live VMs and image are reused by both arms within this capture.
+
+| Metric | CPU control -> candidate | Mixed control -> candidate |
+|--------+--------------------------+----------------------------|
+| Orders/s | 369995.815 -> 358703.679 (-3.052%) | 64663.559 -> 65159.271 (+0.767%) |
+| Pooled short owner-completion p99, us | 440.542 -> 401.875 (-8.777%) | 446.167 -> 481.208 (+7.854%) |
+| Pooled bulk service p99, us | 659.666 -> 717.542 (+8.774%) | 2328.083 -> 1972.125 (-15.290%) |
+| Maximum owner finish spread, us | 459.916 -> 503.667 (+9.513%) | 1603.084 -> 1721.500 (+7.387%) |
+
+Paired audit from the same raw samples:
+
+| Metric | CPU median change; improving pairs | Mixed median change; improving pairs |
+|--------+------------------------------------+--------------------------------------|
+| Throughput | -3.126%; 4/10 | +1.475%; 8/10 |
+| Per-sample short p99 | -6.366%; 5/10 | +10.402%; 3/10 |
+| Per-sample bulk p99 | +3.678%; 3/10 | -7.770%; 7/10 |
+| Owner finish spread | +55.826%; 3/10 | +8.722%; 5/10 |
+
+Worst short per-sample p99 changes remain +233.100% CPU / +375.626% mixed.
+Actor-peer minimum is 0 -> 1 CPU and 0 -> 0 mixed, retained as an observation
+rather than standalone starvation proof. Pooled p99 across 640 probes differs
+from the per-sample 64-probe p99, which is the sample maximum. Aggregate orders/s
+uses the median bulk elapsed window; paired throughput uses each actual window.
+
+Candidate whole/contended plan totals are 82036/524 CPU and 81875/685 mixed.
+Thus 99.365% / 99.170% select whole spans. Candidate work handoffs total 524 CPU
+and 690 mixed across 81920 bulk orders per load. The number of contended plans
+need not equal handoffs: one selected contended handler can hand off more than
+once as new obligations arrive. Every candidate sample accounts for exactly
+393216 bulk records and 256 short records, 8256 selected handler plans, 64 short
+starts, zero pending dispatches, 1088 results, conserved offers and all owners.
+Final cleanup joins four owners, reports zero roots on all four, removes files
+and quiesces the service. Neither successful work counts nor cleanup erase the
+performance negatives.
+
+** Frozen identity
+
+- Parent local/PR revision: =3d53f5484653f6fe1d66740b1720d711349a4cef=.
+- Host binary SHA-256: =c5e73dad2823755c9e1fa066717f487d945106c11c9edc43fcb8182ef331297f=.
+- Native image SHA-256: =02a9459b08e44fc04bff53e0a77a165368957c44654da4f53066e2c1c0fb1582=.
+- Frozen source archive SHA-256: =e28502f59ee1fcaf5ec44673f0aed0a6cc1f3cbf1eed0ca3224d8719e480dabf=.
+
+Raw samples, source snapshot, both binaries and negative gate transcripts remain
+outside Git. This report was extended after the source archive was frozen; its
+hash identifies the captured pre-result sources. Do not replay a copied host
+binary without also identifying the native image it loads.
+
+** Local and remote gates
+
+Local: 45 dispatch unit tests passed; strict Clippy passed; three native
+integration tests passed in 35.03 s; generated Scheme verification and formatting
+passed. The reused Runtime model passed in 410.22 s, with all 16 required
+counterexamples detected. The O2 release bench compiled through the native build
+graph. These are separate from remote CI and performance admission.
+
+PR #18 remains at the parent revision: five completed checks passed, the native
+fixed-owner check failed, and unsupported SDK SMP was skipped. The known native
+CI compile failure has a local Cell-based fix and passing unit gate, but no new
+remote CI is claimed for this uncommitted candidate. No staging, commit or push.
+
+** Architectural consequence
+
+Do not run the combined publication comparison or repeat this unchanged
+candidate hoping for a favorable window. CPU throughput is not preserved and
+mixed short-tail behavior is not stable enough to admit the patch stack. Defaults
+remain unchanged. Historical strict-span and joint-dispatch negatives remain
+independent evidence; comparing their percentages across captures is not a
+causal speedup measurement.
+
+The record loop now avoids repeated fixed checks on more than 99% of requests.
+That observation rules out treating a larger span or a different yield threshold
+as a demonstrated solution. Entry plan selection, context/owner validation and
+plan/accounting writes still occur for every handler. The next architectural
+candidate should let Scheme lease/scheduling transitions own the plan state,
+invalidate it on dispatch, queue and ready-generation changes, and reuse the
+uncontended compiled handler until those events change its obligations. Cold
+validation must remain at the public configuration boundary. Work already
+selected retains its declared maximum; a cached plan must never erase a late
+short obligation, continuation identity fence or independent result retirement.
+This direction is not yet implemented or accepted.
+
+The current capture cannot establish the exclusive cost of entry selection,
+bookkeeping, OS scheduling or GC. Admission and native construction wall tails
+also increase in this capture; their scopes overlap other stages and are not
+additive. Do not subtract pooled quantiles or claim that moving plan selection
+alone will solve those tails. The unresolved watchdog failures retain their
+original identities and unverified cleanup state; this successful A/B does not
+attribute them.
+
+** Watchdog control
+
+The separately built control passed in 5.935 s with the unchanged five-second
+meaningful-progress deadline: synthetic phase messages do not renew progress,
+the stalled child exits 70, and capture descriptors return to baseline. This
+control does not run a Scheme workload or explain historical failures. The
+known policy-rejected executable was not rerun and no signing policy changed.

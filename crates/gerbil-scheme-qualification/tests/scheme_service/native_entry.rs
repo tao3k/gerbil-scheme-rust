@@ -56,6 +56,11 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     configure(&dispatch, true);
     configure(&dispatch, true);
     assert!((roots(&dispatch) - 1.0).abs() < f64::EPSILON);
+    runtime_types::contract(&dispatch);
+    work::contract(runtime, &dispatch, progress);
+    work_plan::contract(runtime, &dispatch, progress);
+    joint::contract(runtime, &dispatch, progress);
+    joint::enable(&dispatch);
     let retained = dispatch
         .submit_native_on(0, |session| {
             let mut values = Vec::with_capacity(65536);
@@ -109,6 +114,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         .unwrap()
         .wait(GATE)
         .unwrap();
+    joint::assert_disabled(&dispatch);
     assert!((roots(&dispatch) - 65536.0).abs() < f64::EPSILON);
     dispatch
         .submit_native_on(0, move |session| {
@@ -121,6 +127,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
         .wait(GATE)
         .unwrap();
     assert!(roots(&dispatch).abs() < f64::EPSILON);
+    joint::abandon(runtime, &dispatch);
     let report = pool.shutdown(GATE);
     assert!(report.is_clean(), "{report:?}");
     assert!(

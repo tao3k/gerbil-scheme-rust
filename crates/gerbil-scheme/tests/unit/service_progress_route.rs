@@ -104,7 +104,7 @@ fn request(units: usize) -> Request {
                 items: vec![vec![1_i64]; units],
                 yield_every: 1,
             },
-            send,
+            send: send.into(),
             submitted: false.into(),
             lane: None,
             short: false,

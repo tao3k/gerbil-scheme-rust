@@ -1,4 +1,9 @@
 //! Actual late binding, cancellation, native retirement and close drain.
+#[cfg(feature = "arrival-clock")]
+#[path = "arrival_clock.rs"]
+mod arrival_clock;
+#[path = "claim_progress.rs"]
+mod claim_progress;
 use super::{GATE, command, config, corpus, descriptor, idle, reselection, short};
 use gerbil_scheme::instances::{
     InstanceDispatcher, InstanceError, InstancePool, InstanceTicket, NativeRoot, NativeSession,
@@ -8,7 +13,10 @@ use std::{sync::mpsc, time::Duration};
 fn probe() -> short::Short {
     short::Short(vec![0, 0, 1, 1, 1])
 }
-fn block(dispatch: &InstanceDispatcher, owner: usize) -> (mpsc::Sender<()>, InstanceTicket<()>) {
+pub(super) fn block(
+    dispatch: &InstanceDispatcher,
+    owner: usize,
+) -> (mpsc::Sender<()>, InstanceTicket<()>) {
     let (entered, ready) = mpsc::channel();
     let (release, wait) = mpsc::channel();
     let ticket = dispatch
@@ -21,7 +29,7 @@ fn block(dispatch: &InstanceDispatcher, owner: usize) -> (mpsc::Sender<()>, Inst
     ready.recv_timeout(GATE).unwrap();
     (release, ticket)
 }
-fn unblock(blocked: Vec<(mpsc::Sender<()>, InstanceTicket<()>)>) {
+pub(super) fn unblock(blocked: Vec<(mpsc::Sender<()>, InstanceTicket<()>)>) {
     for (release, ticket) in blocked {
         release.send(()).unwrap();
         ticket.wait(GATE).unwrap();
@@ -57,6 +65,7 @@ async fn cancel_and_timeout(dispatch: &InstanceDispatcher, supply: &SchemeShortP
             Err(InstanceError::Timeout)
         ));
     }
+    queued_cancellation(dispatch, supply, &before).await;
     unblock(blocked);
     idle(dispatch).await;
 }
@@ -140,8 +149,7 @@ async fn close_queued(pool: &mut InstancePool, supply: &SchemeShortPool) {
         .filter(|o| *o != owner)
         .map(|owner| block(&dispatch, owner))
         .collect();
-    let mut queued = Box::pin(supply.submit(probe(), GATE));
-    reselection::registered(queued.as_mut()).await;
+    let queued = supply.submit_progress(probe(), GATE).await.unwrap();
     let mut capacity_waiter = Box::pin(supply.submit(probe(), GATE));
     reselection::registered(capacity_waiter.as_mut()).await;
     let pending = pool.shutdown(Duration::ZERO);
@@ -152,7 +160,10 @@ async fn close_queued(pool: &mut InstancePool, supply: &SchemeShortPool) {
             .unwrap_err(),
         InstanceError::Closed
     );
-    assert!(matches!(queued.await, Err(InstanceError::Closed)));
+    assert!(matches!(
+        queued.wait_completed(GATE).await,
+        Err(InstanceError::Closed)
+    ));
     assert!(matches!(capacity_waiter.await, Err(InstanceError::Closed)));
     release.send(()).unwrap();
     assert_eq!(accepted.ticket.wait_completed(GATE).await.unwrap().0, owner);
@@ -236,6 +247,10 @@ fn policy_contract(
     assert_eq!(supply.wake_policy(), policy);
     assert!(dispatch.configure_owner_budgets(4, Some(32)).is_err());
     runtime.block_on(async {
+        for owner in 0..4 {
+            dispatch.configure_scheme_completion_publication_on(owner,
+                gerbil_scheme::instances::SchemeCompletionPublication::AfterRetirement).unwrap();
+        }
         assert!(supply.submit(super::batch(false), GATE).await.is_err());
         cancel_and_timeout(&dispatch, &supply).await;
         progress.send("unassigned cancellation and timeout refund shared capacity without native credits").unwrap();
@@ -248,6 +263,10 @@ fn policy_contract(
         unblock(vec![busy]);
         burst(&dispatch, &supply).await;
         accepted_timeout(&dispatch, &supply).await;
+        queued_accepted_timeout(&dispatch, &supply).await;
+        claim_progress::contract(&dispatch, &supply).await;
+        #[cfg(feature = "arrival-clock")]
+        arrival_clock::contract(&dispatch, &supply).await;
         progress.send("owner claims typed short work; observation timeout retains native root and credit until retirement").unwrap();
         close_queued(&mut pool, &supply).await;
     });
@@ -255,4 +274,85 @@ fn policy_contract(
     drop(dispatch);
     drop(pool);
     progress.send("late-binding close wakes queued and capacity waiters; four owners drained with zero roots and removed files").unwrap();
+}
+
+async fn queued_cancellation(
+    dispatch: &InstanceDispatcher,
+    supply: &SchemeShortPool,
+    before: &[(usize, Option<usize>)],
+) {
+    for _ in 0..3 {
+        let queued = supply.submit_queued(probe(), GATE).await.unwrap();
+        assert_eq!(
+            before,
+            dispatch
+                .owner_capacity()
+                .iter()
+                .map(|c| (c.available, c.work_available))
+                .collect::<Vec<_>>()
+        );
+        assert!(matches!(
+            supply
+                .submit_queued(probe(), Duration::from_millis(1))
+                .await,
+            Err(InstanceError::Timeout)
+        ));
+        drop(queued);
+        let expired = supply.submit_queued(probe(), GATE).await.unwrap();
+        assert!(matches!(
+            expired.wait_completed(Duration::ZERO).await,
+            Err(InstanceError::Timeout)
+        ));
+    }
+}
+async fn queued_accepted_timeout(dispatch: &InstanceDispatcher, supply: &SchemeShortPool) {
+    let (entered, ready) = mpsc::channel();
+    let (release, wait) = mpsc::channel();
+    let accepted = supply
+        .submit_queued(
+            HeldProjection {
+                entered,
+                release: wait,
+            },
+            GATE,
+        )
+        .await
+        .unwrap();
+    let owner = ready.recv_timeout(GATE).unwrap();
+    assert!(matches!(
+        accepted.wait_completed(Duration::ZERO).await,
+        Err(InstanceError::Timeout)
+    ));
+    assert_eq!(
+        dispatch.owner_capacity()[owner].available,
+        3,
+        "a queued ticket cannot retract claimed native ownership"
+    );
+    release.send(()).unwrap();
+    idle(dispatch).await;
+    let mut input = corpus::order(923, false);
+    input.truncate(14);
+    let issue = gerbil_scheme::instances::InstanceArrival::new(std::time::Instant::now(), None)
+        .unwrap()
+        .issue()
+        .unwrap();
+    let observed = supply
+        .submit_queued(short::Short(input.clone()), GATE)
+        .await
+        .unwrap()
+        .wait_observed(issue, GATE)
+        .await
+        .unwrap();
+    corpus::verify(&input, &observed.result.unwrap()[0]);
+    assert!(observed.progress.is_ok());
+    assert!(matches!(
+        supply
+            .submit_queued(short::Short(corpus::order(924, false)), GATE)
+            .await
+            .unwrap()
+            .wait_completed(GATE)
+            .await,
+        Err(InstanceError::Scheme(_))
+    ));
+    idle(dispatch).await;
 }

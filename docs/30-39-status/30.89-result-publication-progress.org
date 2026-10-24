@@ -1,0 +1,201 @@
+#+TITLE: Result publication, client consumption and owner progress
+#+STARTUP: overview
+
+* Protocol and ownership
+
+The previous owner cycle publishes a projected reply before returning that
+result's native/stream credits. A client may resume while its completed result
+still occupies admission capacity. This is distinct from Scheme execution,
+client timer eligibility and a serial client's predecessor dependency.
+
+The explicit =SchemeCompletionPublication::AfterRetirement= policy returns each
+successfully taken result's stream and native credits after projection/root
+balance and before its oneshot publication. =Immediate= remains the default.
+The policy is captured once per owner harvest; changing it does not reorder an
+already captured harvest. No whole batch is retained, no extra lease is added,
+and existing per-result owner refill opportunities remain. A result is never
+held for another arbitrary projector. Rust dispatches across fixed owners; the
+complete Scheme VM, Actor/green-thread scheduling and native budgets remain.
+
+Slot-transfer failure keeps native and stream credits for the existing owner
+drain. A projector exception rolls back its retained allocations before reply
+publication. A dropped receiver uses the original failed-send rollback on the
+same owner before its next native entry, even if admission has been notified.
+Successful application-retained values have independent release authority;
+returning execution credits must not release those values. A capacity waiter
+may prepare/enqueue work but cannot enter this owner's Scheme VM concurrently.
+
+* Separate result validity from observation validity
+
+=wait_observed= now returns independent inner =result= and =progress= results.
+An invalid issue/native timestamp association reports invalid timing without
+discarding an already returned value. This corrects the outer-error description
+in 30.88: a successful retained value must remain available for explicit release
+even when its observation metadata is invalid. Only transport closure and the
+observation timeout remain outer errors. The native test deliberately supplies
+a late issue token, receives the retained value and explicitly releases it.
+
+* Observable boundaries
+
+=SchemeServiceRequest::completion_trace= optionally supplies a bounded
+=SchemeCompletionTrace=. No native value, permit or scheduling authority is
+stored in this diagnostic object. The actual API records native-ready time,
+credit return, oneshot send start/end and whether the receiver accepted it.
+=wait_observed= polls the existing Tokio oneshot future and records the final
+ready poll's start/end and count of preceding pending polls. It preserves the
+original future, waker and Tokio cooperative behavior.
+
+A sender can still be returning while a receiver consumes the result. Therefore
+send-end is not ordered before the receiver's ready poll or consumption. Given
+send interval =[S0,S1]= and final ready-poll start =Q=, a conservative interval
+for send-to-poll delay is =[max(Q-S1,0),max(Q-S0,0)]=. An overlapping poll is
+explicitly marked as racing. A first poll that is already ready does not prove
+a Tokio wake occurred. These process timestamps do not isolate OS runnable
+waiting from actual blocking or instrument Tokio's private runnable queue.
+
+Native-ready, publication, final ready poll and consumption remain distinct.
+The existing five-part planned-to-consumed partition is retained, including
+serial predecessor backlog. Owner finish spread is measured independently;
+client consumption is not required to free the completed native result.
+After-retirement =Release= is nested inside =Retire= observation: those inclusive
+phase totals must not be added as an exclusive time partition.
+
+* Reused joint model and native gates
+
+The existing owner/Actor/green-thread/Tokio model gains a harvested publication
+policy snapshot and guards its existing reply publication with result-specific
+root/capacity retirement. It adds no second capacity owner or result queue.
+Directed witnesses cover retirement before send, policy capture across a mode
+change, receiver drop/timeout/close, independent owner opportunities and an
+explicit early-send mutation. Both existing domains pass 156 directed cases
+and 400 random samples of up to 64 steps, seed 42. Model SHA256 is
+=e3b90ef05c0908b530e2065d0b060439493a6bf89881db83c16fa613f5c20e2b=.
+The model assumes a valid result-slot transfer; actual failed-slot drain remains
+an implementation obligation. Finite safety checks do not prove timing or
+universal liveness, and cannot replace native acceptance.
+
+Native fixtures exercise both publication orders, retained-value ownership,
+projector failure, abandoned receivers, invalid timing metadata and bounded
+stream cancellation/drain. Existing initialization, GC, multi-shot continuation,
+exception and teardown qualification remains enabled. Build through the
+existing Cargo/Gerbil graph with =GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2=.
+
+* Targeted performance admission
+
+Run the Rust =scheme_service= bench with
+=--progress-fair-ab --fixed-short-selective --retire-publication-ab=.
+Both arms retain the original client timer, same four live VMs/image and the
+same =NativeBudget= policy. Only completion publication order differs. Both
+arms enable identical per-short-result publication observations; bulk results
+remain untraced. These are matched observed workloads, not an unobserved
+production-performance qualification. No profiler is enabled.
+
+Tokio two workers, window four, work 32, batch eight and Actor quantum one are
+unchanged. Only CPU and mixed loads run, five ordered/reversed blocks. Validate
+work conservation, individual release, native partitions, client partitions,
+receiver intervals and cold completion snapshots before comparing throughput,
+p99 and owner spread. Keep paired-window changes, emitted median-window
+throughput and total-work/total-time throughput distinct. Preserve every
+negative window. Performance acceptance precedes any commit/push or promotion;
+all production defaults remain unchanged.
+
+* Watchdog evidence boundary
+
+The historical first-port watchdog remains UNATTRIBUTED, its original cleanup
+UNVERIFIED. Its exact failed image/phase/stack is unavailable. Current native
+execution freezes binary, image and source identity before running the unchanged
+five-second meaningful-progress watchdog. Passing new tests does not explain
+that historical failure. Intermediate failed build gates remain in private
+receipts; raw logs and machine-local receipt paths do not enter this document.
+
+* Executed native gates
+
+Strict Clippy for the actual native test and Rust bench passes. The three native
+cases pass in 30.23 seconds, including the publication fixture through the
+actual service API. Final drain joins four owners, reports zero roots, removes
+files and takes 2.60 ms for native close. These are native correctness and
+lifecycle receipts, not performance acceptance. O2 release bench builds through
+the standard graph. Intermediate source-shape, naming and documentation lint
+failures are retained, without suppressions or weakened gates.
+
+PR18 remains at =c4b95dfaa116bd67b110d94826535fd27f227b85=: six effective
+CI checks succeeded. The remote result does not attest this local, unpushed
+candidate. The unrelated SDK-unavailable SMP check is skipped; it is not part
+of this fixed-owner Scheme-runtime claim.
+
+* Single matched A/B: not accepted
+
+=service-publication-v32-r1= completes all 40 windows in 8.07 seconds, exit zero,
+empty stderr, no watchdog/controller timeout, empty compiler boundaries and
+unchanged frozen source/host/image identity. The native image SHA256 remains
+=ba8125c6df45516c836e00eef990492df41ff64237222816184db0bf3edfa51e=.
+Every window passes native work/plan/grant conservation, 1088 independently
+retired results, all client/native partitions, legacy timers on both arms,
+per-result publication ordering and final ready-poll interval checks. Final
+cleanup joins four owners, roots zero, files removed and service quiescent.
+The existing model integration harness also passes strict Clippy.
+
+Changes below are candidate relative to control. Latency increases are worse.
+Paired values are median changes over ten matched ordered/reversed pairs per
+load; pooled tails combine the underlying request samples. Emitted throughput
+uses the existing median-window summary. None substitutes for the other.
+
+| Measure | CPU | Mixed |
+|---------+-----+-------|
+| Total-work / total-time throughput | +4.45% | +4.28% |
+| Paired-window throughput | +2.16% | +10.33% |
+| Emitted median-window throughput | -2.20% | +1.20% |
+| Paired native short p99 | +6.40% | -2.63% |
+| Pooled native short p99 | +26.36% | -2.65% |
+| Paired bulk p99 | +18.61% | -29.89% |
+| Pooled bulk p99 | -1.20% | -11.20% |
+| Paired owner finish spread | +148.96% | -22.12% |
+| Maximum owner finish spread | +78.30% | -35.98% |
+| Paired client total p99 | -19.07% | -2.06% |
+| Pooled client total p99 | -35.45% | +13.27% |
+
+CPU native short p99 changes from 537.54 to 679.25 microseconds; maximum owner
+spread changes from 487.21 to 868.71 microseconds. Mixed client total p99
+changes from 5.41 to 6.13 milliseconds, despite its native short p99 improving
+from 672.29 to 654.46 microseconds. CPU throughput improves in only five of ten
+matched pairs, mixed in seven. This is a throughput opportunity with unresolved
+native/owner and client-tail regressions, not performance acceptance. No
+unchanged capture is rerun to obtain a favorable result. No commit/push or
+default change is admitted.
+
+* Same-request attribution and next protocol boundary
+
+Candidate send p99 is 5.67 microseconds for CPU and 7.50 for mixed. Its native
+ready-to-send p99 is 2.88 and 2.79 microseconds, including the deliberately
+moved credit return. Send-to-final-poll delay bounds at pooled p99 are
+1.907708--1.907750 milliseconds for CPU and 0.761875--0.764375 for mixed.
+Those marginal percentiles are not an additive decomposition of another p99.
+One mixed candidate poll overlaps send; 89 CPU and 96 mixed candidate results
+are already ready on their first poll. None proves an isolated Tokio or OS
+cause. The sender interval itself cannot explain the millisecond delivery tail.
+
+For the ten largest candidate native-ready latencies in this same capture,
+before-entry and pending intervals account for 24.90% and 73.88% of CPU total,
+30.08% and 69.12% of mixed total. Construction and projection together account
+for 1.23% and 0.80%. Pending includes the existing Scheme execution/waiting
+boundary; it does not isolate GC CPU or OS blocking. Reducing result copies
+or construction alone cannot explain most of these particular native tails.
+
+For the ten largest candidate planned-to-consumed latencies, serial predecessor
+backlog accounts for 95.65% of CPU total and 87.34% of mixed total. These are
+same-request sums, not independently added percentile shares. Serial backlog
+propagates earlier completion/delivery delays; it is not current-request owner
+execution. Keep planned-client and native-ready performance contracts distinct.
+
+The source boundary to investigate next is the existing capacity transaction:
+=CapacityPermit::drop= returns active/work/slot credits and invokes the shared
+=CapacityEvents::publish= path, while reply publication wakes the receiver and
+the owner service cycle independently replenishes work. That path currently
+signals watch subscribers, capacity waiters and eligible pooled short work.
+The model already separates resource return, notification owed, delivered wake
+and owner progress. Reuse those states to reason about which consumer actually
+needs notification and when an owner gets its next service opportunity; do not
+add another lease, make client acknowledgement own native capacity, or hold a
+completed result behind another projector. Notification fanout is a concrete
+source dependency, not a proven explanation for every measured tail. This run
+rules out treating send order alone as the complete fairness solution.

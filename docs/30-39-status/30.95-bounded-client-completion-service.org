@@ -1,0 +1,186 @@
+#+TITLE: Bounded client completion service across native retirement and bulk progress
+#+STARTUP: overview
+
+* Evidence and remaining protocol gap
+
+The kernel-arrival-only candidate remains rejected: mixed planned-to-client
+p99 improves 84.38%, but CPU total-work/time throughput falls 20.57%, CPU
+native p99 grows 45.07% and CPU client p99 grows 416.98%. Its worst CPU window
+contains a native-ready-to-client interval of 3.378 ms for request 35, whose
+own deadline-resume interval is only 3.625 us. Serial backlog accounts for
+95.43% of the top-ten CPU client tails' summed latency. Backlog is propagated
+delay, not a cause or an excuse to remove those requests from the metric.
+
+The previous generic client-turn driver already offers a signalled short
+future a poll before each bulk wait. That opportunity does not guarantee
+consumption of a published result: Tokio's pinned oneshot Future polls its
+cooperative task budget before reading readiness. Bulk and short sub-futures
+in one task share that budget. A ready transport and a cooperative deferral
+are different from an unfinished native job. This mechanism is verifiable in
+local Tokio 1.53.1 source and a real exhausted-budget control. It is a possible
+protocol gap, not proof that it caused the previous OS/client tail.
+
+* Joint protocol at the actual API
+
+ProgressSchemeTicket::wait_observed_ready is an explicit alternative to the
+unchanged wait_observed method. A poll first tries to take exactly one final
+Rust oneshot value. A successfully published value can complete before
+cooperative deferral. This is a bounded transport operation, not an unbounded
+Future or handler running under unconstrained. Empty/closed transport follows
+the normal receiver poll, registration and error path. The claim event still
+provides an early wake and a single recheck; claim is not a final task value.
+
+The existing InstanceClientProgressDriver provides the service opportunity
+before each bulk registration/receive. It drives the same serial short source,
+including each original timer and the following native wait. Only the final
+receiver's ready read has the new treatment. Timers, bounded admission, bulk
+MPSC receive and arbitrary application work retain normal cooperation. A
+native completion arriving during one ready bulk turn remains due at the
+next service boundary; an indivisible user poll and actual OS scheduling are
+still outside the logical opportunity guarantee. No periodic yield or new
+threshold is introduced, and no native owner waits for a client acknowledgement.
+
+The diagnostic ready_without_budget bit means an actual already-published
+value was taken when the current task had no cooperative budget. It does not
+restore the task budget or count an OS resumption. False does not prove that
+cooperation was irrelevant elsewhere. A capture with zero such events cannot
+claim that this particular fast path explains its performance improvement.
+The bit is captured only in the explicit observed ready receive; conventional
+receive remains false. Claim and publication traces keep their existing clocks.
+
+Native ownership remains owner-local: before claim, dropping the pending guard
+cancels bounded Rust input; after claim, timeout or dropped observation cannot
+release native credit or roots. Projection/retirement and owner refill remain
+independent of client consumption. Exceptions are task values, and successful
+Rust results are not discarded due to separate timing errors. Scheme retains
+its complete Actor, green-thread, continuation, GC and exception semantics;
+Rust only distributes across the fixed independent instances.
+
+* Reused joint model and native controls
+
+The existing delivery/client-turn section gains a client cooperative-availability
+state and explicit completion-service selection. It reuses the same replies,
+claim wake debt, ready bulk queues, producer ownership and native capacity.
+A ready final result can be observed with exhausted cooperation while bulk
+receive remains deferred. Claim-only progress cannot fabricate completion.
+Cancel/close still drains the registered producers and native roots. The
+model is finite safety/opportunity evidence, not an OS latency guarantee.
+
+The first mutation witness lacked its accepted-claim prerequisite; its failed
+run is retained. The correction adds that prerequisite, not a weaker safety
+invariant. The first Rust focused-test filter matched zero tests; it is not
+counted as a test pass. The final filter targets the actual progress_wait
+module and must execute all six controls.
+
+The new real Tokio control exhausts the task budget, verifies that conventional
+ready receive defers, consumes exactly one published result through the new
+API without replenishing that budget, keeps a missing result pending, then
+checks normal registration, claim wake and exception delivery after resumption.
+Actual Scheme controls use the new API for native success/exception, preclaim
+cancel/timeout and claimed timeout; the last still holds owner capacity until
+projection is released. The unchanged lifecycle suite covers multishot
+continuations, native GC and shutdown with zero roots/FD return. The meaningful
+progress watchdog remains five seconds. Historical first-port watchdog
+attribution remains open; no fresh pass explains its missing failed image,
+phase or stack, and original cleanup remains unverified.
+
+* Directed net-cost comparison
+
+Use the existing O2 native build and Rust release bench with the arrival-clock
+feature and =--progress-fair-ab --fixed-short-selective --completion-service-ab=.
+Control retains original unconditional Tokio timers and independent bulk/short
+tasks. Candidate uses the corrected unconditional kernel clock, the existing
+composite client progress driver and bounded ready final receive together.
+Both use ready-owner bulk delivery, unified claim/final transport,
+retirement-before-send and NativeBudget. The control is intentionally the same
+legacy comparison as the rejected clock-only run: net CPU recovery and mixed
+benefit must be measured in this run, not inferred across historical captures.
+This is a joint-protocol comparison, not an isolated try_recv microbenchmark.
+
+The four native VMs are shared by both arms in one process, with two Tokio
+workers, 8192 bulk orders and 64 original 500 us short plans per window, batch
+eight, work 32, slots four, Actor quantum one. Source ordering, serial backlog,
+original timing partitions, work oracle and request counts are unchanged.
+Candidate arms every timer even when overdue. Five ordered/reversed CPU/mixed
+blocks remain the only matrix. All added setup, receiver and driver costs are
+inside the window. No source, default, timeout or workload change can turn a
+regression into acceptance. Keep all failed/negative receipts and require
+native correctness and performance separately before committing or pushing.
+
+* Completed correctness gates before capture
+
+Model SHA256 is
+=27b578cbfdf6dc840d194ab3982fbab4361708e2c64eb48a4df5a6be3013b25c=.
+All 233 directed regressions pass (115 small, 118 wide), including ten new
+completion-service cases. The same hash passes typecheck and 400 random traces.
+Six actual progress-receiver controls and three kernel-clock controls pass.
+Default-feature-path, benchmark/native and model-harness strict lints pass;
+existing client-driver/ready/short-pool suites pass 3 + 6 + 14 controls.
+
+All three native lifecycle cases pass in 32.84 seconds with the unchanged
+meaningful-progress watchdog. Main native shutdown joins four owners, releases
+all roots, removes image files and returns FD count; close is 2.639833 ms.
+These are correctness receipts only. PR18 remote head remains
+=c4b95dfaa116bd67b110d94826535fd27f227b85= with six effective successful CI
+checks; those checks do not attest this local candidate. Historical watchdog
+status remains unattributed, original cleanup unverified.
+
+* Qualified net-protocol capture and limits
+
+Receipt service-completion-service-v32-r1 completes one qualified 40-window
+capture in 7.743 seconds. Compiler preflights that failed ran no samples;
+other tasks continued naturally and no automation was created. The qualified
+run has no compiler at either boundary, no benchmark stderr/controller timeout,
+unchanged frozen sources/binary/image and clean four-owner zero-root shutdown.
+Native image SHA256 remains
+=7c8f25b95db8d6ce8c9665a88bc1c761644b07cc902b73c5cd59cb7989b14d56=.
+All windows pass original native-work, request-identity and additive timing
+checks. All 1280 candidate arrivals have real matching armed timer generations.
+
+| Metric | CPU control | CPU candidate | Mixed control | Mixed candidate |
+|--------+-------------+---------------+---------------+-----------------|
+| Total work / sum elapsed, orders/s | 244914 | 276570 (+12.93%) | 53635 | 60470 (+12.74%) |
+| Native short p99, ms | 0.612250 | 0.622458 (+1.67%) | 0.791125 | 0.597167 (-24.52%) |
+| Planned-to-client p99, ms | 10.645208 | 3.162833 (-70.29%) | 2.554167 | 0.838291 (-67.18%) |
+| Bulk native p99, ms | 1.375500 | 0.992375 (-27.85%) | 4.934291 | 3.030541 (-38.58%) |
+| Maximum owner finish spread, ms | 1.153833 | 0.785166 (-31.95%) | 1.588167 | 1.618291 (+1.90%) |
+
+Paired throughput medians improve 8.23% CPU and 3.59% mixed, with 8/10 pairs
+improving in each class. The two negative throughput pairs in each class remain
+in the capture: CPU worst -2.19%, mixed worst -23.01%. Emitted median-window
+throughput changes +7.92% and +4.73%; this is distinct from total-work/time.
+Paired planned-to-client p99 medians improve 63.15% CPU and 65.55% mixed,
+with all ten pairs improving in each class. CPU native short p99 paired median
+improves 4.12% but its pooled value worsens 1.67%; neither is omitted.
+Mixed owner spread paired median worsens 0.37%, with only five pairs improving.
+Fairness remains unresolved; no universal per-window speedup is claimed.
+
+The capture records ZERO ready_without_budget events in both classes.
+Therefore the exhausted-budget mechanism is a proven transport/control case,
+but is not observed as this run's bottleneck and cannot be credited for the
+measured gains. The actual comparison qualifies the complete kernel-clock plus
+structured client-service protocol, including all ready-receive costs. It does
+not isolate whether co-location, saved ordinary receive-budget charges, timer
+precision or their interaction explains the gain. Do not claim that the
+historical CPU regression or OS scheduling cause is fully explained.
+
+Status is ACCEPTED_SCOPED_NET_PROTOCOL for explicit opt-in integration: the
+requested CPU and mixed throughput/client-tail objectives pass in matched
+controls, including the mixed-load benefit. Keep the small CPU native-p99 and
+mixed-fairness negatives visible. Public defaults remain unchanged. The native
+image and workload are shared within this run; historical controls have
+materially different timing, so no cross-capture improvement ratio is valid.
+Earlier rejected clock-only/client-turn/ready-owner captures and their explicit
+comparison modes remain reproducible negative controls, not promoted defaults.
+Historical first-port watchdog attribution and original cleanup remain open.
+
+* Integration boundary
+
+The tested working tree contains the accumulated joint-runtime/type/producer
+and publication prerequisites for these APIs and models. Commit the coherent
+source/test/model closure together with its English qualification documents;
+do not publish private capture files, logs, patches or machine-specific paths.
+The existing macOS native CI job selects the arrival-clock feature and exercises
+the joint protocol in a functional smoke check. No additional performance matrix
+or timeout increase is introduced. Shared CI smoke is correctness evidence,
+not a substitute for the qualified local performance capture.

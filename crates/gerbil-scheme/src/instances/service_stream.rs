@@ -26,6 +26,7 @@ pub struct SchemeServiceStreamConfig {
 #[derive(Debug)]
 pub struct SchemeServiceStream<R> {
     pub(super) pending: VecDeque<AsyncInstanceTicket<R>>,
+    pub(super) ready: Option<super::service_ready::Receivers<R>>,
     pub(super) cancelled: Arc<AtomicBool>,
     pub(super) signals: Vec<Weak<super::service_stream_runner::Signal>>,
 }
@@ -119,6 +120,7 @@ impl InstanceDispatcher {
         .await?;
         Ok(SchemeServiceStream {
             pending,
+            ready: None,
             cancelled,
             signals: vec![signal],
         })
@@ -129,10 +131,19 @@ impl InstanceDispatcher {
         config: SchemeServiceStreamConfig,
         capacity: &super::capacity::Capacity,
     ) -> Result<Staged<M::Output>, InstanceError> {
+        self.stage_service_delivery(messages, config, capacity, None)
+    }
+    pub(super) fn stage_service_delivery<M: SchemeServiceRequest>(
+        &self,
+        messages: Vec<M>,
+        config: SchemeServiceStreamConfig,
+        capacity: &super::capacity::Capacity,
+        ready: Option<&Arc<super::service_ready::Channels<M::Output>>>,
+    ) -> Result<Staged<M::Output>, InstanceError> {
         let mut work = 0_usize;
         let mut requests = VecDeque::new();
         let mut pending = VecDeque::new();
-        for message in messages {
+        for (sequence, message) in messages.into_iter().enumerate() {
             let message = super::service_contract::Checked::new(message)?;
             if message.lane().is_some() {
                 return Err(InstanceError::InvalidConfig(
@@ -152,7 +163,16 @@ impl InstanceDispatcher {
             }
             let trace = message.entry_trace();
             let short = message.short_service();
-            let (send, response) = tokio::sync::oneshot::channel();
+            let send = if let Some(channels) = ready {
+                super::service_ready::Reply::Ready {
+                    channels: Arc::clone(channels),
+                    sequence,
+                }
+            } else {
+                let (send, response) = tokio::sync::oneshot::channel();
+                pending.push_back(AsyncInstanceTicket { response });
+                send.into()
+            };
             requests.push_back(super::Request {
                 started: Arc::new(AtomicBool::new(false)),
                 capacity: None,
@@ -166,7 +186,6 @@ impl InstanceDispatcher {
                     trace,
                 })),
             });
-            pending.push_back(AsyncInstanceTicket { response });
         }
         Ok((requests, pending))
     }

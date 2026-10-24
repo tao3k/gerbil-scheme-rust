@@ -306,7 +306,7 @@ fn owner_completion_scenarios_and_control() {
             "--main",
             domain,
             "--match",
-            "(completion|coalesced|nativeCycle|nativeEntry|preparedCycle|pipeline).*Test",
+            "(completionService|arrivalClock|clientTurn|delivery|claimProgress|publication|client|cross|native|readyCycle|executionCheckpoint|directed|registration|reclamation|completion|coalesced|runtime|joint|workBudget|workPlan|leasePlan|activation|preparedCycle|pipeline).*Test",
             "--seed",
             "1",
         ]);
@@ -338,12 +338,76 @@ fn owner_completion_scenarios_and_control() {
             "sharedSafety",
         );
     }
+    client_progress_scenarios(source);
     native_cycle_scenarios(source);
     for domain in ["service_completion_small", "service_completion_wide"] {
         prepared_cycle_control(source, domain);
     }
 }
 fn prepared_cycle_control(source: &str, domain: &str) {
+    mutation_counterexample(
+        source,
+        domain,
+        "turnSpentStart",
+        "turnRefundMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "turnStart",
+        "turnHeldYieldMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "cyclePendingStart",
+        "cycleDoubleSettleMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "activationAliasStart",
+        "activationAliasMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "activationEpochStart",
+        "activationEpochMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "leasePlanLateStart",
+        "leasePlanMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "planLateArrivalStart",
+        "planMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "workContendedStart",
+        "workMutationStep",
+        "sharedSafety",
+    );
+    mutation_counterexample(
+        source,
+        domain,
+        "jointBulkReadyStart",
+        "jointMutationStep",
+        "sharedSafety",
+    );
     mutation_counterexample(
         source,
         domain,
@@ -365,6 +429,13 @@ fn native_cycle_scenarios(source: &str) {
             "nativeCycleStart",
             "preparedCycleStart",
             "pipelineCycleStart",
+            "jointStart",
+            "workBudgetStart",
+            "workPlanStart",
+            "leasePlanStart",
+            "activationStart",
+            "cycleAccountingStart",
+            "turnStart",
         ] {
             success(&[
                 "run",
@@ -374,7 +445,15 @@ fn native_cycle_scenarios(source: &str) {
                 "--init",
                 init,
                 "--step",
-                "sharedStep",
+                if init == "turnStart" {
+                    "turnStep"
+                } else if init == "cycleAccountingStart" {
+                    "cycleAccountingStep"
+                } else if init == "activationStart" {
+                    "activationSharedStep"
+                } else {
+                    "sharedStep"
+                },
                 "--invariant",
                 "sharedSafety",
                 "--seed",
@@ -485,4 +564,29 @@ fn mutation_counterexample(
         "{mutation}: {diagnostic}"
     );
     println!("{mutation}: expected safety counterexample");
+}
+
+fn client_progress_scenarios(source: &str) {
+    for domain in ["service_completion_small", "service_completion_wide"] {
+        success(&[
+            "run",
+            source,
+            "--main",
+            domain,
+            "--init",
+            "claimProgressStart",
+            "--step",
+            "crossSharedStep",
+            "--invariant",
+            "sharedSafety",
+            "--seed",
+            "42",
+            "--max-samples",
+            "200",
+            "--max-steps",
+            "64",
+            "--verbosity",
+            "1",
+        ]);
+    }
 }

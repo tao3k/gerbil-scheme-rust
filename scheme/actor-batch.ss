@@ -1,12 +1,19 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 ;;; Fixed-owner mailbox actors. No Rust scheduler or foreign Scheme references.
 (import :gerbil-scheme-rust/scheme/service-budget)
-(export make-gerbil-rs-actor-batch gerbil-rs-actor-batch! gerbil-rs-actor-batch-close!)
+(export make-gerbil-rs-actor-batch make-gerbil-rs-declared-work-actor-batch gerbil-rs-actor-batch! gerbil-rs-actor-batch-close!)
 
-(defstruct actor-batch (workers busy closed))
-(defstruct actor-turn (reply input output quantum width context progress))
+(defstruct actor-batch (workers busy closed declared-work? native))
+(defstruct actor-turn (reply input output quantum width context progress declared-work? execution runtime))
 
 (def (actor-turn-run! handler worker turn)
+  ;; Only a producer-declared layout contract can hold a turn-wide lease.
+  ;; Arbitrary Scheme handlers retain their original item/quantum behavior.
+  (if (actor-turn-declared-work? turn)
+    (call-with-gerbil-rs-service-turn
+      (lambda (yield!) (actor-turn-loop! handler worker turn yield!)))
+    (actor-turn-loop! handler worker turn thread-yield!)))
+(def (actor-turn-loop! handler worker turn yield!)
   (let loop ((index worker) (done 0) (ok #t))
     (if (>= index (vector-length (actor-turn-input turn))) ok
       (let (success
@@ -21,16 +28,25 @@
         (when (and (positive? (actor-turn-quantum turn))
                    (< (+ index (actor-turn-width turn)) (vector-length (actor-turn-input turn)))
                    (zero? (modulo (1+ done) (actor-turn-quantum turn))))
-          (thread-yield!))
+          (yield!))
         (loop (+ index (actor-turn-width turn)) (1+ done) (and ok success))))))
 (def (actor-batch-worker handler worker)
   (let loop ()
     (let (turn (thread-receive))
       (unless (eq? turn 'stop)
-        (thread-send (actor-turn-reply turn) (parameterize ((gerbil-rs-service-context (actor-turn-context turn)))
-          (actor-turn-run! handler worker turn)))
+        (thread-send (actor-turn-reply turn) (parameterize ((gerbil-rs-service-context (actor-turn-context turn))
+                                                       (gerbil-rs-work-execution-context (actor-turn-execution turn)))
+          (call-with-gerbil-rs-runtime-context
+            (and (actor-turn-runtime turn) (vector-ref (actor-turn-runtime turn) worker))
+            (lambda () (actor-turn-run! handler worker turn)))))
         (loop)))))
 (def (make-gerbil-rs-actor-batch handler count)
+  (make-gerbil-rs-actor-batch* handler count #f))
+(def (make-gerbil-rs-declared-work-actor-batch handler count)
+  ;; The handler uses declared work layouts, including validation failures,
+  ;; and releases the lease through service suspension for blocking operations.
+  (make-gerbil-rs-actor-batch* handler count #t))
+(def (make-gerbil-rs-actor-batch* handler count declared-work?)
   (unless (and (procedure? handler) (integer? count) (<= 1 count 64))
     (error "invalid Scheme actor service"))
   (let (workers (make-vector count))
@@ -38,15 +54,42 @@
       (when (< worker count)
         (vector-set! workers worker (spawn (lambda () (actor-batch-worker handler worker))))
         (loop (1+ worker))))
-    (make-actor-batch workers #f #f)))
+    (make-actor-batch workers #f #f declared-work? #f)))
 (def (actor-batch-check! service)
   (when (or (actor-batch-closed service) (actor-batch-busy service))
     (error "Scheme actor service closed or reentered")))
+(def (actor-native-register! service context)
+  (when (and context (cdr context))
+    (let* ((budget (car context)) (state (gerbil-rs-native-state budget))
+           (old (actor-batch-native service)))
+      (unless (eq? old state)
+        (when old (gerbil-rs-native-source-remove! old service))
+        (set! (actor-batch-native service) state)
+        (when state
+          (gerbil-rs-native-source-add! state service (lambda ()
+            (let* ((busy (actor-batch-busy service))
+                   (turn (and (actor-turn? busy) busy))
+                   (active (if turn (actor-turn-context turn) (and (pair? busy) busy))))
+              (and active (eq? (car active) budget) (cdr active)
+                ;; Setup and continuation reentry can precede the coordinator's
+                ;; turn publication. Unknown state permits one conservative pass;
+                ;; it cannot acknowledge execution or grant/retire resources.
+                (or (not turn)
+                    (gerbil-rs-native-runnable? budget (actor-turn-reply turn))
+                    (let loop ((i 0))
+                      (and (< i (vector-length (actor-batch-workers service)))
+                        (or (gerbil-rs-native-runnable? budget (vector-ref (actor-batch-workers service) i))
+                            (loop (1+ i)))))))))))))))
 (def (actor-batch-execute! service input quantum)
   (let* ((workers (actor-batch-workers service)) (count (vector-length workers))
          (active (min count (vector-length input)))
          (output (make-vector (vector-length input)))
-         (turn (make-actor-turn (current-thread) input output quantum count (gerbil-rs-service-context) (gerbil-rs-progress-for-batch (vector-length input)))))
+         (turn (make-actor-turn (current-thread) input output quantum count (gerbil-rs-service-context) (gerbil-rs-progress-for-batch (vector-length input)) (actor-batch-declared-work? service) (gerbil-rs-work-execution-context) #f)))
+    (set! (actor-batch-busy service) turn)
+    (let (context (gerbil-rs-service-context))
+      (when context
+        (set! (actor-turn-runtime turn)
+          (make-gerbil-rs-runtime-contexts (car context) (cdr context) active))))
     ;; Empty actors have no work and do not participate in this turn's barrier.
     (let loop ((worker 0))
       (when (< worker active)
@@ -70,15 +113,23 @@
     (unless (and (<= 0 quantum 256) (<= 1 (vector-length input) 256))
       (error "native actor batch bound"))
     (dynamic-wind
-      (lambda () (set! (actor-batch-busy service) #t))
+      (lambda ()
+        (let (context (gerbil-rs-service-context))
+          (set! (actor-batch-busy service) (or context #t))
+          (actor-native-register! service context)))
       ;; A private coordinator owns acknowledgements; the application's foreign
       ;; entry thread may already have unrelated mailbox traffic.
-      (lambda () (call-with-gerbil-rs-service-suspension
-        (lambda () (thread-join! (spawn (lambda () (actor-batch-execute! service input quantum)))))))
+      (lambda ()
+        (call-with-gerbil-rs-service-suspension
+          (lambda () (thread-join! (spawn (lambda () (actor-batch-execute! service input quantum)))))
+          'barrier))
       (lambda () (set! (actor-batch-busy service) #f)))))
 (def (gerbil-rs-actor-batch-close! service)
   (actor-batch-check! service)
   (vector-for-each (lambda (worker) (thread-send worker 'stop)) (actor-batch-workers service))
   (vector-for-each thread-join! (actor-batch-workers service))
   (set! (actor-batch-workers service) #())
-  (set! (actor-batch-closed service) #t))
+  (set! (actor-batch-closed service) #t)
+  (when (actor-batch-native service)
+    (gerbil-rs-native-source-remove! (actor-batch-native service) service)
+    (set! (actor-batch-native service) #f)))

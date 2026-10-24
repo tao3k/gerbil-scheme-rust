@@ -1,0 +1,164 @@
+#+TITLE: Scheme runnable, registered and actual grant progress
+#+OPTIONS: toc:2
+
+* Status and evidence
+
+Unpublished opt-in ABI23 candidate. Defaults remain unchanged. The ABI20-22
+negative captures and their source/image identities remain frozen; see
+[[file:30.78-scheme-service-receivers.org]]. This candidate compares first-execution
+acknowledgement with the same ABI20 specialized plan control. It adds neither
+a completion fence nor an active receiver layer or an outer batch lease.
+
+Source evidence established a real boundary mismatch: =service-start!= confirms
+a worker dispatch before the handler reaches =budget-acquire!=, while the native
+class selector can only arbitrate registered waiters. The earlier Runtime
+model selected among all assigned runnable workers. This does not establish a
+unique cause of wall-clock tails; it identifies a protocol guarantee the old
+model could not prove. Existing captures also exposed a client notification
+clock mislabeled as admission; the Rust bench timing contract has been fixed
+without rewriting archived samples.
+
+* Progress and ownership contract
+
+The refined Runtime model represents runnable Scheme workers, registered budget
+waiters and the receiving thread's actual cooperative grant separately. Legacy
+controls keep their earlier abstract policy for matched comparisons. Explicit
+registration controls only arbitrate registered waiters. Before registration,
+short work-start debt still constrains new bulk plans at the declared quantum;
+it does not claim that the short worker already owns a lease.
+
+| Transition | Acknowledgement and ownership |
+|------------+-------------------------------|
+| Native short submit | One Scheme ticket and one outstanding execution obligation |
+| Worker dispatch/runnable | Dispatch receipt; execution obligation remains |
+| Budget registration | Registered receipt under existing budget mutex; execution obligation remains |
+| Receiving thread owns actual grant | First cooperative grant settles execution obligation exactly once |
+| Validation/early terminal exception before grant | Distinct ungranted terminal receipt settles obligation without inventing execution |
+| Suspension or multishot reentry | Real lease reacquisition; existing ticket does not issue another first-grant receipt |
+| Completion/projection | Existing per-result custody, root and admission retirement |
+
+A grant can be assigned by another Scheme thread, but that releaser never
+acknowledges on behalf of its peer. The receiving thread settles its own first
+grant after the wait predicate succeeds, under the same budget mutex, before
+copying permission for the handler. No callback acquires the service mutex
+from that critical section. Service-to-budget lock order is preserved.
+
+A ticket is Scheme-owned and bounded by its accepted job/retained continuation.
+Actor turns propagate the same ticket across their Scheme workers, so multiple
+Actor leases cannot duplicate the job's first-execution acknowledgement.
+Policy identity fences prevent old continuations from mutating a new policy's
+counters. Terminal jobs stay terminal during later retained replay; their
+receipt is never reopened. Timeout/drop abandons the Rust observer; accepted
+Scheme execution still drains with its native roots and permits intact.
+
+"Runnable" is a protocol state, not an OS run-queue or CPU-time measurement.
+First grant means the first managed cooperative execution unit before terminal
+completion; Scheme validation or arbitrary code may already run before it.
+Handlers that never enter such a unit retain full Scheme semantics and finish
+with an ungranted receipt. No arbitrary-code preemption or wall-clock guarantee
+is introduced. An already-selected span retains its bound on late arrival.
+
+* Actual typed API and validation
+
+=configure_scheme_service_registered_plan_on= uses native ABI23 op35/mode8
+and the existing =SchemeWorkExecutionPolicy=. =scheme_service_execution_on=
+returns =SchemeExecutionProgress=: pending execution, issued, runnable,
+registered, first grants, and finished-without-grant. Native counters obey
+issued = pending + first grants + ungranted, with first grants <= registered
+<= runnable <= issued. Generic =SchemeExecutedWork.pending_start= describes
+its policy-specific work-start receipt; =SchemeJointProgress.pending_dispatch=
+continues to mean dispatch. The two are no longer presented as the same event.
+
+The actual API qualification exercises real Scheme orders, short success,
+early Scheme exception, abandoned caller tickets and independent capacity
+refund. Deterministic Scheme controls hold a bulk grant while the short worker
+registers, prove registration does not settle execution, and observe settlement
+inside the actual receiving grant. Normal/exceptional multishot replay,
+idempotent terminal settlement, Actor ticket propagation and GC are included.
+
+The existing Runtime model gains registration history and execution obligations;
+no duplicate lifecycle model is introduced. Directed witnesses check the three
+states, fairness eligibility, cancellation/close, ungranted failure, multishot
+reentry, early acknowledgement mutation and an unregistered-grant mutation.
+Old cache, work-plan, activation, joint-dispatch and receiver controls remain.
+Finite transition histories are proof state, not required runtime allocations.
+The existing abstract compute-to-ready boundary remains; these controls do
+not prove instruction-level handler/ready publication equivalence.
+
+* Matched performance admission
+
+The targeted Rust bench flag is =--registered-plan-ab=. Both arms use the
+same four live VMs and image, O2, Tokio2, window4/work32/batch8, Actor quantum1,
+class/feed budgets1 and logical work quantum4/maximum48. Five AB/BA blocks
+cover CPU and mixed loads, with ObservationOff. Execution receipts are read
+outside the timed workload. The updated additive timing contract uses existing
+timestamps; no native profiler is added. Bootstrap-aware compiler preflight,
+five-second meaningful-progress watchdog, 120-second controller and failure-only
+panic stacks remain unchanged.
+
+Correctness, finite modeling, incremental performance, full unpublished-stack
+acceptance and exact remote-head CI are distinct gates. A regression is retained
+and rejected without default change or publication. Rust only distributes
+across fixed runtime owners; Scheme owns computation, continuations and Actor
+scheduling. Historical watchdog attribution remains open.
+
+* Captured outcome: correctness passed, performance rejected
+
+The final model passed 82 directed witnesses across the two existing finite
+domains, including 12 new registration witnesses, and 400 sequences of at most
+64 steps. Canonical native qualification passed 3 tests in 30.37 seconds;
+4 owners joined, roots 0, temporary files removed, FD return passed, native
+close 1.310125 ms. Strict Clippy, formatting, generated-source checks and O2
+release construction passed. An initial build used an old compiled work-field
+interface during migration; its failure remains preserved separately. Final
+coherent-source gates passed without lint suppression or a weakened check.
+
+Forty same-live-VM A/B samples completed in 10.286 seconds, exit0, unchanged
+host/image identities and empty bootstrap-aware compiler boundaries. These
+boundaries do not prove absence of every possible mid-window disturbance.
+Every candidate window had 64 issued/runnable/registered/first-grant receipts,
+zero pending execution and zero ungranted terminals for the valid short load.
+Dispatch receipts remained separate. Exact work/result/plan/grant conservation,
+additive per-request timing and final four-owner cleanup passed. No new watchdog
+failure occurred; no historical watchdog attribution follows.
+
+| Paired-window median change | CPU | Mixed |
+|-----------------------------+-----+-------|
+| Throughput | -0.25% (4/10 improved) | +0.60% (6/10 improved) |
+| Actual short p99 | -5.19% (5/10 improved) | +5.74% (3/10 improved) |
+| Bulk p99 | -3.34% (7/10 improved) | +0.57% (5/10 improved) |
+| Owner finish spread | +7.71% (4/10 improved) | -5.27% (6/10 improved) |
+
+Pooled mixed short p99 worsened 10.80% and aggregate throughput rose 0.36%;
+maximum mixed owner spread improved 13.77%. CPU maximum owner spread
+worsened 18.21%, with actor-peer minimum dropping to zero in one window;
+all requests and owners still drained. Pooled and paired estimators differ.
+The tiny throughput change does not compensate for inconsistent short tails
+or establish a stable throughput gain. Performance admission is rejected:
+no unchanged rerun, expanded matrix, default change, stage, commit or push.
+The complete unpublished-stack comparison was not run after the increment
+failed admission. Both previous and current negative captures remain frozen.
+
+* Remote CI is a separate source boundary
+
+The observed concurrent PR head =57284517= changes the program preload/build
+path, independently of this local candidate. Its macOS Bazel job failed before
+native tests because the tracked generated SCM whole-file digest or build-input
+receipt was rejected. Local canonical generation/check success cannot establish
+that remote head's success. Preserve the concurrent commit and its failure
+record; neither the model pass nor a local benchmark can close remote CI.
+
+* What this establishes and what remains
+
+Runnable, registered waiter and actual managed grant are now distinct in the
+existing model and actual API. Dispatch no longer pretends to acknowledge the
+first execution unit for this candidate. Early terminal outcome and retained
+replay preserve ownership and debt conservation. This closes the identified
+state/acknowledgement mismatch, with finite-model and directed-native scope.
+
+It does not establish a unique cause for every remaining mixed short tail or
+prove that making the debt longer-lived improves performance. Next protocol
+work must use the now-separated states to reason about actual registration
+opportunities and Scheme scheduling before introducing another mechanism.
+The current capture does not justify another completion fence, threshold
+change, hard wall-clock claim or an attribution of pending wall time to GC CPU.

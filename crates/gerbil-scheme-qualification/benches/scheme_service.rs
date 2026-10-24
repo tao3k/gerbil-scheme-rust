@@ -1,4 +1,6 @@
 //! One directed pair: same VMs, native work and explicit budgets, Scheme-owned async service.
+#[path = "scheme_service/arrival.rs"]
+mod arrival;
 #[path = "scheme_service/budget.rs"]
 mod budget;
 #[path = "support/orders.rs"]
@@ -255,6 +257,36 @@ fn validate_arguments(args: &[String]) {
         || s == "--pipeline-cycle-ab"
         || s == "--coupled-refill-ab"
         || s == "--native-entry-ab"
+        || s == "--joint-progress-ab"
+        || s == "--work-budget-ab"
+        || s == "--work-plan-ab"
+        || s == "--lease-plan-ab"
+        || s == "--activation-plan-ab"
+        || s == "--cycle-accounting-ab"
+        || s == "--actor-turn-ab"
+        || s == "--specialized-plan-ab"
+        || s == "--reclamation-plan-ab"
+        || s == "--receiver-plan-ab"
+        || s == "--registered-plan-ab"
+        || s == "--directed-plan-ab"
+        || s == "--execution-checkpoint-ab"
+        || s == "--service-cycle-plan-ab"
+        || s == "--progress-cycle-ab"
+        || s == "--runtime-joint-ab"
+        || s == "--runtime-cost-ab"
+        || s == "--runtime-event-cost-ab"
+        || s == "--native-budget-cost-ab"
+        || s == "--client-arrival-cost-ab"
+        || s == "--retire-publication-ab"
+        || s == "--completion-await-ab"
+        || s == "--claim-progress-ab"
+        || s == "--ready-owner-ab"
+        || s == "--client-turn-ab"
+        || s == "--arrival-clock-ab"
+        || s == "--completion-service-ab"
+        || s == "--activation-protocol-ab"
+        || s == "--lease-plan-protocol-ab"
+        || s == "--work-plan-protocol-ab"
         || s == "--trace-once"
         || s == "--await-trace-start"
         || s == "--notification-ab"

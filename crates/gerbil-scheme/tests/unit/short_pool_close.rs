@@ -28,7 +28,7 @@ fn owner_failure_close_cannot_be_overtaken_by_queued_publication() {
     let queued = Queued {
         id: 0,
         deadline: Instant::now() + Duration::from_secs(1),
-        assigned,
+        assigned: Some(assigned),
         _pending: Arc::clone(&pending).try_acquire_owned().unwrap(),
         request: Request {
             work: Work::Wake,

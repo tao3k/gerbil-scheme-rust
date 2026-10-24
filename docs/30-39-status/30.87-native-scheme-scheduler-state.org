@@ -1,0 +1,198 @@
+#+TITLE: Native Scheme scheduler state without a shadow activation ledger
+#+STARTUP: overview
+
+* Scope and status
+
+This opt-in ABI32 candidate keeps Rust responsible for cross-instance dispatch.
+Each fixed owner still executes a complete Gerbil/Gambit VM. Scheme retains
+Actor and green-thread scheduling, GC, exceptions and continuations. No SMP
+change or default selection is included. Native correctness and performance
+acceptance are separate gates; rejected predecessors remain in the evidence
+history.
+
+The preceding fused-event candidate reduced source-level critical sections but
+failed net-cost acceptance. This candidate removes the duplicated Runtime
+job/Actor activation inventory from its selected path, rather than adding
+another lease, per-handler callback or yield threshold. Existing observed
+Runtime policies remain explicit experimental controls.
+
+* One source of execution state
+
+The existing service queues, worker assignments, budget grant/waiter ownership
+and Actor turn already carry the scheduling state. ABI32 reads those facts only
+at an existing native harvest boundary. Public Gambit =thread-state= predicates
+distinguish running, waiting and terminated threads. Critically, a waiting
+thread whose =thread-state-waiting-for= is a =processor?= is runnable; a mailbox,
+condition variable or timer wait is externally suspended. Known service/budget
+control mutexes are treated as eligible, because the observer releases them
+before invoking the Scheme scheduler. Arbitrary application mutex waits are
+not treated as runnable.
+
+| Existing harvest state | Action |
+|------------------------+--------|
+| Short completion ready | Collect directly |
+| No completion ready | Preserve the existing single Scheme pass, without scanning phases or thread states |
+| Bulk completion ready; no short job or Actor source | Collect directly |
+| Bulk ready; short queued, selected/owned, or natively runnable | Offer one existing Scheme pass before collecting |
+| Bulk ready; all short work externally blocked | Collect directly |
+
+A pass is an execution opportunity, never an execution acknowledgement. Actual
+first grant, pending execution, result roots and capacity retirement retain their
+existing owners. The safe-span contract remains unchanged: an arbitrary handler
+cannot be preempted inside an undeclared operation. Producer-declared work
+layouts remain bounded; this policy does not make an entire batch atomic.
+
+* Actor inventory and continuation boundaries
+
+Only a short Actor service registers one probe per service/policy epoch. It
+reuses the existing active turn and persistent worker threads, including the
+private coordinator that can become runnable after its children reply. Bulk
+Actor calls add no observation context. Idle Actor services are ineligible;
+close removes the source and clears its cached state. A later short call under
+a different policy removes the previous registration before adding the new one.
+An old epoch may remain referenced until that call or close; this bounded cold
+reference is not a new native root or a completed-result retention policy.
+
+The existing dynamic extent still protects Actor reentry and clears active
+state on unwind. During setup or continuation reentry, the coordinator's turn
+may not yet be published. Unknown active state conservatively permits one pass;
+it cannot grant, acknowledge or retire resources. No retained continuation is
+forced to share a new mutable invocation record. Existing budget and work-plan
+continuation/exception ownership stays in force.
+
+Source-list spines are immutable. Registration/removal uses the existing budget
+mutex; a borrowed source snapshot invokes probes outside service/budget locks.
+Service-to-budget lock order is unchanged. No user thunk, Scheme yield or
+resource release runs while holding the inventory lock. The selected path
+allocates no shadow Runtime context per job or Actor child.
+
+* Typed API and reproducible qualification
+
+=SchemeServiceCyclePolicy::NativeBudget= selects the explicit policy through
+=configure_scheme_service_boundary_plan_on=. The native Scheme protocol accepts
+mode 17/command 47; command 48 projects the cold two-field inventory snapshot.
+=SchemeNativeProgress= exposes whether this policy is enabled and the registered
+Actor-source count. =SchemeRuntimeProgress.enabled=false= means shadow context
+tracking is disabled; it never means that a Scheme VM is absent.
+
+Build through the existing Cargo/Gerbil native graph with
+=GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2=. The existing Rust =scheme_service= bench
+selects =--progress-fair-ab --fixed-short-selective --native-budget-cost-ab=.
+It compares unobserved ReadyFirst with NativeBudget in the same four live VMs
+and image: Tokio two workers, window four, work 32, batch eight, Actor quantum
+one, class/feed one and declared work four / maximum span 48. Observation is
+off. Five ordered/reversed blocks cover only the existing CPU and mixed loads.
+Both arms perform the same cold post-window inventory projections.
+
+Retain whole-file host/image/source identities and every sample privately.
+Each window must conserve 8192 orders, 64 short probes, 1088 independently
+retired results, exact declared work and first grants. Terminal acceptance
+requires four owners joined, zero roots, removed files and quiescent service.
+The five-second native meaningful-progress watchdog and 120-second controller
+are unchanged. Boundary compiler checks do not prove complete OS quiescence.
+
+The reused joint Tokio/owner/Actor/green-thread model separates native runnable
+and external wait, source class, existing grant/waiter ownership and collection.
+Directed witnesses include processor-waiting work without a received grant,
+blocked-short close/drain, Actor children blocking/resuming, and required
+skipped-pass/unsafe-OS-sleep mutations. It creates no second production lease
+or waiting queue. Finite model checks do not establish native timing or
+universal liveness.
+
+* Historical watchdog
+
+The original first-port watchdog remains UNATTRIBUTED: no exact failed native
+image, last progress or stack was archived, and its cleanup is UNVERIFIED.
+Later successes do not explain it. This run freezes the actual native test
+binary, embedded image identity and source hashes before native execution so
+future failures have an attributable artifact boundary.
+
+* Executed correctness receipts
+
+The final model source SHA256 is
+=07c11ac721375a515a32e0eed1a23cb11f190577a1c9514b66a5d415af49e7ec=.
+Typecheck, 128 directed cases across both completion domains and 400 native
+cross-layer random samples of up to 64 steps (seed 42) pass. The new policy is
+wired into the shared step relation, rather than tested only in isolated cases.
+Initial model name/type errors are retained in private logs, not reported as
+successful checks.
+
+Strict Clippy passes for the actual bench and native test target. The existing
+Cargo regeneration/check path validates the new build-input receipt and whole
+SCM files; runtime/utf8 generated bytes are unchanged. The final three native
+tests pass in 31.09 seconds, with four owners joined, zero roots, removed files,
+FD return and a 5.00 ms native close. The additional fixture executes the actual
+native service and persistent Actor API: external short blocking permits bulk
+collection without an extra pass; an Actor waiting for its Scheme processor is
+eligible without a budget grant; closing the Actor removes its registered
+source. Existing GC, continuation, exception and drain cases remain enabled.
+The original watchdog attribution remains open.
+
+* Targeted net-cost result: positive but not accepted
+
+=service-native-state-v32-r1= completed all 40 windows in 7.81 seconds, exit 0,
+empty stderr, no controller timeout, unchanged compiled host/image/source
+identities and empty compiler boundaries. All exact-work, first-grant,
+per-result retirement and final-cleanup checks pass. Both arms have zero
+shadow Runtime contexts. The timing workload's Actor calls are bulk; their
+short-source inventory is zero. The separate native fixture exercises the
+short Actor inventory; this capture is not a performance claim for every
+Actor workload. Native image SHA256:
+=ba8125c6df45516c836e00eef990492df41ff64237222816184db0bf3edfa51e=.
+
+| Load | Paired median throughput | Short native-completion p99 | Planned-to-completion p99 | Bulk p99 | Owner completion spread |
+|------+--------------------------+-----------------------------+---------------------------+----------+-------------------------|
+| CPU | +8.02% | +0.85% | +9.97% | -13.66% | -1.37% |
+| Mixed | +1.26% | -10.84% | +3.62% | -3.19% | -1.67% |
+
+CPU throughput improves in six of ten pairs, with a -18.59% to +34.18% range.
+Mixed throughput improves in eight pairs (-2.59% to +6.36%); short and bulk
+p99 also improve in eight mixed pairs. These remain a single capture, not
+confidence bounds or independent replication.
+
+Aggregation must be explicit. The existing bench emitter divides orders by
+the lower-median window duration; it pools underlying samples for latency.
+Its emitted throughput changes are +17.90% CPU and +1.86% mixed. These are
+not total-work divided by total-time throughput. Across all ten windows per
+arm, total-work / total-time changes are +6.27% (234501->249198 orders/s) and
++1.51% (62456->63401 orders/s). These are this workload's orders/s, not generic
+RPC or Python end-to-end rates.
+
+Pooled short native-completion p99 improves 14.97%/14.63%. CPU pooled planned
+tail instead regresses 81.87% (4.350->7.911 ms), bulk p99 4.57%, and maximum
+owner completion spread 13.34% (0.632->0.716 ms). Mixed pooled planned tail,
+bulk p99 and maximum spread improve 75.31%, 11.07% and 21.90%. No unfavorable
+window is removed, and paired versus pooled summaries are not substituted
+for one another. Throughput gains support the direction, but remaining CPU
+planned-tail/fairness regressions prevent performance acceptance. No commit,
+push, default change or favorable same-image rerun follows this result.
+
+* Remaining client progress boundary
+
+Same-request decomposition locates 97.63% of the candidate CPU scheduled top-ten
+total before the current request's submission start (control 94.60%). The worst
+candidate scheduled request is 9.109 ms, of which only 0.157 ms is from submission
+start to native completion. This cannot be attributed to that request's Scheme
+construction, execution or GC. It does not rule out interference from other
+requests, OS scheduling or allocation elsewhere.
+
+The existing probe waits for its previous result before the next planned timer
+and submission. Thus identical logical work and planned 500-us timestamps do
+not mean identical actual arrival traces. =probe_actual_ns= ends at the owner
+completion timestamp, not at client observation; =probe_scheduled_ns= adds the
+pre-issue lag, which can include previous completion delivery/resumption. The
+current fields cannot separate timer wake, Tokio ready wait, synchronous input
+preparation/registration and OS wait. Do not rename/remove the negative metric
+or claim that the issuer boundary is already an attributed root cause.
+
+The next protocol boundary is planned arrival -> actual issue -> native-ready
+-> client-observed, with bounded client preparation/registration kept distinct
+from Scheme execution ownership. The actual stream already awaits Tokio
+oneshot receivers through a timeout; missing generic cooperative yielding is
+not established. Review synchronous pool preparation/validation before the
+first registration await and ready-result delivery/resumption under the same
+client fairness contract. Extend the existing joint client/owner model and
+actual API boundary before another directed experiment; do not add blind
+per-result yields or weaken the Scheme budget. The owner spread regression
+remains independently open. No new profiler or benchmark matrix is needed to
+locate these existing measurement boundaries.

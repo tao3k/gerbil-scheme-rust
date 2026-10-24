@@ -48,6 +48,8 @@ pub(super) struct Reply {
     pub diagnostics: Option<[[f64; 6]; 3]>,
     pub snapshot_ns: Option<[u128; 3]>,
     pub entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
+    pub completion: Option<Arc<gerbil_scheme::instances::SchemeCompletionTrace>>,
+    pub claim: Option<gerbil_scheme::instances::InstanceClaimProgress>,
 }
 pub(super) struct Orders {
     request: NumericServiceBatch<i64>,
@@ -58,6 +60,7 @@ pub(super) struct Orders {
     construction_after: Option<[f64; 6]>,
     snapshot_ns: [u128; 3],
     entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
+    completion: Option<Arc<gerbil_scheme::instances::SchemeCompletionTrace>>,
     _bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 }
 impl SchemeServiceRequest for Orders {
@@ -67,6 +70,9 @@ impl SchemeServiceRequest for Orders {
     }
     fn short_service(&self) -> bool {
         self.short_mode.dedicated()
+    }
+    fn completion_trace(&self) -> Option<Arc<gerbil_scheme::instances::SchemeCompletionTrace>> {
+        self.completion.clone()
     }
     fn work_units(&self) -> usize {
         self.request.work_units()
@@ -157,6 +163,8 @@ impl SchemeServiceRequest for Orders {
             diagnostics,
             snapshot_ns: self.short_mode.counters().then_some(self.snapshot_ns),
             entry: self.entry,
+            completion: self.completion,
+            claim: None,
         })
     }
 }
@@ -176,6 +184,8 @@ pub(super) fn orders(
         entry: short_mode
             .observed()
             .then(|| Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default())),
+        completion: (super::settings::retire_publication_ab() && short_mode.native())
+            .then(|| Arc::new(gerbil_scheme::instances::SchemeCompletionTrace::default())),
         construction_before: None,
         construction_after: None,
         snapshot_ns: [0; 3],
@@ -301,14 +311,32 @@ pub(super) async fn bulk(
         owner_flow_backpressured(jobs, control, submitter).await
     }
 }
+#[derive(Default)]
 pub(super) struct Probes {
     pub owners: Vec<usize>,
+    pub arrival_clock: Vec<Option<[u128; 4]>>,
     pub actual: Vec<u128>,
+    pub serial_backlog: Vec<u128>,
+    pub before_wait: Vec<u128>,
+    pub deadline_resume: Vec<u128>,
+    pub client_delivery: Vec<u128>,
+    pub client_total: Vec<u128>,
+    pub wait_offset: Vec<u128>,
+    pub issue_offset: Vec<u128>,
+    pub native_offset: Vec<u128>,
+    pub observed_offset: Vec<u128>,
+    pub timer_armed: Vec<Option<bool>>,
+    pub ready_poll_start: Vec<u128>,
+    pub ready_poll_end: Vec<u128>,
+    pub pending_polls: Vec<u64>,
+    pub completion: Vec<Option<Arc<gerbil_scheme::instances::SchemeCompletionTrace>>>,
+    pub claim: Vec<Option<gerbil_scheme::instances::InstanceClaimProgress>>,
+    pub issue_instants: Vec<Instant>,
     pub scheduled: Vec<u128>,
-    pub admission: Vec<u128>,
+    pub placement_observed: Vec<u128>,
     pub service: Vec<u128>,
     pub construct: Vec<u128>,
-    pub post_admission: Vec<u128>,
+    pub before_entry: Vec<u128>,
     pub diagnostics: Vec<Option<[[f64; 6]; 3]>>,
     pub snapshot_ns: Vec<Option<[u128; 3]>>,
     pub pending: Vec<u128>,
@@ -318,97 +346,92 @@ pub(super) struct Probes {
 }
 pub(super) async fn probes(
     dispatch: InstanceDispatcher,
-    count: usize,
+    schedule: ProbeSchedule,
     asynchronous: bool,
     released: Instant,
     short_mode: ShortMode,
     router: Option<SchemeServiceRouter>,
     short_pool: Option<gerbil_scheme::instances::SchemeShortPool>,
 ) -> Probes {
-    let mut values = Probes {
-        owners: Vec::new(),
-        actual: Vec::new(),
-        scheduled: Vec::new(),
-        admission: Vec::new(),
-        service: Vec::new(),
-        construct: Vec::new(),
-        post_admission: Vec::new(),
-        diagnostics: Vec::new(),
-        snapshot_ns: Vec::new(),
-        pending: Vec::new(),
-        projection: Vec::new(),
-        completed: Vec::new(),
-        entry: Vec::new(),
-    };
-    for id in 0..count {
+    let mut values = Probes::default();
+    let mut clock = super::arrival::Clock::new(schedule.kernel_clock);
+    let mut previous_observed = None;
+    for id in 0..schedule.count {
         let scheduled = released + Duration::from_micros(u64::try_from(id * 500).unwrap());
-        tokio::time::sleep_until(tokio::time::Instant::from_std(scheduled)).await;
+        let arrival =
+            gerbil_scheme::instances::InstanceArrival::new(scheduled, previous_observed).unwrap();
+        let (issue, clock_trace) = if schedule.kernel_clock {
+            clock.issue(arrival, scheduled, released).await
+        } else if schedule.deadline_aware {
+            (arrival.wait_until_due().await.unwrap(), None)
+        } else {
+            tokio::time::sleep_until(tokio::time::Instant::from_std(scheduled)).await;
+            (arrival.issue().unwrap(), None)
+        };
+        values.arrival_clock.push(clock_trace);
+        let start = issue.issued_at();
         let anchor = short_mode.observed().then(super::native_wait::anchor);
-        let start = Instant::now();
         let mut input = corpus::order(100_000 + id, false);
         input.truncate(14);
         let ticket = if let Some(short_pool) = short_pool.as_ref() {
-            short_pool
-                .submit(
-                    orders(vec![input.clone()], short_mode, None),
+            pooled_probe(
+                short_pool,
+                schedule.queue_wait,
+                (
+                    input.clone(),
+                    short_mode,
                     GATE.saturating_sub(released.elapsed()),
-                )
-                .await
-                .map(|selected| selected.ticket)
-        } else if let Some(router) = router.as_ref() {
-            routed(
-                router,
-                vec![input.clone()],
-                short_mode,
-                GATE.saturating_sub(released.elapsed()),
+                ),
             )
             .await
         } else {
-            submit(
-                dispatch.clone(),
-                id % 4,
-                vec![input.clone()],
-                asynchronous,
-                short_mode,
-                GATE.saturating_sub(released.elapsed()),
-                None,
-            )
-            .await
+            let placed = if let Some(router) = router.as_ref() {
+                routed(
+                    router,
+                    vec![input.clone()],
+                    short_mode,
+                    GATE.saturating_sub(released.elapsed()),
+                )
+                .await
+            } else {
+                submit(
+                    dispatch.clone(),
+                    id % 4,
+                    vec![input.clone()],
+                    asynchronous,
+                    short_mode,
+                    GATE.saturating_sub(released.elapsed()),
+                    None,
+                )
+                .await
+            };
+            placed.map(ProbeTicket::Placed)
         }
         .unwrap();
-        let admitted = Instant::now();
+        let placement_observed = Instant::now();
         values
-            .admission
-            .push(admitted.duration_since(start).as_nanos());
-        let (reply, completed) = ticket
-            .wait_completed(GATE.saturating_sub(released.elapsed()))
+            .placement_observed
+            .push(placement_observed.duration_since(start).as_nanos());
+        let observed = ticket
+            .wait_observed(
+                issue,
+                GATE.saturating_sub(released.elapsed()),
+                schedule.ready_service,
+            )
             .await
             .unwrap();
+        let timing = observed.progress.unwrap();
+        let reply = observed.result.unwrap();
+        let completed = timing.native_completed;
+        previous_observed = Some(timing.client_observed);
+        values.client_progress(timing, released);
+        values.completion.push(reply.completion.clone());
+        values.claim.push(reply.claim);
         corpus::verify(&input, &reply.values[0]);
-        values
-            .post_admission
-            .push(reply.entered.saturating_duration_since(admitted).as_nanos());
-        values
-            .actual
-            .push(completed.duration_since(start).as_nanos());
+        values.native_result(&reply, start, completed);
         values
             .scheduled
             .push(completed.saturating_duration_since(scheduled).as_nanos());
-        values
-            .service
-            .push(completed.duration_since(reply.entered).as_nanos());
-        values
-            .construct
-            .push(reply.constructed.duration_since(reply.entered).as_nanos());
-        values.pending.push(
-            reply
-                .projection
-                .duration_since(reply.constructed)
-                .as_nanos(),
-        );
-        values
-            .projection
-            .push(completed.duration_since(reply.projection).as_nanos());
         values
             .entry
             .push(super::entry::receipt(&reply, start, anchor.as_ref()));
@@ -418,4 +441,158 @@ pub(super) async fn probes(
         values.owners.push(reply.owner);
     }
     values
+}
+
+pub(super) struct ProbeSchedule {
+    pub count: usize,
+    pub deadline_aware: bool,
+    pub kernel_clock: bool,
+    pub ready_service: bool,
+    pub queue_wait: QueueWait,
+}
+impl Probes {
+    fn native_result(&mut self, reply: &Reply, start: Instant, completed: Instant) {
+        self.before_entry
+            .push(reply.entered.duration_since(start).as_nanos());
+        self.actual.push(completed.duration_since(start).as_nanos());
+        self.service
+            .push(completed.duration_since(reply.entered).as_nanos());
+        self.construct
+            .push(reply.constructed.duration_since(reply.entered).as_nanos());
+        self.pending.push(
+            reply
+                .projection
+                .duration_since(reply.constructed)
+                .as_nanos(),
+        );
+        self.projection
+            .push(completed.duration_since(reply.projection).as_nanos());
+    }
+    fn client_progress(
+        &mut self,
+        timing: gerbil_scheme::instances::InstanceClientProgress,
+        released: Instant,
+    ) {
+        self.serial_backlog.push(timing.serial_backlog().as_nanos());
+        self.before_wait.push(timing.before_wait().as_nanos());
+        self.deadline_resume
+            .push(timing.deadline_resume().as_nanos());
+        self.client_delivery.push(timing.delivery().as_nanos());
+        self.client_total.push(
+            timing
+                .client_observed
+                .duration_since(timing.planned)
+                .as_nanos(),
+        );
+        self.wait_offset
+            .push(timing.wait_started.duration_since(released).as_nanos());
+        self.issue_offset
+            .push(timing.issued.duration_since(released).as_nanos());
+        self.native_offset
+            .push(timing.native_completed.duration_since(released).as_nanos());
+        self.observed_offset
+            .push(timing.client_observed.duration_since(released).as_nanos());
+        self.timer_armed.push(timing.timer_armed);
+        self.ready_poll_start.push(
+            timing
+                .response_poll_started
+                .duration_since(released)
+                .as_nanos(),
+        );
+        self.ready_poll_end.push(
+            timing
+                .response_poll_ready
+                .duration_since(released)
+                .as_nanos(),
+        );
+        self.pending_polls.push(timing.pending_polls);
+        self.issue_instants.push(timing.issued);
+    }
+}
+
+impl ProbeSchedule {
+    pub(super) fn for_arm(count: usize, arm: bool) -> Self {
+        Self {
+            count,
+            deadline_aware: super::settings::client_arrival_cost_ab() && arm,
+            ready_service: super::settings::completion_service_ab() && arm,
+            kernel_clock: (super::settings::arrival_clock_ab()
+                || super::settings::completion_service_ab())
+                && arm,
+            queue_wait: if (arm && super::settings::claim_progress_ab())
+                || super::settings::ready_owner_ab()
+                || super::settings::client_turn_ab()
+                || (super::settings::arrival_clock_ab() || super::settings::completion_service_ab())
+            {
+                QueueWait::Progress
+            } else if arm && super::settings::completion_await_ab() {
+                QueueWait::Completion
+            } else {
+                QueueWait::Placement
+            },
+        }
+    }
+}
+
+async fn pooled_probe(
+    pool: &gerbil_scheme::instances::SchemeShortPool,
+    queue_wait: QueueWait,
+    request: (Vec<i64>, ShortMode, Duration),
+) -> Result<ProbeTicket, gerbil_scheme::instances::InstanceError> {
+    let (input, short_mode, timeout) = request;
+    let message = orders(vec![input], short_mode, None);
+    match queue_wait {
+        QueueWait::Progress => pool
+            .submit_progress(message, timeout)
+            .await
+            .map(ProbeTicket::Progress),
+        QueueWait::Completion => pool
+            .submit_queued(message, timeout)
+            .await
+            .map(ProbeTicket::Queued),
+        QueueWait::Placement => pool
+            .submit(message, timeout)
+            .await
+            .map(|selected| ProbeTicket::Placed(selected.ticket)),
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum QueueWait {
+    Placement,
+    Completion,
+    Progress,
+}
+
+enum ProbeTicket {
+    Progress(gerbil_scheme::instances::ProgressSchemeTicket<Reply>),
+    Placed(gerbil_scheme::instances::AsyncInstanceTicket<Reply>),
+    Queued(gerbil_scheme::instances::QueuedSchemeTicket<Reply>),
+}
+impl ProbeTicket {
+    async fn wait_observed(
+        self,
+        issue: gerbil_scheme::instances::InstanceIssue,
+        timeout: Duration,
+        ready_service: bool,
+    ) -> Result<
+        gerbil_scheme::instances::InstanceObservedResult<Reply>,
+        gerbil_scheme::instances::InstanceError,
+    > {
+        match self {
+            Self::Progress(ticket) => {
+                let mut received = if ready_service {
+                    ticket.wait_observed_ready(issue, timeout).await?
+                } else {
+                    ticket.wait_observed(issue, timeout).await?
+                };
+                if let Ok(reply) = &mut received.observed.result {
+                    reply.claim = Some(received.claim);
+                }
+                Ok(received.observed)
+            }
+            Self::Placed(ticket) => ticket.wait_observed(issue, timeout).await,
+            Self::Queued(ticket) => ticket.wait_observed(issue, timeout).await,
+        }
+    }
 }

@@ -2,7 +2,7 @@
 use super::{InstanceError, NativeRoot, NativeSession, object_api::ObjectApi};
 use crate::{BinaryInteger, ObjectKind};
 impl<'vm> NativeSession<'vm> {
-    fn objects(&self) -> Result<&ObjectApi, InstanceError> {
+    pub(super) fn objects(&self) -> Result<&ObjectApi, InstanceError> {
         self.image
             .native
             .objects
@@ -95,6 +95,35 @@ impl<'vm> NativeSession<'vm> {
         &self,
         entries: &[(&NativeRoot<'_>, &NativeRoot<'_>)],
     ) -> Result<NativeRoot<'vm>, InstanceError> {
+        self.hash_table(crate::TableEquality::Structural, entries)
+    }
+    /// Construct a strong Gambit table using official Scheme key equality.
+    /// Duplicate keys use last-value-wins semantics; iteration order is unspecified.
+    /// # Errors
+    /// Foreign roots, input bounds or native construction failure.
+    pub fn hash_table(
+        &self,
+        equality: crate::TableEquality,
+        entries: &[(&NativeRoot<'_>, &NativeRoot<'_>)],
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
+        self.native_table(equality, false, entries)
+    }
+    /// Construct Gerbil's native `HashTable` implementation, retaining its dispatch.
+    /// # Errors
+    /// Foreign roots, bounds or an image without the native `HashTable` implementation.
+    pub fn gerbil_hash_table(
+        &self,
+        equality: crate::TableEquality,
+        entries: &[(&NativeRoot<'_>, &NativeRoot<'_>)],
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
+        self.native_table(equality, true, entries)
+    }
+    fn native_table(
+        &self,
+        equality: crate::TableEquality,
+        gerbil: bool,
+        entries: &[(&NativeRoot<'_>, &NativeRoot<'_>)],
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
         self.input(std::mem::size_of_val(entries))?;
         let mut roots = Vec::with_capacity(entries.len() * 2);
         for (key, value) in entries {
@@ -102,8 +131,13 @@ impl<'vm> NativeSession<'vm> {
             self.local(value)?;
             roots.extend([key.root, value.root]);
         }
-        // SAFETY: complete key/value root pairs, equality 2 means equal?.
-        self.own(unsafe { (self.objects()?.table)(roots.as_ptr(), entries.len() as u64, 2) })
+        let equality = match equality {
+            crate::TableEquality::Identity => 0,
+            crate::TableEquality::Equivalent => 1,
+            crate::TableEquality::Structural => 2,
+        } + if gerbil { 3 } else { 0 };
+        // SAFETY: complete owner-local root pairs; the existing ABI selects official equality.
+        self.own(unsafe { (self.objects()?.table)(roots.as_ptr(), entries.len() as u64, equality) })
     }
     /// Compare native object identity within one owner.
     /// # Errors

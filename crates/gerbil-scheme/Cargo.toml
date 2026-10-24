@@ -18,6 +18,7 @@ tokio = { workspace = true, optional = true, features = ["time"] }
 [features]
 isolated-instances = ["dep:libc"]
 tokio-dispatch = ["isolated-instances", "dep:tokio"]
+arrival-clock = ["tokio-dispatch", "tokio/net"]
 external-program = ["gerbil-scheme-sys/external-program"]
 
 [dev-dependencies]

@@ -10,6 +10,8 @@ actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tok
 instance-probe = ["dep:divan", "dep:tokio"]
 instance-library = ["instance-probe", "dep:gerbil-scheme", "gerbil-scheme/isolated-instances", "dep:serde_json", "dep:gerbil-scheme-python"]
 
+arrival-clock = ["instance-dispatch", "gerbil-scheme/arrival-clock"]
+
 instance-dispatch = ["instance-library", "gerbil-scheme/tokio-dispatch", "dep:rayon", "gerbil-scheme-python/owner-dispatch"]
 
 [dependencies]

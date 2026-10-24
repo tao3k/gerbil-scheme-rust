@@ -255,6 +255,9 @@ impl Job for StreamJob {
     fn short_service(&self) -> bool {
         self.job.as_ref().unwrap().short_service()
     }
+    fn completion_trace(&self) -> Option<Arc<super::SchemeCompletionTrace>> {
+        self.job.as_ref().unwrap().completion_trace()
+    }
     fn may_have_entered(&self) -> bool {
         self.job.as_ref().unwrap().may_have_entered()
     }
@@ -269,14 +272,18 @@ impl Job for StreamJob {
         self: Box<Self>,
         image: &Image,
         completed: super::service::Completion,
-        input: usize,
-        output: usize,
+        retire: &mut dyn FnMut(),
     ) -> super::service::Retirement {
         let Self { job, active } = *self;
-        match job.unwrap().complete(image, completed, input, output) {
+        let mut active = Some(active);
+        let mut release = || {
+            drop(active.take());
+            retire();
+        };
+        match job.unwrap().complete(image, completed, &mut release) {
             super::service::Retirement::Returned => super::service::Retirement::Returned,
             super::service::Retirement::Drain(mut held) => {
-                held.push(active);
+                held.push(active.take().expect("failed slot kept stream credit"));
                 super::service::Retirement::Drain(held)
             }
         }

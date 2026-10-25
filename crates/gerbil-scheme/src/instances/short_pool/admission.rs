@@ -1,6 +1,7 @@
 //! Configuration and cancel-safe publication under the pool close fence.
 use super::{
-    Destination, PendingGuard, Port, Queue, Queued, SchemeShortPool, SchemeShortPoolConfig, Source,
+    Destination, PendingGuard, Port, ProgressSchemeTicket, Queue, Queued, QueuedSchemeTicket,
+    SchemeShortPool, SchemeShortPoolConfig, Source,
 };
 use crate::instances::{
     AsyncInstanceTicket, InstanceDispatcher, InstanceError, Request, RoutedSchemeTicket,
@@ -83,6 +84,7 @@ impl InstanceDispatcher {
             selective: AtomicBool::new(false),
             progress: AtomicBool::new(false),
             pending_limit: config.maximum_pending,
+            maximum_active_per_owner: config.maximum_active_per_owner,
             pending: Arc::new(Semaphore::new(config.maximum_pending)),
             length: AtomicUsize::new(0),
             next: AtomicUsize::new(0),
@@ -105,6 +107,64 @@ impl SchemeShortPool {
         message: M,
         timeout: Duration,
     ) -> Result<RoutedSchemeTicket<M::Output>, InstanceError> {
+        let mut prepared = self.enqueue(message, timeout, true).await?;
+        let placement = prepared.placement.take().ok_or(InstanceError::Closed)?;
+        let owner =
+            tokio::time::timeout_at(tokio::time::Instant::from_std(prepared.deadline), placement)
+                .await
+                .map_err(|_| InstanceError::Timeout)?
+                .map_err(|_| InstanceError::Closed)??;
+        Ok(RoutedSchemeTicket {
+            owner,
+            ticket: prepared.ticket,
+            route_class: SchemeRouteClass::Short,
+            execution_class: SchemeServiceExecution::Short,
+        })
+    }
+    /// Publish into the existing bounded Rust queue and wait only for the final
+    /// native result. Return acknowledges queue publication, not owner selection.
+    /// Owner binding and native capacity acquisition still happen at actual claim.
+    /// Dropping or timing out the ticket removes an unclaimed payload. Once
+    /// claimed, native work and roots drain independently of the client.
+    /// # Errors
+    /// Invalid short declaration, finite queue-admission timeout or closed service.
+    pub async fn submit_queued<M: SchemeServiceRequest>(
+        &self,
+        message: M,
+        timeout: Duration,
+    ) -> Result<QueuedSchemeTicket<M::Output>, InstanceError> {
+        let prepared = self.enqueue(message, timeout, false).await?;
+        Ok(QueuedSchemeTicket {
+            ticket: prepared.ticket,
+            pending: prepared.pending,
+        })
+    }
+    /// Publish a bounded Rust input and await claim progress and the final result
+    /// in one future. Claim is a wake opportunity, never successful completion.
+    /// Both existing channels use the same task waker; final readiness wins races.
+    /// A queue receipt is not native acceptance. Preclaim cancellation removes
+    /// only Rust input; claimed native work drains even after ticket timeout/drop.
+    /// # Errors
+    /// Invalid short declaration, finite queue-admission timeout or closed source.
+    pub async fn submit_progress<M: SchemeServiceRequest>(
+        &self,
+        message: M,
+        timeout: Duration,
+    ) -> Result<ProgressSchemeTicket<M::Output>, InstanceError> {
+        let prepared = self.enqueue(message, timeout, true).await?;
+        let placement = prepared.placement.ok_or(InstanceError::Closed)?;
+        Ok(ProgressSchemeTicket {
+            ticket: prepared.ticket,
+            placement,
+            pending: prepared.pending,
+        })
+    }
+    async fn enqueue<M: SchemeServiceRequest>(
+        &self,
+        message: M,
+        timeout: Duration,
+        placement: bool,
+    ) -> Result<Prepared<M::Output>, InstanceError> {
         let deadline = Instant::now()
             .checked_add(timeout)
             .ok_or(InstanceError::InvalidConfig("short admission deadline"))?;
@@ -125,22 +185,19 @@ impl SchemeShortPool {
         .map_err(|_| InstanceError::Timeout)?
         .map_err(|_| InstanceError::Closed)?;
         let id = self.source.next.fetch_add(1, Ordering::Relaxed);
-        let prepared = prepare(message, deadline, pending, id);
-        self.source.publish(prepared.queued)?;
-        let _guard = PendingGuard {
+        let prepared = prepare(message, (deadline, pending, id), placement);
+        let guard = PendingGuard {
             source: Arc::clone(&self.source),
             id,
         };
-        let owner =
-            tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), prepared.placement)
-                .await
-                .map_err(|_| InstanceError::Timeout)?
-                .map_err(|_| InstanceError::Closed)??;
-        Ok(RoutedSchemeTicket {
-            owner,
+        self.source.publish(prepared.queued)?;
+        // The published payload has moved into the source queue. Keep only the
+        // existing client cancellation authority and optional placement receiver.
+        Ok(Prepared {
             ticket: prepared.ticket,
-            route_class: SchemeRouteClass::Short,
-            execution_class: SchemeServiceExecution::Short,
+            placement: prepared.placement,
+            deadline,
+            pending: guard,
         })
     }
 }
@@ -176,18 +233,29 @@ impl Source {
 }
 
 struct Prepared<R> {
+    pending: PendingGuard,
+    placement: Option<oneshot::Receiver<Result<usize, InstanceError>>>,
+    ticket: AsyncInstanceTicket<R>,
+    deadline: Instant,
+}
+struct Unpublished<R> {
     queued: Queued,
-    placement: oneshot::Receiver<Result<usize, InstanceError>>,
+    placement: Option<oneshot::Receiver<Result<usize, InstanceError>>>,
     ticket: AsyncInstanceTicket<R>,
 }
 fn prepare<M: SchemeServiceRequest>(
     message: M,
-    deadline: Instant,
-    pending: tokio::sync::OwnedSemaphorePermit,
-    id: usize,
-) -> Prepared<M::Output> {
+    admission: (Instant, tokio::sync::OwnedSemaphorePermit, usize),
+    placement: bool,
+) -> Unpublished<M::Output> {
+    let (deadline, pending, id) = admission;
     let trace = message.entry_trace();
-    let (assigned, placement) = oneshot::channel();
+    let (assigned, placement) = if placement {
+        let (send, receive) = oneshot::channel();
+        (Some(send), Some(receive))
+    } else {
+        (None, None)
+    };
     let (send, response) = oneshot::channel();
     let queued = Queued {
         id,
@@ -200,7 +268,7 @@ fn prepare<M: SchemeServiceRequest>(
             work_units: 1,
             work: Work::Service(Box::new(TypedJob {
                 message,
-                send,
+                send: send.into(),
                 submitted: std::cell::Cell::new(false),
                 lane: None,
                 short: true,
@@ -208,7 +276,7 @@ fn prepare<M: SchemeServiceRequest>(
             })),
         },
     };
-    Prepared {
+    Unpublished {
         queued,
         placement,
         ticket: AsyncInstanceTicket { response },
@@ -241,4 +309,44 @@ fn install(
             .map_err(|_| invalid())?;
     }
     Ok(())
+}
+
+impl SchemeShortPool {
+    pub(crate) fn validate_router(
+        &self,
+        dispatch: &InstanceDispatcher,
+        config: &crate::instances::SchemeRoutingConfig,
+    ) -> Result<(), InstanceError> {
+        let same_pool = self
+            .source
+            .admission
+            .upgrade()
+            .is_some_and(|a| Arc::ptr_eq(&a, &dispatch.admission));
+        let expected: std::collections::BTreeSet<_> = config.owners.iter().copied().collect();
+        let actual: std::collections::BTreeSet<_> =
+            self.source.destinations.iter().map(|t| t.owner).collect();
+        if !same_pool
+            || expected != actual
+            || config.short_slots != self.source.maximum_active_per_owner
+            || config.short_max_work != 1
+            || self.source.pending.is_closed()
+        {
+            return Err(InstanceError::InvalidConfig(
+                "owner-claimed short router must share exact owners and short quota",
+            ));
+        }
+        Ok(())
+    }
+    pub(crate) fn router_close(&self) {
+        self.source.close();
+    }
+    pub(crate) fn active_on(&self, owner: usize) -> usize {
+        self.source
+            .destinations
+            .iter()
+            .find(|t| t.owner == owner)
+            .map_or(0, |t| {
+                self.source.maximum_active_per_owner - t.active.available_permits()
+            })
+    }
 }

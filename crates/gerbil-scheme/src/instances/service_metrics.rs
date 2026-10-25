@@ -16,6 +16,8 @@ pub enum SchemeServicePhase {
     Release,
 }
 /// Cumulative completed phase intervals. CPU and GC overlap; do not add them.
+/// `AfterRetirement` publication nests `Release` inside `Retire`; those phase totals
+/// are inclusive and must not be added as an exclusive time partition.
 /// Wall minus thread CPU includes blocking and descheduling, not isolated OS cost.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SchemePhaseObservation {

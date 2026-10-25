@@ -158,14 +158,14 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             );
         }
         let start = Instant::now();
-        while command(&dispatch, 0, 10)[0] < 3 {
+        while cycle_command(&dispatch, 10, start + GATE).await[0] < 3 {
             assert!(start.elapsed() < GATE);
             tokio::task::yield_now().await;
         }
         progress
             .send("PHASE native-cycle release ready barrier")
             .unwrap();
-        command(&dispatch, 0, 18);
+        cycle_command(&dispatch, 18, start + GATE).await;
         for ticket in tickets {
             let (values, _) = ticket.wait_completed(GATE).await.unwrap();
             assert_eq!(values.len(), 8);
@@ -339,11 +339,11 @@ fn invalidated_slots(runtime: &tokio::runtime::Runtime) {
             );
         }
         let start = Instant::now();
-        while command(&dispatch, 0, 10)[0] < 3 {
+        while cycle_command(&dispatch, 10, start + GATE).await[0] < 3 {
             assert!(start.elapsed() < GATE);
             tokio::task::yield_now().await;
         }
-        command(&dispatch, 0, 18);
+        cycle_command(&dispatch, 18, start + GATE).await;
         let mut success = 0;
         let mut failed = 0;
         for ticket in tickets {
@@ -396,4 +396,31 @@ fn start_cycle(progress: &mpsc::Sender<&'static str>) -> (InstancePool, Instance
         .wait(GATE)
         .unwrap();
     (pool, dispatch)
+}
+
+async fn cycle_command(
+    dispatch: &InstanceDispatcher,
+    operation: i64,
+    deadline: Instant,
+) -> Vec<i64> {
+    // The previous response may precede its reservation retirement. These
+    // saturation controls need FIFO backpressure, not a try-submit assumption.
+    // Admission and delivery share the original absolute five-second bound.
+    let remaining = || {
+        deadline
+            .checked_duration_since(Instant::now())
+            .expect("native cycle deadline")
+    };
+    dispatch
+        .submit_native_backpressured_on(
+            0,
+            move |session| observe_command(session, operation),
+            remaining(),
+        )
+        .await
+        .unwrap()
+        .wait_completed(remaining())
+        .await
+        .unwrap()
+        .0
 }

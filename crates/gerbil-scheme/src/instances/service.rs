@@ -22,6 +22,10 @@ pub trait SchemeServiceRequest: Send + 'static {
     fn entry_trace(&self) -> Option<Arc<super::SchemeServiceEntryTrace>> {
         None
     }
+    /// Optional completion/send intervals, independent of entry diagnostics.
+    fn completion_trace(&self) -> Option<Arc<super::SchemeCompletionTrace>> {
+        None
+    }
 
     /// Pin a stateful session/continuation to a persistent Scheme service Actor.
     /// Independent requests use the available Scheme workers by default.
@@ -29,12 +33,14 @@ pub trait SchemeServiceRequest: Send + 'static {
         None
     }
     /// Opt into Scheme's short queue and bounded completion turns.
-    /// Requires one declared work unit and no Actor lane. This is a cooperative
-    /// work budget, not a wall-clock limit or preemption of Scheme computation.
+    /// Requires one retained admission unit and no Actor lane. This selects a
+    /// service class; executed-work safe spans are configured independently with
+    /// `configure_scheme_service_work_on`. Neither preempts Scheme computation.
     fn short_service(&self) -> bool {
         false
     }
-    /// Charge outstanding work through the shared owner budget until projection.
+    /// Retained admission/progress charge through projection, independent of
+    /// executed-work safe spans. This is neither CPU time nor execution fuel.
     fn work_units(&self) -> usize;
     /// Construct a native Scheme payload on its owner.
     /// # Errors
@@ -170,7 +176,7 @@ impl InstanceDispatcher {
             work_units: units,
             work: Work::Service(Box::new(TypedJob {
                 message,
-                send,
+                send: send.into(),
                 lane,
                 short,
                 trace,
@@ -221,6 +227,9 @@ pub(super) struct JobId(pub i64);
 pub(super) struct Completion {
     pub(super) id: JobId,
     pub(super) ready: Option<super::service_cycle::ReadyResult>,
+    pub(super) retire_before_publish: bool,
+    pub(super) input: usize,
+    pub(super) output: usize,
 }
 pub(super) enum Retirement {
     Returned,
@@ -235,6 +244,7 @@ pub(super) struct Start {
 pub(super) trait Job: Send {
     fn entry_trace(&self) -> Option<&Arc<super::SchemeServiceEntryTrace>>;
     fn short_service(&self) -> bool;
+    fn completion_trace(&self) -> Option<Arc<super::SchemeCompletionTrace>>;
     fn start(
         &mut self,
         image: &super::image::Image,
@@ -245,14 +255,13 @@ pub(super) trait Job: Send {
         self: Box<Self>,
         image: &super::image::Image,
         completed: Completion,
-        input: usize,
-        output: usize,
+        retire: &mut dyn FnMut(),
     ) -> Retirement;
     fn fail(self: Box<Self>, error: InstanceError);
 }
 pub(super) struct TypedJob<M: SchemeServiceRequest> {
     pub(super) message: M,
-    pub(super) send: oneshot::Sender<super::types::Completed<M::Output>>,
+    pub(super) send: super::service_ready::Reply<M::Output>,
     pub(super) submitted: std::cell::Cell<bool>,
     pub(super) lane: Option<SchemeServiceLane>,
     pub(super) short: bool,
@@ -267,6 +276,9 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
     }
     fn may_have_entered(&self) -> bool {
         self.submitted.get()
+    }
+    fn completion_trace(&self) -> Option<Arc<super::SchemeCompletionTrace>> {
+        self.message.completion_trace()
     }
     fn start(
         &mut self,
@@ -318,15 +330,15 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
         self: Box<Self>,
         image: &super::image::Image,
         completed: Completion,
-        input: usize,
-        output: usize,
+        retire: &mut dyn FnMut(),
     ) -> Retirement {
         let Self { message, send, .. } = *self;
+        let trace = message.completion_trace();
         let slot_taken = std::cell::Cell::new(completed.ready.is_none());
         super::native_dispatch::run_native(
             image,
-            input,
-            output,
+            completed.input,
+            completed.output,
             |session| {
                 let value = match completed.ready {
                     Some(ready) => ready.project(session, &slot_taken)?,
@@ -334,7 +346,19 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
                 };
                 message.project(session, &value)
             },
-            |value| send.send(value).is_ok(),
+            |value| {
+                if completed.retire_before_publish && slot_taken.get() {
+                    retire();
+                }
+                if let Some(trace) = &trace {
+                    trace.before_send(value.1);
+                }
+                let delivered = send.send(value, Some(image.receipt.owner));
+                if let Some(trace) = &trace {
+                    trace.sent(delivered);
+                }
+                delivered
+            },
         );
         if slot_taken.get() {
             Retirement::Returned
@@ -343,7 +367,7 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
         }
     }
     fn fail(self: Box<Self>, error: InstanceError) {
-        let _ = self.send.send((Err(error), Instant::now()));
+        let _ = self.send.send((Err(error), Instant::now()), None);
     }
 }
 pub(super) fn command<'vm>(

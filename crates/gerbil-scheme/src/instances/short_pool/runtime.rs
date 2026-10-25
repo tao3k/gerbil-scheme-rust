@@ -7,7 +7,10 @@ mod claim;
 mod notification;
 #[path = "progress.rs"]
 mod progress;
+#[path = "progress_wait.rs"]
+mod progress_wait;
 use crate::instances::{Admission, Capacity, InstanceError, Request, service_wake::Wake};
+pub use progress_wait::{InstanceClaimProgress, InstanceProgressResult, ProgressSchemeTicket};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     sync::{
@@ -60,7 +63,7 @@ pub(super) struct Destination {
 pub(super) struct Queued {
     id: usize,
     request: Request,
-    assigned: oneshot::Sender<Result<usize, InstanceError>>,
+    assigned: Option<oneshot::Sender<Result<usize, InstanceError>>>,
     deadline: Instant,
     _pending: OwnedSemaphorePermit,
 }
@@ -79,6 +82,7 @@ pub(crate) struct Source {
     selective: AtomicBool,
     progress: AtomicBool,
     pending_limit: usize,
+    maximum_active_per_owner: usize,
     pending: Arc<Semaphore>,
     length: AtomicUsize,
     next: AtomicUsize,
@@ -108,6 +112,11 @@ impl Source {
         }
     }
     fn cancel(&self, id: usize) {
+        // Publication precedes guard transfer. An empty source cannot contain
+        // this guard's payload; a native claim has already moved its authority.
+        if self.length.load(Ordering::Acquire) == 0 {
+            return;
+        }
         let removed = {
             let mut queue = self
                 .queue
@@ -124,8 +133,10 @@ impl Source {
             }
             removed
         };
-        drop(removed);
-        self.capacity_available();
+        if removed.is_some() {
+            drop(removed);
+            self.capacity_available();
+        }
     }
     pub(crate) fn close(&self) {
         self.pending.close();
@@ -161,11 +172,45 @@ impl Source {
     }
 }
 fn reject(queued: Queued, error: InstanceError) {
-    let _ = queued.assigned.send(Err(error.clone()));
+    if let Some(assigned) = queued.assigned {
+        let _ = assigned.send(Err(error.clone()));
+    }
     if let crate::instances::pool::Work::Service(job) = queued.request.work {
         job.fail(error);
     }
 }
+/// A bounded Rust queue receipt, not proof of owner binding or native acceptance.
+/// Only this ticket carries unclaimed-input cancellation authority. Ordinary
+/// owner tickets retain their original layout and accepted-work semantics.
+#[derive(Debug)]
+pub struct QueuedSchemeTicket<R> {
+    ticket: crate::instances::AsyncInstanceTicket<R>,
+    pending: PendingGuard,
+}
+impl<R> QueuedSchemeTicket<R> {
+    /// Receive the same typed native result and owner completion timestamp.
+    /// # Errors
+    /// Queue expiry/close, result timeout or the original native/task error.
+    pub async fn wait_completed(
+        self,
+        timeout: std::time::Duration,
+    ) -> Result<(R, Instant), InstanceError> {
+        let _pending = self.pending;
+        self.ticket.wait_completed(timeout).await
+    }
+    /// Observe native completion and client consumption without placement await.
+    /// # Errors
+    /// Preserves independent task/timing results and transport timeout/close.
+    pub async fn wait_observed(
+        self,
+        issue: crate::instances::InstanceIssue,
+        timeout: std::time::Duration,
+    ) -> Result<crate::instances::InstanceObservedResult<R>, InstanceError> {
+        let _pending = self.pending;
+        self.ticket.wait_observed(issue, timeout).await
+    }
+}
+#[derive(Debug)]
 struct PendingGuard {
     source: Arc<Source>,
     id: usize,

@@ -126,6 +126,7 @@ const INSTANCE_EXPORTS: &[&str] = &[
     "gerbil_scheme_rust_numeric_batch_create",
     "gerbil_scheme_rust_numeric_service_create",
     "gerbil_scheme_rust_numeric_service_enter",
+    "gerbil_scheme_rust_composite_create",
     "gerbil_scheme_rust_numeric_batch_snapshot",
     "gerbil_scheme_rust_numeric_batch_copy",
     "gerbil_scheme_rust_numeric_size",

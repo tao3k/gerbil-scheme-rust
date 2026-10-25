@@ -1,0 +1,726 @@
+#+TITLE: Gerbil Scheme Actors, fixed owners and Rust executors
+#+STARTUP: overview
+
+* Decision and acceptance boundary
+
+Use a resident Gerbil Scheme asynchronous service on each fixed VM owner as
+our architectural target. Gerbil Scheme's Actor mechanism and green threads
+own in-VM execution. Tokio handles asynchronous cross-instance dispatch and
+notifications. Rayon is an optional bounded preparation executor for expensive,
+pure Rust work. It does not run Scheme, move continuations or schedule Gerbil
+Actors. Keep synchronous batches as an explicit finite-call API and control.
+
+This is an architecture decision for subsequent implementation, not a claim
+that the resident path has passed performance acceptance. The library already
+contains synchronous and asynchronous paths; the remaining work is to align
+their progress and resource contracts. Defaults are unchanged. No new A/B is
+required for this review. The existing native watchdog failure remains open;
+no rejected runtime candidate is approved for PR #18.
+
+* Source facts and three alternatives
+
+| Alternative | Execution authority | Publication boundary | Principal risk |
+|------------+---------------------+----------------------+----------------|
+| Synchronous batch | Fixed owner enters Gerbil; Gerbil Actors execute | Foreign call returns after all active Actors acknowledge | Batch barrier delays host-side recovery; callbacks can create a wait cycle |
+| Resident asynchronous service | Same fixed owner; resident Gerbil Actors execute and suspend | Per-job readiness, then bounded owner recovery | Incorrect coupling of construction, recovery and client consumption |
+| Resident service with on-demand Rayon preparation | Same as resident; Rayon only prepares owned Rust inputs | Bounded prepared windows feed the same service | Extra queues, preparation barriers and shared physical CPU contention |
+
+These are not three competing schedulers for a Scheme VM. The third is an
+optional preparation stage of the second. Cheap input should not require an
+additional executor hop. Direct dispatch remains useful for synchronous callers;
+Tokio is useful when external asynchronous work exists, not a prerequisite for
+Gerbil scheduling.
+
+Source anchors:
+
+- [[file:../../scheme/actor-batch.ss][actor-batch.ss]] uses Gerbil =spawn=, =thread-send= and =thread-receive=;
+  its foreign entry waits for every active Actor acknowledgement.
+- [[file:../../scheme/async-service.ss][async-service.ss]] already provides resident Gerbil workers, class queues,
+  completion queues, exception capture and shutdown draining. Reuse it.
+- [[file:../../crates/gerbil-scheme/src/instances/service_loop.rs][service_loop.rs]] owns native entry, bounded construction and recovery.
+- [[file:../../crates/gerbil-scheme-qualification/benches/owner_dispatch/executor.rs][owner_dispatch/executor.rs]] currently compares paths that also differ in
+  submission and collection. Thread counts alone do not isolate executor cost.
+- [[file:../../specs/owner_lifecycle.qnt][owner_lifecycle.qnt]] contains the existing native lifecycle and joint
+  Tokio / Gerbil Actor model; the architecture refinement imports that state.
+
+* Execution and ownership contract
+
+1. Before first native construction, a stateless root-free input may be rerouted.
+   A stateful session remains pinned according to its existing routing contract.
+2. Only the fixed owner enters its VM. Native construction establishes owner
+   affinity for roots, Actor state and captured continuations. No Rayon work
+   stealing or Tokio resumption transfers that ownership.
+3. Gerbil controls Actor mailboxes, green-thread execution, suspension and
+   continuation reentry. Rust notifications express readiness, never an in-VM
+   execution grant. Do not layer a Rust per-handler execution lease over Gerbil.
+4. A suspended invocation retains the state required for legitimate reentry.
+   Exceptions, cancellation and repeated continuation entry must use the existing
+   invocation ownership protocol; neither a wake nor an observed yield proves
+   that execution completed or a root can be released.
+5. Gerbil Actors and the owner share an OS thread. They are not separate physical
+   CPU consumers. Other owners, Tokio workers and Rayon workers compete for the
+   same host CPUs, allocator and memory bandwidth.
+
+No general latency bound follows from Actor routing alone. Cooperative service
+opportunities exist at actual Gerbil scheduling/checkpoint boundaries. An
+arbitrary handler or foreign function can execute a long indivisible span.
+Declare that boundary explicitly; do not claim preemption, weaken continuations,
+or insert a callback on every handler merely to make a model appear fair.
+
+* Service cycle and independent capacity domains
+
+The cycle is: reserve bounded root-free input space; prepare a window; publish
+it without waiting for all later windows or owner registrations; owner claims
+and constructs native inputs; Gerbil executes; owner recovers completed values
+and retires their native resources; Rust publishes independently consumable
+results; clients consume them.
+
+| Domain | What its credit bounds | Who releases it |
+|--------+------------------------+-----------------|
+| Prepared input | Owned Rust bytes plus declared work, including preparation in flight | Transfer, cancellation, timeout or failed preparation |
+| Native admission | Requests admitted to one owner | Per-result retirement or terminal cleanup |
+| Gerbil execution | Declared actual work between cooperative boundaries | Gerbil's existing budget/continuation protocol |
+| Result transport | Reserved delivery slots and bounded owned result storage | Client consumption or receiver drop |
+
+These credits cannot be interchangeable. An admitted result must have a bounded
+recovery destination, or an explicit terminal policy, before execution can make
+it ready. Reserve delivery capacity before native acceptance; do not block the
+owner waiting for a client to free native capacity. Unknown result byte sizes
+need an explicit limit, bounded chunk protocol or fallible projection contract;
+a request-count bound alone does not bound memory.
+
+A slow consumer necessarily stops further admission when its result reservation
+budget is exhausted. The required property is that already admitted work can
+retire without needing a new admission credit or a client callback. It is not
+unlimited admission independent of consumer speed.
+
+Projected owned Rust values no longer need Scheme roots. Opaque Scheme handles,
+closures and continuation-bearing values may legitimately keep roots on their
+owner until explicit release. Preserve that capability and account for it
+separately; do not force JSON or pretend every value can be detached from its VM.
+
+* Wait dependencies and protocol exclusions
+
+An edge A -> B means A cannot progress until B progresses. A cycle identifies
+a possible protocol deadlock, not proof that a captured watchdog used that path.
+
+| Cycle | Explanation | Required exclusion |
+|-------+-------------+--------------------|
+| Client -> owner -> Gerbil Actor -> client | Synchronous caller blocks the callback executor needed by its Actor | Async callback/reply bridge, or a separate callback execution context |
+| Owner -> result transport -> client -> native capacity -> owner | Recovery awaits a consumer that awaits admission released by recovery | Reserve result space; separate native retirement from final consumption |
+| Owner -> Rayon preparer -> native capacity -> owner | Owner joins preparation which awaits a credit held until owner recovery | Root-free bounded preparation, admission outside Rayon work, no owner join |
+
+The resident service avoids the synchronous all-Actor return barrier, but it
+still needs a bounded owner recovery opportunity at safe native boundaries.
+Always recovering first can starve supply; always constructing first can bury
+ready short results. Use pending obligations and independent credits to select
+a bounded service window, rather than layering another unconditional yield or
+using client polling as the owner progress engine.
+
+Wake protocol: publish a durable generation before signalling; the waiter
+registers then rechecks the generation; consume observed generations rather
+than counting notifications as jobs. Coalesce wake signals while preserving
+pending obligations. Transport readiness, Tokio task resumption, native
+execution and client consumption are distinct transitions. No model assumption
+may turn an unpolled future into actual consumption.
+
+* Shared CPU and duplicate scheduling cost
+
+Model host CPU occupancy across owners, Tokio and Rayon. This is an abstraction
+for competition, not a proposal for a global runtime CPU semaphore. CPU
+oversubscription can produce runnable delay without any protocol deadlock.
+Safety checks alone cannot establish host scheduling fairness or p99.
+
+For a prepared window, Rayon is worthwhile only when the reduction in pure
+Rust preparation time exceeds enqueue, join, copying/allocation and CPU
+interference costs. There is no measured break-even point established by this
+review. Do not enable Rayon by request count alone or change the default.
+
+Count unnecessary cross-runtime handoffs separately from unavoidable native
+construction, execution, GC and projection. The model's 48-item / 6-window
+example counts 96 per-item round trips versus 12 window round trips, or 24 when
+adding a preparation executor round trip. These are symbolic topology counts,
+not observed counts in the current library, not FFI timing, and not a speedup
+prediction. A resident Gerbil service may still need multiple bounded native
+entries. Gerbil mailbox operations are not themselves Rust executor hops.
+
+* Model refinement and what it establishes
+
+The =gerbil_service_architecture= refinement imports =service_sharing_cases=
+and therefore the same native root, admission, Actor and completion state.
+It does not instantiate another native lifecycle, Actor mailbox or work budget.
+The added state records architecture choices, symbolic host CPU occupancy,
+wait dependencies and a small generation-based notification contract.
+
+Directed checks cover synchronous and resident dependencies; three wait-cycle
+controls; optional bounded Rayon preparation; physical CPU competition; invalid
+foreign entry and oversubscription controls; publication before waiter arming;
+coalesced and lost wakes; cancellation before native construction; native
+retirement before client consumption; and symbolic boundary counts. The native
+retirement witness executes the existing model's real construction/execution/
+projection actions rather than replacing them with a synthetic completion bit.
+Both existing job domains use the same refinement through the current Rust
+Quint gate. Supplied dependency graphs are architecture contracts, not extracted
+wait graphs from the runtime. CPU occupancy and wake rules are abstractions,
+not a verified Tokio or OS implementation.
+
+* Local model verification
+
+Quint 0.33.0 completed all 15 architecture scenarios in each of the existing
+small and wide job domains: 30 directed checks passed. Negative controls are
+expected invariant violations asserted by the tests, not accepted unsafe paths.
+The first retirement fixture failed with =QNT502: Variable topology not set=:
+its imported multi-step action did not carry the refinement variable through
+intermediate transitions. Initializing the refinement after the existing
+completion fixture fixed that test composition; no lifecycle invariant was
+weakened. Formatting and whitespace checks passed.
+
+The initial architecture-only review ran no native workload or performance
+A/B. Its checks did not resolve the watchdog, prove starvation freedom,
+establish a CPU scheduling bound, or qualify an implementation for publication.
+The subsequent resident progress implementation is qualified separately below.
+
+* Actual API audit and resident producer progress
+
+The following audit covers the pool stream / registered producer / resident
+service path. It is not an exhaustive proof of arbitrary user callbacks or all
+library APIs. No internal capacity wait cycle was established in this path.
+In particular, the dependency controls above must not be reported as an observed
+native deadlock or as the cause of the historical watchdog.
+
+| Actual boundary | Order found in source | Progress implication |
+|-----------------+-----------------------+----------------------|
+| Pool plan | Validate count/owners; create ready channels; register producers; publish bounded windows | Delivery storage exists before native acceptance; no wait for client consumption during publication |
+| Registration | Await producer semaphore; lock admission table; validate capacity identity; enqueue producer with try_send; unlock; notify | No table lock spans the await; failed enqueue drops the registration permit |
+| Producer claim | Inspect source; acquire active then work then native slot; recheck lifecycle; remove matching-price input; construct on owner | Waiting futures are polled, not synchronously joined; root-free reservations do not migrate entered state |
+| Completion | Harvest native identities/slots; project each result; release each native/active permit through its retirement guard | No synchronous wait for a client to read a result |
+| Reply | oneshot send or per-owner ready queue try_send | Publication cannot block the owner on transport capacity under the original-count/unique-result contract |
+| Failed slot transfer | Preserve native and stream permits in retirement drain; fail owner service | Failure must not manufacture returned credits before native cleanup |
+
+The per-owner ready queue can hold the whole finite input count. At most that
+many logical results exist across all owner queues; channel metadata can scale
+with owners times count. This bounds finite result slots, not arbitrary payload
+bytes. No byte-bound claim or support for an unbounded output stream is added.
+Opaque owner-bound handles retain their separate explicit-release contract.
+
+Source locks follow requests -> offers when both are needed. Reclaimed native
+credits are released outside source locks. Source wake first clones weak signals
+under its signal lock, then invokes them after releasing that lock. Rejection
+extracts jobs under the source lock and calls failure delivery outside it.
+These observations exclude the corresponding source/table/wake lock cycles in
+the audited path; they do not prove all possible OS blocking is absent.
+
+** Concrete repeated scheduling removed
+
+Previously =owner_loop::waker= performed both a =Work::Wake= mailbox enqueue
+(with a new started flag) and a native pipe notification for every producer
+wake. The mailbox token was a durable progress record, not application work.
+Several capacity/source events could leave several tokens for repeated owner
+turns even though pipe writes already coalesced. This duplication is established
+by source and descriptor controls, not a measured throughput attribution.
+
+For resident Gerbil service owners, the waker now publishes a boolean producer
+duty before notifying the existing pipe. Only service programs create this wake
+port; ordinary blocking owners retain the original mailbox token path.
+The owner rearms transport, claims producer duty, and repeats its service cycle
+when duty was present. Application inbox, short-port and offer rechecks remain.
+Gerbil's Actor scheduling, execution budgets, native result tokens and exception/
+continuation ownership are unchanged. No new thread, timer, queue or per-handler
+execution lease is introduced.
+
+The actual ordering is:
+
+1. Publisher makes source/capacity state visible, stores producer duty, then
+   claims or coalesces the pipe notification.
+2. Before native sleep, owner reopens pipe publication, then atomically claims
+   producer duty. A claimed duty requires another owner turn.
+3. Publication before the duty check is either claimed or has a pipe notification.
+   Publication after the check owes a fresh notification (or one already owed
+   by another publisher). A pipe byte is a hint; it is not the work ledger.
+4. Empty open input, cancellation, close and registration still use their existing
+   state. Coalescing does not grant capacity, execute Scheme or release roots.
+
+Removing mailbox tokens without the durable duty/recheck would be incorrect:
+an old pipe byte may already have been consumed while its coalescing claim
+remains set. The new model control demonstrates precisely that unsafe removal.
+It does not claim the previous mailbox-based implementation lost that wake.
+
+The existing architecture refinement now separates the two arming atomics so
+publication before, between and after them can be checked. The descriptor
+controls exercise the actual waker, pipe and coalescing state. Existing native
+service scenarios cover suspended Gerbil work, exceptions, continuations,
+capacity return before client consumption, cancellation, timeout and shutdown.
+The unresolved benchmark watchdog remains a separate failure record.
+
+** Current correctness qualification
+
+The connected resident producer protocol passed:
+
+- Seven actual-descriptor unit checks, including the three new mailbox/duty
+  controls. Repeated service producer notifications leave the application mailbox
+  empty; ordinary blocking owners still receive their wake token.
+- The existing native =scheme_service= target: three tests passed against the
+  actual Gerbil service, with its unchanged progress watchdog. This includes the
+  existing continuation, exception, delayed-consumer, cancellation and close paths.
+- Twenty architecture checks in each job domain: forty passed. Publication during
+  arming is checked explicitly as well as publication before and after it.
+- Strict target Clippy, Rust formatting and diff whitespace checks.
+
+The first strict Clippy run rejected the expanded owner loop at 102 lines. The
+existing native wait phase was extracted into a named helper; no lint allowance,
+timeout or invariant was weakened. Native correctness and Clippy were rerun on
+that final runtime source. No performance A/B, default change, commit or push
+was performed. The earlier benchmark watchdog is still unassigned; passing this
+correctness target does not qualify that failed workload or establish speedup.
+
+* Historical watchdog: source-bound investigation
+
+The retained failed capture contains 32 completed windows. Its last validated
+window was mixed block 2, reverse order, whole-chunk preparation (arm 0). The
+expected next window in the frozen loop is mixed block 3, forward order, also
+arm 0. That is a source-order inference, not a recorded failure context. The
+record cannot establish that the pipeline candidate, preparation, Gerbil
+execution, recovery or configuration caused the stall. It contains no thread
+stack. Original binary and source archive hashes were checked and retained.
+
+The existing Cargo bench target now offers =--protocol-check=. It runs only
+the whole-chunk policy, one mixed warmup and 32 fixed mixed windows using the
+same 8192-order / 64-short-request workload, fixed owners and existing policy
+configuration. Legacy comparison selectors are reused solely to choose that
+configuration; this entry does not run a second policy, emit sample metrics or
+admit performance. It still executes the existing result oracle and clean
+shutdown assertions. It is not an exact replay of the historical CPU/mixed
+configuration sequence and does not run the old frozen executable.
+
+Run through the existing build target:
+
+#+begin_src sh
+cargo bench -p gerbil-scheme-qualification --features arrival-clock \
+  --bench scheme_service --locked -- \
+  --protocol-check --progress-fair-ab --fixed-short-selective \
+  --completion-service-ab --supply-cycle-ab
+#+end_src
+
+With =GERBIL_SERVICE_STALL_SAMPLE= set to a caller-selected private output file,
+window-phase metadata identifies pre-configuration idle, configuration, short
+wake configuration, client work, post-client idle, summary and policy readback.
+Phase metadata never sends watchdog progress. After the unchanged 5-second
+watchdog has already declared failure, the existing bounded self-sample helper
+attempts a thread stack and still exits 70. No profiler samples during healthy
+execution, no timer threshold changes, and no synthetic progress are introduced.
+
+One fixed-policy diagnostic completed all 32 windows. Four owners joined, roots
+were zero, service quiesced and image files were removed. No failure sample was
+produced because no watchdog fired. Strict bench Clippy and optimized compilation
+passed; initial function-length lint failures were repaired with named phases,
+without allowances. The core runtime/model hashes still match the preceding
+correctness gate, so that unchanged gate was not rerun.
+
+This narrows the evidence gap but does NOT identify or repair the historical
+watchdog root cause. A successful run does not close the failed capture, prove
+starvation freedom, or permit publication. Further identical repetitions stop
+here; a future stall must be attributed using its own phase and stack before
+changing the owner/Gerbil protocol. No speculative production fix follows from
+this non-reproduction, and no throughput or p99 claims are made.
+
+* Frozen historical-order replay
+
+A subsequent directed replay restores the archived failed Rust source rather
+than using the current resident producer fix. All archived runtime Rust files
+remain byte-identical. Diagnostic overlays add only the replay entry, phase
+markers and failure-only stack collection. The descriptor explicitly selects
+the retained original Scheme image, whose SHA-256 remains
+=d813f33b03b085c944162982abb8b7113fcf28f5de81f1c21d27bb3d15f01411=.
+The diagnostic executable is rebuilt, so it is not the original frozen binary.
+
+=--watchdog-replay= follows CPU warmups 0/1, twenty CPU windows, mixed warmups
+0/1, then thirteen mixed windows through block 3 / forward / arm 0: the first
+historically unvalidated window. It preserves both configurations and their
+call order, four fixed VMs, inputs, short arrival plans and per-policy result
+retention lifetime. It discards comparison output and does not calculate or
+publish A/B results. Historical metric serialization/aggregate output is omitted;
+OS scheduling and instruction timing are not deterministic replay guarantees.
+
+The maintained diagnostic entry uses the normal Cargo target and existing
+configuration selectors:
+
+#+begin_src sh
+cargo bench -p gerbil-scheme-qualification --features arrival-clock \
+  --bench scheme_service --locked -- \
+  --watchdog-replay --progress-fair-ab --fixed-short-selective \
+  --completion-service-ab --supply-cycle-ab
+#+end_src
+
+Running that command in the current checkout uses the current runtime. Replaying
+the historical runtime requires restoring its archived sources and overlaying
+only these diagnostic files, then selecting the retained image in the private
+diagnostic descriptor. The source/image identities and overlay list are recorded
+privately; private evidence is not added to the repository. Restore executable
+Unix modes from the source archive before building: the initial temporary
+extraction lost the executable bit on =build.ss= and failed with permission
+denied. Restoring recorded modes repaired preparation; it was not a runtime fix.
+
+The one historical-order replay completed all 33 windows. The emitted window
+sequence was independently checked against the frozen loop order. Four owners
+joined, roots were zero and image files were removed. No watchdog fired and no
+failure stack was produced. This is a non-reproduction with archived runtime
+sources, not root-cause closure or an accepted implementation improvement.
+
+A stack-tool preflight exposed a separate diagnostic limitation: the initial
+2-second collector budget produced no file on a cold invocation; a bounded
+follow-up succeeded. The failure-only collector now has a separate 15-second
+budget and retains tool stderr. The service still declares failure after the
+same 5 seconds and still exits 70. No healthy execution receives additional
+time, and stack collection never resets the progress clock. This diagnostic
+repair does not explain the historical native watchdog.
+
+Strict bench Clippy, optimized frozen-source compilation, formatting and
+whitespace checks passed. No production protocol is changed on the basis of this
+non-reproduction. The original failed capture, binary, source archive and owner
+images remain preserved; its cause and cleanup status remain UNATTRIBUTED and
+UNVERIFIED respectively. Performance acceptance and PR publication remain blocked.
+
+* Directed projection and producer-retirement interleaving
+
+=--watchdog-interleaving= follows the same first 32 historical windows, then
+replaces the first unvalidated window with a controlled API interleaving. It
+uses the existing Cargo bench target, =arrival-clock= feature and the four
+selectors shown above. It emits correctness events rather than A/B comparisons.
+
+For each of the four owners, three native eight-item requests share a final
+projection counter. The last projection copies its typed native result, signals
+a handshake and briefly awaits release. A Tokio task observes that the real
+replacement producer registration is pending, then immediately releases the
+projection. No deliberate sleep or watchdog-length hold is used. A missing
+release is explicitly a fixture error, never evidence of a native stall.
+
+The replacement registration and result run with an already-due arrival clock.
+Old results remain unread while producer retirement, idle-fenced policy reset
+and a subsequent request complete. Only then does the client consume all old
+results, checking sequence identities and an independent result oracle. This
+separates native projection, producer permit retirement and client consumption;
+it does not assume all three results share one native harvest snapshot.
+
+The first three-request fixture failed with =InvalidConfig("short wake policy
+requires idle budgets")=, exit 101. It omitted the historical idle fence between
+configuration reply and short-wake configuration: a control reply can precede
+native permit retirement. Restoring that existing fence corrected the fixture;
+the production guard and protocol were unchanged. The failed fixture, binary
+and receipt remain private evidence and are not classified as watchdog failures.
+
+The corrected frozen-source run completed the 32-window prefix and all four
+controlled owner interleavings, exit 0. It did not trigger the 5-second watchdog
+and produced no failure stack. This rules out neither timing-dependent variants
+nor other wait dependencies. In particular, it does not establish a reliable
+historical trigger, root-cause attribution, a production repair or performance
+acceptance. No identical replay loop or new performance matrix follows from
+this non-reproduction. The historical failure remains open; a production change
+requires an observed failing dependency and its same-run phase/thread evidence.
+
+* Next falsifiable hypothesis: short eligibility after capacity retirement
+
+The projection/producer scenario did not exercise short-queue publication while
+all destinations were ineligible for work. Hypothesis H2 is that a published
+short request can remain unclaimed when native work credits return, because
+short wait registration and selective notification duty fail to become effective
+again. This is an unconfirmed dependency hypothesis, not a diagnosis of the
+historical exit 70.
+
+The source-level expected path is =CapacityPermit::drop -> Capacity::signal ->
+CapacityEvents::publish -> Source::capacity_available=. A running owner also
+checks visible short work before parking; =Port::arm_wait= registers under the
+queue mutex and calls =capacity_available= after registration. The existing
+model separates =shortEligible=, =armShort= and =selectiveShortWake=; its
+=selectiveVisibleWorkBeforeWaitTest= and =selectiveArmAfterPublishTest= remain
+relevant specifications, not native liveness evidence.
+
+=--watchdog-capacity-handoff= reuses the historical 32-window state prefix and
+then performs one directed handoff. Four real 32-item batches each exhaust one
+owner's unchanged 32-unit budget. Final typed projection uses a release
+handshake. Four short requests are published through =submit_progress= while
+all work availability snapshots are zero; a real claim/final observer must poll
+pending. The controller immediately releases projections and waits for short
+completion without submitting any ordinary work or control request. Each result
+is checked independently before bulk client results are consumed.
+
+This boundary witness deliberately uses 32-item batches rather than pretending
+to reproduce the historical eight-item batch load. Owners start this handoff in
+running projectors; success can come from their visible-work scan. It therefore
+cannot, by itself, refute a later arm/park race or prove that a capacity callback
+woke an already sleeping owner. A stall after release would require the same
+run's phase and thread stacks before selecting a repair. A fixture that fails
+to release its barrier is not such evidence. No post-release synthetic wake,
+timeout relaxation, production mutation or performance claim is permitted.
+
+The first execution reached zero work capacity but the diagnostic supplied a
+48-line payload to the dedicated four-line short layout. Scheme correctly
+rejected it; exit 101 is retained as a fixture contract failure, not a watchdog.
+The corrected fixture uses the existing benchmark's =truncate(14)= input shape
+(two header values plus four triples) and verifies that exact input.
+
+The corrected archived-runtime scenario completed the 32-window setup prefix
+and the single capacity handoff, exit 0. All four short results passed the
+four-line oracle; no post-release ordinary work/control was submitted. Four
+owners joined, roots were zero, service quiesced and image files were removed.
+No watchdog fired and no failure stack was produced. This bounds H2 for running
+owners only: a subsequent owner arm/park interleaving remains uncovered. It is
+not evidence that every capacity notification delivered a native wake.
+
+The initial optional-budget assertion compile error and the native short-layout
+fixture error are retained separately. Strict bench Clippy passes with both
+=arrival-clock= and =instance-dispatch=; focused formatting and whitespace checks
+pass. No production protocol changed, no performance comparison ran, and neither
+historical root cause nor PR publication is closed by this result.
+
+* H3: publication between final scan and wait registration
+
+H2 covered running projectors, not the last-scan/arm interval. H3 predicts that
+short input published after the last failed claim but before wait registration
+can lose notification duty, leaving the owner in an infinite native port wait.
+The expected counteracting transaction is =Port::arm_wait=: register under the
+queue lock, then re-evaluate =Source::capacity_available=. The existing
+=selectiveArmAfterPublishTest= specifies that ordering; it does not prove the
+concrete native port bridge.
+
+One private diagnostic copy adds two explicit Rust callbacks around
+=register_short_wait=. The first holds all four owners after their final failed
+short/offer scans. The client publishes four valid dedicated short requests
+with all native budgets available, then releases that boundary. The second
+holds owners after registration and before native wait. Once all registrations
+are acknowledged, every gate is released and the hook is disabled. No subsequent
+ordinary/control publication can wake the owners. Missing gate release is a
+fixture failure; only a post-release native stall can support H3.
+
+These hooks exist only in the isolated diagnostic source overlay. The archived
+runtime is therefore NOT byte-identical for this witness: exactly
+=crates/gerbil-scheme/src/instances/service_loop.rs= changes, while the original
+Scheme image is retained. The overlay source, binary and hashes are preserved
+with the result. This is a controlled schedule witness, not exact reproduction
+of the uninstrumented historical executable or a performance measurement. No
+hook, ABI export or protocol repair is added to the maintained production library.
+
+The single controlled H3 execution reached both barriers on all four owners,
+then completed all four short requests after release, exit 0. Cleanup joined
+four owners, reported zero roots, quiesced the service and removed image files.
+No watchdog fired and no failure stack exists for this execution. Thus the
+specific forced publish-before-arm ordering did not reproduce H3. This does
+not prove starvation freedom under arbitrary interleavings, explain the
+uninstrumented historical exit 70, or justify a production wake-protocol change.
+No identical repetition follows. An initial build-cache permission failure was
+retained; the build succeeded using the normal approved cache access.
+
+* Retained CPU tail: 12.798333 ms to 91.323792 ms
+
+Re-analysis of the retained =service-supply-cycle-v32-r1= capture independently
+selects nearest-rank p99 from 640 short requests per arm. The ratio is 7.1356,
+a 613.56% regression. This candidate remains rejected. The two quantiles need
+not belong to matching requests or windows; paired-window median changes are
+separate metrics and cannot replace this pooled tail.
+
+The candidate quantile is block 2, reverse order, arm 1, zero-based request 22:
+
+| Interval | Wall time (ms) |
+|----------+----------------|
+| Earlier serial-client backlog | 91.219500 |
+| Current deadline resume | 0.003375 |
+| Unclassified issue gap | 0.001000 |
+| Current issue to native completion | 0.079584 |
+| Current native completion to client consumption | 0.020333 |
+| Total planned arrival to client consumption | 91.323792 |
+
+This is not permission to discount the regression. In that same window, request
+9 starts the spike with no prior serial backlog: issue-to-native-completion is
+49.798625 ms, comprising 21.211833 ms before construction entry, 0.046750 ms
+construction, 28.538042 ms construction-end to projection-start and 0.002000 ms
+projection-to-native completion. Its client consumption adds 1.772541 ms.
+Subsequent requests propagate this delay under the unchanged serial arrival
+contract; request 22 itself is fast after issue but inherits the backlog.
+
+The 28.538042 ms interval includes native service and owner recovery before
+projection; it is not a measured GC CPU interval. The retained capture has no
+per-request entry trace, native diagnostic snapshots, OS run state or thread
+stack. Neither the triggering mechanism nor equivalence with the separate
+5-second watchdog is established. Exporting and checking these existing rows
+runs no new benchmark and changes neither arrivals nor metric definitions.
+
+Cross-checking the same capture's native bulk completion timestamps adds an
+important limit to an owner-local explanation: between 4.602959 and 25.814792 ms,
+none of the four owners has a bulk completion record. Between 25.861542 and
+54.399584 ms, only owner 1 has two distinct bulk completion times; the other
+three have none. These are gaps in observed completion, not proof that threads
+were blocked, runnable, executing GC, or out of input. A short-router-only repair
+cannot be selected from this evidence. The next attribution boundary must retain
+shared supply/execution/recovery progress as well as OS state, rather than
+presuming a short-queue notification failure from end-to-end p99 alone.
+
+* H4: accepted Scheme work while Rust publication is paused
+
+The retained 49.798625 ms spike contains a 21.211833 ms pre-construction interval
+and a 28.538042 ms construction-end/projection-start interval. No bulk completion
+was observed on any owner during the former. That does not establish source
+emptiness, active execution, mutex contention or a process-wide scheduling pause.
+The original capture retains no source queue/lock state or Scheme ready-queue
+state at those instants.
+
+H4 predicts a concrete cycle: subsequent Rust input preparation or source seal
+must advance before already accepted Scheme tasks can execute, project results
+and return native credits. The source audit rejects the simpler claim that the
+iterator is called under =Shared.requests=: preparation and indexed staging are
+outside that mutex; =Shared::publish= appends an already prepared batch. The
+owner loop also collects before its next producer step. Native conformance still
+needs a witness because Scheme advancement and completion custody cross FFI.
+
+=--watchdog-source-handoff= supplies that witness through the actual
+=pipeline_scheme_service_pool_ready_stream= API. It uses the historical setup
+prefix, existing four fixed VMs, unchanged four-slot/32-work budgets and real
+native eight-item Actor batches. This directed scenario explicitly uses one
+active request per owner and eight requests total, not the historical performance
+load. No library default changes.
+
+Four initial requests each stop at an owner-local entry handshake. The one-active
+bound ensures four distinct owners receive them. The iterator pauses before
+preparing request 4, after the first four-request window is published. Once all
+four entries and the publisher pause are acknowledged, the controller releases
+all owner gates immediately. It requires four distinct owner projections and
+full native slot/work credit return while all producer registrations remain live.
+Only then does it resume Rust preparation, obtain the result stream and consume
+all eight independently verified results. Missing entry release or publisher
+release marks a fixture failure; no held owner gate is called native starvation.
+
+Failure phases distinguish initial entry/publication, post-release native
+progress, projected-but-unretired credits, publisher resume and client
+consumption. A stall before projection still needs same-run stacks to separate
+Scheme execution from owner-side recovery; the phase alone cannot do so. The
+unchanged five-second watchdog performs failure-only stack capture.
+
+One execution against byte-identical archived runtime Rust sources and the
+original Scheme image completed the witness. Four owner projections and all
+native credits returned before publisher resume/client consumption; producers
+remained live. Final cleanup joined four owners, reported zero roots, quiesced
+the service and removed image files. No watchdog fired and no failure stack was
+produced. This rejects H4 for the controlled ordering, not arbitrary histories.
+The 49.798625 ms trigger and the separate exit-70 capture remain UNATTRIBUTED.
+
+The existing lifecycle model now adds
+=streamingInputOpenExecutionRetirementTest=: native service readiness and
+retirement occur while the source remains unsealed and its producer registered,
+with native capacities returned and a host result ready. Only this new case ran
+in the existing small/wide domains; both passed. No new model or ownership state
+was introduced. Strict bench Clippy passed both supported feature configurations;
+optimized compilation and focused formatting/whitespace checks passed. These
+are correctness evidence, not a throughput or historical root-cause result.
+
+| Dependency | Existing evidence | Still missing at the historical spike |
+|------------+-------------------+---------------------------------------|
+| Shared supply -> owner entry | Preparation is outside the request lock; H4 progresses during a publisher pause | Queue occupancy, waiter identity and lock-owner running state |
+| Scheme execution -> ready result | All four native tasks complete in H4 | Actual Scheme runnable/lease/external-wait/ready states |
+| Ready result -> native retirement | Credits return before publisher resume or client consumption in H4 | Native-ready time versus harvest and projection for the original requests |
+
+No unchanged repetition, additional A/B, production repair, default promotion or
+PR push follows from H4. Further root-cause work must identify an actual wait
+owner and its release event, not manufacture a five-second lock hold or select
+GC/OS/supply attribution from absent completion records.
+
+* Implementation candidate: shared supply without blocking owner progress
+
+The work now moves from additional historical non-reproduction witnesses to a
+concrete protocol improvement. Existing owner code could synchronously wait for
+shared source queues, offer payloads/slots and producer signal metadata before
+its next Scheme service turn. A source-level dependency is sufficient to improve
+that boundary; it does not attribute the historical 49.798625 ms spike or exit 70.
+
+The actual producer and owner offer path now implement these transitions:
+
+| Boundary | Implemented behavior |
+|----------+----------------------|
+| Uncontended shared access | Immediate try-lock; no wait future allocation |
+| Contended shared access | Enable an owned notification, then recheck before returning Pending |
+| Pending source/offer entry | Return speculative active/work/slot credits before returning to the owner service loop |
+| Unlock | Release all transaction data guards before dispatching registered notifications |
+| Owner retry | Persistent notification uses the existing durable native producer wake and pipe |
+| First native entry | Payload commit remains unique; entered Scheme objects stay on that owner |
+| Optional peer assistance | Busy peer metadata/source/target slot skips assistance; input remains owned |
+| Failed unpublished offer | Sole-capability rollback returns the Rust request without acquiring the busy target slot |
+| Source signal fanout | Preallocated once-initialized weak slots; partial registration is usable immediately |
+| Pipe publication | Existing nonblocking one-byte write, retaining coalescing and error semantics; no writer mutex |
+
+=SupplyMutex= and =SupplyWait= are internal synchronization types. =Head= separates
+work, temporarily empty/open input and exhausted input; contention is Poll::Pending,
+not a false end-of-source. The producer caches proven exhaustion for its deadline
+query rather than taking a source lock there. A pending take releases speculative
+credits; accepted tasks retain their original native credit/root guards. A
+transaction-local notification list ensures nested queue/offer unlocks cannot
+invoke a reentrant owner callback under an outer supply data lock. The list
+allocates only when a contended release actually owes notifications.
+
+=Source::poll_head= and =poll_take= replace blocking source cursor methods in
+=ServiceProducer=. =Pump::claim_offer= owns a persistent offer wait and owner
+waker. Both ready work and unlock events return through the existing owner service
+cycle; no new runtime thread, timer retry, task-per-message or Scheme scheduler
+is introduced. Gerbil still owns Actor/green-thread execution, GC, continuations
+and exceptions. Rust handles cross-instance dispatch and typed boundary custody.
+
+The changes were applied and checked in separate layers: synchronization controls,
+pipe transport, source cursor, offer withdrawal, optional routing, owner entry and
+signal registration. Initial compile fixture migrations and strict-lint failures
+are retained privately. Two pre-existing ready-delivery test initializer qualifiers
+were made explicit to satisfy strict lint, with no assertion changes.
+
+** Correctness evidence and limits
+
+- Six synchronization controls cover immediate Pending, one unlock notification,
+  cancellation, changing wait targets, no uncontended future, and nested-lock
+  callback release order.
+- Sixteen offer/routing controls cover source/payload/slot contention, exact-once
+  withdrawal/entry, cancelled waits and quota return, including rollback while the
+  target slot remains locked.
+- Signal registry controls cover partial installation and weak lifetime; existing
+  source/transport controls remain exercised. The final related Rust control gate
+  passes 57 tests; strict library/test Clippy passes.
+- The existing Gerbil/Tokio/Rayon model adds seven supply cases in each of its
+  two existing domains. They cover owner execution during supply deferral, unlock
+  before registration/park, cancellation, and rejected missing-notification,
+  held-speculative-credit and native-owner-blocking mutations. All 14 pass.
+- The changed-runtime native qualification passes three tests, covering native
+  types, GC, continuation affinity, exceptions, backpressure, wake, drain and FD
+  return. Final drain reports four joined owners, zero roots and removed images.
+  Expected injected construction/projection panics remain visible in its stderr.
+- The standalone =isolated-instances= library check also passes. Its initial
+  failure exposed missing Tokio feature guards already present in the archived
+  source. The missing module/re-export guards are now consistent; the initial
+  failure is retained separately. This does not change the default feature set.
+
+This is a local implementation candidate with correctness evidence. The retained
+12.798333 -> 91.323792 ms regression remains rejected. No new A/B or historical
+replay ran for this implementation, no default values changed, and no PR push
+is admitted. Native qualification is not same-image performance acceptance or
+historical watchdog attribution.
+
+The scope is ordinary shared bulk supply and offer progress. It does not assert
+lock freedom for Tokio internals, the short queue, admission/close fences, user
+handlers or OS scheduling. Those boundaries must not be silently covered by this
+claim. Performance and historical root-cause gates remain separate; any later
+comparison must keep original arrivals, VM count, native image identity, quotas
+and complete negative results.
+
+* Ordered next implementation work
+
+1. Audit current recovery destinations and credit acquisition order against the
+   wait graphs. Pinpoint actual joins, locks and native entry boundaries. Do not
+   infer an observed deadlock from the abstract cycle controls.
+2. Consolidate resident service progress around bounded Gerbil/owner events:
+   pending native recovery, admissible prepared input and Gerbil runnable work.
+   Reuse existing producer, offer and capacity machinery; no additional scheduler.
+3. Connect output reservations and independent retirement to each actual API,
+   including dropped receivers, exceptions, cancellation, timeout and close.
+   Retain owner-bound handle semantics and continuation safety.
+4. Add optional window-level Rayon preparation only where measured pure Rust
+   work justifies its additional boundary. Avoid whole-input preparation and
+   all-owner registration barriers. Keep cheap preparation on the direct path.
+5. Investigate the unresolved watchdog using the concrete dependency map, then
+   validate the changed protocol with focused native controls. Only after the
+   architecture is implemented and correctness closes should one targeted,
+   same-VM, same-load performance comparison decide acceptance and PR publication.
+
+No runtime promotion, default change, additional performance matrix, or push is
+part of this architecture review. Historical failures remain valid evidence.

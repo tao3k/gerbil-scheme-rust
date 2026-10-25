@@ -47,11 +47,12 @@ impl Port {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut expired = Vec::new();
-        while queue
-            .requests
-            .front()
-            .is_some_and(|q| q.deadline <= Instant::now() || q.assigned.is_closed())
-        {
+        while queue.requests.front().is_some_and(|q| {
+            q.deadline <= Instant::now()
+                || q.assigned
+                    .as_ref()
+                    .is_some_and(tokio::sync::oneshot::Sender::is_closed)
+        }) {
             expired.push(queue.requests.pop_front().unwrap());
         }
         let queued = queue.requests.pop_front();
@@ -81,6 +82,8 @@ fn claimed(mut queued: Queued, permit: CapacityPermit, owner: usize) -> Request 
     }
     // Send/wake outside all locks. A concurrently cancelled receiver cannot
     // retract this committed request: the owner still drains it normally.
-    let _ = queued.assigned.send(Ok(owner));
+    if let Some(assigned) = queued.assigned {
+        let _ = assigned.send(Ok(owner));
+    }
     queued.request
 }

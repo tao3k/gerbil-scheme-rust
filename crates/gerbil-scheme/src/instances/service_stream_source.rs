@@ -9,12 +9,64 @@ use std::{
 };
 pub(super) struct Shared {
     pub ready: AtomicBool,
+    // Monotonic terminal input state. Mutation is serialized by requests.
+    sealed: AtomicBool,
+    failure: OnceLock<InstanceError>,
     pub fair: OnceLock<super::Fair>,
     pub(super) requests: Mutex<VecDeque<Request>>,
     pub(super) offers: Mutex<VecDeque<Arc<super::Offer>>>,
     pub signals: Mutex<Vec<Weak<super::service_stream_runner::Signal>>>,
 }
 impl Shared {
+    pub(super) fn opening() -> Arc<Self> {
+        let source = Self::new(VecDeque::new());
+        source.sealed.store(false, Ordering::Release);
+        source.ready.store(true, Ordering::Release);
+        source
+    }
+    pub(super) fn publish(
+        &self,
+        mut batch: VecDeque<Request>,
+        cancelled: &AtomicBool,
+        deadline: std::time::Instant,
+    ) -> Result<(), InstanceError> {
+        let notify = {
+            let mut requests = self
+                .requests
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(error) = self.failure.get() {
+                return Err(error.clone());
+            }
+            if self.sealed.load(Ordering::Acquire) {
+                return Err(InstanceError::Closed);
+            }
+            if cancelled.load(Ordering::Acquire) {
+                return Err(InstanceError::Cancelled);
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(InstanceError::Timeout);
+            }
+            let notify = requests.is_empty();
+            requests.append(&mut batch);
+            notify
+        };
+        // Publication precedes notification. Empty/open is never end-of-input.
+        if notify {
+            self.wake();
+        }
+        Ok(())
+    }
+    pub(super) fn seal(&self) {
+        {
+            let _requests = self
+                .requests
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            self.sealed.store(true, Ordering::Release);
+        }
+        self.wake();
+    }
     pub(super) fn head_units(&self) -> Option<usize> {
         let requests = self
             .requests
@@ -50,6 +102,8 @@ impl Shared {
     pub(super) fn new(requests: VecDeque<Request>) -> Arc<Self> {
         Arc::new(Self {
             ready: AtomicBool::new(false),
+            sealed: AtomicBool::new(true),
+            failure: OnceLock::new(),
             fair: OnceLock::new(),
             requests: Mutex::new(requests),
             offers: Mutex::new(VecDeque::new()),
@@ -70,6 +124,9 @@ impl Source {
                     .requests
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
+                if !s.sealed.load(Ordering::Acquire) {
+                    return false;
+                }
                 if s.fair.get().is_none() {
                     return requests.is_empty();
                 }
@@ -181,7 +238,18 @@ impl Source {
     }
     pub(super) fn reject(&mut self, error: &InstanceError) {
         // Fail application jobs outside the shared source lock.
-        let requests = self.with(std::mem::take);
+        let (requests, was_open) = match self {
+            Self::Owner(q) => (std::mem::take(q), false),
+            Self::Pool(source) => {
+                let mut requests = source
+                    .requests
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let _ = source.failure.set(error.clone());
+                let was_open = !source.sealed.swap(true, Ordering::AcqRel);
+                (std::mem::take(&mut *requests), was_open)
+            }
+        };
         let offers = if let Self::Pool(s) = self {
             std::mem::take(
                 &mut *s
@@ -192,7 +260,7 @@ impl Source {
         } else {
             VecDeque::new()
         };
-        if !requests.is_empty() || !offers.is_empty() {
+        if was_open || !requests.is_empty() || !offers.is_empty() {
             self.wake();
         }
         for request in offers.into_iter().filter_map(|o| o.withdraw()) {
@@ -205,3 +273,7 @@ impl Source {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/service_stream_source.rs"]
+mod tests;

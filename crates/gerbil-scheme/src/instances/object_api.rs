@@ -10,6 +10,7 @@ pub(super) struct ObjectApi {
     pub length: unsafe extern "C" fn(i64, i32) -> i64,
     pub snapshot: unsafe extern "C" fn(i64, i32, u64) -> i64,
     pub table: unsafe extern "C" fn(*const i64, u64, i32) -> i64,
+    pub number_create: Option<unsafe extern "C" fn(*const i64, u64, i32) -> i64>,
     pub composite: unsafe extern "C" fn(i64, i64, i32, *mut u64) -> i64,
     pub identical: unsafe extern "C" fn(i64, i64, i64, i64) -> i32,
 }
@@ -49,6 +50,14 @@ impl ObjectApi {
                     *mut c_void,
                     unsafe extern "C" fn(*const i64, u64, i32) -> i64,
                 >(symbol(handle, c"gerbil_scheme_rust_table_create").ok()?),
+                number_create: symbol(handle, c"gerbil_scheme_rust_composite_create")
+                    .ok()
+                    .map(|address| {
+                        std::mem::transmute::<
+                            *mut c_void,
+                            unsafe extern "C" fn(*const i64, u64, i32) -> i64,
+                        >(address)
+                    }),
                 composite: std::mem::transmute::<
                     *mut c_void,
                     unsafe extern "C" fn(i64, i64, i32, *mut u64) -> i64,

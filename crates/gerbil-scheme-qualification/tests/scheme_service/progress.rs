@@ -89,6 +89,8 @@ pub(super) async fn capabilities(
     dispatch: &InstanceDispatcher,
     progress: &std::sync::mpsc::Sender<&'static str>,
 ) {
+    super::client_progress::contract(dispatch, progress).await;
+    super::publication::contract(dispatch, progress).await;
     enable(dispatch).await;
     partial(dispatch).await;
     super::capabilities(dispatch, progress).await;

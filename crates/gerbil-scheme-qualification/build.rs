@@ -41,6 +41,9 @@ fn main() {
     println!("cargo:rerun-if-changed=scheme/instance-green.ss");
     println!("cargo:rerun-if-changed=scheme/instance-orders.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-service-lease.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-service-activation.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-service-turn.ss");
     println!("cargo:rerun-if-changed=scheme/instance-actor-control.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-controls.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-inline-control.ss");

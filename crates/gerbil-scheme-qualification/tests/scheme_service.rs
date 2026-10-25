@@ -1,10 +1,14 @@
 //! Native Scheme-owned waiting, continuation affinity and close/error drain.
 #[path = "scheme_service/budget.rs"]
 mod budget;
+#[path = "scheme_service/client_progress.rs"]
+mod client_progress;
 #[path = "../benches/support/orders.rs"]
 mod corpus;
 #[path = "scheme_service/deferred.rs"]
 mod deferred;
+#[path = "scheme_service/joint.rs"]
+mod joint;
 #[path = "scheme_service/native_cycle.rs"]
 mod native_cycle;
 #[path = "scheme_service/native_entry.rs"]
@@ -21,12 +25,16 @@ mod pool_stream;
 mod prepared;
 #[path = "scheme_service/priority.rs"]
 mod priority;
+#[path = "scheme_service/publication.rs"]
+mod publication;
 #[path = "scheme_service/reselection.rs"]
 mod reselection;
 #[path = "scheme_service/reselection_contract.rs"]
 mod reselection_contract;
 #[path = "scheme_service/routing.rs"]
 mod routing;
+#[path = "scheme_service/runtime_types.rs"]
+mod runtime_types;
 #[path = "scheme_service/progress.rs"]
 mod service_progress;
 #[path = "scheme_service/settings.rs"]
@@ -37,6 +45,10 @@ mod short;
 mod stream;
 #[path = "scheme_service/watchdog.rs"]
 mod watchdog;
+#[path = "scheme_service/work.rs"]
+mod work;
+#[path = "scheme_service/work_plan.rs"]
+mod work_plan;
 use gerbil_scheme::instances::{
     InstanceConfig, InstanceDispatcher, InstanceError, InstancePool, IsolatedProgram, NativeRoot,
     NativeSession, NumericServiceBatch, SchemeServiceLane, SchemeServiceRequest,
@@ -100,6 +112,14 @@ fn configure_refill(
     policy: gerbil_scheme::instances::SchemeServiceCompletion,
 ) {
     if policy == gerbil_scheme::instances::SchemeServiceCompletion::PipelineCycle {
+        work::enable(dispatch, owner);
+        assert!(
+            dispatch
+                .configure_scheme_service_joint_progress_on(owner, true)
+                .unwrap()
+                .wait(GATE)
+                .unwrap()
+        );
         assert!(
             dispatch
                 .configure_scheme_service_refill_on(owner, true)
@@ -126,26 +146,31 @@ fn config() -> InstanceConfig {
         startup_timeout: GATE,
     }
 }
+fn observe_command(session: &NativeSession<'_>, operation: i64) -> Result<Vec<i64>, InstanceError> {
+    // A prepared-cycle callback can execute while a linear result batch owns
+    // another root. This callback must preserve, not release, that custody.
+    let before = session.usage()?[3].to_bits();
+    let header = session.numeric_vector(&[operation])?;
+    let output = session.call_export(c"gerbil_owner_service_observe", &header)?;
+    let result = session.copy_numeric::<i64>(&output)?;
+    drop(output);
+    drop(header);
+    session.collect()?;
+    assert_eq!(
+        session.usage()?[3].to_bits(),
+        before,
+        "observer callback must preserve pre-existing owner roots"
+    );
+    Ok(result)
+}
 fn command(dispatch: &InstanceDispatcher, owner: usize, operation: i64) -> Vec<i64> {
     dispatch
-        .submit_native_on(owner, move |session| {
-            let header = session.numeric_vector(&[operation])?;
-            let output = session.call_export(c"gerbil_owner_service_observe", &header)?;
-            let result = session.copy_numeric::<i64>(&output)?;
-            drop(output);
-            drop(header);
-            session.collect()?;
-            assert_eq!(
-                session.usage()?[3].to_bits(),
-                f64::from(session.scheme_service_native_entry_enabled()).to_bits(),
-                "only the declared native-entry capability may be externally rooted"
-            );
-            Ok(result)
-        })
+        .submit_native_on(owner, move |session| observe_command(session, operation))
         .unwrap()
         .wait(GATE)
         .unwrap()
 }
+
 async fn vector(
     dispatch: &InstanceDispatcher,
     owner: usize,
@@ -537,3 +562,6 @@ fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Send
     pipeline::contract(runtime, progress);
     native_entry::contract(runtime, progress);
 }
+
+#[path = "scheme_service/owner_claim.rs"]
+mod owner_claim;

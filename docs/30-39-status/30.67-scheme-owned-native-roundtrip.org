@@ -324,3 +324,8 @@ maintained reproduction command above.
 Frozen executable SHA256: =5bcc7a61ce4cec6640fd5fdce1f5b2389fbd54134cb7ba4243f59141e1d5e309=.
 Native image SHA256: =9c42e12fba22be08d8ef4ac745aef77acac251e36da67abd537f025b1bbc9ac2=.
 Source archive SHA256: =e38c0ea2127c445003e7b17f2f6781332ab9ad3511ad70820fc98f487aefc0bc=.
+
+* Runtime and type follow-up
+
+See [[file:30.68-scheme-runtime-native-payload.org][Scheme Runtime boundaries and native payload admission]] for the reused runtime
+model, native type extensions, same-VM payload A/B and retained latency negatives.

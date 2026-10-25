@@ -62,6 +62,7 @@ impl Fixture {
             selective: AtomicBool::new(true),
             progress: AtomicBool::new(false),
             pending_limit: 4,
+            maximum_active_per_owner: 1,
             pending: Arc::new(Semaphore::new(4)),
             length: AtomicUsize::new(0),
             next: AtomicUsize::new(0),
@@ -99,7 +100,7 @@ impl Fixture {
             .publish(Queued {
                 id,
                 deadline: Instant::now() + Duration::from_secs(1),
-                assigned,
+                assigned: Some(assigned),
                 _pending: Arc::clone(&self.source.pending)
                     .try_acquire_owned()
                     .unwrap(),
@@ -259,4 +260,26 @@ fn progress_ranking_promotes_an_eligible_oldest_waiter() {
             f.port(expected).arm_wait();
         }
     }
+}
+
+#[test]
+fn expired_guard_cannot_publish_a_new_peers_capacity_event() {
+    let fixture = Fixture::new();
+    let _placement = fixture.offer(0);
+    let running = fixture.port(0).claim().unwrap();
+    let active = Arc::clone(&fixture.source.destinations[1].active)
+        .try_acquire_owned()
+        .unwrap();
+    fixture.port(1).arm_wait();
+    let _next = fixture.offer(1);
+    assert!(!fixture.readable(1));
+    // Native credit return and shared event publication are separate boundaries.
+    drop(active);
+    fixture.source.cancel(0); // this client no longer owns any queued input
+    assert!(!fixture.readable(1));
+    assert_eq!(fixture.source.length.load(Ordering::Acquire), 1);
+    fixture.source.capacity_available(); // the actual eligibility event
+    assert!(fixture.readable(1));
+    assert!(fixture.port(1).claim().is_some());
+    drop(running);
 }

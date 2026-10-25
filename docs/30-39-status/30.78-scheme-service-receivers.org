@@ -1,0 +1,159 @@
+#+TITLE: Scheme service receiver ownership and execution opportunities
+#+OPTIONS: toc:2
+
+* Status
+
+Unpublished opt-in ABI22 candidate; defaults unchanged. The rejected ABI21
+hard completion fence and its bootstrap-compiler confound remain recorded in
+[[file:30.77-scheme-completion-grants.org]]. Neither source inspection nor that
+capture proves a unique cause for the preceding mixed-load regressions.
+
+* One service protocol, separate authorities
+
+A ready graph is a retained completion obligation. It does not prove that a
+Scheme host receiver currently exists. Reserving all future grants until a
+later Rust entry can turn completion priority into execution head-of-line
+blocking. ABI22 separates persistent ready custody from a temporary service
+receiver's execution opportunity.
+
+The actual =service-ready-ids!= path enters a Scheme-owned receiver dynamic
+extent before its dispatch checkpoint and ready harvest. While this receiver
+is active, pending short readiness prevents new worker grants. Harvest of the
+last ready short graph acknowledges the ready generation and restores grants.
+
+Normal return, exception and continuation exit revoke only the active receiver
+and refresh class permissions. An unharvested generation remains pending, but
+does not block execution in the absence of a receiver. Receiver entry likewise
+invalidates permissions. No handler polls receiver state per record; changes
+are attached to existing Scheme service/queue/grant transitions.
+
+A previously issued worker grant remains valid. Already selected plans retain
+their cooperative span bounds on multishot reentry. An execution grant is not
+a native result claim, root, admission slot or work reservation. Harvested
+native slots and each result's projection/retirement keep their existing token,
+root and capacity protocol. A receiver does not hold a grant across arbitrary
+Rust projectors or wait for a future Rust call. Stop/close revokes receiver
+state before waiting for accepted workers to finish.
+
+Rust continues to distribute work across fixed VM owners and prepares bounded
+inputs without Scheme roots. Scheme owns Actor/green-thread execution, waits,
+continuations and result readiness. This changes neither compilation into
+native Gerbil/Gambit code nor the completeness of Scheme execution. It adds
+no SMP dependency, outer Actor lease, quantum adjustment or default selection.
+
+* Actual interface and executable controls
+
+=InstanceDispatcher::configure_scheme_service_receiver_plan_on= takes the
+existing typed =SchemeWorkExecutionPolicy= and validates idle native ABI22
+op34/mode7. The benchmark flag =--receiver-plan-ab= compares this policy with
+ABI20 specialized plans within the same live VMs, native image and workload.
+Policy mode receipts and independent work, result and cleanup checks precede
+any performance conclusion.
+
+The existing Runtime model gains receiver presence, entry and departure while
+reusing its execution, dispatch, ready, harvest, root and permit states. Directed
+controls check grants before/during/after receiver presence, departure without
+acknowledgement, harvest before root release, close revocation, and a mutation
+that incorrectly consumes custody on departure. Existing continuation, class,
+cache and cancellation controls remain in the same model.
+The model retains its abstract compute-to-ready transition; it does not prove
+instruction-level equivalence of handler return, lease release and ready
+publication. In particular, native code can issue the next grant before the
+previous result is published. The receiver fence preserves that grant, so
+this implementation boundary must not be reported as immediate preemption.
+
+Native controls include typed order/short success, Scheme exception, abandoned
+caller tickets and capacity refund through the actual API. A deterministic
+Scheme control verifies that no receiver permits execution, an active receiver
+retains its opportunity, and an injected receiver exception unblocks a queued
+worker without consuming the ready generation. A subsequent real harvest
+acknowledges it. Ordinary execution yields do not acknowledge it.
+
+* Admission and limitations
+
+Reuse the fixed O2 four-live-VM Tokio2 window4/work32/batch8 comparison,
+Actor quantum1, class/feed budgets1, work quantum4/maximum48, five AB/BA
+blocks per CPU/mixed workload, ObservationOff. Do not expand the matrix or
+rerun a rejected source merely to seek a favorable number. Preserve pooled
+and paired statistics separately and retain every negative result privately.
+
+The compiler preflight now also detects =gsc-boot= and related bootstrap
+variants; the previous omission is retained as evidence, not silently removed.
+Empty boundaries do not prove absence of every possible host interference.
+
+No wall-clock preemption bound follows from logical work. OS descheduling,
+GC and arbitrary native waits still matter. Historical watchdog attribution
+remains open; the five-second meaningful-progress watchdog and 120-second
+controller remain unchanged, with failure-only panic stacks. No performance
+promotion or commit is authorized until admission passes; a successful increment
+also needs a complete unpublished-protocol comparison against the published
+control.
+
+* Captured outcome: rejected
+
+Forty same-live-VM samples completed in 6.763 seconds, exit0, unchanged host
+and image, empty bootstrap-aware compiler boundaries, exact logical work,
+result/plan/grant conservation, joined4, roots0 and temporary files removed.
+Boundary checks do not prove absence of every possible mid-window disturbance.
+No new watchdog failure occurred; the historical failure remains unattributed.
+
+| Paired-window median change | CPU | Mixed |
+|-----------------------------+-----+-------|
+| Throughput | +1.42% (6/10 improved) | -4.46% (1/10 improved) |
+| Actual short p99 | -12.94% (7/10 improved) | -3.08% (6/10 improved) |
+| Bulk p99 | -4.54% (6/10 improved) | +17.23% (0/10 improved) |
+| Owner finish spread | +39.40% (3/10 improved) | -6.48% (8/10 improved) |
+
+Pooled mixed short p99 worsened 26.05%, aggregate mixed throughput fell 4.00%,
+and maximum owner finish spread worsened 16.37%. Keep the pooled and paired
+estimators distinct. The candidate is rejected: no defaults, staging, commit
+or push. Its incremental gain does not warrant a full-stack promotion run.
+
+* Same-request timing and the next protocol gap
+
+The existing =probe_admission_ns= sampled when the Tokio caller resumed from
+the placement future, not when the owner claimed its payload. Placement
+notification may be observed after native execution or even completion.
+In the mixed candidate this happened after completion for 57/640 requests.
+It cannot be treated as an additive owner admission-queue duration.
+
+Using the SAME request's timestamps, exact pre-entry time is actual duration
+minus native service duration; the four components pre-entry, construction,
+constructed-to-projection pending, and projection sum to actual time. No
+unrelated p99 values are subtracted. Among the candidate's seven pooled-tail
+short requests, four are pending-dominant, two pre-entry-dominant and one
+construction-dominant. Their pre-entry fraction has median 6.24%. Pending
+includes execution, Scheme scheduling, GC/OS waits and collection; this does
+not isolate Scheme CPU, GC CPU or OS delay.
+
+There is a separate source/model boundary: =service-start!= acknowledges
+dispatch before the handler reaches =budget-acquire!=. Native =budget-grant!=
+arbitrates only registered waiters. The model's =classRunnable= includes an
+assigned runnable worker, and =allowedCpu= can prioritize it immediately.
+The model therefore does not establish the delay bound from Scheme runnable
+to actual grant registration. Existing class-bypass counters cover registered
+waiters only. End-to-end fairness must not be inferred from them.
+
+Before another scheduling candidate, refine runnable, registered waiter and
+actual grant as separate progress states, preserve dispatch versus execution
+acknowledgements, and connect that boundary to the existing Scheme scheduler.
+Keep full Scheme execution and the service-to-budget lock order; an execution
+acknowledgement must not acquire a service lock while holding the budget lock.
+No timing attribution in this capture justifies changing quantum thresholds.
+
+* Benchmark timing contract repair after rejection
+
+New =scheme_service= output uses timing contract
+=placement-observed-and-additive-entry-v2=. The old client-observed placement
+fields are renamed =probe_placement_observed_ns= and
+=probe_placement_observed_p99_ns=. The clipped post-observation gap is replaced
+by exact =probe_before_entry_ns= and =probe_before_entry_p99_ns=, measured from
+client start to native entry using existing timestamps. Each request asserts
+that pre-entry + construction + pending + projection equals actual elapsed.
+The assertion and serialization run outside the timed native workload.
+
+No new native profiler or diagnostic sample is introduced. Archived captures
+keep their original field names and bytes. This metric-only correction does
+not turn the rejected runtime into a performance pass and is not followed by
+another favorable-number search. Native source/model acceptance remains
+separate from the pending runnable-to-grant protocol refinement.

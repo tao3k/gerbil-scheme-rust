@@ -120,6 +120,9 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
             .unwrap()
             .wait(GATE)
             .unwrap();
+        // A control reply confirms its native result, not retirement of its
+        // outer admission guard. Progress configuration requires idle credits.
+        runtime.block_on(idle(&dispatch));
         dispatch
             .enable_scheme_service_progress_on(0)
             .unwrap()

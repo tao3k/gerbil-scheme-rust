@@ -112,6 +112,9 @@ impl<M: SchemeServiceRequest> SchemeServiceRequest for RoutedRequest<M> {
     fn entry_trace(&self) -> Option<Arc<crate::instances::SchemeServiceEntryTrace>> {
         self.message.entry_trace()
     }
+    fn completion_trace(&self) -> Option<Arc<crate::instances::SchemeCompletionTrace>> {
+        self.message.completion_trace()
+    }
     fn work_units(&self) -> usize {
         self.units
     }

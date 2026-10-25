@@ -4,6 +4,16 @@
 mod async_dispatch;
 #[cfg(feature = "tokio-dispatch")]
 pub use async_dispatch::AsyncInstanceTicket;
+#[cfg(feature = "arrival-clock")]
+mod arrival_clock;
+#[cfg(feature = "tokio-dispatch")]
+mod client_progress;
+#[cfg(feature = "arrival-clock")]
+pub use arrival_clock::{InstanceArrivalClock, InstanceArrivalWake};
+#[cfg(feature = "tokio-dispatch")]
+pub use client_progress::{
+    InstanceArrival, InstanceClientProgress, InstanceIssue, InstanceObservedResult,
+};
 #[cfg(feature = "tokio-dispatch")]
 mod capacity;
 #[cfg(feature = "tokio-dispatch")]
@@ -30,6 +40,7 @@ pub use mapping::{ImageCodeLease, ImageMappingReceipt, ImageMappingState};
 mod native;
 mod native_api;
 mod native_dispatch;
+mod numbers;
 mod object_api;
 mod objects;
 pub use native::{NativeRoot, NativeSession};
@@ -97,9 +108,29 @@ pub use service_metrics::{SchemePhaseObservation, SchemeServiceObservation, Sche
 #[cfg(feature = "tokio-dispatch")]
 mod service_feed;
 #[cfg(feature = "tokio-dispatch")]
+mod service_work;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_work::SchemeExecutedWork;
+#[cfg(feature = "tokio-dispatch")]
+mod service_actor_turn;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_actor_turn::SchemeActorTurnObservation;
+#[cfg(feature = "tokio-dispatch")]
+mod service_work_plan;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_work_plan::{
+    SchemeLeasePlanObservation, SchemeNativeProgress, SchemeRuntimeProgress,
+    SchemeServiceCyclePolicy, SchemeServiceCycleProgress, SchemeWorkExecutionPolicy,
+    SchemeWorkPlanObservation,
+};
+#[cfg(feature = "tokio-dispatch")]
+mod service_joint;
+#[cfg(feature = "tokio-dispatch")]
 mod service_progress;
 #[cfg(feature = "tokio-dispatch")]
 mod service_refill;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_joint::{SchemeExecutionProgress, SchemeJointProgress};
 #[cfg(feature = "tokio-dispatch")]
 pub use service_progress::SchemeServiceProgress;
 
@@ -133,7 +164,15 @@ mod service_notify;
 pub use service_notify::SchemeServiceNotification;
 
 #[cfg(feature = "tokio-dispatch")]
+mod client_driver;
+#[cfg(feature = "tokio-dispatch")]
+mod service_ready;
+#[cfg(feature = "tokio-dispatch")]
+pub use client_driver::InstanceClientProgressDriver;
+#[cfg(feature = "tokio-dispatch")]
 mod service_stream;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_ready::{SchemeServiceReadyResult, SchemeServiceReadyStream};
 #[cfg(feature = "tokio-dispatch")]
 mod service_stream_acquire;
 #[cfg(feature = "tokio-dispatch")]
@@ -143,6 +182,10 @@ mod service_stream_runner;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_stream::{SchemeServiceStream, SchemeServiceStreamConfig};
 
+#[cfg(feature = "tokio-dispatch")]
+mod producer_registration;
+#[cfg(feature = "tokio-dispatch")]
+mod service_pool_pipeline;
 #[cfg(feature = "tokio-dispatch")]
 mod service_pool_stream;
 #[cfg(feature = "tokio-dispatch")]
@@ -178,4 +221,22 @@ pub use service_settings::SchemeServiceSettings;
 #[cfg(feature = "tokio-dispatch")]
 mod short_pool;
 #[cfg(feature = "tokio-dispatch")]
-pub use short_pool::{SchemeShortPool, SchemeShortPoolConfig, SchemeShortWake};
+pub use short_pool::{
+    InstanceClaimProgress, InstanceProgressResult, ProgressSchemeTicket, QueuedSchemeTicket,
+    SchemeShortPool, SchemeShortPoolConfig, SchemeShortWake,
+};
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_publication;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_publication::{
+    SchemeCompletionObservation, SchemeCompletionPublication, SchemeCompletionTrace,
+};
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_ingress;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_ingress::{
+    SchemeIngressAdmission, SchemeIngressClaim, SchemeIngressConfig, SchemeIngressId,
+    SchemeIngressRejected, SchemeIngressSnapshot, SchemeServiceIngress,
+};

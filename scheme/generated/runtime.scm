@@ -1,6 +1,6 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1792760087)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1792766643)
   (begin
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))
@@ -37,9 +37,9 @@
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
       (lambda (_%exception760%_)
-        (let ((__tmp6316
+        (let ((__tmp7917
                (lambda (_%_762%_) '"Scheme exception (formatting failed)"))
-              (__tmp6315
+              (__tmp7916
                (lambda ()
                  (let ((_%message767%_
                         (call-with-output-string
@@ -57,17 +57,17 @@
                            (declare (not safe))
                            (##string-length _%message767%_))))))))
           (declare (not safe))
-          (__with-catch __tmp6316 __tmp6315))))
+          (__with-catch __tmp7917 __tmp7916))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call
       (lambda (_%root752%_ _%procedure753%_)
         (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
-        (let ((__tmp6318
+        (let ((__tmp7919
                (lambda (_%exception755%_)
                  (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
                         _%exception755%_))
                  '0))
-              (__tmp6317
+              (__tmp7918
                (lambda ()
                  (let ((_%value758%_
                         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
@@ -78,7 +78,7 @@
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
                         (_%procedure753%_ _%value758%_)))))))
           (declare (not safe))
-          (__with-catch __tmp6318 __tmp6317))))
+          (__with-catch __tmp7919 __tmp7918))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
       (lambda (_%value748%_)
         (let ((_%root-id750%_
@@ -1158,7 +1158,7 @@
       (lambda (_%value653%_ _%kind654%_)
         (let ((_%$e656%_ _%kind654%_))
           (if (or (eq? '0 _%$e656%_) (eq? '1 _%$e656%_))
-              (let ((_g6319_ (if (= _%kind654%_ '0)
+              (let ((_g7920_ (if (= _%kind654%_ '0)
                                  (values gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-rational?
                                          numerator
                                          denominator)
@@ -1168,15 +1168,15 @@
                   (let ((_%valid?662%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g6319_ 0)))
+                           (##values-ref _g7920_ 0)))
                         (_%left663%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g6319_ 1)))
+                           (##values-ref _g7920_ 1)))
                         (_%right664%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g6319_ 2))))
+                           (##values-ref _g7920_ 2))))
                     (let* ((_%items666%_
                             (if (vector? _%value653%_)
                                 _%value653%_

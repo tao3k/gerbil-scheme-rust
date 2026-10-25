@@ -25,7 +25,6 @@ const DARWIN_F_SETNOSIGPIPE: libc::c_int = 73;
 #[derive(Debug)]
 pub(super) struct Wake {
     writer: Mutex<File>,
-    #[cfg(feature = "tokio-dispatch")]
     pub write_fd: i32,
     #[cfg(feature = "tokio-dispatch")]
     pub lanes: AtomicUsize,
@@ -39,6 +38,8 @@ pub(super) struct Wake {
     pub pipeline_cycle: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
     pub coupled_refill: AtomicBool,
+    #[cfg(feature = "tokio-dispatch")]
+    pub retire_before_publish: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
     pub feed_limit: AtomicUsize,
     #[cfg(feature = "tokio-dispatch")]
@@ -57,6 +58,9 @@ pub(super) struct Wake {
     pub short_pool: std::sync::OnceLock<super::short_pool::Port>,
     #[cfg(feature = "tokio-dispatch")]
     pub offers: super::OfferPort,
+    // Durable producer duty survives a coalesced or already consumed pipe byte.
+    #[cfg(feature = "tokio-dispatch")]
+    producer_pending: AtomicBool,
     pending: AtomicBool,
     pub closed: AtomicBool,
     pub failed: AtomicBool,
@@ -96,7 +100,6 @@ impl Wake {
             Reader(reader),
             Arc::new(Self {
                 writer: Mutex::new(writer),
-                #[cfg(feature = "tokio-dispatch")]
                 write_fd: fd,
                 #[cfg(feature = "tokio-dispatch")]
                 lanes: AtomicUsize::new(0),
@@ -113,6 +116,8 @@ impl Wake {
                 #[cfg(feature = "tokio-dispatch")]
                 coupled_refill: AtomicBool::new(false),
                 #[cfg(feature = "tokio-dispatch")]
+                retire_before_publish: AtomicBool::new(false),
+                #[cfg(feature = "tokio-dispatch")]
                 progress: super::service_progress::Progress::default(),
                 #[cfg(feature = "tokio-dispatch")]
                 direct: AtomicBool::new(false),
@@ -126,6 +131,8 @@ impl Wake {
                 short_pool: std::sync::OnceLock::new(),
                 #[cfg(feature = "tokio-dispatch")]
                 offers: super::OfferPort::default(),
+                #[cfg(feature = "tokio-dispatch")]
+                producer_pending: AtomicBool::new(false),
                 pending: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
                 failed: AtomicBool::new(false),
@@ -163,7 +170,6 @@ impl Wake {
             self.notify()
         }
     }
-    #[cfg(feature = "tokio-dispatch")]
     fn notify_independent(&self) -> SchemeWakeDelivery {
         loop {
             // SAFETY: this Wake owns the descriptor until all notifier Arcs drop.
@@ -183,8 +189,19 @@ impl Wake {
         }
     }
     #[cfg(feature = "tokio-dispatch")]
-    pub fn arm(&self) {
+    pub fn notify_producer(&self) {
+        // Publish progress before claiming/coalescing the transport notification.
+        // No mailbox entry or native execution authority is transferred.
+        self.producer_pending.store(true, Ordering::Release);
+        self.notify();
+    }
+    #[cfg(feature = "tokio-dispatch")]
+    pub fn arm(&self) -> bool {
+        // Reopen pipe publication BEFORE claiming durable producer duty. An
+        // earlier publication requires another owner turn; a later publisher
+        // leaves a fresh byte (or a byte already owed by another publisher).
         self.pending.store(false, Ordering::Release);
+        self.producer_pending.swap(false, Ordering::AcqRel)
     }
     #[cfg(feature = "tokio-dispatch")]
     fn signal_capacity_change(&self) {
@@ -290,3 +307,13 @@ pub(super) fn notify_enqueued(wake: Option<Arc<Wake>>, enqueued: bool) {
 #[cfg(all(test, feature = "tokio-dispatch"))]
 #[path = "service_wake_tests.rs"]
 mod tests;
+
+#[cfg(feature = "tokio-dispatch")]
+impl std::task::Wake for Wake {
+    fn wake(self: Arc<Self>) {
+        self.notify_producer();
+    }
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.notify_producer();
+    }
+}

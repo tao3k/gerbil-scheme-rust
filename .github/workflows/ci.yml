@@ -41,6 +41,8 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Cargo gates
+        env:
+          GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM: "1"
         run: |
           cargo check --workspace --locked
           cargo test --workspace --locked -- --nocapture
@@ -138,53 +140,54 @@ jobs:
       - name: Native Rust owner cost bench smoke
         run: cargo bench -p gerbil-scheme-qualification --features instance-library --bench owner_costs --profile dev --locked -- --test
       - name: Native Scheme capabilities and reuse
-        run: cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --profile dev --locked -- --smoke
+        run: cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --profile dev --locked -- --smoke
       - name: Native Rust dispatcher bench smoke
         run: |
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --grouped-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --profile --grouped-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_dispatch --profile dev --locked -- --test --focused-flow
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_capacity --profile dev --locked -- --test --wait-trace
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_capacity --profile dev --locked -- --test --transfer-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench owner_capacity --profile dev --locked -- --test --qos-ab --wait-trace
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --split-layout-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --short-layout-only
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --class-route-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --short-service-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --feed-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --feed-ab --phase-observation
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --budget-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --notification-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --reselection-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --owner-qos-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --resident-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --pooled-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --pooled-ab --probe-observation
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --observer-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --observer-ab --entry-observation
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --observer-ab --state-observation
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --short-route-load-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --supply-admission-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --pooled-wake-ab
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --pooled-ab --phase-observation
-          cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --notification-ab --phase-observation
-          cargo test -p gerbil-scheme --features tokio-dispatch --lib instances:: --locked
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --grouped-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --profile --grouped-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --focused-flow
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_capacity --profile dev --locked -- --test --wait-trace
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_capacity --profile dev --locked -- --test --transfer-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_capacity --profile dev --locked -- --test --qos-ab --wait-trace
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --split-layout-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --short-layout-only
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --class-route-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --short-service-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --feed-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --feed-ab --phase-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --budget-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --notification-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --reselection-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --owner-qos-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --resident-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-ab --probe-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --observer-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --observer-ab --entry-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --observer-ab --state-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --short-route-load-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --supply-admission-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-wake-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-ab --phase-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --notification-ab --phase-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --progress-fair-ab --fixed-short-selective --completion-service-ab
+          cargo test -p gerbil-scheme --features arrival-clock --lib instances:: --locked
           cargo test -p gerbil-scheme --features tokio-dispatch --test unit_test instance_timer --locked -- --test-threads=12
-          cargo test -p gerbil-scheme-qualification --features instance-dispatch --test owner_capacity --test owner_dispatch_faults --test owner_producer --test scheme_service --test service_watchdog --locked
+          cargo test -p gerbil-scheme-qualification --features arrival-clock --test owner_capacity --test owner_dispatch_faults --test owner_producer --test scheme_service --test service_watchdog --locked
       - name: Native owner Rust lint
         run: |
-          cargo clippy -p gerbil-scheme --features external-program,isolated-instances,tokio-dispatch --lib --test unit_test --locked -- -D warnings
-          cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
+          cargo clippy -p gerbil-scheme --features external-program,arrival-clock --lib --test unit_test --locked -- -D warnings
+          cargo clippy -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
 
       # Reuse the existing native job for the same macOS Actor gates; the
       # bindings job exhausted its deadline rebuilding this feature graph.
       - name: macOS single-processor Actor and Rust concurrency qualification
         run: |
-          cargo bench -p gerbil-scheme-qualification --features actor-aot,instance-dispatch --bench actors --profile dev --locked -- --test one_processor_control
-          cargo bench -p gerbil-scheme-qualification --features actor-aot,instance-dispatch --bench actors --profile dev --locked -- --test tokio_one_worker_control
-          cargo bench -p gerbil-scheme-qualification --features actor-aot,instance-dispatch --bench actors --profile dev --locked -- --test tokio_machine_workers
-          cargo clippy -p gerbil-scheme-qualification --features actor-aot,instance-dispatch --all-targets --locked -- -D warnings
+          cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test one_processor_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test tokio_one_worker_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test tokio_machine_workers
+          cargo clippy -p gerbil-scheme-qualification --features actor-aot,arrival-clock --all-targets --locked -- -D warnings
 
   # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
   # execution inside a VM. Restore this job only with a qualified SDK release.

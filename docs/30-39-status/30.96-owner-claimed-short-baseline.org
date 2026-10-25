@@ -128,6 +128,14 @@ missing dependencies, source positions and cache invalidation. The failed
 invocations remain outside Git. There is no new model, interpreter or Python
 runner, and no change to Scheme execution or benchmark timing.
 
+The final complete real Quint gate passes all 95 planned checks in 714.76
+test seconds, within the unchanged 900-second external limit. The initial
+canonical typecheck also passes. Merged library tests pass 51 cases; native
+service qualification passes all four selected executable cases. The four
+projection ownership controls, strict selected-target Clippy and workspace
+formatting also pass. These are local source/functional checks; new-head remote
+CI remains separate, and they do not create a new production latency claim.
+
 The protected-client experiment reached 17.327301 ms short p99 and did not
 preserve the retained working point. Its 33.741527 ms borrowed-policy control
 was a new executable and the first arm, not the frozen binary's second arm.

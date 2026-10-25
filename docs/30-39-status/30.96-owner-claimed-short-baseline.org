@@ -98,9 +98,10 @@ frozen checkpoint in those integration details and formatting. Its exact-head
 CI is a separate obligation; the frozen measurements are not relabeled as
 measurements of a newly compiled integration executable.
 
-Two full integrated model invocations exceeded the existing fifteen-minute
-budget. Distributing completion suites and twenty-two native-cycle checks
-across the same three workers was insufficient. The installed Quint 0.33 CLI
+Three full integrated model invocations exceeded the existing fifteen-minute
+budget. Fixed worker groups and module scoping alone were insufficient: the
+last attempt completed 82 checks while pending work remained bound to busy
+groups and another worker was idle. The installed Quint 0.33 CLI
 sends its complete lookup table to a new Rust evaluator for each test; the
 canonical parsed artifact is approximately 34 MiB across thirteen modules.
 
@@ -115,8 +116,14 @@ through the scoped workers; no generated model copies are committed.
 
 Only the input file passed to each main-module check changes. Command mode,
 main, initializer, step, invariant, seed, sample bound, step bound and rejecting
-controls remain intact. The three-worker ceiling and fifteen-minute budget
-remain unchanged. Four ordinary Rust controls cover exact module retention,
+controls remain intact. The complete existing check plan is now collected
+before execution into a finite shared queue. A worker claims one owned check
+only when ready, runs its original success or counterexample assertions, then
+claims another. Long scenario commands are scheduled before shorter runs.
+No result is inferred from planning: the gate asserts that every planned
+check completed, and scoped thread panics still fail the entire gate.
+
+The three-worker ceiling and fifteen-minute budget remain unchanged. Four ordinary Rust controls cover exact module retention,
 missing dependencies, source positions and cache invalidation. The failed
 invocations remain outside Git. There is no new model, interpreter or Python
 runner, and no change to Scheme execution or benchmark timing.

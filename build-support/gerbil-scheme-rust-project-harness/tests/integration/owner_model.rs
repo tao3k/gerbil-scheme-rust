@@ -1,8 +1,77 @@
 //! Finite protocol checks, separate from native execution acceptance.
 use std::{
+    cell::RefCell,
+    collections::VecDeque,
     path::PathBuf,
     process::{Command, Output},
+    sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
+
+struct Check {
+    scenario: bool,
+    work: Box<dyn FnOnce() + Send>,
+}
+thread_local! {
+    static PLANNING: RefCell<Option<Vec<Check>>> = const { RefCell::new(None) };
+}
+struct FinishPlanning;
+impl Drop for FinishPlanning {
+    fn drop(&mut self) {
+        PLANNING.with(|plan| plan.replace(None));
+    }
+}
+fn collect_success(arguments: &[&str]) -> bool {
+    PLANNING.with(|plan| {
+        let mut plan = plan.borrow_mut();
+        let Some(plan) = plan.as_mut() else {
+            return false;
+        };
+        let scenario = arguments[0] == "test";
+        let owned: Vec<_> = arguments.iter().map(|arg| (*arg).to_owned()).collect();
+        plan.push(Check {
+            scenario,
+            work: Box::new(move || {
+                let args: Vec<_> = owned.iter().map(String::as_str).collect();
+                success(&args);
+            }),
+        });
+        true
+    })
+}
+fn collect_mutation(arguments: [&str; 5]) -> bool {
+    PLANNING.with(|plan| {
+        let mut plan = plan.borrow_mut();
+        let Some(plan) = plan.as_mut() else {
+            return false;
+        };
+        let owned = arguments.map(str::to_owned);
+        plan.push(Check {
+            scenario: false,
+            work: Box::new(move || {
+                mutation_counterexample(&owned[0], &owned[1], &owned[2], &owned[3], &owned[4]);
+            }),
+        });
+        true
+    })
+}
+fn protocol_plan(source: &str) -> Vec<Check> {
+    PLANNING.with(|plan| {
+        let mut plan = plan.borrow_mut();
+        assert!(plan.is_none(), "nested model check collection");
+        *plan = Some(Vec::new());
+    });
+    let _finish = FinishPlanning;
+    lifecycle_protocol(source);
+    capacity_protocol(source);
+    architecture_protocol(source);
+    shared_protocol(source);
+    owner_completion_scenarios_and_control();
+    progress_protocol(source);
+    PLANNING.with(|plan| plan.borrow_mut().take().unwrap())
+}
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -16,13 +85,16 @@ fn run(arguments: &[&str]) -> Output {
         .output()
         .expect("installed Quint CLI");
     eprintln!(
-        "QUINT-DONE {:?} {:?}",
+        "QUINT-DONE {arguments:?} {:?} {:?}",
         output.status.code(),
         started.elapsed()
     );
     output
 }
 fn success(arguments: &[&str]) {
+    if collect_success(arguments) {
+        return;
+    }
     let output = run(arguments);
     assert!(
         output.status.success(),
@@ -37,38 +109,31 @@ fn owner_protocol_scenarios_and_controls() {
     let source = "specs/owner_lifecycle.qnt";
     success(&["typecheck", source]);
     let model = std::sync::Arc::new(super::owner_model_source::ModelSource::prepare(&root()));
-    // Independent CLI processes read the same immutable model. Keep three
-    // workers and every original command, seed, bound and negative control.
+    let mut checks = protocol_plan(source);
+    // Put long scenario commands ahead of shorter simulations. Each immutable
+    // check binds to a worker only at actual claim; no static shard can strand
+    // pending work while a peer is idle.
+    checks.sort_by_key(|check| !check.scenario);
+    let count = checks.len();
+    let queue = Mutex::new(VecDeque::from(checks));
+    let completed = AtomicUsize::new(0);
+    eprintln!("QUINT-PLAN jobs={count} workers=3");
     std::thread::scope(|scope| {
-        scope.spawn(|| {
-            super::owner_model_source::scoped(&model, || {
-                lifecycle_protocol(source);
-                capacity_protocol(source);
-                native_cycle_scenarios(source, Some(0));
-            })
-        });
-        scope.spawn(|| {
-            super::owner_model_source::scoped(&model, || {
-                shared_protocol(source);
-                progress_protocol(source);
-                completion_domain(source, "service_completion_small");
-                client_progress_scenarios(source);
-                native_cycle_scenarios(source, Some(1));
-            })
-        });
-        scope.spawn(|| {
-            super::owner_model_source::scoped(&model, || {
-                success(&["typecheck", source]);
-                completion_sharing(source);
-                completion_domain(source, "service_completion_wide");
-                for domain in ["service_completion_small", "service_completion_wide"] {
-                    prepared_cycle_control(source, domain);
-                }
-                architecture_protocol(source);
-                native_cycle_scenarios(source, Some(2));
-            })
-        });
+        for _ in 0..3 {
+            scope.spawn(|| {
+                super::owner_model_source::scoped(&model, || {
+                    loop {
+                        let check = queue.lock().unwrap().pop_front();
+                        let Some(check) = check else { break };
+                        (check.work)();
+                        completed.fetch_add(1, Ordering::Relaxed);
+                    }
+                })
+            });
+        }
     });
+    assert_eq!(completed.load(Ordering::Relaxed), count);
+    eprintln!("QUINT-PLAN-DONE jobs={count}");
 }
 fn lifecycle_protocol(source: &str) {
     for (domain, seed) in [
@@ -318,7 +383,7 @@ fn owner_completion_scenarios_and_control() {
         completion_domain(source, domain);
     }
     client_progress_scenarios(source);
-    native_cycle_scenarios(source, None);
+    native_cycle_scenarios(source);
     for domain in ["service_completion_small", "service_completion_wide"] {
         prepared_cycle_control(source, domain);
     }
@@ -482,7 +547,7 @@ fn prepared_cycle_control(source: &str, domain: &str) {
         "sharedSafety",
     );
 }
-fn native_cycle_scenarios(source: &str, partition: Option<usize>) {
+fn native_cycle_scenarios(source: &str) {
     let inits = [
         "nativeCycleStart",
         "preparedCycleStart",
@@ -495,16 +560,8 @@ fn native_cycle_scenarios(source: &str, partition: Option<usize>) {
         "cycleAccountingStart",
         "turnStart",
     ];
-    for (domain_index, domain) in ["service_completion_small", "service_completion_wide"]
-        .into_iter()
-        .enumerate()
-    {
-        for (case_index, init) in inits.into_iter().enumerate() {
-            // Three disjoint partitions retain the exact same immutable-model
-            // commands. No worker waits for both long domain suites in sequence.
-            if partition.is_some_and(|p| (domain_index * inits.len() + case_index) % 3 != p) {
-                continue;
-            }
+    for domain in ["service_completion_small", "service_completion_wide"] {
+        for init in inits {
             success(&[
                 "run",
                 source,
@@ -533,9 +590,6 @@ fn native_cycle_scenarios(source: &str, partition: Option<usize>) {
                 "--verbosity",
                 "1",
             ]);
-        }
-        if partition.is_some_and(|p| (2 * inits.len() + domain_index) % 3 != p) {
-            continue;
         }
         mutation_counterexample(
             source,
@@ -604,6 +658,9 @@ fn mutation_counterexample(
     mutation: &str,
     invariant: &str,
 ) {
+    if collect_mutation([source, domain, init, mutation, invariant]) {
+        return;
+    }
     let output = run(&[
         "run",
         source,

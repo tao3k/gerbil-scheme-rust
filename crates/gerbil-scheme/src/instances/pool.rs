@@ -5,14 +5,15 @@ use super::{
     image::Image,
     mapping::{ImageMappingState, Mapping},
 };
-use std::os::unix::fs::DirBuilderExt;
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::{
     collections::BTreeSet,
+    ffi::{CString, OsString},
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, Ordering},
         mpsc,
     },
     thread,
@@ -20,7 +21,24 @@ use std::{
 };
 
 pub(super) static LIFECYCLE: Mutex<()> = Mutex::new(());
-static GENERATION: AtomicUsize = AtomicUsize::new(0);
+fn create_owner_directory(root: &Path) -> Result<PathBuf, InstanceError> {
+    // A PID/counter can recur after process exit while a quarantined directory
+    // still exists. Atomically reserve a new private namespace; never delete or
+    // reuse files whose native owner lifetime belongs to another pool/process.
+    let template = root.join(format!("gerbil-owners-{}-XXXXXX", std::process::id()));
+    let mut path = CString::new(template.as_os_str().as_bytes())
+        .map_err(|error| InstanceError::Loader(error.to_string()))?
+        .into_bytes_with_nul();
+    // SAFETY: path is a uniquely borrowed, writable, NUL-terminated template
+    // ending in six X bytes. mkdtemp changes only that buffer and creates 0700.
+    if unsafe { libc::mkdtemp(path.as_mut_ptr().cast()) }.is_null() {
+        return Err(InstanceError::Loader(
+            std::io::Error::last_os_error().to_string(),
+        ));
+    }
+    path.pop(); // Remove only the CString terminator; preserve native path bytes.
+    Ok(OsString::from_vec(path).into())
+}
 #[derive(Debug)]
 struct OwnerThread {
     worker: thread::JoinHandle<()>,
@@ -153,15 +171,7 @@ impl InstancePool {
         if !crate::instance_backend::claim_images() {
             return Err(InstanceError::BackendConflict);
         }
-        let directory = std::env::temp_dir().join(format!(
-            "gerbil-owners-{}-{}",
-            std::process::id(),
-            GENERATION.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&directory)
-            .map_err(|e| InstanceError::Loader(e.to_string()))?;
+        let directory = create_owner_directory(&std::env::temp_dir())?;
         let (finished, done) = mpsc::channel();
         let mut pool = Self {
             dispatcher: InstanceDispatcher::new(

@@ -139,3 +139,25 @@ retained verbatim; each job keeps the existing thirty-minute budget. This
 prevents preceding benchmark/build costs from consuming the independent lint
 and Actor qualification budget. It does not claim reduced compilation cost,
 changed runtime limits or qualified production throughput.
+
+* Protocol CI coverage partition
+
+The next exact-head single-job protocol gate (40208489069) still exhausted its
+fifteen-minute budget after the evaluator installation race was removed. The
+log contains no worker panic or extraction error, but only 35 completed CLI
+invocations. The initialization fix is not a complete timing fix.
+
+The authorized CI matrix assigns the original ordered checklist by ordinal
+modulo two: shard zero selects 48 checks and shard one selects 47 checks. Each
+check belongs to exactly one shard. Each job retains three workers, the original
+fifteen-minute budget, complete canonical typechecking, all original seeds,
+sample counts, step bounds and counterexample assertions. The two jobs may use
+six checking workers in aggregate; this is an explicit resource organization
+change, not a claim that the original single-job budget has been qualified.
+Without GERBIL_OWNER_MODEL_SHARD, the local entry still executes all 95 checks.
+Invalid shard numbers fail instead of selecting an empty or partial suite.
+
+Local shard execution logs must be combined and compared with the successful
+unpartitioned checklist before accepting coverage. The repeated whole-model
+typecheck at each job entry is additional validation, not a missing scenario.
+Remote cold-build timing and complete exact-head CI remain required separately.

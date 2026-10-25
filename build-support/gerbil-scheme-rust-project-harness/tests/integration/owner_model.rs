@@ -114,7 +114,20 @@ fn owner_protocol_scenarios_and_controls() {
     // check binds to a worker only at actual claim; no static shard can strand
     // pending work while a peer is idle.
     checks.sort_by_key(|check| !check.scenario);
+    let total = checks.len();
+    let shard = std::env::var("GERBIL_OWNER_MODEL_SHARD")
+        .ok()
+        .map(|value| value.parse::<usize>().expect("integer protocol shard"));
+    if let Some(shard) = shard {
+        assert!(shard < 2, "protocol shard must be zero or one");
+        checks = checks
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, check)| (index % 2 == shard).then_some(check))
+            .collect();
+    }
     let count = checks.len();
+    eprintln!("QUINT-COVERAGE total={total} shard={shard:?} selected={count}");
     let mut checks = VecDeque::from(checks);
     // Quint lazily installs its Rust evaluator without a cross-process lock.
     // Execute one real check before concurrent invocations can observe a

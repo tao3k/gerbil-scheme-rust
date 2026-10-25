@@ -246,9 +246,15 @@ jobs:
         run: cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test machine_processors
 
   owner-protocol:
-    name: Native owner lifecycle protocol (Quint)
+    name: Owner lifecycle protocol (Quint shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    env:
+      GERBIL_OWNER_MODEL_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4

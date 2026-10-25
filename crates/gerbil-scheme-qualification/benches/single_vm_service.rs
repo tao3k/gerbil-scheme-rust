@@ -3,14 +3,16 @@
 mod corpus;
 #[path = "single_vm_service/request.rs"]
 mod request;
+#[path = "single_vm_service/watchdog.rs"]
+mod watchdog;
 use gerbil_scheme::instances::{InstanceConfig, InstanceDispatcher, InstancePool, IsolatedProgram};
 use request::{Reply, Request};
 use serde_json::json;
 use std::{
-    sync::{Arc, mpsc},
-    thread,
+    sync::Arc,
     time::{Duration, Instant},
 };
+use watchdog::{Event, Progress, Watchdog};
 const GATE: Duration = Duration::from_secs(5);
 #[derive(Clone, Copy, Debug)]
 enum Arm {
@@ -120,7 +122,7 @@ async fn service_sample(
     dispatch: InstanceDispatcher,
     inputs: Arc<Vec<Vec<Vec<i64>>>>,
     short: bool,
-    progress: mpsc::Sender<&'static str>,
+    progress: Progress,
 ) -> Sample {
     let mut sample = Sample::new();
     for input in inputs.iter() {
@@ -134,7 +136,7 @@ async fn service_sample(
             .unwrap()
             .0;
         sample.record(input, short, started, &reply);
-        progress.send("validated service completion").unwrap();
+        progress.record(Event::ServiceCompleted);
     }
     sample.finish();
     sample
@@ -143,7 +145,7 @@ fn native_sample(
     dispatch: &InstanceDispatcher,
     inputs: &[Vec<Vec<i64>>],
     short: bool,
-    progress: &mpsc::Sender<&'static str>,
+    progress: &Progress,
 ) -> Sample {
     let mut sample = Sample::new();
     for input in inputs {
@@ -155,14 +157,12 @@ fn native_sample(
             .wait(GATE)
             .unwrap();
         sample.record(input, short, started, &reply);
-        progress
-            .send("validated native service completion")
-            .unwrap();
+        progress.record(Event::NativeCompleted);
     }
     sample.finish();
     sample
 }
-fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
+fn run(progress: &Progress, smoke: bool) {
     // SAFETY: Cargo builds this qualification image and its rooted service ABI.
     let program = unsafe {
         IsolatedProgram::from_image(
@@ -185,7 +185,7 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         },
     )
     .unwrap();
-    progress.send("single VM initialized").unwrap();
+    progress.record(Event::Initialized);
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
     let caller = tokio::runtime::Builder::new_current_thread()
@@ -210,12 +210,11 @@ fn run(progress: &mpsc::Sender<&'static str>, smoke: bool) {
         "native_scope":"host_owner_queue_plus_full_Scheme_service_cycle_not_pure_Scheme_upper_bound",
         "caller_scope":"public_async_API_on_current_thread_Tokio",
         "worker_scope":"same_public_API_on_one_Tokio_worker",
-        "phase_percentiles_are_not_additive":true})
+        "phase_percentiles_are_not_additive":true,
+        "progress_observer":"atomic_verified_epoch_no_per_request_notification"})
     );
     exception_controls(&dispatch, &caller);
-    progress
-        .send("both Scheme exception paths retired")
-        .unwrap();
+    progress.record(Event::ControlsCompleted);
     profiles(&dispatch, &caller, &worker, progress, smoke, messages);
     cleanup(&mut pool, progress);
 }
@@ -223,7 +222,7 @@ fn profiles(
     dispatch: &InstanceDispatcher,
     caller: &tokio::runtime::Runtime,
     worker: &tokio::runtime::Runtime,
-    progress: &mpsc::Sender<&'static str>,
+    progress: &Progress,
     smoke: bool,
     messages: usize,
 ) {
@@ -315,7 +314,7 @@ fn profiles(
         }
     }
 }
-fn cleanup(pool: &mut InstancePool, progress: &mpsc::Sender<&'static str>) {
+fn cleanup(pool: &mut InstancePool, progress: &Progress) {
     let dispatch = pool.dispatcher();
     dispatch
         .submit_native_on(0, |session| {
@@ -339,7 +338,7 @@ fn cleanup(pool: &mut InstancePool, progress: &mpsc::Sender<&'static str>) {
         "{}",
         json!({"event":"single_vm_cleanup","joined":receipt.joined,"roots":0,"files_removed":true})
     );
-    progress.send("single VM retired").unwrap();
+    progress.record(Event::Retired);
 }
 fn snapshot(dispatch: &InstanceDispatcher) -> ([f64; 4], Option<[f64; 6]>) {
     dispatch
@@ -391,21 +390,7 @@ fn main() {
         args.iter().all(|a| a == "--test" || a == "--bench"),
         "supported arguments: --test, --bench"
     );
-    let (progress, events) = mpsc::channel();
-    let watchdog = thread::spawn(move || {
-        let mut last = "start";
-        loop {
-            match events.recv_timeout(GATE) {
-                Ok(event) => last = event,
-                Err(mpsc::RecvTimeoutError::Disconnected) => return,
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    eprintln!("SINGLE-VM-STALL last={last} cleanup=UNVERIFIED");
-                    std::process::exit(70);
-                }
-            }
-        }
-    });
+    let (watchdog, progress) = Watchdog::start(GATE);
     run(&progress, args.iter().any(|a| a == "--test"));
-    drop(progress);
-    watchdog.join().unwrap();
+    watchdog.finish();
 }

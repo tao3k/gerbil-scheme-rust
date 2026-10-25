@@ -251,3 +251,7 @@ bridge-owner-capacity-benchmark *args:
 # Same native Scheme work/budgets: synchronous versus Scheme-owned async service.
 bridge-scheme-service-benchmark *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- {{ args }}
+
+# One fixed Scheme VM: native endpoint, caller-driven and Tokio-worker costs.
+bridge-single-vm-service-benchmark *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench single_vm_service --locked -- {{ args }}

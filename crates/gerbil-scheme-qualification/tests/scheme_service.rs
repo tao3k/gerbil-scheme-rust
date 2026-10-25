@@ -3,6 +3,8 @@
 mod budget;
 #[path = "scheme_service/client_progress.rs"]
 mod client_progress;
+#[path = "../benches/single_vm_service/watchdog.rs"]
+mod bench_watchdog;
 #[path = "../benches/support/orders.rs"]
 mod corpus;
 #[path = "scheme_service/deferred.rs"]

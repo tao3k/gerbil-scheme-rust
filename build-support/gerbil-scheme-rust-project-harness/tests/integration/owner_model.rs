@@ -115,9 +115,15 @@ fn owner_protocol_scenarios_and_controls() {
     // pending work while a peer is idle.
     checks.sort_by_key(|check| !check.scenario);
     let count = checks.len();
-    let queue = Mutex::new(VecDeque::from(checks));
-    let completed = AtomicUsize::new(0);
-    eprintln!("QUINT-PLAN jobs={count} workers=3");
+    let mut checks = VecDeque::from(checks);
+    // Quint lazily installs its Rust evaluator without a cross-process lock.
+    // Execute one real check before concurrent invocations can observe a
+    // partially downloaded archive. It remains part of the original checklist.
+    let first = checks.pop_front().expect("nonempty protocol checklist");
+    super::owner_model_source::scoped(&model, || (first.work)());
+    let queue = Mutex::new(checks);
+    let completed = AtomicUsize::new(1);
+    eprintln!("QUINT-PLAN jobs={count} workers=3 initialized=1");
     std::thread::scope(|scope| {
         for _ in 0..3 {
             scope.spawn(|| {

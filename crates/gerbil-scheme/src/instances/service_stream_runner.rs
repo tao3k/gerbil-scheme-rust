@@ -168,7 +168,7 @@ impl ServiceProducer {
         }
         let Some(units) = self.requests.units() else {
             self.acquiring.clear();
-            return if self.active.available_permits() == self.maximum {
+            return if self.requests.is_empty() && self.active.available_permits() == self.maximum {
                 ProducerStep::Finished
             } else {
                 ProducerStep::Waiting

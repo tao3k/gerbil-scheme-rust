@@ -63,6 +63,7 @@ pub struct InstanceClientProgressDriver<P: Future> {
     output: Option<P::Output>,
     done: bool,
     signal: Arc<Signal>,
+    parent: Option<Waker>,
 }
 impl<P: Future> fmt::Debug for InstanceClientProgressDriver<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -78,6 +79,7 @@ impl<P: Future> InstanceClientProgressDriver<P> {
             progress: Box::pin(progress),
             output: None,
             done: false,
+            parent: None,
             signal: Arc::new(Signal {
                 ready: AtomicBool::new(true),
                 parent: Mutex::new(None),
@@ -88,7 +90,21 @@ impl<P: Future> InstanceClientProgressDriver<P> {
         if self.done {
             return;
         }
-        self.signal.arm(cx.waker());
+        // Parent identity is activation metadata, not per-result work. Publish
+        // replacement before checking the ready level so a concurrent wake is
+        // delivered to this parent or observed by this very poll.
+        if self
+            .parent
+            .as_ref()
+            .is_none_or(|old| !old.will_wake(cx.waker()))
+        {
+            self.signal.arm(cx.waker());
+            self.parent = Some(cx.waker().clone());
+        }
+        // Unsignalled service boundaries must not write the shared cache line.
+        if !self.signal.ready.load(Ordering::Acquire) {
+            return;
+        }
         if !self.signal.ready.swap(false, Ordering::AcqRel) {
             return;
         }
@@ -101,6 +117,7 @@ impl<P: Future> InstanceClientProgressDriver<P> {
             self.output = Some(value);
             self.done = true;
             self.signal.retire();
+            self.parent = None;
         }
     }
     /// Offer signalled client progress before every work poll. Neither future's
@@ -110,6 +127,54 @@ impl<P: Future> InstanceClientProgressDriver<P> {
         std::future::poll_fn(|cx| {
             self.poll_progress(cx);
             work.as_mut().poll(cx)
+        })
+        .await
+    }
+    /// Prepare a count-bounded, root-free Rust source before producer registration.
+    /// Each iterator step is one non-preemptible application preparation unit:
+    /// signalled client progress is serviced before it, never inside it. The
+    /// caller must bound its bytes and CPU cost and must not enter Scheme here.
+    /// Native work/slot credit is acquired later by the existing producer.
+    /// Error, expiry or dropping this future drops all prepared Rust values;
+    /// no producer or native root has been acquired by this operation.
+    /// # Errors
+    /// Invalid count, expired deadline, an inconsistent iterator or item error.
+    pub async fn prepare_bounded<I, T>(
+        &mut self,
+        mut input: I,
+        maximum: usize,
+        deadline: std::time::Instant,
+    ) -> Result<Vec<T>, super::InstanceError>
+    where
+        I: ExactSizeIterator<Item = Result<T, super::InstanceError>>,
+    {
+        let count = input.len();
+        if count == 0 || count > maximum {
+            return Err(super::InstanceError::InvalidConfig(
+                "Rust preparation count bound",
+            ));
+        }
+        let mut prepared = Vec::with_capacity(count);
+        for _ in 0..count {
+            let value = self
+                .wait(async {
+                    if std::time::Instant::now() >= deadline {
+                        return Err(super::InstanceError::Timeout);
+                    }
+                    input.next().ok_or(super::InstanceError::InvalidConfig(
+                        "Rust preparation iterator length",
+                    ))?
+                })
+                .await?;
+            prepared.push(value);
+        }
+        // Service an event raised by the last preparation unit before handoff.
+        self.wait(async {
+            if std::time::Instant::now() >= deadline {
+                Err(super::InstanceError::Timeout)
+            } else {
+                Ok(prepared)
+            }
         })
         .await
     }

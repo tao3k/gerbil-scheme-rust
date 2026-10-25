@@ -237,6 +237,30 @@ impl Strategy {
         }
     }
 }
+pub(super) fn configure_service(
+    pool: &InstancePool,
+    comparison: Comparison,
+    arm: bool,
+) -> (
+    gerbil_scheme::instances::SchemeServiceRouter,
+    Vec<gerbil_scheme::instances::SchemeServiceSettings>,
+) {
+    super::stall_forensics::phase(1);
+    idle(pool);
+    super::stall_forensics::phase(2);
+    let router = router(pool, comparison, arm);
+    super::stall_forensics::phase(3);
+    let settings = super::settings::configure(pool, comparison, arm);
+    // Settings replies precede native permit retirement. Policy mutation must
+    // observe returned credits, not just a delivered reply.
+    super::stall_forensics::phase(4);
+    idle(pool);
+    super::stall_forensics::phase(5);
+    super::settings::short_wake(pool, comparison, arm);
+    super::stall_forensics::phase(6);
+    idle(pool);
+    (router, settings)
+}
 pub(super) fn run(
     pool: &InstancePool,
     runtime: &tokio::runtime::Runtime,
@@ -249,21 +273,15 @@ pub(super) fn run(
     let observation = observation.paired(comparison, arm);
     let strategy = Strategy::for_arm(comparison, arm, observation);
     let asynchronous = comparison != Comparison::Service || arm;
-    idle(pool);
-    let router = router(pool, comparison, arm);
+    let (router, settings) = configure_service(pool, comparison, arm);
     let active_router = strategy.class_routing.then(|| router.clone());
-    let settings = super::settings::configure(pool, comparison, arm);
-    // Settings replies precede native permit retirement. Policy mutation must
-    // observe returned credits, not just a delivered reply.
-    idle(pool);
-    super::settings::short_wake(pool, comparison, arm);
-    idle(pool);
     let qos = (comparison == Comparison::OwnerQos).then(|| super::native_wait::qos(pool, arm));
     let capture = super::observation::Capture::start(
         pool,
         observation,
         comparison == Comparison::ObserverCost,
     );
+    super::stall_forensics::phase(7);
     let deliveries_before = peer_deliveries(pool);
     let outcomes_before = offer_outcomes(pool);
     let completions_before =
@@ -272,6 +290,7 @@ pub(super) fn run(
     let bulk_inputs = Arc::clone(inputs);
     let dispatch = pool.dispatcher();
     let probe_dispatch = pool.dispatcher();
+    super::stall_forensics::phase(8);
     let (rows, probe) = runtime.block_on(async {
         let bulk_router = if matches!(
             comparison,
@@ -318,8 +337,10 @@ pub(super) fn run(
         .await
     });
     let elapsed = released.elapsed().as_nanos();
+    super::stall_forensics::phase(9);
     idle(pool);
     close_router(&router);
+    super::stall_forensics::phase(10);
     let mut value = summarize(
         rows,
         inputs,
@@ -340,12 +361,14 @@ pub(super) fn run(
         value["owner_qos_receipts"] = qos;
         value["owner_qos_restored"] = super::native_wait::qos(pool, false);
     }
+    super::stall_forensics::phase(11);
     append_offer_outcomes(&mut value, pool, deliveries_before, outcomes_before);
     append_completions(&mut value, pool, completions_before);
     append_policy(&mut value, pool, comparison, arm, &settings, inputs, probes);
     if observation.full() && comparison == Comparison::Notification && arm {
         super::budget::verify_notifications(&value, probes);
     }
+    super::stall_forensics::phase(12);
     value
 }
 type BulkClient = (
@@ -366,7 +389,7 @@ async fn run_clients<P: std::future::Future<Output = workload::Probes> + Send + 
     workload::Probes,
 ) {
     let (dispatch, inputs, router) = bulk;
-    if (super::settings::client_turn_ab() || super::settings::completion_service_ab()) && arm {
+    if super::settings::client_turn_ab() && arm || super::settings::completion_service_active(arm) {
         return runtime
             .spawn(super::pooled::bulk_progress(
                 dispatch,
@@ -374,6 +397,9 @@ async fn run_clients<P: std::future::Future<Output = workload::Probes> + Send + 
                 released,
                 comparison.supply_admission(arm),
                 progress,
+                !super::settings::supply_cycle_ab()
+                    && (!super::settings::input_preparation_ab() || arm),
+                super::settings::supply_cycle_ab() && arm,
             ))
             .await
             .unwrap();
@@ -439,7 +465,7 @@ fn router(
     gerbil_scheme::instances::SchemeServiceRouter::with_admission(
         pool.dispatcher(),
         gerbil_scheme::instances::SchemeRoutingConfig {
-            owners: vec![0, 1, 2, 3],
+            owners: (0..pool.owners().len()).collect(),
             short_slots: 1,
             batch_slots: 3,
             short_max_work: 1,
@@ -693,6 +719,7 @@ fn summarize(
     strategy: Strategy,
 ) -> Value {
     let count = inputs.len();
+    let work_counts = super::throughput::counts(count, rows.len(), probe.actual.len());
     let mut clocks = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
     let mut service = Vec::new();
     let mut construct = Vec::new();
@@ -778,6 +805,7 @@ fn summarize(
         "probe_owners":probe.owners,"probe_entry":probe.entry,"probe_actual_ns":probe.actual,"probe_scheduled_ns":probe.scheduled,"probe_placement_observed_ns":probe.placement_observed,"probe_service_ns":probe.service,"probe_native_diagnostics":probe.diagnostics,"probe_native_snapshot_ns":probe.snapshot_ns,"probe_before_entry_ns":probe.before_entry,"probe_construct_ns":probe.construct,"probe_pending_ns":probe.pending,"probe_projection_ns":probe.projection,
         "probe_overlap":probe.completed.iter().filter(|&&at|at<=end).count(),"owner_progress_at_first_done":minimum,"owner_totals":owner_totals,"unused_owners":unused_owners,"owner_progress_fraction_min":progress_fraction,
         "owner_finish_spread_ns":finish_spread,"actor_peer_min":peer});
+    value["work_counts"] = work_counts;
     append_client_progress(&mut value, probe);
     value
 }
@@ -799,16 +827,11 @@ fn quantile(samples: &[Value], field: &str, percent: usize) -> u128 {
     corpus::percentile(&mut data, percent)
 }
 pub(super) fn emit(samples: &[Value], arm: usize, mixed: bool) {
-    let mut duration: Vec<_> = samples
-        .iter()
-        .map(|s| u128::from(s["bulk_elapsed_ns"].as_u64().unwrap()))
-        .collect();
-    let median = corpus::percentile(&mut duration, 50);
-    let seconds = std::time::Duration::from_nanos(u64::try_from(median).unwrap()).as_secs_f64();
+    let throughput = super::throughput::summary(samples);
     println!(
         "{}",
         json!({"event":"service_result","arm":arm,"mixed":mixed,"samples":samples.len(),
-        "bulk_orders_per_second":samples[0]["orders"].as_f64().unwrap()/seconds,
+        "throughput":throughput,
         "bulk_service_p99_ns":quantile(samples,"bulk_service_ns",99),"bulk_pending_p99_ns":quantile(samples,"bulk_pending_before_projection_ns",99),
         "probe_client_total_p99_ns":quantile(samples,"probe_client_total_ns",99),"probe_client_delivery_p99_ns":quantile(samples,"probe_client_delivery_ns",99),"probe_serial_backlog_p99_ns":quantile(samples,"probe_serial_backlog_ns",99),"probe_deadline_resume_p99_ns":quantile(samples,"probe_deadline_resume_ns",99),
         "probe_actual_p99_ns":quantile(samples,"probe_actual_ns",99),"probe_scheduled_p99_ns":quantile(samples,"probe_scheduled_ns",99),
@@ -929,26 +952,36 @@ fn append_client_policy(value: &mut Value, arm: bool) {
     });
     value["arrival_clock_ab"] =
         json!((super::settings::arrival_clock_ab() || super::settings::completion_service_ab()));
-    value["arrival_clock_backend"] = json!(if (super::settings::arrival_clock_ab()
-        || super::settings::completion_service_ab())
-        && arm
+    value["arrival_clock_backend"] = json!(if super::settings::arrival_clock_ab() && arm
+        || super::settings::completion_service_active(arm)
     {
         "darwin-kqueue-nanoseconds"
     } else {
         "tokio-sleep"
     });
     value["client_turn_ab"] = json!(super::settings::client_turn_ab());
-    value["client_progress_opportunities"] = json!(if (super::settings::client_turn_ab()
-        || super::settings::completion_service_ab())
-        && arm
+    value["client_progress_opportunities"] = json!(if super::settings::client_turn_ab() && arm
+        || super::settings::completion_service_active(arm)
     {
         "signalled-before-each-bulk-wait"
     } else {
         "independent-tokio-tasks"
     });
     value["ready_owner_ab"] = json!(super::settings::ready_owner_ab());
+    value["input_preparation_ab"] = json!(super::settings::input_preparation_ab());
+    value["supply_cycle_ab"] = json!(super::settings::supply_cycle_ab());
+    value["rust_input_preparation"] = json!(if super::settings::supply_cycle_ab() && arm {
+        "capacity-window-publication"
+    } else if !super::settings::supply_cycle_ab()
+        && super::settings::completion_service_active(arm)
+        && (!super::settings::input_preparation_ab() || arm)
+    {
+        "bounded-client-service-turns"
+    } else {
+        "whole-chunk-before-registration"
+    });
     value["completion_service_ab"] = json!(super::settings::completion_service_ab());
-    value["completion_receive"] = json!(if super::settings::completion_service_ab() && arm {
+    value["completion_receive"] = json!(if super::settings::completion_service_active(arm) {
         "one-ready-result-before-coop"
     } else {
         "cooperative-receiver"
@@ -980,7 +1013,11 @@ fn append_client_policy(value: &mut Value, arm: bool) {
 }
 
 fn activation_label() -> &'static str {
-    if super::settings::completion_service_ab() {
+    if super::settings::supply_cycle_ab() {
+        "same VMs/workload/native budgets/kernel clock/joint client service in BOTH arms; whole-source preparation and registration barrier versus capacity-derived preparation windows published while registration progresses"
+    } else if super::settings::input_preparation_ab() {
+        "same VMs/workload/native budgets/kernel clock/joint client service in BOTH arms; whole-chunk Rust preparation versus count-bounded preparation with client progress at each request boundary"
+    } else if super::settings::completion_service_ab() {
         "same original 500us plan/VMs/workload/native budgets; legacy independent clients versus kernel arrival clock with bounded ready completion service at bulk client boundaries"
     } else if super::settings::arrival_clock_ab() {
         "same 500us planned arrivals/native VMs/workload/ready delivery/unified short observer/independent Tokio clients; millisecond Sleep versus one-shot nanosecond-unit kernel timer, always armed"

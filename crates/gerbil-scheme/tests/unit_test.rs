@@ -26,3 +26,7 @@ mod vm_capabilities;
 #[cfg(all(target_os = "macos", feature = "isolated-instances"))]
 #[path = "unit/instance_timer.rs"]
 mod instance_timer;
+
+#[cfg(all(target_os = "macos", feature = "tokio-dispatch"))]
+#[path = "unit/service_ingress.rs"]
+mod service_ingress;

@@ -1,6 +1,8 @@
 //! Pooled supply moves only independent Rust inputs, never accepted Scheme state.
 #[path = "peer_delivery.rs"]
 mod peer_delivery;
+#[path = "pool_pipeline.rs"]
+mod pool_pipeline;
 #[path = "ready_delivery.rs"]
 mod ready_delivery;
 use super::{GATE, batch, command, idle, reselection, short};
@@ -92,6 +94,8 @@ pub(super) async fn contract(dispatch: &InstanceDispatcher, progress: &mpsc::Sen
     progress_route(dispatch).await;
     peer_delivery::contract(dispatch, progress).await;
     ready_delivery::contract(dispatch).await;
+    pool_pipeline::contract(dispatch).await;
+    progress.send("incremental pool source: native overlap before complete preparation/registration, indexed delivery, cancellation, timeout and late input/work failure drain").unwrap();
     progress.send("ready-owner delivery: native indices, independent retirement, errors, timeout and cancellation").unwrap();
     for mode in [
         SchemeServiceSupplyAdmission::Queued,

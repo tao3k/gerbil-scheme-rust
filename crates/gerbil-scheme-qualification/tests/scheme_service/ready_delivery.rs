@@ -35,6 +35,19 @@ impl SchemeServiceRequest for Held {
     }
 }
 pub(super) async fn contract(dispatch: &InstanceDispatcher) {
+    let mut driver =
+        gerbil_scheme::instances::InstanceClientProgressDriver::new(std::future::ready(()));
+    let failed = dispatch
+        .prepare_scheme_service_pool_ready_stream(
+            vec![Err::<Held, _>(InstanceError::Closed)].into_iter(),
+            config(vec![0, 1], GATE),
+            SchemeServiceSupplyAdmission::ProgressFair,
+            &mut driver,
+        )
+        .await;
+    assert!(matches!(failed, Err(InstanceError::Closed)));
+    idle(dispatch).await;
+    producer_free(dispatch, &[0, 1]).await;
     bypass(dispatch).await;
     errors(dispatch).await;
     cancellation(dispatch).await;
@@ -67,11 +80,14 @@ async fn bypass(dispatch: &InstanceDispatcher) {
     ];
     let mut cfg = config(vec![0, 1], GATE);
     cfg.maximum_active_per_owner = 1;
+    let mut driver =
+        gerbil_scheme::instances::InstanceClientProgressDriver::new(std::future::ready(()));
     let mut stream = dispatch
-        .submit_scheme_service_pool_ready_stream(
-            messages,
+        .prepare_scheme_service_pool_ready_stream(
+            messages.into_iter().map(Ok),
             cfg,
             SchemeServiceSupplyAdmission::ProgressFair,
+            &mut driver,
         )
         .await
         .unwrap();

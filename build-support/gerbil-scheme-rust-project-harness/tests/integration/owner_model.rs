@@ -139,6 +139,18 @@ fn owner_protocol_scenarios_and_controls() {
         "safety",
     );
     capacity_protocol(source);
+    for domain in ["gerbil_architecture_small", "gerbil_architecture_wide"] {
+        success(&[
+            "test",
+            source,
+            "--main",
+            domain,
+            "--match",
+            "architecture.*Test",
+            "--seed",
+            "1",
+        ]);
+    }
     shared_protocol(source);
     owner_completion_scenarios_and_control();
     progress_protocol(source);
@@ -306,7 +318,7 @@ fn owner_completion_scenarios_and_control() {
             "--main",
             domain,
             "--match",
-            "(completionService|arrivalClock|clientTurn|delivery|claimProgress|publication|client|cross|native|readyCycle|executionCheckpoint|directed|registration|reclamation|completion|coalesced|runtime|joint|workBudget|workPlan|leasePlan|activation|preparedCycle|pipeline).*Test",
+            "(streamingJoint|preparation|completionService|arrivalClock|clientTurn|delivery|claimProgress|publication|client|cross|native|readyCycle|executionCheckpoint|directed|registration|reclamation|completion|coalesced|runtime|joint|workBudget|workPlan|leasePlan|activation|preparedCycle|pipeline).*Test",
             "--seed",
             "1",
         ]);

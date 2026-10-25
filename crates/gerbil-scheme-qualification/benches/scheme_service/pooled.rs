@@ -64,14 +64,15 @@ pub(super) async fn bulk_progress<P: std::future::Future<Output = super::workloa
     released: Instant,
     mode: SchemeServiceSupplyAdmission,
     progress: P,
+    bounded_preparation: bool,
+    pipelined: bool,
 ) -> (Vec<OwnerResult<Reply>>, super::workload::Probes) {
     let mut driver = gerbil_scheme::instances::InstanceClientProgressDriver::new(progress);
     let mut results = Vec::new();
     for chunk in inputs.chunks(128 * 8) {
         let messages = chunk
             .chunks(8)
-            .map(|items| orders(items.to_vec(), ShortMode::Batch, None))
-            .collect();
+            .map(|items| Ok(orders(items.to_vec(), ShortMode::Batch, None)));
         let config = SchemeServicePoolStreamConfig {
             owners: vec![0, 1, 2, 3],
             maximum_active_per_owner: 3,
@@ -80,10 +81,21 @@ pub(super) async fn bulk_progress<P: std::future::Future<Output = super::workloa
         };
         let count = chunk.len().div_ceil(8);
         let mut indexed = (0..count).map(|_| None).collect::<Vec<_>>();
-        let mut stream = driver
-            .wait(dispatch.submit_scheme_service_pool_ready_stream(messages, config, mode))
-            .await
-            .unwrap();
+        let mut stream = if pipelined {
+            dispatch
+                .pipeline_scheme_service_pool_ready_stream(messages, config, mode, &mut driver)
+                .await
+        } else if bounded_preparation {
+            dispatch
+                .prepare_scheme_service_pool_ready_stream(messages, config, mode, &mut driver)
+                .await
+        } else {
+            let messages = messages.collect::<Result<Vec<_>, _>>().unwrap();
+            driver
+                .wait(dispatch.submit_scheme_service_pool_ready_stream(messages, config, mode))
+                .await
+        }
+        .unwrap();
         while let Some(row) = driver
             .wait(stream.next(GATE.saturating_sub(released.elapsed())))
             .await

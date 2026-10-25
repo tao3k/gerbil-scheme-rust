@@ -515,10 +515,9 @@ impl ProbeSchedule {
         Self {
             count,
             deadline_aware: super::settings::client_arrival_cost_ab() && arm,
-            ready_service: super::settings::completion_service_ab() && arm,
-            kernel_clock: (super::settings::arrival_clock_ab()
-                || super::settings::completion_service_ab())
-                && arm,
+            ready_service: super::settings::completion_service_active(arm),
+            kernel_clock: super::settings::arrival_clock_ab() && arm
+                || super::settings::completion_service_active(arm),
             queue_wait: if (arm && super::settings::claim_progress_ab())
                 || super::settings::ready_owner_ab()
                 || super::settings::client_turn_ab()

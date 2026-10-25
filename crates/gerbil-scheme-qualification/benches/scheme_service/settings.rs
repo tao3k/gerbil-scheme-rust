@@ -46,7 +46,7 @@ pub(super) fn configure(
     if comparison == Comparison::Feed {
         // Native delivery precedes permit retirement; feed changes require both.
         super::measurement::idle(pool);
-        for owner in 0..4 {
+        for owner in 0..pool.owners().len() {
             pool.dispatcher()
                 .configure_scheme_service_feed_on(owner, if arm { 4 } else { 1 })
                 .unwrap();
@@ -55,7 +55,7 @@ pub(super) fn configure(
     if completion_ab() {
         assert!(comparison == Comparison::ProgressFair && fixed_short_selective());
         super::measurement::idle(pool);
-        for owner in 0..4 {
+        for owner in 0..pool.owners().len() {
             use gerbil_scheme::instances::SchemeServiceCompletion;
             let policy = if coupled_refill_ab() || native_entry_ab() {
                 SchemeServiceCompletion::PipelineCycle
@@ -139,7 +139,7 @@ pub(super) fn configure(
     actual
 }
 fn read(pool: &InstancePool) -> Vec<SchemeServiceSettings> {
-    let tickets: Vec<_> = (0..4)
+    let tickets: Vec<_> = (0..pool.owners().len())
         .map(|owner| pool.dispatcher().scheme_service_settings_on(owner).unwrap())
         .collect();
     tickets
@@ -158,7 +158,7 @@ pub(super) fn short_pool(pool: &InstancePool, comparison: Comparison) {
     ) {
         pool.dispatcher()
             .configure_scheme_short_pool(gerbil_scheme::instances::SchemeShortPoolConfig {
-                owners: vec![0, 1, 2, 3],
+                owners: (0..pool.owners().len()).collect(),
                 maximum_pending: 128,
                 maximum_active_per_owner: 1,
             })
@@ -191,7 +191,7 @@ pub(super) fn short_wake(pool: &InstancePool, comparison: Comparison, arm: bool)
 
 pub(super) fn progress(pool: &InstancePool, comparison: Comparison) {
     if comparison == Comparison::ProgressFair {
-        for owner in 0..4 {
+        for owner in 0..pool.owners().len() {
             pool.dispatcher()
                 .enable_scheme_service_progress_on(owner)
                 .unwrap()
@@ -233,7 +233,7 @@ pub(super) fn completion_ab() -> bool {
 /// Outside the timing interval; actual native counters and quiescence checks.
 pub(super) fn completions(pool: &InstancePool) -> [u64; 3] {
     let mut result = [0; 3];
-    for owner in 0..4 {
+    for owner in 0..pool.owners().len() {
         let actual = pool
             .dispatcher()
             .scheme_service_completion_on(owner)
@@ -687,7 +687,7 @@ pub(super) fn actor_turn_counts(pool: &InstancePool) -> Vec<[u64; 4]> {
     if !actor_turn_ab() {
         return Vec::new();
     }
-    (0..4)
+    (0..pool.owners().len())
         .map(|owner| {
             let v = pool
                 .dispatcher()
@@ -731,7 +731,7 @@ pub(super) fn execution_counts(pool: &InstancePool, arm: bool) -> Vec<[u64; 6]> 
     {
         return Vec::new();
     }
-    (0..4)
+    (0..pool.owners().len())
         .map(|owner| {
             let p = pool
                 .dispatcher()
@@ -782,7 +782,7 @@ pub(super) fn service_cycle_counts(pool: &InstancePool, arm: bool) -> Vec<[u64; 
     {
         return Vec::new();
     }
-    (0..4)
+    (0..pool.owners().len())
         .map(|owner| {
             let p = pool
                 .dispatcher()
@@ -823,7 +823,7 @@ pub(super) fn runtime_counts(pool: &InstancePool, arm: bool) -> Vec<[u64; 4]> {
     if !(runtime_joint_ab() || runtime_cost_ab() || runtime_event_cost_ab()) {
         return Vec::new();
     }
-    (0..4)
+    (0..pool.owners().len())
         .map(|owner| {
             let p = pool
                 .dispatcher()
@@ -883,7 +883,7 @@ pub(super) fn native_budget_counts(pool: &InstancePool, arm: bool) -> Vec<[u64; 
     if !native_budget_cost_ab() {
         return Vec::new();
     }
-    (0..4)
+    (0..pool.owners().len())
         .map(|owner| {
             let d = pool.dispatcher();
             let n = d
@@ -979,4 +979,17 @@ pub(super) fn arrival_clock_ab() -> bool {
 
 pub(super) fn completion_service_ab() -> bool {
     std::env::args().any(|arg| arg == "--completion-service-ab")
+}
+
+/// A supplemental control: both arms retain the joint service protocol;
+/// only lazy Rust preparation participates in its turns in the candidate.
+pub(super) fn input_preparation_ab() -> bool {
+    completion_service_ab() && std::env::args().any(|arg| arg == "--input-preparation-ab")
+}
+pub(super) fn completion_service_active(arm: bool) -> bool {
+    completion_service_ab() && (arm || input_preparation_ab() || supply_cycle_ab())
+}
+
+pub(super) fn supply_cycle_ab() -> bool {
+    completion_service_ab() && std::env::args().any(|arg| arg == "--supply-cycle-ab")
 }

@@ -3,6 +3,10 @@
 mod arrival;
 #[path = "scheme_service/budget.rs"]
 mod budget;
+#[path = "scheme_service/capacity.rs"]
+mod capacity;
+#[path = "scheme_service/capacity_handoff.rs"]
+mod capacity_handoff;
 #[path = "support/orders.rs"]
 mod corpus;
 #[path = "scheme_service/entry.rs"]
@@ -23,10 +27,21 @@ mod os_sampling;
 mod os_threads;
 #[path = "scheme_service/pooled.rs"]
 mod pooled;
+#[path = "scheme_service/protocol_check.rs"]
+mod protocol_check;
 #[path = "scheme_service/resident.rs"]
 mod resident;
+#[cfg(feature = "arrival-clock")]
+#[path = "scheme_service/retirement_interleaving.rs"]
+mod retirement_interleaving;
 #[path = "scheme_service/settings.rs"]
 mod settings;
+#[path = "scheme_service/source_handoff.rs"]
+mod source_handoff;
+#[path = "scheme_service/stall_forensics.rs"]
+mod stall_forensics;
+#[path = "scheme_service/throughput.rs"]
+mod throughput;
 #[path = "scheme_service/workload.rs"]
 mod workload;
 use gerbil_scheme::instances::{InstanceConfig, InstancePool, IsolatedProgram};
@@ -38,6 +53,17 @@ use std::{
     time::{Duration, Instant},
 };
 const GATE: Duration = Duration::from_secs(5);
+fn service_program() -> IsolatedProgram {
+    let image = std::env::var("GERBIL_SERVICE_BENCH_IMAGE")
+        .unwrap_or_else(|_| gerbil_scheme_qualification::owner_instance_image().to_owned());
+    // SAFETY: the explicitly selected qualification image exports this protocol.
+    unsafe {
+        IsolatedProgram::from_image(&image, c"gerbil_owner_orders_call")
+            .unwrap()
+            .with_exports(&[c"gerbil_owner_service_reference"])
+            .with_scheme_service(c"gerbil_owner_service_call")
+    }
+}
 fn run(
     progress: &mpsc::Sender<&'static str>,
     smoke: bool,
@@ -47,21 +73,16 @@ fn run(
     blocks: usize,
 ) {
     let split = comparison.is_split();
-    // SAFETY: the build-owned image exports the admitted native service protocol.
-    let program = unsafe {
-        IsolatedProgram::from_image(
-            gerbil_scheme_qualification::owner_instance_image(),
-            c"gerbil_owner_orders_call",
-        )
-        .unwrap()
-        .with_exports(&[c"gerbil_owner_service_reference"])
-        .with_scheme_service(c"gerbil_owner_service_call")
-    };
+    let capacity_config =
+        capacity::Config::from_args(&std::env::args().skip(1).collect::<Vec<_>>());
+    let owners = capacity_config.map_or(4, |c| c.owners);
+    let workers = capacity_config.map_or(2, |c| c.rust_workers);
+    let program = service_program();
     let startup = Instant::now();
     let mut pool = InstancePool::start_observed(
         &program,
         InstanceConfig {
-            owners: 4,
+            owners,
             queue_capacity: 128,
             maximum_request_bytes: 16 * 1024 * 1024,
             maximum_reply_bytes: 16 * 1024 * 1024,
@@ -78,24 +99,30 @@ fn run(
     settings::short_pool(&pool, comparison);
     settings::progress(&pool, comparison);
     if observation.full() {
-        for owner in 0..4 {
+        for owner in 0..owners {
             pool.dispatcher().observe_scheme_service_on(owner).unwrap();
         }
     }
     let identities: Vec<_> = pool.owners().iter().map(|r| r.state).collect();
     println!(
         "{}",
-        json!({"event":"service_configuration","pool_startup_ns":startup.elapsed().as_nanos(),"sdk_setup_ns":pool.owners().iter().map(|r|r.setup_time.as_nanos()).collect::<Vec<_>>(),"owners":4,"states":identities,"rust_workers":2,"slots":4,"work":32,"batch":8,
+        json!({"event":"service_configuration","pool_startup_ns":startup.elapsed().as_nanos(),"sdk_setup_ns":pool.owners().iter().map(|r|r.setup_time.as_nanos()).collect::<Vec<_>>(),"owners":owners,"states":identities,"rust_workers":workers,"slots":4,"work":32,"batch":8,
         "quantum":1,"scheme_service_workers":4,"actor_workers_per_batch":4,"probe_interval_us":500,"defaults_changed":false,"phase_observation":observation.full(),"observation_mode":format!("{observation:?}"),"trace_once":trace_once,"blocks":blocks,
         "split_layout_ab":split,"short_layout_only":comparison==Comparison::ShortLayout,"class_route_ab":comparison==Comparison::ClassRouting,"client_bulk_callbacks_per_owner":if split { Some(3) } else { None },"comparison":comparison.label()})
     );
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
+    let runtime = client_runtime(workers);
+    if let Some(config) = capacity_config {
+        capacity::run_profiles(&pool, &runtime, progress, comparison, config);
+        cleanup(&mut pool);
+        return;
+    }
     if observation.full() {
         os_calibration::run(&pool);
+    }
+    if protocol_check::selected() {
+        protocol_check::run(&pool, &runtime, progress, comparison, observation);
+        cleanup(&mut pool);
+        return;
     }
     for mixed in [false, true] {
         let inputs = Arc::new(
@@ -104,17 +131,17 @@ fn run(
                 .collect::<Vec<_>>(),
         );
         let warm = Arc::new(inputs[..256].to_vec());
-        for arm in [false, true] {
-            measurement::run(&pool, &runtime, &warm, 8, comparison, arm, observation);
-            progress.send("service warmup validated").unwrap();
-        }
+        measurement::run(&pool, &runtime, &warm, 8, comparison, true, observation);
+        progress.send("service warmup validated").unwrap();
         let mut samples = [Vec::new(), Vec::new()];
         for block in 0..blocks {
             for reverse in [false, true]
                 .into_iter()
                 .take(if trace_once { 1 } else { 2 })
             {
-                for arm in if reverse { [1, 0] } else { [0, 1] } {
+                {
+                    let arm = 1;
+                    stall_forensics::context(block, reverse, mixed, arm);
                     let sample = measurement::run(
                         &pool,
                         &runtime,
@@ -134,6 +161,9 @@ fn run(
             }
         }
         for (arm, values) in samples.iter().enumerate() {
+            if values.is_empty() {
+                continue;
+            }
             measurement::emit(values, arm, mixed);
         }
         assert_eq!(
@@ -143,16 +173,24 @@ fn run(
     }
     cleanup(&mut pool);
 }
+fn client_runtime(workers: usize) -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(workers)
+        .enable_all()
+        .build()
+        .unwrap()
+}
 fn cleanup(pool: &mut InstancePool) {
+    let owners = pool.owners().len();
     let closed = pool.shutdown(GATE);
     assert!(closed.is_clean(), "{closed:?}");
-    assert_eq!(closed.joined, 4);
+    assert_eq!(closed.joined, owners);
     assert!(closed.owners.iter().all(|o| o.roots_before_cleanup == 0
         && o.finalizer_status == Some(0)
         && o.image_file_removed));
     println!(
         "{}",
-        json!({"event":"service_cleanup","joined":4,"roots":[0,0,0,0],"files_removed":true,"service_quiesced":true})
+        json!({"event":"service_cleanup","joined":owners,"roots":vec![0;owners],"files_removed":true,"service_quiesced":true})
     );
 }
 fn select_comparison(args: &[String]) -> Comparison {
@@ -230,10 +268,30 @@ fn await_trace_start(args: &[String]) {
         assert_eq!(start, [b'R'], "trace start token");
     }
 }
+fn validate_client_comparisons(args: &[String]) {
+    assert!(
+        !args.iter().any(|s| s == "--input-preparation-ab")
+            || args.iter().any(|s| s == "--completion-service-ab"),
+        "input preparation comparison requires the joint completion service control"
+    );
+    assert!(
+        !args.iter().any(|s| s == "--supply-cycle-ab")
+            || (args.iter().any(|s| s == "--completion-service-ab")
+                && !args.iter().any(|s| s == "--input-preparation-ab")),
+        "supply cycle comparison requires the joint control and excludes the preparation-only comparison"
+    );
+}
 fn validate_arguments(args: &[String]) {
+    validate_client_comparisons(args);
     assert!(args.iter().all(|s| s.starts_with("--blocks=")
+        || capacity::is_argument(s)
         || s == "--test"
         || s == "--bench"
+        || s == "--protocol-check"
+        || s == "--watchdog-replay"
+        || s == "--watchdog-interleaving"
+        || s == "--watchdog-capacity-handoff"
+        || s == "--watchdog-source-handoff"
         || s == "--split-layout-ab"
         || s == "--short-layout-only"
         || s == "--class-route-ab"
@@ -284,6 +342,8 @@ fn validate_arguments(args: &[String]) {
         || s == "--client-turn-ab"
         || s == "--arrival-clock-ab"
         || s == "--completion-service-ab"
+        || s == "--input-preparation-ab"
+        || s == "--supply-cycle-ab"
         || s == "--activation-protocol-ab"
         || s == "--lease-plan-protocol-ab"
         || s == "--work-plan-protocol-ab"
@@ -341,6 +401,7 @@ fn main() {
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     eprintln!("SERVICE-BENCH-STALL last={last} cleanup=UNVERIFIED");
+                    stall_forensics::capture();
                     std::process::exit(70);
                 }
             }

@@ -80,7 +80,7 @@ fn timeout_does_not_consume_ready_identity() {
         .block_on(async {
             let (send, receive) = channels(&[0], 1);
             let mut stream = SchemeServiceReadyStream(SchemeServiceStream {
-                pending: Default::default(),
+                pending: std::collections::VecDeque::default(),
                 ready: Some(receive),
                 cancelled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 signals: Vec::new(),
@@ -111,7 +111,7 @@ fn dropped_sender_reports_missing_output_and_drop_closes_publish() {
         .block_on(async {
             let (send, receive) = channels::<usize>(&[0], 1);
             let mut stream = SchemeServiceReadyStream(SchemeServiceStream {
-                pending: Default::default(),
+                pending: std::collections::VecDeque::default(),
                 ready: Some(receive),
                 cancelled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 signals: Vec::new(),

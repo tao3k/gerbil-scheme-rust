@@ -111,6 +111,13 @@ pub(super) fn waker(
             self.wake_by_ref();
         }
         fn wake_by_ref(self: &Arc<Self>) {
+            if let Some(wake) = &self.1 {
+                // Only resident service owners have a native wake port. Keep
+                // producer progress there, outside the application mailbox.
+                wake.notify_producer();
+                return;
+            }
+            // Ordinary owners block on recv and still require a mailbox token.
             // A full channel already guarantees that the owner will poll again.
             let _ = self.0.try_send(Request {
                 started: Arc::new(AtomicBool::new(false)),
@@ -118,9 +125,6 @@ pub(super) fn waker(
                 capacity: None,
                 work_units: 0,
             });
-            if let Some(wake) = &self.1 {
-                wake.notify();
-            }
         }
     }
     std::task::Waker::from(Arc::new(WakeOwner(sender, wake)))

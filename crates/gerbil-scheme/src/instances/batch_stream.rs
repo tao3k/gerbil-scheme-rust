@@ -161,16 +161,8 @@ impl InstanceDispatcher {
         if !crate::instance_backend::images_ready() {
             return Err(InstanceError::Closed);
         }
-        let registration = tokio::time::timeout(
-            deadline.saturating_duration_since(Instant::now()),
-            Arc::clone(&capacity.producer).acquire_owned(),
-        )
-        .await
-        .map_err(|_| InstanceError::Timeout)?
-        .map_err(|_| InstanceError::Closed)?;
-        if Instant::now() >= deadline {
-            return Err(InstanceError::Timeout);
-        }
+        let registration =
+            super::producer_registration::acquire(&capacity.producer, deadline).await?;
         let mut senders = self
             .admission
             .senders

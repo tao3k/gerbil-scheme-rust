@@ -576,6 +576,20 @@ impl Pump<'_> {
             .flatten()
             .map(|deadline| deadline.saturating_duration_since(Instant::now()))
     }
+    fn wait_native(&self, waiting: bool) -> Result<(), InstanceError> {
+        let remaining = self.wait_remaining(waiting);
+        if remaining.is_some_and(|value| value.is_zero()) {
+            return Ok(());
+        }
+        let micros = wait_timeout(remaining);
+        observed(
+            self.image,
+            self.wake,
+            super::SchemeServicePhase::Wait,
+            || control(self.image, &[4, micros]),
+        )?;
+        Ok(())
+    }
     fn shutdown_turn(&self, draining: &mut bool) -> Result<bool, InstanceError> {
         if self.wake.closed.load(Ordering::Acquire) {
             if !*draining {
@@ -669,9 +683,15 @@ impl Pump<'_> {
                     ProducerStep::Waiting => waiting = true,
                 }
             }
-            // Clear/coalesce, then recheck. An enqueue before clear is visible in
-            // the inbox; one after recheck publishes a fresh native pipe byte.
-            wake.arm();
+            // Reopen notification, then claim durable producer duty. A source
+            // publication or returned capacity before this boundary needs a new
+            // producer turn even when its pipe notification was coalesced. After
+            // this boundary a publisher owes a fresh native pipe notification.
+            // No producer callback or native work runs under a transport lock.
+            if wake.arm() {
+                continue;
+            }
+            // Application inbox and short/offer ports retain their own rechecks.
             match dequeue(requests, self.wake) {
                 Ok(request) => {
                     self.receive(request)?;
@@ -697,17 +717,7 @@ impl Pump<'_> {
             if self.shutdown_turn(&mut draining)? {
                 return Ok(());
             }
-            let remaining = self.wait_remaining(waiting);
-            if remaining.is_some_and(|value| value.is_zero()) {
-                continue;
-            }
-            let micros = wait_timeout(remaining);
-            observed(
-                self.image,
-                self.wake,
-                super::SchemeServicePhase::Wait,
-                || control(self.image, &[4, micros]),
-            )?;
+            self.wait_native(waiting)?;
         }
     }
 }

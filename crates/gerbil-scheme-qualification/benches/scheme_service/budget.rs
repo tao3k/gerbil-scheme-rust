@@ -3,7 +3,7 @@ use super::GATE;
 use gerbil_scheme::instances::InstancePool;
 use serde_json::{Value, json};
 pub(super) fn configure(pool: &InstancePool, enabled: bool) {
-    let tickets: Vec<_> = (0..4)
+    let tickets: Vec<_> = (0..pool.owners().len())
         .map(|owner| {
             pool.dispatcher()
                 .configure_scheme_service_budget_on(owner, usize::from(enabled))
@@ -20,7 +20,7 @@ pub(super) fn snapshot(
     inputs: &[Vec<i64>],
     probes: usize,
 ) -> Value {
-    let tickets: Vec<_> = (0..4)
+    let tickets: Vec<_> = (0..pool.owners().len())
         .map(|owner| pool.dispatcher().scheme_service_budget_on(owner).unwrap())
         .collect();
     let rows: Vec<_> = tickets
@@ -31,7 +31,7 @@ pub(super) fn snapshot(
     let bulk: u64 = rows.iter().map(|row| row.bulk_units).sum();
     let waits = inputs.iter().filter(|row| row[1] == 1).count();
     let handoffs = if super::settings::work_budget_ab() {
-        (0..4)
+        (0..pool.owners().len())
             .map(|owner| {
                 pool.dispatcher()
                     .scheme_service_work_on(owner)
@@ -80,7 +80,7 @@ pub(super) fn wake(pool: &InstancePool, direct: bool) {
     } else {
         SchemeServiceWake::Watcher
     };
-    let tickets: Vec<_> = (0..4)
+    let tickets: Vec<_> = (0..pool.owners().len())
         .map(|owner| {
             pool.dispatcher()
                 .configure_scheme_service_wake_on(owner, mode)
@@ -99,7 +99,7 @@ pub(super) fn notification(pool: &InstancePool, independent: bool) {
     } else {
         SchemeServiceNotification::Coalesced
     };
-    for owner in 0..4 {
+    for owner in 0..pool.owners().len() {
         pool.dispatcher()
             .configure_scheme_service_notification_on(owner, policy)
             .unwrap();
@@ -120,7 +120,7 @@ fn turn_ownership(pool: &InstancePool) -> (Option<u64>, u64) {
     if !super::settings::actor_turn_ab() {
         return (None, 0);
     }
-    let turns: Vec<_> = (0..4)
+    let turns: Vec<_> = (0..pool.owners().len())
         .map(|owner| {
             pool.dispatcher()
                 .scheme_service_actor_turn_on(owner)

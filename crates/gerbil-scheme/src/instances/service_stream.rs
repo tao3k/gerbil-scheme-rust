@@ -140,10 +140,26 @@ impl InstanceDispatcher {
         capacity: &super::capacity::Capacity,
         ready: Option<&Arc<super::service_ready::Channels<M::Output>>>,
     ) -> Result<Staged<M::Output>, InstanceError> {
+        self.stage_service_delivery_indexed(messages, config, capacity, ready, 0)
+    }
+    pub(super) fn stage_service_delivery_indexed<M: SchemeServiceRequest>(
+        &self,
+        messages: Vec<M>,
+        config: SchemeServiceStreamConfig,
+        capacity: &super::capacity::Capacity,
+        ready: Option<&Arc<super::service_ready::Channels<M::Output>>>,
+        first_sequence: usize,
+    ) -> Result<Staged<M::Output>, InstanceError> {
         let mut work = 0_usize;
         let mut requests = VecDeque::new();
         let mut pending = VecDeque::new();
-        for (sequence, message) in messages.into_iter().enumerate() {
+        for (offset, message) in messages.into_iter().enumerate() {
+            let sequence =
+                first_sequence
+                    .checked_add(offset)
+                    .ok_or(InstanceError::InvalidConfig(
+                        "service input sequence overflow",
+                    ))?;
             let message = super::service_contract::Checked::new(message)?;
             if message.lane().is_some() {
                 return Err(InstanceError::InvalidConfig(

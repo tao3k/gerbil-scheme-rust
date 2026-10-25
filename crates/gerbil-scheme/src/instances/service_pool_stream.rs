@@ -81,7 +81,7 @@ impl InstanceDispatcher {
         config: SchemeServicePoolStreamConfig,
         mode: SchemeServiceSupplyAdmission,
     ) -> Result<SchemeServiceStream<M::Output>, InstanceError> {
-        self.pool_stream_delivery(messages, config, mode, false)
+        self.pool_stream_delivery(messages, config, mode, false, None)
             .await
     }
     /// Deliver results in ready-owner rotation with stable input indices, avoiding
@@ -97,7 +97,42 @@ impl InstanceDispatcher {
         config: SchemeServicePoolStreamConfig,
         mode: SchemeServiceSupplyAdmission,
     ) -> Result<super::SchemeServiceReadyStream<M::Output>, InstanceError> {
-        self.pool_stream_delivery(messages, config, mode, true)
+        self.pool_stream_delivery(messages, config, mode, true, None)
+            .await
+            .map(super::SchemeServiceReadyStream)
+    }
+    /// Prepare lazy, root-free Rust inputs as bounded client service turns, then
+    /// register the existing pool producers. One deadline covers preparation,
+    /// registration and uncommitted input. Count uses the existing pool inbox
+    /// bound; declared work is validated by the existing staging transaction.
+    /// Each iterator step must have bounded CPU/bytes and must not enter Scheme.
+    /// The driver services signalled client progress between steps. Owners keep
+    /// running independently; client consumption never grants native capacity.
+    /// # Errors
+    /// Preparation error/expiry and the ordinary ready-stream validation errors.
+    pub async fn prepare_scheme_service_pool_ready_stream<I, M, P>(
+        &self,
+        messages: I,
+        config: SchemeServicePoolStreamConfig,
+        mode: SchemeServiceSupplyAdmission,
+        driver: &mut super::InstanceClientProgressDriver<P>,
+    ) -> Result<super::SchemeServiceReadyStream<M::Output>, InstanceError>
+    where
+        I: ExactSizeIterator<Item = Result<M, InstanceError>>,
+        M: SchemeServiceRequest,
+        P: std::future::Future,
+    {
+        let deadline =
+            Instant::now()
+                .checked_add(config.timeout)
+                .ok_or(InstanceError::InvalidConfig(
+                    "service pool deadline overflow",
+                ))?;
+        let messages = driver
+            .prepare_bounded(messages, self.admission.queue_capacity, deadline)
+            .await?;
+        driver
+            .wait(self.pool_stream_delivery(messages, config, mode, true, Some(deadline)))
             .await
             .map(super::SchemeServiceReadyStream)
     }
@@ -107,12 +142,13 @@ impl InstanceDispatcher {
         mut config: SchemeServicePoolStreamConfig,
         mode: SchemeServiceSupplyAdmission,
         ready: bool,
+        deadline: Option<Instant>,
     ) -> Result<SchemeServiceStream<M::Output>, InstanceError> {
         if mode == SchemeServiceSupplyAdmission::ProgressFair {
             self.require_progress_owners(&config.owners)?;
         }
         let (source, mut stream, capacities, deadline) =
-            self.prepare_pool(messages, &mut config, ready)?;
+            self.prepare_pool(messages, &mut config, ready, deadline)?;
         if mode == SchemeServiceSupplyAdmission::ProgressFair {
             source
                 .fair
@@ -143,7 +179,7 @@ impl InstanceDispatcher {
         stream.wake();
         Ok(stream)
     }
-    fn pool_capacity<M: SchemeServiceRequest>(
+    pub(super) fn pool_capacity<M: SchemeServiceRequest>(
         &self,
         owner: usize,
         messages: &[M],
@@ -166,13 +202,18 @@ impl InstanceDispatcher {
         messages: Vec<M>,
         config: &mut SchemeServicePoolStreamConfig,
         ready: bool,
+        deadline: Option<Instant>,
     ) -> Result<Prepared<M::Output>, InstanceError> {
         let deadline =
-            Instant::now()
-                .checked_add(config.timeout)
-                .ok_or(InstanceError::InvalidConfig(
-                    "service pool deadline overflow",
-                ))?;
+            match deadline {
+                Some(deadline) => deadline,
+                None => Instant::now().checked_add(config.timeout).ok_or(
+                    InstanceError::InvalidConfig("service pool deadline overflow"),
+                )?,
+            };
+        if Instant::now() >= deadline {
+            return Err(InstanceError::Timeout);
+        }
         config.owners.sort_unstable();
         if config.owners.is_empty()
             || config.owners.windows(2).any(|w| w[0] == w[1])

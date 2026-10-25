@@ -20,6 +20,7 @@ module owner_lifecycle {
     capacityLimit: int, capacityHeld: Set[int], reserved: Set[int],
     workLimit: int, workHeld: Set[int],
     poolStaged: Set[int], poolReady: bool, poolPremature: bool,
+    poolStreaming: bool, poolSealed: bool, poolInputFailed: bool, poolPublished: Set[int], poolInputLimit: int,
     producerLimit: int, producers: Set[int], staged: Set[int], producerJobs: Set[int],
     servicePending: Set[int], serviceReady: Set[int], serviceRoots: Set[int], serviceFailed: Set[int],
     inbox: Set[int], wakeOwed: Set[int], notified: Set[int], parked: Set[int],
@@ -43,6 +44,7 @@ module owner_lifecycle {
     capacityLimit: JOBS.size(), capacityHeld: Set(), reserved: Set(),
     workLimit: JOBS.size() + 7, workHeld: Set(),
     poolStaged: Set(), poolReady: false, poolPremature: false,
+    poolStreaming: false, poolSealed: true, poolInputFailed: false, poolPublished: Set(), poolInputLimit: JOBS.size()+7,
     producerLimit: JOBS.size(), producers: Set(), staged: Set(), producerJobs: Set(),
     servicePending: Set(), serviceReady: Set(), serviceRoots: Set(), serviceFailed: Set(),
     inbox: Set(), wakeOwed: Set(), notified: Set(), parked: Set(),
@@ -141,6 +143,7 @@ module owner_lifecycle {
   }
   action finishProducer(owner: int): bool = all {
     Set("open", "closing").contains(s.phase), s.producers.contains(owner),
+    (not(s.poolStreaming) or s.poolSealed),
     s.poolStaged.size() == 0, s.offers.size() == 0, s.producerJobs.filter(job => ownerOf(job) == owner).subseteq(s.completed),
     s' = { ...s, producers: s.producers.exclude(Set(owner)),
       producerJobs: s.producerJobs.filter(job => ownerOf(job) != owner) }
@@ -291,7 +294,10 @@ module owner_lifecycle {
       s.inbox.exists(r => ownerOf(r) == owner) or s.serviceReady.exists(r => ownerOf(r) == owner),
       s.notified.contains(owner) or s.wakeOwed.contains(owner))),
     not(s.poolPremature), s.poolStaged.subseteq(JOBS), s.poolStaged.intersect(s.accepted.union(s.producerJobs).union(s.workHeld)).size() == 0,
-    implies(s.poolReady and s.poolStaged.size() > 0, s.producers == Set(1, 2)),
+    implies(s.poolReady and s.poolStaged.size() > 0 and not(s.poolStreaming), s.producers == Set(1, 2)),
+    implies(s.poolInputFailed, s.poolSealed and s.poolStaged.size() == 0),
+    s.poolPublished.subseteq(JOBS),
+    implies(s.poolStreaming, s.poolPublished.fold(0,(n,r) => n+units(r)) <= s.poolInputLimit),
     s.producerLimit > 0, Set(1, 2).forall(owner => producerActive(owner) <= s.producerLimit),
     s.producers.subseteq(Set(1, 2)), s.staged.subseteq(s.producerJobs), s.producerJobs.subseteq(JOBS),
     s.producerJobs.subseteq(s.staged.union(s.accepted)), s.staged.intersect(s.accepted).size() == 0,
@@ -432,9 +438,11 @@ module owner_lifecycle {
   // a fixed owner only after its active/native capacities and barrier are ready.
   // Speculative partial credits and OS wake delivery are native obligations.
   action stagePool(r: int): bool = all {
-    s.phase == "open", not(s.poolReady), JOBS.contains(r),
+    s.phase == "open", (not(s.poolReady) or (s.poolStreaming and not(s.poolSealed) and not(s.poolInputFailed))), JOBS.contains(r),
+    not(s.poolPublished.contains(r)),
+    not(s.poolStreaming) or s.poolPublished.union(Set(r)).fold(0,(n,j) => n+units(j)) <= s.poolInputLimit,
     not(s.poolStaged.union(s.offers).union(s.accepted).union(s.producerJobs).union(s.workHeld).contains(r)),
-    s' = { ...s, poolStaged: s.poolStaged.union(Set(r)) }
+    s' = { ...s, poolStaged: s.poolStaged.union(Set(r)), poolPublished: s.poolPublished.union(Set(r)) }
   }
   action enablePool = all {
     s.phase == "open", not(s.poolReady), s.producers == Set(1, 2),
@@ -451,7 +459,7 @@ module owner_lifecycle {
       accepted: s.accepted.union(Set(r)), capacityHeld: s.capacityHeld.union(Set(r)), workHeld: s.workHeld.union(Set(r)),
       inbox: s.inbox.union(Set(r)), wakeOwed: s.wakeOwed.union(Set(owner)) }
   }
-  action claimPool(r: int, owner: int): bool = all { s.poolReady, claimPoolUnchecked(r, owner) }
+  action claimPool(r: int, owner: int): bool = all { s.poolReady, not(s.poolInputFailed), claimPoolUnchecked(r, owner) }
   // Cancellation owns only the still-unassigned Rust payload, never a claim.
   action cancelShort(r: int): bool = all {
     s.poolStaged.contains(r),
@@ -470,6 +478,66 @@ module owner_lifecycle {
     nondet owner = Set(1, 2).oneOf()
     any { streamStep, stagePool(r), enablePool, claimPool(r, owner), cancelPool }
   }
+  // An opt-in open source reuses the producer set and native capacity. The
+  // cumulative publication budget is independent of native per-owner work.
+  action streamingInputOpen = all {
+    s.phase == "open", not(s.poolStreaming), s.accepted.size() == 0,
+    s' = { ...s, poolStreaming: true, poolSealed: false, poolReady: true }
+  }
+  action streamingInputSeal = all {
+    s.poolStreaming, not(s.poolSealed),
+    s' = { ...s, poolSealed: true }
+  }
+  action streamingInputAbort = all {
+    s.poolStreaming,
+    s' = { ...s, poolSealed: true, poolInputFailed: true, poolStaged: Set(), shortSignalled: Set() }
+  }
+  action streamingInputBudget(limit: int): bool = all {
+    s.poolPublished.size() == 0, limit > 0,
+    s' = { ...s, poolInputLimit: limit }
+  }
+  action unsafeStreamingPublish(r: int): bool = all {
+    s.poolInputFailed, s' = { ...s, poolStaged: s.poolStaged.union(Set(r)) }
+  }
+  action unsafeStreamingFinish(owner: int): bool = all {
+    s.poolStreaming, not(s.poolSealed), s.producers.contains(owner),
+    s' = { ...s, producers: s.producers.exclude(Set(owner)), poolPremature: true }
+  }
+  action streamingStart = init.then(streamingInputOpen)
+  action streamingInputStep = {
+    nondet r = JOBS.oneOf()
+    nondet owner = Set(1,2).oneOf()
+    any { streamStep, stagePool(r), claimPool(r,owner), streamingInputSeal, streamingInputAbort }
+  }
+  run streamingInputPartialRegistrationTest = init.then(streamingInputOpen).then(registerProducer(1)).then(stagePool(3))
+    .then(claimPool(3,1)).then(submitService(3))
+    .then(all { assert(s.producers == Set(1)), assert(s.serviceRoots == Set(3)), assert(not(s.poolSealed)), assert(safety), stutter })
+    .then(registerProducer(2)).then(streamingInputSeal).then(readyService(3,false)).then(complete(3))
+    .then(finishProducer(1)).then(finishProducer(2)).then(all { assert(safety), stutter })
+  run streamingInputEmptyOpenTest = init.then(streamingInputOpen).then(registerProducer(1))
+    .then(all { assert(s.poolStaged.size() == 0), assert(not(s.poolSealed)), assert(safety), stutter })
+    .then(stagePool(3)).then(claimPool(3,1)).then(complete(3)).then(streamingInputSeal).then(finishProducer(1))
+    .then(all { assert(s.producers.size() == 0), assert(safety), stutter })
+  // Native execution/retirement must not await future Rust publication or seal.
+  run streamingInputOpenExecutionRetirementTest = init.then(streamingInputOpen).then(registerProducer(1))
+    .then(stagePool(1)).then(claimPool(1,1)).then(submitService(1))
+    .then(readyService(1,false)).then(complete(1))
+    .then(all { assert(not(s.poolSealed)), assert(s.producers == Set(1)),
+      assert(s.serviceRoots.size() == 0), assert(s.servicePending.size() == 0),
+      assert(s.capacityHeld.size() == 0), assert(s.workHeld.size() == 0), assert(s.ready == Set(1)), assert(safety), stutter })
+    .then(streamingInputSeal).then(finishProducer(1)).then(all { assert(safety), stutter })
+  run streamingInputAbortAcceptedDrainTest = init.then(streamingInputOpen).then(registerProducer(1)).then(stagePool(1)).then(stagePool(3))
+    .then(claimPool(1,1)).then(submitService(1)).then(streamingInputAbort).then(close)
+    .then(all { assert(s.serviceRoots == Set(1)), assert(s.capacityHeld == Set(1)), assert(s.poolStaged.size() == 0), assert(safety), stutter })
+    .then(readyService(1,true)).then(complete(1)).then(finishProducer(1)).then(join)
+    .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
+  run streamingInputSeparateBudgetTest = init.then(configureWork(8)).then(streamingInputBudget(9)).then(streamingInputOpen)
+    .then(registerProducer(1)).then(stagePool(1)).then(stagePool(3)).then(claimPool(1,1))
+    .then(all { assert(s.poolPublished == Set(1,3)), assert(workUsed(1) == 8), assert(s.poolInputLimit == 9), assert(safety), stutter })
+  run streamingInputLatePublicationMutationTest = init.then(streamingInputOpen).then(registerProducer(1))
+    .then(streamingInputAbort).then(unsafeStreamingPublish(3)).then(all { assert(not(safety)), stutter })
+  run streamingInputPrematureFinishMutationTest = init.then(streamingInputOpen).then(registerProducer(1))
+    .then(unsafeStreamingFinish(1)).then(all { assert(not(safety)), stutter })
   action poolRegistrationMutationInit = s' = { ...initial, poolStaged: Set(3), producers: Set(1) }
   action unsafePoolRegistrationStep = {
     nondet r = JOBS.oneOf()
@@ -927,11 +995,11 @@ module service_sharing {
   type Delivery = {
     enabled: bool, requests: Set[int], queues: int -> List[int], cursor: int,
     consumed: Set[int], armed: bool, wakeOwed: bool, dropped: bool,
-    readyService: bool, coopAvailable: bool, turnMode: bool, turnChecked: bool, turnMissed: bool, expectedOwner: int, pickedOwner: int
+    preparationRemaining: int, preparationCount: int, readyService: bool, coopAvailable: bool, turnMode: bool, turnChecked: bool, turnMissed: bool, expectedOwner: int, pickedOwner: int
   }
   val emptyDelivery: Delivery = { enabled: false, requests: Set(), queues: owners.mapBy(_ => List()),
     cursor: 1, consumed: Set(), armed: false, wakeOwed: false, dropped: false,
-    readyService: false, coopAvailable: true, turnMode: false, turnChecked: false, turnMissed: false, expectedOwner: 0, pickedOwner: 0 }
+    preparationRemaining: 0, preparationCount: 0, readyService: false, coopAvailable: true, turnMode: false, turnChecked: false, turnMissed: false, expectedOwner: 0, pickedOwner: 0 }
   type ArrivalClock = {mode: Set[int], generation: int -> int, event: int -> int, observed: Set[int]}
   val emptyArrivalClock: ArrivalClock = {mode: Set(), generation: JOBS.mapBy(_ => 0), event: JOBS.mapBy(_ => 0), observed: Set()}
   type Shared = {
@@ -2006,6 +2074,8 @@ module service_sharing {
     deliveryCount == deliveryQueued.size(), deliveryCount <= q.delivery.requests.size(),
     q.delivery.consumed.subseteq(q.observedReplies),
     q.delivery.expectedOwner == q.delivery.pickedOwner, not(q.delivery.turnMissed),
+    q.delivery.preparationRemaining >= 0, q.delivery.preparationCount >= 0,
+    q.delivery.preparationRemaining + q.delivery.preparationCount <= 2,
     implies(q.delivery.armed and deliveryQueued.size() > 0, q.delivery.wakeOwed),
     implies(q.delivery.dropped, deliveryQueued.size() == 0 and not(q.delivery.armed))
   }
@@ -2061,6 +2131,23 @@ module service_sharing {
   action cooperativeClientCheck = if (q.delivery.coopAvailable) clientTurnCheck else clientTurnChecked
   action completionServiceCheck = if (q.delivery.readyService and q.replies.contains(3))
     clientTurnCheck else cooperativeClientCheck
+  // Root-free Rust preparation reuses the client turn boundary, not native
+  // constructed-input ownership, execution fuel or producer capacity.
+  action preparationStart = all { q.delivery.turnMode, life::stutter,
+    q' = { ...q, delivery: { ...q.delivery, preparationRemaining: 2, preparationCount: 0, turnChecked: false } } }
+  action preparationItem = all { q.delivery.preparationRemaining > 0, q.delivery.turnChecked, life::stutter,
+    q' = { ...q, delivery: { ...q.delivery, preparationRemaining: q.delivery.preparationRemaining - 1,
+      preparationCount: q.delivery.preparationCount + 1, turnChecked: false } } }
+  action preparationDiscard = all { life::stutter,
+    q' = { ...q, delivery: { ...q.delivery, preparationRemaining: 0, preparationCount: 0 } } }
+  action unsafePreparationSkip = all { q.delivery.preparationRemaining > 0, not(q.delivery.turnChecked), life::stutter,
+    q' = { ...q, delivery: { ...q.delivery, turnMissed: true } } }
+  action jointInputOpen = all { life::streamingInputOpen, q' = q }
+  action jointInputSeal = all { life::streamingInputSeal, q' = q }
+  action jointInputWindow(r: int): bool = all {
+    q.delivery.turnMode, q.delivery.turnChecked, life::stagePool(r),
+    q' = { ...q, delivery: { ...q.delivery, turnChecked: false } }
+  }
   action unsafeClientTurnSkip = all {
     q.delivery.turnMode, not(q.delivery.turnChecked), deliveryFirstOwner != 0,
     deliveryTakeOwner(deliveryFirstOwner)
@@ -2199,6 +2286,15 @@ module service_sharing_cases {
   const CASE_JOBS: Set[int]
   const CASE_ASSIGNED: int -> int
   import service_sharing(JOBS = CASE_JOBS, ASSIGNED = CASE_ASSIGNED).*
+  // Architecture refinement exports projections of this SAME runtime state.
+  action architectureBaseInit = deliveryStart
+  action architectureBaseIdle = resourceStutter
+  action architectureBaseComplete = deliveryOne
+  action architectureBaseConsume = deliveryTake
+  val architectureBaseSafe = resourceSafety
+  val architectureBaseRoots = rootedJobs
+  val architectureBaseCapacity = capacityJobs
+  val architectureBaseConsumed = q.delivery.consumed
   action currentInit = implementationInit
   action sharedInit = candidateInit
   action sharedStep = resourceStep
@@ -2545,6 +2641,27 @@ module service_sharing_cases {
     .then(all { assert(rootedJobs.size() == 0), assert(capacityJobs.size() == 0), assert(resourceSafety), resourceStutter })
   action completionServiceReadyMutationProof = completionServiceStart.then(completionClaim(3)).then(unsafeJointClaimCompletes(3))
     .then(all { assert(not(resourceSafety)), resourceStutter })
+  action preparationBeforeNextProof = completionServiceStart.then(preparationStart)
+    .then(completionServiceCheck).then(preparationItem).then(claimProgressNative)
+    .then(completionServiceCheck).then(preparationItem).then(completionServiceCheck)
+    .then(all { assert(q.delivery.preparationCount == 2), assert(q.observedReplies == Set(3)), assert(capacityJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  action preparationFinalProof = completionServiceStart.then(preparationStart)
+    .then(completionServiceCheck).then(preparationItem).then(completionServiceCheck).then(preparationItem)
+    .then(claimProgressNative).then(completionServiceCheck)
+    .then(all { assert(q.observedReplies == Set(3)), assert(resourceSafety), resourceStutter })
+  action preparationCancelProof = completionServiceStart.then(preparationStart)
+    .then(completionServiceCheck).then(preparationItem).then(preparationDiscard).then(completionCancel(3))
+    .then(resourceClose).then(completionFinishOwner(1)).then(completionFinishOwner(2)).then(resourceJoin)
+    .then(all { assert(q.delivery.preparationCount == 0), assert(rootedJobs.size() == 0), assert(capacityJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  action preparationSkipProof = completionServiceStart.then(preparationStart).then(unsafePreparationSkip)
+    .then(all { assert(not(resourceSafety)), resourceStutter })
+  action streamingJointStart = claimProgressArmed.then(enableDelivery).then(enableClientTurn).then(enableCompletionService).then(jointInputOpen)
+  action streamingJointClientProof = streamingJointStart.then(completionServiceCheck).then(jointInputWindow(1))
+    .then(claimProgressNative).then(completionServiceCheck).then(jointInputWindow(2)).then(jointInputSeal)
+    .then(all { assert(q.observedReplies == Set(3)), assert(unassignedJobs == Set(1,2)), assert(capacityJobs.size() == 0), assert(resourceSafety), resourceStutter })
+  action streamingJointLastProof = streamingJointStart.then(completionServiceCheck).then(jointInputWindow(1))
+    .then(claimProgressNative).then(completionServiceCheck).then(jointInputSeal)
+    .then(all { assert(q.observedReplies == Set(3)), assert(resourceSafety), resourceStutter })
   action clientTurnStart = claimProgressArmed.then(enableDelivery).then(enableClientTurn)
   action clientTurnBulkReady = clientTurnStart.then(deliveryJob(1,1,1)).then(completionAck(1,q.completionEpoch.get(1))).then(boundary(1))
   action clientTurnFinalProof = clientTurnBulkReady.then(claimProgressNative).then(clientTurnCheck)
@@ -3183,6 +3300,12 @@ module service_completion_small {
   run crossTokioHeldAwaitMutationTest = crossTokioMutationProof
   run crossActorEarlyReadyMutationTest = crossActorMutationProof
   run crossOsParkRunnableMutationTest = crossOsMutationProof
+  run streamingJointClientBetweenWindowsTest = streamingJointClientProof
+  run streamingJointClientAtSealTest = streamingJointLastProof
+  run preparationBeforeNextTest = preparationBeforeNextProof
+  run preparationFinalHandoffTest = preparationFinalProof
+  run preparationCancelCloseTest = preparationCancelProof
+  run preparationSkipMutationTest = preparationSkipProof
   run completionServiceReadyBeforeCoopTest = completionServiceReadyProof
   run completionServiceLegacyDeferralTest = completionServiceLegacyProof
   run completionServiceClaimNotResultTest = completionServiceClaimProof
@@ -3346,6 +3469,12 @@ module service_completion_wide {
   run deliveryRotationTest = deliveryRotationProof
   run deliveryPickMutationTest = deliveryPickMutationProof
   run deliveryHeadBypassTest = deliveryBypassProof
+  run streamingJointClientBetweenWindowsTest = streamingJointClientProof
+  run streamingJointClientAtSealTest = streamingJointLastProof
+  run preparationBeforeNextTest = preparationBeforeNextProof
+  run preparationFinalHandoffTest = preparationFinalProof
+  run preparationCancelCloseTest = preparationCancelProof
+  run preparationSkipMutationTest = preparationSkipProof
   run completionServiceReadyBeforeCoopTest = completionServiceReadyProof
   run completionServiceLegacyDeferralTest = completionServiceLegacyProof
   run completionServiceClaimNotResultTest = completionServiceClaimProof
@@ -3483,4 +3612,316 @@ module service_routing_isolated {
     .then(shared::offer(3)).then(shared::feed(3)).then(shared::assignWorker(3, 3))
     .then(shared::acquireCpu(3)).then(shared::compute(3)).then(shared::project(3))
     .then(all { assert(shared::completedJobs.contains(3)), assert(shared::q.gc.contains(1)), assert(shared::resourceSafety), shared::resourceStutter })
+}
+
+// Architecture refinement of the existing Gerbil Actor / owner / Tokio model.
+// CPU occupancy is a host scheduling abstraction, NOT a proposed runtime lease.
+// Wait edges mean "cannot progress until target progresses"; they are not wakes.
+module gerbil_service_architecture {
+  const ARCH_JOBS: Set[int]
+  const ARCH_ASSIGNED: int -> int
+  import service_sharing_cases(CASE_JOBS = ARCH_JOBS, CASE_ASSIGNED = ARCH_ASSIGNED) as base
+  // 1=fixed owner (including its Gerbil green threads), 2=Tokio, 3=Rayon.
+  // Actor CPU is deliberately NOT counted again as a fourth native executor.
+  val executors = Set(1,2,3)
+  val nodes = Set(1,2,3,4,5,6,7)
+  // Wait graph nodes: owner, Gerbil Actor, Tokio client, Rayon preparer,
+  // native capacity, Rust result transport. A cycle is a structural warning,
+  // not a proof that every concrete execution deadlocks.
+  type Topology = {
+    synchronous: bool, rayon: bool, cores: int, running: Set[int],
+    waits: Set[(int,int)], nativeEntrants: Set[int],
+    reserved: bool, prepared: bool, published: int, observed: int, armed: bool,
+    wake: bool, wakes: int, ready: bool, retired: bool,
+    producerClaimed: bool, producerByte: bool, producerDuty: bool,
+    producerRetry: bool, producerParked: bool,
+    supplyLocked: bool, supplyPhase: str, supplyRegistered: bool, supplyNotice: bool, supplyCredits: bool
+  }
+  var topology: Topology
+  pure def reaches(edges: Set[(int,int)], start: int): Set[int] =
+    nodes.fold(Set(start), (seen, _) => seen.union(nodes.filter(target =>
+      seen.exists(previous => edges.contains((previous,target))))))
+  pure def cyclic(edges: Set[(int,int)]): bool = nodes.exists(n =>
+    edges.exists(edge => edge._1 == n and reaches(edges,edge._2).contains(n)))
+  val architectureSafety = and {
+    base::architectureBaseSafe,
+    topology.running.subseteq(executors), topology.running.size() <= topology.cores,
+    topology.nativeEntrants.subseteq(Set(1)),
+    not(topology.running.contains(3)) or topology.rayon,
+    not(topology.prepared) or topology.reserved,
+    topology.observed <= topology.published,
+    not(topology.armed and topology.published > topology.observed) or topology.wake,
+    not(topology.retired) or topology.ready,
+    // Native wait cannot bury a durable producer publication without transport.
+    not(topology.producerParked and topology.producerDuty) or topology.producerByte,
+    topology.supplyPhase != "waiting" or not(topology.supplyCredits),
+    topology.supplyPhase != "waiting" or topology.supplyRegistered,
+    not(topology.supplyPhase == "waiting" and not(topology.supplyLocked)) or topology.supplyNotice,
+    topology.supplyPhase != "waiting" or not(topology.waits.contains((1,7))),
+    not(cyclic(topology.waits))
+  }
+  pure def initialTopology(sync: bool, rayon: bool, cores: int): Topology = {
+    synchronous: sync, rayon: rayon, cores: cores, running: Set(),
+    waits: Set(), nativeEntrants: Set(), reserved: false, prepared: false,
+    published: 0, observed: 0, armed: false, wake: false, wakes: 0,
+    ready: false, retired: false, producerClaimed: false, producerByte: false,
+    producerDuty: false, producerRetry: false, producerParked: false,
+    supplyLocked: false, supplyPhase: "idle", supplyRegistered: false, supplyNotice: false, supplyCredits: false}
+  action architectureInit(sync: bool, rayon: bool, cores: int): bool = all {
+    base::architectureBaseInit, topology' = initialTopology(sync,rayon,cores)
+  }
+  // Node 7 is shared Rust supply data, not a Scheme execution resource.
+  action architectureSupplyLock = all {
+    not(topology.supplyLocked), base::architectureBaseIdle,
+    topology' = {...topology, supplyLocked: true}
+  }
+  action architectureSupplyCredits = all {
+    not(topology.supplyCredits), base::architectureBaseIdle,
+    topology' = {...topology, supplyCredits: true}
+  }
+  action architectureSupplyBusy = all {
+    topology.supplyLocked, base::architectureBaseIdle,
+    topology' = {...topology, supplyPhase: "registering", supplyRegistered: false, supplyNotice: false}
+  }
+  action architectureSupplyRegister = all {
+    topology.supplyPhase == "registering", base::architectureBaseIdle,
+    topology' = {...topology, supplyRegistered: true}
+  }
+  action architectureSupplyRecheck = all {
+    topology.supplyPhase == "registering", topology.supplyRegistered, base::architectureBaseIdle,
+    topology' = if (topology.supplyLocked)
+      {...topology, supplyPhase: "waiting", supplyCredits: false}
+      else {...topology, supplyPhase: "ready", supplyRegistered: false, supplyNotice: false}
+  }
+  action architectureSupplyUnlock = all {
+    topology.supplyLocked, base::architectureBaseIdle,
+    topology' = {...topology, supplyLocked: false, supplyNotice: topology.supplyNotice or topology.supplyRegistered}
+  }
+  action architectureSupplyResume = all {
+    topology.supplyPhase == "waiting", topology.supplyNotice, base::architectureBaseIdle,
+    topology' = {...topology, supplyPhase: "retry", supplyRegistered: false, supplyNotice: false}
+  }
+  action architectureSupplyCancel = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, supplyPhase: "idle", supplyRegistered: false, supplyNotice: false, supplyCredits: false}
+  }
+  action architectureSupplyUnsafeUnlock = all {
+    topology.supplyLocked, base::architectureBaseIdle,
+    topology' = {...topology, supplyLocked: false, supplyNotice: false}
+  }
+  action architectureSupplyUnsafeCredits = all {
+    topology.supplyPhase == "waiting", base::architectureBaseIdle,
+    topology' = {...topology, supplyCredits: true}
+  }
+  run architectureSupplyOwnerCanExecuteTest = architectureInit(false,false,2)
+    .then(architectureSupplyLock).then(architectureSupplyCredits).then(architectureSupplyBusy)
+    .then(architectureSupplyRegister).then(architectureSupplyRecheck).then(architectureStart(1))
+    .then(all { assert(topology.running.contains(1)), assert(not(topology.supplyCredits)), assert(architectureSafety), architectureIdle })
+    .then(architectureSupplyUnlock).then(architectureSupplyResume)
+    .then(all { assert(architectureSafety), architectureIdle })
+  run architectureSupplyUnlockBeforeRegistrationTest = architectureInit(false,false,2)
+    .then(architectureSupplyLock).then(architectureSupplyBusy).then(architectureSupplyUnlock)
+    .then(architectureSupplyRegister).then(architectureSupplyRecheck)
+    .then(all { assert(topology.supplyPhase == "ready"), assert(architectureSafety), architectureIdle })
+  run architectureSupplyUnlockBeforeParkTest = architectureInit(false,false,2)
+    .then(architectureSupplyLock).then(architectureSupplyBusy).then(architectureSupplyRegister)
+    .then(architectureSupplyUnlock).then(architectureSupplyRecheck)
+    .then(all { assert(topology.supplyPhase == "ready"), assert(architectureSafety), architectureIdle })
+  run architectureSupplyCancelTest = architectureInit(false,false,2)
+    .then(architectureSupplyLock).then(architectureSupplyCredits).then(architectureSupplyBusy)
+    .then(architectureSupplyRegister).then(architectureSupplyRecheck).then(architectureSupplyCancel)
+    .then(architectureSupplyUnlock)
+    .then(all { assert(not(topology.supplyRegistered)), assert(not(topology.supplyNotice)), assert(not(topology.supplyCredits)), assert(architectureSafety), architectureIdle })
+  run architectureSupplyMissingUnlockMutationTest = architectureInit(false,false,2)
+    .then(architectureSupplyLock).then(architectureSupplyBusy).then(architectureSupplyRegister)
+    .then(architectureSupplyRecheck).then(architectureSupplyUnsafeUnlock)
+    .then(all { assert(not(architectureSafety)), architectureIdle })
+  run architectureSupplyHeldCreditMutationTest = architectureInit(false,false,2)
+    .then(architectureSupplyLock).then(architectureSupplyBusy).then(architectureSupplyRegister)
+    .then(architectureSupplyRecheck).then(architectureSupplyUnsafeCredits)
+    .then(all { assert(not(architectureSafety)), architectureIdle })
+  run architectureSupplyNativeBlockMutationTest = architectureInit(false,false,2)
+    .then(architectureSupplyLock).then(architectureSupplyBusy).then(architectureSupplyRegister)
+    .then(architectureSupplyRecheck).then(architectureWait(Set((1,7))))
+    .then(all { assert(not(architectureSafety)), architectureIdle })
+  action architectureIdle = all { base::architectureBaseIdle, topology' = topology }
+  action architectureWait(edges: Set[(int,int)]): bool = all {
+    base::architectureBaseIdle, topology' = {...topology, waits: edges}
+  }
+  action architectureStart(executor: int): bool = all {
+    executors.contains(executor), not(topology.running.contains(executor)),
+    topology.running.size() < topology.cores,
+    executor != 3 or (topology.rayon and topology.reserved),
+    base::architectureBaseIdle, topology' = {...topology, running: topology.running.union(Set(executor))}
+  }
+  action architectureStop(executor: int): bool = all {
+    topology.running.contains(executor), base::architectureBaseIdle,
+    topology' = {...topology, running: topology.running.exclude(Set(executor))}
+  }
+  action architectureReserve = all {
+    not(topology.reserved), base::architectureBaseIdle,
+    topology' = {...topology, reserved: true}
+  }
+  action architecturePrepare = all {
+    topology.reserved, not(topology.prepared),
+    not(topology.rayon) or topology.running.contains(3),
+    base::architectureBaseIdle, topology' = {...topology, prepared: true}
+  }
+  action architectureNative(executor: int): bool = all {
+    executor == 1, topology.prepared, topology.running.contains(1),
+    base::architectureBaseIdle,
+    topology' = {...topology, nativeEntrants: topology.nativeEntrants.union(Set(executor))}
+  }
+  // Publication increments a generation even when a notification is coalesced.
+  // Registration plus recheck is atomic in this abstraction.
+  action architecturePublish = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, published: topology.published+1,
+      wake: topology.wake or topology.armed,
+      wakes: topology.wakes + (if (topology.armed and not(topology.wake)) 1 else 0)}
+  }
+  action architectureArm = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, armed: true,
+      wake: topology.wake or topology.published > topology.observed}
+  }
+  action architectureObserve = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, observed: topology.published, armed: false, wake: false}
+  }
+  // Reuses actual rooted execution / projection / capacity retirement actions;
+  // does not invent another native queue, root table, or execution budget.
+  action architectureCompletedInit = all {
+    base::architectureBaseComplete,
+    topology' = {...initialTopology(false,false,2), ready: true, retired: true}
+  }
+  action architectureCancelPrepared = all {
+    not(topology.ready), base::architectureBaseIdle,
+    topology' = {...topology, reserved: false, prepared: false, running: Set()}
+  }
+  action architectureCpuMutation = all {
+    base::architectureBaseIdle, topology' = {...topology, running: executors}
+  }
+  action architectureForeignMutation = all {
+    base::architectureBaseIdle, topology' = {...topology, nativeEntrants: Set(3)}
+  }
+  action architectureLostWakeMutation = all {
+    base::architectureBaseIdle, topology' = {...topology, wake: false}
+  }
+  // Resident producer notification refines Wake::notify_producer / arm. The
+  // previous mailbox token was durable too; removing it without this duty is
+  // the mutation, NOT a claimed lost-wake bug in the previous implementation.
+  action residentProducerPublish = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, producerDuty: true, producerClaimed: true,
+      producerByte: topology.producerByte or not(topology.producerClaimed)}
+  }
+  action residentProducerRead = all {
+    topology.producerByte, base::architectureBaseIdle,
+    topology' = {...topology, producerByte: false, producerParked: false}
+  }
+  action residentProducerReopen = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, producerClaimed: false}
+  }
+  action residentProducerCheck = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, producerDuty: false,
+      producerRetry: topology.producerDuty, producerParked: false}
+  }
+  action residentProducerArm = residentProducerReopen.then(residentProducerCheck)
+  action residentProducerPark = all {
+    not(topology.producerRetry), base::architectureBaseIdle,
+    topology' = {...topology, producerParked: true}
+  }
+  action unsafeResidentProducerPark = all {
+    base::architectureBaseIdle,
+    topology' = {...topology, producerClaimed: false, producerParked: true}
+  }
+  run architectureResidentCoalescedDutyTest = architectureInit(false,false,2)
+    .then(residentProducerPublish).then(residentProducerRead).then(residentProducerPublish)
+    .then(all { assert(not(topology.producerByte)), assert(topology.producerDuty), architectureIdle })
+    .then(residentProducerArm)
+    .then(all { assert(topology.producerRetry), assert(architectureSafety), architectureIdle })
+  run architectureResidentPublishAfterArmTest = architectureInit(false,false,2)
+    .then(residentProducerArm).then(residentProducerPublish).then(residentProducerPark)
+    .then(all { assert(topology.producerByte), assert(architectureSafety), architectureIdle })
+    .then(residentProducerRead).then(residentProducerArm)
+    .then(all { assert(topology.producerRetry), assert(architectureSafety), architectureIdle })
+  run architectureResidentPublishDuringArmTest = architectureInit(false,false,2)
+    .then(residentProducerReopen).then(residentProducerPublish).then(residentProducerCheck)
+    .then(all { assert(topology.producerRetry), assert(topology.producerByte),
+      assert(architectureSafety), architectureIdle })
+  run architectureResidentEmptyParkTest = architectureInit(false,false,2)
+    .then(residentProducerArm).then(residentProducerPark)
+    .then(all { assert(architectureSafety), architectureIdle })
+  run architectureResidentRemovedTokenMutationTest = architectureInit(false,false,2)
+    .then(residentProducerPublish).then(residentProducerRead).then(residentProducerPublish)
+    .then(unsafeResidentProducerPark)
+    .then(all { assert(not(architectureSafety)), architectureIdle })
+
+  // Counts only ADDITIONAL scheduler round trips at the Rust/Gerbil boundary.
+  // Common construction, handler, GC and projection costs are not removed.
+  pure def extraHandoffs(items: int, windows: int, perItem: bool, rayon: bool): int =
+    (if (perItem) items else windows) * (if (rayon) 4 else 2)
+
+  run architectureSyncDependencyTest = architectureInit(true,false,2)
+    .then(architectureWait(Set((3,1),(1,2))))
+    .then(all { assert(architectureSafety), architectureIdle })
+  run architectureSyncCallbackCycleTest = architectureInit(true,false,2)
+    .then(architectureWait(Set((3,1),(1,2),(2,3))))
+    .then(all { assert(cyclic(topology.waits)), assert(not(architectureSafety)), architectureIdle })
+  run architectureResidentDependencyTest = architectureInit(false,false,2)
+    .then(architectureWait(Set((3,6),(6,1),(2,1))))
+    .then(all { assert(architectureSafety), architectureIdle })
+  run architectureCompletionCapacityCycleTest = architectureInit(false,false,2)
+    .then(architectureWait(Set((1,6),(6,3),(3,5),(5,1))))
+    .then(all { assert(not(architectureSafety)), architectureIdle })
+  run architectureRayonCapacityCycleTest = architectureInit(false,true,2)
+    .then(architectureWait(Set((1,4),(4,5),(5,1))))
+    .then(all { assert(not(architectureSafety)), architectureIdle })
+  run architectureBoundedRayonTest = architectureInit(false,true,2)
+    .then(architectureReserve).then(architectureStart(3)).then(architecturePrepare)
+    .then(architectureStop(3)).then(architectureStart(1)).then(architectureNative(1))
+    .then(all { assert(architectureSafety), assert(base::architectureBaseRoots.size()==0), architectureIdle })
+  run architectureSharedCpuTest = architectureInit(false,true,2)
+    .then(architectureReserve).then(architectureStart(1)).then(architectureStart(3))
+    .then(all { assert(not(topology.running.size() < topology.cores)), assert(architectureSafety), architectureIdle })
+    .then(architectureStop(3)).then(architectureStart(2))
+    .then(all { assert(architectureSafety), architectureIdle })
+  run architectureOversubscriptionMutationTest = architectureInit(false,true,2)
+    .then(architectureCpuMutation).then(all { assert(not(architectureSafety)), architectureIdle })
+  run architectureForeignEntryMutationTest = architectureInit(false,true,2)
+    .then(architectureForeignMutation).then(all { assert(not(architectureSafety)), architectureIdle })
+  run architecturePublishBeforeArmTest = architectureInit(false,false,2)
+    .then(architecturePublish).then(architectureArm)
+    .then(all { assert(topology.wake), assert(architectureSafety), architectureIdle })
+  run architectureCoalescedWakeTest = architectureInit(false,false,2)
+    .then(architectureArm).then(architecturePublish).then(architecturePublish)
+    .then(all { assert(topology.wakes==1), assert(topology.published==2), assert(architectureSafety), architectureIdle })
+    .then(architectureObserve).then(architectureArm)
+    .then(all { assert(not(topology.wake)), assert(architectureSafety), architectureIdle })
+  run architectureLostWakeMutationTest = architectureInit(false,false,2)
+    .then(architectureArm).then(architecturePublish).then(architectureLostWakeMutation)
+    .then(all { assert(not(architectureSafety)), architectureIdle })
+  run architectureRetireBeforeClientTest = architectureCompletedInit
+    .then(all { assert(base::architectureBaseConsumed.size()==0), assert(base::architectureBaseCapacity.size()==0),
+      assert(base::architectureBaseRoots.size()==0), assert(architectureSafety), architectureIdle })
+    .then(all { base::architectureBaseConsume, topology'=topology })
+    .then(all { assert(base::architectureBaseConsumed==Set(1)), assert(architectureSafety), architectureIdle })
+  run architecturePreparedCancelTest = architectureInit(false,true,2)
+    .then(architectureReserve).then(architectureStart(3)).then(architecturePrepare)
+    .then(architectureCancelPrepared)
+    .then(all { assert(not(topology.reserved)), assert(not(topology.prepared)),
+      assert(base::architectureBaseRoots.size()==0), assert(architectureSafety), architectureIdle })
+  run architectureBoundaryCostTest = architectureInit(false,false,2)
+    .then(all { assert(extraHandoffs(48,6,true,false)==96),
+      assert(extraHandoffs(48,6,false,false)==12), assert(extraHandoffs(48,6,false,true)==24),
+      assert(architectureSafety), architectureIdle })
+}
+module gerbil_architecture_small {
+  import gerbil_service_architecture(ARCH_JOBS=Set(1,2,3,4), ARCH_ASSIGNED=Set(1,2,3,4).mapBy(_ => 1)).*
+}
+module gerbil_architecture_wide {
+  import gerbil_service_architecture(ARCH_JOBS=Set(1,2,3,4,5), ARCH_ASSIGNED=Set(1,2,3,4,5).mapBy(r => if (r==5) 2 else 1)).*
 }

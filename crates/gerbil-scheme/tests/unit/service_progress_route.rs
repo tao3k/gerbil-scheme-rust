@@ -146,7 +146,7 @@ fn ordinary_full_inbox_does_not_block_offer_and_withdrawal_reuses_slot_immediate
     let old = f.offer();
     let claim = old.claim(&f.target.wake);
     let mut source = Source::Pool(Arc::clone(&f.source));
-    let withdrawn = source.take(8).unwrap();
+    let withdrawn = take(&mut source, 8).unwrap();
     assert!(!f.target.wake.offers.pending());
     f.free();
     f.source.requests.lock().unwrap().push_back(withdrawn);
@@ -284,18 +284,15 @@ fn same_price_entry_has_no_source_fanout_but_price_change_and_eof_signal() {
             std::task::Waker::from(Arc::clone(&count)),
             Arc::downgrade(&f.target.wake),
         ));
-        f.source
-            .signals
-            .lock()
-            .unwrap()
-            .push(Arc::downgrade(&signal));
+        f.source.signals.configure(1);
+        f.source.signals.register(Arc::downgrade(&signal));
         assert!(f.deliver(false, false));
         assert_eq!(count.0.load(Ordering::Acquire), 0);
         let offer = f.offer();
         drop(offer.claim(&f.target.wake).enter().unwrap());
         offer.wake_source();
         assert_eq!(count.0.load(Ordering::Acquire), usize::from(next != 8));
-        drop(Source::Pool(Arc::clone(&f.source)).take(next));
+        drop(take(&mut Source::Pool(Arc::clone(&f.source)), next));
         assert_eq!(count.0.load(Ordering::Acquire), usize::from(next != 8) + 1);
     }
 }
@@ -363,5 +360,145 @@ fn partial_native_credit_return_calls_waiters_only_after_entry_fence_unlocks() {
     assert!(offer.pending());
     drop(busy);
     drop(offer.withdraw());
+    f.free();
+}
+
+fn take(source: &mut Source, units: usize) -> Option<crate::instances::Request> {
+    let mut wait = crate::instances::service_supply_mutex::SupplyWait::default();
+    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
+    let std::task::Poll::Ready(request) = source.poll_take(units, &mut wait, &mut cx) else {
+        panic!("uncontended claim deferred");
+    };
+    request
+}
+
+#[test]
+fn source_cursor_defers_a_busy_offer_without_owning_native_credits() {
+    use crate::instances::service_supply_mutex::SupplyWait;
+    let f = Fixture::new();
+    assert!(f.deliver(false, false));
+    let offer = f.offer();
+    let mut source = Source::Pool(Arc::clone(&f.source));
+    let mut wait = SupplyWait::default();
+    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
+    offer.with_entry_fence(|| {
+        assert!(source.poll_head(&mut wait, &mut cx).is_pending());
+        assert!(source.poll_take(8, &mut wait, &mut cx).is_pending());
+        assert!(f.source.requests.try_lock().is_ok());
+        assert!(f.source.offers.try_lock().is_ok());
+        f.free();
+    });
+    let request = take(&mut source, 8).unwrap();
+    assert!(request.capacity.is_none());
+    assert!(take(&mut source, 8).is_none());
+    f.free();
+}
+#[test]
+fn source_cursor_defers_slot_detach_and_preserves_unique_withdrawal() {
+    use crate::instances::service_supply_mutex::SupplyWait;
+    let f = Fixture::new();
+    assert!(f.deliver(false, false));
+    let offer = f.offer();
+    let mut source = Source::Pool(Arc::clone(&f.source));
+    let mut wait = SupplyWait::default();
+    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
+    f.target.wake.offers.with_slot_fence(|| {
+        assert!(source.poll_take(8, &mut wait, &mut cx).is_pending());
+        assert!(offer.entry_fence_is_free());
+        assert!(f.source.requests.try_lock().is_ok());
+        assert!(f.source.offers.try_lock().is_ok());
+        f.free();
+    });
+    let request = take(&mut source, 8).unwrap();
+    assert!(request.capacity.is_none());
+    assert!(offer.claim(&f.target.wake).enter().is_none());
+    assert!(!f.target.wake.offers.pending());
+    f.free();
+}
+
+#[test]
+fn optional_route_skips_busy_source_without_moving_work() {
+    let f = Fixture::new();
+    let held = f.source.requests.lock().unwrap();
+    assert!(!f.deliver(false, false));
+    assert_eq!(held.len(), 1);
+    drop(held);
+    assert!(f.deliver(false, false));
+    drop(f.offer().withdraw());
+    f.free();
+}
+#[test]
+fn optional_route_rolls_back_without_waiting_for_a_busy_target_slot() {
+    let f = Fixture::new();
+    f.target.wake.offers.with_slot_fence(|| {
+        assert!(!f.deliver(false, false));
+        assert_eq!(f.source.requests.lock().unwrap().len(), 1);
+        assert!(f.source.offers.lock().unwrap().is_empty());
+        f.free();
+    });
+    assert!(f.deliver(false, false));
+    let request = take(&mut Source::Pool(Arc::clone(&f.source)), 8).unwrap();
+    assert!(request.capacity.is_none());
+    assert!(f.source.requests.lock().unwrap().is_empty());
+    f.free();
+}
+
+#[test]
+fn owner_offer_entry_defers_payload_and_slot_without_retaining_credits() {
+    use crate::instances::service_supply_mutex::SupplyWait;
+    use std::task::{Context, Poll, Waker};
+    let f = Fixture::new();
+    assert!(f.deliver(false, false));
+    let offer = f.offer();
+    let mut wait = SupplyWait::default();
+    let mut cx = Context::from_waker(Waker::noop());
+    offer.with_entry_fence(|| {
+        assert!(
+            offer
+                .claim(&f.target.wake)
+                .poll(&mut wait, &mut cx)
+                .is_pending()
+        );
+        f.free();
+    });
+    f.target.wake.offers.with_slot_fence(|| {
+        assert!(
+            offer
+                .claim(&f.target.wake)
+                .poll(&mut wait, &mut cx)
+                .is_pending()
+        );
+        assert!(offer.entry_fence_is_free());
+        f.free();
+    });
+    let Poll::Ready(Some(request)) = offer.claim(&f.target.wake).poll(&mut wait, &mut cx) else {
+        panic!("entry not resumed");
+    };
+    assert!(request.capacity.is_some());
+    assert!(offer.claim(&f.target.wake).enter().is_none());
+    drop(request);
+    f.free();
+}
+#[test]
+fn cancelled_owner_offer_wait_does_not_commit_or_leak_credits() {
+    use crate::instances::service_supply_mutex::SupplyWait;
+    let f = Fixture::new();
+    assert!(f.deliver(false, false));
+    let offer = f.offer();
+    let mut wait = SupplyWait::default();
+    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
+    offer.with_entry_fence(|| {
+        assert!(
+            offer
+                .claim(&f.target.wake)
+                .poll(&mut wait, &mut cx)
+                .is_pending()
+        );
+        wait.clear();
+        f.free();
+    });
+    offer.cancel(crate::instances::InstanceError::Cancelled);
+    assert!(offer.claim(&f.target.wake).enter().is_none());
+    assert!(!f.target.wake.offers.pending());
     f.free();
 }

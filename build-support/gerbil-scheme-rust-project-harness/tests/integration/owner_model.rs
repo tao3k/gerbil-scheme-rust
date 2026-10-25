@@ -8,11 +8,19 @@ fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 fn run(arguments: &[&str]) -> Output {
-    Command::new("quint")
+    eprintln!("QUINT-CHECK {arguments:?}");
+    let started = std::time::Instant::now();
+    let output = Command::new("quint")
         .args(arguments)
         .current_dir(root())
         .output()
-        .expect("installed Quint CLI")
+        .expect("installed Quint CLI");
+    eprintln!(
+        "QUINT-DONE {:?} {:?}",
+        output.status.code(),
+        started.elapsed()
+    );
+    output
 }
 fn success(arguments: &[&str]) {
     let output = run(arguments);
@@ -34,14 +42,24 @@ fn owner_protocol_scenarios_and_controls() {
         scope.spawn(|| {
             lifecycle_protocol(source);
             capacity_protocol(source);
+            native_cycle_scenarios(source, Some(0));
         });
         scope.spawn(|| {
             shared_protocol(source);
             progress_protocol(source);
+            completion_domain(source, "service_completion_small");
+            client_progress_scenarios(source);
+            native_cycle_scenarios(source, Some(1));
         });
         scope.spawn(|| {
-            owner_completion_scenarios_and_control();
+            success(&["typecheck", source]);
+            completion_sharing(source);
+            completion_domain(source, "service_completion_wide");
+            for domain in ["service_completion_small", "service_completion_wide"] {
+                prepared_cycle_control(source, domain);
+            }
             architecture_protocol(source);
+            native_cycle_scenarios(source, Some(2));
         });
     });
 }
@@ -288,6 +306,17 @@ fn owner_protocol_symbolic_8() {
 fn owner_completion_scenarios_and_control() {
     let source = "specs/owner_lifecycle.qnt";
     success(&["typecheck", source]);
+    completion_sharing(source);
+    for domain in ["service_completion_small", "service_completion_wide"] {
+        completion_domain(source, domain);
+    }
+    client_progress_scenarios(source);
+    native_cycle_scenarios(source, None);
+    for domain in ["service_completion_small", "service_completion_wide"] {
+        prepared_cycle_control(source, domain);
+    }
+}
+fn completion_sharing(source: &str) {
     for domain in ["service_sharing_small", "service_sharing_wide"] {
         success(&[
             "test",
@@ -327,50 +356,45 @@ fn owner_completion_scenarios_and_control() {
             "sharedSafety",
         );
     }
-    for domain in ["service_completion_small", "service_completion_wide"] {
-        success(&[
-            "test",
-            source,
-            "--main",
-            domain,
-            "--match",
-            "(streamingJoint|preparation|completionService|arrivalClock|clientTurn|delivery|claimProgress|publication|client|cross|native|readyCycle|executionCheckpoint|directed|registration|reclamation|completion|coalesced|runtime|joint|workBudget|workPlan|leasePlan|activation|preparedCycle|pipeline).*Test",
-            "--seed",
-            "1",
-        ]);
-        success(&[
-            "run",
-            source,
-            "--main",
-            domain,
-            "--init",
-            "completionCoalescedStart",
-            "--step",
-            "sharedStep",
-            "--invariant",
-            "sharedSafety",
-            "--seed",
-            "42",
-            "--max-samples",
-            "1000",
-            "--max-steps",
-            "64",
-            "--verbosity",
-            "1",
-        ]);
-        mutation_counterexample(
-            source,
-            domain,
-            "completionLateReadyStart",
-            "completionStaleAckMutationStep",
-            "sharedSafety",
-        );
-    }
-    client_progress_scenarios(source);
-    native_cycle_scenarios(source);
-    for domain in ["service_completion_small", "service_completion_wide"] {
-        prepared_cycle_control(source, domain);
-    }
+}
+fn completion_domain(source: &str, domain: &str) {
+    success(&[
+        "test",
+        source,
+        "--main",
+        domain,
+        "--match",
+        "(streamingJoint|preparation|completionService|arrivalClock|clientTurn|delivery|claimProgress|publication|client|cross|native|readyCycle|executionCheckpoint|directed|registration|reclamation|completion|coalesced|runtime|joint|workBudget|workPlan|leasePlan|activation|preparedCycle|pipeline).*Test",
+        "--seed",
+        "1",
+    ]);
+    success(&[
+        "run",
+        source,
+        "--main",
+        domain,
+        "--init",
+        "completionCoalescedStart",
+        "--step",
+        "sharedStep",
+        "--invariant",
+        "sharedSafety",
+        "--seed",
+        "42",
+        "--max-samples",
+        "1000",
+        "--max-steps",
+        "64",
+        "--verbosity",
+        "1",
+    ]);
+    mutation_counterexample(
+        source,
+        domain,
+        "completionLateReadyStart",
+        "completionStaleAckMutationStep",
+        "sharedSafety",
+    );
 }
 fn prepared_cycle_control(source: &str, domain: &str) {
     mutation_counterexample(
@@ -451,20 +475,29 @@ fn prepared_cycle_control(source: &str, domain: &str) {
         "sharedSafety",
     );
 }
-fn native_cycle_scenarios(source: &str) {
-    for domain in ["service_completion_small", "service_completion_wide"] {
-        for init in [
-            "nativeCycleStart",
-            "preparedCycleStart",
-            "pipelineCycleStart",
-            "jointStart",
-            "workBudgetStart",
-            "workPlanStart",
-            "leasePlanStart",
-            "activationStart",
-            "cycleAccountingStart",
-            "turnStart",
-        ] {
+fn native_cycle_scenarios(source: &str, partition: Option<usize>) {
+    let inits = [
+        "nativeCycleStart",
+        "preparedCycleStart",
+        "pipelineCycleStart",
+        "jointStart",
+        "workBudgetStart",
+        "workPlanStart",
+        "leasePlanStart",
+        "activationStart",
+        "cycleAccountingStart",
+        "turnStart",
+    ];
+    for (domain_index, domain) in ["service_completion_small", "service_completion_wide"]
+        .into_iter()
+        .enumerate()
+    {
+        for (case_index, init) in inits.into_iter().enumerate() {
+            // Three disjoint partitions retain the exact same immutable-model
+            // commands. No worker waits for both long domain suites in sequence.
+            if partition.is_some_and(|p| (domain_index * inits.len() + case_index) % 3 != p) {
+                continue;
+            }
             success(&[
                 "run",
                 source,
@@ -493,6 +526,9 @@ fn native_cycle_scenarios(source: &str) {
                 "--verbosity",
                 "1",
             ]);
+        }
+        if partition.is_some_and(|p| (2 * inits.len() + domain_index) % 3 != p) {
+            continue;
         }
         mutation_counterexample(
             source,

@@ -98,6 +98,16 @@ frozen checkpoint in those integration details and formatting. Its exact-head
 CI is a separate obligation; the frozen measurements are not relabeled as
 measurements of a newly compiled integration executable.
 
+The first full integrated model invocation exceeded its existing fifteen-minute
+budget. Its fixed grouping serialized both long completion-domain suites in
+one worker. The gate now distributes those suites and the twenty-two native
+cycle checks across the same three workers. Every CLI argument, seed, sample
+bound, step bound and rejecting control remains intact; standalone completion
+qualification retains the complete sequence. Start/finish diagnostics make
+unfinished commands visible. The failed invocation remains outside Git, and
+the budget is not increased. This scheduling change is confined to the Rust
+model-test driver and does not alter Scheme execution or benchmark timing.
+
 The protected-client experiment reached 17.327301 ms short p99 and did not
 preserve the retained working point. Its 33.741527 ms borrowed-policy control
 was a new executable and the first arm, not the frozen binary's second arm.

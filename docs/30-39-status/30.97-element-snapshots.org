@@ -120,3 +120,22 @@ seeds, sample counts, step bounds and negative controls remain unchanged. The
 first scenario counts exactly once; failure aborts before starting the queue.
 A fresh exact-head gate is still required to qualify the cold installation and
 full checklist within the original budget.
+
+The revised local full protocol gate completes all 95 checks in 772.63 seconds.
+This local result does not qualify the remote cold-build budget. Exact-head
+remote validation remains separate.
+
+* Owner CI stage separation
+
+In run 40205943552 the macOS owner job completed retirement/failure controls,
+capability reuse, dispatcher benchmarks and native semantic tests before the
+Rust lint stage started, approximately 26 minutes into the job. The original
+thirty-minute job budget cancelled lint compilation; the following Actor
+qualification never ran. No successful full owner result is inferred.
+
+The workflow separates Rust lint and single-processor Actor qualification from
+the owner lifecycle job. Every Cargo command and the immutable SDK setup are
+retained verbatim; each job keeps the existing thirty-minute budget. This
+prevents preceding benchmark/build costs from consuming the independent lint
+and Actor qualification budget. It does not claim reduced compilation cost,
+changed runtime limits or qualified production throughput.

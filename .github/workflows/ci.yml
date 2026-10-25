@@ -175,13 +175,44 @@ jobs:
           cargo test -p gerbil-scheme --features arrival-clock --lib instances:: --locked
           cargo test -p gerbil-scheme --features tokio-dispatch --test unit_test instance_timer --locked -- --test-threads=12
           cargo test -p gerbil-scheme-qualification --features arrival-clock --test owner_capacity --test owner_dispatch_faults --test owner_producer --test scheme_service --test service_watchdog --locked
+
+  owner-rust-lint:
+    name: Owner Rust lint (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
       - name: Native owner Rust lint
         run: |
           cargo clippy -p gerbil-scheme --features external-program,arrival-clock --lib --test unit_test --locked -- -D warnings
           cargo clippy -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
 
-      # Reuse the existing native job for the same macOS Actor gates; the
-      # bindings job exhausted its deadline rebuilding this feature graph.
+  owner-actor:
+    name: Single-processor Actor and Rust concurrency (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
       - name: macOS single-processor Actor and Rust concurrency qualification
         run: |
           cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test one_processor_control

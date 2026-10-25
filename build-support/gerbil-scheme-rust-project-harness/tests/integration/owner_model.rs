@@ -28,6 +28,21 @@ fn success(arguments: &[&str]) {
 fn owner_protocol_scenarios_and_controls() {
     let source = "specs/owner_lifecycle.qnt";
     success(&["typecheck", source]);
+    // Independent CLI processes read the same immutable model. Keep three
+    // workers and every original command, seed, bound and negative control.
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            lifecycle_protocol(source);
+            capacity_protocol(source);
+        });
+        scope.spawn(|| {
+            shared_protocol(source);
+            progress_protocol(source);
+        });
+        scope.spawn(owner_completion_scenarios_and_control);
+    });
+}
+fn lifecycle_protocol(source: &str) {
     for (domain, seed) in [
         ("owner_lifecycle_small", "1"),
         ("owner_lifecycle_wide", "42"),
@@ -138,10 +153,6 @@ fn owner_protocol_scenarios_and_controls() {
         "unsafePoolRegistrationStep",
         "safety",
     );
-    capacity_protocol(source);
-    shared_protocol(source);
-    owner_completion_scenarios_and_control();
-    progress_protocol(source);
 }
 fn capacity_protocol(source: &str) {
     for step in [

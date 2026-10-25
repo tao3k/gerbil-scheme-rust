@@ -76,6 +76,15 @@ impl Fixture {
     fn offer(&self) -> Arc<Offer> {
         self.target.wake.offers.peek().unwrap()
     }
+    fn target(&self) -> RouteTarget {
+        RouteTarget {
+            wake: Arc::clone(&self.target.wake),
+            capacity: Arc::clone(&self.target.capacity),
+            active: Arc::clone(&self.target.active),
+            staged: Arc::clone(&self.target.staged),
+            mailbox: self.target.mailbox.clone(),
+        }
+    }
     fn free(&self) {
         assert_eq!(self.target.active.available_permits(), 3);
         assert_eq!(
@@ -284,8 +293,11 @@ fn same_price_entry_has_no_source_fanout_but_price_change_and_eof_signal() {
             std::task::Waker::from(Arc::clone(&count)),
             Arc::downgrade(&f.target.wake),
         ));
-        f.source.signals.configure(1);
-        f.source.signals.register(Arc::downgrade(&signal));
+        f.source
+            .signals
+            .lock()
+            .unwrap()
+            .push(Arc::downgrade(&signal));
         assert!(f.deliver(false, false));
         assert_eq!(count.0.load(Ordering::Acquire), 0);
         let offer = f.offer();
@@ -364,141 +376,249 @@ fn partial_native_credit_return_calls_waiters_only_after_entry_fence_unlocks() {
 }
 
 fn take(source: &mut Source, units: usize) -> Option<crate::instances::Request> {
-    let mut wait = crate::instances::service_supply_mutex::SupplyWait::default();
-    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
-    let std::task::Poll::Ready(request) = source.poll_take(units, &mut wait, &mut cx) else {
-        panic!("uncontended claim deferred");
-    };
-    request
+    source.take(units)
 }
-
 #[test]
-fn source_cursor_defers_a_busy_offer_without_owning_native_credits() {
-    use crate::instances::service_supply_mutex::SupplyWait;
+fn source_cursor_waits_for_busy_offer_without_owning_native_credits() {
     let f = Fixture::new();
     assert!(f.deliver(false, false));
     let offer = f.offer();
-    let mut source = Source::Pool(Arc::clone(&f.source));
-    let mut wait = SupplyWait::default();
-    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
-    offer.with_entry_fence(|| {
-        assert!(source.poll_head(&mut wait, &mut cx).is_pending());
-        assert!(source.poll_take(8, &mut wait, &mut cx).is_pending());
-        assert!(f.source.requests.try_lock().is_ok());
-        assert!(f.source.offers.try_lock().is_ok());
-        f.free();
+    let request = std::thread::scope(|scope| {
+        let (worker, done) = offer.with_entry_fence(|| {
+            let shared = Arc::clone(&f.source);
+            let (started, ready) = mpsc::channel();
+            let (completed, done) = mpsc::channel();
+            let worker = scope.spawn(move || {
+                started.send(()).unwrap();
+                let request = Source::Pool(shared).take(8);
+                completed.send(()).unwrap();
+                request
+            });
+            ready.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert!(matches!(done.try_recv(), Err(mpsc::TryRecvError::Empty)));
+            f.free();
+            (worker, done)
+        });
+        done.recv_timeout(Duration::from_secs(5)).unwrap();
+        worker.join().unwrap().unwrap()
     });
-    let request = take(&mut source, 8).unwrap();
     assert!(request.capacity.is_none());
-    assert!(take(&mut source, 8).is_none());
-    f.free();
-}
-#[test]
-fn source_cursor_defers_slot_detach_and_preserves_unique_withdrawal() {
-    use crate::instances::service_supply_mutex::SupplyWait;
-    let f = Fixture::new();
-    assert!(f.deliver(false, false));
-    let offer = f.offer();
-    let mut source = Source::Pool(Arc::clone(&f.source));
-    let mut wait = SupplyWait::default();
-    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
-    f.target.wake.offers.with_slot_fence(|| {
-        assert!(source.poll_take(8, &mut wait, &mut cx).is_pending());
-        assert!(offer.entry_fence_is_free());
-        assert!(f.source.requests.try_lock().is_ok());
-        assert!(f.source.offers.try_lock().is_ok());
-        f.free();
-    });
-    let request = take(&mut source, 8).unwrap();
-    assert!(request.capacity.is_none());
-    assert!(offer.claim(&f.target.wake).enter().is_none());
-    assert!(!f.target.wake.offers.pending());
-    f.free();
-}
-
-#[test]
-fn optional_route_skips_busy_source_without_moving_work() {
-    let f = Fixture::new();
-    let held = f.source.requests.lock().unwrap();
-    assert!(!f.deliver(false, false));
-    assert_eq!(held.len(), 1);
-    drop(held);
-    assert!(f.deliver(false, false));
-    drop(f.offer().withdraw());
-    f.free();
-}
-#[test]
-fn optional_route_rolls_back_without_waiting_for_a_busy_target_slot() {
-    let f = Fixture::new();
-    f.target.wake.offers.with_slot_fence(|| {
-        assert!(!f.deliver(false, false));
-        assert_eq!(f.source.requests.lock().unwrap().len(), 1);
-        assert!(f.source.offers.lock().unwrap().is_empty());
-        f.free();
-    });
-    assert!(f.deliver(false, false));
-    let request = take(&mut Source::Pool(Arc::clone(&f.source)), 8).unwrap();
-    assert!(request.capacity.is_none());
-    assert!(f.source.requests.lock().unwrap().is_empty());
-    f.free();
-}
-
-#[test]
-fn owner_offer_entry_defers_payload_and_slot_without_retaining_credits() {
-    use crate::instances::service_supply_mutex::SupplyWait;
-    use std::task::{Context, Poll, Waker};
-    let f = Fixture::new();
-    assert!(f.deliver(false, false));
-    let offer = f.offer();
-    let mut wait = SupplyWait::default();
-    let mut cx = Context::from_waker(Waker::noop());
-    offer.with_entry_fence(|| {
-        assert!(
-            offer
-                .claim(&f.target.wake)
-                .poll(&mut wait, &mut cx)
-                .is_pending()
-        );
-        f.free();
-    });
-    f.target.wake.offers.with_slot_fence(|| {
-        assert!(
-            offer
-                .claim(&f.target.wake)
-                .poll(&mut wait, &mut cx)
-                .is_pending()
-        );
-        assert!(offer.entry_fence_is_free());
-        f.free();
-    });
-    let Poll::Ready(Some(request)) = offer.claim(&f.target.wake).poll(&mut wait, &mut cx) else {
-        panic!("entry not resumed");
-    };
-    assert!(request.capacity.is_some());
-    assert!(offer.claim(&f.target.wake).enter().is_none());
+    assert!(take(&mut Source::Pool(Arc::clone(&f.source)), 8).is_none());
     drop(request);
     f.free();
 }
 #[test]
-fn cancelled_owner_offer_wait_does_not_commit_or_leak_credits() {
-    use crate::instances::service_supply_mutex::SupplyWait;
+fn source_cursor_waits_for_slot_detach_and_preserves_unique_withdrawal() {
     let f = Fixture::new();
     assert!(f.deliver(false, false));
     let offer = f.offer();
-    let mut wait = SupplyWait::default();
-    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
-    offer.with_entry_fence(|| {
-        assert!(
-            offer
-                .claim(&f.target.wake)
-                .poll(&mut wait, &mut cx)
-                .is_pending()
-        );
-        wait.clear();
-        f.free();
+    let request = std::thread::scope(|scope| {
+        let (worker, done) = f.target.wake.offers.with_slot_fence(|| {
+            let shared = Arc::clone(&f.source);
+            let (started, ready) = mpsc::channel();
+            let (completed, done) = mpsc::channel();
+            let worker = scope.spawn(move || {
+                started.send(()).unwrap();
+                let request = Source::Pool(shared).take(8);
+                completed.send(()).unwrap();
+                request
+            });
+            ready.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert!(matches!(done.try_recv(), Err(mpsc::TryRecvError::Empty)));
+            f.free();
+            (worker, done)
+        });
+        done.recv_timeout(Duration::from_secs(5)).unwrap();
+        worker.join().unwrap().unwrap()
     });
-    offer.cancel(crate::instances::InstanceError::Cancelled);
+    assert!(request.capacity.is_none());
     assert!(offer.claim(&f.target.wake).enter().is_none());
     assert!(!f.target.wake.offers.pending());
+    drop(request);
+    f.free();
+}
+
+#[test]
+fn optional_route_waits_for_busy_source_without_moving_work_early() {
+    let f = Fixture::new();
+    std::thread::scope(|scope| {
+        let held = f.source.requests.lock().unwrap();
+        let source = Arc::clone(&f.source);
+        let target = f.target();
+        let accepting = Arc::clone(&f.dispatch.admission.accepting);
+        let (started, ready) = mpsc::channel();
+        let (completed, done) = mpsc::channel();
+        let worker = scope.spawn(move || {
+            started.send(()).unwrap();
+            let sent = deliver(
+                &source,
+                &target,
+                8,
+                &accepting,
+                &Arc::new(AtomicBool::new(false)),
+                Instant::now() + Duration::from_secs(1),
+            );
+            completed.send(sent).unwrap();
+        });
+        ready.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(matches!(done.try_recv(), Err(mpsc::TryRecvError::Empty)));
+        assert_eq!(held.len(), 1);
+        f.free();
+        drop(held);
+        assert!(done.recv_timeout(Duration::from_secs(5)).unwrap());
+        worker.join().unwrap();
+    });
+    drop(f.offer().withdraw());
+    f.free();
+}
+#[test]
+fn optional_route_waits_for_busy_target_then_publishes_one_offer() {
+    let f = Fixture::new();
+    std::thread::scope(|scope| {
+        let (worker, done) = f.target.wake.offers.with_slot_fence(|| {
+            let source = Arc::clone(&f.source);
+            let target = f.target();
+            let accepting = Arc::clone(&f.dispatch.admission.accepting);
+            let (started, ready) = mpsc::channel();
+            let (completed, done) = mpsc::channel();
+            let worker = scope.spawn(move || {
+                started.send(()).unwrap();
+                let sent = deliver(
+                    &source,
+                    &target,
+                    8,
+                    &accepting,
+                    &Arc::new(AtomicBool::new(false)),
+                    Instant::now() + Duration::from_secs(1),
+                );
+                completed.send(sent).unwrap();
+            });
+            ready.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert!(matches!(done.try_recv(), Err(mpsc::TryRecvError::Empty)));
+            assert!(!f.target.wake.offers.pending());
+            f.free();
+            (worker, done)
+        });
+        assert!(done.recv_timeout(Duration::from_secs(5)).unwrap());
+        worker.join().unwrap();
+    });
+    let request = take(&mut Source::Pool(Arc::clone(&f.source)), 8).unwrap();
+    assert!(request.capacity.is_none());
+    assert!(f.source.requests.lock().unwrap().is_empty());
+    assert!(take(&mut Source::Pool(Arc::clone(&f.source)), 8).is_none());
+    drop(request);
+    f.free();
+}
+
+fn charged(f: &Fixture) {
+    assert_eq!(f.target.active.available_permits(), 2);
+    assert_eq!(
+        f.target.capacity.slots.available_permits(),
+        f.target.capacity.slot_limit - 1
+    );
+    assert_eq!(
+        f.target.capacity.work.as_ref().unwrap().available_permits(),
+        f.target.capacity.work_limit - 8
+    );
+}
+#[test]
+fn owner_offer_sync_wait_preserves_pre_and_postclaim_credit_ownership() {
+    for slot in [false, true] {
+        let f = Fixture::new();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        assert!(deliver(
+            &f.source,
+            &f.target,
+            8,
+            &f.dispatch.admission.accepting,
+            &cancelled,
+            Instant::now() + Duration::from_secs(1)
+        ));
+        let offer = f.offer();
+        let request = std::thread::scope(|scope| {
+            let wait = || {
+                let wake = Arc::clone(&f.target.wake);
+                let offer = Arc::clone(&offer);
+                let (started, ready) = mpsc::channel();
+                let (completed, done) = mpsc::channel();
+                let worker = scope.spawn(move || {
+                    started.send(()).unwrap();
+                    let request = offer.claim(&wake).enter();
+                    completed.send(()).unwrap();
+                    request
+                });
+                ready.recv_timeout(Duration::from_secs(5)).unwrap();
+                (worker, done)
+            };
+            let (worker, done) = if slot {
+                f.target.wake.offers.with_slot_fence(|| {
+                    let (worker, done) = wait();
+                    let deadline = Instant::now() + Duration::from_secs(5);
+                    while offer.pending() {
+                        assert!(Instant::now() < deadline, "payload was not claimed");
+                        std::thread::yield_now();
+                    }
+                    charged(&f);
+                    cancelled.store(true, Ordering::Release);
+                    assert!(matches!(done.try_recv(), Err(mpsc::TryRecvError::Empty)));
+                    (worker, done)
+                })
+            } else {
+                offer.with_entry_fence(|| {
+                    let (worker, done) = wait();
+                    assert!(matches!(done.try_recv(), Err(mpsc::TryRecvError::Empty)));
+                    f.free();
+                    (worker, done)
+                })
+            };
+            done.recv_timeout(Duration::from_secs(5)).unwrap();
+            worker.join().unwrap().unwrap()
+        });
+        assert!(request.capacity.is_some());
+        charged(&f);
+        assert!(offer.claim(&f.target.wake).enter().is_none());
+        drop(request);
+        assert_eq!(f.target.staged.load(Ordering::Acquire), 0);
+        f.free();
+    }
+}
+#[test]
+fn cancelled_owner_offer_sync_wait_does_not_commit_or_leak_credits() {
+    let f = Fixture::new();
+    let cancelled = Arc::new(AtomicBool::new(false));
+    assert!(deliver(
+        &f.source,
+        &f.target,
+        8,
+        &f.dispatch.admission.accepting,
+        &cancelled,
+        Instant::now() + Duration::from_secs(1)
+    ));
+    let offer = f.offer();
+    let request = std::thread::scope(|scope| {
+        let (worker, done) = offer.with_entry_fence(|| {
+            let wake = Arc::clone(&f.target.wake);
+            let offer = Arc::clone(&offer);
+            let (started, ready) = mpsc::channel();
+            let (completed, done) = mpsc::channel();
+            let worker = scope.spawn(move || {
+                started.send(()).unwrap();
+                let request = offer.claim(&wake).enter();
+                completed.send(()).unwrap();
+                request
+            });
+            ready.recv_timeout(Duration::from_secs(5)).unwrap();
+            cancelled.store(true, Ordering::Release);
+            assert!(matches!(done.try_recv(), Err(mpsc::TryRecvError::Empty)));
+            f.free();
+            (worker, done)
+        });
+        done.recv_timeout(Duration::from_secs(5)).unwrap();
+        worker.join().unwrap()
+    });
+    assert!(request.is_none());
+    assert!(offer.claim(&f.target.wake).enter().is_none());
+    assert!(!f.target.wake.offers.pending());
+    assert_eq!(f.target.staged.load(Ordering::Acquire), 0);
     f.free();
 }

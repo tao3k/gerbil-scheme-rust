@@ -161,6 +161,7 @@ const OWNER_EXPORTS: &[&str] = &[
     "gerbil_owner_blocking_tls_retire",
     "gerbil_owner_native_call",
     "gerbil_owner_orders_call",
+    "gerbil_owner_snapshot_retarget",
     "gerbil_owner_service_call",
     "gerbil_owner_service_reference",
     "gerbil_owner_service_observe",

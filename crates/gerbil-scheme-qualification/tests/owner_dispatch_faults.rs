@@ -138,6 +138,31 @@ fn check_flow_continuations(pool: &InstancePool, runtime: &tokio::runtime::Runti
         }
     }
 }
+fn start(progress: &std::sync::mpsc::Sender<()>) -> InstancePool {
+    // SAFETY: the Cargo-owned image implements the existing native root ABI.
+    let program = unsafe {
+        IsolatedProgram::from_image(
+            gerbil_scheme_qualification::owner_instance_image(),
+            c"gerbil_owner_native_call",
+        )
+    }
+    .unwrap();
+    InstancePool::start_observed(
+        &program,
+        InstanceConfig {
+            owners: 4,
+            queue_capacity: 128,
+            maximum_request_bytes: 16 * 1024 * 1024,
+            maximum_reply_bytes: 16 * 1024 * 1024,
+            startup_timeout: GATE,
+        },
+        |owner| {
+            assert_eq!(owner.processors, 1);
+            progress.send(()).unwrap();
+        },
+    )
+    .unwrap()
+}
 #[test]
 fn submission_panics_drain_native_peers_and_preserve_order() {
     let (progress, events) = std::sync::mpsc::channel();
@@ -149,25 +174,7 @@ fn submission_panics_drain_native_peers_and_preserve_order() {
         eprintln!("DISPATCH-FAULT-STALL cleanup=UNVERIFIED");
         std::process::exit(70);
     });
-    // SAFETY: the Cargo-owned image implements the existing native root ABI.
-    let program = unsafe {
-        IsolatedProgram::from_image(
-            gerbil_scheme_qualification::owner_instance_image(),
-            c"gerbil_owner_native_call",
-        )
-    }
-    .unwrap();
-    let mut pool = InstancePool::start(
-        &program,
-        InstanceConfig {
-            owners: 4,
-            queue_capacity: 128,
-            maximum_request_bytes: 16 * 1024 * 1024,
-            maximum_reply_bytes: 16 * 1024 * 1024,
-            startup_timeout: GATE,
-        },
-    )
-    .unwrap();
+    let mut pool = start(&progress);
     progress.send(()).unwrap();
     let dispatch = pool.dispatcher();
     let runtime = tokio::runtime::Builder::new_multi_thread()

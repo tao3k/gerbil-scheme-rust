@@ -96,29 +96,34 @@ fn sealed_published_input_remains_claimable() {
 }
 
 fn take(source: &mut Source, units: usize) -> Option<Request> {
-    let mut wait = crate::instances::service_supply_mutex::SupplyWait::default();
-    let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
-    let std::task::Poll::Ready(request) = source.poll_take(units, &mut wait, &mut cx) else {
-        panic!("uncontended claim deferred");
-    };
-    request
+    source.take(units)
 }
 #[test]
-fn shared_source_busy_access_returns_to_owner_and_retries_after_unlock() {
-    use crate::instances::{service_source_poll::Head, service_supply_mutex::SupplyWait};
-    use std::task::{Context, Poll, Waker};
+fn shared_source_busy_access_waits_then_observes_open_work_and_seal() {
     let shared = Shared::opening();
-    let mut source = Source::Pool(Arc::clone(&shared));
-    let held = shared.requests.lock().unwrap();
-    let mut wait = SupplyWait::default();
-    let mut cx = Context::from_waker(Waker::noop());
-    assert!(source.poll_head(&mut wait, &mut cx).is_pending());
-    assert!(source.poll_take(1, &mut wait, &mut cx).is_pending());
-    drop(held);
-    assert!(matches!(
-        source.poll_head(&mut wait, &mut cx),
-        Poll::Ready(Head::Open)
-    ));
+    let mut source = std::thread::scope(|scope| {
+        let held = shared.requests.lock().unwrap();
+        let (started, ready) = std::sync::mpsc::channel();
+        let (completed, done) = std::sync::mpsc::channel();
+        let shared = Arc::clone(&shared);
+        let worker = scope.spawn(move || {
+            started.send(()).unwrap();
+            let mut source = Source::Pool(shared);
+            assert_eq!(source.units(), None);
+            assert!(source.take(1).is_none());
+            completed.send(()).unwrap();
+            source
+        });
+        ready.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(matches!(
+            done.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
+        drop(held);
+        done.recv_timeout(Duration::from_secs(5)).unwrap();
+        worker.join().unwrap()
+    });
+    assert!(!source.is_empty(), "open empty input is not terminal");
     shared
         .publish(
             VecDeque::from([request()]),
@@ -126,14 +131,9 @@ fn shared_source_busy_access_returns_to_owner_and_retries_after_unlock() {
             Instant::now() + Duration::from_secs(1),
         )
         .unwrap();
-    assert!(matches!(
-        source.poll_head(&mut wait, &mut cx),
-        Poll::Ready(Head::Work(1))
-    ));
+    assert_eq!(source.units(), Some(1));
     assert!(take(&mut source, 1).is_some());
     shared.seal();
-    assert!(matches!(
-        source.poll_head(&mut wait, &mut cx),
-        Poll::Ready(Head::Exhausted)
-    ));
+    assert_eq!(source.units(), None);
+    assert!(source.is_empty());
 }

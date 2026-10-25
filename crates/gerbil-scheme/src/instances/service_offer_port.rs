@@ -17,6 +17,11 @@ impl std::fmt::Debug for OfferPort {
     }
 }
 impl OfferPort {
+    #[cfg(test)]
+    pub(super) fn with_slot_fence<T>(&self, action: impl FnOnce() -> T) -> T {
+        let _guard = self.slot.lock().unwrap();
+        action()
+    }
     pub(super) fn pending(&self) -> bool {
         self.full.load(Ordering::Acquire)
     }

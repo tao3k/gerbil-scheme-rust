@@ -7,6 +7,10 @@ mod client_progress;
 mod corpus;
 #[path = "scheme_service/deferred.rs"]
 mod deferred;
+#[path = "scheme_service/elements.rs"]
+mod element_snapshots;
+#[path = "scheme_service/isolation.rs"]
+mod isolation;
 #[path = "scheme_service/joint.rs"]
 mod joint;
 #[path = "scheme_service/native_cycle.rs"]
@@ -98,7 +102,10 @@ fn descriptor(fail: bool) -> IsolatedProgram {
             c"gerbil_owner_orders_call",
         )
         .unwrap()
-        .with_exports(&[c"gerbil_owner_service_observe"])
+        .with_exports(&[
+            c"gerbil_owner_service_observe",
+            c"gerbil_owner_snapshot_retarget",
+        ])
         .with_scheme_service(if fail {
             c"gerbil_owner_service_fail"
         } else {
@@ -447,6 +454,11 @@ async fn close_full(pool: &mut InstancePool, progress: &mpsc::Sender<&'static st
 }
 #[test]
 fn scheme_owns_waits_roots_continuations_and_close() {
+    if !isolation::isolate_fd_case("scheme_owns_waits_roots_continuations_and_close") {
+        qualify_service();
+    }
+}
+fn qualify_service() {
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || watchdog::observe(&events));
     progress.send("PHASE initialization controls").unwrap();

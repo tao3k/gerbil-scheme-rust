@@ -37,12 +37,14 @@ mod image;
 mod mapping;
 mod mapping_modules;
 pub use mapping::{ImageCodeLease, ImageMappingReceipt, ImageMappingState};
+mod elements;
 mod native;
 mod native_api;
 mod native_dispatch;
 mod numbers;
 mod object_api;
 mod objects;
+pub use elements::ElementSnapshot;
 pub use native::{NativeRoot, NativeSession};
 #[cfg(feature = "tokio-dispatch")]
 mod batch_stream;

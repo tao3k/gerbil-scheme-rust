@@ -163,6 +163,20 @@ impl<'vm> NativeSession<'vm> {
     /// # Errors
     /// Rejects unsupported kinds, output bounds and native snapshot failures.
     pub fn elements(&self, value: &NativeRoot<'_>) -> Result<Vec<NativeRoot<'vm>>, InstanceError> {
+        let snapshot = self.elements_snapshot(value)?;
+        (0..snapshot.len())
+            .map(|index| snapshot.rooted(index))
+            .collect()
+    }
+    /// Capture one rooted native vector and borrow scalar children without
+    /// allocating a strong root for every element. Later parent mutation cannot
+    /// retarget the captured slots; referenced child objects may remain mutable.
+    /// # Errors
+    /// Rejects foreign roots, unsupported kinds, bounds and native failures.
+    pub fn elements_snapshot(
+        &self,
+        value: &NativeRoot<'_>,
+    ) -> Result<super::ElementSnapshot<'_, 'vm>, InstanceError> {
         let api = self.objects()?;
         let (snapshot, len) = match self.kind(value)? {
             ObjectKind::GambitTable | ObjectKind::GerbilHashTable => {
@@ -193,9 +207,11 @@ impl<'vm> NativeSession<'vm> {
         if len > self.maximum_output / 8 {
             return Err(InstanceError::InvalidConfig("snapshot bound"));
         }
-        (0..len)
-            .map(|index| self.vector_element(&snapshot, index))
-            .collect()
+        Ok(super::ElementSnapshot {
+            session: self,
+            snapshot,
+            len,
+        })
     }
     /// Copy a native bytevector to independently owned Rust storage.
     /// # Errors

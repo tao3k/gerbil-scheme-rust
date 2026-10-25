@@ -122,3 +122,13 @@ c-end
  (c-define (owner-orders-call root) (int64) int64 "gerbil_owner_orders_call" "extern"
   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
     gerbil-scheme-rust/qualification/actors#instance-orders-entry)))
+
+;; Snapshot qualification mutates only its explicitly supplied parent vector.
+(def (snapshot-retarget value)
+  (vector-set! value 0 #f)
+  (##gc)
+  (void))
+(begin-foreign
+ (c-define (owner-snapshot-retarget root) (int64) int64 "gerbil_owner_snapshot_retarget" "extern"
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
+    gerbil-scheme-rust/qualification/actors#snapshot-retarget)))

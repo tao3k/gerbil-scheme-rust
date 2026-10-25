@@ -176,6 +176,11 @@ impl Offer {
         Some(request)
     }
     #[cfg(test)]
+    pub(super) fn with_entry_fence<T>(&self, action: impl FnOnce() -> T) -> T {
+        let _guard = self.payload.lock().unwrap();
+        action()
+    }
+    #[cfg(test)]
     pub(super) fn entry_fence_is_free(&self) -> bool {
         self.payload.try_lock().is_ok()
     }

@@ -1,0 +1,106 @@
+#+TITLE: Owner-scoped element snapshots
+#+LANGUAGE: en
+
+* Implementation
+
+Base: =f3e714e0801558aead59c2962921f521a9baed79=, including the current
+running-owner claim implementation. This patch does not restore a rejected
+scheduler, change production Scheme evaluation, change the SDK or production
+C ABI, or alter capacity, cancellation, output bounds or watchdog settings.
+
+=NativeSession::elements_snapshot= captures the same collection slots and uses
+the same checks and foreign snapshot operations as =elements=. The returned
+=ElementSnapshot= owns one private strong vector root. Indexed kind/scalar
+reads borrow this root; =rooted= promotes a complex child only when needed.
+The existing =elements= API still returns independently rooted children.
+Out-of-bounds indices fail before foreign entry. Unsupported scalar projection
+returns =None= only for the existing ABI's explicit unsupported status; other
+failures remain errors. No Scheme word or borrowed child crosses an owner.
+
+The snapshot fixes slot identity, not deep immutability. A child object can
+still be mutable. The qualification fixture mutates the original parent slot
+and forces GC, then checks that the captured child remains the original value.
+The mutation export is confined to the test image and its export manifest.
+
+* Evidence and limits
+
+A local diagnostic over the previously built ASCENT image observed 16,384
+additional roots for =elements= on 16,384 scalar slots, versus one additional
+root for the borrowed snapshot. Ordered local observations were 5755 and 1712
+microseconds. They are not a paired production performance comparison.
+The current GSR fixture independently asserts the same root-count difference.
+Neither observation measures cumulative allocation or proves that the
+production twelve-VM tail regression is fixed.
+
+The current GSR Scheme service regression passes all four tests in 34.25
+seconds with its unchanged five-second progress guard. Added checks cover:
+
+- Scalar collection size, peak live roots, and all index-bound failures.
+- Direct parent-slot mutation plus GC, compared with independently rooted values.
+- Parent drop, arbitrary precision integers, shared identity and child survival.
+- Gambit table entries, nil, booleans, Unicode characters and negative-zero bits.
+- Return to the initial strong-root count after every scope.
+
+A compile-fail documentation test prohibits exporting the snapshot from its
+owner. This is a Rust lifetime/transfer check, not proof of the C implementation.
+No complete C/GC/source refinement or production throughput closure is claimed.
+
+* Retained failures
+
+The initial local integration placed a native request before capacity
+configuration. The existing guard rejected it. The test now configures the
+same capacity first; the guard was not changed. An additional primitive test
+initially used a nonexistent Character variant, then was corrected to the
+actual Char API before execution.
+
+On the new baseline, an inherited ASCENT GERBIL_LOADPATH selected old GSR
+service-budget metadata, which omitted gerbil-rs-work-configure!. The newly
+built GSR metadata contained that symbol. Clearing only the inherited override
+let the unchanged native build and service tests pass; no compiler or SDK fix
+was required.
+
+The base revision had 29 library-unit compile errors: old tests referred to
+removed service_supply_mutex, service_source_poll, poll_head, poll_take and
+Claim::poll interfaces. A clean f3e714e tree reproduced the same errors. The
+user selected the current synchronous waiting semantics. The 21 source/offer
+scenarios are retained and migrated to Source::take and Claim::enter, using
+actual contended locks and scoped threads. No scene is removed or disabled.
+
+Before payload claim, waiting owns no native credits; cancellation prevents
+entry. After payload claim, waiting to detach the notification slot retains
+exactly one set of bounded credits, including cancellation after claim. Unique
+entry/withdrawal and complete retirement remain checked. Two lock-fence helpers
+are compiled only for tests; production scheduling code is unchanged.
+All 85 selected instance library tests pass with twelve test threads. The first
+migration attempt dropped completion observers too early; retaining them until
+post-unlock completion fixed the test harness without changing runtime limits.
+Exact-head supported-platform CI remains mandatory before updating ASCENT.
+
+The production 33-case matrix, both complete provenance loads, actual cumulative
+allocation, and complete source refinement remain separate required evidence.
+
+* Constrained native qualification
+
+The full owner-capacity, dispatch-fault, producer, Scheme-service and watchdog
+targets pass on the integrated tree. The source/offer test migration retains
+all 21 original scenarios and runs within the 85-test instance library target
+with twelve test threads. No production scheduling algorithm is changed.
+
+A full service run initially compared ten open descriptors at entry with seven
+at exit. The process-wide census overlapped the parallel owner-claim test. The
+census case now runs in a fresh child test process, retaining its original
+owner population, runtime workers, strict descriptor equality and five-second
+progress watchdog. Other libtest cases remain concurrent. The full parent
+service target passes all four tests; its isolated child passes the service
+case with exact descriptor return. No less-than-or-equal allowance is used.
+
+A later dispatch-fault run reached its existing five-second progress guard.
+A native process sample placed startup in start_owner and the dynamic loader.
+A separate sampled diagnostic passed in 2.52 seconds; that was not treated as
+closing the failed run. Source inspection found that this case reported no
+startup progress until all four owners were ready, unlike the other native
+fixtures. It now uses the existing start_observed callback after each verified
+owner admission. Per-owner startup and no-progress limits remain five seconds;
+no phase chatter or timer heartbeat grants additional time. The subsequent
+full five-target native invocation passes, including the watchdog negative
+control that rejects phase chatter without renewing progress.

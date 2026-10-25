@@ -11,7 +11,7 @@ fn run(arguments: &[&str]) -> Output {
     eprintln!("QUINT-CHECK {arguments:?}");
     let started = std::time::Instant::now();
     let output = Command::new("quint")
-        .args(arguments)
+        .args(super::owner_model_source::arguments(arguments))
         .current_dir(root())
         .output()
         .expect("installed Quint CLI");
@@ -36,30 +36,37 @@ fn success(arguments: &[&str]) {
 fn owner_protocol_scenarios_and_controls() {
     let source = "specs/owner_lifecycle.qnt";
     success(&["typecheck", source]);
+    let model = std::sync::Arc::new(super::owner_model_source::ModelSource::prepare(&root()));
     // Independent CLI processes read the same immutable model. Keep three
     // workers and every original command, seed, bound and negative control.
     std::thread::scope(|scope| {
         scope.spawn(|| {
-            lifecycle_protocol(source);
-            capacity_protocol(source);
-            native_cycle_scenarios(source, Some(0));
+            super::owner_model_source::scoped(&model, || {
+                lifecycle_protocol(source);
+                capacity_protocol(source);
+                native_cycle_scenarios(source, Some(0));
+            })
         });
         scope.spawn(|| {
-            shared_protocol(source);
-            progress_protocol(source);
-            completion_domain(source, "service_completion_small");
-            client_progress_scenarios(source);
-            native_cycle_scenarios(source, Some(1));
+            super::owner_model_source::scoped(&model, || {
+                shared_protocol(source);
+                progress_protocol(source);
+                completion_domain(source, "service_completion_small");
+                client_progress_scenarios(source);
+                native_cycle_scenarios(source, Some(1));
+            })
         });
         scope.spawn(|| {
-            success(&["typecheck", source]);
-            completion_sharing(source);
-            completion_domain(source, "service_completion_wide");
-            for domain in ["service_completion_small", "service_completion_wide"] {
-                prepared_cycle_control(source, domain);
-            }
-            architecture_protocol(source);
-            native_cycle_scenarios(source, Some(2));
+            super::owner_model_source::scoped(&model, || {
+                success(&["typecheck", source]);
+                completion_sharing(source);
+                completion_domain(source, "service_completion_wide");
+                for domain in ["service_completion_small", "service_completion_wide"] {
+                    prepared_cycle_control(source, domain);
+                }
+                architecture_protocol(source);
+                native_cycle_scenarios(source, Some(2));
+            })
         });
     });
 }

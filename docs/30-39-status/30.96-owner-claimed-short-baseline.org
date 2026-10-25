@@ -98,15 +98,28 @@ frozen checkpoint in those integration details and formatting. Its exact-head
 CI is a separate obligation; the frozen measurements are not relabeled as
 measurements of a newly compiled integration executable.
 
-The first full integrated model invocation exceeded its existing fifteen-minute
-budget. Its fixed grouping serialized both long completion-domain suites in
-one worker. The gate now distributes those suites and the twenty-two native
-cycle checks across the same three workers. Every CLI argument, seed, sample
-bound, step bound and rejecting control remains intact; standalone completion
-qualification retains the complete sequence. Start/finish diagnostics make
-unfinished commands visible. The failed invocation remains outside Git, and
-the budget is not increased. This scheduling change is confined to the Rust
-model-test driver and does not alter Scheme execution or benchmark timing.
+Two full integrated model invocations exceeded the existing fifteen-minute
+budget. Distributing completion suites and twenty-two native-cycle checks
+across the same three workers was insufficient. The installed Quint 0.33 CLI
+sends its complete lookup table to a new Rust evaluator for each test; the
+canonical parsed artifact is approximately 34 MiB across thirteen modules.
+
+The existing Rust gate now asks the pinned Quint parser for module identities,
+imports and source ranges once. Each check receives the complete transitive
+module closure for its explicit main module, copied byte-for-byte from the
+single canonical model. No declarations within a required module are removed.
+The whole canonical file is still typechecked, and its digest is rechecked
+before every scoped invocation. Missing dependencies, external source ranges
+and changed canonical input fail closed. Private temporary closures are owned
+through the scoped workers; no generated model copies are committed.
+
+Only the input file passed to each main-module check changes. Command mode,
+main, initializer, step, invariant, seed, sample bound, step bound and rejecting
+controls remain intact. The three-worker ceiling and fifteen-minute budget
+remain unchanged. Four ordinary Rust controls cover exact module retention,
+missing dependencies, source positions and cache invalidation. The failed
+invocations remain outside Git. There is no new model, interpreter or Python
+runner, and no change to Scheme execution or benchmark timing.
 
 The protected-client experiment reached 17.327301 ms short p99 and did not
 preserve the retained working point. Its 33.741527 ms borrowed-policy control

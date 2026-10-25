@@ -196,6 +196,8 @@ jobs:
         run: |
           cargo clippy -p gerbil-scheme --features external-program,arrival-clock --lib --test unit_test --locked -- -D warnings
           cargo clippy -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
+          cargo clippy -p gerbil-scheme-qualification --features actor-aot,arrival-clock --all-targets --locked -- -D warnings
+
 
   owner-actor:
     name: Single-processor Actor and Rust concurrency (macos-latest)
@@ -218,7 +220,6 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test one_processor_control
           cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test tokio_one_worker_control
           cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test tokio_machine_workers
-          cargo clippy -p gerbil-scheme-qualification --features actor-aot,arrival-clock --all-targets --locked -- -D warnings
 
   # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
   # execution inside a VM. Restore this job only with a qualified SDK release.

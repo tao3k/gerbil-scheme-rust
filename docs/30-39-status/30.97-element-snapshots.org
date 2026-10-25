@@ -161,3 +161,20 @@ Local shard execution logs must be combined and compared with the successful
 unpartitioned checklist before accepting coverage. The repeated whole-model
 typecheck at each job entry is additional validation, not a missing scenario.
 Remote cold-build timing and complete exact-head CI remain required separately.
+
+* Remaining Actor lint placement
+
+Run 40211054769 passed both formal shards, both Bazel jobs, both ordinary
+bindings jobs, owner lifecycle and owner lint. Its sole remaining failure was
+the separate Actor job's thirty-minute budget. The first Actor build took
+18 minutes 19 seconds; all three benchmark commands then completed. Clippy
+started another qualification build and the job was cancelled while native
+C compilation was still active. This is not an Actor execution deadlock.
+
+The combined actor-aot/arrival-clock Clippy command is moved unchanged into
+the existing owner lint job. The Actor job retains its three benchmark commands.
+This completes the authorized separation of lint from Actor execution without
+adding a job, changing features or raising the budget. A fresh exact-head run
+is required. Cross-Cargo-mode build cost remains an observed limitation; this
+workflow change does not establish byte-identical duplicate compilation or
+claim a compiler optimization.

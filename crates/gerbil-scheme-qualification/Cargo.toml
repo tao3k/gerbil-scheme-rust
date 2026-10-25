@@ -98,3 +98,8 @@ required-features = ["instance-dispatch"]
 name = "scheme_service"
 harness = false
 required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "single_vm_service"
+harness = false
+required-features = ["instance-dispatch"]

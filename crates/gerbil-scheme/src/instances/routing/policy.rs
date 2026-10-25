@@ -19,6 +19,7 @@ use tokio::sync::Semaphore;
 pub struct SchemeServiceRouter {
     pub(super) dispatch: InstanceDispatcher,
     config: SchemeRoutingConfig,
+    claimed_short: Option<crate::instances::SchemeShortPool>,
     pub(super) state: Arc<State>,
     pub(super) admission: SchemeRoutingAdmission,
 }
@@ -81,6 +82,7 @@ impl SchemeServiceRouter {
         Ok(Self {
             dispatch,
             config,
+            claimed_short: None,
             admission,
             state: Arc::new(State {
                 changed: Arc::clone(&changed),
@@ -110,10 +112,31 @@ impl SchemeServiceRouter {
             }),
         })
     }
+    /// Opt into owner-claimed short admission on the already-configured shared
+    /// short pool. No owner/native quota is held until a running owner claims.
+    /// The exact owner set and per-owner short quota must match this router.
+    /// Clones share the facility; closing this router also closes that facility.
+    /// Batch routing and stateful owner/lane APIs are unchanged.
+    /// # Errors
+    /// Missing/closed short facility or mismatched owner/quota configuration.
+    pub fn with_owner_claimed_shorts(mut self) -> Result<Self, InstanceError> {
+        let pool = self
+            .dispatch
+            .scheme_short_pool()
+            .ok_or(InstanceError::InvalidConfig(
+                "configure shared short pool before selecting owner-claimed routing",
+            ))?;
+        pool.validate_router(&self.dispatch, &self.config)?;
+        self.claimed_short = Some(pool);
+        Ok(self)
+    }
     /// Close class admission and wake class waiters. Already-granted class
     /// permits may complete native admission and execution. Drain their tickets,
     /// then shut down the native pool through its existing close protocol.
     pub fn close(&self) {
+        if let Some(pool) = &self.claimed_short {
+            pool.router_close();
+        }
         self.state.short_gate.close();
         self.state.batch_gate.close();
         for destination in &self.state.destinations {
@@ -126,14 +149,23 @@ impl SchemeServiceRouter {
     }
     /// Snapshot spans owner reservation through projection. Pinned additionally
     /// charges owner-specific admission waits; unassigned reselection waiters do not.
+    /// Owner-claimed mode reports the shared facility's active native short charges;
+    /// queued, unassigned inputs never contribute an invented owner charge.
     #[must_use]
     pub fn loads(&self) -> Vec<SchemeRouteLoad> {
-        self.state
+        let mut loads = self
+            .state
             .ledger
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .loads
-            .clone()
+            .clone();
+        if let Some(pool) = &self.claimed_short {
+            for load in &mut loads {
+                load.short_requests = pool.active_on(load.owner);
+            }
+        }
+        loads
     }
     /// Short routing minimizes pending short requests, then total request count,
     /// then declared batch work. Rotating ties avoid a permanently favored VM.
@@ -215,6 +247,16 @@ impl SchemeServiceRouter {
         };
         if units == 0 || units > bound {
             return Err(InstanceError::InvalidConfig("routing class work bound"));
+        }
+        if class == Class::Short {
+            if let Some(pool) = &self.claimed_short {
+                if self.state.short_gate.is_closed() {
+                    return Err(InstanceError::Closed);
+                }
+                return pool
+                    .submit(message, timeout.saturating_sub(started.elapsed()))
+                    .await;
+            }
         }
         if self.admission != SchemeRoutingAdmission::Pinned {
             return self

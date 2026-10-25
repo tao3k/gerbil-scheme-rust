@@ -84,6 +84,7 @@ impl InstanceDispatcher {
             selective: AtomicBool::new(false),
             progress: AtomicBool::new(false),
             pending_limit: config.maximum_pending,
+            maximum_active_per_owner: config.maximum_active_per_owner,
             pending: Arc::new(Semaphore::new(config.maximum_pending)),
             length: AtomicUsize::new(0),
             next: AtomicUsize::new(0),
@@ -308,4 +309,44 @@ fn install(
             .map_err(|_| invalid())?;
     }
     Ok(())
+}
+
+impl SchemeShortPool {
+    pub(crate) fn validate_router(
+        &self,
+        dispatch: &InstanceDispatcher,
+        config: &crate::instances::SchemeRoutingConfig,
+    ) -> Result<(), InstanceError> {
+        let same_pool = self
+            .source
+            .admission
+            .upgrade()
+            .is_some_and(|a| Arc::ptr_eq(&a, &dispatch.admission));
+        let expected: std::collections::BTreeSet<_> = config.owners.iter().copied().collect();
+        let actual: std::collections::BTreeSet<_> =
+            self.source.destinations.iter().map(|t| t.owner).collect();
+        if !same_pool
+            || expected != actual
+            || config.short_slots != self.source.maximum_active_per_owner
+            || config.short_max_work != 1
+            || self.source.pending.is_closed()
+        {
+            return Err(InstanceError::InvalidConfig(
+                "owner-claimed short router must share exact owners and short quota",
+            ));
+        }
+        Ok(())
+    }
+    pub(crate) fn router_close(&self) {
+        self.source.close();
+    }
+    pub(crate) fn active_on(&self, owner: usize) -> usize {
+        self.source
+            .destinations
+            .iter()
+            .find(|t| t.owner == owner)
+            .map_or(0, |t| {
+                self.source.maximum_active_per_owner - t.active.available_permits()
+            })
+    }
 }

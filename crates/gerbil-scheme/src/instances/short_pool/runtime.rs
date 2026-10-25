@@ -82,6 +82,7 @@ pub(crate) struct Source {
     selective: AtomicBool,
     progress: AtomicBool,
     pending_limit: usize,
+    maximum_active_per_owner: usize,
     pending: Arc<Semaphore>,
     length: AtomicUsize,
     next: AtomicUsize,

@@ -21,6 +21,7 @@ pub(super) fn is_argument(value: &str) -> bool {
     value == "--capacity"
         || value == "--capacity-mixed"
         || value == "--capacity-ingress-ab"
+        || value == "--capacity-owner-claim-ab"
         || [
             "--capacity-count=",
             "--capacity-clients=",
@@ -33,12 +34,24 @@ pub(super) fn is_argument(value: &str) -> bool {
         .iter()
         .any(|prefix| value.starts_with(prefix))
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ComparisonMode {
+    Single,
+    Ingress,
+    OwnerClaim,
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ShortBinding {
+    Routed,
+    RunningOwner,
+}
 #[derive(Clone, Copy)]
 pub(super) struct Config {
     pub(super) owners: usize,
     pub(super) rust_workers: usize,
     pub(super) class_ingress: bool,
-    pub(super) ingress_ab: bool,
+    comparison: ComparisonMode,
+    binding: ShortBinding,
     count: usize,
     clients: usize,
     rate: usize,
@@ -62,11 +75,18 @@ impl Config {
             xs.first()
                 .map_or(default, |s| s.parse().expect("unsigned capacity option"))
         };
-        let out = Self {
+        let mut out = Self {
             owners: value("--capacity-owners=", 4),
             rust_workers: value("--capacity-rust-workers=", 2),
-            class_ingress: false,
-            ingress_ab: args.iter().any(|s| s == "--capacity-ingress-ab"),
+            binding: ShortBinding::Routed,
+            class_ingress: args.iter().any(|s| s == "--capacity-owner-claim-ab"),
+            comparison: if args.iter().any(|s| s == "--capacity-owner-claim-ab") {
+                ComparisonMode::OwnerClaim
+            } else if args.iter().any(|s| s == "--capacity-ingress-ab") {
+                ComparisonMode::Ingress
+            } else {
+                ComparisonMode::Single
+            },
             count: value("--capacity-count=", 1_000_000),
             clients: value("--capacity-clients=", 50),
             rate: value("--capacity-rate=", 0),
@@ -74,11 +94,14 @@ impl Config {
             warmup: value("--capacity-warmup-seconds=", 5).try_into().unwrap(),
             mixed: args.iter().any(|s| s == "--capacity-mixed"),
         };
+        if out.rate == 0 {
+            out.class_ingress = false;
+        }
         assert!((1..=1_000_000).contains(&out.count) && (1..=4096).contains(&out.clients));
         assert!((1..=64).contains(&out.owners) && (1..=64).contains(&out.rust_workers));
         assert!(out.clients >= 2);
         assert!(
-            !out.ingress_ab || out.rate > 0,
+            out.comparison != ComparisonMode::Ingress || out.rate > 0,
             "ingress A/B requires planned arrivals"
         );
         assert!(out.seconds <= 120 && out.warmup <= 30 && out.rate <= 1_000_000);
@@ -387,9 +410,14 @@ pub(super) fn run(
     config: Config,
 ) {
     let (router, _settings) = measurement::configure_service(pool, comparison, true);
+    let router = if config.binding == ShortBinding::RunningOwner {
+        router.with_owner_claimed_shorts().unwrap()
+    } else {
+        router
+    };
     println!(
         "{}",
-        json!({"event":"capacity_configuration","api":"routed-typed-service-messages","qualifies_pool_pipeline_candidate":false,"count_minimum":config.count,"minimum_seconds":config.seconds,"sample_hard_bound":10_000_000,"clients":config.clients,"offered_rate":config.rate,"queue_capacity":if config.rate>0{Some(128)}else{None},"load_mode":if config.rate==0{"closed-loop-saturation"}else{"open-loop-planned-arrivals"},"bulk_messages_per_short":16,"bulk_items_per_message":8,"bulk_lines_per_item":48,"short_lines":4,"mixed":config.mixed,"warmup_seconds":config.warmup,"owners":config.owners,"rust_workers":config.rust_workers,"class_ingress":config.class_ingress,"native_progress_watchdog_seconds":5,"defaults_changed":false})
+        json!({"event":"capacity_configuration","owner_claim":config.binding==ShortBinding::RunningOwner,"api":"routed-typed-service-messages","qualifies_pool_pipeline_candidate":false,"count_minimum":config.count,"minimum_seconds":config.seconds,"sample_hard_bound":10_000_000,"clients":config.clients,"offered_rate":config.rate,"queue_capacity":if config.rate>0{Some(128)}else{None},"load_mode":if config.rate==0{"closed-loop-saturation"}else{"open-loop-planned-arrivals"},"bulk_messages_per_short":16,"bulk_items_per_message":8,"bulk_lines_per_item":48,"short_lines":4,"mixed":config.mixed,"warmup_seconds":config.warmup,"owners":config.owners,"rust_workers":config.rust_workers,"class_ingress":config.class_ingress,"native_progress_watchdog_seconds":5,"defaults_changed":false})
     );
     if config.warmup > 0 {
         runtime.block_on(closed(router.clone(), config, progress.clone(), true));
@@ -430,7 +458,7 @@ pub(super) fn run(
     let number = |value: usize| f64::from(u32::try_from(value).expect("bounded benchmark count"));
     println!(
         "{}",
-        json!({"event":"capacity_result","class_ingress":config.class_ingress,"measurement_valid":config.rate>0 || (elapsed>=Duration::from_secs(config.seconds) && rows.len()>=config.count),"performance_accepted":false,"completed_messages":successful,"bulk_messages":bulk,"short_messages":short,"bulk_items":bulk*8,"completed_input_items":bulk*8+short,"offered_messages":offered_count,"rejected_before_admission":rejected,"failed_messages":failed,"elapsed_ns":elapsed.as_nanos(),"offered_elapsed_ns":offered_elapsed.as_nanos(),"completed_messages_per_second":number(successful)/elapsed.as_secs_f64(),"emitted_messages_per_second":number(offered_count)/offered_elapsed.as_secs_f64(),"bulk_items_per_second":number(bulk*8)/elapsed.as_secs_f64(),"owner_completed_messages":owners,"owner_bulk_messages":(0..config.owners).map(|o|rows.iter().filter(|r|r.status==0 && r.owner==o && !r.short).count()).collect::<Vec<_>>(),"owner_short_messages":(0..config.owners).map(|o|rows.iter().filter(|r|r.status==0 && r.owner==o && r.short).count()).collect::<Vec<_>>(),"latency":classes,"latency_population":"successful messages; all rejected and failed arrivals remain in outcome accounting","benchmark_record_bytes":rows.capacity()*std::mem::size_of::<Record>(),"latency_includes_payload_preparation":true,"throughput_includes_result_oracle":true,"closed_loop_is_not_open_loop_slo_evidence":config.rate==0,"pipeline_performance_acceptance":false})
+        json!({"event":"capacity_result","owner_claim":config.binding==ShortBinding::RunningOwner,"class_ingress":config.class_ingress,"measurement_valid":config.rate>0 || (elapsed>=Duration::from_secs(config.seconds) && rows.len()>=config.count),"performance_accepted":false,"completed_messages":successful,"bulk_messages":bulk,"short_messages":short,"bulk_items":bulk*8,"completed_input_items":bulk*8+short,"offered_messages":offered_count,"rejected_before_admission":rejected,"failed_messages":failed,"elapsed_ns":elapsed.as_nanos(),"offered_elapsed_ns":offered_elapsed.as_nanos(),"completed_messages_per_second":number(successful)/elapsed.as_secs_f64(),"emitted_messages_per_second":number(offered_count)/offered_elapsed.as_secs_f64(),"bulk_items_per_second":number(bulk*8)/elapsed.as_secs_f64(),"owner_completed_messages":owners,"owner_bulk_messages":(0..config.owners).map(|o|rows.iter().filter(|r|r.status==0 && r.owner==o && !r.short).count()).collect::<Vec<_>>(),"owner_short_messages":(0..config.owners).map(|o|rows.iter().filter(|r|r.status==0 && r.owner==o && r.short).count()).collect::<Vec<_>>(),"latency":classes,"latency_population":"successful messages; all rejected and failed arrivals remain in outcome accounting","benchmark_record_bytes":rows.capacity()*std::mem::size_of::<Record>(),"latency_includes_payload_preparation":true,"throughput_includes_result_oracle":true,"closed_loop_is_not_open_loop_slo_evidence":config.rate==0,"pipeline_performance_acceptance":false})
     );
     assert_eq!(successful + rejected + failed, offered_count);
 }
@@ -522,10 +550,15 @@ pub(super) fn run_profiles(
 ) {
     let identities: Vec<_> = pool.owners().iter().map(|r| r.state).collect();
     run(pool, runtime, progress, comparison, config);
-    if config.ingress_ab {
+    if config.comparison == ComparisonMode::Ingress {
         config.class_ingress = true;
         run(pool, runtime, progress, comparison, config);
     }
+    if config.comparison == ComparisonMode::OwnerClaim {
+        config.binding = ShortBinding::RunningOwner;
+        run(pool, runtime, progress, comparison, config);
+    }
+
     assert_eq!(
         identities,
         pool.owners().iter().map(|r| r.state).collect::<Vec<_>>()

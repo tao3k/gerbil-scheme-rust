@@ -20,6 +20,7 @@ fn owner_failure_close_cannot_be_overtaken_by_queued_publication() {
         selective: AtomicBool::new(false),
         progress: AtomicBool::new(false),
         pending_limit: 1,
+        maximum_active_per_owner: 1,
         pending: Arc::clone(&pending),
         length: AtomicUsize::new(0),
         next: AtomicUsize::new(0),

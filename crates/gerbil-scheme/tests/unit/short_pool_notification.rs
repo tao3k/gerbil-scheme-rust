@@ -62,6 +62,7 @@ impl Fixture {
             selective: AtomicBool::new(true),
             progress: AtomicBool::new(false),
             pending_limit: 4,
+            maximum_active_per_owner: 1,
             pending: Arc::new(Semaphore::new(4)),
             length: AtomicUsize::new(0),
             next: AtomicUsize::new(0),

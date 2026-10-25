@@ -562,3 +562,6 @@ fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Send
     pipeline::contract(runtime, progress);
     native_entry::contract(runtime, progress);
 }
+
+#[path = "scheme_service/owner_claim.rs"]
+mod owner_claim;

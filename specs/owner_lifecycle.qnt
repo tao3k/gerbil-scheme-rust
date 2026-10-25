@@ -917,6 +917,14 @@ module owner_lifecycle {
     .then(all { assert(ownerOf(3) == 2), assert(s.serviceRoots == Set(3)), assert(safety), stutter })
     .then(readyService(3, false)).then(complete(3)).then(complete(1)).then(finishProducer(1)).then(finishProducer(2)).then(join)
     .then(all { assert(s.serviceRoots.size() == 0), assert(safety), stutter })
+  // A peer makes no steps at all while an uncommitted short is claimed elsewhere.
+  run dynamicShortStalledOwnerBypassTest = init.then(configureCapacity(1)).then(admit(1))
+    .then(registerProducer(1)).then(registerProducer(2)).then(enablePool).then(offerShort(3))
+    .then(all { assert(s.committed.get(3)==0), assert(not(s.workHeld.contains(3))), assert(safety), stutter })
+    .then(claimPool(3,2)).then(submitService(3)).then(readyService(3,false)).then(complete(3))
+    .then(all { assert(ownerOf(3)==2), assert(s.accepted.contains(1)), assert(not(s.completed.contains(1))), assert(safety), stutter })
+    .then(close).then(complete(1)).then(finishProducer(1)).then(finishProducer(2)).then(join)
+    .then(all { assert(s.serviceRoots.size()==0), assert(safety), stutter })
   action streamStep = any { step, configureProducer(1), configureProducer(2) }
   action producerMutationInit = s' = { ...initial, producerLimit: 1,
     producers: Set(1), producerJobs: Set(1, 3), staged: Set(3), accepted: Set(1),

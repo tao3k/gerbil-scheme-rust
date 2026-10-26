@@ -255,3 +255,17 @@ bridge-scheme-service-benchmark *args:
 # One fixed Scheme VM: native endpoint, caller-driven and Tokio-worker costs.
 bridge-single-vm-service-benchmark *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench single_vm_service --locked -- {{ args }}
+
+# Fixed single-VM public-API baseline: exactly one million verified short messages.
+bridge-single-vm-million-baseline:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench single_vm_service --locked -- --million-short-cpu
+
+# Reuse the existing owner/Actor protocols; no new scheduler state machine.
+bridge-single-vm-models:
+    quint typecheck specs/scheduling/single_vm.qnt
+    quint test specs/scheduling/single_vm.qnt --main single_vm_host --seed 1
+    quint test specs/scheduling/single_vm.qnt --main single_vm_actors --seed 1
+    quint run specs/scheduling/single_vm.qnt --main single_vm_actors --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --verbosity 1
+    quint test specs/actor_batch.qnt --main actor_batch_small --seed 1
+    quint test specs/actor_batch.qnt --main actor_batch_wide --seed 1
+    sysml -strict -no-record-cache -validate specs/scheduling/scheme_rust.sysml

@@ -288,3 +288,17 @@ Final local gates: seven service/observer tests passed, strict selected-target
 Clippy and changed-bench Rust formatting passed, and the existing Justfile/CI entrypoints were
 wired. Remote CI and the unresolved initialization watchdog are not qualified by
 this capture. No rejected runtime candidate was committed or sent to PR #18.
+
+## Fixed million-message baseline
+
+The explicit `--million-short-cpu` mode completes exactly 1,000,000 verified
+short messages through the public Tokio-worker API on one VM. It preserves
+the original 2,048-message corpus, fresh native construction, five-second
+request/progress guards and whole-request timing. Its single measured cohort
+reports whole-million quantiles, not a median of small-sample p99 values.
+The old default diagnostic mode and production engine are unchanged.
+
+Run `just bridge-single-vm-million-baseline`. The model and architecture
+contract is in `specs/scheduling/README.md` at the repository root.
+A closed-loop single-VM zero-rejection result does not replace the twelve-VM
+fixed-arrival acceptance gate.

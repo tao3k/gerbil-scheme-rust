@@ -96,7 +96,8 @@ impl Sample {
         println!(
             "{}",
             json!({"event":"single_vm_sample","arm":arm.label(),"profile":profile,
-            "block":block,"warmup":warmup,"messages":messages,"order_rows":self.rows,
+            "block":block,"warmup":warmup,"messages":messages,"completed_messages":messages,
+            "rejected_messages":0,"native_request_errors":0,"order_rows":self.rows,
             "elapsed_ns":elapsed_ns,"messages_per_second":rate(messages, elapsed_ns),
             "order_rows_per_second":rate(self.rows, elapsed_ns),
             "oracle_ns":self.oracle_ns,"latency_ns":quantiles(&mut self.latency),
@@ -123,9 +124,10 @@ async fn service_sample(
     inputs: Arc<Vec<Vec<Vec<i64>>>>,
     short: bool,
     progress: Progress,
+    messages: usize,
 ) -> Sample {
     let mut sample = Sample::new();
-    for input in inputs.iter() {
+    for input in inputs.iter().cycle().take(messages) {
         let started = Instant::now();
         let reply = dispatch
             .submit_scheme_service_backpressured_on(0, Request::new(input.clone(), short), GATE)
@@ -162,16 +164,15 @@ fn native_sample(
     sample.finish();
     sample
 }
-fn run(progress: &Progress, smoke: bool) {
+fn run(progress: &Progress, smoke: bool, million: bool) {
+    let image = std::env::var("GERBIL_SERVICE_BENCH_IMAGE")
+        .unwrap_or_else(|_| gerbil_scheme_qualification::owner_instance_image().to_owned());
     // SAFETY: Cargo builds this qualification image and its rooted service ABI.
     let program = unsafe {
-        IsolatedProgram::from_image(
-            gerbil_scheme_qualification::owner_instance_image(),
-            c"gerbil_owner_orders_call",
-        )
-        .unwrap()
-        .with_exports(&[c"gerbil_owner_service_reference"])
-        .with_scheme_service(c"gerbil_owner_service_call")
+        IsolatedProgram::from_image(&image, c"gerbil_owner_orders_call")
+            .unwrap()
+            .with_exports(&[c"gerbil_owner_service_reference"])
+            .with_scheme_service(c"gerbil_owner_service_call")
     };
     let startup = Instant::now();
     let mut pool = InstancePool::start(
@@ -197,13 +198,19 @@ fn run(progress: &Progress, smoke: bool) {
         .enable_all()
         .build()
         .unwrap();
-    let messages = if smoke { 64 } else { 2048 };
+    let corpus_messages = if smoke { 64 } else { 2048 };
+    let messages = if million { 1_000_000 } else { corpus_messages };
     println!(
         "{}",
         json!({"event":"single_vm_configuration","owners":1,"outstanding":1,
         "tokio_workers":1,"messages_per_sample":messages,"startup_ns":startup.elapsed().as_nanos(),
         "service_completion":"Snapshot","defaults_changed":false,"deadline_ms":GATE.as_millis(),
-        "profiles":["short_cpu","bulk_cpu","bulk_mixed"],"bulk_orders":8,"bulk_lines":48,
+        "profiles":if million { vec!["short_cpu"] } else { vec!["short_cpu","bulk_cpu","bulk_mixed"] },
+        "million_baseline":million,"corpus_messages":corpus_messages,
+        "arrival_mode":"closed_loop_one_outstanding",
+        "exclusive_physical_core_affinity":false,
+        "explicit_image_override":std::env::var_os("GERBIL_SERVICE_BENCH_IMAGE").is_some(),
+        "measured_arms":if million { vec![Arm::WorkerService.label()] } else { vec![Arm::NativeCycle.label(),Arm::CallerService.label(),Arm::WorkerService.label()] },"bulk_orders":8,"bulk_lines":48,
         "short_orders":1,"short_lines":4,"yield_every":1,"service_workers":4,"actors_per_batch":4,
         "throughput_unit":"service_messages_per_second_including_oracle",
         "comparison_scope":"one_VM_component_costs_not_capacity_or_open_arrival_p99",
@@ -215,9 +222,35 @@ fn run(progress: &Progress, smoke: bool) {
     );
     exception_controls(&dispatch, &caller);
     progress.record(Event::ControlsCompleted);
-    profiles(&dispatch, &caller, &worker, progress, smoke, messages);
+    profiles(
+        &dispatch,
+        &caller,
+        &worker,
+        progress,
+        smoke,
+        corpus_messages,
+        million,
+    );
     cleanup(&mut pool, progress);
 }
+fn input_corpus(messages: usize, short: bool, mixed: bool) -> Arc<Vec<Vec<Vec<i64>>>> {
+    Arc::new(
+        (0..messages)
+            .map(|n| {
+                (0..if short { 1 } else { 8 })
+                    .map(|row| {
+                        let mut input = corpus::order(n * 8 + row, mixed);
+                        if short {
+                            input.truncate(14);
+                        }
+                        input
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>(),
+    )
+}
+
 fn profiles(
     dispatch: &InstanceDispatcher,
     caller: &tokio::runtime::Runtime,
@@ -225,42 +258,42 @@ fn profiles(
     progress: &Progress,
     smoke: bool,
     messages: usize,
+    million: bool,
 ) {
     for (profile, short, mixed) in [
         ("short_cpu", true, false),
         ("bulk_cpu", false, false),
         ("bulk_mixed", false, true),
     ] {
-        let inputs = Arc::new(
-            (0..messages)
-                .map(|n| {
-                    (0..if short { 1 } else { 8 })
-                        .map(|row| {
-                            let mut input = corpus::order(n * 8 + row, mixed);
-                            if short {
-                                input.truncate(14);
-                            }
-                            input
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>(),
-        );
+        if million && !short {
+            continue;
+        }
+        let inputs = input_corpus(messages, short, mixed);
         for warmup in [true, false] {
             let data = if warmup {
                 Arc::new(inputs[..32].to_vec())
             } else {
                 inputs.clone()
             };
-            for block in 0..if warmup || smoke { 1 } else { 3 } {
-                for arm in [
-                    Arm::NativeCycle,
-                    Arm::CallerService,
-                    Arm::WorkerService,
-                    Arm::WorkerService,
-                    Arm::CallerService,
-                    Arm::NativeCycle,
-                ] {
+            for block in 0..if warmup || smoke || million { 1 } else { 3 } {
+                let arms: &[Arm] = if million {
+                    &[Arm::WorkerService]
+                } else {
+                    &[
+                        Arm::NativeCycle,
+                        Arm::CallerService,
+                        Arm::WorkerService,
+                        Arm::WorkerService,
+                        Arm::CallerService,
+                        Arm::NativeCycle,
+                    ]
+                };
+                for &arm in arms {
+                    let count = if million && !warmup {
+                        1_000_000
+                    } else {
+                        data.len()
+                    };
                     // One request is consumed before the next is submitted; no
                     // Rust service ticket/permit may overlap the native reference.
                     caller.block_on(async {
@@ -282,6 +315,7 @@ fn profiles(
                             data.clone(),
                             short,
                             progress.clone(),
+                            count,
                         )),
                         Arm::WorkerService => worker
                             .block_on(worker.spawn(service_sample(
@@ -289,9 +323,15 @@ fn profiles(
                                 data.clone(),
                                 short,
                                 progress.clone(),
+                                count,
                             )))
                             .unwrap(),
                     };
+                    assert_eq!(
+                        sample.latency.len(),
+                        count,
+                        "all requested messages must complete"
+                    );
                     let after = snapshot(dispatch);
                     assert_eq!(after.0[3].to_bits(), 0.0_f64.to_bits());
                     let counters = before
@@ -387,10 +427,17 @@ fn exception_controls(dispatch: &InstanceDispatcher, caller: &tokio::runtime::Ru
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     assert!(
-        args.iter().all(|a| a == "--test" || a == "--bench"),
-        "supported arguments: --test, --bench"
+        args.iter()
+            .all(|a| a == "--test" || a == "--bench" || a == "--million-short-cpu"),
+        "supported arguments: --test, --bench, --million-short-cpu"
+    );
+    let million = args.iter().any(|a| a == "--million-short-cpu");
+    let smoke = args.iter().any(|a| a == "--test");
+    assert!(
+        !(million && smoke),
+        "million baseline cannot be labeled as smoke"
     );
     let (watchdog, progress) = Watchdog::start(GATE);
-    run(&progress, args.iter().any(|a| a == "--test"));
+    run(&progress, smoke, million);
     watchdog.finish();
 }

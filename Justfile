@@ -260,6 +260,15 @@ bridge-single-vm-service-benchmark *args:
 bridge-single-vm-million-baseline:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench single_vm_service --locked -- --million-short-cpu
 
+# Same one-million short corpus: choose 1 or 12 fixed owners explicitly.
+bridge-fixed-owner-scaling owners:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench single_vm_service --locked -- --fixed-owner-scaling={{ owners }}
+
+# Linearizable startup-mode choice; isolated from the owner/Actor models.
+bridge-backend-choice-model:
+    quint test specs/scheduling/backend_choice.qnt --main backend_choice --seed 1
+    quint run specs/scheduling/backend_choice.qnt --main backend_choice --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --verbosity 1
+
 # Reuse the existing owner/Actor protocols; no new scheduler state machine.
 bridge-single-vm-models:
     quint typecheck specs/scheduling/single_vm.qnt

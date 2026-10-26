@@ -162,7 +162,7 @@ therefore names two distinct twelve-VM targets:
 
 - `scalingTarget`: the same short corpus and public API, 1,000,000 total messages,
   one outstanding request per owner, with per-owner throughput/CPU and global
-  latency reported. It is a design target, not a completed benchmark.
+  latency reported. The first completed comparison is documented below.
 - `productionAcceptance`: the unchanged 1,000,000-message, 16:1 bulk/short fixed
   arrival contract. It measures offered, completed, rejected, latency and
   fairness separately. A closed-loop scaling result cannot admit this gate.
@@ -207,3 +207,13 @@ record their identities rather than silently mixing different Cargo outputs.
 This branch publishes the measured baseline and research models. It does not
 update PR 18, change executor defaults, claim a twelve-VM speedup, or qualify
 remote CI merely because local checks passed.
+
+## Comparable fixed-owner scaling
+
+[Fixed-owner scaling](fixed_owner_scaling.md) records the new one/twelve-owner
+million-message comparison, its artifact identities and the first backend-mode
+read experiment. The baseline sections above describe the published unchanged
+engine cohort; a local candidate does not replace that baseline or qualify the
+mixed open-arrival gate. Run `just bridge-fixed-owner-scaling 1` and `12` as
+separate processes. Run `just bridge-backend-choice-model` for the isolated
+shared-mode primitive; existing owner/Actor protocols remain authoritative.

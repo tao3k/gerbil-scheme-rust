@@ -302,3 +302,14 @@ Run `just bridge-single-vm-million-baseline`. The model and architecture
 contract is in `specs/scheduling/README.md` at the repository root.
 A closed-loop single-VM zero-rejection result does not replace the twelve-VM
 fixed-arrival acceptance gate.
+
+## Same-workload owner scaling
+
+`--fixed-owner-scaling=1` and `--fixed-owner-scaling=12` each measure exactly
+1,000,000 short-CPU messages in total, with one live request per fixed owner
+and a common start barrier. They retain the original oracle, five-second guards
+and cleanup controls. Quantiles pool actual requests, while throughput ends at
+the last client completion. This closed-loop comparison is separate from the
+12-VM mixed open-arrival acceptance contract. See
+[the scaling contract](../../../../specs/scheduling/fixed_owner_scaling.md)
+for measured results, ownership boundaries and frozen artifact hashes.

@@ -29,7 +29,19 @@ package SchemeRustScheduling {
         attribute held : Integer;
         assert constraint bounded { held >= 0 and held <= limit }
     }
-    part def PrivateHeap;
+part def SharedBackendChoice {
+    doc /* Process-wide startup-mode choice is shared across private VMs.
+            Candidate: acquire readiness load, compare-exchange first choice,
+            sticky release poison. Readiness grants no image lifetime authority. */
+    attribute sharedAcrossOwners : Boolean = true;
+}
+part def SharedRegistry {
+    doc /* Current public submission visits a shared registry for validation,
+            capacity capture, repeated validation and final publication.
+            Close and reconfiguration fences must survive optimization. */
+    attribute sharedAcrossOwners : Boolean = true;
+}
+part def PrivateHeap;
     part def GerbilActorScheduler {
         doc /* Gerbil schedules Actors and green threads inside the VM.
                 Actors are not additional native execution threads. */
@@ -108,6 +120,8 @@ package SchemeRustScheduling {
             attribute :>> workers = 12;
         }
         part owners : FixedOwner[12];
+        part backendChoice : SharedBackendChoice;
+        part registry : SharedRegistry;
         part preparation : RayonPreparation;
         connect dispatcher.route to owners.bridge.rust;
     }

@@ -3,6 +3,8 @@
 mod corpus;
 #[path = "single_vm_service/request.rs"]
 mod request;
+#[path = "single_vm_service/scaling.rs"]
+mod scaling;
 #[path = "single_vm_service/watchdog.rs"]
 mod watchdog;
 use gerbil_scheme::instances::{InstanceConfig, InstanceDispatcher, InstancePool, IsolatedProgram};
@@ -91,11 +93,12 @@ impl Sample {
         self.elapsed_ns = self.started.elapsed().as_nanos();
     }
     fn emit(mut self, arm: Arm, profile: &str, block: usize, warmup: bool) {
+        println!("{}", self.report(arm, profile, block, warmup));
+    }
+    fn report(&mut self, arm: Arm, profile: &str, block: usize, warmup: bool) -> serde_json::Value {
         let elapsed_ns = self.elapsed_ns;
         let messages = self.latency.len();
-        println!(
-            "{}",
-            json!({"event":"single_vm_sample","arm":arm.label(),"profile":profile,
+        json!({"event":"single_vm_sample","arm":arm.label(),"profile":profile,
             "block":block,"warmup":warmup,"messages":messages,"completed_messages":messages,
             "rejected_messages":0,"native_request_errors":0,"order_rows":self.rows,
             "elapsed_ns":elapsed_ns,"messages_per_second":rate(messages, elapsed_ns),
@@ -106,7 +109,6 @@ impl Sample {
             "constructed_to_projection_ns":quantiles(&mut self.service),
             "projection_ns":quantiles(&mut self.projection),
             "projected_to_consumed_ns":quantiles(&mut self.recovery)})
-        );
     }
 }
 fn quantiles(values: &mut [u128]) -> serde_json::Value {
@@ -119,6 +121,13 @@ fn rate(count: usize, elapsed_ns: u128) -> f64 {
     let elapsed = Duration::from_nanos(u64::try_from(elapsed_ns).expect("bounded sample time"));
     count / elapsed.as_secs_f64()
 }
+#[derive(Clone, Copy, Debug)]
+struct Partition {
+    owner: usize,
+    owners: usize,
+    messages: usize,
+}
+
 async fn service_sample(
     dispatch: InstanceDispatcher,
     inputs: Arc<Vec<Vec<Vec<i64>>>>,
@@ -126,11 +135,41 @@ async fn service_sample(
     progress: Progress,
     messages: usize,
 ) -> Sample {
+    service_partition(
+        dispatch,
+        inputs,
+        short,
+        progress,
+        Partition {
+            owner: 0,
+            owners: 1,
+            messages,
+        },
+    )
+    .await
+}
+async fn service_partition(
+    dispatch: InstanceDispatcher,
+    inputs: Arc<Vec<Vec<Vec<i64>>>>,
+    short: bool,
+    progress: Progress,
+    partition: Partition,
+) -> Sample {
     let mut sample = Sample::new();
-    for input in inputs.iter().cycle().take(messages) {
+    for input in inputs
+        .iter()
+        .cycle()
+        .skip(partition.owner)
+        .step_by(partition.owners)
+        .take(partition.messages)
+    {
         let started = Instant::now();
         let reply = dispatch
-            .submit_scheme_service_backpressured_on(0, Request::new(input.clone(), short), GATE)
+            .submit_scheme_service_backpressured_on(
+                partition.owner,
+                Request::new(input.clone(), short),
+                GATE,
+            )
             .await
             .unwrap()
             .wait_completed(GATE)
@@ -164,7 +203,8 @@ fn native_sample(
     sample.finish();
     sample
 }
-fn run(progress: &Progress, smoke: bool, million: bool) {
+fn run(progress: &Progress, smoke: bool, million: bool, scaling_owners: Option<usize>) {
+    let owners = scaling_owners.unwrap_or(1);
     let image = std::env::var("GERBIL_SERVICE_BENCH_IMAGE")
         .unwrap_or_else(|_| gerbil_scheme_qualification::owner_instance_image().to_owned());
     // SAFETY: Cargo builds this qualification image and its rooted service ABI.
@@ -175,18 +215,18 @@ fn run(progress: &Progress, smoke: bool, million: bool) {
             .with_scheme_service(c"gerbil_owner_service_call")
     };
     let startup = Instant::now();
-    let mut pool = InstancePool::start(
+    let mut pool = InstancePool::start_observed(
         &program,
         InstanceConfig {
-            owners: 1,
+            owners,
             queue_capacity: 128,
             maximum_request_bytes: 16 * 1024 * 1024,
             maximum_reply_bytes: 16 * 1024 * 1024,
             startup_timeout: GATE,
         },
+        |_| progress.record(Event::Initialized),
     )
     .unwrap();
-    progress.record(Event::Initialized);
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
     let caller = tokio::runtime::Builder::new_current_thread()
@@ -194,7 +234,7 @@ fn run(progress: &Progress, smoke: bool, million: bool) {
         .build()
         .unwrap();
     let worker = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
+        .worker_threads(owners)
         .enable_all()
         .build()
         .unwrap();
@@ -202,18 +242,19 @@ fn run(progress: &Progress, smoke: bool, million: bool) {
     let messages = if million { 1_000_000 } else { corpus_messages };
     println!(
         "{}",
-        json!({"event":"single_vm_configuration","owners":1,"outstanding":1,
-        "tokio_workers":1,"messages_per_sample":messages,"startup_ns":startup.elapsed().as_nanos(),
+        json!({"event":if scaling_owners.is_some() {"fixed_owner_scaling_configuration"} else {"single_vm_configuration"},"owners":owners,"outstanding":owners,
+        "tokio_workers":owners,"messages_per_sample":messages,"startup_ns":startup.elapsed().as_nanos(),
         "service_completion":"Snapshot","defaults_changed":false,"deadline_ms":GATE.as_millis(),
         "profiles":if million { vec!["short_cpu"] } else { vec!["short_cpu","bulk_cpu","bulk_mixed"] },
         "million_baseline":million,"corpus_messages":corpus_messages,
-        "arrival_mode":"closed_loop_one_outstanding",
+        "fixed_owner_scaling":scaling_owners.is_some(),"outstanding_per_owner":1,
+        "arrival_mode":if scaling_owners.is_some() {"closed_loop_one_outstanding_per_owner"} else {"closed_loop_one_outstanding"},
         "exclusive_physical_core_affinity":false,
         "explicit_image_override":std::env::var_os("GERBIL_SERVICE_BENCH_IMAGE").is_some(),
         "measured_arms":if million { vec![Arm::WorkerService.label()] } else { vec![Arm::NativeCycle.label(),Arm::CallerService.label(),Arm::WorkerService.label()] },"bulk_orders":8,"bulk_lines":48,
         "short_orders":1,"short_lines":4,"yield_every":1,"service_workers":4,"actors_per_batch":4,
         "throughput_unit":"service_messages_per_second_including_oracle",
-        "comparison_scope":"one_VM_component_costs_not_capacity_or_open_arrival_p99",
+        "comparison_scope":if scaling_owners.is_some() {"same_short_CPU_workload_fixed_owner_scaling_not_open_arrival"} else {"one_VM_component_costs_not_capacity_or_open_arrival_p99"},
         "native_scope":"host_owner_queue_plus_full_Scheme_service_cycle_not_pure_Scheme_upper_bound",
         "caller_scope":"public_async_API_on_current_thread_Tokio",
         "worker_scope":"same_public_API_on_one_Tokio_worker",
@@ -222,15 +263,19 @@ fn run(progress: &Progress, smoke: bool, million: bool) {
     );
     exception_controls(&dispatch, &caller);
     progress.record(Event::ControlsCompleted);
-    profiles(
-        &dispatch,
-        &caller,
-        &worker,
-        progress,
-        smoke,
-        corpus_messages,
-        million,
-    );
+    if let Some(owners) = scaling_owners {
+        scaling::run(&dispatch, &worker, progress, owners);
+    } else {
+        profiles(
+            &dispatch,
+            &caller,
+            &worker,
+            progress,
+            smoke,
+            corpus_messages,
+            million,
+        );
+    }
     cleanup(&mut pool, progress);
 }
 fn input_corpus(messages: usize, short: bool, mixed: bool) -> Arc<Vec<Vec<Vec<i64>>>> {
@@ -356,18 +401,21 @@ fn profiles(
 }
 fn cleanup(pool: &mut InstancePool, progress: &Progress) {
     let dispatch = pool.dispatcher();
-    dispatch
-        .submit_native_on(0, |session| {
-            session.collect()?;
-            assert_eq!(session.usage()?[3].to_bits(), 0.0_f64.to_bits());
-            Ok(())
-        })
-        .unwrap()
-        .wait(GATE)
-        .unwrap();
+    let owners = pool.owners().len();
+    for owner in 0..owners {
+        dispatch
+            .submit_native_on(owner, |session| {
+                session.collect()?;
+                assert_eq!(session.usage()?[3].to_bits(), 0.0_f64.to_bits());
+                Ok(())
+            })
+            .unwrap()
+            .wait(GATE)
+            .unwrap();
+    }
     let receipt = pool.shutdown(GATE);
     assert!(receipt.is_clean(), "{receipt:?}");
-    assert_eq!(receipt.joined, 1);
+    assert_eq!(receipt.joined, owners);
     assert!(
         receipt
             .owners
@@ -376,13 +424,18 @@ fn cleanup(pool: &mut InstancePool, progress: &Progress) {
     );
     println!(
         "{}",
-        json!({"event":"single_vm_cleanup","joined":receipt.joined,"roots":0,"files_removed":true})
+        json!({"event":if owners==1 {"single_vm_cleanup"} else {"fixed_owner_scaling_cleanup"},"joined":receipt.joined,"roots":0,"files_removed":true})
     );
     progress.record(Event::Retired);
 }
 fn snapshot(dispatch: &InstanceDispatcher) -> ([f64; 4], Option<[f64; 6]>) {
+    snapshot_on(dispatch, 0)
+}
+fn snapshot_on(dispatch: &InstanceDispatcher, owner: usize) -> ([f64; 4], Option<[f64; 6]>) {
     dispatch
-        .submit_native_on(0, |session| Ok((session.usage()?, session.diagnostics())))
+        .submit_native_on(owner, |session| {
+            Ok((session.usage()?, session.diagnostics()))
+        })
         .unwrap()
         .wait(GATE)
         .unwrap()
@@ -427,17 +480,33 @@ fn exception_controls(dispatch: &InstanceDispatcher, caller: &tokio::runtime::Ru
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     assert!(
-        args.iter()
-            .all(|a| a == "--test" || a == "--bench" || a == "--million-short-cpu"),
-        "supported arguments: --test, --bench, --million-short-cpu"
+        args.iter().all(|a| a == "--test"
+            || a == "--bench"
+            || a == "--million-short-cpu"
+            || a == "--fixed-owner-scaling=1"
+            || a == "--fixed-owner-scaling=12"),
+        "supported arguments: --test, --bench, --million-short-cpu, --fixed-owner-scaling=1|12"
     );
-    let million = args.iter().any(|a| a == "--million-short-cpu");
+    let scaling: Vec<_> = args
+        .iter()
+        .filter_map(|a| a.strip_prefix("--fixed-owner-scaling="))
+        .collect();
+    assert!(
+        scaling.len() <= 1,
+        "one fixed-owner scaling target per process"
+    );
+    let scaling_owners = scaling.first().map(|s| s.parse::<usize>().unwrap());
+    assert!(
+        !(scaling_owners.is_some() && args.iter().any(|a| a == "--million-short-cpu")),
+        "select one million-message profile"
+    );
+    let million = scaling_owners.is_some() || args.iter().any(|a| a == "--million-short-cpu");
     let smoke = args.iter().any(|a| a == "--test");
     assert!(
         !(million && smoke),
         "million baseline cannot be labeled as smoke"
     );
     let (watchdog, progress) = Watchdog::start(GATE);
-    run(&progress, smoke, million);
+    run(&progress, smoke, million, scaling_owners);
     watchdog.finish();
 }

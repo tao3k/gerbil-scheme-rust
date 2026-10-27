@@ -46,6 +46,7 @@ fn track_native_sources() {
     println!("cargo:rerun-if-changed=scheme/instance-mailbox-observation.ss");
     println!("cargo:rerun-if-changed=scheme/instance-owner-watch.ss");
     println!("cargo:rerun-if-changed=scheme/instance-ready-edge.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-source-plan.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service-lease.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service-activation.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service-turn.ss");

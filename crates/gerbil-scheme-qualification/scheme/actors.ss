@@ -29,6 +29,7 @@ package: gerbil-scheme-rust/qualification
 (include "instance-mailbox-observation.ss")
 (include "instance-owner-watch.ss")
 (include "instance-ready-edge.ss")
+(include "instance-source-plan.ss")
 (include "instance-mailbox-backpressure.ss")
 (include "instance-native.ss")
 

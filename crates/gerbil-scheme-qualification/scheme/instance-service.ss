@@ -71,6 +71,8 @@
     ((59) (orders-mailbox-backpressure-parked command))
     ((60) (orders-mailbox-backpressure-coalesced command))
     ((61) (mailbox-ready-native-contract))
+    ((62) (orders-mailbox-backpressure-scheduled command))
+    ((63) (mailbox-source-plan-contract))
     (else (error "invalid synchronous reference"))))
 ;; Qualification only: drive the SAME endpoint from its fixed owner. Unlike op 6,
 ;; this includes the service queue, Gerbil workers, waiting and ready/take custody.

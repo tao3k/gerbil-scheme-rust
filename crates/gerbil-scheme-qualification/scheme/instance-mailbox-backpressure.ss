@@ -2,7 +2,7 @@
 ;; an unbounded list of payloads. The original timestamps and deadline include
 ;; that debt. Three existing execution credits own three transfer frames.
 (defrules define-mailbox-backpressure ()
- ((_ name observe? watch? park? coalesce?)
+ ((_ name observe? watch? park? coalesce? owned-plan?)
  (def (name command)
   (let* ((header (vector-ref command 0)) (rate (s64vector-ref header 1))
          (seconds (s64vector-ref header 2)) (progress (s64vector-ref header 3))
@@ -12,17 +12,22 @@
                  (zero? (s64vector-ref state 3)) (zero? (s64vector-ref state 7))
                  (not orders-native-access?))
       (error "native backpressure requires idle original handler, at most 500k/s"))
-    (when (memv (s64vector-ref header 0) '(56 57 58 59 60)) (actor-arrival-access-contract!))
+    (when (memv (s64vector-ref header 0) '(56 57 58 59 60 62)) (actor-arrival-access-contract!))
     (when observe? (mailbox-clock-contract!))
     (let* ((receiver (current-thread)) (workers (make-vector 4 #f))
            ;; [slot, application id, custody, input/result, failure?]
-           (frames (vector (vector 0 -1 'free #f #f) (vector 1 -1 'free #f #f)
-                           (vector 2 -1 'free #f #f)))
+           (frames (if owned-plan?
+                     (vector (vector 0 -1 'free #f #f #f) (vector 1 -1 'free #f #f #f)
+                             (vector 2 -1 'free #f #f #f))
+                     (vector (vector 0 -1 'free #f #f) (vector 1 -1 'free #f #f)
+                             (vector 2 -1 'free #f #f))))
            (histogram (make-u64vector 5000000 0)) (total (* rate seconds))
            (next 0) (completed 0) (active 0) (max-debt 0) (max-outstanding 0)
            (max-lag 0) (last-publish 0) (over-window 0) (start 0) (stopped? #f)
            (watch-before #f) (watch-after #f)
-           (edge (and coalesce? (make-mailbox-ready-edge frames receiver (vector #f) 0 0 0))))
+           (edge (and coalesce? (make-mailbox-ready-edge frames receiver (vector #f) 0 0 0)))
+           (plan (and owned-plan? (mailbox-source-plan-create rate)))
+           (advance-plan (and owned-plan? (mailbox-source-plan-step plan))))
      (with-mailbox-observation observe? rate (if observe? (s64vector-ref header 4) 0)
        observer (source construction dispatch consumption idle)
       (def (planned id) (+ start (quotient (* id 1000000000) rate)))
@@ -35,11 +40,12 @@
         (let drain () (when (thread-receive 0 #f) (drain)))
         (vector-for-each (lambda (frame)
           (vector-set! frame 1 -1) (vector-set! frame 2 'free)
-          (vector-set! frame 3 #f) (vector-set! frame 4 #f)) frames)
+          (vector-set! frame 3 #f) (vector-set! frame 4 #f)
+          (when owned-plan? (vector-set! frame 5 #f))) frames)
         (set! stopped? #t)))
       (with-mailbox-observation-failure observe? observer
        (with-mailbox-owner-failure watch?
-       (dynamic-wind (lambda () (set! orders-native-access? (memv (s64vector-ref header 0) '(56 57 58 59 60))))
+       (dynamic-wind (lambda () (set! orders-native-access? (memv (s64vector-ref header 0) '(56 57 58 59 60 62))))
         (lambda ()
           (let create ((index 0))
             (when (< index 4)
@@ -87,6 +93,7 @@
                               (quotient (* (s64vector-ref header 4) 1000000000) rate)))
               (error "native owner observation unavailable")))
           (set! start (owner-wait-trace 1 0))
+          (when owned-plan? (mailbox-source-plan-time-set! plan start))
           (when observe? (mailbox-observation-start! observer source))
           (let drive ()
             (when observe? (mailbox-observe! observer source next))
@@ -96,7 +103,8 @@
               (set! max-debt (max max-debt debt))
               (set! max-outstanding (max max-outstanding outstanding))
               (when (> outstanding 128) (set! over-window (1+ over-window)))
-              (when (and (positive? debt) (>= (- now (planned next)) 5000000000))
+              (when (and (positive? debt)
+                         (>= (- now (if owned-plan? (mailbox-source-plan-time plan) (planned next))) 5000000000))
                 (error "native source debt exceeded five seconds"))
               ;; Source eligibility is arithmetic, retaining every original
               ;; arrival, not a loop allocating or rejecting catch-up messages.
@@ -105,13 +113,17 @@
                   (let (frame (vector-ref frames slot))
                     (when (eq? (vector-ref frame 2) 'free)
                       (when observe? (mailbox-observe! observer construction next))
-                      (let ((id next) (input (actor-arrival-input next)))
+                      (let ((id next) (input (actor-arrival-input next))
+                            (planned-time (and owned-plan? (mailbox-source-plan-time plan))))
                         (vector-set! frame 1 id) (vector-set! frame 2 'queued)
                         (vector-set! frame 3 input) (vector-set! frame 4 #f)
+                        (when owned-plan? (vector-set! frame 5 planned-time))
                         (thread-send (vector-ref workers (modulo id 4)) frame)
                         (set! next (1+ next)) (set! active (1+ active))
+                        (when owned-plan? (advance-plan plan))
                         (set! last-publish (- (owner-wait-trace 1 0) start))
-                        (set! max-lag (max max-lag (- (+ start last-publish) (planned id))))
+                        (set! max-lag (max max-lag
+                          (- (+ start last-publish) (if owned-plan? planned-time (planned id)))))
                         (when observe? (mailbox-observe! observer source next)))))
                   (supply (1+ slot)))))
             (if (positive? active)
@@ -133,7 +145,8 @@
                                (= id (vector-ref frame 1)) (eq? (vector-ref frame 2) 'ready))
                     (error "stale or duplicate native completion frame"))
                   (when (vector-ref frame 4) (raise (vector-ref frame 3)))
-                  (let* ((now (owner-wait-trace 1 0)) (latency (- now (planned id)))
+                  (let* ((now (owner-wait-trace 1 0))
+                         (latency (- now (if owned-plan? (vector-ref frame 5) (planned id))))
                          (bucket (quotient latency 1000)))
                     (unless (< latency 5000000000) (error "native request exceeded five seconds"))
                     (u64vector-set! histogram bucket (1+ (u64vector-ref histogram bucket))))
@@ -141,6 +154,7 @@
                   ;; Only verified consumption returns custody and capacity.
                   (vector-set! frame 3 #f) (vector-set! frame 4 #f)
                   (vector-set! frame 1 -1) (vector-set! frame 2 'free)
+                  (when owned-plan? (vector-set! frame 5 #f))
                   (set! active (1- active)) (set! completed (1+ completed)))))
               (begin
                 (when observe? (mailbox-observe! observer idle next))
@@ -161,6 +175,9 @@
             (when observe? (mailbox-observe! observer source next))
             (unless (and (= next total) (= completed total) (zero? active))
               (error "native backpressure accounting"))
+            (when owned-plan?
+              (unless (= (mailbox-source-plan-time plan) (planned total))
+                (error "native source plan final identity")))
             (when coalesce?
               ;; Join any worker between frame publication and signaling before
               ;; projecting epoch counters. Cleanup drains the last optional wake.
@@ -191,8 +208,9 @@
               (when watch?
                 (unless (zero? (mailbox-owner-watch-stop!)) (error "native owner observer unwind failed")))
               (stop!) (set! orders-native-access? #f)))))))))))))
-(define-mailbox-backpressure orders-mailbox-backpressure #f #f #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-observed #t #f #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-watched #f #t #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-parked #f #f #t #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-coalesced #f #f #f #t)
+(define-mailbox-backpressure orders-mailbox-backpressure #f #f #f #f #f)
+(define-mailbox-backpressure orders-mailbox-backpressure-observed #t #f #f #f #f)
+(define-mailbox-backpressure orders-mailbox-backpressure-watched #f #t #f #f #f)
+(define-mailbox-backpressure orders-mailbox-backpressure-parked #f #f #t #f #f)
+(define-mailbox-backpressure orders-mailbox-backpressure-coalesced #f #f #f #t #f)
+(define-mailbox-backpressure orders-mailbox-backpressure-scheduled #f #f #f #f #t)

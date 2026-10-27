@@ -2,6 +2,15 @@
 
 ## Current native 500k/s checkpoint
 
+The user-authorized [source-owned timestamp checkpoint at 0.317 ms p99](checkpoints/native-source-plan-0317ms-20261027/README.md)
+is the explicit continuation reference for source-debt research. Its 351 > 128
+outstanding failure and the same run's anomalous 23.044 ms control are preserved;
+the checkpoint is not fully admitted and does not change defaults. The earlier
+0.391 ms original remains the historical reference. Do not infer a speedup from
+the delayed control or promote the rejected notification-coalescing experiment.
+
+## Earlier original-path checkpoint
+
 Use [the original native mailbox arm at 0.391 ms p99](checkpoints/native-mailbox-500k-20261027/README.md)
 as the reference for subsequent native optimization. Both arms completed five
 million messages at 500k/s with zero rejection, but the opt-in ready-edge

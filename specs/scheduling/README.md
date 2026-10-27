@@ -1,5 +1,18 @@
 # Scheme–Rust scheduling baseline and model map
 
+## Current native 500k/s checkpoint
+
+Use [the original native mailbox arm at 0.391 ms p99](checkpoints/native-mailbox-500k-20261027/README.md)
+as the reference for subsequent native optimization. Both arms completed five
+million messages at 500k/s with zero rejection, but the opt-in ready-edge
+candidate had worse p99 (0.453 ms) and debt. Neither passes the separate original
+128-message outstanding guard. Candidate source is retained for reproducibility,
+not selected as a default or optimization baseline. The checkpoint includes the
+actual measured dependency cohort, complete structured results and negative
+evidence; it makes no new production/CI admission claim.
+
+## Original source and component baseline
+
 This work starts on `research/single-vm-service-cost` at `fc82d5a`.
 Production Rust, C and Scheme engine sources are unchanged. The first task is
 to establish a measured single-VM baseline before changing scheduling.
@@ -217,3 +230,39 @@ engine cohort; a local candidate does not replace that baseline or qualify the
 mixed open-arrival gate. Run `just bridge-fixed-owner-scaling 1` and `12` as
 separate processes. Run `just bridge-backend-choice-model` for the isolated
 shared-mode primitive; existing owner/Actor protocols remain authoritative.
+
+## Duration-driven short concurrency research
+
+[Bounded short concurrency](short_concurrency.md) records the manual-grounded
+class/projection/native-retirement contract and same-live-VM 1-versus-3-slot API
+experiments at 500,000 and 1,000,000 planned arrivals/s for ten seconds per arm.
+The retained [two-second burst](single_vm_open_500k.md) is historical and is not
+the current duration-driven acceptance contract. Neither replaces the published
+closed-loop or mixed fixed-arrival references. Current candidates are not admitted.
+
+- [Bounded continuous short service](continuous_short.md): one resident producer,
+  independent result consumption, per-request expiry and bounded host/native
+  ownership; refines the existing short-concurrency model.
+- [Gerbil Actor supply opportunities](actor_supply.md): distinguishes native
+  active capacity from actual bounded publication before Scheme advancement.
+- [Bounded Actor completion custody](actor_completion.qnt): native result
+  snapshots retain independently projected/retired messages, including partial
+  consumption followed by cancellation and close.
+- [Native lifecycle and fixture ownership](native_lifecycle.md): preserves loader/SDK
+  coordination and excludes application finalizers from the process gate.
+- [Typed Actor input construction](native_construction.md): same graph and quota,
+  one external constructor root; opt-in comparison on the original service policy.
+- [Typed Actor evidence chain](typed_actor_evidence.md): source identity,
+  ownership checks, complete outcomes and explicit failed capacity admission.
+- [Gerbil-native Actor arrival reference](native_actor_reference.md): same business
+  workload in raw mailboxes and the existing service, without per-message Rust entry.
+- [Native ready-edge handoff](native_ready_wake.md): optional completion-edge
+  coalescing over the original frames, CAS notification ownership and round-robin
+  result consumption; model and native gates remain distinct.
+- [Continuous backpressure](continuous_backpressure.md): wait for existing window
+  credit without payload/root preparation, while consuming results independently.
+- [Rejected typed mailbox service](mailbox_service.md): archived native completion
+  Actor and failed capacity receipts, excluded from the active candidate.
+- [Owner-local native type exchange](native_exchange.md): synchronous copied
+  input, scalar identity and independently consumed completion slots.
+- [Shared continuous lease](continuous_lease.qnt) and [publication deadline](publication_deadline.qnt): joint canceled-input custody and original-deadline commit checks.

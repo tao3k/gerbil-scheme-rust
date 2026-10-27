@@ -3,7 +3,7 @@ use super::{
     InstanceConfig, InstanceError, IsolatedProgram, OwnerReceipt, OwnerShutdown,
     image::Image,
     mapping::Mapping,
-    pool::{LIFECYCLE, Request},
+    pool::Request,
     service_wake::{Reader, Wake},
 };
 use std::{
@@ -23,12 +23,15 @@ pub(super) struct Task {
     pub requests: mpsc::Receiver<Request>,
 }
 pub(super) fn run(task: Task) {
-    let loaded = {
-        let _guard = LIFECYCLE
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        Image::load(&task.path, &task.program, task.owner, task.mapping)
-    };
+    super::lifecycle_trace::event(
+        task.mapping.identity,
+        if task.config.queue_capacity == 1 {
+            "owner-begin-small"
+        } else {
+            "owner-begin"
+        },
+    );
+    let loaded = Image::load(&task.path, &task.program, task.owner, task.mapping);
     let image = match loaded {
         Ok(image) => image,
         Err(error) => {
@@ -38,14 +41,13 @@ pub(super) fn run(task: Task) {
     };
     #[cfg(feature = "tokio-dispatch")]
     if let (Some(reader), Some(wake)) = (task.wake_reader.as_ref(), task.wake.as_ref()) {
+        super::lifecycle_trace::event(image.identity, "service-open");
         if let Err(error) =
             super::service_loop::open(&image, reader, wake, task.config.queue_capacity)
         {
             let _ = task.ready.send(Err(error));
+            super::lifecycle_trace::event(image.identity, "service-open-failed");
             super::service_loop::close(&image);
-            let _guard = LIFECYCLE
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let _ = task.finished.send(image.finish());
             return;
         }
@@ -67,11 +69,6 @@ pub(super) fn run(task: Task) {
     }
     #[cfg(not(feature = "tokio-dispatch"))]
     super::owner_loop::run(&image, &task.requests, task.config.maximum_reply_bytes);
-    let receipt = {
-        let _guard = LIFECYCLE
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        image.finish()
-    };
+    let receipt = image.finish();
     let _ = task.finished.send(receipt);
 }

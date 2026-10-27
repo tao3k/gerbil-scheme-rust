@@ -32,6 +32,8 @@ mod batch_types;
 pub use batch_types::{BatchTimeline, ProfiledBatch};
 mod dispatch;
 #[cfg(feature = "tokio-dispatch")]
+mod owner_admission;
+#[cfg(feature = "tokio-dispatch")]
 use dispatch::Admission;
 mod image;
 mod mapping;
@@ -73,9 +75,17 @@ mod service_contract;
 #[cfg(feature = "tokio-dispatch")]
 pub use service_contract::SchemeServiceExecution;
 #[cfg(feature = "tokio-dispatch")]
+mod exchange_api;
+#[cfg(feature = "tokio-dispatch")]
 mod numeric_snapshot;
 #[cfg(feature = "tokio-dispatch")]
 mod service_cycle;
+#[cfg(feature = "tokio-dispatch")]
+mod service_exchange;
+#[cfg(feature = "tokio-dispatch")]
+mod service_output;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_output::SchemeServiceOutput;
 #[cfg(feature = "tokio-dispatch")]
 mod service_input;
 #[cfg(feature = "tokio-dispatch")]
@@ -236,4 +246,14 @@ pub use service_publication::{
 #[cfg(feature = "tokio-dispatch")]
 mod service_ingress;
 #[cfg(feature = "tokio-dispatch")]
-pub use service_ingress::{SchemeServiceIngress,SchemeIngressConfig,SchemeIngressId,SchemeIngressAdmission,SchemeIngressRejected,SchemeIngressSnapshot,SchemeIngressClaim};
+pub use service_ingress::{
+    SchemeIngressAdmission, SchemeIngressClaim, SchemeIngressConfig, SchemeIngressId,
+    SchemeIngressRejected, SchemeIngressSnapshot, SchemeServiceIngress,
+};
+
+#[cfg(feature = "tokio-dispatch")]
+mod service_continuous;
+#[cfg(feature = "tokio-dispatch")]
+pub use service_continuous::{SchemeServiceContinuous, SchemeServiceContinuousTicket};
+
+mod lifecycle_trace;

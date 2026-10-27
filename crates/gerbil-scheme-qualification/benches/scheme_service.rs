@@ -400,6 +400,7 @@ fn main() {
                 Ok(event) => last = event,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
                 Err(mpsc::RecvTimeoutError::Timeout) => {
+                    capacity::report_stalled_flow();
                     eprintln!("SERVICE-BENCH-STALL last={last} cleanup=UNVERIFIED");
                     stall_forensics::capture();
                     std::process::exit(70);

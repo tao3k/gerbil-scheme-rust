@@ -25,6 +25,11 @@ package: gerbil-scheme-rust/qualification
 (include "instance-actor-control.ss")
 (include "instance-orders.ss")
 (include "instance-service.ss")
+(include "instance-actor-arrival.ss")
+(include "instance-mailbox-observation.ss")
+(include "instance-owner-watch.ss")
+(include "instance-ready-edge.ss")
+(include "instance-mailbox-backpressure.ss")
 (include "instance-native.ss")
 
 ;; Diagnostic-only synchronous callback from inside Scheme. The host owns the

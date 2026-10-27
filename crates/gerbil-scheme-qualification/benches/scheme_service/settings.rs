@@ -283,38 +283,41 @@ pub(super) fn coupled_refill_ab() -> bool {
 }
 
 pub(super) fn native_entry_ab() -> bool {
-    std::env::args().any(|arg| {
-        arg == "--native-entry-ab"
-            || arg == "--joint-progress-ab"
-            || arg == "--work-budget-ab"
-            || arg == "--work-plan-ab"
-            || arg == "--lease-plan-ab"
-            || arg == "--activation-plan-ab"
-            || arg == "--cycle-accounting-ab"
-            || arg == "--actor-turn-ab"
-            || arg == "--specialized-plan-ab"
-            || arg == "--reclamation-plan-ab"
-            || arg == "--receiver-plan-ab"
-            || arg == "--registered-plan-ab"
-            || arg == "--directed-plan-ab"
-            || arg == "--execution-checkpoint-ab"
-            || arg == "--service-cycle-plan-ab"
-            || arg == "--progress-cycle-ab"
-            || arg == "--runtime-joint-ab"
-            || arg == "--runtime-cost-ab"
-            || arg == "--runtime-event-cost-ab"
-            || arg == "--native-budget-cost-ab"
-            || arg == "--client-arrival-cost-ab"
-            || arg == "--retire-publication-ab"
-            || arg == "--completion-await-ab"
-            || arg == "--claim-progress-ab"
-            || arg == "--ready-owner-ab"
-            || arg == "--client-turn-ab"
-            || arg == "--arrival-clock-ab"
-            || arg == "--completion-service-ab"
-            || arg == "--activation-protocol-ab"
-            || arg == "--lease-plan-protocol-ab"
-            || arg == "--work-plan-protocol-ab"
+    static SELECTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *SELECTED.get_or_init(|| {
+        std::env::args().any(|arg| {
+            arg == "--native-entry-ab"
+                || arg == "--joint-progress-ab"
+                || arg == "--work-budget-ab"
+                || arg == "--work-plan-ab"
+                || arg == "--lease-plan-ab"
+                || arg == "--activation-plan-ab"
+                || arg == "--cycle-accounting-ab"
+                || arg == "--actor-turn-ab"
+                || arg == "--specialized-plan-ab"
+                || arg == "--reclamation-plan-ab"
+                || arg == "--receiver-plan-ab"
+                || arg == "--registered-plan-ab"
+                || arg == "--directed-plan-ab"
+                || arg == "--execution-checkpoint-ab"
+                || arg == "--service-cycle-plan-ab"
+                || arg == "--progress-cycle-ab"
+                || arg == "--runtime-joint-ab"
+                || arg == "--runtime-cost-ab"
+                || arg == "--runtime-event-cost-ab"
+                || arg == "--native-budget-cost-ab"
+                || arg == "--client-arrival-cost-ab"
+                || arg == "--retire-publication-ab"
+                || arg == "--completion-await-ab"
+                || arg == "--claim-progress-ab"
+                || arg == "--ready-owner-ab"
+                || arg == "--client-turn-ab"
+                || arg == "--arrival-clock-ab"
+                || arg == "--completion-service-ab"
+                || arg == "--activation-protocol-ab"
+                || arg == "--lease-plan-protocol-ab"
+                || arg == "--work-plan-protocol-ab"
+        })
     })
 }
 
@@ -923,14 +926,17 @@ pub(super) fn client_arrival_cost_ab() -> bool {
 }
 
 pub(super) fn retire_publication_ab() -> bool {
-    std::env::args().any(|arg| {
-        arg == "--retire-publication-ab"
-            || arg == "--completion-await-ab"
-            || arg == "--claim-progress-ab"
-            || arg == "--ready-owner-ab"
-            || arg == "--client-turn-ab"
-            || arg == "--arrival-clock-ab"
-            || arg == "--completion-service-ab"
+    static SELECTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *SELECTED.get_or_init(|| {
+        std::env::args().any(|arg| {
+            arg == "--retire-publication-ab"
+                || arg == "--completion-await-ab"
+                || arg == "--claim-progress-ab"
+                || arg == "--ready-owner-ab"
+                || arg == "--client-turn-ab"
+                || arg == "--arrival-clock-ab"
+                || arg == "--completion-service-ab"
+        })
     })
 }
 fn configure_publication(pool: &InstancePool, owner: usize, arm: bool) {

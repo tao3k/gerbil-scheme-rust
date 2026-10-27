@@ -198,7 +198,7 @@ impl InstanceDispatcher {
                 "short pool freezes native budgets",
             ));
         }
-        let previous = configure(
+        let previous = replace_owner_capacities(
             &mut senders,
             maximum_in_flight,
             maximum_work,
@@ -228,7 +228,9 @@ impl InstanceDispatcher {
         if timeout.is_zero() {
             return Err(InstanceError::Timeout);
         }
-        let capacity = {
+        let capacity = if let Some(port) = self.owner_port(owner) {
+            port?.capacity()?
+        } else {
             let senders = self
                 .admission
                 .senders
@@ -288,6 +290,30 @@ pub(super) async fn acquire_pair(
             .map_err(|_| InstanceError::Closed)?,
     );
     Ok(permit)
+}
+
+fn replace_owner_capacities(
+    senders: &mut super::dispatch::Senders,
+    maximum_in_flight: usize,
+    maximum_work: Option<usize>,
+    changed: &Arc<std::sync::OnceLock<crate::instances::capacity_event::CapacityEvents>>,
+) -> Result<Vec<Arc<Capacity>>, InstanceError> {
+    // Registry -> ascending owner gates. Fast publication never takes registry.
+    let ports = super::owner_admission::ports(senders);
+    let mut states: Vec<_> = ports.iter().map(|port| port.lock()).collect();
+    senders.ever_admitted |= states
+        .iter()
+        .any(|state| state.as_ref().is_some_and(|state| state.published));
+    let previous = configure(senders, maximum_in_flight, maximum_work, changed)?;
+    for (owner, state) in senders.owners.iter().zip(&mut states) {
+        state
+            .as_mut()
+            .expect("live owner publication")
+            .capacity
+            .clone_from(&owner.capacity);
+    }
+    drop(states);
+    Ok(previous)
 }
 
 fn configure(

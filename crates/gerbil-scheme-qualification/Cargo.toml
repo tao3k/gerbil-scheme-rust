@@ -103,3 +103,8 @@ required-features = ["instance-dispatch"]
 name = "single_vm_service"
 harness = false
 required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "gerbil_actor_arrival"
+harness = false
+required-features = ["instance-dispatch"]

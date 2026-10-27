@@ -77,6 +77,9 @@ static int owner_wait_readable(int fd) {
   return fd >= 0 && ioctl(fd, FIONREAD, &count) == 0 && count > 0;
 }
 typedef int (*owner_select_fn)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+extern void gerbil_mailbox_native_wait_enter(void);
+extern void gerbil_mailbox_native_wait_exit(void);
+extern void gerbil_mailbox_native_progress(uint64_t previous, uint64_t now);
 static owner_select_fn owner_select_original;
 static pthread_once_t owner_select_once = PTHREAD_ONCE_INIT;
 static void owner_select_resolve(void) {
@@ -96,9 +99,11 @@ int select(int count, fd_set *readers, fd_set *writers, fd_set *errors, struct t
   if (observed && owner_wait_readable(wake_fd)) flags |= 2;
   uint64_t cpu = observed ? owner_wait_cpu() : 0;
   uint64_t start = observed ? owner_wait_clock() : 0;
+  gerbil_mailbox_native_wait_enter();
   errno = incoming_errno;
   int result = owner_select_original(count, readers, writers, errors, timeout);
   int saved_errno = errno;
+  gerbil_mailbox_native_wait_exit();
   if (observed) {
     uint64_t kind = result == 0 ? 1 : result > 0 ? 4 : saved_errno == EINTR ? 3 : 5;
     uint64_t end = owner_wait_clock(), used = owner_wait_cpu() - cpu;
@@ -131,7 +136,19 @@ static uint64_t gerbil_owner_wait_observe(int operation, uint64_t value) {
     case 5: return owner_wait_qos_set(value);
     case 6: return (uint64_t)qos_class_self();
     case 7: return (uint64_t)owner_wait_qos;
+    /* Qualification-only atomic progress address, borrowed for this native call.
+     * Match the existing aligned atomic-word bridge used by owner_callbacks.h. */
+    case 11: {
+      uint64_t *word = (uint64_t *)(uintptr_t)value;
+      uint64_t now = owner_wait_clock();
+      uint64_t last = __atomic_load_n(word, __ATOMIC_ACQUIRE);
+      if (now - last >= 5000000000ULL) return UINT64_MAX;
+      __atomic_store_n(word, now, __ATOMIC_RELEASE);
+      gerbil_mailbox_native_progress(last, now);
+      return 0;
+    }
     case 1: return owner_wait_clock();
+
     case 2: owner_wait_record(2, value, owner_wait_clock(), 1000000, 0, 0); return 0;
     case 3: owner_wait_enabled = 0; return owner_wait.count * 6 + 2;
     case 4:

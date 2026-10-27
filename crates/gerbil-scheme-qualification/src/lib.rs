@@ -1,6 +1,8 @@
 //! Producer-owned full-program AOT qualification, isolated from the default
 //! scalar archive. Benchmark workload exports are not production bridge APIs.
 
+pub mod mailbox_admission;
+
 /// The compiler-owned full Gerbil graph used only by actor qualification.
 #[cfg(feature = "actor-aot")]
 #[must_use]

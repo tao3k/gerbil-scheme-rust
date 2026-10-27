@@ -195,6 +195,8 @@ impl InstancePool {
             }
             ready(pool.receipts.last().expect("validated owner admission"));
         }
+        #[cfg(feature = "tokio-dispatch")]
+        pool.dispatcher.seal_owner_ports();
         Ok(pool)
     }
 

@@ -11,6 +11,7 @@ instance-probe = ["dep:divan", "dep:tokio"]
 instance-library = ["instance-probe", "dep:gerbil-scheme", "gerbil-scheme/isolated-instances", "dep:serde_json", "dep:gerbil-scheme-python"]
 
 arrival-clock = ["instance-dispatch", "gerbil-scheme/arrival-clock"]
+owner-wait-diagnostic = ["arrival-clock"]
 
 instance-dispatch = ["instance-library", "gerbil-scheme/tokio-dispatch", "dep:rayon", "gerbil-scheme-python/owner-dispatch"]
 
@@ -29,6 +30,7 @@ gerbil-scheme-aot-build.workspace = true
 
 [dev-dependencies]
 libc = "=0.2.186"
+serde_json.workspace = true
 
 [[bench]]
 name = "actors"

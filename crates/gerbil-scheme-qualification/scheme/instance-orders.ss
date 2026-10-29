@@ -5,6 +5,36 @@
  (namespace ("gerbil-scheme-rust/qualification/actors#" owner-wait-trace))
  (c-declare #<<c-end
 #include <stdint.h>
+#include <string.h>
+#include <math.h>
+static uint64_t (*owner_scope_control)(const char *, uint64_t, uint64_t);
+static uint64_t (*owner_scope_publish)(uint64_t, uint64_t);
+static void (*owner_scope_source)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+void gerbil_owner_scope_bind(uint64_t (*control)(const char *, uint64_t, uint64_t),
+    uint64_t (*publish)(uint64_t, uint64_t),
+    void (*source)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t)) {
+  owner_scope_control=control; owner_scope_publish=publish; owner_scope_source=source;
+}
+static uint64_t gerbil_owner_scope_control(const char *name, uint64_t generation, uint64_t value) {
+  return owner_scope_control ? owner_scope_control(name,generation,value) :
+    !strcmp(name,"supported") ? 0 : UINT64_MAX;
+}
+static uint64_t gerbil_owner_scope_publish(uint64_t generation, uint64_t address) {
+  return owner_scope_publish ? owner_scope_publish(generation,address) : UINT64_MAX;
+}
+static void gerbil_owner_scope_source(uint64_t generation, uint64_t now, uint64_t due,
+    uint64_t published, uint64_t consumed, uint64_t active) {
+  if (owner_scope_source) owner_scope_source(generation,now,due,published,consumed,active);
+}
+uint64_t gerbil_owner_scope_gc_count(void) { return (uint64_t)___VMSTATE->mem.nb_gcs_; }
+static uint64_t gerbil_owner_scope_gc_ns(double seconds) {
+  double value=seconds*1000000000.0;
+  return isfinite(value) && value>=0 && value<(double)UINT64_MAX ? (uint64_t)value : UINT64_MAX;
+}
+uint64_t gerbil_owner_scope_gc_wall(void) { return gerbil_owner_scope_gc_ns(___VMSTATE->mem.gc_real_time_); }
+uint64_t gerbil_owner_scope_gc_cpu(void) {
+  return gerbil_owner_scope_gc_ns(___VMSTATE->mem.gc_user_time_+___VMSTATE->mem.gc_sys_time_);
+}
 static uint64_t (*owner_wait_observe)(int, uint64_t);
 void gerbil_owner_wait_bind(uint64_t (*observe)(int, uint64_t)) {
   owner_wait_observe = observe;
@@ -16,6 +46,12 @@ c-end
  )
  (define owner-wait-trace
    (c-lambda (int unsigned-int64) unsigned-int64 "gerbil_owner_wait_trace")))
+(extern owner-scope-control owner-scope-publish owner-scope-source)
+(begin-foreign
+ (namespace ("gerbil-scheme-rust/qualification/actors#" owner-scope-control owner-scope-publish owner-scope-source))
+ (define owner-scope-control (c-lambda (char-string unsigned-int64 unsigned-int64) unsigned-int64 "gerbil_owner_scope_control"))
+ (define owner-scope-publish (c-lambda (unsigned-int64 unsigned-int64) unsigned-int64 "gerbil_owner_scope_publish"))
+ (define owner-scope-source (c-lambda (unsigned-int64 unsigned-int64 unsigned-int64 unsigned-int64 unsigned-int64 unsigned-int64) void "gerbil_owner_scope_source")))
 (def orders-wait-trace? #f)
 (def (orders-wait-snapshot)
   (let* ((count (owner-wait-trace 3 0)) (result (make-s64vector count)))

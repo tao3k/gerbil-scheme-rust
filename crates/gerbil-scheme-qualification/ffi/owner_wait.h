@@ -85,6 +85,9 @@ static pthread_once_t owner_select_once = PTHREAD_ONCE_INIT;
 static void owner_select_resolve(void) {
   owner_select_original = (owner_select_fn)dlsym(RTLD_NEXT, "select");
 }
+#ifdef GERBIL_OWNER_WAIT_SCOPE
+#include "owner_wait_scope_binding.h"
+#endif
 /* Hidden by the image export list: only the embedded SDK binds this symbol.
  * Forward every argument and preserve errno; do not change SDK timeout policy. */
 int select(int count, fd_set *readers, fd_set *writers, fd_set *errors, struct timeval *timeout) {
@@ -100,9 +103,22 @@ int select(int count, fd_set *readers, fd_set *writers, fd_set *errors, struct t
   uint64_t cpu = observed ? owner_wait_cpu() : 0;
   uint64_t start = observed ? owner_wait_clock() : 0;
   gerbil_mailbox_native_wait_enter();
+#ifdef GERBIL_OWNER_WAIT_SCOPE
+  struct owner_wait_scope_call association;
+  int result, saved_errno;
+  owner_wait_binding_enter(&association, timeout);
+  pthread_cleanup_push(owner_wait_binding_cancel, &association);
+#endif
   errno = incoming_errno;
+#ifdef GERBIL_OWNER_WAIT_SCOPE
+  result = owner_select_original(count, readers, writers, errors, timeout);
+  saved_errno = errno;
+  pthread_cleanup_pop(0);
+  owner_wait_binding_leave(&association, result, saved_errno);
+#else
   int result = owner_select_original(count, readers, writers, errors, timeout);
   int saved_errno = errno;
+#endif
   gerbil_mailbox_native_wait_exit();
   if (observed) {
     uint64_t kind = result == 0 ? 1 : result > 0 ? 4 : saved_errno == EINTR ? 3 : 5;
@@ -118,6 +134,10 @@ int select(int count, fd_set *readers, fd_set *writers, fd_set *errors, struct t
 static uint64_t gerbil_owner_wait_observe(int operation, uint64_t value) {
   switch (operation) {
     case 0:
+#ifdef GERBIL_OWNER_WAIT_SCOPE
+      if (value && (owner_wait_association.phase == OWNER_WAIT_SCOPE_ACTIVE ||
+                    owner_wait_association.pending)) return EBUSY;
+#endif
       owner_wait_enabled = 0;
       owner_wait.count = owner_wait.overflow = owner_wait.errors = 0;
       owner_wait_enabled = value != 0;
@@ -161,6 +181,15 @@ static uint64_t gerbil_owner_wait_observe(int operation, uint64_t value) {
 }
 
 extern void gerbil_owner_wait_bind(uint64_t (*observe)(int, uint64_t));
+#ifdef GERBIL_OWNER_WAIT_SCOPE
+#include "owner_wait_scope_scheme.h"
+extern void gerbil_owner_scope_bind(uint64_t (*)(const char *,uint64_t,uint64_t),
+    uint64_t (*)(uint64_t,uint64_t),
+    void (*)(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t));
+#endif
 __attribute__((constructor)) static void owner_wait_bind(void) {
   gerbil_owner_wait_bind(gerbil_owner_wait_observe);
+#ifdef GERBIL_OWNER_WAIT_SCOPE
+  gerbil_owner_scope_bind(owner_scope_scheme_control,owner_scope_scheme_publish,owner_scope_scheme_source);
+#endif
 }

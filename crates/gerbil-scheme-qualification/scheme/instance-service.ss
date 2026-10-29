@@ -73,6 +73,8 @@
     ((61) (mailbox-ready-native-contract))
     ((62) (orders-mailbox-backpressure-scheduled command))
     ((63) (mailbox-source-plan-contract))
+    ((64) (orders-mailbox-backpressure-scoped command))
+    ((65) (owner-scope-vm-contract (s64vector-ref (vector-ref command 0) 1)))
     (else (error "invalid synchronous reference"))))
 ;; Qualification only: drive the SAME endpoint from its fixed owner. Unlike op 6,
 ;; this includes the service queue, Gerbil workers, waiting and ready/take custody.

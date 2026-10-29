@@ -3,6 +3,12 @@
 
 pub mod mailbox_admission;
 
+#[cfg(feature = "owner-wait-diagnostic")]
+#[must_use]
+pub fn owner_wait_diagnostic_image() -> &'static str {
+    env!("GERBIL_OWNER_WAIT_DIAGNOSTIC_IMAGE")
+}
+
 /// The compiler-owned full Gerbil graph used only by actor qualification.
 #[cfg(feature = "actor-aot")]
 #[must_use]

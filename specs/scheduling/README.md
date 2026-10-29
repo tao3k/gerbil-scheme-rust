@@ -1,13 +1,37 @@
 # Scheme–Rust scheduling baseline and model map
 
-## Current native 500k/s checkpoint
+## Current best observed 500k/s checkpoint
+
+The [frozen 0.298 ms observation](checkpoints/owner-scope-0298-20261029/README.md)
+is the current best observed single-owner latency reference. Its binary,
+private VM image and original result have a verified persistent local copy.
+The 1,415 > 128 guard failure remains explicit; this is not full admission or
+a claim of proven code-optimization benefit. Existing automated gates are unchanged.
+
+The [static observer diff audit](owner_observation_diff_audit.md) identifies
+generated hot-path work and same-VM reuse confounds in the rejected 770.831 ms
+observer. It adds no observer or workload run.
+
+## Historical 6d4ec27 source checkpoint
 
 The user-authorized [source-owned timestamp checkpoint at 0.317 ms p99](checkpoints/native-source-plan-0317ms-20261027/README.md)
-is the explicit continuation reference for source-debt research. Its 351 > 128
+remains the historical source reference for source-debt research. Its 351 > 128
 outstanding failure and the same run's anomalous 23.044 ms control are preserved;
 the checkpoint is not fully admitted and does not change defaults. The earlier
 0.391 ms original remains the historical reference. Do not infer a speedup from
 the delayed control or promote the rejected notification-coalescing experiment.
+
+The [owner wait coverage audit](owner_wait_coverage.md), including the
+[explicit-generation Scheme diagnostic receipt](owner_wait_scheme.json), distinguishes green-thread
+dependencies, native call envelopes and owner CPU absence. It records the exact
+restored source identity and missing temporary evidence; its cold report/model
+checks are not performance acceptance or a replacement baseline.
+
+The [rejected peak-observer receipt](owner_peak_recovery.json) preserves the
+failed runtime experiment and exact rollback boundary. Its
+[`owner_recovery.qnt`](owner_recovery.qnt) counterexample distinguishes recovery
+under continuing arrivals from drain after a finite source stops. The collector
+and cold analysis are test-only; their runtime integration was removed.
 
 ## Earlier original-path checkpoint
 

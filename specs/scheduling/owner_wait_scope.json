@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "scope": "Bounded owner-local wait/progress association core; not yet connected to native callbacks",
+  "baseline": {
+    "revision": "6d4ec27ccf166b89279999cce66e33ce1e34c643",
+    "historical_p99_ns": 317000,
+    "historical_outstanding_peak": 351,
+    "outstanding_guard": 128,
+    "performance_admitted": false
+  },
+  "predecessor": {
+    "receipt": "owner_wait_coverage.json",
+    "sha256": "7d7fb38f51c0f9c2f86849f872dbf55bd7ae8bd436f6e4fcf899fe94f390449a",
+    "represents_prior_slice_not_current_source_manifest": true
+  },
+  "implementation": {
+    "header": "crates/gerbil-scheme-qualification/ffi/owner_wait_scope.h",
+    "named_c_records": true,
+    "retention": "current interval aggregates and one largest completed progress gap",
+    "row_array": false,
+    "dynamic_capacity": false,
+    "allocation": false,
+    "clocks_read": 0,
+    "threads_created": 0,
+    "locks_added": 0,
+    "scheme_objects_retained": false,
+    "callbacks_retained": false,
+    "progress_pointer_retained": false,
+    "new_scheduler": false,
+    "new_completion_queue": false
+  },
+  "lifetime": {
+    "zero_initialization_required": true,
+    "single_owner_only": true,
+    "owner_value_is_association_not_os_authentication": true,
+    "generation_and_sequence_ticket": true,
+    "nested_open_rejected": true,
+    "reopen_before_pending_exit_rejected": true,
+    "stale_or_duplicate_exit_cannot_finish_new_call": true,
+    "aborted_exit_only_acknowledges_retirement": true,
+    "aborted_snapshot_is_failed_evidence": true,
+    "late_invalidity_invalidates_earlier_best": true,
+    "unsealed_tail_calls_explicit": true,
+    "first_unprimed_interval_excluded": true,
+    "counter_exhaustion_invalidates_without_wrap": true
+  },
+  "validation": {
+    "cargo_test": {
+      "target": "owner_wait_scope",
+      "passed": 1,
+      "c_contract_groups": 6,
+      "marker": "OWNER-WAIT-SCOPE-CONTRACT-OK",
+      "host_c_flags": [
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic"
+      ],
+      "vm_initialized": false,
+      "real_waits_executed": false
+    },
+    "asan_ubsan": {
+      "passed": true,
+      "marker": "OWNER-WAIT-SCOPE-CONTRACT-OK",
+      "sdk_stubbed": false,
+      "sdk_used": false
+    },
+    "strict_clippy_passed": true,
+    "format_passed": true,
+    "qnt": {
+      "module": "owner_wait_scope_lifecycle",
+      "backend": "typescript",
+      "seed": 1,
+      "typecheck_passed": true,
+      "new_directed_cases": 8,
+      "inherited_coverage_cases": 10,
+      "all_directed_passed": 18,
+      "invariant": "safety",
+      "sampled_traces": 200,
+      "max_steps": 40,
+      "violation_found": false,
+      "integer_model_proves_c_overflow": false
+    }
+  },
+  "retained_model_development_failures": [
+    {
+      "cause": "nested imported owner names were unavailable",
+      "correction": "explicit projections through existing coverage module"
+    },
+    {
+      "cause": "association pending field collided with inherited source-debt pending",
+      "correction": "association metadata renamed callPending"
+    }
+  ],
+  "source_sha256": {
+    "crates/gerbil-scheme-qualification/ffi/owner_wait_scope.h": "d5e898bcb65bca547cc56e226e54c027a735ac32623e878158de05215e695101",
+    "crates/gerbil-scheme-qualification/tests/owner_wait_scope.c": "45d10b522a31eca8a89bae42e6240b43f1472179c4f786a4f2dcc34163c1d9c1",
+    "crates/gerbil-scheme-qualification/tests/owner_wait_scope.rs": "f4c6520c3888fba30860029163face2437e18aa0106c89eda35510ca4dac570d",
+    "specs/scheduling/native_owner_watch.qnt": "220f015a7952c21226e55cf005e520e70fadf971d1699baec73138e9afd5d5b0",
+    "specs/scheduling/owner_wait_coverage.md": "41776c0a4682b55d116465f9ac563b3cad7ca9c6f846216343d844ba24ed9900"
+  },
+  "unchanged_runtime_input_sha256": {
+    "crates/gerbil-scheme-qualification/ffi/owner_wait.h": "1791a51e62c3564be8d5a7e4e39f8c705d83c56079ff6851d02a2a44eeb008dd",
+    "crates/gerbil-scheme-qualification/ffi/owner_instance.c": "eb87d8423698c2a0b45b1b07c9428de510adba64d2b49fce274e4a4e039d36fe",
+    "crates/gerbil-scheme-qualification/scheme/instance-owner-watch.ss": "254fd45205e8aa4ad6540a42d5baeeb5c5dd5afa725eec34a2f80a6cd047849c",
+    "crates/gerbil-scheme-qualification/scheme/instance-orders.ss": "db05bd5577c349746c3e07fa55038953d63b3e1c224520ee5cceeb22eea43546",
+    "crates/gerbil-scheme-qualification/scheme/instance-mailbox-backpressure.ss": "d02c136d74f02fa8cd3b30538ded6c33b38e744faea4291721bc2df4476da3fd",
+    "crates/gerbil-scheme-qualification/build.rs": "f0ede1d4e69faa4e7b5d822557ca7af9ef958d75916886463ff766be673ed3b3",
+    "crates/gerbil-scheme-qualification/build/instances.rs": "1838c683d41d53f6b4e3d2ddbfb8403204865fbf27a6d990286a8d98c3f672fe"
+  },
+  "unresolved": [
+    "actual fixed-owner thread affinity and callback binding",
+    "native wait/progress linkage in one image generation and arm",
+    "foreign-call termination and actual Scheme continuation/GC integration",
+    "first-request delay before the first original progress callback",
+    "exact kernel blocking versus runnable OS scheduling time",
+    "historical outstanding peak 351 above 128"
+  ],
+  "next_integration": {
+    "reuse": "existing image-local wait and verified-progress callbacks",
+    "capture_not_yet_wired": true,
+    "old_remote_sampler_reenabled": false,
+    "detach_and_unwind_still_required": true,
+    "actual_vm_correctness_still_required": true
+  },
+  "boundaries": {
+    "defaults_changed": false,
+    "wait_protocol_changed": false,
+    "frame_return_order_changed": false,
+    "original_two_measurement_points_changed": false,
+    "gambit_or_sdk_changed": false,
+    "rust_scheduling_integration": false,
+    "native_runtime_image_built": false,
+    "load_runs": 0,
+    "performance_accepted": false,
+    "committed": false,
+    "pushed": false,
+    "pr_18_merged": false
+  }
+}

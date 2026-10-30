@@ -1,9 +1,9 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf, process::Command};
 
 use gerbil_scheme_aot_build::{
-    ProgramArchiveObservation, ProgramArchiveObserver, ProgramArchiveRequest,
-    build_program_archive_observed, discover_gambit_gsc_from_env, gerbil_command,
-    run_native_process, source_workspace,
+    ProgramArchiveObservation, ProgramArchiveObserver, ProgramArchiveOperation,
+    ProgramArchiveRequest, build_program_archive_observed, discover_gambit_gsc_from_env,
+    gerbil_command, observe_program_archive_operation, run_native_process, source_workspace,
 };
 
 #[path = "build/inputs.rs"]
@@ -13,6 +13,25 @@ mod instances;
 
 struct Progress {
     out: PathBuf,
+}
+
+impl Progress {
+    fn run(
+        &self,
+        command: &mut Command,
+        phase: &'static str,
+        operation: &str,
+    ) -> Result<(), String> {
+        observe_program_archive_operation(
+            self,
+            ProgramArchiveOperation {
+                phase,
+                operation,
+                subject: None,
+            },
+            || run_native_process(command, operation, true),
+        )
+    }
 }
 
 impl ProgramArchiveObserver for Progress {
@@ -75,6 +94,7 @@ fn main() {
         );
     }
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output"));
+    let progress = Progress { out: out.clone() };
     let package = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("package"));
     let gerbil_path = out.join("gerbil-path");
     let stage = out.join("stage");
@@ -84,7 +104,12 @@ fn main() {
         .arg("compile")
         .current_dir(&workspace)
         .env("GERBIL_PATH", &gerbil_path);
-    run_native_process(&mut build, "actor qualification producer modules", true)
+    progress
+        .run(
+            &mut build,
+            "producer-modules",
+            "actor qualification producer modules",
+        )
         .expect("compile producer modules");
     let source = package.join("scheme/actors.ss");
     let controls = package.join("scheme/utf8-controls.ss");
@@ -114,12 +139,13 @@ fn main() {
         .args(["-e", &expression])
         .current_dir(&workspace)
         .env("GERBIL_PATH", &gerbil_path);
-    run_native_process(
-        &mut stage_command,
-        "actor qualification compiler graph",
-        true,
-    )
-    .expect("stage compiler-owned graph");
+    progress
+        .run(
+            &mut stage_command,
+            "program-graph",
+            "actor qualification compiler graph",
+        )
+        .expect("stage compiler-owned graph");
     let gsc = discover_gambit_gsc_from_env().expect("paired Gambit compiler");
     let receipt = build_program_archive_observed(
         ProgramArchiveRequest {
@@ -129,7 +155,7 @@ fn main() {
             linker_name: "gerbil_actor_qualification",
             out_dir: &out.join("archive"),
         },
-        &Progress { out: out.clone() },
+        &progress,
     )
     .expect("full Gerbil actor program archive");
     if instance_probe {

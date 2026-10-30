@@ -27,6 +27,11 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     )
     .expect("write runtime collections include");
     fs::write(
+        workspace.join("scheme/runtime-exchange.ss"),
+        "exchange-v1\n",
+    )
+    .expect("write runtime exchange include");
+    fs::write(
         workspace.join("scheme/runtime-composites.ss"),
         "composites-v1\n",
     )
@@ -62,6 +67,13 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     )
     .expect("change object kinds include");
     assert_ne!(before_kinds, workspace_input_fingerprint(&workspace));
+    let before_exchange = workspace_input_fingerprint(&workspace);
+    fs::write(
+        workspace.join("scheme/runtime-exchange.ss"),
+        "exchange-v2\n",
+    )
+    .expect("change runtime exchange include");
+    assert_ne!(before_exchange, workspace_input_fingerprint(&workspace));
     fs::remove_dir_all(workspace).expect("remove Scheme input root");
 }
 
@@ -81,4 +93,24 @@ fn whole_file_receipt_rejects_any_file_or_input_change() {
     }
     assert!(validate_generated_scm(contents, &receipt, "changed-inputs").is_err());
     assert!(validate_generated_scm(contents, "", INPUT_FINGERPRINT).is_err());
+}
+
+#[test]
+fn tracked_generated_scm_matches_current_workspace_inputs() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("build crate lives below the workspace build-support directory");
+    let fingerprint = workspace_input_fingerprint(workspace);
+    for module in ["runtime", "utf8"] {
+        let scm = workspace.join(format!("scheme/generated/{module}.scm"));
+        let contents = fs::read(&scm).expect("read tracked compiler output");
+        let receipt = fs::read_to_string(scm.with_extension("scm.sha256"))
+            .expect("read tracked compiler receipt");
+        assert_eq!(
+            validate_generated_scm(&contents, &receipt, &fingerprint),
+            Ok(()),
+            "{module}: regenerate compiler output with just bridge-regenerate"
+        );
+    }
 }

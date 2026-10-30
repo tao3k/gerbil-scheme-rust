@@ -50,4 +50,22 @@ module owner_recovery {
     all {assert(valid(peak)),assert(sourceDebt(peak)==144614),
       assert(outstanding(peak)==144616),assert(outstanding(peak)>128),
       assert(270485000>418000),idle}})
+  // The integrated 80e6825 checkpoint: admission counts are not consumption.
+  run integratedPeakNeedsSourceServiceNotJustTwoReturnedFramesTest=init.then({
+    val peak={due:2447139,published:2445999,consumed:2445997}
+    all {assert(valid(peak)),assert(outstanding(peak)==1142),
+      assert(sourceDebt(peak)==1140),assert(peak.published-peak.consumed==2),
+      assert(outstanding(peak)-2>128),idle}})
+  // A necessary bound for a no-consumption interval, even with zero entry debt.
+  // It does not attribute any observed interval to the OS or a native lock.
+  run zeroConsumptionWindowCannotBeRepairedByLaterCatchupTest=init.then(all {
+    assert(128*1000000000/500000==256000),
+    assert(1094625*500000/1000000000==547),assert(547>128),idle})
+  // Hypothetical service rates, not capacity measurements. Recovery cannot
+  // retroactively admit a peak, and moving work gives no certified surplus.
+  run integratedDebtRequiresNetConsumptionSurplusTest=init.then(all {
+    assert(1142-128==1014),
+    assert(r::recoveryNs(2028000,500000,500000)== -1),
+    assert(r::recoveryNs(2028000,500000,600000)==10140000),
+    assert(r::recoveryNs(2028000,500000,1000000)==2028000),idle})
 }

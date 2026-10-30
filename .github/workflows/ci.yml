@@ -196,8 +196,8 @@ jobs:
       - name: Native owner Rust lint
         run: |
           cargo clippy -p gerbil-scheme --features external-program,arrival-clock --lib --test unit_test --locked -- -D warnings
-          cargo -vv clippy -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --bench single_vm_service --bench gerbil_actor_arrival --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
-          cargo -vv clippy -p gerbil-scheme-qualification --features actor-aot,arrival-clock --all-targets --locked -- -D warnings
+          cargo clippy -vv -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --bench single_vm_service --bench gerbil_actor_arrival --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
+          cargo clippy -vv -p gerbil-scheme-qualification --features actor-aot,arrival-clock --all-targets --locked -- -D warnings
 
 
   owner-actor:

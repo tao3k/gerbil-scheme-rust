@@ -31,3 +31,48 @@ performance reference. Peak 1,142 still fails 128. No scheduling proposal is
 part of this diagnostic change; PR #18 remains unmerged.
 
 Source: [CI run 41009298021](https://github.com/tao3k/gerbil-scheme-rust/actions/runs/41009298021).
+
+## f1e3beb result and identified module
+
+[Run 41015460124](https://github.com/tao3k/gerbil-scheme-rust/actions/runs/41015460124)
+completed with five successes, four cancelled jobs and the unchanged SMP skip.
+Both bindings and both Bazel jobs passed, as did Quint shard 0. Shard 1 exceeded
+its original 15-minute budget; it is not a model counterexample receipt. Actor,
+lifecycle and owner lint did not complete within their 30-minute budgets.
+
+The lifecycle job now identifies the outstanding object unambiguously:
+
+| Operation | Result |
+| --- | --- |
+| Producer modules | Completed in 36.819 s |
+| Compiler-owned graph | Completed in 4.655 s |
+| Generate 141 module C inputs | Completed in 4.847 s |
+| Generate qualification/actors C | Completed in 2.720 s |
+| Native object batch | Ten jobs, three workers |
+| Nine other objects | All completed; slowest was async-service, 86.402 s |
+| qualification/actors object | Started 06:44:24.355 UTC; no completion before cancellation around 07:10:53 UTC |
+
+The identified budget consumer is C object compilation of
+gerbil-scheme-rust/qualification/actors, not Scheme expansion or runtime work.
+The log does not identify the expensive internal C optimizer pass. A local
+control generated C has 8,736,081 bytes; its largest selected procedure is the
+scoped backpressure variant, 1,147,315 bytes and 1,323 labels. These are static
+local source counts, not proof of the remote compiler's exact input identity or
+pass-level CPU time. The module combines lifecycle, services and all mailbox
+qualification variants through includes. Any compilation decomposition must
+preserve those variants and their shared state; removing test cases, lowering
+optimization or lengthening the deadline is not an accepted repair.
+
+Owner lint's first command completed at 07:07:32 UTC. The second reached
+qualification compilation at 07:10:35 UTC and timed out without phase output.
+The diagnostic syntax was wrong for this external Cargo subcommand: Cargo's
+prefix `cargo -vv clippy` does not forward the required verbosity. A focused
+cached no-feature check emitted one line with that spelling, versus 112 lines
+and 104 Fresh/Running records with `cargo clippy -vv`. Both checks passed strict
+Clippy. Correct only the two Clippy argument positions; the builtin bench
+command already exposes its observations and does not need this repair.
+
+The lint module therefore remains unconfirmed until its own records arrive.
+Do not attribute it to the lifecycle module merely because both jobs compile
+the qualification package. No build-time improvement is claimed by this
+diagnostic correction. All existing features, commands and budgets remain.

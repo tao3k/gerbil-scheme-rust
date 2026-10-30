@@ -12,7 +12,11 @@
 #include <time.h>
 static uint64_t mailbox_clock_now(void) {
   struct timespec now;
+#ifdef __APPLE__
   if (clock_gettime(CLOCK_UPTIME_RAW, &now)) return UINT64_MAX;
+#else
+  if (clock_gettime(CLOCK_MONOTONIC, &now)) return UINT64_MAX;
+#endif
   return (uint64_t)now.tv_sec * 1000000000ULL + (uint64_t)now.tv_nsec;
 }
 static uint64_t mailbox_cpu_now(void) {

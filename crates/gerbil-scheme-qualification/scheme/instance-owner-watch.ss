@@ -5,6 +5,8 @@
  (namespace ("gerbil-scheme-rust/qualification/actors#"
    mailbox-owner-watch-start! mailbox-owner-watch-stop!))
  (c-declare #<<c-end
+#ifdef __APPLE__
+#define GERBIL_MAILBOX_OWNER_READING(value) value
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 #include <pthread.h>
@@ -191,6 +193,22 @@ static int mailbox_owner_watch_stop(void) {
   mailbox_owner_watch.progress = NULL; mailbox_owner_watch.active = 0;
   return released == KERN_SUCCESS ? 0 : EIO;
 }
+#else
+#include <stdint.h>
+#include <errno.h>
+/* Kernel observation is Darwin-only. Never turn missing facts into zeros. */
+#define GERBIL_MAILBOX_OWNER_READING(value) UINT64_MAX
+static int mailbox_owner_watch_start(uint64_t address, uint64_t period) {
+  (void)address; (void)period;
+  return ENOTSUP;
+}
+static int mailbox_owner_watch_stop(void) { return ENOTSUP; }
+void gerbil_mailbox_native_progress(uint64_t previous, uint64_t now) {
+  (void)previous; (void)now;
+}
+void gerbil_mailbox_native_wait_enter(void) {}
+void gerbil_mailbox_native_wait_exit(void) {}
+#endif
 c-end
  )
  (define mailbox-owner-watch-start! (c-lambda (unsigned-int64 unsigned-int64) int "mailbox_owner_watch_start"))
@@ -204,41 +222,41 @@ c-end
      (begin-foreign
        (namespace ("gerbil-scheme-rust/qualification/actors#" name))
        (define name (c-lambda () unsigned-int64 expression))))))
-(define-mailbox-owner-reading mailbox-owner-gap-begin "___result = mailbox_owner_watch.best.begin;")
-(define-mailbox-owner-reading mailbox-owner-gap-end "___result = mailbox_owner_watch.best.end;")
-(define-mailbox-owner-reading mailbox-owner-first-sample "___result = mailbox_owner_watch.best.first_sample;")
-(define-mailbox-owner-reading mailbox-owner-last-sample "___result = mailbox_owner_watch.best.last_sample;")
-(define-mailbox-owner-reading mailbox-owner-samples "___result = mailbox_owner_watch.best.samples;")
-(define-mailbox-owner-reading mailbox-owner-runnable "___result = mailbox_owner_watch.best.runnable;")
-(define-mailbox-owner-reading mailbox-owner-waiting "___result = mailbox_owner_watch.best.waiting;")
-(define-mailbox-owner-reading mailbox-owner-uninterruptible "___result = mailbox_owner_watch.best.uninterruptible;")
-(define-mailbox-owner-reading mailbox-owner-stopped "___result = mailbox_owner_watch.best.stopped;")
-(define-mailbox-owner-reading mailbox-owner-other "___result = mailbox_owner_watch.best.other;")
-(define-mailbox-owner-reading mailbox-owner-select-samples "___result = mailbox_owner_watch.best.select_samples;")
-(define-mailbox-owner-reading mailbox-owner-select-waiting "___result = mailbox_owner_watch.best.select_waiting;")
-(define-mailbox-owner-reading mailbox-owner-first-cpu "___result = mailbox_owner_watch.best.first_cpu;")
-(define-mailbox-owner-reading mailbox-owner-last-cpu "___result = mailbox_owner_watch.best.last_cpu;")
-(define-mailbox-owner-reading mailbox-owner-sample-spacing "___result = mailbox_owner_watch.best.largest_spacing;")
-(define-mailbox-owner-reading mailbox-owner-query-errors "___result = mailbox_owner_watch.query_errors;")
-(define-mailbox-owner-reading mailbox-owner-qos "___result = mailbox_owner_watch.qos;")
-(define-mailbox-owner-reading mailbox-owner-assigned-qos "___result = mailbox_owner_watch.assigned_qos;")
-(define-mailbox-owner-reading mailbox-owner-qos-status "___result = mailbox_owner_watch.qos_query_status;")
-(define-mailbox-owner-reading mailbox-owner-poll-spacing "___result = mailbox_owner_watch.largest_poll_spacing;")
-(define-mailbox-owner-reading mailbox-owner-active "___result = mailbox_owner_watch.active;")
-(define-mailbox-owner-reading mailbox-owner-witness-begin "___result = mailbox_owner_watch.witnessed.begin;")
-(define-mailbox-owner-reading mailbox-owner-witness-end "___result = mailbox_owner_watch.witnessed.end;")
-(define-mailbox-owner-reading mailbox-owner-before-begin "___result = mailbox_owner_watch.witnessed.before.begin;")
-(define-mailbox-owner-reading mailbox-owner-before-end "___result = mailbox_owner_watch.witnessed.before.end;")
-(define-mailbox-owner-reading mailbox-owner-before-cpu "___result = mailbox_owner_watch.witnessed.before.cpu;")
-(define-mailbox-owner-reading mailbox-owner-before-gcs "___result = mailbox_owner_watch.witnessed.before.gc_count;")
-(define-mailbox-owner-reading mailbox-owner-before-gc-wall "___result = mailbox_owner_watch.witnessed.before.gc_wall;")
-(define-mailbox-owner-reading mailbox-owner-before-gc-cpu "___result = mailbox_owner_watch.witnessed.before.gc_cpu;")
-(define-mailbox-owner-reading mailbox-owner-after-begin "___result = mailbox_owner_watch.witnessed.after.begin;")
-(define-mailbox-owner-reading mailbox-owner-after-end "___result = mailbox_owner_watch.witnessed.after.end;")
-(define-mailbox-owner-reading mailbox-owner-after-cpu "___result = mailbox_owner_watch.witnessed.after.cpu;")
-(define-mailbox-owner-reading mailbox-owner-after-gcs "___result = mailbox_owner_watch.witnessed.after.gc_count;")
-(define-mailbox-owner-reading mailbox-owner-after-gc-wall "___result = mailbox_owner_watch.witnessed.after.gc_wall;")
-(define-mailbox-owner-reading mailbox-owner-after-gc-cpu "___result = mailbox_owner_watch.witnessed.after.gc_cpu;")
+(define-mailbox-owner-reading mailbox-owner-gap-begin "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.begin);")
+(define-mailbox-owner-reading mailbox-owner-gap-end "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.end);")
+(define-mailbox-owner-reading mailbox-owner-first-sample "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.first_sample);")
+(define-mailbox-owner-reading mailbox-owner-last-sample "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.last_sample);")
+(define-mailbox-owner-reading mailbox-owner-samples "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.samples);")
+(define-mailbox-owner-reading mailbox-owner-runnable "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.runnable);")
+(define-mailbox-owner-reading mailbox-owner-waiting "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.waiting);")
+(define-mailbox-owner-reading mailbox-owner-uninterruptible "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.uninterruptible);")
+(define-mailbox-owner-reading mailbox-owner-stopped "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.stopped);")
+(define-mailbox-owner-reading mailbox-owner-other "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.other);")
+(define-mailbox-owner-reading mailbox-owner-select-samples "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.select_samples);")
+(define-mailbox-owner-reading mailbox-owner-select-waiting "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.select_waiting);")
+(define-mailbox-owner-reading mailbox-owner-first-cpu "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.first_cpu);")
+(define-mailbox-owner-reading mailbox-owner-last-cpu "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.last_cpu);")
+(define-mailbox-owner-reading mailbox-owner-sample-spacing "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.best.largest_spacing);")
+(define-mailbox-owner-reading mailbox-owner-query-errors "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.query_errors);")
+(define-mailbox-owner-reading mailbox-owner-qos "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.qos);")
+(define-mailbox-owner-reading mailbox-owner-assigned-qos "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.assigned_qos);")
+(define-mailbox-owner-reading mailbox-owner-qos-status "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.qos_query_status);")
+(define-mailbox-owner-reading mailbox-owner-poll-spacing "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.largest_poll_spacing);")
+(define-mailbox-owner-reading mailbox-owner-active "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.active);")
+(define-mailbox-owner-reading mailbox-owner-witness-begin "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.begin);")
+(define-mailbox-owner-reading mailbox-owner-witness-end "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.end);")
+(define-mailbox-owner-reading mailbox-owner-before-begin "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.before.begin);")
+(define-mailbox-owner-reading mailbox-owner-before-end "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.before.end);")
+(define-mailbox-owner-reading mailbox-owner-before-cpu "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.before.cpu);")
+(define-mailbox-owner-reading mailbox-owner-before-gcs "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.before.gc_count);")
+(define-mailbox-owner-reading mailbox-owner-before-gc-wall "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.before.gc_wall);")
+(define-mailbox-owner-reading mailbox-owner-before-gc-cpu "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.before.gc_cpu);")
+(define-mailbox-owner-reading mailbox-owner-after-begin "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.after.begin);")
+(define-mailbox-owner-reading mailbox-owner-after-end "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.after.end);")
+(define-mailbox-owner-reading mailbox-owner-after-cpu "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.after.cpu);")
+(define-mailbox-owner-reading mailbox-owner-after-gcs "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.after.gc_count);")
+(define-mailbox-owner-reading mailbox-owner-after-gc-wall "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.after.gc_wall);")
+(define-mailbox-owner-reading mailbox-owner-after-gc-cpu "___result = GERBIL_MAILBOX_OWNER_READING(mailbox_owner_watch.witnessed.after.gc_cpu);")
 (def (mailbox-owner-watch-report)
   (unless (zero? (mailbox-owner-active)) (error "native observer report before join"))
   (mailbox-report

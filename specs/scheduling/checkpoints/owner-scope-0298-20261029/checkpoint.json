@@ -1,0 +1,55 @@
+{
+  "checkpoint_id": "owner-scope-0298-20261029",
+  "role": "Current best observed single-owner latency checkpoint; not full performance acceptance",
+  "git_base_revision": "6d4ec27ccf166b89279999cce66e33ce1e34c643",
+  "standalone_git_revision_created": false,
+  "workload": {
+    "owners": 1,
+    "scheme_workers": 4,
+    "rate": 500000,
+    "seconds": 10,
+    "warmup_rate": 1000,
+    "warmup_seconds": 1
+  },
+  "result": {
+    "completed": 5000000,
+    "throughput_per_second": 500000.0250000013,
+    "p99_ns": 298000,
+    "p999_ns": 1634000,
+    "rejected": 0,
+    "timeouts": 0,
+    "outstanding_peak": 1415,
+    "unpublished_peak": 1413,
+    "original_guard": 128,
+    "original_guard_passed": false
+  },
+  "integrity": {
+    "original_binary_and_vm_image_hashes_verified": true,
+    "original_result_hash_verified": true,
+    "native_sources_match_original_saved_manifest": true,
+    "host_source_reconstruction_independently_proven_original": false,
+    "original_raw_histogram_retained": false,
+    "performance_admitted": false,
+    "result_reproduced_by_this_freeze_operation": false
+  },
+  "source_notes": "Base archive is the original Git commit. Native qualification Scheme/C files match the original saved manifest. Host Rust/build files are a labeled reconstruction after rollback, not a falsely claimed exact historical source REV.",
+  "constraints": {
+    "defaults_changed": false,
+    "wait_protocol_changed": false,
+    "limits_changed": false,
+    "benchmark_or_tests_run": false,
+    "commit": false,
+    "push": false
+  },
+  "storage": {
+    "location": "XDG_STATE_HOME (or HOME/.local/state)/gerbil-scheme-rust/checkpoints/owner-scope-0298-20261029",
+    "persistent_copy_verified": true,
+    "read_only_files": true,
+    "verified_files": 49,
+    "manifest_sha256": "865519b4955dd5d050cc5db9eea0628fa32834224474fe6425af8020b2e0b4fd"
+  },
+  "artifacts": {
+    "gerbil_actor_arrival": "2b016d1d934ed5de55041d095e0a71801c4aa0b9a61f1cc643a83f0bdf56f289",
+    "owner_wait_diagnostic.dylib": "92eba95f7972033f4c9980344f0d62070ed38ea8f5c8e9513a1f9692141900d1"
+  }
+}

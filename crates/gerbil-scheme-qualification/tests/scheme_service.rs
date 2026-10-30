@@ -1,4 +1,6 @@
 //! Native Scheme-owned waiting, continuation affinity and close/error drain.
+#[path = "../benches/single_vm_service/watchdog.rs"]
+mod bench_watchdog;
 #[path = "scheme_service/budget.rs"]
 mod budget;
 #[path = "scheme_service/client_progress.rs"]
@@ -459,14 +461,11 @@ fn scheme_owns_waits_roots_continuations_and_close() {
     }
 }
 fn qualify_service() {
+    let _case = native_case();
     let (progress, events) = mpsc::channel();
     let watchdog = std::thread::spawn(move || watchdog::observe(&events));
     progress.send("PHASE initialization controls").unwrap();
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
+    let runtime = native_runtime();
     let before = std::fs::read_dir("/dev/fd").unwrap().count();
     // Protocol export cannot be exposed as an ordinary rooted application call.
     let exposed = unsafe { descriptor(false).with_exports(&[c"gerbil_owner_service_call"]) };
@@ -577,3 +576,32 @@ fn additional_contracts(runtime: &tokio::runtime::Runtime, progress: &mpsc::Send
 
 #[path = "scheme_service/owner_claim.rs"]
 mod owner_claim;
+
+#[path = "scheme_service/admission.rs"]
+mod admission;
+
+#[path = "scheme_service/continuous.rs"]
+mod continuous;
+#[path = "scheme_service/routing_concurrency.rs"]
+mod routing_concurrency;
+
+// Cold SDK fault injection and /dev/fd assertions own process resources.
+// Acquire before starting a case watchdog; execution inside each case remains
+// concurrent and all native startup/request gates retain their original limits.
+fn native_case() -> std::sync::MutexGuard<'static, ()> {
+    static CASE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    CASE.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+#[path = "scheme_service/tagged_input.rs"]
+mod tagged_input;
+
+fn native_runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap()
+}
+#[path = "scheme_service/exchange.rs"]
+mod exchange;

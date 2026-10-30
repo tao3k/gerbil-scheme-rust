@@ -198,6 +198,7 @@ async fn exercise(
 }
 #[test]
 fn owner_claim_bypasses_stalled_peer_and_drains_cancellation() {
+    let _case = super::native_case();
     let (progress, events) = mpsc::channel();
     let watch = std::thread::spawn(move || watchdog::observe(&events));
     let runtime = tokio::runtime::Builder::new_multi_thread()

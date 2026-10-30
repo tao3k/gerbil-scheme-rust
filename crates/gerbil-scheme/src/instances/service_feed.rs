@@ -2,7 +2,7 @@
 use super::{InstanceDispatcher, InstanceError};
 use std::sync::atomic::Ordering;
 impl InstanceDispatcher {
-    /// Opt into feeding up to `maximum` queued service inputs before advancing
+    /// Opt into feeding up to `maximum` queued or resident-producer service inputs before advancing
     /// Scheme. FIFO, native slot/work permits and Actor affinity are preserved.
     /// The default is one. This bounds input count, not arbitrary Scheme time.
     /// # Errors

@@ -82,8 +82,11 @@ module actor_batch {
   // Many runnable actors are legal; only simultaneous CPU leases are bounded.
   run actorsOutnumberProcessorsTest = init
     .then(all { assert(ready.size() > PROCESSORS.size()), assert(safety), stutter })
-    .then(start(1, 1)).then(start(2, 2)).then(yieldActor(1)).then(start(3, 1))
-    .then(all { assert(running.size() == 2), assert(safety), stutter })
+    .then(start(1, 1))
+    .then(if (PROCESSORS.contains(2)) start(2, 2) else stutter)
+    .then(yieldActor(1)).then(start(3, 1))
+    .then(all { assert(running.size() == (if (PROCESSORS.contains(2)) 2 else 1)),
+      assert(safety), stutter })
   run cancellationDoesNotDestroyActorsTest = init.then(start(1, 1)).then(cancel)
     .then(all { assert(running.contains(1)), assert(not(published)), assert(safety), stutter })
   run failedActorStillRequiresJoinTest = init.then(start(1, 1)).then(finish(1, true))

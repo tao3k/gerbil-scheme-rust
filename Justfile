@@ -251,3 +251,87 @@ bridge-owner-capacity-benchmark *args:
 # Same native Scheme work/budgets: synchronous versus Scheme-owned async service.
 bridge-scheme-service-benchmark *args:
     {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- {{ args }}
+
+# One fixed Scheme VM: native endpoint, caller-driven and Tokio-worker costs.
+bridge-single-vm-service-benchmark *args:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench single_vm_service --locked -- {{ args }}
+
+# Fixed single-VM public-API baseline: exactly one million verified short messages.
+bridge-single-vm-million-baseline:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench single_vm_service --locked -- --million-short-cpu
+
+# Same one-million short corpus: choose 1 or 12 fixed owners explicitly.
+bridge-fixed-owner-scaling owners:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench single_vm_service --locked -- --fixed-owner-scaling={{ owners }}
+
+# Linearizable startup-mode choice; isolated from the owner/Actor models.
+bridge-backend-choice-model:
+    quint test specs/scheduling/backend_choice.qnt --main backend_choice --seed 1
+    quint run specs/scheduling/backend_choice.qnt --main backend_choice --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --verbosity 1
+
+# One VM, 500,000 planned short requests/s, exactly one million total arrivals.
+bridge-single-vm-open-500k-burst:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --capacity --capacity-short-only --capacity-owners=1 --capacity-rust-workers=1 --capacity-clients=50 --capacity-rate=500000 --capacity-count=1000000 --capacity-seconds=2 --capacity-warmup-seconds=1
+
+# Same live VM: one vs three short slots, ten seconds at the requested rate.
+bridge-single-vm-short-concurrency rate:
+    {{ build_env }} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --capacity --capacity-short-only --capacity-short-slots-ab --capacity-owners=1 --capacity-rust-workers=1 --capacity-clients=50 --capacity-rate={{ rate }} --capacity-count=0 --capacity-seconds=10 --capacity-warmup-seconds=1
+
+# Reuse native lifecycle and Actor models for class/projection/retirement boundaries.
+bridge-short-concurrency-models:
+    quint test specs/scheduling/short_concurrency.qnt --main short_serial --seed 1 --backend typescript
+    quint test specs/scheduling/short_concurrency.qnt --main short_pipeline --seed 1 --backend typescript
+    quint run specs/scheduling/short_concurrency.qnt --main short_serial --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
+    quint run specs/scheduling/short_concurrency.qnt --main short_pipeline --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
+
+# Reuse the existing owner/Actor protocols; no new scheduler state machine.
+bridge-single-vm-models:
+    quint typecheck specs/scheduling/single_vm.qnt
+    quint test specs/scheduling/single_vm.qnt --main single_vm_host --seed 1
+    quint test specs/scheduling/single_vm.qnt --main single_vm_actors --seed 1
+    quint run specs/scheduling/single_vm.qnt --main single_vm_actors --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --verbosity 1
+    quint test specs/actor_batch.qnt --main actor_batch_small --seed 1
+    quint test specs/actor_batch.qnt --main actor_batch_wide --seed 1
+    sysml -strict -no-record-cache -validate specs/scheduling/scheme_rust.sysml
+
+# Continuous owner-resident supply; ten seconds at the requested arrival rate.
+bridge-single-vm-continuous rate:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --capacity --capacity-continuous --capacity-short-only --capacity-short-slots-ab --capacity-owners=1 --capacity-rust-workers=1 --capacity-clients=50 --capacity-rate={{rate}} --capacity-count=0 --capacity-seconds=10 --capacity-warmup-seconds=1
+
+# Same active capacity; compare actual owner-to-Gerbil supply opportunities.
+bridge-single-vm-actor-supply rate:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --capacity --capacity-continuous --capacity-short-only --capacity-actor-supply-ab --capacity-short-slots=3 --capacity-owners=1 --capacity-rust-workers=1 --capacity-clients=50 --capacity-rate={{rate}} --capacity-count=0 --capacity-seconds=10 --capacity-warmup-seconds=1
+
+# Same Actor scheduling and Snapshot/feed1; only native construction differs.
+bridge-single-vm-tagged-input rate:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --capacity --capacity-continuous --capacity-short-only --capacity-tagged-input-ab --capacity-short-slots=3 --capacity-owners=1 --capacity-rust-workers=1 --capacity-clients=50 --capacity-rate={{rate}} --capacity-count=0 --capacity-seconds=10 --capacity-warmup-seconds=1
+
+# Scheme generates, executes and consumes messages inside one fixed VM.
+gerbil-actor-arrival rate:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench gerbil_actor_arrival --locked -- --rate={{rate}} --seconds=10 --compare
+
+# Same VM, typed constructor and bounded backpressure; retain all original deadlines.
+bridge-single-vm-native-exchange rate:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --capacity --capacity-continuous --capacity-short-only --capacity-native-exchange-ab --capacity-short-slots=3 --capacity-owners=1 --capacity-rust-workers=1 --capacity-clients=50 --capacity-rate={{rate}} --capacity-count=0 --capacity-seconds=10 --capacity-warmup-seconds=1
+
+# Refine existing Actor completion and joint continuous lease ownership.
+native-exchange-model-check:
+    quint typecheck specs/scheduling/native_exchange.qnt
+    quint test specs/scheduling/native_exchange.qnt --main native_exchange --seed 1 --backend typescript
+    quint run specs/scheduling/native_exchange.qnt --main native_exchange --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
+
+# Application-level use of native mailboxes; no per-message Rust dispatch.
+native-mailbox-pipeline rate:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench gerbil_actor_arrival --locked -- --rate={{rate}} --seconds=10 --pipeline-compare
+
+native-mailbox-model-check:
+    quint test specs/scheduling/native_mailbox_pipeline.qnt --main native_mailbox_pipeline --seed 1 --backend typescript
+    quint run specs/scheduling/native_mailbox_pipeline.qnt --main native_mailbox_pipeline --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
+
+# Zero-rejection native guard comes before any million-rate experiment.
+native-mailbox-backpressure:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench gerbil_actor_arrival --locked -- --rate=500000 --seconds=10 --backpressure-compare
+
+native-mailbox-backpressure-model-check:
+    quint test specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --seed 1 --backend typescript
+    quint run specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1

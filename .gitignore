@@ -12,6 +12,9 @@
 !crates/gerbil-scheme-qualification/ffi/instance_probe.c
 !crates/gerbil-scheme-qualification/ffi/owner_instance.c
 !crates/gerbil-scheme-qualification/ffi/owner_signpost.c
+!crates/gerbil-scheme-qualification/tests/owner_wait_scope.c
+!crates/gerbil-scheme-qualification/tests/owner_wait_binding.c
+!crates/gerbil-scheme-qualification/tests/owner_wait_binding_image.c
 !scheme/runtime.ssi
 !scheme/generated/
 !scheme/generated/runtime.scm

@@ -56,12 +56,19 @@ pub(super) struct Orders {
     entered: Option<Instant>,
     constructed: Option<Instant>,
     short_mode: ShortMode,
+    tagged_service: bool,
     construction_before: Option<[f64; 6]>,
     construction_after: Option<[f64; 6]>,
     snapshot_ns: [u128; 3],
     entry: Option<Arc<gerbil_scheme::instances::SchemeServiceEntryTrace>>,
     completion: Option<Arc<gerbil_scheme::instances::SchemeCompletionTrace>>,
     _bulk_permit: Option<tokio::sync::OwnedSemaphorePermit>,
+}
+impl Orders {
+    pub(super) fn with_tagged_service(mut self, enabled: bool) -> Self {
+        self.tagged_service = enabled;
+        self
+    }
 }
 impl SchemeServiceRequest for Orders {
     type Output = Reply;
@@ -104,6 +111,12 @@ impl SchemeServiceRequest for Orders {
         session: &NativeSession<'vm>,
         input: &gerbil_scheme::instances::SchemeServiceInput<'_>,
     ) -> Result<NativeRoot<'vm>, InstanceError> {
+        if self.short_mode.native() && self.tagged_service {
+            self.entered = Some(Instant::now());
+            let value = input.tagged_numeric(session, &[77_i64, 1], &self.request.items[0])?;
+            self.constructed = Some(Instant::now());
+            return Ok(value);
+        }
         if self.short_mode.native() {
             let value = self.construct(session)?;
             return input.wrap(session, &value);
@@ -124,6 +137,16 @@ impl SchemeServiceRequest for Orders {
         session: &NativeSession<'vm>,
         input: &gerbil_scheme::instances::SchemeServiceInput<'_>,
     ) -> Result<gerbil_scheme::instances::SchemeServiceSubmission<'vm>, InstanceError> {
+        if self.short_mode.native()
+            && self.tagged_service
+            && session.scheme_service_exchange_enabled()
+        {
+            self.entered = Some(Instant::now());
+            let receipt =
+                input.enter_tagged_numeric(session, &[77_i64, 1], &self.request.items[0])?;
+            self.constructed = Some(Instant::now());
+            return Ok(receipt);
+        }
         if self.short_mode.native() || !super::settings::native_entry_ab() {
             let value = self.construct_service(session, input)?;
             return input.submit(session, &value);
@@ -132,6 +155,34 @@ impl SchemeServiceRequest for Orders {
         let receipt = self.request.enter_service(session, input)?;
         self.constructed = Some(Instant::now());
         Ok(receipt)
+    }
+    fn project_service(
+        self,
+        session: &NativeSession<'_>,
+        output: &gerbil_scheme::instances::SchemeServiceOutput<'_>,
+    ) -> Result<Reply, InstanceError> {
+        if self.short_mode.native()
+            && self.tagged_service
+            && session.scheme_service_exchange_enabled()
+            && !self.short_mode.counters()
+        {
+            let projection = Instant::now();
+            let values = vec![output.copy_numeric::<i64>(session, 21)?];
+            return Ok(Reply {
+                values,
+                owner: session.owner_index(),
+                entered: self.entered.unwrap(),
+                constructed: self.constructed.unwrap(),
+                projection,
+                diagnostics: None,
+                snapshot_ns: None,
+                entry: self.entry,
+                completion: self.completion,
+                claim: None,
+            });
+        }
+        let value = output.rooted(session)?;
+        self.project(session, &value)
     }
     fn project(
         mut self,
@@ -181,6 +232,7 @@ pub(super) fn orders(
         entered: None,
         constructed: None,
         short_mode,
+        tagged_service: false,
         entry: short_mode
             .observed()
             .then(|| Arc::new(gerbil_scheme::instances::SchemeServiceEntryTrace::default())),

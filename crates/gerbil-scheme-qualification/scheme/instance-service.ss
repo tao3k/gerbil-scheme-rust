@@ -61,8 +61,52 @@
       (error "qualification wake pipe identity unavailable")))
   (orders-endpoint command))
 (def (orders-service-reference command)
-  (unless (= (s64vector-ref (vector-ref command 0) 0) 6) (error "invalid synchronous reference"))
-  (orders-service-handler 0 (vector-ref command 1)))
+  (case (s64vector-ref (vector-ref command 0) 0)
+    ((6) (orders-service-handler 0 (vector-ref command 1)))
+    ((49) (orders-service-cycle-reference command))
+    ((50 51 52 53 54) (orders-actor-arrival-reference command))
+    ((55 56) (orders-mailbox-backpressure command))
+    ((57) (orders-mailbox-backpressure-observed command))
+    ((58) (orders-mailbox-backpressure-watched command))
+    ((59) (orders-mailbox-backpressure-parked command))
+    ((60) (orders-mailbox-backpressure-coalesced command))
+    ((61) (mailbox-ready-native-contract))
+    ((62) (orders-mailbox-backpressure-scheduled command))
+    ((63) (mailbox-source-plan-contract))
+    ((64) (orders-mailbox-backpressure-scoped command))
+    ((65) (owner-scope-vm-contract (s64vector-ref (vector-ref command 0) 1)))
+    (else (error "invalid synchronous reference"))))
+;; Qualification only: drive the SAME endpoint from its fixed owner. Unlike op 6,
+;; this includes the service queue, Gerbil workers, waiting and ready/take custody.
+;; The host must have no outstanding service requests. No lifecycle operation or
+;; transferable continuation is exposed, and the production service is unchanged.
+(def (orders-service-cycle-reference command)
+  (let* ((header (vector-ref command 0))
+         (state (orders-endpoint (vector (s64vector 15)))))
+    (unless (and (= (s64vector-length header) 3)
+                 (<= 0 (s64vector-ref header 1) 1)
+                 (positive? (s64vector-ref header 2))
+                 (zero? (s64vector-ref state 0))
+                 (zero? (s64vector-ref state 3))
+                 (zero? (s64vector-ref state 7)))
+      (error "native cycle reference requires idle snapshot service"))
+    (let* ((start (owner-wait-trace 1 0))
+           (id (s64vector-ref
+                 (orders-endpoint
+                   (vector (s64vector 1 -1 (s64vector-ref header 1) (s64vector-ref header 2))
+                           (vector-ref command 1))) 0)))
+      (let loop ()
+        (let (ready (orders-endpoint (vector (s64vector 3))))
+          (if (positive? (s64vector-length ready))
+            (begin
+              (unless (and (= (s64vector-length ready) 1) (= (s64vector-ref ready 0) id))
+                (error "native cycle reference observed unrelated completion"))
+              (orders-endpoint (vector (s64vector 2 id))))
+            (let (remaining (- 5000000000 (- (owner-wait-trace 1 0) start)))
+              (unless (positive? remaining) (error "native cycle reference exceeded five seconds"))
+              ;; This is the existing Scheme condition/port wait, not host polling.
+              (orders-endpoint (vector (s64vector 4 (quotient (+ remaining 999) 1000))))
+              (loop))))))))
 ;; One persistent worker exposes deterministic queue-order acceptance separately
 ;; from the four-VM throughput workload. It uses the identical service protocol.
 (def single-started [])

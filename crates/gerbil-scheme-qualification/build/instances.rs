@@ -43,6 +43,9 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
             "../../../ffi/instance.c",
             "owner_memory.h",
             "owner_wait.h",
+            "owner_wait_scope.h",
+            "owner_wait_scope_binding.h",
+            "owner_wait_scope_scheme.h",
             "owner_callbacks.h",
         ] {
             println!(
@@ -94,6 +97,30 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
                 },
             );
         }
+        build_wait_diagnostic(package, out, gsc, receipt);
+    }
+}
+
+fn build_wait_diagnostic(
+    package: &Path,
+    out: &Path,
+    gsc: &Path,
+    receipt: &NativeArchiveLinkReceipt,
+) {
+    if std::env::var_os("CARGO_FEATURE_OWNER_WAIT_DIAGNOSTIC").is_some() {
+        build_image(
+            package,
+            out,
+            gsc,
+            receipt,
+            ImageBuild {
+                adapter: "owner_instance",
+                artifact: "owner_wait_diagnostic",
+                environment: "GERBIL_OWNER_WAIT_DIAGNOSTIC_IMAGE",
+                c_options: "-O2 -DGERBIL_OWNER_WAIT_SCOPE",
+                exports: OWNER_EXPORTS,
+            },
+        );
     }
 }
 
@@ -120,6 +147,10 @@ const OWNER_EXPORTS: &[&str] = &[
     "gerbil_scheme_rust_numeric_create",
     "gerbil_scheme_rust_numeric_batch_create",
     "gerbil_scheme_rust_numeric_service_create",
+    "gerbil_scheme_rust_tagged_numeric_service_create",
+    "gerbil_scheme_rust_exchange_enter",
+    "gerbil_scheme_rust_exchange_harvest",
+    "gerbil_scheme_rust_result_slot_numeric_copy",
     "gerbil_scheme_rust_numeric_service_enter",
     "gerbil_scheme_rust_composite_create",
     "gerbil_scheme_rust_numeric_batch_snapshot",

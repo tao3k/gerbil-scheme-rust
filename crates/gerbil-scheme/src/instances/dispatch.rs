@@ -10,6 +10,8 @@ use std::sync::{
 pub(super) struct Admission {
     pub(super) senders: Mutex<Senders>,
     #[cfg(feature = "tokio-dispatch")]
+    pub(super) ports: std::sync::OnceLock<Box<[Arc<super::owner_admission::Port>]>>,
+    #[cfg(feature = "tokio-dispatch")]
     pub(super) accepting: Arc<AtomicBool>,
     #[cfg(feature = "tokio-dispatch")]
     pub(super) queue_capacity: usize,
@@ -31,6 +33,8 @@ pub(super) struct Senders {
 }
 #[derive(Debug)]
 pub(super) struct OwnerSender {
+    #[cfg(feature = "tokio-dispatch")]
+    pub(super) port: Arc<super::owner_admission::Port>,
     pub(super) sender: Arc<mpsc::SyncSender<Request>>,
     pub(super) wake: Option<Arc<super::service_wake::Wake>>,
     #[cfg(feature = "tokio-dispatch")]
@@ -51,6 +55,8 @@ impl InstanceDispatcher {
         Self {
             admission: Arc::new(Admission {
                 senders: Mutex::new(Senders::default()),
+                #[cfg(feature = "tokio-dispatch")]
+                ports: std::sync::OnceLock::new(),
                 #[cfg(feature = "tokio-dispatch")]
                 accepting: Arc::new(AtomicBool::new(true)),
                 #[cfg(feature = "tokio-dispatch")]
@@ -76,13 +82,18 @@ impl InstanceDispatcher {
                 .capacity_changed
                 .set(Arc::clone(&self.admission.capacity_changed));
         }
+        let sender = Arc::new(sender);
+        #[cfg(feature = "tokio-dispatch")]
+        let port = Arc::new(super::owner_admission::Port::new(&sender, wake.clone()));
         self.admission
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .owners
             .push(OwnerSender {
-                sender: Arc::new(sender),
+                sender,
+                #[cfg(feature = "tokio-dispatch")]
+                port,
                 wake,
                 #[cfg(feature = "tokio-dispatch")]
                 capacity: None,
@@ -96,12 +107,22 @@ impl InstanceDispatcher {
             .senders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        #[cfg(feature = "tokio-dispatch")]
+        let ports = super::owner_admission::ports(&senders);
+        #[cfg(feature = "tokio-dispatch")]
+        let mut states: Vec<_> = ports.iter().map(|port| port.lock()).collect();
         // Invalidate registered owner-local admission at the same fence as table
         // removal. No semaphore callback or foreign waker runs under this lock.
         #[cfg(feature = "tokio-dispatch")]
         self.admission.accepting.store(false, Ordering::Release);
+        #[cfg(feature = "tokio-dispatch")]
+        let retired: Vec<_> = states.iter_mut().filter_map(|state| state.take()).collect();
         let owners = std::mem::take(&mut senders.owners);
+        #[cfg(feature = "tokio-dispatch")]
+        drop(states);
         drop(senders);
+        #[cfg(feature = "tokio-dispatch")]
+        drop(retired);
         #[cfg(feature = "tokio-dispatch")]
         if let Some(source) = self.admission.short_pool.get() {
             source.close();

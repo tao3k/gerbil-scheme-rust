@@ -1,0 +1,335 @@
+#+TITLE: Scheme-Owned Async Service and Native Owner Wake Protocol
+#+DATE: 2026-10-21
+
+* Implementation scope
+
+PR #18 continues from =cfbc10c=. Its exact-head CI run
+[[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39565425105][39565425105]] completed successfully: all six active jobs passed; SMP was
+explicitly skipped. The new service described here is opt-in and has separate
+local/native/performance and subsequent exact-head CI gates.
+
+This implementation removes the requirement that an asynchronous Scheme task
+finish before its host owner can accept another request. The task is a real
+Scheme computation, with its own Scheme objects, exceptions, Actor state and
+continuations. Gerbil still compiles through Gambit C with the existing =-O2=
+chain. No Scheme computation is translated into Rust.
+
+Rust owns cross-instance admission, native conversion/projection, slot/work
+permits and owned result channels. Scheme owns the pending queue, worker
+selection, Actor execution, timers, native event wait and completion signaling.
+A requested Actor lane is an application destination, not a Rust green-thread
+scheduling policy. The existing ordinary entry remains synchronous; opting into
+a service does not silently convert unrelated native calls into async jobs.
+
+* Actual Rust API
+
+An unsafe =IsolatedProgram::with_scheme_service= descriptor admits one build-owned
+rooted unary command export implementing =make-gerbil-rs-service-endpoint=.
+It is resolved before SDK initialization and held as a private function pointer.
+It cannot also be the ordinary entry, a public additional export or a finalizer.
+The ordinary safe =NativeSession::call_export= lookup does not expose it. This
+keeps lifecycle/root commands from bypassing the service's admission protocol.
+
+=InstanceDispatcher::submit_scheme_service_backpressured_on= accepts a
+=SchemeServiceRequest=. Its constructor builds a native =NativeRoot= on the
+fixed owner, and its projector returns only a =Send= owned Rust value. Temporary
+Scheme roots remain non-Send. =NumericServiceBatch= reuses the actual existing
+native bulk constructor and bounded batch projector; it is not a second codec.
+There is no JSON payload boundary or VM-less fallback.
+
+Each request declares work units. The shared owner slot/work reservation is
+held through Scheme completion, result projection and native root balance.
+A delivery timeout or abandoned receiver does not cancel accepted Scheme work,
+free its pending graph, or return its capacity early. Arbitrary custom Rust
+constructors/projectors retain the existing callback obligations; work units
+are declarations, not predictions of CPU or heap use.
+
+Independent requests may use any available Scheme service worker on their owner.
+A stateful session or retained delimited continuation requests a stable
+=SchemeServiceLane=. Rust validates that address against the initialized worker
+count; Scheme keeps it on the corresponding persistent Actor and preserves its
+serial mailbox order. Scheme state is never moved across heaps or Actors.
+Application continuations keep their application-owned delimiters; no
+continuation may escape a foreign frame or finalize the owning VM.
+
+The native continuation oracle resumes the same captured payload twice across
+separate host returns and GC, checks Scheme current-thread identity and dynamic
+bindings, and checks balanced =dynamic-wind=. An owner alone is not sufficient
+Actor affinity; this native check is separate from the finite ownership model.
+
+* Versioned native command boundary
+
+The private rooted unary payload is a native vector containing an s64 header
+and, where required, a native Scheme payload. It is protocol metadata, not the
+public Rust representation of application data.
+
+| Operation | Header/data | Ownership and result |
+|-----------+-------------+----------------------|
+| 0 open | read fd, write fd, accepted-task limit | Success =[0,1,workers,limit]=; version/count/limit checked before readiness |
+| 1 submit | explicit lane or -1, native payload | Store a strong job graph, return a positive opaque owner-local identity |
+| 2 take | job identity | Require done, remove table entry, return a temporary rooted result or caught Scheme failure |
+| 3 ready | none | Scheme yield, then ready identities; result graphs remain strong until take |
+| 4 wait | real host producer deadline in microseconds, or zero | Scheme condition-variable/port wait; zero means no timer |
+| 7 prepare-close | none | Stop service admission and invoke the Scheme application drain hook |
+| 5 drain/close | none | Join accepted Scheme work, clear results, join workers/watcher, close ports and application resources |
+
+The reusable endpoint tracks partially opened application resources. Its hooks
+initialize, prepare and close application-owned services entirely in Scheme.
+Preparation/close is idempotent. The order qualification adds separate declared
+reference/observation exports; these are fixtures, not public service commands.
+
+* Wake protocol and backpressure
+
+Each opted-in owner has its own pipe. The read side stays owned by the native
+owner while Scheme holds its input-port duplicate. Scheme also owns an output
+port used to wake and join its watcher during close. Host writers are
+nonblocking; one pending atomic flag coalesces notifications. A full pipe is
+already a readable wake source. Standard descriptors remain untouched, including
+when the host intentionally left them closed. Descriptor RAII, close-on-exec
+flags and the existing Rust 1.85 requirement are retained.
+
+Enqueue and notification are distinct publication steps. After processing a
+native completion/request, the owner clears the host pending flag and rechecks
+the inbox before entering Scheme's wait. Enqueues before that clear remain in
+the inbox; later enqueues publish another pipe byte. Scheme's watcher and job
+completion paths signal the same Scheme condition variable. Ready jobs or a
+retained host notification prevent sleep. There is no Rust idle polling timer,
+forced yield loop or release of work credits merely because Scheme is waiting.
+A real existing producer admission deadline may supply a timeout to Scheme's
+condition-variable wait; it does not schedule Scheme task timers.
+
+Normal close publishes the host close fence and wake, drains already-enqueued
+host requests, then prepares the Scheme application and drains accepted jobs.
+No new submission can cross the fence. Task errors are terminal task outcomes;
+peers continue. Construction errors before Scheme admission reject only that
+request. Rust projection panics unwind temporary roots and use the existing
+retained-root rollback. Protocol/transport errors fail remaining requests and
+attempt Scheme drain. Unverified quiescence produces a failed shutdown receipt
+and quarantined heap/code, never a successful SDK cleanup claim.
+
+A native Scheme table roots pending inputs and completed results. Taking a
+result transfers protection to a temporary external native root until projection
+finishes. External root-ledger count zero while tasks are pending therefore does
+not mean the service/VM is absent: the internal graph is strong. The acceptance
+test forces GC while real handlers are blocked, then verifies their results.
+All four owners reach zero external roots, joined children, removed copied image
+files and returned pipe/port descriptor counts after normal drain. This does
+not claim general RSS convergence or a newly qualified image-unload policy.
+
+* Reused model and native gates
+
+The existing =specs/owner_lifecycle.qnt= is extended, not duplicated. It adds
+pending/ready service jobs, logical service-root protection, an inbox and
+notification publication/park/recheck state. Logical protection spans the
+internal job table and the temporary root during take/projection. Existing
+completion releases capacity only after projection; observation timeout does
+not. Existing close/code-quarantine boundaries are retained. The model starts after
+successful owner admission: native initialization rollback, GC, Actor semantics
+and successful joins remain obligations requiring executable checks.
+
+The existing Rust model gate passes 27 scenarios in each of two finite domains,
+1,000 sampled runs per domain up to 64 steps, and nine expected safety mutation
+counterexamples including missing-root protection and parking without an inbox
+recheck. This is finite safety evidence, not an OS scheduling/liveness proof.
+
+The native service target checks partial application-open failure, a fully
+opened service initialization exception, private lifecycle access, same-Actor
+multishot continuations, forced GC, Scheme errors including a false exception
+value, Rust construction/projection panics, real batch error/recovery, abandoned
+and timed-out receivers, repeated short requests while long tasks remain latched,
+full slot/work admission timeout, and prepare/drain/close with descriptors returned.
+The existing native capacity, dispatcher-fault and producer targets remain
+separate regression gates. Five-second native progress/observation gates are
+unchanged. Model success is not substituted for these native checks.
+
+* Directed comparison contract
+
+One pair uses the same four VMs, native image, two Tokio workers, four request
+slots, work budget 32, batch eight, quantum one, four Scheme service workers,
+and four Actor workers per batch. Both arms reuse the same native constructor,
+order handler and bounded projector. The control calls a synchronous reference;
+the candidate uses the actual asynchronous service API. Both arms enable the
+same wake/service infrastructure. This isolates the new async execution boundary;
+it is not an end-to-end comparison against the old default Python backend.
+
+Each full sample uses 8,192 48-line orders and 64 four-line short probes at the
+same nominal 500-microsecond schedule. CPU and mixed inputs are unchanged;
+mixed handlers still perform the real one-millisecond Scheme wait. Ten samples
+per arm/load alternate AB/BA. VM state identities remain fixed throughout.
+
+Work 32 is explicit and identical in both arms, not a default change. Work eight
+would permit only one batch of eight per owner; freeing those credits on sleep
+would break the retention bound. These results must not be spliced into the
+older work-eight baseline as if only implementation changed.
+
+Native owner completion clocks define bulk throughput and service p99. Short
+latency includes its actual admission start through native completion; scheduled
+latency is also retained. Pending-before-projection spans include Scheme work,
+queueing/waits and owner interleaving, not pure CPU execution. Fairness retains
+per-owner progress at first owner finish, finish spread, Actor progress and probe
+overlap; faster bulk completion can reduce overlap without proving starvation.
+Startup is outside the timed samples and separately observed. No thread/VM/QoS
+matrix or automatic policy/default promotion is introduced.
+
+* Reproduction
+
+#+begin_src text
+just bridge-scheme-service-benchmark --test
+just bridge-scheme-service-benchmark
+cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked
+just owner-model-check
+#+end_src
+
+Use the repository's admitted SDK/Cargo environment and native =-O2= chain.
+Freeze both the benchmark and its actual embedded image, verify source/image
+identity for both arms, and keep raw logs/binaries/source archives outside Git.
+Portable evidence filenames and final measured results follow below.
+
+* Final publication-source directed results
+
+After the initialization rollback repair, a freshly frozen release benchmark
+repeats the same smoke and two full captures. No VM/thread/workload/default or
+five-second native progress gate changed. Both full captures pass forty samples,
+four result summaries and native cleanup (four joins, zero external roots,
+Scheme quiescence and copied image removal). These publication-source results
+are distinct from the retained intermediate captures below.
+
+| Capture/load | Throughput sync -> service orders/s | Ratio | Short actual p99 ms | Batch service p99 ms | Owner finish spread max ms |
+|--------------+------------------------------------+-------+---------------------+----------------------+----------------------------|
+| A/CPU | 46,243 -> 57,900 | 1.25x | 37.87 -> 39.61 | 4.37 -> 12.44 | 241.98 -> 168.58 |
+| A/mixed | 9,092 -> 24,584 | 2.70x | 51.84 -> 23.47 | 17.17 -> 20.33 | 114.32 -> 135.21 |
+| B/CPU | 114,011 -> 83,948 | 0.74x | 21.34 -> 46.98 | 1.50 -> 10.93 | 120.72 -> 118.68 |
+| B/mixed | 11,033 -> 31,346 | 2.84x | 62.83 -> 33.67 | 16.27 -> 18.47 | 82.95 -> 210.61 |
+
+Mixed throughput improves 2.70x / 2.84x; short actual p99 decreases 55% / 46%.
+Scheduled probe p99 decreases 1,172.24 -> 325.19 ms and
+1,019.29 -> 478.12 ms. Probe overlap minima are 58 -> 64 and 54 -> 57.
+Mixed pending-before-projection p99 still increases 16.23 -> 19.49 ms and
+15.41 -> 18.30 ms; admission p99 decreases 22.64 -> 17.44 ms and
+24.00 -> 14.86 ms. These spans do not isolate native CPU time.
+
+Negative results remain material. CPU throughput changes +25% / -26%, and CPU
+short p99 increases in both captures (including 21.34 -> 46.98 ms in B). Batch
+service p99 increases for both loads. Mixed owner finish spread worsens in both
+captures; minimum progress at first owner finish changes 1,696 -> 1,520 and
+1,768 -> 1,640 out of 2,048 orders per owner. Actor peer minima are zero in both
+arms. Earlier CPU regressions are retained below. This is not a universal CPU
+speedup, fairness improvement, starvation-freedom proof or default promotion.
+
+The concrete admitted improvement is concurrent pending Scheme work during
+native waits, with matching host admission and root/drain protection. Scheme
+still owns scheduling and cooperative yield points. A CPU-bound handler that
+never yields is not preempted by the Rust dispatcher.
+
+Pool startup outside timed windows: 2.943 / 2.675 seconds.
+
+Final portable private receipts are =service-publish-{smoke,a,b}.jsonl=,
+=service-publish-manifest.json= and =service-publish-source.tar.gz=. The manifest
+binds 196 source inputs, all matching the publication source tree. Source,
+binaries and raw logs stay outside Git. The image is unchanged across all
+service captures.
+
+Publication benchmark SHA-256: =10e04b18298b0ca015cf234b95cff72ecc2a23bed18347ec7a8ba4fea3b1e6de=.
+
+Native image SHA-256: =329d03ef2e265ce53cbe974137c6c79df6893c49b00d77e121edcc2d7f5b2543=.
+
+Current service/capacity/dispatch-fault/producer native targets and strict
+all-target qualification lint pass after the allocation-order repair. The latest
+native close observation is 2.97 ms with returned descriptor counts. That is a
+bounded acceptance observation, not a tail-latency distribution. The unchanged
+model gate remains the separate finite evidence described above.
+
+* Intermediate directed results before allocation rollback repair
+
+The corrected benchmark uses the maximum native completion clock for each owner,
+including out-of-order asynchronous results. A release smoke and two full
+captures pass on the corrected pre-rollback measured source. Each full capture has forty samples,
+four result summaries, four joined owners, zero external roots, successful
+Scheme service quiescence and removed copied image files. Pool startup is
+2.498 / 2.533 seconds, outside timing windows. This is a local finite workload,
+not a portable throughput guarantee or an idle-host certification.
+
+Throughput is orders/second from median native bulk completion duration. Each
+p99 pools the corresponding ten samples. =Sync -> service= always uses identical
+VMs and input/work budgets within that capture. Millisecond values are rounded.
+
+| Capture/load | Throughput sync -> service | Ratio | Short actual p99 ms | Batch service p99 ms | Owner finish spread max ms |
+|--------------+----------------------------+-------+---------------------+----------------------+----------------------------|
+| A/CPU | 91,700 -> 86,761 | 0.95x | 33.77 -> 34.11 | 1.46 -> 7.01 | 217.35 -> 143.17 |
+| A/mixed | 12,251 -> 24,719 | 2.02x | 44.40 -> 27.87 | 11.48 -> 19.52 | 110.12 -> 161.14 |
+| B/CPU | 240,719 -> 124,854 | 0.52x | 29.84 -> 23.49 | 1.29 -> 11.25 | 124.30 -> 158.72 |
+| B/mixed | 10,482 -> 32,086 | 3.06x | 49.89 -> 30.73 | 14.34 -> 20.16 | 108.55 -> 163.07 |
+
+Mixed throughput improves 2.02x / 3.06x and short actual p99 decreases 37% / 38%.
+All 64 probes overlap bulk work in both service captures, versus control minima
+54 / 57. Scheduled probe p99 also decreases: 770.36 -> 403.00 ms and
+824.95 -> 328.61 ms. However, serial probe generation means these are measured
+arrival-delay observations, not an open-loop offered-QPS experiment.
+
+Negative results prevent default promotion. CPU throughput falls 5% / 48%; batch
+service p99 increases for both loads. Mixed owner finish spread increases
+110.12 -> 161.14 ms and 108.55 -> 163.07 ms. Minimum per-owner progress at first
+owner finish falls 1,616 -> 1,168 and 1,576 -> 1,432 out of 2,048 orders per owner.
+Actor peer-progress minima reach zero in both arms. No starvation-freedom or
+uniform fairness improvement is claimed. Pending-before-projection mixed p99
+increases 10.83 -> 18.84 ms and 13.61 -> 19.06 ms; this is retained outstanding
+work, Scheme waits/execution and owner interleaving, not isolated CPU time.
+The service removes the synchronous host-admission boundary; it does not
+preempt a CPU-bound Scheme handler that never yields.
+
+Two earlier full captures are also retained: mixed throughput ratios were
+2.46x / 1.96x with lower short actual p99, while CPU ratios were 0.78x / 1.35x.
+Their raw owner-clock arrays permit corrected fairness reconstruction. Their
+aggregate fairness originally used the last submitted item; the final benchmark
+now uses the maximum completion. Those captures are historical observations,
+not substituted for the final two captures. CPU variation and all regressions
+remain evidence against a universal acceleration claim. No larger matrix was run.
+
+The next optimization boundary is now concrete: preserve Scheme's ability to
+run multiple pending handlers while bounding how much CPU work and result
+projection can delay peers. Existing work credits remain charged until retirement;
+releasing them on sleep is not an admissible shortcut. Any change must retain
+this matched sync/service control and its CPU/fairness negatives.
+
+* Intermediate artifact identity and gates
+
+Portable private receipts are =service-corrected-{smoke,a,b}.jsonl= and their
+stderr files, =service-corrected-manifest.json=, and the frozen corrected benchmark.
+The manifest binds 196 pre-rollback source inputs.
+The copied native image is unchanged between all service captures.
+
+Intermediate benchmark SHA-256: =f030d178836d13007923e9bac657a90cb0c12a28ff8e3bd158a274d59b042acc=.
+
+Native image SHA-256: =329d03ef2e265ce53cbe974137c6c79df6893c49b00d77e121edcc2d7f5b2543=.
+
+The earlier frozen benchmark/source archive and =service-ab-{a,b}.jsonl= remain
+outside Git. A separate source archive binds the corrected manifest; logs,
+binaries and archives are not PR content. Reproduction uses repository commands
+above, not a private host directory.
+
+Final strict all-target =actor-aot,instance-dispatch= qualification lint passes.
+Strict core library lint passes both with and without Tokio. The native service,
+capacity, dispatch-fault and producer tests pass with the current service image.
+The five-second native acceptance test observes eight short requests finishing
+while long handlers remain latched, then verifies retained outputs after GC,
+exception recovery and close/drain. Final close observation is 2.93 ms, a native
+acceptance observation rather than a performance distribution. The reused finite
+model gate passes independently as described above.
+
+Retained intermediate failures include invalid Gambit foreign-block binding
+syntax, a real SIGPIPE during failed-owner wake teardown, a missing platform
+constant in the libc binding, and an initial use of pipe types newer than the
+declared Rust 1.85 requirement. Repairs use Gambit's syntax, task-owned Darwin
+no-SIGPIPE descriptors, the verified Darwin SDK constant and RAII File/libc pipe
+ownership. No global signal override, SDK patch, Rust version bump, lowered
+optimization or widened native progress gate is introduced. A standalone probe
+with missing SDK home and intermediate compile/lint failures remain failures.
+This native event-port implementation is qualified on the existing Darwin
+isolated-image backend; no new Linux image-lifecycle claim is made.
+
+The final initialization audit also moves wake-resource allocation before image
+copying. A pipe/descriptor allocation failure therefore cannot leave an
+untracked copied image; a subsequent copy failure drops the task-owned RAII
+wake descriptors. This changes failure rollback ordering, not service scheduling
+or successful-path admission. Current native regression and lint gates are
+repeated after this repair.

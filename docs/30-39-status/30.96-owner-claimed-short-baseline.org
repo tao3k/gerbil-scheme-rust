@@ -1,0 +1,151 @@
+#+TITLE: Running-owner short admission and the retained benchmark baseline
+
+* Library behavior
+
+=SchemeServiceRouter::with_owner_claimed_shorts= opts into the existing bounded
+shared short source. A running owner claims each stateless short request before
+native construction and acquisition of its active native charge. A request no
+longer reserves an owner that cannot run while an eligible peer is available.
+The configured owner set and short quota must match the existing short pool.
+
+Rust only admits and distributes work across fixed owners. Gerbil Scheme keeps
+the complete evaluator, Actor and green-thread scheduling, GC, exceptions and
+continuations. Native typed inputs and owned Rust projections remain in use.
+Batch routing, stateful owner/lane affinity and defaults are unchanged.
+
+Before claim, cancellation or timeout removes queued Rust input. After claim,
+client timeout does not release native quotas or roots; the owner must complete
+projection and retirement. Router clones share the short facility, including
+its explicit close boundary. The native witness holds one owner, verifies that
+a peer completes short work, and checks cancellation, post-claim timeout and
+close/drain with zero transient roots.
+
+* Frozen source and numerical observations
+
+The retained source checkpoint is
+=6f32a10f56420005b2effcc9465b45f309f14ccf= on
+=checkpoint/owner-claim-10_14ms=. All 1,595 measured source files were verified
+against the build manifest. The executable SHA-256 is
+=200958008209c615946eda5a8648375fd842c86521eadaa9e20fa38dc8e8df79=.
+The original O2 VM image SHA-256 is
+=2b464ed65ef1c49945f4f973a8044a4be18b0f9ddc882748ea89da0f10553559=.
+
+One direct Rust executable replay retained that binary, image, arguments and
+the original arm order: legacy routing first, running-owner claims second, on
+the same twelve VMs within the process. Each arm planned 1,000,000 messages at
+14,639 messages/s, with twelve Tokio workers, fifty clients and five seconds
+of warmup. Both configuration events exactly matched the historical run.
+
+| Fixed-rate metric | Historical owner-claim arm | Frozen replay owner-claim arm |
+|-------------------+----------------------------+-------------------------------|
+| Verified completed messages/s | 13988.449 | 13795.599 |
+| Short planned-to-observed p99, ms | 10.140999 | 13.039400 |
+| Short p99.9, ms | 22.857009 | 37.940356 |
+| Short rejected | 140 | 365 |
+| Total rejected | 44371 | 57529 |
+| Bulk p99.9, ms | 52.731135 | 84.953933 |
+| Native request errors | 0 | 0 |
+
+Both observations remain visible. Neither is replaced by a slower new control
+or represented as a guaranteed SLO. The replay joins twelve owners, reports
+twelve zero transient-root counts and removes their image files. This does
+not establish complete RSS reclamation or explain every historical watchdog.
+
+The separate closed-loop capacity observation is 37,427.135252 verified
+messages/s with 1.278625 ms short p99 in that same capacity arm, without rejects.
+That capacity profile was not rerun during the fixed-rate replay. Do not combine
+its throughput and the fixed-rate tail into one benchmark claim.
+
+Throughput includes result verification and drain. Short latency runs from
+planned arrival through client observation, before the benchmark oracle check.
+Only successful messages enter the latency quantiles; all rejections remain
+separate outcomes. Marginal stage p99 values are not additive and cannot assign
+one tail request to a particular wait. The original run used a lightweight
+process sampler; the direct replay did not. The original full inherited
+environment was not captured. No host, GC or OS attribution follows from this.
+
+* Rust reproduction entry point
+
+Use the frozen executable for an exact artifact replay. To build from source,
+use the existing project SDK/toolchain environment and Cargo bench target:
+
+#+begin_src sh
+cargo bench --offline --locked -p gerbil-scheme-qualification \
+  --features arrival-clock --bench scheme_service --no-run
+#+end_src
+
+Set =GERBIL_SERVICE_BENCH_IMAGE= to the verified retained image. Invoke the
+executable with the following arguments; the target is its second arm:
+
+#+begin_src sh
+--progress-fair-ab --fixed-short-selective --completion-service-ab
+--supply-cycle-ab --capacity --capacity-owners=12
+--capacity-rust-workers=12 --capacity-clients=50 --capacity-owner-claim-ab
+--capacity-count=1000000 --capacity-seconds=30
+--capacity-warmup-seconds=5 --capacity-rate=14639
+#+end_src
+
+The arrival clock, workload, native calls, quantiles and outcome accounting
+remain Rust-owned. No Python benchmark runner is required. Native inactivity
+and request deadlines remain five seconds; the external replay limit is 300
+seconds. No machine-specific path, raw log, image or executable is committed.
+
+* Integration and retained negative results
+
+PR integration retains the later atomic private-directory reservation fix and
+the three-worker model gate. The merged source therefore differs from the
+frozen checkpoint in those integration details and formatting. Its exact-head
+CI is a separate obligation; the frozen measurements are not relabeled as
+measurements of a newly compiled integration executable.
+
+Three full integrated model invocations exceeded the existing fifteen-minute
+budget. Fixed worker groups and module scoping alone were insufficient: the
+last attempt completed 82 checks while pending work remained bound to busy
+groups and another worker was idle. The installed Quint 0.33 CLI
+sends its complete lookup table to a new Rust evaluator for each test; the
+canonical parsed artifact is approximately 34 MiB across thirteen modules.
+
+The existing Rust gate now asks the pinned Quint parser for module identities,
+imports and source ranges once. Each check receives the complete transitive
+module closure for its explicit main module, copied byte-for-byte from the
+single canonical model. No declarations within a required module are removed.
+The whole canonical file is still typechecked, and its digest is rechecked
+before every scoped invocation. Missing dependencies, external source ranges
+and changed canonical input fail closed. Private temporary closures are owned
+through the scoped workers; no generated model copies are committed.
+
+Only the input file passed to each main-module check changes. Command mode,
+main, initializer, step, invariant, seed, sample bound, step bound and rejecting
+controls remain intact. The complete existing check plan is now collected
+before execution into a finite shared queue. A worker claims one owned check
+only when ready, runs its original success or counterexample assertions, then
+claims another. Long scenario commands are scheduled before shorter runs.
+No result is inferred from planning: the gate asserts that every planned
+check completed, and scoped thread panics still fail the entire gate.
+
+The three-worker ceiling and fifteen-minute budget remain unchanged. Four ordinary Rust controls cover exact module retention,
+missing dependencies, source positions and cache invalidation. The failed
+invocations remain outside Git. There is no new model, interpreter or Python
+runner, and no change to Scheme execution or benchmark timing.
+
+The final complete real Quint gate passes all 95 planned checks in 714.76
+test seconds, within the unchanged 900-second external limit. The initial
+canonical typecheck also passes. Merged library tests pass 51 cases; native
+service qualification passes all four selected executable cases. The four
+projection ownership controls, strict selected-target Clippy and workspace
+formatting also pass. These are local source/functional checks; new-head remote
+CI remains separate, and they do not create a new production latency claim.
+
+The protected-client experiment reached 17.327301 ms short p99 and did not
+preserve the retained working point. Its 33.741527 ms borrowed-policy control
+was a new executable and the first arm, not the frozen binary's second arm.
+That comparison cannot establish improvement over the frozen checkpoint.
+The separate arrival-reactor experiment also failed to restore the earlier
+tail. Neither candidate is included by this integration.
+
+The next protocol work must distinguish retractable Rust inputs, irrevocable
+native work and completed results still owned by clients. Client admission
+credits and native root/credit retirement are separate domains. Reuse the
+existing model before changing their transfer boundary; do not free roots
+early, introduce unbounded result retention or tune a reservation count as a
+substitute for the ownership protocol.

@@ -30,6 +30,12 @@ pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_fixnum(
     value: GerbilValueHandle,
     out: *mut GerbilBoolean,
 ) -> GerbilStatus {
+    if value == 0 && !out.is_null() {
+        unsafe {
+            *out = GerbilBoolean::TRUE;
+        }
+        return GerbilStatus::Ok;
+    }
     // SAFETY: raw predicate call is guarded by the shared checked predicate helper.
     unsafe {
         checked_scheme_object_predicate(value, out, gerbil_scheme_rust_scheme_object_is_fixnum_raw)
@@ -46,8 +52,14 @@ pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_as_fixnum(
     value: GerbilValueHandle,
     out: *mut GerbilFixnum,
 ) -> GerbilStatus {
-    if value == 0 || out.is_null() {
+    if out.is_null() {
         return GerbilStatus::NullPointer;
+    }
+    if value == 0 {
+        unsafe {
+            *out = GerbilFixnum(0);
+        }
+        return GerbilStatus::Ok;
     }
     // SAFETY: raw predicate accepts a Scheme-object handle exported by Gerbil.
     if unsafe { gerbil_scheme_rust_scheme_object_is_fixnum_raw(value) } == 0 {

@@ -1,0 +1,215 @@
+#+TITLE: Planned arrival, native completion and client consumption
+#+STARTUP: overview
+
+* Contract and ownership
+
+The opt-in client progress API records process-local monotonic instants for
+planned arrival, the boundary before a deadline wait, actual submission attempt,
+native completion and client consumption. Consumption means receiving the Rust
+result before application processing; it is not the owner projection timestamp.
+An optional predecessor observation describes a serial client's dependency.
+Issuing means beginning the client attempt, before input preparation/admission;
+it is not a claim that an owner has accepted or started the request.
+
+=InstanceArrival::new= records the wait boundary. The caller-controlled path
+retains its existing timer and calls =issue=. The explicit =wait_until_due=
+path checks eligibility when polled: already-due work proceeds without another
+timer; future arrivals await their existing Tokio deadline. Neither path
+bypasses capacity, affinity, cancellation or final native entry checks. This
+is not a Tokio task-priority promise or arbitrary-code preemption mechanism.
+
+=AsyncInstanceTicket::wait_observed= consumes an =InstanceIssue= and returns
+=InstanceObservedResult=, including an =InstanceClientProgress= timeline.
+Native task failure is inside the observed result and retains its completion
+and consumption instants. Transport closure, observation timeout and invalid
+clock/order are outer errors. A timed-out or dropped observer does not release
+an accepted task's native roots or credits prematurely; Scheme work drains
+through the existing owner protocol. The tokens hold no native resource.
+The caller must associate the issue token with the request it actually starts;
+timestamps are observations, not security capabilities or cross-process clocks.
+
+Rust only dispatches across fixed owners. The full Scheme VM, Actor/green-thread
+execution, GC, exceptions, continuations and original native budgets remain.
+Existing API behavior and all production defaults are unchanged.
+
+* Additive client boundaries
+
+Let =P= be the planned arrival, =W= the before-wait boundary, =I= actual issue,
+=N= native completion, =C= client consumption and =Cprev= the previous client's
+consumption (or =P= for the first request). The API checks =W >= Cprev= when
+present and =I >= max(P,W)=, =N >= I=, =C >= N=.
+
+| Component | Exact duration | Interpretation |
+|-----------+----------------+----------------|
+| Serial backlog | max(Cprev-P,0) | Predecessor already consumed late |
+| Client before wait | max(W-max(P,Cprev),0) | Includes client processing and initial task-start delay |
+| Deadline/resume | I-max(P,W) | Deadline eligibility to actual client resumption/issue |
+| Native-ready latency | N-I | Existing attempt-to-native-completion interval |
+| Delivery/consumption | C-N | Ready result awaiting transport/client observation |
+
+Their sum is exactly =C-P=. The existing native construction/pending/projection
+partition remains exactly =N-I=. Placement observed after an await can lag
+native completion and is not used as a native execution boundary.
+
+Deadline/resume includes OS scheduling and Tokio dispatch; it does not identify
+the internal timer wake timestamp or prove runnable versus blocked OS time.
+Serial backlog can propagate a previous delivery delay into later requests.
+Owner completion spread remains an independent native progress metric. None
+of these components alone establishes GC CPU cost or an OS root cause.
+
+* Joint model refinement
+
+Reuse the existing Tokio/fixed-owner/Actor/green-thread model. Planned,
+deadline-due, timer-waiting and client-eligible sets refine the existing
+submission, native projection, reply publication and client-observed states.
+A serial successor becomes eligible only after predecessor consumption, even
+if the predecessor is already native-ready. Independent owner work can continue
+without that consumption. Waiting for a deadline holds no Tokio polling slot,
+native root or capacity permit.
+
+Tracked client arrivals are distinct from untracked bulk supply. Existing
+accepted work, root retirement, budget grants and Actor phases retain their
+owners. Canceling an unissued arrival removes only client timing state.
+Early issue/consumption mutations must fail the existing safety relation.
+An initial model failure incorrectly equated a Rust-projected value with root
+retirement; the corrected relation permits ready or already-retired results,
+matching the existing independent native retirement protocol. Its failure log
+is retained rather than relabeled as success.
+
+* Directed native and performance scope
+
+The actual native test API checks late arrival without a timer, future arrival,
+deliberately late consumption after native retirement, exact duration
+conservation, observable task failure, observation timeout with retained
+accepted credit and dropped observation followed by clean drain. Existing GC,
+continuation, exception, initialization and teardown cases remain enabled.
+
+Build through the existing Cargo/Gerbil graph at
+=GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2=. The Rust =scheme_service= bench uses
+=--progress-fair-ab --fixed-short-selective --client-arrival-cost-ab=.
+Both arms select the same =NativeBudget= Scheme policy in the same four live
+VMs/image. Only the client deadline policy differs: unconditional timer versus
+explicit already-due admission. Both collect the same progress fields outside
+native diagnostic observation. No extra Scheme checkpoints or execution lease
+is added. Tokio two workers, window four, work 32, batch eight, Actor quantum
+one and existing work bounds are unchanged. Only CPU and mixed loads run,
+five ordered/reversed blocks.
+
+Logical work and planned arrival timestamps match, while actual issue traces
+can differ by the policy being tested. The existing serial probe remains
+serial, explicitly labeled; it is not independent open-loop traffic. Preserve
+all windows and both native-ready and client-consumed tails. Report paired
+relative changes, emitted median-window throughput and total-work/total-time
+throughput separately. No profiler, threshold change or expanded matrix is
+required. Performance acceptance precedes any commit/push or default change.
+
+* Watchdog evidence boundary
+
+The original first-port watchdog remains UNATTRIBUTED and its cleanup
+UNVERIFIED: a matching failed image/phase/stack was not archived. Current
+native tests freeze their binary, embedded image and source map before
+execution. The existing five-second watchdog records last meaningful progress
+and phase; phase chatter does not extend its deadline. New client timestamps
+separate future evidence boundaries but do not explain the historical failure.
+
+A subsequent random trace (seed =0x1bbdf=, 38 states) exposed an abstract generic
+source accepting a tracked request before its caller issued it. The trace is
+retained in machine-readable form. The refined caller workflow applies the
+same issue-before-submit condition to tracked direct and asynchronous routes;
+untracked bulk/legacy calls retain their original paths. A required bypass
+mutation reproduces that invalid workflow. This is a valid-caller composition
+contract, not a claim that an observation token changes every legacy admission
+API. The actual benchmark creates its issue token before preparing or submitting
+the corresponding request. =wait_observed= rejects a native completion timestamp
+that predates the supplied issue token; callers remain responsible for correct
+association, as stated by the API.
+
+* Executed gates
+
+Strict Clippy passes for the actual Rust bench/native test and existing model
+integration harness. The existing CI aggregate now selects client, native and
+cross-layer witnesses and runs the two client-progress random domains. Local
+model source SHA256
+=768958ea776a1d6cc32c4cfb39bca413697a6b323f296a51142cef1ccd07d815=
+passes typecheck, 146 directed cases and 400 random samples of up to 64 steps,
+seed 42. Failed intermediate checks and the explicit random counterexample
+remain in private receipts. These finite checks do not prove timing or
+universal liveness.
+
+The three real native tests pass in 30.21 seconds: four owners joined, roots
+zero, removed files, FD return and 2.71 ms native close. The new error, timeout
+and dropped-observer cases recover through actual accepted native work.
+The original five-second progress watchdog is unchanged. Exact PR18 head
+=c4b95dfaa116bd67b110d94826535fd27f227b85= has six effective successful CI checks;
+that remote result does not attest these unpushed local changes.
+
+* Single A/B result: rejected
+
+=service-client-progress-v32-r1= completes all 40 windows in 8.60 seconds,
+exit 0, empty stderr, no controller/watchdog timeout, unchanged host/image/source
+identity and empty compiler boundaries. Work, 64 first grants, 1088 independently
+retired results and all five-part client / four-part native duration partitions
+pass for every window. Cleanup reports four owners joined, roots zero, files
+removed and quiescent service. The native image is unchanged from the previous
+capture: SHA256
+=ba8125c6df45516c836e00eef990492df41ff64237222816184db0bf3edfa51e=.
+This does not justify subtracting independent captures to attribute a speedup.
+
+The candidate skips 430 of 640 CPU timers and 407 of 640 mixed timers. Fewer
+timers do not establish a net performance improvement.
+
+| Load | Paired throughput | Native-ready short p99 | Client total p99 | Delivery p99 | Owner completion spread |
+|------+-------------------+------------------------+------------------+--------------+-------------------------|
+| CPU | +7.74% | +42.78% | +2.49% | +121.64% | -24.15% |
+| Mixed | -0.19% | +15.15% | -19.39% | +92.75% | +12.19% |
+
+These are medians of ten ordered/reversed relative pairs per load. CPU
+throughput has seven positive pairs but ranges -37.90% to +21.27%. Mixed
+client total improves in nine pairs, while native-ready short p99 improves in
+only two and owner spread in four. CPU delivery improves in only one pair.
+
+Total-work/total-time throughput declines 0.11% CPU (251164->250890 orders/s)
+and 0.96% mixed (61032->60445 orders/s). The existing emitter's lower-median
+window throughput instead changes +14.62%/-2.98%; neither aggregation is
+substituted for the other. These are workload orders/s, not generic RPC rates.
+Pooled native-ready short p99 regresses 20.14%/10.38%. Pooled client total
+changes +23.36%/-7.83%, delivery +50.56%/+136.44%, and maximum owner spread
++75.45%/+24.06%. The unchanged planned-to-native metric changes +24.70%/-7.12%.
+No unfavorable window is removed or rerun. The candidate is REJECTED_PERFORMANCE:
+no commit, push or default change follows it.
+
+* What the added boundaries establish
+
+Same-request top-ten totals by client-consumed latency have these shares:
+
+| Candidate load | Serial backlog | Before wait | Deadline/resume | Native-ready | Delivery |
+|----------------+----------------+-------------+-----------------+--------------+----------|
+| CPU | 89.445% | 0.032% | 0.001% | 3.452% | 7.070% |
+| Mixed | 30.597% | 0.032% | 40.728% | 14.426% | 14.218% |
+
+The CPU top tail is dominated by serial predecessor backlog, not waiting for
+the current request's already-elapsed timer. Removing that timer cannot repair
+its predecessor's delivery/resumption delay. Mixed tails span several stages;
+a single pre-issue bucket hid that distinction. These are additive same-request
+shares; independent component p99 values must never be added to explain total
+p99. The data do not identify why any particular OS thread was not running.
+
+Source inspection further bounds delivery: =run_native= stamps native completion
+after the job, error rollback and balance check, immediately before the delivery
+callback. =ServiceJob::complete= forwards that callback to the Tokio oneshot
+sender. Thus =C-N= includes the send/publication interval and client scheduling,
+not exclusively Tokio's ready queue. Native resource retirement remains its
+own protocol after result delivery. The model already separates native
+projection, reply publication and client observation; the current timestamp
+receipt does not independently stamp all three events. Do not label all of
+this interval a Tokio wakeup or use client consumption to retire roots.
+
+The next algorithm review must treat publication/client resumption and owner
+completion fairness as distinct obligations, retaining the existing cooperative
+oneshot waits. A bounded completion/registration policy must preserve capacity
+ownership, cancellation and accepted-work drain. The failed timer-only fast
+path supplies no evidence for disabling cooperative scheduling, changing Scheme
+work budgets, or replacing the serial probe with easier traffic. Keep this
+experiment explicit and the negative results available; improve the joint
+progress protocol before another targeted capture. The historical watchdog
+remains unattributed and its original cleanup unverified.

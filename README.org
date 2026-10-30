@@ -1,42 +1,219 @@
 #+title: gerbil-scheme-rust
 #+options: toc:nil num:nil
 
-Rust bindings for Gerbil Scheme.
+In-process Gerbil Scheme FFI and AOT build support for Rust. Scheme owns its
+numeric tower, object identity and GC; Rust gets explicit, lifetime-bound
+handles and whole-value transfer APIs.
 
-* Scope
+This is a standalone bridge, not an application runtime or parser.
+Marlin, POO Flow, Orgize, graph execution and application policy remain
+downstream concerns.
 
-=gerbil-scheme-rust= provides a small, explicit boundary between Gerbil
-Scheme and Rust:
+* Native Scheme execution with Rust dispatch
 
-- raw native bindings and ABI declarations;
-- safe Rust wrappers for Gerbil values, modules, and calls;
-- build support for Gerbil packages, AOT objects, and native archives.
+Scheme application code follows Gerbil -> Gambit C -> native compilation.
+Rust owns host admission, cross-instance dispatch and lifecycle. The default
+Python ledger backend starts four complete Scheme runtimes on fixed OS owners.
+Scheme retains macros, GC, closures, continuations and Actor/green-thread
+scheduling. Tokio and Rayon submit jobs; they do not schedule Scheme continuations.
 
-The repository does not own an application runtime.  Marlin, =poo-flow=,
-Deck, policy routing, graph execution, resident agents, and workspace policy
-remain downstream concerns.
+The former Scheme-to-Rust IR compiler and VM-free subset examples are removed.
+The ledger's =rust-backend= selects native Scheme instances. Native typed values
+and owner-affine handles preserve actual Scheme objects; no subset fallback
+replaces their execution. See [[file:docs/hybrid-execution.md][the execution contract]].
 
-* Build model
+The latest matched read-only payload-reuse baseline is 10.10x Actor-item
+throughput with scheduled short-request p99 72.045 ms. This is a bounded
+observation, not a universal speedup or fixed acceptance threshold. Read
+[[file:docs/30-39-status/30.19-owner-resident-payload-baseline.org][the baseline]] and
+[[file:docs/30-39-status/30.20-scalar-projection-experiment.org][the rejected projection experiment]]
+for conditions and negative results. The private-image API is experimental on
+Darwin; portable packaging, hot unloading and crash containment need separate
+qualification. Raw diagnostic logs and experimental patches stay outside this
+repository; maintained tests and English summaries are versioned.
 
-- Cargo owns Rust package metadata and dependency resolution.
-- =build.ss= owns Gerbil package compilation.
-- Bazel owns cross-language orchestration and the CI target graph.
+* Runtime and ownership
 
-Both Cargo and Bazel are first-class supported entry points.
+- =GerbilRuntime= initializes the process-global runtime on one owner thread.
+  Strong roots keep Scheme objects alive; handles cannot cross threads.
+- Rooted snapshots retain an entire collection or component span with one
+  root. Borrowed references cannot outlive that snapshot. Explicit element
+  roots remain valid within the runtime lifetime after snapshot release.
+- Byte/string/numeric/name buffers own their copied Rust data. Reused
+  staging preserves published output when validation fails. No borrowed
+  Scheme heap pointer becomes a Rust slice that survives GC.
+- AOT and FFI work together: the canonical build produces linked Scheme
+  objects; Rust enters those compiled exports through the C ABI.
+- The separate =Gerbil= toolchain API explicitly invokes the configured
+  interpreter/compiler. It is not a process fallback for in-process calls.
+- Tokio controls admission, queues and response tasks. Concurrent Rust
+  callers do not establish parallel Scheme execution inside one VM.
 
-* License
+Multiple-VM capability does not imply multiple active processors or safe
+cross-thread entry. Current CI explicitly SKIPS Scheme multi-processor
+qualification because its pinned SDK lacks qualified multiple-threaded-VM
+support. A skipped gate is not a pass. Independent-VM experiments remain
+separate from the admitted single-owner path.
 
-The intended project license is:
+* Data transfer
 
-#+begin_example
-Apache-2.0 OR LGPL-2.1-or-later
-#+end_example
+| Family | Public transfer and ownership |
+|--------+-------------------------------|
+| Boolean, fixnum, character, flonum | Validated owned scalar spans, including trusted false/zero |
+| String / bytevector | Whole UTF-8/byte transfer; validated owned Rust data and reused output |
+| Exact integer | Canonical sign + binary magnitude, no decimal serialization or truncation |
+| u16/u32/u64, s8/s16/s32/s64, f32/f64 vectors | Sealed native-layout whole spans with transactional staging |
+| Symbol / keyword | Owned bulk names; spelling is not identity; explicit interned/uninterned construction |
+| Pair, proper list, generic vector | Strong shallow snapshots and root-bound element references |
+| Rational / complex | Whole batch construction; exact or inexact components remain rooted Scheme values |
+| Gambit hash table | Explicit eq?/eqv?/equal?, strong keys/values, shallow bulk key/value snapshots |
 
-The repository is being bootstrapped; the dual-license file layout is part of
-the first implementation slice.
+Rational reduction and complex-to-real normalization follow official Scheme
+semantics. Table order is unspecified; duplicate keys follow the selected
+equality and last value wins. Weak tables, arbitrary Gerbil HashTable
+implementations and deep recursive Rust serialization are not implied.
 
-* Documentation
+#+begin_src rust
+use gerbil_scheme::{GerbilRuntime, NumberKind, RootedObjectBatch};
+
+fn main() -> Result<(), gerbil_scheme::NativeError> {
+    let runtime = GerbilRuntime::initialize()?;
+    let numerator = runtime.root_value(runtime.fixnum_value(6)?)?;
+    let denominator = runtime.root_value(runtime.fixnum_value(-4)?)?;
+    let values = runtime.number_batch(
+        NumberKind::Rational, &[(&numerator, &denominator)],
+    )?;
+    let mut parts = RootedObjectBatch::default();
+    values.copy_number_components(NumberKind::Rational, &mut parts)?;
+    drop(values);
+    // Scheme normalized 6/-4 to -3/2. The snapshot retains both components.
+    println!("{:?}", parts.get(0).unwrap().scalar()?);
+    Ok(())
+}
+#+end_src
+
+* Benchmarks and evidence
+
+Benchmarks live under =benches/= and run through Justfile entry points.
+Full matrices use 1,000 / 10,000 / 100,000 requests per batch, 20 batches
+PER variant/load, rotating inputs and matched ABBA controls. P95/P99 are
+exact nearest-rank percentiles of individual requests pooled across all
+20 batches, not percentiles of 20 batch means. Time and memory units are
+explicit. Observer storage, Scheme heap and shared process RSS are reported
+separately from Rust retained capacity.
+
+The following completed local conversion receipt measures eight table
+entries per request. Both variants first snapshot the same table; control
+then roots each of 16 fields independently, while bulk borrows one strong
+snapshot. Setup/construction is outside timing; validation is included.
+
+| Requests/batch | Mean batch wall: control / bulk (ms) | Request P95: control / bulk (µs) | Request P99: control / bulk (µs) | Throughput: control / bulk (requests/s) |
+|----------------+--------------------------------------+----------------------------------+----------------------------------+----------------------------------------|
+| 1,000 | 9.103325 / 2.698231 | 11.416 / 2.667 | 15.125 / 3.708 | 109,850 / 370,613 |
+| 10,000 | 94.050337 / 28.319367 | 12.000 / 2.833 | 20.000 / 4.750 | 106,326 / 353,115 |
+| 100,000 | 934.893840 / 279.999561 | 11.750 / 2.709 | 18.041 / 4.542 | 106,964 / 357,143 |
+
+Control/bulk Rust descriptor and element-owner capacity: 176 / 24 bytes.
+Scheme allocation is not zero. The current host reports 12 available
+processors; these are local single-owner bridge results, NOT Org parsing,
+Tokio end-to-end tails, SMP throughput, or universal hardware guarantees.
+All nine numeric/table scenario gates passed wall and pooled tails across
+360 batches. Full numerical results and methodology:
+[[file:docs/bridge-composites-20261011.org][numeric/table ownership receipt]].
+
+Other completed receipts:
+
+- [[file:docs/bridge-signed-identifiers-20261011.org][signed vectors and identifier names]]: 960 batches, 24 accepted scenarios;
+  includes four changing character distributions and Rust capacity accounting.
+- [[file:docs/bridge-rooted-objects-20261011.org][strong collections and arbitrary-precision integer transport]].
+- [[file:docs/bridge-utf8-tokio-scheduling-audit-20261011.org][Tokio admission, queue, service and response timing]].
+- [[file:docs/bridge-data-type-bulk-audit-20261011.org][data-family audit and exact evidence boundaries]].
+
+The owner-CPU worker-budget candidate completed 840 batches and failed
+121 of 189 metric gates; it is reverted. See the
+[[file:docs/bridge-composites-20261011.org][full scheduling comparison and negative receipt]].
+Rejected scheduling candidates stay reverted. A lower GC count or
+allocation count alone never admits a change:
+wall time and P95/P99 must also pass. Exact-head remote CI is independent
+from local bridge qualification and downstream Org acceptance.
+
+The admission fast path completed 840 batches and failed 78/189 gates;
+it remains reverted. [[file:docs/bridge-tokio-admission-20261011.org][Its complete negative receipt]].
+
+Private injection-lock and owner receive timing are now separately probed
+in an ISOLATED official-source copy, never the production Tokio dependency
+or kernel. For mixed text at 100,000 requests/batch, observed baseline
+lock request-to-acquire / hold means were 0.358844 / 0.056695 µs/event;
+owner receive wall / CPU means were 2.860260 / 0.852333 µs/receive.
+Probe timing windows and preemption limits are explicit in the receipt.
+
+The source-guided caller-future coalescing candidate kept the same host
+workers, 24 pending callers, bounded channel and single Scheme owner.
+Separate 20-batch diagnostic runs observed 1.9963 / 0.5714 injection
+events/request at that load. Those are NOT a paired speed comparison.
+Uninstrumented ABBA acceptance completed 840 batches, failed 51/189 gates
+and is reverted, including its added dependencies. ASCII results are
+control / rejected candidate:
+
+| Requests/batch | Mean batch wall (ms) | Response P95 (µs) | Response P99 (µs) | Throughput (requests/s) |
+|----------------+----------------------+-------------------+-------------------+-------------------------|
+| 1,000 | 3.784 / 2.886 | 165.125 / 115.833 | 254.209 / 236.042 | 264,268 / 346,453 |
+| 10,000 | 50.072 / 48.643 | 241.958 / 320.709 | 1,115.167 / 1,067.959 | 199,714 / 205,578 |
+| 100,000 | 515.229 / 433.500 | 221.750 / 159.875 | 637.625 / 372.459 | 194,088 / 230,680 |
+
+Shared peak RSS: 634,470,400 bytes, including 512,000,000 bytes of retained
+large-load observations across both variants, plus scratch. This is not
+production memory/request or a per-variant RSS saving. One reply allocation
+and owned output still occur per completed request; coalescing is not
+allocation-free. [[file:docs/bridge-tokio-lock-owner-20261012.org][Exact probes, matrices, memory boundaries and rejected patches]].
+Fewer injection events did not pass all tail gates. No scheduler improvement
+is admitted; baseline and unsupported SMP status are preserved.
+
+#+begin_src text
+just bridge-composites-matched
+just bridge-signed-matched
+just bridge-identifiers-matched
+just bridge-utf8-matched --scheduling-audit all
+#+end_src
+
+The last command runs the ordinary versus perturbed diagnostic observer,
+not an admitted scheduler optimization. Queue/response measurement is
+closed-loop; it does not establish open-loop overload behavior.
+
+* Build and validation
+
+Cargo owns Rust packages and dependency resolution. =build.ss= owns Scheme
+compilation; the AOT build helper owns compiler discovery, archive production,
+provenance and complete link receipts. Bazel owns the cross-language CI graph.
+Downstream consumers validate and consume the receipt, without repeating
+SDK, compiler or system-library discovery.
+
+Compiler selection follows the configured Gerbil executable and paired SDK.
+Ghostscript's unrelated =gsc= is rejected. Explicit =GERBIL_GSC= overrides
+remain validated. OpenSSL, zlib and SQLite link receipts are admitted before
+generation; missing required libraries fail the producer build.
+
+Use the installed SDK environment and repository's Justfile:
+
+#+begin_src text
+just bridge-workspace
+just bridge-lint
+just bridge-actor-lint
+just bridge-regenerate
+#+end_src
+
+Regeneration is required after Scheme/build-input changes; fingerprint
+validation prevents stale committed SCM from qualifying a new source.
+Linux/macOS CI keeps Cargo, single-processor Actor/AOT, Rust concurrency and
+=bazel test //:ci= mandatory. SMP is a separately labeled unsupported gate.
+
+The [[file:.github/actions/setup-gerbil/action.yml][shared setup action]] supplies immutable CI SDK prerequisites.
+Consumers pin that action to a commit, rather than copying its installer.
+The local benchmark workflow does not download or rebuild the installed SDK.
+
+* Documentation and license
 
 - [[file:docs/00-index.org][Documentation index]]
-- [[file:docs/10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][RFC: Gerbil Scheme Rust bindings]]
-- [[file:docs/20-29-roadmap/20.01-bindings-bootstrap-plan.org][Bindings bootstrap and delivery plan]]
+- [[file:docs/10-19-design/10.01-gerbil-scheme-rust-bindings-rfc.org][Bindings design]]
+- [[file:specs/README.md][Bounded Quint models and their proof boundaries]]
+- [[file:LICENSE-APACHE][Apache-2.0]] OR [[file:LICENSE-LGPL][LGPL-2.1-or-later]]

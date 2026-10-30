@@ -1,0 +1,112 @@
+#+TITLE: Per-VM processor capacity and Rust allocation policy audit
+
+* Evidence boundary
+
+Existing PR #18; encoding baseline =f48bd8d7f4b4438223a0f79e5e5686f0fc14a924=.
+Local bridge conversion, remote CI, independent VM admission and Org parsing
+are separate gates. No kernel edits, SDK installation/rebuild, weaker
+assertions, extra skips or enlarged deadlines are used in this audit.
+
+* Official processor activation chain
+
+The installed SDK's matching source is available locally in the Gerbil source
+checkout, under =src/gambit=; no download is required.
+=lib/_thread.scm= defines =##cvmr= using =##current-vm-resize=;
+=lib/_kernel.scm= dispatches that primitive to =___current_vm_resize=.
+=lib/setup.c:1155-1170= clamps the requested processor count to the compiled
+=___MAX_PROCESSORS= before dispatching =OP_VM_RESIZE=.
+
+=configure.ac:1271-1318= separates three settings:
+
+- =multiple-vms= permits independent VM instances.
+- =multiple-threaded-vms= permits multiple OS threads inside one VM.
+- =smp= selects the Scheme SMP scheduler, independently of those settings.
+
+Crucially, if =multiple-threaded-vms= is disabled, configure sets
+=CONF_MAX_PROCESSORS=1= even if =smp= is enabled. When per-VM threading is
+enabled, the configured maximum defaults to 64, or the explicit
+=--enable-max-processors=N=. The header's fallback is one in either threading
+branch when no generated override is supplied. These are distinct mechanisms:
+header defaults alone do not establish the exact flags of a running binary.
+
+The frozen baseline's remote Linux gate observed =requested=4 active=1=;
+macOS observed =requested=3 active=1=. The installed SDK's linked capability
+also reports maximum one. This matches the official capacity limitation;
+adding Rust queue workers cannot raise a VM's compiled processor maximum.
+The runtime capability assertion remains =requested > 1= and
+=active == requested=. Failure now includes a diagnostic identifying the
+per-VM settings, without converting the failure into a skip or smaller test.
+Local =just smp-check= reproduces =requested=12 active=1= and exits 70.
+The diagnostic does not repair the SDK or admit the rejected capability.
+
+Under the currently unavailable qualified per-VM threading capability, SMP
+closure requires an upstream SDK receipt. An independent-VM Rust-thread
+route remains a separate alternative, subject to its own owner, entry-binding,
+isolation and actual parsing-parallelism gates. Neither route is admitted
+by queue throughput or by the UTF-8 measurements below.
+
+* Allocation policy control
+
+=just bridge-utf8-matched --compact= compares the actual caller-buffer ABI
+with the same conversion followed by Rust =String::shrink_to_fit=.
+The latter is qualification-only; production retains the frozen policy until
+all three matched loads are admitted. Shrinking is inside the timed operation,
+not moved into setup or disposal. Both variants retain full SIMD validation,
+exact content checks and all ownership/Unicode/negative contracts.
+
+The standard allocator may shrink in place or reallocate, and shrinking does
+not universally guarantee exact capacity. See the official Rust
+[[https://doc.rust-lang.org/std/vec/struct.Vec.html#method.shrink_to_fit][allocation contract]]. Each timed sample records actual output lengths and
+summed returned capacities. This sum measures cumulative capacity across
+transfers, not simultaneously live bytes, allocator metadata or peak RSS.
+Only one result is live at a time in this changing-text transfer scenario.
+No retained-output or Org parsing speed claim follows from these values.
+
+ABBA provides twenty complete samples per variant at 1,000, 10,000 and
+100,000 fresh encodings. All loads finish before rejection; any paired
+median ratio above one rejects default promotion. No fixed load threshold
+or unmeasured automatic allocation policy is introduced.
+
+The first complete run returned success on the existing paired-ratio gate,
+but at 100,000 requests its unpaired wall median increased from 3,798.368
+to 3,936.242 ms and CPU median from 731.885 to 734.910 ms. GC totals were
+identical (1,237); GC CPU medians were 17.470 and 16.679 ms. The paired
+ratio was 0.861850, illustrating why a favorable paired statistic alone
+does not justify a universal improvement claim under large clock variation.
+At 10,000 requests wall medians were 184.680 / 174.595 ms; CPU medians
+74.370 / 72.592 ms; paired ratio 0.945893; GC totals 123 / 124.
+The first terminal capture truncated part of the small-load output. Its
+available evidence is preserved as a partial transcript, not fabricated or
+presented as a complete raw receipt. A second complete run is retained below.
+Production is not changed on the basis of the first successful gate.
+
+* Complete repeat and rejection
+
+The complete repeat retains 120 sample rows in
+=benchmarks/20261011-utf8-capacity-abba.log=, with twenty samples for each
+variant in each load. The process exits 101 only after completing all loads:
+
+| Requests | Baseline wall ms | Compact wall ms | Paired ratio | Baseline CPU ms | Compact CPU ms |
+|----------+------------------+-----------------+--------------+-----------------+----------------|
+|     1000 |           39.223 |          19.083 |     0.422761 |           7.473 |          7.122 |
+|    10000 |          367.346 |         293.840 |     0.768999 |          75.166 |         75.816 |
+|   100000 |         2545.065 |        2865.141 |     1.024987 |         735.260 |        744.398 |
+
+At 100,000 requests, both variants collect 1,237 times; GC CPU medians are
+15.909 / 16.013 ms. Shrinking does not remove the initial 13,660-byte reserve,
+encoding, validation or Scheme allocation/GC work. It adds an allocator
+operation and can move/copy data; no allocation profiler or peak-RSS reduction
+is claimed. Measured returned capacities are 13,660 / 8,196 bytes per result,
+a 40% reduction in returned logical capacity on this allocator.
+
+The candidate is rejected at 100,000 by the unchanged paired-ratio gate.
+The production encoding policy is unchanged; compact mode remains only an
+explicit negative qualification control, not a production option or adaptive
+threshold. No performance failure is suppressed to permit promotion.
+
+The host was not an isolated idle runner. A read-only CPU snapshot during
+the repeat showed bridge CPU alongside WindowServer, Codex and development
+sessions. Same-image ABBA balances chronology but cannot establish stable
+absolute speed or attribute wall-clock delay to GC. CPU rises slightly at
+the two larger loads despite the capacity reduction; wall-time variability
+precludes advertising the small-load ratio as a universal speedup.

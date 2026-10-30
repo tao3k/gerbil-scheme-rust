@@ -32,36 +32,65 @@ jobs:
         with:
           components: clippy,rustfmt
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential jq
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
 
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
+      - name: Cargo format
+        run: cargo fmt --all --check
+
+      - name: Cargo gates
         env:
-          HOMEBREW_NO_AUTO_UPDATE: 1
-          HOMEBREW_NO_INSTALL_CLEANUP: 1
+          GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM: "1"
         run: |
-          brew list --formula ghostscript >/dev/null 2>&1 && brew unlink ghostscript || true
-          brew install gcc jq
+          cargo check --workspace --locked
+          cargo test --workspace --locked -- --nocapture
+          cargo bench -p gerbil-scheme --bench ffi --profile dev --locked -- --test
+          cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
+          cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: Download immutable Gerbil v0.19 release artifact
-        shell: bash
-        run: tools/ci/install-gerbil-release.sh "$GERBIL_RELEASE_ROOT"
-
-      - name: Activate Gerbil build controls
-        shell: bash
+      - name: Qualify opt-in compiler-owned metadata carriers
         run: |
-          test -x "$GERBIL_PREFIX/bin/gsc"
-          cores="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)"
-          {
-            echo "GERBIL_GSC=$GERBIL_PREFIX/bin/gsc"
-            echo "GERBIL_BUILD_CORES=$cores"
-          } >> "$GITHUB_ENV"
-          "$GERBIL_PREFIX/bin/gsc" -v
+          export GERBIL_PATH="$RUNNER_TEMP/metadata-package"
+          export GERBIL_LOADPATH="$GERBIL_PATH/lib"
+          gxi build.ss compile
+          gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
+          gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"
 
+      - name: Record unsupported SMP qualification
+        run: |
+          echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned SDK does not support. This is not an SMP pass.'
+          echo '### Scheme SMP: SKIPPED (unsupported SDK capability; not passed)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The pinned SDK supports multiple VMs but not multiple-threaded VMs. Single-processor actor AOT and both Rust concurrency controls remain required. Restore the separate SMP job after the SDK capability is qualified.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Single-processor actor AOT and Rust concurrency qualification
+        if: runner.os != 'macOS'
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test one_processor_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_one_worker_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_machine_workers
+          cargo clippy -p gerbil-scheme-qualification --features actor-aot --all-targets --locked -- -D warnings
+
+  # Cargo and Bazel own independent build graphs. Keep both complete gates,
+  # without spending Bazel's watchdog budget on Cargo compilation first.
+  bazel:
+    name: Bazel bindings (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
       - name: Configure Bazel
         uses: bazel-contrib/setup-bazel@0.19.0
         with:
@@ -69,18 +98,172 @@ jobs:
           cache-save: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
           disk-cache: gerbil-v0.19-${{ runner.os }}-${{ runner.arch }}
           repository-cache: true
-
-      - name: Cargo format
-        run: cargo fmt --all --check
-
-      - name: Cargo gates
-        run: |
-          cargo check --workspace --locked
-          cargo test --workspace --locked
-          cargo clippy --workspace --all-targets --locked -- -D warnings
-
       - name: Bazel gates
         run: |
           bazel query //...
           bazel build //...
           bazel test //:ci
+
+  # Real owner/TLS retirement has a separate native gate from the Quint model.
+  # This Darwin image backend uses independent single-processor Scheme runtimes.
+  native-owner:
+    name: Fixed-owner native lifecycle (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Native owner retirement and failure controls
+        run: |
+          cargo -vv bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --blocking-tls
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --blocking-tls-drop
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --callbacks
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --finalizer-failure
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --owner-unwind
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --root-quarantine
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --before
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --after
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --retained
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --preflight
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-release
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-foreign-tls
+          cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --module-capture-failure
+      - name: Native Rust owner cost bench smoke
+        run: cargo bench -p gerbil-scheme-qualification --features instance-library --bench owner_costs --profile dev --locked -- --test
+      - name: Native Scheme capabilities and reuse
+        run: cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --profile dev --locked -- --smoke
+      - name: Native Rust dispatcher bench smoke
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --grouped-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --profile --grouped-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --focused-flow
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_capacity --profile dev --locked -- --test --wait-trace
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_capacity --profile dev --locked -- --test --transfer-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_capacity --profile dev --locked -- --test --qos-ab --wait-trace
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench single_vm_service --profile dev --locked -- --test
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --split-layout-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --short-layout-only
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --class-route-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --short-service-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --feed-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --feed-ab --phase-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --budget-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --notification-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --reselection-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --owner-qos-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --resident-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-ab --probe-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --observer-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --observer-ab --entry-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --observer-ab --state-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --short-route-load-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --supply-admission-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-wake-ab
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --pooled-ab --phase-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --notification-ab --phase-observation
+          cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --profile dev --locked -- --test --progress-fair-ab --fixed-short-selective --completion-service-ab
+          cargo test -p gerbil-scheme --features arrival-clock --lib instances:: --locked
+          cargo test -p gerbil-scheme --features tokio-dispatch --test unit_test instance_timer --locked -- --test-threads=12
+          cargo test -p gerbil-scheme-qualification --features arrival-clock --test owner_capacity --test owner_dispatch_faults --test owner_producer --test scheme_service --test service_watchdog --locked
+
+  owner-rust-lint:
+    name: Owner Rust lint (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Native owner Rust lint
+        run: |
+          cargo clippy -p gerbil-scheme --features external-program,arrival-clock --lib --test unit_test --locked -- -D warnings
+          cargo clippy -vv -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --bench single_vm_service --bench gerbil_actor_arrival --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
+          cargo clippy -vv -p gerbil-scheme-qualification --features actor-aot,arrival-clock --all-targets --locked -- -D warnings
+
+
+  owner-actor:
+    name: Single-processor Actor and Rust concurrency (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: macOS single-processor Actor and Rust concurrency qualification
+        run: |
+          cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test one_processor_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test tokio_one_worker_control
+          cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test tokio_machine_workers
+
+  # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
+  # execution inside a VM. Restore this job only with a qualified SDK release.
+  scheme-smp:
+    name: Scheme SMP (SKIPPED - SDK lacks multiple-threaded-vms)
+    if: ${{ false }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Require exact processor activation
+        run: gxi scheme/runtime-smp-test.ss
+      - name: Multi-processor actor AOT qualification
+        run: cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test machine_processors
+
+  owner-protocol:
+    name: Owner lifecycle protocol (Quint shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    env:
+      GERBIL_OWNER_MODEL_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install pinned Quint CLI
+        run: npm install --global @informalsystems/quint@0.33.0
+      - name: Check lifecycle scenarios, sampled traces and negative controls
+        run: cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture

@@ -72,7 +72,11 @@ impl GerbilToolchain {
     /// the resolved `gxi`.
     #[must_use]
     pub fn resolved_gsc(&self) -> PathBuf {
-        default_gambit_gsc_program_for_gxi(self.gxi())
+        if self.gsc() == Path::new("gsc") {
+            default_gambit_gsc_program_for_gxi(self.gxi())
+        } else {
+            self.gsc().to_path_buf()
+        }
     }
 
     /// Resolve a conventional Gerbil tool name through this toolchain.
@@ -96,83 +100,18 @@ impl GerbilToolchain {
         match program_name {
             "gxi" => self.gxi().to_path_buf(),
             "gxc" => self.gxc().to_path_buf(),
-            "gsc" => self.gsc().to_path_buf(),
+            "gsc" => self.resolved_gsc(),
             _ => program.to_path_buf(),
         }
     }
 }
 
-/// Resolve a configured Gerbil executable through PATH when it is a program name.
-#[must_use]
-pub fn resolve_gerbil_executable(program: impl AsRef<Path>) -> Option<PathBuf> {
-    let program = program.as_ref();
-    if should_check_gerbil_program_directly(program) {
-        return program.is_file().then(|| program.to_path_buf());
-    }
-
-    env::var_os("PATH").and_then(|paths| {
-        env::split_paths(&paths)
-            .map(|dir| dir.join(program))
-            .find(|candidate| candidate.is_file())
-    })
-}
-
-/// Returns whether a `gsc` executable appears to be the Gambit compiler.
-#[must_use]
-pub fn is_gambit_gsc_program(program: impl AsRef<Path>) -> bool {
-    let Ok(output) = std::process::Command::new(program.as_ref())
-        .arg("-v")
-        .output()
-    else {
-        return false;
-    };
-    if !output.status.success() {
-        return false;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    stdout.lines().chain(stderr.lines()).any(|line| {
-        let mut characters = line.trim().chars();
-        characters.next() == Some('v')
-            && characters
-                .next()
-                .is_some_and(|character| character.is_ascii_digit())
-    })
-}
-
-/// Resolve the Gambit `gsc` compiler paired with a Gerbil `gxi` executable.
-#[must_use]
-pub fn default_gambit_gsc_program_for_gxi(gxi: impl AsRef<Path>) -> PathBuf {
-    let path_program = PathBuf::from("gsc");
-    if let Some(program) =
-        resolve_gerbil_executable(&path_program).filter(|program| is_gambit_gsc_program(program))
-    {
-        return program;
-    }
-
-    resolve_gerbil_executable(gxi)
-        .and_then(|gxi| gxi.parent().map(|bin| bin.join("gsc")))
-        .filter(|candidate| candidate.is_file() && is_gambit_gsc_program(candidate))
-        .unwrap_or(path_program)
-}
-
-fn should_check_gerbil_program_directly(program: &Path) -> bool {
-    if program.has_root() {
-        return true;
-    }
-    let mut components = program.components();
-    let Some(first) = components.next() else {
-        return false;
-    };
-    matches!(
-        first,
-        std::path::Component::CurDir
-            | std::path::Component::ParentDir
-            | std::path::Component::Prefix(_)
-    ) || components.next().is_some()
-}
-
+#[path = "../../../build-support/gerbil-scheme-aot-build/src/gambit_program.rs"]
+mod gambit_program;
+pub use gambit_program::{
+    default_gambit_gsc_program_for_gxi, discover_gambit_gsc_from_env, is_gambit_gsc_program,
+    resolve_gerbil_executable,
+};
 impl Default for GerbilToolchain {
     fn default() -> Self {
         Self::from_env()

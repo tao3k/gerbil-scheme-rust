@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "gerbil-ledger"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[tool.maturin]
+python-source = "python"
+module-name = "gerbil_ledger._core"
+features = ["extension-module", "rust-backend"]
+include = [{ path = "python/gerbil_ledger/_resources/**/*", format = "wheel" }]
+exclude = ["python/gerbil_ledger/_runtime/**/*", "python/gerbil_ledger/_sources/**/*", "python/gerbil_ledger/.gerbil-*"]

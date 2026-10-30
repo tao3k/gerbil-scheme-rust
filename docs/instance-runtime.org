@@ -1,0 +1,314 @@
+#+title: Native Scheme Instances on Fixed Rust Owners
+#+date: 2026-10-19
+
+* Execution boundary
+
+Enable =gerbil-scheme/isolated-instances= explicitly on Darwin. The library's
+=instances= module provides =IsolatedProgram=, =InstancePool= and a cloneable
+=InstanceDispatcher=. This is an experimental native image backend, selected
+at process startup. The ordinary linked =GerbilRuntime= and this backend cannot
+be initialized together through the safe API. There is no automatic fallback.
+
+Each fixed OS thread loads a different native image, initializes exactly one
+single-processor Scheme runtime, enters it, drains its accepted queue, and
+cleans it up. Rust provides scheduling and owned native type projections. Scheme retains
+its heap, closures, continuations, dynamic bindings, exceptions and execution.
+This path uses the ordinary Gerbil-to-C native compiler graph; no Scheme code
+is lowered to Rust.
+
+=InstanceDispatcher= is =Send + Sync= and cloneable for concurrent Rust callers.
+The underlying image is neither =Send= nor =Sync=. The short Rust admission lock
+covers queue selection and nonblocking send only. Scheme computation never
+runs under that lock. Setup and cleanup transitions are serialized because
+native process hooks remain shared. Computation on different owners is not
+serialized.
+
+* Build-owned image contract
+
+The unsafe =IsolatedProgram::from_image= constructor admits trusted native code,
+just as =LinkedGerbilProgram::from_linker= does. The image and SDK dependencies
+must retain the documented ABI and file identity through construction. Resolve
+all required symbols before initialization. Each copied image must hide Gambit
+globals and link its native runtime state independently. An absent application
+symbol is rejected before initialization; if present it must obey the contract.
+
+The C interface is defined in [[file:../ffi/instance.h][ffi/instance.h]]. Application entry takes a borrowed
+strong object root and returns zero on failure or transfers one fresh
+strong object result root. Catch every Scheme exception before returning
+through C. Never retain Rust pointers, release the borrowed input root, transfer
+Scheme roots between owners, finalize the runtime from an application call, or
+let a continuation jump through a retired foreign frame.
+
+The library resolves existing native type functions within that image rather
+than calling another instance's static globals. =submit_native_on= provides an
+owner-local =NativeSession= to construct real Scheme numeric vectors, scalars,
+strings and vectors with the existing strong-root/type ABI. =NativeRoot= is
+neither =Send= nor =Sync=; job results must be independently owned Rust values.
+Root guards release values on the native owner, including unwinding a caught
+Rust task panic. Application computation and exception handling stay in Scheme.
+There is no JSON requirement or secondary value codec. The optional byte API
+remains available for applications whose own protocol uses bytes.
+
+The library invokes the application, projects the rooted reply to Rust-owned
+storage, and releases input and reply roots on the native owner. It checks root balance after rejected calls and
+reply-size failures too. Native setup, root-balance or cleanup failures poison
+further image admission; they never trigger another execution route.
+
+The qualification image reuses =ffi/runtime.c=, including the production
+single-processor setup and host-I/O restoration. Its archive comes from the
+existing =build_program_archive_observed= compiler graph; the existing image
+link step applies a minimal export list. See
+=crates/gerbil-scheme-qualification/build/instances.rs= and
+=ffi/owner_instance.c= in that crate for the build-owned adapter. The host graph
+is also linked in the qualification executable solely to exercise rejection of
+the ordinary runtime entry; that host runtime is never initialized in image mode.
+
+* Call and shutdown
+
+#+begin_src rust
+use gerbil_scheme::instances::{InstanceConfig, InstancePool, IsolatedProgram};
+use std::time::Duration;
+
+// SAFETY: the application's build owns and verifies the image and export ABI.
+let program = unsafe {
+    IsolatedProgram::from_image(image_path, c"application_call")?
+};
+let mut pool = InstancePool::start(&program, InstanceConfig {
+    owners: 4,
+    queue_capacity: 16,
+    maximum_request_bytes: 16 * 1024 * 1024,
+    maximum_reply_bytes: 1024 * 1024,
+    startup_timeout: Duration::from_secs(5),
+})?;
+let dispatcher = pool.dispatcher();
+let ticket = dispatcher.submit_native_on(0, |session| {
+    let input = session.numeric_vector(&[0_i64, 3, 7])?;
+    let output = session.call(&input)?;
+    session.copy_numeric::<i64>(&output)
+})?;
+let reply: Vec<i64> = ticket.wait(Duration::from_secs(5))?;
+// The example export computes the result in Scheme.
+let shutdown = pool.shutdown(Duration::from_secs(5));
+assert!(shutdown.is_clean());
+#+end_src
+
+Use =submit_native_on(owner, job)= for native typed stateful interactions. Saved continuations
+and other Scheme state stay in that owner's VM. Stateless =submit= selects an
+owner by round robin. Full queues reject before admission; they do not allocate
+unbounded work or silently retry on another backend.
+
+A wait timeout does not cancel work. Keep the ticket to observe eventual
+completion. Dropping a ticket discards the eventual Rust result, while its
+accepted Scheme work finishes and releases transfer roots normally.
+
+=shutdown= atomically closes all dispatcher clones, drains accepted work,
+collects owner-local root/GC/cleanup receipts and joins finished owners under one
+shared deadline. A pending owner is reported as pending, never as clean. Call
+shutdown again to observe later completion. Startup errors retain both their
+cause, image directory and observed shutdown receipt. ABI v3 reports setup
+phase: 0 means native setup was never attempted, 1 means partial state is
+unknown, and 2 means the production setup completed. A missing-symbol rejection
+or phase-0 failure unloads and removes the uninitialized copy. A later failure
+with phase 2 observes owner-local cleanup before returning. Phase 1 is terminal;
+partial native setup rollback is not admitted. Native initialization failures
+poison further image admission in the process, including after known cleanup.
+
+Dropping a busy pool closes admission and detaches owners. It does not force
+cleanup of an active native call, block indefinitely, or certify a clean drain.
+Use explicit shutdown when cleanup completion matters. Native code remains
+mapped after setup was attempted. After known cleanup,
+the library removes its copied file and empty parent directory. Filesystem
+errors are separate receipt fields; =is_clean()= requires successful path
+retirement as well as native cleanup and joins. Unknown partial initialization
+and failed native cleanup retain their copies for diagnosis. Removing a path
+is not =dlclose= and does not establish that mapped backing storage has been
+released. Completed cleanup and joined owners do not prove hot unloading,
+total RSS reclamation or process crash containment.
+
+* Native qualification
+
+#+begin_src sh
+just bridge-instance-resources --preflight
+just bridge-instance-resources --before
+just bridge-instance-resources --after
+just bridge-instance-resources --reuse
+just bridge-instance-resources --churn
+just bridge-instance-resources --retirement
+just bridge-instance-resources --allocator
+just bridge-instance-resources --mappings
+just bridge-instance-resources --file-failure
+just bridge-instance-resources --green
+just bridge-instance-resources --green-io
+just bridge-instance-resources --ab
+#+end_src
+
+These commands exercise the actual native typed library API through the existing
+Just/Cargo/Gerbil compiler graph. Native numeric vectors drive Scheme closures,
+continuations, dynamic bindings, exceptions and collection. Rust checks complete
+results with an independent arithmetic oracle. The type matrix also checks nine
+numeric families, four scalar families, Unicode/NUL strings, mixed vectors,
+NaN payloads and signed zero. Other native type families remain outside this
+qualification matrix.
+
+The reuse case includes caught Scheme exceptions, Rust task panics with live
+root guards, post-GC live metrics, current Mach RSS/footprint, file descriptors,
+threads, loaded images and allocator statistics. An intentionally retained
+Scheme-global object control demonstrates why zero external roots alone cannot
+establish reclamation. The churn case measures retained images and copied files
+when repeatedly replacing pools.
+
+=--ab= compares one and four fixed owners using identical native s64vectors,
+Scheme computation and complete Rust result checks, with ABBA order and 20
+samples per variant and size. It measures the end-to-end typed job including
+host input construction and validation. It is not a claim about every Scheme
+program or an isolated conversion microbenchmark.
+
+The earlier JSON workload remains a separate application-specific example:
+=just bridge-instance-library=. Its receipts do not measure native type
+conversion performance. See
+[[file:30-39-status/30.04-instance-library-qualification.org][the historical JSON library-path qualification]] and
+[[file:30-39-status/30.05-native-instance-resources.org][the native typed resource qualification]].
+Darwin image behavior is not a portability or remote CI claim.
+
+
+* Terminal I/O buffers and image ABI v3
+
+ABI v3 resolves =gerbil_scheme_instance_cleanup= and
+=gerbil_scheme_instance_io_retired_bytes= before setup. The build-owned isolated
+image adapter wraps the unchanged production lifecycle. At its quiescent
+single-owner terminal boundary, it detaches the SDK-typed fdset scratch buffers,
+resets their native capacity, invokes production cleanup, then releases the
+owned buffers with the paired SDK allocator. It never accesses a finalized
+Scheme heap. The byte counter is plain adapter storage, safe to read after
+cleanup. Custom image builders must implement this lifecycle contract with
+their paired SDK; the Rust library does not guess native struct offsets.
+
+This repairs a terminal allocation gap in the paired SDK image. It does not
+change =ffi/runtime.c= or the ordinary linked runtime, recompile the SDK, lower
+Scheme to Rust, or replace the Scheme collector/scheduler. See
+[[file:30-39-status/30.06-instance-retirement-and-green-scheduling.org][the executed retirement and green scheduling qualification]].
+
+* Two scheduling levels
+
+Rust admits owned typed messages to a fixed native owner. Within that runtime,
+Scheme mailbox actors run as Scheme green threads and retain their own
+continuations, parameters and heap references. Actor state stays owner-affine;
+a cross-owner message must project to owned data at the native boundary.
+
+The current API enters Scheme synchronously. A =thread-yield!= can let another
+Scheme actor run; it cannot drain another task from the Rust queue while the
+current foreign entry is active. An actor that waits forever for the next Rust
+message inside that entry would block ingress. The qualification instead keeps
+actors alive between entries, bounds each turn's admitted messages, consumes
+all acknowledgements, then returns to Rust. These are count-bounded turns;
+they are not hard time preemption for arbitrary Scheme computations.
+
+The measured local mailbox actors use native =spawn=, =thread-send=,
+=thread-receive= and =thread-join!=, the primitives underlying SDK local actor
+routing. They do not qualify the complete =:std/actor= protocol, remote
+transport or a general actor-address API. Rust remains the outer scheduler.
+
+* Public native numeric batches and Scheme mailbox actors
+
+=InstanceDispatcher::submit_numeric_batch_on(owner, items, yield_every)= admits
+one explicit batch to a fixed owner. =items= is =Vec<Vec<T>>= for an existing
+sealed =NumericElement=. Each item/result uses the existing native numeric-vector
+ABI. Construction and projection still perform native conversion calls; only
+one application Scheme entry is made for the complete batch. There is no JSON
+encoding, Scheme-to-Rust compilation, automatic coalescing or batch fill timer.
+
+The trusted application entry must pass the native envelope to the library
+module =:gerbil-scheme-rust/scheme/actor-batch=:
+
+#+begin_src scheme
+(import :gerbil-scheme-rust/scheme/actor-batch)
+(def service
+  (make-gerbil-rs-actor-batch
+    (lambda (worker input) (application-handler worker input)) 4))
+;; application-entry is called inside the existing gerbil-rs-rooted-call export.
+(def (application-entry envelope) (gerbil-rs-actor-batch! service envelope))
+;; Call while the owner is live, after accepted work has drained.
+(def (application-stop!) (gerbil-rs-actor-batch-close! service))
+#+end_src
+
+#+begin_src rust
+let ticket = dispatcher.submit_numeric_batch_on(owner, native_records, 1)?;
+let (native_results, completed_at) = ticket.wait_completed(timeout)?;
+#+end_src
+
+The Scheme service starts 1--64 persistent mailbox workers. Items are assigned
+by their slot modulo the worker count, and results retain input order. Worker
+indices are service-local; stable business actor identity and routing belong
+to the application. The Rust API selects the VM owner, not a green thread.
+
+The service creates a private green coordinator for each turn, keeping worker
+acknowledgements out of the application's foreign-entry mailbox. Every handler
+exception is caught locally; all assigned items and acknowledgements drain
+before the batch throws through the existing rooted-call rejection path.
+Successful handlers may already have performed side effects: a rejected batch
+is not a transaction, and automatic retry could duplicate effects. Workers
+remain available for a later turn. Explicit close joins workers and rejects
+reentry/closed services. Handlers must eventually return or throw; arbitrary
+thread termination, escaped foreign frames and nonterminating handlers are
+outside this synchronous contract.
+
+Admission rejects empty/over-256 batches, quantum above 256 and aggregate input
+payload overflow before queuing. The configured native input bound includes
+numeric payloads and envelope/vector root spans. Numeric output projection
+checks the remaining aggregate payload budget before allocating each result.
+These are transfer bounds, not limits on Scheme allocations, elapsed handler
+time or every host container overhead byte. Oversized results fail after
+Scheme work has run; no automatic retry is performed.
+
+A positive =yield_every= asks each Scheme worker to yield after that many
+completed items. Zero disables explicit item-boundary yields; native green
+scheduling, handler waits and handler-internal yields still work. An individual
+CPU handler needs its own cooperative points to bound its scheduling delay.
+Yielding does not let the Rust owner drain its next queue entry while the
+current foreign call is active. Batch size bounds item count, not time. There
+is no global actor fairness or priority scheduling guarantee.
+
+=InstanceTicket::wait_completed= returns an owner timestamp captured after
+native projection, root balancing and any error handling, immediately before
+reply publication. It avoids attributing a consumer's sequential receive order
+to Scheme execution. Like =wait=, timeout does not cancel admitted work.
+
+See [[file:30-39-status/30.07-native-batch-actor-api.org][matched native order workload qualification]] for throughput, tails, fairness
+and the observed skewed-actor negative control.
+
+* Optional native batch phase receipts
+
+=submit_numeric_batch_profiled_on= returns =ProfiledBatch<T>= with a
+=BatchTimeline=: dispatched, entered, items-constructed, constructed, executed
+and projected monotonic timestamps, plus four native collection-count snapshots.
+Optional diagnostics additionally sample cumulative SDK GC user/system/real
+seconds, owner thread CPU seconds, strong roots and GC count at all five owner
+markers. The native export writes exactly six doubles without Scheme entry.
+Older ABI-v3 images may omit it; absent or failed snapshots remain =None=.
+Regular native calls do not require this optional export. Pair it
+with =wait_completed= to include final root release and balance checking.
+Dispatched-to-entered includes admission/channel work and owner queue/wakeup;
+it is not a pure FIFO queue metric. Phase spans include OS preemption. Collection
+counts establish events, not their exact duration. The ordinary batch API
+performs the same execution path with no additional phase clock/counter reads.
+
+The Scheme service now wakes only workers with assigned items and yields
+between work items, omitting terminal yields. Service stride, input order,
+exception draining and the private per-turn coordinator remain intact. Native
+GC, construction and owner-wakeup tails are not eliminated. See
+[[file:30-39-status/30.08-native-batch-tail-attribution.org][phase attribution and paired A/B]] for all metrics, the rejected persistent
+coordinator experiment and the open p99 boundary.
+
+
+=items_constructed= splits numeric leaf construction from collection/envelope
+construction. =NativeSession::diagnostics= reads the paired SDK counters; GC real
+time is elapsed collector time, including any descheduling inside collection.
+Thread CPU seconds measure the owner, while the SDK defines its GC user/system
+accounting. GC time is not an exclusive scheduler/CPU attribution.
+
+The Owned C ABI now supports an explicit =SCHEME_VM= runtime declaration for
+callbacks on this owner. The provider or admitted scope must retain the VM and
+captures through all releases; the flag is not a lease. Ordinary native roots
+still cannot leave the owner task. Independent copied output can remain =NO_VM=.
+See [[file:owned-c-abi.md][the callable lifetime contract]] and
+[[file:30-39-status/30.09-owner-wakeup-gc-and-runtime-contract.org][owner-wakeup, GC and rejected root-lifetime measurements]].

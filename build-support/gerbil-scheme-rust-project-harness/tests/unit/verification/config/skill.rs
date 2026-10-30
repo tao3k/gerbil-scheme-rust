@@ -154,7 +154,7 @@ fn verification_skill_contracts_clear_with_receipt() {
 }
 
 #[test]
-fn rust_native_performance_skill_descriptors_snapshot() {
+fn rust_performance_skill_descriptors_snapshot() {
     let plan = RustVerificationPlan {
         project_root: PathBuf::new(),
         tasks: Vec::new(),
@@ -167,13 +167,13 @@ fn rust_native_performance_skill_descriptors_snapshot() {
     };
 
     insta::assert_snapshot!(
-        "rust_native_performance_skill_descriptors",
+        "rust_performance_skill_descriptors",
         render_rust_verification_skill_contracts(&plan)
     );
 }
 
 #[test]
-fn verification_performance_skill_binding_uses_rust_native_descriptor_snapshot() {
+fn verification_performance_skill_binding_uses_rust_descriptor_snapshot() {
     let temp = TempDir::new().expect("temp dir");
     let root = temp.path();
     write_api_project(root);
@@ -207,7 +207,7 @@ fn verification_performance_skill_binding_uses_rust_native_descriptor_snapshot()
     assert!(!rendered.contains("|fact:"), "{rendered}");
     assert!(!rendered.contains("|contract:"), "{rendered}");
     insta::assert_snapshot!(
-        "verification_performance_skill_binding_uses_rust_native_descriptor",
+        "verification_performance_skill_binding_uses_rust_descriptor",
         format!("{rendered}\n{contracts}")
     );
 }

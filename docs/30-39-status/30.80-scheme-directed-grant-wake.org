@@ -1,0 +1,148 @@
+#+TITLE: Scheme registered grant notification and CI provenance repair
+#+OPTIONS: toc:2
+
+* Admission boundary
+
+Unpublished opt-in ABI24 candidate; defaults are unchanged. ABI23 remains the
+matched control. Earlier negative captures retain their original identities;
+see [[file:30.79-scheme-execution-registration.org]]. This increment is not an
+admission of the accumulated unpublished scheduling stack.
+
+* Evidence and protocol
+
+ABI23 corrected premature execution acknowledgement, but its matched capture
+still regressed mixed short p99 and CPU owner completion spread. The native
+budget selects one Scheme waiter while broadcasting to every registered waiter.
+This is a concrete notification amplification mechanism, not proof that it is
+the unique cause of wall-clock tails or cross-owner imbalance.
+
+ABI24 preserves class selection, FIFO within each class, work bounds, immutable
+specialized layout plans and receiving-thread first-grant settlement. Only a
+contended acquisition creates a waiter with its own condition variable. The
+existing budget mutex protects registration, selection and the wait predicate.
+Selection records the owner before signaling that waiter's event. The receiver
+checks actual ownership before acknowledging execution or copying permission.
+A notification cannot acknowledge execution on behalf of another thread.
+
+| Boundary | Ownership and lifetime |
+|----------+------------------------|
+| Uncontended acquisition | Existing direct path; no waiter/event allocation |
+| Contended registration | One acquisition owns a thread/event pair in its class FIFO |
+| Selection and notification | Pop one waiter; record its owner; signal its private event under the budget mutex |
+| Receive/recheck | Atomic unlock-and-wait plus ownership predicate; spurious wakes do not grant execution |
+| Suspension/reentry | Release the lease; subsequent acquisition has a fresh notification lifetime |
+| First execution receipt | Existing Scheme ticket settles once; replay cannot settle twice |
+| Terminal result | Existing independent result root and capacity retirement |
+
+The private event is not a shared single-signal replacement: signaling an
+arbitrary waiter on the old shared condition could leave the selected owner
+asleep. No thread/event registry retains completed workers. Retained Scheme
+continuations may retain their lexical state under ordinary GC. The queue
+entry is removed at selection; its native event has no explicit OS handle
+requiring Rust destruction. Additional allocation on contended acquisitions is
+a cost to measure, not a claimed free optimization.
+
+Rust timeout/cancellation abandons an observer, not an accepted Scheme worker.
+Close drains selected and registered work through existing native completion
+custody before joining. Externally terminating Scheme worker threads is not a
+supported cancellation operation. Lock order remains service then budget;
+selection adds no callback into the service mutex. A late arrival does not
+revoke an already assigned grant or promise instruction-level preemption.
+
+* Existing Runtime model refinement
+
+The same model now separates selected waiter/notification from actual receiving
+grant. Outstanding short execution debt survives selection and notification.
+The selected worker owns the notification; an unrelated wake cannot consume it.
+Close preserves this custody until execution/result drain. Mutation controls
+reject a notification delivered to an unrelated waiter. Existing registration,
+cache invalidation, replay/exception and root/capacity models remain controls.
+Finite safety checks do not establish OS wake latency or starvation freedom
+without progress assumptions.
+
+* PR CI repair
+
+At PR head =57284517f44fbec1c60a791ae18a4de76ee8e7bb=, both Bazel jobs failed
+before native tests in the tracked generated-SCM check. The committed =build.ss=
+input no longer matched the generated files' build-input receipt. Normal Gerbil
+Cargo jobs and native lifecycle/Quint jobs passed at that head; they did not
+make the failed Bazel gate pass.
+
+The exact PR source was isolated from unpublished Runtime changes and rebuilt
+with the canonical =bridge-regenerate= Cargo operation. Both generated SCM files
+and their external whole-file/input receipts were refreshed. Generated compiler
+timestamps and temporary identifiers changed as expected; no hash comments,
+hand-edited compiler output or weakened validation were introduced. A separate
+check-only sys build and =cargo check --workspace --locked= with receipt checking
+enabled passed. The normal Cargo CI step now enables the same receipt check.
+
+This isolated repair must accompany its matching PR source. It must not be
+replaced by generated files from a rejected local Runtime candidate. Local
+Cargo evidence is distinct from a new remote Bazel run; no repaired remote CI
+result is claimed before publication. No new Bash is introduced.
+
+* Targeted acceptance
+
+Use the existing four live VMs/image, O2, Tokio two workers, window four,
+work capacity32, batch eight, Actor quantum one, class/feed budget one and
+work quantum four/maximum48. Compare ABI23 broadcast against ABI24 private
+notification over five AB/BA blocks for CPU and mixed load. Both arms retain
+registered execution debt. Use observation off, unchanged five-second native
+progress and120-second capture bounds. Preserve additive per-request timing,
+throughput, actual short/bulk p99, owner completion spread and all negatives.
+No expanded matrix or default change is authorized by a passing model.
+
+* Native and performance result: rejected
+
+Both finite model domains passed44 directed witnesses each;400 randomized
+sequences of at most64 steps found no safety violation. Strict Clippy,
+formatting and generated-SCM checks passed. Native qualification passed3 tests
+in35.29s, including the four-waiter FIFO/class test and the receiving-grant,
+replay, exception and Actor controls under both notification policies. Four
+owners joined, roots returned to zero, temporary files and FD recovery passed;
+native close took2.732792ms. O2 release construction passed.
+
+Forty matched samples completed in7.224s with unchanged host/image identities,
+empty compiler boundaries, exact work/result/grant conservation and complete
+four-owner cleanup. Both arms recorded64 issued, runnable, registered and
+first-grant short receipts per window, with zero pending/ungranted terminals.
+
+| Paired-window median change | CPU | Mixed |
+|-----------------------------+-----+-------|
+| Throughput | +0.52% (5/10 improved) | -0.05% (4/10 improved) |
+| Actual short p99 | +3.49% (5/10 improved) | +5.78% (5/10 improved) |
+| Bulk p99 | -4.91% (6/10 improved) | +1.01% (4/10 improved) |
+| Owner finish spread | +20.91% (2/10 improved) | +7.01% (3/10 improved) |
+
+Pooled CPU throughput rose2.55% and pooled maximum finish spread fell46.87%,
+but this does not overturn the paired fairness regression. Pooled mixed short
+p99 fell3.75% while its paired-window median regressed. These different
+statistics are preserved rather than selecting the favorable one. CPU pooled
+short p99 rose7.54%; mixed bulk p99 rose9.26%. One CPU candidate window had
+zero peer-at-start overlap; all owners still made progress and drained. This
+is not proof of permanent starvation.
+
+The candidate is not performance admitted and is not submitted. Notification
+amplification is insufficient as a standalone explanation/fix. Existing samples
+place the largest mixed candidate short delay before native entry in five
+windows, in native pending in four, and in construction in one; these are
+same-request stages, not differences between unrelated quantiles. Native
+pending includes Scheme work, scheduling, GC and completion waiting; it is not
+CPU execution time. Selected sliced-plan counts are not waiter counts and
+cannot establish notification frequency. Historical watchdog attribution
+remains open; this capture had no watchdog failure.
+
+The isolated CI repair additionally passed strict workspace/all-target Clippy
+with generated-SCM checking enabled. It remains separate from this rejected
+Runtime candidate and has not been published. Remote Bazel success is pending
+an admitted publication and a new remote run.
+
+* Concurrent PR repair observed
+
+PR head =c4b95dfaa116bd67b110d94826535fd27f227b85= independently refreshed
+the same four generated files after the build recipe change. Both whole-file
+and build-input receipts were verified against that remote commit. Ubuntu
+Bazel CI passed; macOS Bazel was still running at this observation. The local
+isolated regeneration is superseded and will not be published as a duplicate.
+The unpublished normal-Cargo CI receipt-check addition remains separate.
+No Runtime performance candidate was included in that remote regeneration.

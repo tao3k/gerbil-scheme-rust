@@ -1,0 +1,339 @@
+#+TITLE: Joint Scheme dispatch, wake and completion progress
+#+OPTIONS: toc:2
+
+* Admission decision
+
+This is an explicit experiment. Snapshot remains the default. Neither the
+withdrawn payload shortcut nor this protocol is admitted for publication until
+the matched performance comparison passes. Negative captures remain immutable.
+Rust distributes owned inputs across fixed owners. Scheme retains its complete
+runtime, cooperative scheduling, Actor state, continuations and collector.
+
+The preceding payload-shortcut comparison is a rejected experiment: mixed short
+p99 +158.099%, mixed throughput -0.351%, with material scheduled/admission stalls.
+Its local commit was archived and removed from the publication branch. Its
+shortcut symbol, Rust API and benchmark path are removed from current code.
+It is not the control arm of the new comparison. Both new arms instead use the
+previous complete numeric native round trip and original short submission path.
+
+* Existing evidence and the actual protocol gap
+
+The seven largest mixed candidate requests in the earlier native-roundtrip
+capture spent only 1.583--3.750 us constructing and 0.834--1.208 us projecting;
+their pending intervals were 410.709--506.375 us. Reducing short payload FFI did
+not resolve the dominant interval. The subsequent rejected shortcut capture
+also had substantial scheduled and admission excursions, without same-spike
+blocked/runnable/GC evidence. Neither capture establishes collector causality.
+
+There is a concrete source-level gap independent of that unproven attribution:
+=service-ready-ids!= skips its scheduling yield whenever any bulk result is
+ready. A newly submitted short request can still be awaiting its first Scheme
+worker dispatch. The completion fast path has no explicit record that this
+scheduler opportunity is owed. Separate class queues and ready epochs alone
+do not encode that obligation.
+
+* Joint protocol
+
+** Ownership and transitions
+
+1. The ordinary submit function records an =awaiting-start= bit on a short job
+   only when joint progress is explicitly enabled. The Scheme service increments
+   its pending-dispatch count before publishing the job to an idle worker or
+   queue. Rust input preparation, native roots, request slots and work budgets
+   keep their existing ownership rules.
+2. Before native readiness harvest or native event wait, if a short dispatch is
+   still pending and there is no ready short result, Scheme offers one scheduler
+   checkpoint. A ready bulk result does not suppress it. The checkpoint neither
+   clears the obligation nor waits for arbitrary handler completion. No new
+   time threshold, retry window or polling timer is introduced.
+3. The actual worker clears the job bit and decrements the pending count exactly
+   once, immediately before entering the original handler. It records a worker
+   start and signals the existing Scheme condition; the condition waiter must
+   recheck actionable work. It does not write a native host wake byte.
+   A notification, host observation, yield or Rust cancellation cannot fabricate
+   this acknowledgement.
+4. A ready short result is harvested immediately using the existing short-first
+   readiness path. The existing completion epoch/token and result-slot custody
+   remain intact. Every result independently releases its root and capacity
+   after projection, before new native bulk construction.
+5. Pre-entry cancellation introduces no dispatch obligation. Post-entry timeout,
+   abandoned reply and close retain Scheme ownership until acknowledgement and
+   completion/drain. Close verifies no dispatch obligations remain; it cannot
+   silently erase a pending counter and report clean shutdown.
+6. Changing completion policy disables joint progress. Explicit configuration
+   requires an idle PipelineCycle endpoint without a held ready token. Default
+   configuration introduces no additional scheduler yield.
+
+The new state is Scheme-local, constant-sized apart from one bit per already
+bounded native job. There is no additional global root registry, Rust green
+scheduler, recycled mutable input graph, or cross-VM Scheme-object movement.
+The existing port remains a coalesced host-actionable level: result readiness,
+external Rust input and control transitions publish native wake bytes. Worker
+acknowledgement is internal progress, so it cannot make an empty native result
+wait return to Rust. The condition-variable transport already rechecks its
+ready/input predicates after a signal; the refined native-port behavior preserves
+that distinction. Readiness remains durable in the original queues.
+
+** API and limits
+
+Service ABI 13 adds idle configure command 20 and readback command 21. Older
+supported services remain usable; only the new methods require version 13.
+
+- =configure_scheme_service_joint_progress_on(owner, enabled)= opts in explicitly.
+- =scheme_service_joint_progress_on(owner)= returns actual Scheme enablement,
+  outstanding dispatches, scheduler checkpoints and acknowledged worker starts.
+
+A checkpoint is a scheduling opportunity, not a hard wall-clock bound or proof
+that a short handler has completed a cooperative unit. Arbitrary noncooperative
+user code, collector pauses and OS descheduling remain possible. Handler
+exceptions and continuation behavior retain their original Scheme semantics.
+The five-second meaningful-progress watchdog is unchanged.
+
+* Reused Runtime model
+
+The existing =service_sharing= refinement gains a pending-dispatch set, an
+owner checkpoint receipt and a joint-policy bit. Short publication creates the
+obligation; =ackDispatch= is a separate real-worker transition. Short computation
+cannot precede that acknowledgement. Bulk harvest without a checkpoint while
+short dispatch is pending is rejected. Ready short work must be included first.
+An empty harvest consumes the old checkpoint, and new short publication cannot
+reuse a stale checkpoint receipt. Existing transient input roots, GC/OS gates,
+ready epochs, per-result credits and close/join rules remain authoritative.
+
+New small/wide witnesses exercise persistent debt after yield, actual dispatch
+acknowledgement, short completion and independent retirement, timeout/close drain,
+and the bypass mutation. Acknowledgement alone leaves the host wake level
+unchanged; result publication sets it. The wait witness fails if internal
+acknowledgement is accidentally treated as an actionable native wake. The sampled joint-policy lane reuses the same resource
+step and invariant. The mutation must produce a counterexample. This model does
+not predict p99 or simulate the exact Gambit runnable queue.
+
+* Native validation
+
+The normal native test exercises real short requests, handler exception and
+recovery, exact worker acknowledgement counts, idle disable, completion-policy
+reset and close immediately after abandoning an accepted short ticket. Existing
+Pipeline preparation/cancellation/timeout/close fixtures also enable the joint
+policy. Native exact-number and Gerbil table coverage remains; the failed generic
+payload path is not exercised or retained as a new API.
+
+* Targeted comparison
+
+Both arms: same four live VMs and native image, O2, Tokio two Rust workers,
+PipelineCycle, numeric native entry and private numeric result snapshot/copy,
+original native short layout and wrap/submit, ProgressFair supply, Selective
+wake, NativePort, observation Off and coupled refill Off. Slot limit 4,
+work budget 32, active producer budget 3, batch 8 and quantum/budget/feed 1.
+Five AB/BA blocks, ten samples per arm/load, 8192 real orders and 64 probes per
+sample. Candidate alone enables joint progress. Counts are read after timing.
+
+#+begin_src sh
+env -u SDKROOT GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 GERBIL_BUILD_CORES=4 \
+  CARGO_BUILD_JOBS=8 PYO3_PYTHON=python3.14 \
+  cargo bench -p gerbil-scheme-qualification --features instance-dispatch \
+  --bench scheme_service --locked -- \
+  --progress-fair-ab --fixed-short-selective --joint-progress-ab
+#+end_src
+
+The probe client is serial: it waits for each response before issuing the next
+request relative to a fixed 500-us schedule. =actual= ends at the owner's native
+completion timestamp; =scheduled= includes lateness relative to the planned
+issue time, but neither includes a separately measured client-consumer wake
+interval. =post_admission_wait= is a saturated difference between owner entry
+and the client's admission receipt: it can be zero because they overlap, and is
+not an exclusive owner-queue duration. These definitions are unchanged in both
+arms; no end-to-end client-delivery SLO or GC attribution is inferred.
+
+The publication decision requires throughput, tail latency and fairness together;
+a model pass, fewer FFI calls or a single improved percentage cannot admit the
+candidate. All negative short/bulk tails, scheduled/admission stalls and owner
+imbalance are retained. No favorable rerun or expanded matrix replaces a failed
+capture. The 120-second capture limit and native watchdog are unchanged.
+
+* CI and watchdog evidence
+
+PR #18 at parent =3d53f5484653f6fe1d66740b1720d711349a4cef= failed its native CI
+job while compiling a unit-test constructor: =submitted: false= was not migrated
+to =Cell<bool>=. The test now initializes the declared type. This is a compiler
+failure, not a watchdog failure. All parent CI has now completed: five supported checks succeeded and this
+native check failed. Its corresponding local instance unit suite passed 45/45
+after the type initialization repair. The failed remote receipt remains failed;
+it is not relabeled by a local pass. No run was cancelled.
+
+The historical first-port and native-roundtrip watchdog exits remain
+unattributed. The separate pre-main Cargo-path loader-policy rejection also
+remains distinct; an identical-byte copy passing does not admit that rejected
+path. A later observed startup interval in dynamic-loader mapping/fcntl does not
+attribute an earlier failed run. Passing this new native gate cannot erase any
+of those failures. Raw logs and immutable failure artifacts stay outside Git.
+
+* First protocol comparison: acknowledgement also wakes the native host
+
+The first complete comparison used a native byte for worker acknowledgement as
+well as actual ready/input events. It completed normally, but was not admitted.
+
+| Metric | CPU control -> candidate | Mixed control -> candidate |
+|--------+--------------------------+----------------------------|
+
+| Orders/s | 169786.194 -> 173103.338 (+1.954%) | 50070.786 -> 52899.450 (+5.649%) |
+| Short owner-completion p99 (us) | 1465.875 -> 1034.292 (-29.442%) | 1232.583 -> 933.625 (-24.255%) |
+| Short scheduled p99 (us) | 45945.750 -> 21102.958 (-54.070%) | 6420.875 -> 7438.125 (+15.843%) |
+| Bulk service p99 (us) | 2526.167 -> 2303.459 (-8.816%) | 3261.000 -> 3568.750 (+9.437%) |
+| Maximum owner finish spread (us) | 1324.666 -> 812.125 (-38.692%) | 2481.916 -> 1804.291 (-27.302%) |
+
+Each candidate arm/load recorded 640 checkpoints and 640 real worker starts over
+its ten samples. Both controls recorded zero. All 10880 results per arm/load
+retired independently; all owners were used, every offer entered or withdrew,
+and the four final owners joined with zero roots and removed image files.
+CPU Actor-peer minimum regressed 1 -> 0 despite improving owner balance; this
+is retained. Mixed Actor-peer minimum stayed zero. Mixed bulk p99 +9.437% and
+scheduled p99 +15.843% prevent claiming complete tail-latency closure.
+
+Before that complete capture, a warmup assertion incorrectly expected 64 worker
+starts from the eight-probe warmup. It exited 101 after configuration, with no
+measured rows and unverified cleanup. The assertion was repaired to compare
+against the actual probe array length; the formal measured rounds still require
+64 probes and 64 starts in the independent admission check. No timeout or
+performance gate was relaxed. The failed capture remains immutable.
+
+The first protocol's start byte could wake the host without a result or new
+input to handle. That is a source-level actionability defect; it is not proven
+to cause all measured tail regressions. The refined protocol removes that byte
+and checks the distinction in the same Runtime model. The following comparison
+uses the same stable native-roundtrip control, not the rejected intermediate
+protocol; percentages from these distinct images/captures are not chained.
+
+* Refined actionable-wake comparison
+
+The complete refined capture exited zero in 11.411 seconds without the 120-second
+controller expiring. It contains configuration, 40 samples, four aggregates and
+a clean final receipt. The same live VMs/image were used throughout both arms.
+
+| Metric | CPU control -> candidate | Mixed control -> candidate |
+|--------+--------------------------+----------------------------|
+| Orders/s | 131545.389 -> 133645.388 (+1.596%) | 31561.255 -> 34205.081 (+8.377%) |
+| Short owner-completion p99 (us) | 3574.708 -> 1580.750 (-55.780%) | 9298.958 -> 1887.000 (-79.707%) |
+| Short scheduled p99 (us) | 62455.500 -> 40066.541 (-35.848%) | 163491.417 -> 6750.083 (-95.871%) |
+| Short admission p99 (us) | 4220.375 -> 3240.542 (-23.217%) | 8940.708 -> 1413.917 (-84.186%) |
+| Short pending p99 (us) | 1329.000 -> 1005.584 (-24.335%) | 4341.625 -> 1583.542 (-63.527%) |
+| Bulk service p99 (us) | 4210.917 -> 3890.750 (-7.603%) | 21526.083 -> 19847.292 (-7.799%) |
+| Maximum owner finish spread (us) | 39839.792 -> 6154.041 (-84.553%) | 5235.916 -> 4328.792 (-17.325%) |
+
+These aggregates are promising; they are not sufficient publication acceptance.
+No sample or outlier was discarded. The same captured samples were joined by
+block and AB/BA order into ten adjacent pairs per load; this audit collects no
+additional measurements and does not substitute a new workload or gate.
+
+| Paired check | CPU | Mixed |
+|--------------+-----+-------|
+| Throughput improving pairs / 10 | 5 | 5 |
+| Short sample-p99 improving pairs / 10 | 7 | 7 |
+| Scheduled sample-p99 improving pairs / 10 | 5 | 8 |
+| Bulk sample-p99 improving pairs / 10 | 5 | 5 |
+| Finish-spread improving pairs / 10 | 5 | 5 |
+
+The median paired throughput change is +0.772% CPU / +0.736% mixed, whereas the
+median paired finish-spread change is +5.844% / +2.963% (worse). Worst paired
+throughput changes are -22.321% CPU and -52.687% mixed. Paired bulk p99 can
+regress +94.796% CPU / +536.815% mixed. The pooled p99 and the per-sample p99
+are distinct estimators: with 64 short probes the latter is the sample maximum.
+Neither estimator is silently substituted for the other.
+
+The mixed aggregate throughput gain includes a +175.148% pair; a CPU pair gains
++182.633%. Those pairs remain in the receipt, alongside all losing pairs. There
+is no same-spike blocked/runnable or collector-CPU observation in this capture.
+The results cannot attribute these excursions to OS scheduling, collector work,
+or the new protocol, and do not establish stable throughput/fairness gains.
+
+Additional negatives remain even with improved pooled short/bulk latency:
+CPU construction+submission p99 795.917 -> 902.625 us; mixed construction p99
+1294.708 -> 1638.666 us. CPU projection p99 45.709 -> 46.750 us, and short
+projection p99 4.459 -> 5.833 us. CPU minimum short overlap falls 64 -> 44;
+Actor-peer minimum is 1 -> 1 CPU and 0 -> 0 mixed. A faster bulk window can
+reduce overlap, so overlap is neither a standalone starvation proof nor a
+standalone admission rule. Mixed projection p99 improves 179.500 -> 124.083 us,
+with intervals over 100 us 147 -> 118, while mixed construction intervals over
+100 us rise 542 -> 565. CPU construction intervals over 100 us rise 432 -> 487;
+projection intervals over 100 us fall 57 -> 53.
+
+Construction includes native submission in both arms. These wall intervals can
+include other Scheme scheduling, GC or OS delay and are not isolated allocation
+CPU measurements. Post-admission positive-part timing also regresses (86.334 ->
+98.750 us CPU; 143.292 -> 173.959 us mixed); its overlapping/saturated scope above
+precludes treating it as exclusive owner waiting or adding pooled quantiles.
+
+Each candidate load recorded exactly 640 scheduler checkpoints and 640 actual
+worker acknowledgements; controls recorded zero. Each sample has 1088 results,
+all owners used, conserved entered/withdrawn offers and no outstanding dispatch
+acknowledgements. Completion groups are 4130 -> 4032 CPU and 4501 -> 4463 mixed
+for the same 10880 results per arm/load. Final cleanup joins four owners with
+zero roots, removed image files and quiesced service state. This is not an RSS
+soak or universal dynamic-mapping unload proof.
+
+** Decision
+
+The protocol/model/API work is implemented and natively validated, but robust
+performance admission remains open. The candidate is left uncommitted and is
+not pushed to PR #18. Snapshot and all existing defaults remain unchanged.
+Neither the failed payload shortcut nor the intermediate start-wake protocol
+is resurrected as a publication candidate. No favorable rerun is used to turn
+these samples into a pass.
+
+** Identity
+
+- Parent branch revision: =3d53f5484653f6fe1d66740b1720d711349a4cef=.
+- Host binary SHA-256: =9ef59def46267b1ef6ae03ba09ad247a46ad4767d2ad60f9c79455566df5052e=.
+- Native image SHA-256: =4df9407c08a1ca7ee5931603fd36c8325ebaf40a87d49224826c323e9c3b7b4d=.
+- Frozen source archive SHA-256: =a44a8f21b912145392313607c22c465011610222a20be39f9c4177800374c118=.
+- Final model source SHA-256: =4c1900ba9d4f74741d590881c90849b2f2f24c9a06f6aeee4d820f9f0af23cab=.
+
+The host binary is identical to the first complete protocol capture; its native
+image differs. Both identities are necessary. No performance percentages are
+chained between the captures. Raw logs, images and archives remain outside Git.
+
+** Native/model gates
+
+- Final fixed-owner unit suite: 45 passed, 0 failed (0.11 seconds).
+- Final actual Scheme integration: 3 passed, 0 failed (33.58 seconds), including
+  GC, continuation affinity, short exception/recovery, actual acknowledgement
+  counts, abandoned reply close, preparation cancellation/deadline/close, native
+  exact-number/table types, roots, descriptors and temporary-image cleanup.
+- Final completion Runtime model: passed in 243.13 seconds (297.715 seconds
+  including build/controller), eight new joint witnesses across small/wide
+  domains, sampled joint-policy lanes and all twelve required counterexamples.
+  Source identity is unchanged throughout that gate.
+- Clippy with warnings denied, the isolated-instance-only feature check,
+  generated-source verification with updates disabled, formatting and diff
+  checks passed. The isolated-only Rust surface is unchanged by the subsequent
+  Scheme-only actionable-wake correction.
+- Watchdog failure control at the original Cargo executable path: passed, new
+  executable SHA-256 =1c0f5e43fe41ccd2aab0f397486c6a45a15b3d15ffe6ee1fcff9befb1b882d00=, strict signature verification
+  succeeded. The child exits 70 under the original five-second meaningful-
+  progress rule, phase chatter cannot renew it, and capture descriptors return.
+  This newly built identity does not retrospectively admit the earlier rejected
+  executable or explain an earlier native watchdog exit.
+
+The initial Clippy documentation spelling and a model namespace qualification
+were repaired before their final gates. Failed build/test/capture evidence is
+retained; no warning suppression, deadline extension or expected-value rewrite
+was used to qualify a failed performance result.
+
+* Next architecture question from the existing source
+
+The order handler acquires one cooperative service unit around an entire order.
+The fixed corpus has 48 line records per bulk order, whereas a short input is
+truncated to 4 records; both still acquire one service unit. The progress ledger
+also reports stable completed item identities, not an independently bounded
+amount of native CPU work. A logical unit therefore does not imply comparable
+execution cost or a wall-clock bound.
+
+This is a concrete type/protocol distinction for the next refinement: request
+slot capacity, reserved work/progress accounting, actual execution opportunity
+and completed-result retirement are different authorities. The current change
+makes dispatch acknowledgement and host-actionable wake distinct, but cannot
+turn a coarse cooperative unit into bounded native execution. Any next design
+must preserve original admission charges and same-load semantics, reuse the
+current ledger/model and retain full Scheme continuation behavior. Changing
+only a quantum, reducing FFI calls, or attributing all tails to GC would not
+close this gap. The corpus difference is not proven to cause the measured
+outliers; historical watchdog attribution and stable performance remain open.

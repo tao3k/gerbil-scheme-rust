@@ -1,0 +1,112 @@
+[package]
+name = "gerbil-scheme-qualification"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tokio", "dep:simdutf8"]
+instance-probe = ["dep:divan", "dep:tokio"]
+instance-library = ["instance-probe", "dep:gerbil-scheme", "gerbil-scheme/isolated-instances", "dep:serde_json", "dep:gerbil-scheme-python"]
+
+arrival-clock = ["instance-dispatch", "gerbil-scheme/arrival-clock"]
+owner-wait-diagnostic = ["arrival-clock"]
+
+instance-dispatch = ["instance-library", "gerbil-scheme/tokio-dispatch", "dep:rayon", "gerbil-scheme-python/owner-dispatch"]
+
+[dependencies]
+gerbil-scheme-python = { path = "../gerbil-scheme-python", default-features = false, features = ["c-abi"], optional = true }
+rayon = { version = "=1.12.0", optional = true }
+serde_json = { workspace = true, optional = true }
+gerbil-scheme = { workspace = true, optional = true, features = ["external-program"] }
+gerbil-scheme-sys = { workspace = true, optional = true, features = ["external-program"] }
+divan = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["time"] }
+simdutf8 = { workspace = true, optional = true }
+
+[build-dependencies]
+gerbil-scheme-aot-build.workspace = true
+
+[dev-dependencies]
+libc = "=0.2.186"
+serde_json.workspace = true
+
+[[bench]]
+name = "actors"
+harness = false
+required-features = ["actor-aot"]
+
+[[bench]]
+name = "utf8"
+harness = false
+required-features = ["actor-aot"]
+
+[[bench]]
+name = "instances"
+harness = false
+required-features = ["instance-probe"]
+
+[[bench]]
+name = "instance_lifecycle"
+harness = false
+required-features = ["instance-probe"]
+
+[[bench]]
+name = "instance_library"
+harness = false
+required-features = ["instance-library"]
+
+[[bench]]
+name = "instance_resources"
+harness = false
+required-features = ["instance-library"]
+
+[[bench]]
+name = "owner_costs"
+harness = false
+required-features = ["instance-library"]
+
+[[bench]]
+name = "owner_capacity"
+harness = false
+required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "owner_dispatch"
+harness = false
+required-features = ["instance-dispatch"]
+
+[[test]]
+name = "owner_capacity"
+required-features = ["instance-dispatch"]
+
+[[test]]
+name = "owner_dispatch_faults"
+required-features = ["instance-dispatch"]
+
+[[test]]
+name = "owner_producer"
+required-features = ["instance-dispatch"]
+
+[lints]
+workspace = true
+
+[[test]]
+name = "scheme_service"
+required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "scheme_service"
+harness = false
+required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "single_vm_service"
+harness = false
+required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "gerbil_actor_arrival"
+harness = false
+required-features = ["instance-dispatch"]

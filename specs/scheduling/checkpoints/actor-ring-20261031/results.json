@@ -1,0 +1,105 @@
+{
+  "schema": "gerbil-actor-ring-capacity-v1",
+  "date": "2026-10-31",
+  "scope": "standalone-standard-gerbil-actor-ring",
+  "source": "crates/gerbil-scheme-qualification/scheme/actor-ring-bench.ss",
+  "source_sha256": "f54624c7254a8ffc3948fa3f143fa791dc25ba63562a7c3fb7c83a9ddc8af907",
+  "executable_sha256": "34fa49dc616787b92c738152076789f6753a5fd468506c1edab981cdd2d448b4",
+  "sdk": {
+    "gerbil_revision": "1cfb032c7a1612637da6205f5f8a15683eba3ba0",
+    "gambit_revision": "ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f",
+    "patchset": "618d76f9eb725e27ce13194514ce5b8ca5489038",
+    "gambit_h_sha256": "8257ff05aadb634e2ef2532f7e1a21608a828c4adae35cf88276b78e7efff1e5",
+    "gsc_sha256": "dd32a1694062deb4175641bbfe51c23f2d9d9efa5770fe5b1a2f75d68557984e",
+    "libgambit_a_sha256": "a416eff818d9a0deac88c6037bbcb839ba35fe28c31ee262b700940314483874",
+    "modified": false
+  },
+  "environment_audit_after_run": {
+    "architecture": "arm64",
+    "physical_cpus": 12,
+    "logical_cpus": 12,
+    "physical_memory_bytes": 34359738368,
+    "macos_version": "26.6.1",
+    "note": "Queried after the run. Concurrent host load, affinity and inherited QoS were not captured for this run."
+  },
+  "build": {
+    "source_compiler": "installed-Gerbil-and-Gambit",
+    "workload_c_compiler": "GCC 16",
+    "workload_c_optimization": "-O2",
+    "final_link_driver": "Apple clang",
+    "runtime_directory_mapping": "GAMBOPT=~~=$GERBIL_HOME",
+    "relocation_fixes": ["explicit installed GERBIL_GSC", "current OpenSSL library search path", "Apple final link driver"],
+    "source_and_sdk_files_modified_for_relocation": false,
+    "successful_build_sampled_peak_rss_bytes": 783548416,
+    "exit_code": 0,
+    "published_recipe_check": {
+      "empty_output_prefix": true,
+      "sampled_peak_rss_bytes": 781074432,
+      "executable_sha256": "fff28cd620a5a3bd686fb0cad0caed218de975bcf58c626507266b478af38268",
+      "build_exit_code": 0,
+      "smoke_actors": 7,
+      "smoke_messages": 31,
+      "smoke_exit_code": 0,
+      "capacity_remeasured": false
+    },
+    "negative_build_attempts": [
+      "Incomplete Scheme form and incompatible SDK module imports corrected before measurement",
+      "Installed compiler configuration referenced absent build-host gsc directory",
+      "Relocated gsc required runtime directory mapping",
+      "GCC driver could not link system symbols; final link driver changed",
+      "Installed executable linker metadata referenced absent versioned OpenSSL directory",
+      "Initial smoke exposed reversed arguments to installed write-json; corrected before successful build and measurement"
+    ]
+  },
+  "resource_guard": {
+    "implementation": "external guarded_build process-group supervisor",
+    "executable_sha256": "417e348d488c7ed17f54cfa1f2f9df3925bd20eae331c75e77e2a89db7a2e1b8",
+    "limit_bytes": 8589934592,
+    "sampling_interval_ms": 50,
+    "sampled_peak_rss_bytes": 6123831296,
+    "limit_triggered": false,
+    "kernel_allocation_cap": false
+  },
+  "configuration": {
+    "arguments": ["-:p1", "1000000", "5000000"],
+    "vms": 1,
+    "vm_processors": 1,
+    "actors": 1000000,
+    "work_messages": 5000000,
+    "circulating_tokens": 1,
+    "rust_message_scheduling": false,
+    "per_message_clock_reads": false,
+    "bootstrap_messages": 1000000,
+    "ready_messages": 1000000,
+    "completion_messages": 1,
+    "stop_messages": 1000000,
+    "control_messages_in_work_count": false
+  },
+  "phase_events": [
+    {"phase": "create-begin", "actors": 1000000, "work_messages": 5000000},
+    {"phase": "created", "cpu_s": 1.970107, "wall_s": 1.9729269999952521},
+    {"phase": "ready", "cpu_s": 1.988804, "wall_s": 1.9926109999942128},
+    {"phase": "work-complete", "wall_s": 1.1101909999997588, "cpu_s": 1.1081919999999998, "messages_per_s": 4503729.538431753, "work_messages": 5000000},
+    {"phase": "joined", "validated_messages": 5000000, "wall_s": 0.35612999998556916},
+    {"phase": "reclaimed", "wall_s": 0.0011979999981122091}
+  ],
+  "validation": {
+    "per_actor_expected_counts_checked": true,
+    "total_messages_checked": true,
+    "all_actors_joined": true,
+    "thread_and_peer_vector_entries_cleared": true,
+    "explicit_gc_completed": true,
+    "failure_count": 0,
+    "natural_exit_code": 0,
+    "preceding_smoke": {"actors": 7, "messages": 31, "exit_code": 0}
+  },
+  "unmeasured": ["per-message latency p99", "per-message latency p99.9", "open-arrival rejection rate", "backlog percentiles", "long-lived memory convergence", "memory returned to OS", "twelve-VM scaling"],
+  "admission": {
+    "standalone_ring_capacity_observation": true,
+    "business_api_performance": false,
+    "historical_128_backlog_gate": false,
+    "repeatability_qualification": false,
+    "default_changes": false,
+    "pr18_changes": false
+  }
+}

@@ -806,13 +806,13 @@ fn native_link_options(
     if let Some(paths) = std::env::var_os("LIBRARY_PATH") {
         search.extend(std::env::split_paths(&paths).filter(|path| path.is_absolute()));
     }
-    complete_sdk_dependency_search(&mut search, &libraries, |package| {
+    complete_sdk_dependency_search(&mut search, &libraries, |package, static_only| {
         pkg_config::Config::new()
             .cargo_metadata(false)
-            .statik(true)
+            .statik(static_only)
             .probe(package)
             .map(|library| library.link_paths)
-            .map_err(|error| format!("resolve Gerbil static dependency {package}: {error}"))
+            .map_err(|error| format!("resolve Gerbil dependency {package}: {error}"))
     })?;
     Ok((search, libraries))
 }
@@ -820,17 +820,16 @@ fn native_link_options(
 fn complete_sdk_dependency_search(
     search: &mut Vec<PathBuf>,
     libraries: &[NativeLinkLibrary],
-    mut resolve: impl FnMut(&str) -> Result<Vec<PathBuf>, String>,
+    mut resolve: impl FnMut(&str, bool) -> Result<Vec<PathBuf>, String>,
 ) -> Result<(), String> {
     // The compiler receipt must locate non-platform SDK archives, including
     // implicit Linux multiarch paths and a relocated Homebrew SDK. Consumers
     // must not rediscover this toolchain or probe packages themselves.
     let mut directories: HashSet<PathBuf> = search.iter().cloned().collect();
     for library in libraries {
-        let name = library
-            .as_str()
-            .strip_prefix("static=")
-            .unwrap_or(library.as_str());
+        let static_name = library.as_str().strip_prefix("static=");
+        let name = static_name.unwrap_or(library.as_str());
+        let static_only = static_name.is_some();
         let package = match name {
             "crypto" => "libcrypto",
             "ssl" => "libssl",
@@ -839,28 +838,36 @@ fn complete_sdk_dependency_search(
             _ => continue,
         };
         let file = format!("lib{name}.a");
-        if locate_static_archive(search, &file).is_some() {
+        if locate_sdk_library(search, name, static_only) {
             continue;
         }
-        for path in resolve(package)? {
+        for path in resolve(package, static_only)? {
             if path.is_absolute() && directories.insert(path.clone()) {
                 search.push(path);
             }
         }
-        if locate_static_archive(search, &file).is_none() {
-            return Err(format!("Gerbil SDK static archive unavailable: {file}"));
+        if !locate_sdk_library(search, name, static_only) {
+            return Err(format!(
+                "Gerbil SDK dependency unavailable: {file}; static={static_only}"
+            ));
         }
     }
     Ok(())
 }
 
-fn locate_static_archive(search: &[PathBuf], file: &str) -> Option<PathBuf> {
+fn locate_sdk_library(search: &[PathBuf], name: &str, static_only: bool) -> bool {
     // Ordered linker precedence is semantic. Probe one basename rather than
     // enumerating every archive in each SDK/system library directory.
-    search
-        .iter()
-        .map(|path| path.join(file))
-        .find(|path| path.is_file())
+    let extensions: &[&str] = if static_only {
+        &["a"]
+    } else {
+        &["a", "so", "dylib"]
+    };
+    search.iter().any(|path| {
+        extensions
+            .iter()
+            .any(|extension| path.join(format!("lib{name}.{extension}")).is_file())
+    })
 }
 
 fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {

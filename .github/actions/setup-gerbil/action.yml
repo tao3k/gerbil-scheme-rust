@@ -43,8 +43,8 @@ runs:
           echo "GERBIL_GSC=$GERBIL_PREFIX/bin/gsc"
           echo "GERBIL_BUILD_CORES=$cores"
           if [[ "$(uname -s)" == Darwin ]]; then
-            # Stable formula roots, not the Cellar version embedded in an SDK.
-            echo "LIBRARY_PATH=$(brew --prefix openssl@3)/lib:$(brew --prefix sqlite)/lib:$(brew --prefix zlib)/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+            # Package discovery belongs to pkg-config, not injected linker paths.
+            echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
           fi
         } >> "$GITHUB_ENV"
         "$GERBIL_PREFIX/bin/gsc" -v

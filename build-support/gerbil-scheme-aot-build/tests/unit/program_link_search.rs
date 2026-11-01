@@ -34,7 +34,8 @@ fn receipt_locates_implicit_archives_once_without_changing_link_order() {
         NativeLinkLibrary::new("dl"),
     ];
     let mut probes = Vec::new();
-    complete_sdk_dependency_search(&mut search, &libraries, |package| {
+    complete_sdk_dependency_search(&mut search, &libraries, |package, static_only| {
+        assert!(!static_only);
         probes.push(package.to_owned());
         Ok(vec![root.0.clone(), root.0.clone()])
     })
@@ -48,7 +49,8 @@ fn receipt_locates_implicit_archives_once_without_changing_link_order() {
             .collect::<Vec<_>>(),
         ["crypto", "crypto", "m", "dl"]
     );
-    complete_sdk_dependency_search(&mut search, &libraries, |_| panic!("already located")).unwrap();
+    complete_sdk_dependency_search(&mut search, &libraries, |_, _| panic!("already located"))
+        .unwrap();
 }
 
 #[test]
@@ -57,7 +59,7 @@ fn receipt_rejects_missing_static_archive_and_relative_package_paths() {
     let libraries = vec![NativeLinkLibrary::new("ssl")];
     let mut search = Vec::new();
     assert!(
-        complete_sdk_dependency_search(&mut search, &libraries, |_| Ok(vec![
+        complete_sdk_dependency_search(&mut search, &libraries, |_, _| Ok(vec![
             "relative".into(),
             root.0.clone()
         ]))
@@ -65,9 +67,37 @@ fn receipt_rejects_missing_static_archive_and_relative_package_paths() {
     );
     assert_eq!(search.as_slice(), std::slice::from_ref(&root.0));
     assert!(
-        complete_sdk_dependency_search(&mut Vec::new(), &libraries, |_| Err(
+        complete_sdk_dependency_search(&mut Vec::new(), &libraries, |_, _| Err(
             "unavailable target package".into()
         ))
+        .is_err()
+    );
+}
+
+#[test]
+fn dynamic_dependency_is_not_reinterpreted_as_a_static_archive() {
+    let root = fixture();
+    fs::write(root.0.join("libcrypto.dylib"), "target crypto").unwrap();
+    let mut search = Vec::new();
+    complete_sdk_dependency_search(
+        &mut search,
+        &[NativeLinkLibrary::new("crypto")],
+        |package, static_only| {
+            assert_eq!(package, "libcrypto");
+            assert!(!static_only);
+            Ok(vec![root.0.clone()])
+        },
+    )
+    .unwrap();
+    assert!(
+        complete_sdk_dependency_search(
+            &mut search,
+            &[NativeLinkLibrary::new("static=crypto")],
+            |_, static_only| {
+                assert!(static_only);
+                Ok(vec![root.0.clone()])
+            }
+        )
         .is_err()
     );
 }

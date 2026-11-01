@@ -44,3 +44,21 @@ concurrency cap supplies progress. The earlier SIGKILL evidence is retained.
 This focused receipt is not complete MRR acceptance or a performance comparison
 against a successful baseline. Logs and generated objects remain temporary.
 Frozen consumer dependency pins do not acquire this upstream patch silently.
+
+* Link-kind and release admission
+
+The complete consumer entry exposes an independent link admission defect:
+ordinary SDK =-lcrypto= dependencies were being required to provide a static
+archive. Discovery now retains the declared link kind. A normal library can
+resolve to a shared library or archive; =static=crypto= still requires an
+archive and refuses a shared-only package. A standard test covers that negative
+case. No link order is rewritten. The setup action publishes package-manager
+pkg-config search roots instead of injecting linker library paths.
+
+Consumers must provision the release through this build owner's setup action
+as well as consume its Rust build API. An older Darwin release lacks
+=add-compile-output-job!= required by the pinned Ascent producer; selecting it
+from a separate old action is not the same admitted source/toolchain cohort.
+The setup action's already declared newer Darwin release contains that API.
+This does not imply adopting the unfinished embedded tooling feature or changing
+the consumer's independently pinned runtime bridge.

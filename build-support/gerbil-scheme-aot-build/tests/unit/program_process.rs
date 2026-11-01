@@ -124,6 +124,13 @@ fn tokio_runtime_releases_threads_after_last_native_child() {
             true,
         )
         .unwrap();
+        // /proc task-directory removal can lag pthread completion. Observe
+        // actual kernel quiescence within the existing five-second gate;
+        // a persistent extra thread still fails with the original exact count.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while threads() != before && std::time::Instant::now() < deadline {
+            std::thread::yield_now();
+        }
         assert_eq!(
             threads(),
             before,

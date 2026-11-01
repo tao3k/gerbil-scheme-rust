@@ -62,3 +62,14 @@ from a separate old action is not the same admitted source/toolchain cohort.
 The setup action's already declared newer Darwin release contains that API.
 This does not imply adopting the unfinished embedded tooling feature or changing
 the consumer's independently pinned runtime bridge.
+
+* Thread receipt observation
+
+Ubuntu reports three task-directory entries against an initial count of two
+immediately after the last Tokio build lease is dropped. Tokio's blocking pool
+joins its worker handles during shutdown; kernel task-directory visibility is
+not an instantaneous completion receipt. The standard isolated child test now
+observes return to the exact baseline within the existing five-second operation
+gate. A persistent extra task still fails; actual host worker count, repeated
+owner creation and the final exact-count assertion remain. No runtime shutdown
+deadline or CI watchdog is extended. The original Ubuntu failure is retained.

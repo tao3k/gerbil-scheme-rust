@@ -1,0 +1,46 @@
+#+TITLE: Bounded Gambit Host Function Layout
+#+LANGUAGE: en
+
+* Ownership and failure
+
+The selected Gambit header defines both =___SINGLE_HOST_LIMIT= and
+=___OPTIMIZED_MODULE_LIMIT=. A configured single-host build has no host split
+when the former is zero. Generated modules can therefore place tens of
+thousands of labels in one C function. MRR's retained POO table contains 20,116
+labels; its failed GCC compilation reports approximately 91,000 basic blocks and
+445,000 registers before signal 9. Signal 9 alone does not identify which
+operating-system resource policy terminated the compiler.
+
+The producer's POO =build.ss= already uses a 10,000-label split for that module.
+Recompilation of its static Scheme carrier by a generic program archive does
+not inherit the producer's =gxc:= command-line options. Installed dynamic-module
+success therefore does not qualify the archive's single-host compilation.
+
+* Compiler-owned remedy
+
+For generated module objects built by the configured GCC lane, the program
+archive sets =___SINGLE_HOST_LIMIT= to Gambit's own
+=___OPTIMIZED_MODULE_LIMIT=. The paired header supplies the numeric threshold
+and selects multiple host functions when necessary. The existing O2 setting,
+module closure, runtime headers, concurrency, linker entry and existing GCSE
+load-motion exclusion remain. Code-generation options are part of the existing
+object fingerprint; the old single-host object cannot satisfy the new recipe.
+
+This is a generic archive safety default, not reproduction of every producer's
+module-specific compiler option. It does not replace source-owned build.ss or
+authorize changing an unrelated runtime ABI. Runtime compatibility still needs
+the complete linked consumer entry and its real tests.
+
+* Retained-source evidence
+
+The exact failed generated C source compiles with the remedy and the same
+paired compiler in 66.36 seconds. The system time utility reports maximum RSS
+of 1,756,725,248 bytes; this is a compiler-process observation, not peak memory
+of a concurrent complete build. The object is 3,945,400 bytes. Native child
+completion is observed naturally under the original 1,800-second wall and
+five-second idle supervision. No new optimization dump, timer heartbeat or
+concurrency cap supplies progress. The earlier SIGKILL evidence is retained.
+
+This focused receipt is not complete MRR acceptance or a performance comparison
+against a successful baseline. Logs and generated objects remain temporary.
+Frozen consumer dependency pins do not acquire this upstream patch silently.

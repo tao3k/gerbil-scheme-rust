@@ -136,9 +136,13 @@ fn owner_protocol_scenarios_and_controls() {
     super::owner_model_source::scoped(&model, || (first.work)());
     let queue = Mutex::new(checks);
     let completed = AtomicUsize::new(1);
-    eprintln!("QUINT-PLAN jobs={count} workers=3 initialized=1");
+    let workers = std::thread::available_parallelism()
+        .expect("host parallelism for protocol workers")
+        .get()
+        .max(4);
+    eprintln!("QUINT-PLAN jobs={count} workers={workers} initialized=1");
     std::thread::scope(|scope| {
-        for _ in 0..3 {
+        for _ in 0..workers {
             scope.spawn(|| {
                 super::owner_model_source::scoped(&model, || {
                     loop {

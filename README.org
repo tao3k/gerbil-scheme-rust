@@ -180,20 +180,46 @@ The last command runs the ordinary versus perturbed diagnostic observer,
 not an admitted scheduler optimization. Queue/response measurement is
 closed-loop; it does not establish open-loop overload behavior.
 
+* Compiler observations and diagnostics
+
+=gerbil-scheme-aot-build= owns generic Scheme/C compilation, optimization, ABI,
+archive generation and compiler subprocess output. Application =build.ss= files
+own their PackageSpec/module graph; consumer process glue owns neither compiler
+flags nor direct command replay. Gerbil Scheme is the toolchain; this integration
+project does not create an additional SDK authority.
+
+Live compiler output is framed at actual pipe reads: an incomplete diagnostic
+chunk receives a newline delimiter so Cargo can expose it before child exit.
+Complete lines are unchanged; empty reads emit nothing. Framed diagnostics retain
+the payload but are not a byte-identical original stream. Phase observations and
+output bytes are not successful exit, quiescence or runtime execution permission.
+A silent child remains subject to the original outer idle/wall limits.
+
+=GERBIL_BUILD_VERBOSE= enables live compiler observations. Detailed optimizer
+notes and allocation dumps require =GERBIL_BUILD_COMPILER_DIAGNOSTICS=1;
+=GERBIL_BUILD_OBJECT_PROGRESS=1 independently selects compiler-written allocation
+artifact observations. Diagnostic flags do not alter optimization or ABI policy.
+No wall-clock, CPU-time or input-read heartbeat is emitted.
+
+The Rust Cargo handshake test blocks a compiler child until the outer Cargo
+reader observes its unterminated diagnostic payload. The child retains a
+five-second bound and exits naturally after acknowledgement. Failure and empty
+output controls remain separate from archive/runtime acceptance.
+
 * Build and validation
 
 Cargo owns Rust packages and dependency resolution. =build.ss= owns Scheme
 compilation; the AOT build helper owns compiler discovery, archive production,
 provenance and complete link receipts. Bazel owns the cross-language CI graph.
 Downstream consumers validate and consume the receipt, without repeating
-SDK, compiler or system-library discovery.
+Gerbil installation, compiler or system-library discovery.
 
-Compiler selection follows the configured Gerbil executable and paired SDK.
+Compiler selection follows the configured Gerbil executable and its paired Gambit compiler.
 Ghostscript's unrelated =gsc= is rejected. Explicit =GERBIL_GSC= overrides
 remain validated. OpenSSL, zlib and SQLite link receipts are admitted before
 generation; missing required libraries fail the producer build.
 
-Use the installed SDK environment and repository's Justfile:
+Use the installed Gerbil environment and repository's Justfile:
 
 #+begin_src text
 just bridge-workspace

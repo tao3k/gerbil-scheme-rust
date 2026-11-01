@@ -40,6 +40,12 @@ jobs:
       - name: Cargo format
         run: cargo fmt --all --check
 
+      - name: Scheme compiler output and diagnostic controls
+        run: cargo test -p gerbil-scheme-aot-build --lib --locked
+      - name: Paired Gambit GCC object identity
+        if: runner.os == 'Linux'
+        run: cargo test -p gerbil-scheme-aot-build --lib --locked actual_gambit_diagnostic_modes_preserve_object_bytes -- --ignored --exact program::process::process_tests::actual_gambit_diagnostic_modes_preserve_object_bytes --nocapture
+
       - name: Cargo gates
         env:
           GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM: "1"
@@ -60,9 +66,9 @@ jobs:
 
       - name: Record unsupported SMP qualification
         run: |
-          echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned SDK does not support. This is not an SMP pass.'
-          echo '### Scheme SMP: SKIPPED (unsupported SDK capability; not passed)' >> "$GITHUB_STEP_SUMMARY"
-          echo 'The pinned SDK supports multiple VMs but not multiple-threaded VMs. Single-processor actor AOT and both Rust concurrency controls remain required. Restore the separate SMP job after the SDK capability is qualified.' >> "$GITHUB_STEP_SUMMARY"
+          echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned Gerbil toolchain does not support. This is not an SMP pass.'
+          echo '### Scheme SMP: SKIPPED (unsupported Gerbil toolchain capability; not passed)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The pinned Gerbil toolchain supports multiple VMs but not multiple-threaded VMs. Single-processor actor AOT and both Rust concurrency controls remain required. Restore the separate SMP job after the Gerbil toolchain capability is qualified.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Single-processor actor AOT and Rust concurrency qualification
         if: runner.os != 'macOS'
@@ -107,7 +113,7 @@ jobs:
   # Real owner/TLS retirement has a separate native gate from the Quint model.
   # This Darwin image backend uses independent single-processor Scheme runtimes.
   native-owner:
-    name: Fixed-owner native lifecycle (macos-latest)
+    name: Fixed-owner Scheme/Rust lifecycle (macos-latest)
     runs-on: macos-latest
     timeout-minutes: 30
     env:
@@ -122,7 +128,7 @@ jobs:
         uses: ./.github/actions/setup-gerbil
         with:
           release-root: ${{ env.GERBIL_RELEASE_ROOT }}
-      - name: Native owner retirement and failure controls
+      - name: Scheme owner retirement and failure controls
         run: |
           cargo -vv bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --blocking-tls
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --blocking-tls-drop
@@ -137,11 +143,11 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-release
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-foreign-tls
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --module-capture-failure
-      - name: Native Rust owner cost bench smoke
+      - name: Rust owner cost bench smoke
         run: cargo bench -p gerbil-scheme-qualification --features instance-library --bench owner_costs --profile dev --locked -- --test
-      - name: Native Scheme capabilities and reuse
+      - name: Scheme runtime capabilities and reuse
         run: cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --profile dev --locked -- --smoke
-      - name: Native Rust dispatcher bench smoke
+      - name: Rust dispatcher bench smoke
         run: |
           cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --grouped-ab
           cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench owner_dispatch --profile dev --locked -- --test --profile --grouped-ab
@@ -193,7 +199,7 @@ jobs:
         uses: ./.github/actions/setup-gerbil
         with:
           release-root: ${{ env.GERBIL_RELEASE_ROOT }}
-      - name: Native owner Rust lint
+      - name: Scheme owner Rust lint
         run: |
           cargo clippy -p gerbil-scheme --features external-program,arrival-clock --lib --test unit_test --locked -- -D warnings
           cargo clippy -vv -p gerbil-scheme-qualification --features arrival-clock --bench instance_resources --bench owner_costs --bench owner_dispatch --bench owner_capacity --bench scheme_service --bench single_vm_service --bench gerbil_actor_arrival --test scheme_service --test service_watchdog --test owner_dispatch_faults --test owner_capacity --test owner_producer --locked -- -D warnings
@@ -223,9 +229,9 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features actor-aot,arrival-clock --bench actors --profile dev --locked -- --test tokio_machine_workers
 
   # Explicitly skipped, not passed. Multiple VMs do not imply multi-processor
-  # execution inside a VM. Restore this job only with a qualified SDK release.
+  # execution inside a VM. Restore this job only with a qualified Gerbil toolchain release.
   scheme-smp:
-    name: Scheme SMP (SKIPPED - SDK lacks multiple-threaded-vms)
+    name: Scheme SMP (SKIPPED - Gerbil toolchain lacks multiple-threaded-vms)
     if: ${{ false }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

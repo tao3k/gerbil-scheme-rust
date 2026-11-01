@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
-//! Owned native subprocess diagnostics and compiler-written progress.
+//! Owned compiler subprocess diagnostics and compiler-written progress.
 use crate::gerbil_command;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -47,18 +47,18 @@ pub(super) fn run_process(
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|error| format!("{operation}: {error}"))?;
-        let stdout = child.stdout.take().expect("piped native stdout");
-        let stderr = child.stderr.take().expect("piped native stderr");
+        let stdout = child.stdout.take().expect("piped compiler stdout");
+        let stderr = child.stderr.take().expect("piped compiler stderr");
         return std::thread::scope(|scope| {
-            let out = scope.spawn(|| forward_native_output(stdout, &mut std::io::stdout()));
-            let err = scope.spawn(|| forward_native_output(stderr, &mut std::io::stderr()));
+            let out = scope.spawn(|| forward_compiler_output(stdout, &mut std::io::stdout()));
+            let err = scope.spawn(|| forward_compiler_output(stderr, &mut std::io::stderr()));
             let status = child
                 .wait()
                 .map_err(|error| format!("{operation}: {error}"));
             let out = out.join().map_err(compiler_monitor_panic_message)?;
             let err = err.join().map_err(compiler_monitor_panic_message)?;
             out.and(err)
-                .map_err(|error| format!("{operation}: forward native diagnostics: {error}"))?;
+                .map_err(|error| format!("{operation}: forward compiler diagnostics: {error}"))?;
             let status = status?;
             if status.success() {
                 Ok(())
@@ -84,7 +84,7 @@ pub(super) fn run_process(
     }
 }
 
-/// Execute a native command with isolated child stdio and immediate diagnostics.
+/// Execute a compiler command with isolated child stdio and immediate diagnostics.
 /// Quiet mode retains failed-child output. Live mode preserves real bytes and
 /// exit status without sharing the parent's stdio file-status flags.
 pub fn run_native_process(
@@ -95,7 +95,7 @@ pub fn run_native_process(
     run_process(command, operation, live)
 }
 
-fn forward_native_output(
+fn forward_compiler_output(
     mut input: impl std::io::Read,
     output: &mut impl std::io::Write,
 ) -> std::io::Result<()> {
@@ -103,7 +103,9 @@ fn forward_native_output(
     loop {
         match input.read(&mut buffer) {
             Ok(0) => return Ok(()),
-            Ok(count) => write_progress_event(output, &buffer[..count])?,
+            Ok(count) => {
+                write_compiler_chunk(output, &buffer[..count])?;
+            }
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(Duration::from_millis(1));
@@ -113,7 +115,23 @@ fn forward_native_output(
     }
 }
 
-// Read the immutable SDK's declared compiler feature, not PATH or CC.
+// Cargo consumes build-script output as lines. Flushing a fragment alone does
+// not expose it to the outer supervisor. Preserve the payload and delimit each
+// received chunk; already complete records remain byte-for-byte unchanged.
+// This is diagnostic framing, not a timer, compiler completion or send permit.
+fn write_compiler_chunk(output: &mut impl std::io::Write, bytes: &[u8]) -> std::io::Result<()> {
+    if bytes.is_empty() {
+        return Ok(());
+    }
+    write_progress_event(output, bytes)?;
+    if !bytes.ends_with(b"\n") {
+        write_progress_event(output, b"\n")?;
+    }
+    Ok(())
+}
+
+// Read the selected Gerbil toolchain's declared compiler feature, not PATH or CC.
+
 pub(crate) fn configured_gambit_gcc(gsc: &Path) -> bool {
     let Ok(gsc) = fs::canonicalize(gsc) else {
         return false;
@@ -222,7 +240,7 @@ pub(super) fn gcc_allocation_diagnostics(object: &Path) -> Result<String, String
         let name = path
             .to_str()
             .ok_or_else(|| format!("GCC diagnostic path is not UTF-8: {}", path.display()))?;
-        // Gambit's -cc-options is parsed by the SDK's shell command. Preserve
+        // Gambit's -cc-options is parsed by Gambit's shell command. Preserve
         // spaces and apostrophes in the exact object-owned diagnostic path.
         let quoted = name.replace('\'', "'\\''");
         options.push(format!("-fdump-rtl-{extension}-details='{quoted}'"));

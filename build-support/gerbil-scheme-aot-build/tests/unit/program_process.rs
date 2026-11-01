@@ -435,3 +435,160 @@ fn allocation_diagnostics_preserve_optimized_object_bytes() {
     }
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn compiler_fragment_is_framed_without_waiting_for_the_next_record() {
+    let mut output = Vec::new();
+    super::write_compiler_chunk(&mut output, b"partial compiler diagnostic").unwrap();
+    assert_eq!(output, b"partial compiler diagnostic\n");
+    let before = output.len();
+    super::write_compiler_chunk(&mut output, b"").unwrap();
+    assert_eq!(output.len(), before, "silence cannot fabricate progress");
+    super::write_compiler_chunk(&mut output, b"complete\n").unwrap();
+    assert_eq!(&output[before..], b"complete\n");
+}
+
+#[test]
+fn cargo_observes_fragment_before_compiler_child_can_finish() {
+    use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let root = artifact_fixture("cargo-framing");
+    let release = root.join("release");
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/lib.rs"), "").unwrap();
+    std::fs::write(root.join("Cargo.toml"), "[package]\nname = \"build-progress-framing-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n[workspace]\n").unwrap();
+    let process = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/program/process.rs");
+    std::fs::write(root.join("build.rs"), format!(r#"
+fn gerbil_command(program: &std::path::Path) -> std::process::Command {{
+    std::process::Command::new(program)
+}}
+#[allow(dead_code)]
+#[path = {process:?}]
+mod compiler_process;
+fn main() {{
+    use std::io::Write;
+    let release = std::path::PathBuf::from(std::env::var_os("FIXTURE_RELEASE").unwrap());
+    if std::env::args().any(|arg| arg == "--compiler-fixture") {{
+        print!("compiler-fragment-before-exit");
+        std::io::stdout().flush().unwrap();
+        let started = std::time::Instant::now();
+        while !release.exists() {{
+            assert!(started.elapsed() < std::time::Duration::from_secs(5), "Cargo withheld compiler fragment");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }}
+        eprintln!("compiler-finished-after-receipt");
+        return;
+    }}
+    compiler_process::run_native_process(
+        std::process::Command::new(std::env::current_exe().unwrap()).arg("--compiler-fixture"),
+        "compiler fragment fixture", true).unwrap();
+}}
+"#)).unwrap();
+    let mut child = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+        .args(["build", "--offline", "--verbose", "--verbose"])
+        .current_dir(&root)
+        .env("FIXTURE_RELEASE", &release)
+        .env("CARGO_TARGET_DIR", root.join("target"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+    let observed = AtomicBool::new(false);
+    let completed = AtomicBool::new(false);
+    let status = std::thread::scope(|scope| {
+        let read = |input: Box<dyn std::io::Read + Send>| {
+            let mut transcript = String::new();
+            for line in BufReader::new(input).lines() {
+                let line = line.unwrap();
+                if line.contains("] compiler-fragment-before-exit") {
+                    observed.store(true, Ordering::SeqCst);
+                    std::fs::write(&release, b"observed actual Cargo output").unwrap();
+                }
+                if line.contains("] compiler-finished-after-receipt") {
+                    completed.store(true, Ordering::SeqCst);
+                }
+                transcript.push_str(&line);
+                transcript.push('\n');
+            }
+            transcript
+        };
+        let out = scope.spawn(move || read(Box::new(stdout)));
+        let err = scope.spawn(move || read(Box::new(stderr)));
+        let status = child.wait().unwrap();
+        (status, out.join().unwrap(), err.join().unwrap())
+    });
+    assert!(
+        status.0.success(),
+        "Cargo fixture failed; retained at {}\n{}{}",
+        root.display(),
+        status.1,
+        status.2
+    );
+    assert!(observed.load(Ordering::SeqCst));
+    assert!(completed.load(Ordering::SeqCst));
+    // The child itself enforces the unchanged five-second observation bound.
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+#[ignore = "requires GERBIL_GSC selecting the actual paired Gambit compiler"]
+fn actual_gambit_diagnostic_modes_preserve_object_bytes() {
+    let gsc = std::path::PathBuf::from(std::env::var_os("GERBIL_GSC").expect("paired compiler"));
+    assert!(super::configured_gambit_gcc(&gsc));
+    let root = artifact_fixture("paired-gambit-diagnostics");
+    let scheme = root.join("module.scm");
+    let source = root.join("module.c");
+    std::fs::write(&scheme, "(define (squared x) (* x x))\n").unwrap();
+    run_process(
+        super::gambit_progress_command_with_mode(&gsc, true)
+            .args(["-c", "-o"])
+            .arg(&source)
+            .arg(&scheme),
+        "generate actual Scheme fixture",
+        true,
+    )
+    .unwrap();
+    assert!(
+        source.is_file(),
+        "GSC status alone cannot establish generated C"
+    );
+    let mut original = None;
+    for (name, progress, detailed) in [
+        ("baseline", false, false),
+        ("progress", true, false),
+        ("detailed", true, true),
+    ] {
+        let object = root.join(format!("{name}.o"));
+        let options = super::super::archive::compiler_diagnostic_options(
+            "-O2 -fno-gcse-lm",
+            progress,
+            detailed,
+        );
+        run_process(
+            super::gambit_progress_command_with_mode(&gsc, progress)
+                .args(["-obj", "-cc-options", &options, "-o"])
+                .arg(&object)
+                .arg(&source),
+            "compile actual Scheme fixture",
+            true,
+        )
+        .unwrap();
+        let bytes = std::fs::read(&object).expect("GSC success requires an actual object");
+        assert!(!bytes.is_empty());
+        if let Some(expected) = &original {
+            assert_eq!(
+                &bytes,
+                expected,
+                "diagnostics changed object identity; retained at {}",
+                root.display()
+            );
+        } else {
+            original = Some(bytes);
+        }
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}

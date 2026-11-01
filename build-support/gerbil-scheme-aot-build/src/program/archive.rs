@@ -576,14 +576,13 @@ pub(crate) fn compile_native_object(
     // They expose real compiler progress when a large optimized function takes
     // longer than the initial observation window, without changing GSC options.
     println!("cargo:rerun-if-env-changed=GERBIL_BUILD_OBJECT_PROGRESS");
+    println!("cargo:rerun-if-env-changed=GERBIL_BUILD_COMPILER_DIAGNOSTICS");
     let gcc_progress = native_progress_enabled() && gcc;
-    let allocation_progress = gcc_progress
+    let detailed_diagnostics =
+        gcc && std::env::var("GERBIL_BUILD_COMPILER_DIAGNOSTICS").as_deref() == Ok("1");
+    let allocation_progress = detailed_diagnostics
         || (gcc && std::env::var("GERBIL_BUILD_OBJECT_PROGRESS").as_deref() == Ok("1"));
-    let cc_options = if gcc_progress {
-        format!("{cc_options} -save-temps=obj -Q -fopt-info-all")
-    } else {
-        cc_options
-    };
+    let cc_options = compiler_diagnostic_options(&cc_options, gcc_progress, detailed_diagnostics);
     let fingerprint = native_input_fingerprint(gsc, domain, &cc_options, source)?;
     if let Some(fingerprint) = fingerprint.as_deref() {
         if cached_native_output(object, fingerprint)? {
@@ -630,6 +629,22 @@ pub(crate) fn compile_native_object(
         None => Ok(()),
     }
 }
+
+// Diagnostic work is independent of genuine progress and code-generation policy.
+pub(super) fn compiler_diagnostic_options(options: &str, progress: bool, detailed: bool) -> String {
+    let mut options = options.to_owned();
+    if progress {
+        options.push_str(" -save-temps=obj -Q");
+    }
+    if detailed {
+        options.push_str(" -fopt-info-all");
+    }
+    options
+}
+
+#[cfg(test)]
+#[path = "../../tests/unit/program_diagnostics.rs"]
+mod diagnostic_tests;
 
 pub(crate) fn native_input_fingerprint(
     compiler: &Path,

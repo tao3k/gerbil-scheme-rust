@@ -4,8 +4,11 @@ use crate::gerbil_command;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::Ordering;
 use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+#[path = "process_runtime.rs"]
+mod process_runtime;
 
 // Verbose native builds expose genuine compiler and collector events. The
 // collector policy and heap limits remain Gambit's defaults.
@@ -25,9 +28,6 @@ pub(super) fn gambit_progress_command(program: &Path) -> Command {
 fn gambit_progress_command_with_mode(program: &Path, live: bool) -> Command {
     let mut command = gerbil_command(program);
     if live {
-        // Runtime options must precede compiler options. Line buffering also
-        // applies when Cargo redirects stdout/stderr to pipes. q/Q retain
-        // nonzero termination rather than entering a REPL on failure.
         command.args(GSC_PROGRESS_OPTIONS);
     }
     command
@@ -37,6 +37,30 @@ pub(super) fn run_process(
     command: &mut Command,
     operation: &str,
     live: bool,
+) -> Result<(), String> {
+    let runtime = process_runtime::acquire()?;
+    runtime.block_on(run_process_async(command, operation, live, None))
+}
+
+async fn run_process_async(
+    command: &mut Command,
+    operation: &str,
+    live: bool,
+    artifacts: Option<&[PathBuf]>,
+) -> Result<(), String> {
+    let placeholder = Command::new(command.get_program());
+    let mut native = tokio::process::Command::from(std::mem::replace(command, placeholder));
+    native.kill_on_drop(true);
+    let result = run_owned_process(&mut native, operation, live, artifacts).await;
+    *command = native.into_std();
+    result
+}
+
+async fn run_owned_process(
+    command: &mut tokio::process::Command,
+    operation: &str,
+    live: bool,
+    artifacts: Option<&[PathBuf]>,
 ) -> Result<(), String> {
     if live {
         // Gambit changes O_NONBLOCK on inherited stdio, which also changes
@@ -49,28 +73,45 @@ pub(super) fn run_process(
             .map_err(|error| format!("{operation}: {error}"))?;
         let stdout = child.stdout.take().expect("piped compiler stdout");
         let stderr = child.stderr.take().expect("piped compiler stderr");
-        return std::thread::scope(|scope| {
-            let out = scope.spawn(|| forward_compiler_output(stdout, &mut std::io::stdout()));
-            let err = scope.spawn(|| forward_compiler_output(stderr, &mut std::io::stderr()));
-            let status = child
-                .wait()
-                .map_err(|error| format!("{operation}: {error}"));
-            let out = out.join().map_err(compiler_monitor_panic_message)?;
-            let err = err.join().map_err(compiler_monitor_panic_message)?;
-            out.and(err)
-                .map_err(|error| format!("{operation}: forward compiler diagnostics: {error}"))?;
-            let status = status?;
-            if status.success() {
-                Ok(())
-            } else {
-                Err(format!(
-                    "{operation}: {status}; diagnostics streamed to parent stdout/stderr"
-                ))
+        let forward = async {
+            tokio::try_join!(
+                forward_compiler_output(stdout, tokio::io::stdout()),
+                forward_compiler_output(stderr, tokio::io::stderr())
+            )
+            .map(|_| ())
+        };
+        let forwarded = if let Some(paths) = artifacts {
+            tokio::select! {
+                result = forward => result,
+                result = observe_compiler_artifacts(paths) => result,
             }
-        });
+        } else {
+            forward.await
+        };
+        if let Err(error) = forwarded {
+            // A forwarding/observation refusal cannot leave the owned child
+            // running. Kill and reap before acknowledging the failed call.
+            let cleanup = child.kill().await;
+            let reaped = child.wait().await;
+            return Err(format!(
+                "{operation}: forward compiler diagnostics: {error}; cleanup={cleanup:?}; reap={reaped:?}"
+            ));
+        }
+        let status = child
+            .wait()
+            .await
+            .map_err(|error| format!("{operation}: wait: {error}"))?;
+        return if status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "{operation}: {status}; diagnostics streamed to parent stdout/stderr"
+            ))
+        };
     }
     let output = command
         .output()
+        .await
         .map_err(|error| format!("{operation}: {error}"))?;
     if output.status.success() {
         Ok(())
@@ -95,20 +136,20 @@ pub fn run_native_process(
     run_process(command, operation, live)
 }
 
-fn forward_compiler_output(
-    mut input: impl std::io::Read,
-    output: &mut impl std::io::Write,
+async fn forward_compiler_output(
+    mut input: impl tokio::io::AsyncRead + Unpin,
+    mut output: impl AsyncWrite + Unpin,
 ) -> std::io::Result<()> {
     let mut buffer = [0_u8; 16 * 1024];
     loop {
-        match input.read(&mut buffer) {
+        match input.read(&mut buffer).await {
             Ok(0) => return Ok(()),
             Ok(count) => {
-                write_compiler_chunk(output, &buffer[..count])?;
+                write_compiler_chunk(&mut output, &buffer[..count]).await?;
             }
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(1));
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
             Err(error) => return Err(error),
         }
@@ -119,13 +160,16 @@ fn forward_compiler_output(
 // not expose it to the outer supervisor. Preserve the payload and delimit each
 // received chunk; already complete records remain byte-for-byte unchanged.
 // This is diagnostic framing, not a timer, compiler completion or send permit.
-fn write_compiler_chunk(output: &mut impl std::io::Write, bytes: &[u8]) -> std::io::Result<()> {
+async fn write_compiler_chunk(
+    output: &mut (impl AsyncWrite + Unpin),
+    bytes: &[u8],
+) -> std::io::Result<()> {
     if bytes.is_empty() {
         return Ok(());
     }
-    write_progress_event(output, bytes)?;
+    write_progress_event(output, bytes).await?;
     if !bytes.ends_with(b"\n") {
-        write_progress_event(output, b"\n")?;
+        write_progress_event(output, b"\n").await?;
     }
     Ok(())
 }
@@ -148,6 +192,7 @@ pub(crate) fn configured_gambit_gcc(gsc: &Path) -> bool {
 
 const COMPILER_ARTIFACT_PROGRESS_BYTES: u64 = 256 * 1024;
 
+#[cfg(test)]
 fn compiler_artifact_growth(path: &Path, previous: &mut u64) -> Result<Option<u64>, String> {
     let size = match fs::metadata(path) {
         Ok(metadata) => metadata.len(),
@@ -159,11 +204,14 @@ fn compiler_artifact_growth(path: &Path, previous: &mut u64) -> Result<Option<u6
             ));
         }
     };
-    if size.saturating_sub(*previous) < COMPILER_ARTIFACT_PROGRESS_BYTES {
-        return Ok(None);
-    }
-    *previous = size;
-    Ok(Some(size))
+    Ok(observe_artifact_length(size, previous))
+}
+
+fn observe_artifact_length(size: u64, previous: &mut u64) -> Option<u64> {
+    (size.saturating_sub(*previous) >= COMPILER_ARTIFACT_PROGRESS_BYTES).then(|| {
+        *previous = size;
+        size
+    })
 }
 
 fn remove_compiler_artifacts(paths: &[PathBuf]) -> Result<(), String> {
@@ -182,8 +230,8 @@ fn remove_compiler_artifacts(paths: &[PathBuf]) -> Result<(), String> {
     Ok(())
 }
 
-fn emit_compiler_artifact_event(
-    output: &mut impl std::io::Write,
+async fn emit_compiler_artifact_event(
+    output: &mut (impl AsyncWrite + Unpin),
     path: &Path,
     size: u64,
 ) -> Result<(), String> {
@@ -191,42 +239,37 @@ fn emit_compiler_artifact_event(
     // partial write. Retain the offset until the complete event is delivered.
     let event = format!("native compiler artifact={} bytes={size}\n", path.display());
     write_progress_event(output, event.as_bytes())
+        .await
         .map_err(|error| format!("write compiler artifact progress: {error}"))
 }
 
-fn write_progress_event(output: &mut impl std::io::Write, mut bytes: &[u8]) -> std::io::Result<()> {
+async fn write_progress_event(
+    output: &mut (impl AsyncWrite + Unpin),
+    mut bytes: &[u8],
+) -> std::io::Result<()> {
     while !bytes.is_empty() {
-        match output.write(bytes) {
+        match output.write(bytes).await {
             Ok(0) => return Err(std::io::ErrorKind::WriteZero.into()),
             Ok(written) => bytes = &bytes[written..],
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 // Wait for the consumer, emitting nothing. The enclosing
                 // process supervisor retains its idle and wall budgets.
-                std::thread::sleep(Duration::from_millis(1));
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
             Err(error) => return Err(error),
         }
     }
     loop {
-        match output.flush() {
+        match output.flush().await {
             Ok(()) => return Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(1));
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
             Err(error) => return Err(error),
         }
     }
-}
-
-fn compiler_monitor_panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
-    let detail = payload
-        .downcast_ref::<String>()
-        .map(String::as_str)
-        .or_else(|| payload.downcast_ref::<&str>().copied())
-        .unwrap_or("non-string panic payload");
-    format!("compiler artifact monitor panicked: {detail}")
 }
 
 fn compiler_artifact_paths(object: &Path) -> [PathBuf; 4] {
@@ -256,29 +299,36 @@ pub(super) fn run_with_compiler_artifacts(
     let artifacts = compiler_artifact_paths(object);
     // A previous attempt must never qualify as progress for this process.
     remove_compiler_artifacts(&artifacts)?;
-    let running = std::sync::atomic::AtomicBool::new(true);
-    let result = std::thread::scope(|scope| {
-        let monitor = scope.spawn(|| -> Result<(), String> {
-            let mut previous = [0_u64; 4];
-            while running.load(Ordering::Acquire) {
-                for (path, previous) in artifacts.iter().zip(previous.iter_mut()) {
-                    if let Some(size) = compiler_artifact_growth(path, previous)? {
-                        emit_compiler_artifact_event(&mut std::io::stderr().lock(), path, size)?;
-                    }
-                }
-                // Polling itself emits nothing. Only compiler-written growth
-                // produces an event; a stalled compiler still fails supervision.
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            Ok(())
-        });
-        let result = run_process(command, operation, true);
-        running.store(false, Ordering::Release);
-        let observed = monitor.join().map_err(compiler_monitor_panic_message)?;
-        result.and(observed)
-    });
+    let runtime = process_runtime::acquire()?;
+    let result = runtime.block_on(run_process_async(
+        command,
+        operation,
+        true,
+        Some(&artifacts),
+    ));
     let cleanup = remove_compiler_artifacts(&artifacts);
     result.and(cleanup)
+}
+
+async fn observe_compiler_artifacts(paths: &[PathBuf]) -> std::io::Result<()> {
+    let mut previous = vec![0; paths.len()];
+    let mut interval = tokio::time::interval(Duration::from_millis(100));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        interval.tick().await;
+        for (path, previous) in paths.iter().zip(previous.iter_mut()) {
+            let size = match tokio::fs::metadata(path).await {
+                Ok(metadata) => metadata.len(),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error),
+            };
+            if let Some(size) = observe_artifact_length(size, previous) {
+                emit_compiler_artifact_event(&mut tokio::io::stderr(), path, size)
+                    .await
+                    .map_err(std::io::Error::other)?;
+            }
+        }
+    }
 }
 
 #[cfg(all(test, unix))]

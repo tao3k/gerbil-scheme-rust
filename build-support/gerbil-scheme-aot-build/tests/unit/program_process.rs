@@ -2,6 +2,50 @@
 use super::run_process;
 use std::process::Command;
 
+struct ReadyWriter<'a, W>(&'a mut W);
+impl<W: std::io::Write + Unpin> tokio::io::AsyncWrite for ReadyWriter<'_, W> {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+        bytes: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        std::task::Poll::Ready(self.0.write(bytes))
+    }
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::task::Poll::Ready(self.0.flush())
+    }
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+fn emit_compiler_artifact_event(
+    output: &mut (impl std::io::Write + Unpin),
+    path: &std::path::Path,
+    size: u64,
+) -> Result<(), String> {
+    super::process_runtime::acquire()?.block_on(super::emit_compiler_artifact_event(
+        &mut ReadyWriter(output),
+        path,
+        size,
+    ))
+}
+
+fn write_compiler_chunk(
+    output: &mut (impl std::io::Write + Unpin),
+    bytes: &[u8],
+) -> std::io::Result<()> {
+    super::process_runtime::acquire()
+        .map_err(std::io::Error::other)?
+        .block_on(super::write_compiler_chunk(&mut ReadyWriter(output), bytes))
+}
+
 #[test]
 fn quiet_failure_retains_both_diagnostic_streams() {
     let error = run_process(
@@ -27,6 +71,70 @@ fn live_failure_preserves_nonzero_status() {
     assert!(error.contains("compile fixture"));
     assert!(error.contains('7'));
     assert!(error.contains("streamed"));
+}
+
+#[test]
+fn tokio_runtime_releases_threads_after_last_native_child() {
+    const CHILD: &str = "GERBIL_PROCESS_THREAD_RECEIPT";
+    if std::env::var_os(CHILD).is_none() {
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "program::process::process_tests::tokio_runtime_releases_threads_after_last_native_child", "--nocapture"])
+            .env(CHILD, "1").output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let threads = || {
+        #[cfg(target_os = "macos")]
+        {
+            let output = Command::new("ps")
+                .args(["-M", "-p", &std::process::id().to_string(), "-o", "pid="])
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            String::from_utf8(output.stdout)
+                .unwrap()
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .count()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            std::fs::read_dir("/proc/self/task").unwrap().count()
+        }
+    };
+    let before = threads();
+    for _ in 0..4 {
+        let runtime = super::process_runtime::acquire().unwrap();
+        assert_eq!(
+            runtime.worker_count(),
+            std::thread::available_parallelism().unwrap().get()
+        );
+        assert!(threads() >= before + runtime.worker_count());
+        let weak = std::sync::Arc::downgrade(&runtime);
+        drop(runtime);
+        assert!(weak.upgrade().is_none());
+        run_process(
+            Command::new("printf").arg("actual-native-output\n"),
+            "thread receipt",
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            threads(),
+            before,
+            "Tokio threads must be joined at the last build lease"
+        );
+    }
+    eprintln!(
+        "TOKIO-PROCESS-RECEIPT cpu={} threads-before={before} threads-after={}",
+        std::thread::available_parallelism().unwrap(),
+        threads()
+    );
 }
 
 #[test]
@@ -80,7 +188,7 @@ fn compiler_artifact_diagnostic_write_failure_is_typed_without_panicking() {
             Ok(())
         }
     }
-    let error = super::emit_compiler_artifact_event(
+    let error = emit_compiler_artifact_event(
         &mut ClosedDiagnosticPipe,
         std::path::Path::new("module.i"),
         262_144,
@@ -91,14 +199,12 @@ fn compiler_artifact_diagnostic_write_failure_is_typed_without_panicking() {
 }
 
 #[test]
-fn compiler_monitor_retains_actual_thread_panic_cause() {
-    let payload = std::thread::spawn(|| panic!("fixture monitor cause"))
-        .join()
-        .unwrap_err();
-    assert_eq!(
-        super::compiler_monitor_panic_message(payload),
-        "compiler artifact monitor panicked: fixture monitor cause"
-    );
+fn nested_tokio_runtime_is_refused_without_detached_work() {
+    let owner = super::process_runtime::acquire().unwrap();
+    owner.block_on(async {
+        let result = super::process_runtime::acquire();
+        assert!(matches!(result, Err(error) if error.contains("cannot nest")));
+    });
 }
 
 #[test]
@@ -236,8 +342,7 @@ fn progress_retains_partial_writes_and_retries_interrupted_write_and_flush() {
         }
     }
     let mut output = Backpressure::default();
-    super::emit_compiler_artifact_event(&mut output, std::path::Path::new("module.i"), 262_144)
-        .unwrap();
+    emit_compiler_artifact_event(&mut output, std::path::Path::new("module.i"), 262_144).unwrap();
     assert_eq!(
         output.bytes,
         b"native compiler artifact=module.i bytes=262144\n"
@@ -300,8 +405,7 @@ fn actual_nonblocking_full_pipe_delivers_event_without_loss_after_consumer_drain
         ready,
         blocked: false,
     };
-    super::emit_compiler_artifact_event(&mut output, std::path::Path::new("module.i"), 262_144)
-        .unwrap();
+    emit_compiler_artifact_event(&mut output, std::path::Path::new("module.i"), 262_144).unwrap();
     assert!(
         output.blocked,
         "the event must encounter real pipe backpressure"
@@ -439,12 +543,12 @@ fn allocation_diagnostics_preserve_optimized_object_bytes() {
 #[test]
 fn compiler_fragment_is_framed_without_waiting_for_the_next_record() {
     let mut output = Vec::new();
-    super::write_compiler_chunk(&mut output, b"partial compiler diagnostic").unwrap();
+    write_compiler_chunk(&mut output, b"partial compiler diagnostic").unwrap();
     assert_eq!(output, b"partial compiler diagnostic\n");
     let before = output.len();
-    super::write_compiler_chunk(&mut output, b"").unwrap();
+    write_compiler_chunk(&mut output, b"").unwrap();
     assert_eq!(output.len(), before, "silence cannot fabricate progress");
-    super::write_compiler_chunk(&mut output, b"complete\n").unwrap();
+    write_compiler_chunk(&mut output, b"complete\n").unwrap();
     assert_eq!(&output[before..], b"complete\n");
 }
 
@@ -458,7 +562,7 @@ fn cargo_observes_fragment_before_compiler_child_can_finish() {
     let release = root.join("release");
     std::fs::create_dir(root.join("src")).unwrap();
     std::fs::write(root.join("src/lib.rs"), "").unwrap();
-    std::fs::write(root.join("Cargo.toml"), "[package]\nname = \"build-progress-framing-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n[workspace]\n").unwrap();
+    std::fs::write(root.join("Cargo.toml"), "[package]\nname = \"build-progress-framing-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n[workspace]\n[build-dependencies]\ntokio = { version = \"=1.53.1\", features = [\"full\"] }\n").unwrap();
     let process = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/program/process.rs");
     std::fs::write(root.join("build.rs"), format!(r#"
 fn gerbil_command(program: &std::path::Path) -> std::process::Command {{

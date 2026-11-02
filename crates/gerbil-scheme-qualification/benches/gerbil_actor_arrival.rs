@@ -436,16 +436,13 @@ fn native_clock_anchor(
     Ok(())
 }
 fn selected_default_image() -> &'static str {
-    if std::env::args().any(|arg| arg == "--owner-wait-scope") {
-        #[cfg(feature = "owner-wait-diagnostic")]
-        {
-            return gerbil_scheme_qualification::owner_wait_diagnostic_image();
-        }
-        #[cfg(not(feature = "owner-wait-diagnostic"))]
-        {
-            panic!("owner-wait-diagnostic build feature required");
-        }
+    let diagnostic = std::env::args().any(|arg| arg == "--owner-wait-scope");
+    #[cfg(feature = "owner-wait-diagnostic")]
+    if diagnostic {
+        return gerbil_scheme_qualification::owner_wait_diagnostic_image();
     }
+    #[cfg(not(feature = "owner-wait-diagnostic"))]
+    assert!(!diagnostic, "owner-wait-diagnostic build feature required");
     gerbil_scheme_qualification::owner_instance_image()
 }
 fn start_pool() -> InstancePool {

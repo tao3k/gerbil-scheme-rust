@@ -11,9 +11,7 @@ pub(super) struct CompilerRuntime {
 impl CompilerRuntime {
     /// Owns the host-sized worker pool; no task is detached by process execution.
     fn build_runtime() -> Result<Self, String> {
-        let workers = std::thread::available_parallelism()
-            .map_err(|error| format!("read compiler host parallelism: {error}"))?
-            .get();
+        let workers = crate::parallelism::host_build_parallelism();
         Ok(Self {
             runtime: Builder::new_multi_thread()
                 .worker_threads(workers)

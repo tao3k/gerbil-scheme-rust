@@ -18,4 +18,4 @@
     "scheme/python-runtime"
     "scheme/python-package")
   optimize: #t
-  parallelize: 1)
+  parallelize: (##cpu-count))

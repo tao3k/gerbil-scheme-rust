@@ -14,6 +14,7 @@ mod header;
 mod instance;
 pub use instance::{NativeInstanceImageRequest, build_native_instance_image};
 mod package_launcher;
+mod parallelism;
 mod program;
 mod toolchain;
 pub use program::{

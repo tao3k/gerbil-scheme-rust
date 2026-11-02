@@ -780,12 +780,7 @@ fn observe_cached(
 }
 
 pub(crate) fn native_build_parallelism(job_count: usize) -> usize {
-    let configured = std::env::var("GERBIL_BUILD_CORES")
-        .ok()
-        .and_then(|value| value.parse::<usize>().ok())
-        .filter(|count| *count > 0)
-        .or_else(|| std::thread::available_parallelism().ok().map(usize::from))
-        .unwrap_or(1);
+    let configured = crate::parallelism::host_build_parallelism();
     configured.min(job_count.max(1))
 }
 

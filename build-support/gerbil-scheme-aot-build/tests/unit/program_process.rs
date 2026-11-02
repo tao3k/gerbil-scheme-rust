@@ -571,7 +571,10 @@ fn cargo_observes_fragment_before_compiler_child_can_finish() {
     std::fs::write(root.join("src/lib.rs"), "").unwrap();
     std::fs::write(root.join("Cargo.toml"), "[package]\nname = \"build-progress-framing-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n[workspace]\n[build-dependencies]\ntokio = { version = \"=1.53.1\", features = [\"full\"] }\n").unwrap();
     let process = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/program/process.rs");
+    let parallelism = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/parallelism.rs");
     std::fs::write(root.join("build.rs"), format!(r#"
+#[path = {parallelism:?}]
+mod parallelism;
 fn gerbil_command(program: &std::path::Path) -> std::process::Command {{
     std::process::Command::new(program)
 }}

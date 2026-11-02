@@ -2,6 +2,38 @@ use crate::{configure_gerbil_runtime_diagnostics, gerbil_command};
 use std::ffi::OsStr;
 
 #[test]
+fn build_children_and_object_workers_use_the_executing_host_capacity() {
+    const CHILD: &str = "GERBIL_CORE_INJECTION_RECEIPT";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "compiler::environment_tests::build_children_and_object_workers_use_the_executing_host_capacity", "--nocapture"])
+            .env(CHILD, "1")
+            .env("GERBIL_BUILD_CORES", "stale-untrusted-count")
+            .output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let host = std::thread::available_parallelism().unwrap().get();
+    let output = gerbil_command("printenv")
+        .arg("GERBIL_BUILD_CORES")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap().trim(),
+        host.to_string()
+    );
+    assert_eq!(crate::program::native_build_parallelism(usize::MAX), host);
+    assert_eq!(crate::program::native_build_parallelism(1), 1);
+    println!("BUILD-CORE-RECEIPT actual-host={host} child={host} object-workers={host}");
+}
+
+#[test]
 fn selected_sdk_command_removes_ambient_apple_tool_redirects() {
     let command = gerbil_command("selected-gsc");
     assert_eq!(command.get_program(), OsStr::new("selected-gsc"));

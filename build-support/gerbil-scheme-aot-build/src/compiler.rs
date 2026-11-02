@@ -297,6 +297,12 @@ fn scheme_string(path: &Path) -> String {
 /// directory overrides must not redirect that compiler's system tool shims.
 pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program.as_ref());
+    // Resolve on the executing host, including when the driver is precompiled.
+    // Do not inherit a stale CI value or embed the library build host's count.
+    command.env(
+        "GERBIL_BUILD_CORES",
+        crate::parallelism::host_build_parallelism().to_string(),
+    );
     // Nix/direnv environments commonly inject compiler include and linker
     // paths for Rust. Gerbil's selected gsc is already configured with its own
     // C compiler and SDK, so inheriting those unrelated paths can mix libc/SDK

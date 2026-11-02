@@ -26,6 +26,22 @@ Tokio tasks must not move a live Gerbil VM across arbitrary worker threads.
 Reuse the existing affine owner/instance mechanisms. Serial access to one VM
 does not cap native compiler workers or the host scheduler to one CPU.
 
+* Executing-host build capacity
+
+The AOT owner resolves =std::thread::available_parallelism= when constructing
+each Gerbil build command and explicitly injects =GERBIL_BUILD_CORES= into that
+child. It does not compile a developer machine's CPU count into an artifact or
+inherit a stale CI override. Object compilation and the shared Tokio runtime
+use the same host-capacity function; an object batch uses at most its number of
+jobs. The root =build.ss= uses Gambit's current =##cpu-count= instead of a fixed
+single worker. Package declarations remain in =build.ss=.
+
+A real child-process regression starts with an invalid inherited core value,
+checks the injected count against the executing host, and checks object-worker
+capacity and the one-job bound. This establishes environment propagation, not
+whole-build speedup, successful linking, or completion of remote CI. Existing
+resource cleanup, cancellation and wall/idle watchdogs remain unchanged.
+
 * Source audit and actual gap
 
 =crates/gerbil-scheme-build/src/lib.rs= currently implements

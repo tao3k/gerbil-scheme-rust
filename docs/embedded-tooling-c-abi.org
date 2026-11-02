@@ -540,3 +540,62 @@ results still require execution. The existing native CI preparation step now
 runs the resolver/codec tests and shared-link suite using its already-built
 package, with GxTest's result propagated explicitly. No extra job or build runner
 is introduced.
+
+* Native local-package discovery regression (2026-11-03)
+
+The real ASCENT consumer at candidate =9207638= failed before its build script
+could import Yuanxu: the C ABI loaded build.ss without first selecting the local
+package environment. Explicitly configured small cases did not cover that
+standard default path. The installed Gerbil package command's native
+=build-pkgs= / =clean-pkgs= implementation calls =setup-local-pkg-env!= before
+script loading. The integration library now uses that same procedure for
+build/main/spec operations and native test selection. No compiler path, package
+path override, compatibility loader or new public argument is introduced.
+
+The existing immutable prefix binding retains the native selection for later
+calls. Existing scoped path restoration now also encloses the first discovery
+call, including exceptions. Unbound cleanup still refuses entry; pre-entry
+cancellation still performs no discovery or directory creation. Subsequent
+cleanup uses the selected owner prefix. Dependency installation remains the
+native package manager's responsibility; build does not silently fetch packages.
+
+A second case in the existing package test target uses the same existing source
+package, not a new fixture. A load-time assertion rejects a missing native prefix
+before any compiler output can fall back into a host-global package directory.
+The case fails with code 70 before the implementation change. After it, the
+case checks local .gerbil products, same-process build identity, canonical native
+prefix rebinding, refusal of a different prefix, passing and failing GxTest,
+per-call environment restoration, cancellation and cleanup isolation. The
+existing explicit-prefix scenario and all of its assertions remain present.
+The existing child supervisor selects the actual test name and serializes
+one-shot cases; each retains host capacity and its original 15 s total / 5 s
+idle gate. No feature switch or second runner is added.
+
+The first new test draft compared active runtime state with the caller's
+pre-initialization environment. That was an incorrect boundary: the existing
+compiler projection spans VM initialization through teardown. The corrected
+case checks the active-owner snapshot after every call and the full caller
+snapshot after Drop. A second incorrect draft used macOS's /var spelling while
+native discovery selected /private/var; it now supplies the same canonical
+native prefix, preserving the different-prefix refusal. These failed drafts
+are retained separately and did not cause weaker production validation.
+Diagnostics no longer print complete environment maps.
+
+The checked-artifact =bridge-build= entry passes all 22 sys tests, both package
+cases and runtime lifecycle, plus both strict lint commands. The original case
+exits naturally in 6.965942541 s, and the new discovery case in 4.556149208 s,
+each with 12 workers and unchanged gates. Those separate invocations are
+functional receipts, not a latency comparison or net-benefit claim. Full
+workspace and clean Git-checkout results for the follow-up remain separate
+until recorded. Earlier =9207638= results do not qualify later source changes.
+
+The follow-up checked-artifact workspace test passes aggregate counters of
+685 passed, zero failed and 15 ignored; full workspace strict Clippy passes.
+The two package cases exit naturally in 9.145700541 s and 4.585919875 s in that
+workspace invocation. The unchanged scalar gate is 5.465125 ms including
+initialization and 30,000 calls. These are pass/fail gates, not a performance
+admission. Tests and implementation bytes match the isolated source export;
+only the API documentation was clarified afterward. The first draft's full
+environment-map diagnostics are redacted in its retained log; the original
+log digest, failure trace and differing key names remain recorded. No raw logs
+or environment values are published to Git.

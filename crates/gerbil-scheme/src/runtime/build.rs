@@ -21,7 +21,7 @@ impl GerbilRuntime {
     /// Invoke the package's official `build.ss clean` action on this VM owner.
     /// Package code owns generated-output cleanup; this does not unload modules
     /// or classify artifacts in Rust. A new source cut requires a new host.
-    /// Bind package paths explicitly before requesting cleanup.
+    /// Select paths through a prior native package operation or explicit binding before cleanup.
     /// # Errors
     /// Returns checked owner/image/transport errors and preserves package status.
     pub fn clean_package(&self, directory: &str) -> Result<i32, NativeError> {
@@ -135,6 +135,8 @@ impl GerbilRuntime {
     }
 
     /// Execute the ordinary native `build.ss` entry without a Gerbil CLI child.
+    /// Select the native local package environment before loading the script;
+    /// retain that immutable prefix while restoring caller paths after each call.
     /// # Errors
     /// Rejects thread/lifecycle errors and invalid UTF-8 transport. A nonzero
     /// returned code is a package build failure, not successful admission.

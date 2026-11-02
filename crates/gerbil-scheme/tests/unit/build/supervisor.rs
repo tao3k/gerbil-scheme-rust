@@ -9,11 +9,22 @@ unsafe extern "C" {
     fn kill(pid: i32, signal: i32) -> i32;
 }
 
+static PACKAGE_CHILD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub(super) fn run() -> bool {
     const CHILD: &str = "GERBIL_SCHEME_RUST_STDIO_CHILD";
     if std::env::var_os(CHILD).is_some() {
         return false;
     }
+    // Each existing native gate keeps its own fixed budget and host capacity.
+    // Serialize independent one-shot VM cases instead of making them compete.
+    let _serial = PACKAGE_CHILD
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let test_name = std::thread::current()
+        .name()
+        .expect("named test thread")
+        .to_owned();
     let workers = std::thread::available_parallelism().unwrap().get();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(workers)
@@ -25,8 +36,8 @@ pub(super) fn run() -> bool {
         std::fs::create_dir_all(&poisoned).unwrap();
         std::fs::write(poisoned.join("stdio.h"), "#error unrelated host compiler headers leaked into Gerbil\n").unwrap();
         let mut command = tokio::process::Command::new(std::env::current_exe().unwrap());
-        command.args(["--exact", "build::build_test_and_failures_share_the_existing_owner", "--nocapture"])
-            .env(CHILD, "1").stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+        command.args(["--exact", &test_name, "--nocapture"])
+            .env(CHILD, "1").env_remove("GERBIL_PATH").env_remove("GERBIL_LOADPATH").stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
         command.env("CPATH", &poisoned).env("SDKROOT", "/nix/store/invalid-host-sdk");
         #[cfg(unix)]
         { command.process_group(0); }

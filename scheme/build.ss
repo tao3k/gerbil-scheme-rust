@@ -21,20 +21,20 @@
 (def (restore-environment name value)
   (if value (setenv name value) (setenv name)))
 (def (with-package-paths action)
-  (if (not package-paths) (action)
     (let ((prefix (getenv "GERBIL_PATH" #f))
           (libraries (getenv "GERBIL_LOADPATH" #f))
           (paths (load-path)))
       (dynamic-wind
         (lambda ()
-          (setenv "GERBIL_PATH" (car package-paths))
-          (setenv "GERBIL_LOADPATH" (cdr package-paths))
-          (set-load-path! (append (string-split (cdr package-paths) #\:) paths)))
+          (when package-paths
+            (setenv "GERBIL_PATH" (car package-paths))
+            (setenv "GERBIL_LOADPATH" (cdr package-paths))
+            (set-load-path! (append (string-split (cdr package-paths) #\:) paths))))
         action
         (lambda ()
           (set-load-path! paths)
           (restore-environment "GERBIL_PATH" prefix)
-          (restore-environment "GERBIL_LOADPATH" libraries))))))
+          (restore-environment "GERBIL_LOADPATH" libraries)))))
 
 (def (package-configure prefix libraries)
   (unless (and (string? prefix) (not (string-empty? prefix))
@@ -45,6 +45,21 @@
       (error "tooling owner is already bound to another package prefix"))
     (set! package-paths selected)
     0))
+
+;; Match the native package command before expanding the package build script.
+;; The existing immutable owner binding retains the native selection across calls;
+;; with-package-paths restores the caller's environment even on the first failure.
+(def (setup-package-env! create?)
+  (unless package-paths
+    (setup-local-pkg-env! create?)
+    (let (prefix (getenv "GERBIL_PATH" #f))
+      (when prefix
+        (let* ((library (path-expand "lib" prefix))
+               (extra (getenv "GERBIL_LOADPATH" #f))
+               (libraries (if (and extra (not (string-empty? extra)))
+                            (string-append library ":" extra) library)))
+          (package-configure prefix libraries)
+          (add-load-path! library))))))
 
 (def (with-build-cores action)
   (let ((previous (getenv "GERBIL_BUILD_CORES" #f))
@@ -89,6 +104,7 @@
 (def (package-invoke-main arguments)
   (when (and (pair? arguments) (equal? (car arguments) "clean") (not package-paths))
     (error "package cleanup requires explicitly bound package paths"))
+  (setup-package-env! #t)
   (load (path-expand "build.ss" (current-directory)))
   (apply (eval 'main) arguments))
 (def (package-main directory arguments)
@@ -133,6 +149,7 @@
         (lambda ()
           (unless (and (string? tests) (not (string-empty? tests)))
             (error "nonempty package test path required"))
+          (setup-package-env! #f)
           ;; Evaluate selected entries once for this request; dependencies remain cached.
           (for-each (lambda (file) (import-module file #t #t))
                     (collect-files [tests]))
@@ -141,7 +158,7 @@
 (def (package-build-spec directory specification)
   (call-package directory
     (lambda ()
-      (setup-local-pkg-env! #t)
+      (setup-package-env! #t)
       (load (path-expand "build.ss" (current-directory)))
       (eval-syntax '(import (only-in :std/make make)))
       ((eval 'make) ((eval (string->symbol specification)))

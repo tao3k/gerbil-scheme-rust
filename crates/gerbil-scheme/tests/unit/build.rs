@@ -16,6 +16,85 @@ use std::{
 };
 
 #[test]
+fn local_package_environment_is_selected_before_loading_build_script() {
+    if supervisor::run() {
+        return;
+    }
+    let root = fixture();
+    let environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
+    assert!(std::env::var_os("GERBIL_PATH").is_none());
+    let runtime = initialize();
+    // The existing runtime compiler projection lasts until VM teardown. Calls
+    // must restore this active-owner state; Drop restores the full caller state.
+    let active_environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
+    let directory = root.to_str().unwrap();
+    let prefix = root.join(".gerbil");
+    assert_eq!(
+        runtime
+            .build_package_cancellable(directory, &AtomicBool::new(true))
+            .unwrap(),
+        PackageCallOutcome::CancelledBeforeEntry,
+    );
+    assert!(
+        !prefix.exists(),
+        "cancelled call must not select/create package environment"
+    );
+    assert_eq!(runtime.build_package(directory).unwrap(), 0);
+    assert!(prefix.join("lib/package-fixture/answer.o1").is_file());
+    assert_eq!(
+        fs::read_to_string(root.join("build-owner.txt")).unwrap(),
+        std::process::id().to_string()
+    );
+    assert!(
+        std::env::vars_os().collect::<std::collections::BTreeMap<_, _>>() == active_environment,
+        "package call changed the active owner's environment"
+    );
+    // Native setup normalizes its current directory (for example /var resolves
+    // to /private/var on macOS). Compare the same selected prefix identity.
+    let selected_prefix = prefix.canonicalize().unwrap();
+    assert_eq!(
+        runtime
+            .configure_package_paths(
+                selected_prefix.to_str().unwrap(),
+                selected_prefix.join("lib").to_str().unwrap()
+            )
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        runtime
+            .configure_package_paths(root.join("other-prefix").to_str().unwrap(), directory)
+            .unwrap(),
+        70
+    );
+    assert_eq!(
+        runtime
+            .test_package(directory, "t/passing-test.ss")
+            .unwrap(),
+        0
+    );
+    assert_ne!(
+        runtime
+            .test_package(directory, "t/failing-test.ss")
+            .unwrap(),
+        0
+    );
+    assert!(
+        std::env::vars_os().collect::<std::collections::BTreeMap<_, _>>() == active_environment,
+        "package call changed the active owner's environment"
+    );
+    assert_eq!(runtime.clean_package(directory).unwrap(), 0);
+    assert!(!prefix.join("lib/package-fixture/answer.o1").exists());
+    assert!(prefix.join("lib/unrelated/keep").is_file());
+    drop(runtime);
+    assert_environment_after_close(&environment);
+    fs::remove_dir_all(root).unwrap();
+    println!(
+        "PACKAGE-NATIVE-ENV-OK discovery immutable-prefix failure-restoration cancellation cleanup"
+    );
+}
+
+#[test]
 fn build_test_and_failures_share_the_existing_owner() {
     if supervisor::run() {
         return;

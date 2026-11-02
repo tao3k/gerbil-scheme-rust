@@ -1,5 +1,7 @@
 #!/usr/bin/env gxi
 (import :std/build-script (only-in "package-clean" clean-package-modules!))
+(unless (getenv "GERBIL_PATH" #f)
+  (error "native package environment must be selected before loading build.ss"))
 (call-with-output-file (list path: "build-owner.txt" truncate: #t)
   (lambda (port) (write (##os-getpid) port)))
 (defbuild-script '("answer"))

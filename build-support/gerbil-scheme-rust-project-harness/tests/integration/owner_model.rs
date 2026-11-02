@@ -10,39 +10,16 @@ use std::{
     },
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CheckKind {
+    Scenario,
+    Simulation,
+    Frontend,
+}
+
 struct Check {
-    scenario: bool,
+    kind: CheckKind,
     work: Box<dyn FnOnce() + Send>,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct ProtocolShard {
-    index: usize,
-    count: usize,
-}
-
-impl ProtocolShard {
-    fn parse(index: Option<&str>, count: Option<&str>) -> Result<Option<Self>, String> {
-        let (index, count) = match (index, count) {
-            (None, None) => return Ok(None),
-            (Some(index), Some(count)) => (index, count),
-            _ => return Err("protocol shard index and count must be supplied together".into()),
-        };
-        let index = index
-            .parse::<usize>()
-            .map_err(|_| "integer protocol shard index")?;
-        let count = count
-            .parse::<usize>()
-            .map_err(|_| "integer protocol shard count")?;
-        if count == 0 || index >= count {
-            return Err("protocol shard index must be below a nonzero count".into());
-        }
-        Ok(Some(Self { index, count }))
-    }
-
-    fn selects(self, index: usize) -> bool {
-        index % self.count == self.index
-    }
 }
 thread_local! {
     static PLANNING: RefCell<Option<Vec<Check>>> = const { RefCell::new(None) };
@@ -59,10 +36,14 @@ fn collect_success(arguments: &[&str]) -> bool {
         let Some(plan) = plan.as_mut() else {
             return false;
         };
-        let scenario = arguments[0] == "test";
+        let kind = match arguments[0] {
+            "test" => CheckKind::Scenario,
+            "run" => CheckKind::Simulation,
+            _ => CheckKind::Frontend,
+        };
         let owned: Vec<_> = arguments.iter().map(|arg| (*arg).to_owned()).collect();
         plan.push(Check {
-            scenario,
+            kind,
             work: Box::new(move || {
                 let args: Vec<_> = owned.iter().map(String::as_str).collect();
                 success(&args);
@@ -79,7 +60,7 @@ fn collect_mutation(arguments: [&str; 5]) -> bool {
         };
         let owned = arguments.map(str::to_owned);
         plan.push(Check {
-            scenario: false,
+            kind: CheckKind::Simulation,
             work: Box::new(move || {
                 mutation_counterexample(&owned[0], &owned[1], &owned[2], &owned[3], &owned[4]);
             }),
@@ -140,34 +121,33 @@ fn owner_protocol_scenarios_and_controls() {
     success(&["typecheck", source]);
     let model = std::sync::Arc::new(super::owner_model_source::ModelSource::prepare(&root()));
     let mut checks = protocol_plan(source);
-    // Put long scenarios first. Within each declared CI shard, workers claim
-    // immutable checks from one queue. A completed sibling shard is not evidence
-    // that this shard has verified its remaining checks.
-    checks.sort_by_key(|check| !check.scenario);
+    // Put long scenario commands ahead of shorter simulations. Each immutable
+    // check binds to a worker only at actual claim; no static shard can strand
+    // pending work while a peer is idle.
+    checks.sort_by_key(|check| check.kind != CheckKind::Scenario);
     let total = checks.len();
-    let shard = ProtocolShard::parse(
-        std::env::var("GERBIL_OWNER_MODEL_SHARD").ok().as_deref(),
-        std::env::var("GERBIL_OWNER_MODEL_SHARDS").ok().as_deref(),
-    )
-    .expect("complete protocol shard configuration");
+    let shard = std::env::var("GERBIL_OWNER_MODEL_SHARD")
+        .ok()
+        .map(|value| value.parse::<usize>().expect("integer protocol shard"));
     if let Some(shard) = shard {
-        assert!(
-            shard.count <= total,
-            "each protocol shard must receive work"
-        );
+        assert!(shard < 2, "protocol shard must be zero or one");
         checks = checks
             .into_iter()
             .enumerate()
-            .filter_map(|(index, check)| shard.selects(index).then_some(check))
+            .filter_map(|(index, check)| (index % 2 == shard).then_some(check))
             .collect();
     }
     let count = checks.len();
     eprintln!("QUINT-COVERAGE total={total} shard={shard:?} selected={count}");
     let mut checks = VecDeque::from(checks);
     // Quint lazily installs its Rust evaluator without a cross-process lock.
-    // Execute one real check before concurrent invocations can observe a
-    // partially downloaded archive. It remains part of the original checklist.
-    let first = checks.pop_front().expect("nonempty protocol checklist");
+    // Interpreter scenarios do not install the Rust evaluator. Execute an
+    // actual Rust simulation from this shard's original checklist first.
+    let first_rust = checks
+        .iter()
+        .position(|check| check.kind == CheckKind::Simulation)
+        .expect("each protocol shard must initialize its Rust evaluator");
+    let first = checks.remove(first_rust).unwrap();
     super::owner_model_source::scoped(&model, || (first.work)());
     let queue = Mutex::new(checks);
     let completed = AtomicUsize::new(1);
@@ -192,42 +172,6 @@ fn owner_protocol_scenarios_and_controls() {
     });
     assert_eq!(completed.load(Ordering::Relaxed), count);
     eprintln!("QUINT-PLAN-DONE jobs={count}");
-}
-
-#[test]
-fn ci_shards_cover_the_complete_canonical_protocol_checklist_once() {
-    let mut checks = protocol_plan("specs/owner_lifecycle.qnt");
-    checks.sort_by_key(|check| !check.scenario);
-    assert_eq!(
-        checks.len(),
-        95,
-        "scenario, trace or negative-control inventory changed"
-    );
-    let mut covered = vec![0; checks.len()];
-    let sizes: Vec<_> = (0..4)
-        .map(|index| {
-            let shard = ProtocolShard { index, count: 4 };
-            let selected: Vec<_> = (0..checks.len())
-                .filter(|&index| shard.selects(index))
-                .collect();
-            for index in &selected {
-                covered[*index] += 1;
-            }
-            selected.len()
-        })
-        .collect();
-    assert_eq!(sizes, [24, 24, 24, 23]);
-    assert!(covered.iter().all(|&visits| visits == 1));
-    for (index, count) in [
-        (None, Some("4")),
-        (Some("0"), None),
-        (Some("4"), Some("4")),
-        (Some("0"), Some("0")),
-        (Some("old"), Some("4")),
-    ] {
-        assert!(ProtocolShard::parse(index, count).is_err());
-    }
-    assert!(ProtocolShard::parse(None, None).unwrap().is_none());
 }
 fn lifecycle_protocol(source: &str) {
     for (domain, seed) in [
@@ -811,4 +755,28 @@ fn client_progress_scenarios(source: &str) {
             "1",
         ]);
     }
+}
+
+#[test]
+fn original_two_ci_shards_cover_all_checks_once() {
+    let mut checks = protocol_plan("specs/owner_lifecycle.qnt");
+    checks.sort_by_key(|check| check.kind != CheckKind::Scenario);
+    assert_eq!(checks.len(), 95);
+    let mut visits = vec![0; checks.len()];
+    let sizes: Vec<_> = (0..2)
+        .map(|shard| {
+            let selected: Vec<_> = (0..checks.len())
+                .filter(|index| index % 2 == shard)
+                .collect();
+            assert!(
+                selected
+                    .iter()
+                    .any(|&index| checks[index].kind == CheckKind::Simulation)
+            );
+            selected.iter().for_each(|&index| visits[index] += 1);
+            selected.len()
+        })
+        .collect();
+    assert_eq!(sizes, [48, 47]);
+    assert!(visits.iter().all(|&count| count == 1));
 }

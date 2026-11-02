@@ -195,6 +195,13 @@ pub(super) fn arguments(arguments: &[&str]) -> Vec<OsString> {
             }
         });
     }
+    // Scenario assertions use Quint's official in-process interpreter. Random
+    // traces keep the official Rust evaluator and their original sample bounds.
+    match arguments.first().copied() {
+        Some("test") => output.extend(["--backend", "typescript"].map(OsString::from)),
+        Some("run") => output.extend(["--backend", "rust"].map(OsString::from)),
+        _ => {}
+    }
     output
 }
 
@@ -273,4 +280,31 @@ fn cached_entry_rejects_changed_canonical_source() {
     };
     fs::write(canonical, "modified").unwrap();
     source.entry("Main");
+}
+
+#[test]
+fn official_backend_selection_preserves_the_original_check_arguments() {
+    for (command, backend) in [("test", "typescript"), ("run", "rust")] {
+        let original = [
+            command,
+            "specs/owner_lifecycle.qnt",
+            "--main",
+            "owner_lifecycle_small",
+            "--seed",
+            "1",
+            "--max-samples",
+            "1000",
+        ];
+        let selected = arguments(&original);
+        let unchanged: Vec<_> = original.iter().map(OsString::from).collect();
+        assert_eq!(&selected[..unchanged.len()], unchanged.as_slice());
+        assert_eq!(
+            &selected[unchanged.len()..],
+            &[OsString::from("--backend"), OsString::from(backend)]
+        );
+    }
+    assert_eq!(
+        arguments(&["typecheck", "source.qnt"]),
+        [OsString::from("typecheck"), OsString::from("source.qnt")]
+    );
 }

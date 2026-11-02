@@ -14,6 +14,36 @@ struct Check {
     scenario: bool,
     work: Box<dyn FnOnce() + Send>,
 }
+
+#[derive(Clone, Copy, Debug)]
+struct ProtocolShard {
+    index: usize,
+    count: usize,
+}
+
+impl ProtocolShard {
+    fn parse(index: Option<&str>, count: Option<&str>) -> Result<Option<Self>, String> {
+        let (index, count) = match (index, count) {
+            (None, None) => return Ok(None),
+            (Some(index), Some(count)) => (index, count),
+            _ => return Err("protocol shard index and count must be supplied together".into()),
+        };
+        let index = index
+            .parse::<usize>()
+            .map_err(|_| "integer protocol shard index")?;
+        let count = count
+            .parse::<usize>()
+            .map_err(|_| "integer protocol shard count")?;
+        if count == 0 || index >= count {
+            return Err("protocol shard index must be below a nonzero count".into());
+        }
+        Ok(Some(Self { index, count }))
+    }
+
+    fn selects(self, index: usize) -> bool {
+        index % self.count == self.index
+    }
+}
 thread_local! {
     static PLANNING: RefCell<Option<Vec<Check>>> = const { RefCell::new(None) };
 }
@@ -110,20 +140,25 @@ fn owner_protocol_scenarios_and_controls() {
     success(&["typecheck", source]);
     let model = std::sync::Arc::new(super::owner_model_source::ModelSource::prepare(&root()));
     let mut checks = protocol_plan(source);
-    // Put long scenario commands ahead of shorter simulations. Each immutable
-    // check binds to a worker only at actual claim; no static shard can strand
-    // pending work while a peer is idle.
+    // Put long scenarios first. Within each declared CI shard, workers claim
+    // immutable checks from one queue. A completed sibling shard is not evidence
+    // that this shard has verified its remaining checks.
     checks.sort_by_key(|check| !check.scenario);
     let total = checks.len();
-    let shard = std::env::var("GERBIL_OWNER_MODEL_SHARD")
-        .ok()
-        .map(|value| value.parse::<usize>().expect("integer protocol shard"));
+    let shard = ProtocolShard::parse(
+        std::env::var("GERBIL_OWNER_MODEL_SHARD").ok().as_deref(),
+        std::env::var("GERBIL_OWNER_MODEL_SHARDS").ok().as_deref(),
+    )
+    .expect("complete protocol shard configuration");
     if let Some(shard) = shard {
-        assert!(shard < 2, "protocol shard must be zero or one");
+        assert!(
+            shard.count <= total,
+            "each protocol shard must receive work"
+        );
         checks = checks
             .into_iter()
             .enumerate()
-            .filter_map(|(index, check)| (index % 2 == shard).then_some(check))
+            .filter_map(|(index, check)| shard.selects(index).then_some(check))
             .collect();
     }
     let count = checks.len();
@@ -157,6 +192,42 @@ fn owner_protocol_scenarios_and_controls() {
     });
     assert_eq!(completed.load(Ordering::Relaxed), count);
     eprintln!("QUINT-PLAN-DONE jobs={count}");
+}
+
+#[test]
+fn ci_shards_cover_the_complete_canonical_protocol_checklist_once() {
+    let mut checks = protocol_plan("specs/owner_lifecycle.qnt");
+    checks.sort_by_key(|check| !check.scenario);
+    assert_eq!(
+        checks.len(),
+        95,
+        "scenario, trace or negative-control inventory changed"
+    );
+    let mut covered = vec![0; checks.len()];
+    let sizes: Vec<_> = (0..4)
+        .map(|index| {
+            let shard = ProtocolShard { index, count: 4 };
+            let selected: Vec<_> = (0..checks.len())
+                .filter(|&index| shard.selects(index))
+                .collect();
+            for index in &selected {
+                covered[*index] += 1;
+            }
+            selected.len()
+        })
+        .collect();
+    assert_eq!(sizes, [24, 24, 24, 23]);
+    assert!(covered.iter().all(|&visits| visits == 1));
+    for (index, count) in [
+        (None, Some("4")),
+        (Some("0"), None),
+        (Some("4"), Some("4")),
+        (Some("0"), Some("0")),
+        (Some("old"), Some("4")),
+    ] {
+        assert!(ProtocolShard::parse(index, count).is_err());
+    }
+    assert!(ProtocolShard::parse(None, None).unwrap().is_none());
 }
 fn lifecycle_protocol(source: &str) {
     for (domain, seed) in [

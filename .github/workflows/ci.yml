@@ -260,9 +260,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1]
+        shard: [0, 1, 2, 3]
     env:
       GERBIL_OWNER_MODEL_SHARD: ${{ matrix.shard }}
+      GERBIL_OWNER_MODEL_SHARDS: '4'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4

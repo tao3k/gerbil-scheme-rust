@@ -38,7 +38,22 @@ and a checkout-local cache resolved these environment failures. The installed
 SDK was not downloaded, rebuilt, or changed. Complete remote gates still
 require the exact pushed head's GitHub run; these local checks are not CI green.
 
-* Restoration
+* Finite protocol scheduling
+
+The canonical owner protocol retains 95 checks, including scenarios, sampled
+traces and deliberate safety counterexamples. CI partitions that unchanged
+inventory into four declared shards of 24, 24, 24 and 23 checks. The shard index
+and count must be supplied together. A regression checks exact-once coverage
+of the actual collected checklist and rejects malformed partition settings.
+
+This changes scheduling, not the model, sample counts, seeds or step bounds.
+Each job retains its fifteen-minute limit. Workers still use executing-host
+parallelism with the existing minimum of four; the number of CI shards is not
+the number of compiler cores. Every shard must finish its selected checklist
+and the union must remain complete. A successful sibling does not admit a
+timed-out shard. The previous shard-zero cancellation remains failure evidence.
+
+* Processor capability restoration
 
 After both platform SDK releases qualify multiple-threaded VMs, update the
 immutable release identity/checksum and restore the =scheme-smp= job condition.

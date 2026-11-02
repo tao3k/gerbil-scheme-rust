@@ -165,13 +165,11 @@
       (let* ((entry (path-expand source))
              (destination (path-expand output))
              (sdk-root (path-expand ".." (path-directory (this-source-file)))))
-        ;; Read the SDK owner's native link declaration, not host package probes.
-        (load (path-expand "build.ss" sdk-root))
+        ;; Staging owns the shared package link declaration on every entry path.
         (eval-syntax `(import (only-in ,(path-expand "scheme/program-build.ss" sdk-root)
                                gerbil-rs-stage-program)))
         (create-directory* destination)
-        ((eval 'gerbil-rs-stage-program) entry destination imports
-          link-options: ((eval 'gerbil-scheme-rust-link-options)))
+        ((eval 'gerbil-rs-stage-program) entry destination imports)
         ;; write-json returns a byte count; that is data, not a tool exit code.
         (void)))))
 

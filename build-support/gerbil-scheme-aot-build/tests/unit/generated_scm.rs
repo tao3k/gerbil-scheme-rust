@@ -14,6 +14,8 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     let workspace = unique_temp_dir("gerbil-native-build-generated-scm");
     fs::create_dir_all(workspace.join("scheme")).expect("create Scheme input root");
     fs::write(workspace.join("build.ss"), "build-v1\n").expect("write build.ss");
+    fs::write(workspace.join("scheme/link-options.ss"), "link-v1\n")
+        .expect("write native dependency declaration");
     fs::write(workspace.join("scheme/package-clean.ss"), "clean-v1\n")
         .expect("write package cleanup source");
     fs::write(workspace.join("gerbil.pkg"), "package-v1\n").expect("write gerbil.pkg");
@@ -40,6 +42,12 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     .expect("write composite include");
     fs::write(workspace.join("scheme/utf8.ss"), "encoder-v1\n").expect("write utf8.ss");
     let original = workspace_input_fingerprint(&workspace);
+    fs::write(workspace.join("scheme/link-options.ss"), "link-v2\n")
+        .expect("change native dependency declaration");
+    assert_ne!(original, workspace_input_fingerprint(&workspace));
+    fs::write(workspace.join("scheme/link-options.ss"), "link-v1\n")
+        .expect("restore native dependency declaration");
+    assert_eq!(original, workspace_input_fingerprint(&workspace));
     fs::write(workspace.join("scheme/package-clean.ss"), "clean-v2\n")
         .expect("change package cleanup source");
     assert_ne!(original, workspace_input_fingerprint(&workspace));

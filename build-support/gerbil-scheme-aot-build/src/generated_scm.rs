@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 const PROVENANCE_SCHEMA: &str = "gerbil-scheme-rust.generated-scm-provenance.v2";
 const INPUT_PATHS: &[&str] = &[
     "build.ss",
+    "scheme/link-options.ss",
     "scheme/package-clean.ss",
     "gerbil.pkg",
     "scheme/runtime.ss",

@@ -169,7 +169,14 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     )
     .unwrap_err();
     assert!(error.contains("generate program module C"));
-    assert_eq!(*observations.1.lock().unwrap(), vec![bridge]);
+    assert_eq!(
+        *observations.1.lock().unwrap(),
+        vec![
+            bridge,
+            source_workspace().join("scheme/link-options.ss"),
+            PathBuf::from("unused/libgerbil.ldd"),
+        ]
+    );
     let rows = observations.0.into_inner().unwrap();
     assert_eq!(
         rows[0],

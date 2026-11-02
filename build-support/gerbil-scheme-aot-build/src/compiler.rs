@@ -26,6 +26,14 @@ fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM");
     println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM");
     println!("cargo:rerun-if-changed=../../build.ss");
+    println!("cargo:rerun-if-changed=../../scheme/link-options.ss");
+    for variable in [
+        "PKG_CONFIG_PATH",
+        "PKG_CONFIG_LIBDIR",
+        "PKG_CONFIG_SYSROOT_DIR",
+    ] {
+        println!("cargo:rerun-if-env-changed={variable}");
+    }
     println!("cargo:rerun-if-changed=../../scheme/package-clean.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
@@ -243,6 +251,7 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
     for source in [
         "scheme/build.ss",
         "scheme/program-build.ss",
+        "scheme/link-options.ss",
         "scheme/program-metadata.ss",
         "scheme/python-package.ss",
     ] {
@@ -252,8 +261,7 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
         );
     }
     let expression = format!(
-        "(load {}) (import :gerbil-scheme-rust/scheme/program-build) (gerbil-rs-stage-program {} {} '(:gerbil/core :gerbil/compiler :gerbil/tools/gxtest) link-options: (gerbil-scheme-rust-link-options))",
-        scheme_string(&workspace.join("build.ss")),
+        "(import :gerbil-scheme-rust/scheme/program-build) (gerbil-rs-stage-program {} {} '(:gerbil/core :gerbil/compiler :gerbil/tools/gxtest))",
         scheme_string(&workspace.join("scheme/build.ss")),
         scheme_string(&stage)
     );

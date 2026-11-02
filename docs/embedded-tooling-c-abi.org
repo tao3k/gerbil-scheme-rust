@@ -49,6 +49,22 @@ from direct public build/test invocation.
 
 * Package context and host state
 
+Native dependency discovery belongs to this package's build declaration.
+=build.ss= and low-level program staging include the same =scheme/link-options.ss=
+declaration, using =pkg-config-libs= for OpenSSL, zlib and SQLite. Staging records
+these target flags before caller additions and the installed Gerbil link flags.
+An old installation path is not a reason to probe alternate host libraries in a
+downstream consumer. Missing target package metadata fails staging naturally.
+The Rust archive consumer retains its availability and static/dynamic checks;
+it does not reinterpret a dynamic library as a static archive.
+
+Discovery runs during builds, never during Policy evaluation or provider sends.
+The host supplies its target pkg-config environment, including keg-only package
+metadata when needed. Compiler/linker selection and package metadata search are
+separate inputs: configuring pkg-config does not select the C compiler.
+=gerbil test -g -v 5 t/link-options-test.ss= checks ordinary staging, preservation
+of explicit flag ordering and refusal when target metadata is unavailable.
+
 Each call scopes its directory, expander context and standard Gerbil paths.
 Prefix binding is immutable for the tooling owner's lifetime. Standard
 GERBIL_PATH, GERBIL_LOADPATH, GAMBOPT and GERBIL_BUILD_CORES values are restored

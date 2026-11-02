@@ -231,6 +231,12 @@ pub fn build_program_archive_with_contract(
     for module in &plan.modules {
         observer.observe_source_input(&module.scm);
     }
+    for input in [
+        source_workspace().join("scheme/link-options.ss"),
+        plan.library_dir.join("libgerbil.ldd"),
+    ] {
+        observer.observe_source_input(&input);
+    }
     for input in crate::discovery::gambit_sdk_inputs(request.gsc) {
         observer.observe_source_input(&input);
     }

@@ -3,8 +3,11 @@
 (import :gerbil/compiler
         :gerbil/expander
         (only-in :std/list/list delete-duplicates/hash)
+        (only-in :std/make pkg-config-libs)
         (only-in :std/encoding/json write-json))
 (export gerbil-rs-stage-program)
+
+(include "link-options.ss")
 
 ;; The versioned compiler adapter lives here, never in a downstream Rust
 ;; parser. These are the same native graph operations used by compile-exe.
@@ -45,7 +48,10 @@
     ;; loop. Its ordinary exports become callable after shared runtime setup.
     (compile-exe source [invoke-gsc: #f keep-scm: #t optimize: #t output-file: output])
     (let* ((home (gerbil-home))
-           (link-options (append declared-link-options
+           ;; All staging clients receive the same owner-declared target paths.
+           ;; Installed Gerbil metadata remains required, but its historical -L
+           ;; directories cannot hide the current pkg-config declaration.
+           (link-options (append (gerbil-scheme-rust-link-options) declared-link-options
               (call-with-input-file (path-expand "lib/libgerbil.ldd" home) read)))
            (modules
             (map (lambda (id)

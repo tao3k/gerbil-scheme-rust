@@ -193,6 +193,10 @@ impl GerbilRuntime {
 
         // SAFETY: lifecycle operations are serialized by RUNTIME_LIFECYCLE and
         // no safe GerbilRuntime exists while RUNTIME_INITIALIZED is false.
+        #[cfg(feature = "package-tools")]
+        let toolchain_environment = linker
+            .is_none()
+            .then(super::package_tools::CompilerEnvironment::enter);
         RUNTIME_STATE.store(RUNTIME_INITIALIZING, Ordering::Release);
         let status = unsafe {
             match linker {
@@ -233,6 +237,8 @@ impl GerbilRuntime {
         Ok(Self {
             owner: thread::current().id(),
             _not_send_or_sync: PhantomData,
+            #[cfg(feature = "package-tools")]
+            _toolchain_environment: toolchain_environment,
         })
     }
 

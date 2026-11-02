@@ -310,36 +310,7 @@ pub fn gerbil_command(program: impl AsRef<OsStr>) -> Command {
         "GERBIL_BUILD_CORES",
         crate::parallelism::host_build_parallelism().to_string(),
     );
-    // Nix/direnv environments commonly inject compiler include and linker
-    // paths for Rust. Gerbil's selected gsc is already configured with its own
-    // C compiler and SDK, so inheriting those unrelated paths can mix libc/SDK
-    // headers and make even FILE or wchar_t unavailable.
-    for variable in [
-        "CC",
-        "CFLAGS",
-        "CPPFLAGS",
-        "LDFLAGS",
-        "CPATH",
-        "C_INCLUDE_PATH",
-        "CPLUS_INCLUDE_PATH",
-        "LIBRARY_PATH",
-        "NIX_CFLAGS_COMPILE",
-        "NIX_LDFLAGS",
-        "SDKROOT",
-        "DEVELOPER_DIR",
-    ] {
-        command.env_remove(variable);
-    }
-    if let Some(path) = env::var_os("PATH") {
-        let gerbil_path = env::join_paths(env::split_paths(&path).filter(|entry| {
-            !entry
-                .canonicalize()
-                .unwrap_or_else(|_| entry.clone())
-                .starts_with("/nix/store")
-        }))
-        .expect("rebuild Gerbil tool PATH");
-        command.env("PATH", gerbil_path);
-    }
+    crate::tool_environment::configure_gerbil_compiler_environment(&mut command);
     if let Some(selected) = crate::resolve_gerbil_executable(Path::new(program.as_ref())) {
         crate::configure_gerbil_native_tool_command(&mut command, selected);
     }

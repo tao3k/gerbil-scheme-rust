@@ -13,6 +13,39 @@ pub const GERBIL_HOME_ENV: &str = "GERBIL_HOME";
 /// Gambit option environment variable used to override runtime paths.
 pub const GAMBOPT_ENV: &str = "GAMBOPT";
 
+/// Keep Gerbil's configured C compiler isolated from unrelated Rust SDK settings.
+/// This same environment projection is used by process and embedded build owners.
+/// # Panics
+/// Panics if the filtered host PATH cannot be represented as a joined path list.
+pub fn configure_gerbil_compiler_environment(command: &mut Command) {
+    for variable in [
+        "CC",
+        "CFLAGS",
+        "CPPFLAGS",
+        "LDFLAGS",
+        "CPATH",
+        "C_INCLUDE_PATH",
+        "CPLUS_INCLUDE_PATH",
+        "LIBRARY_PATH",
+        "NIX_CFLAGS_COMPILE",
+        "NIX_LDFLAGS",
+        "SDKROOT",
+        "DEVELOPER_DIR",
+    ] {
+        command.env_remove(variable);
+    }
+    if let Some(path) = env::var_os("PATH") {
+        let path = env::join_paths(env::split_paths(&path).filter(|entry| {
+            !entry
+                .canonicalize()
+                .unwrap_or_else(|_| entry.clone())
+                .starts_with("/nix/store")
+        }))
+        .expect("rebuild Gerbil tool PATH");
+        command.env("PATH", path);
+    }
+}
+
 /// Native Gerbil tool environment inferred from an installed tool path.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GerbilNativeToolEnvironment {

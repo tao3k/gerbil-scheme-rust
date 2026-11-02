@@ -60,7 +60,7 @@ The C boundary saves host descriptors and signals, installs the actual
 Gambit child notification handler for package work and restores host state
 before publishing its result. This is trusted, exclusive build-host tooling;
 it does not isolate arbitrary package code from unrelated host threads.
-Do not run unrelated subprocess or environment mutation concurrently with an
+Do not run unrelated subprocess or environment access concurrently with an
 entered package operation. Tokio coordination must not migrate the affine VM.
 
 * Exceptions, cancellation and completion
@@ -147,3 +147,20 @@ allocations after VM teardown and checks exact preservation without printing
 potentially sensitive values. It keeps natural exit and the original deadlines.
 A separate MallocScribble diagnostic reaches a child compiler failure earlier
 and is retained as inconclusive for this focused post-shutdown counterexample.
+
+* One compiler environment for process and embedded owners
+
+The complete MRR build exposed Homebrew GCC reading Nix SDK headers through
+ambient CPATH. The former command entry already excluded unrelated compiler
+settings, but the C ABI owner had not reused that projection. The existing
+shared tool_environment source now owns that single projection. The AOT process
+builder and opt-in tooling VM both consume it. The VM applies it before setup
+and restores the original values after teardown; there is no compiler command
+spawn or consumer-owned environment policy on this path. Explicit downstream
+program initialization retains its original environment.
+
+The complete fixture receives a CPATH containing a deliberately rejecting
+stdio.h and an invalid inherited SDKROOT. Actual Scheme compilation must pass,
+and the exact original host environment must be restored after shutdown.
+The real MRR failure remains in ignored cache; passing the focused poison
+counterexample does not replace full consumer acceptance.

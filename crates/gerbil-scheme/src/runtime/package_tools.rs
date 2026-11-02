@@ -62,7 +62,7 @@ impl GerbilRuntime {
     /// Bind this build host to one package prefix and its standard Gerbil load path.
     /// Calls scope and restore Gerbil's environment and loader paths. A different
     /// prefix on the same owner is refused. This is trusted build-host tooling;
-    /// unrelated host environment mutation or subprocess work must not overlap.
+    /// unrelated host environment access or subprocess work must not overlap.
     /// # Errors
     /// Returns owner/transport errors; nonzero Scheme status refuses rebinding.
     pub fn configure_package_paths(
@@ -191,5 +191,61 @@ fn package_result(
             operation,
             code: status as i32,
         }),
+    }
+}
+
+/// Tooling is an exclusive build-host operation. Apply the existing compiler
+/// projection before VM setup and restore it only after native teardown.
+pub(super) struct CompilerEnvironment {
+    previous: Vec<(std::ffi::OsString, Option<std::ffi::OsString>)>,
+}
+
+impl std::fmt::Debug for CompilerEnvironment {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CompilerEnvironment")
+            .finish_non_exhaustive()
+    }
+}
+
+impl CompilerEnvironment {
+    pub(super) fn enter() -> Self {
+        // This command is an environment projection only; it is never spawned.
+        let mut projection = std::process::Command::new("gsc");
+        crate::tool_environment::configure_gerbil_compiler_environment(&mut projection);
+        let previous = projection
+            .get_envs()
+            .map(|(name, _)| (name.to_owned(), std::env::var_os(name)))
+            .collect();
+        for (name, value) in projection.get_envs() {
+            // SAFETY: package-tools requires exclusive host environment access
+            // from initialization through teardown. No Scheme owner exists yet.
+            unsafe {
+                restore_variable(name, value);
+            }
+        }
+        Self { previous }
+    }
+}
+
+impl Drop for CompilerEnvironment {
+    fn drop(&mut self) {
+        for (name, value) in &self.previous {
+            // SAFETY: the same exclusive tooling lifetime covers this restore;
+            // Gambit teardown has already installed surviving environment storage.
+            unsafe {
+                restore_variable(name, value.as_deref());
+            }
+        }
+    }
+}
+
+unsafe fn restore_variable(name: &std::ffi::OsStr, value: Option<&std::ffi::OsStr>) {
+    // SAFETY: callers retain the exclusive build-host environment contract.
+    unsafe {
+        match value {
+            Some(value) => std::env::set_var(name, value),
+            None => std::env::remove_var(name),
+        }
     }
 }

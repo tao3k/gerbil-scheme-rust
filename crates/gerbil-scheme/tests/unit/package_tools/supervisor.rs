@@ -21,9 +21,13 @@ pub(super) fn run() -> bool {
         .build()
         .unwrap();
     runtime.block_on(async {
+        let poisoned = std::env::temp_dir().join(format!("package-toolchain-poison-{}", std::process::id()));
+        std::fs::create_dir_all(&poisoned).unwrap();
+        std::fs::write(poisoned.join("stdio.h"), "#error unrelated host compiler headers leaked into Gerbil\n").unwrap();
         let mut command = tokio::process::Command::new(std::env::current_exe().unwrap());
         command.args(["--exact", "package_tools::build_test_and_failures_share_the_existing_owner", "--nocapture"])
             .env(CHILD, "1").stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+        command.env("CPATH", &poisoned).env("SDKROOT", "/nix/store/invalid-host-sdk");
         #[cfg(unix)]
         { command.process_group(0); }
         let mut child = command.spawn().unwrap();
@@ -68,6 +72,7 @@ pub(super) fn run() -> bool {
             assert_eq!(std::io::Error::last_os_error().raw_os_error(), Some(3));
         }
         println!("PACKAGE-TOOLS-NATURAL-EXIT-OK workers={workers} elapsed={:?}", start.elapsed());
+        std::fs::remove_dir_all(poisoned).unwrap();
     });
     drop(runtime);
     true

@@ -12,6 +12,7 @@ publish = false
 
 [features]
 external-program = []
+package-tools = []
 
 [lints]
 workspace = true

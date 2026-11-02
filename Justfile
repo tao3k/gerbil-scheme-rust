@@ -335,3 +335,8 @@ native-mailbox-backpressure:
 native-mailbox-backpressure-model-check:
     quint test specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --seed 1 --backend typescript
     quint run specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
+
+# Real official build/GxTest calls, cancellation and natural VM teardown.
+bridge-package-tools:
+    {{ build_env }} cargo test -p gerbil-scheme --features package-tools --test package_tools --locked -- --nocapture
+    {{ build_env }} cargo clippy -p gerbil-scheme --features package-tools --test package_tools --locked -- -D warnings

@@ -10,6 +10,10 @@ mod capabilities;
 mod integer;
 mod lifecycle;
 mod objects;
+#[cfg(feature = "package-tools")]
+mod package_tools;
+#[cfg(feature = "package-tools")]
+pub use package_tools::PackageCallOutcome;
 mod program;
 mod rooted;
 mod scalar_batch;

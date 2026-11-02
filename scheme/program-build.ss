@@ -15,7 +15,15 @@
   (let (id (symbol->string (expander-context-id context)))
     (or (string-prefix? "gerbil/" id) (string-prefix? "std/" id))))
 
-(def (gerbil-rs-stage-program source output-dir (runtime-imports []) (separate-procedures []))
+;; Namespace ordering and installed object availability are different facts.
+;; A tools module may ship only .scm; compile that source through the ordinary
+;; programme archive path instead of claiming a reusable installed AOT object.
+(def (installed-aot? id scm)
+  (and (or (string-prefix? "gerbil/" id) (string-prefix? "std/" id))
+       (file-exists? (string-append (path-strip-extension scm) ".c"))
+       (file-exists? (string-append (path-strip-extension scm) ".o"))))
+
+(def (gerbil-rs-stage-program source output-dir (runtime-imports []) (separate-procedures []) link-options: (declared-link-options []))
   (let* ((output (path-expand "program" output-dir))
          (context (import-module source))
          (dependencies (find-runtime-module-deps context))
@@ -37,11 +45,12 @@
     ;; loop. Its ordinary exports become callable after shared runtime setup.
     (compile-exe source [invoke-gsc: #f keep-scm: #t optimize: #t output-file: output])
     (let* ((home (gerbil-home))
-           (link-options (call-with-input-file (path-expand "lib/libgerbil.ldd" home) read))
+           (link-options (append declared-link-options
+              (call-with-input-file (path-expand "lib/libgerbil.ldd" home) read)))
            (modules
             (map (lambda (id)
-                   (let ((scm (find-static-module-file id))
-                         (system? (or (string-prefix? "gerbil/" id) (string-prefix? "std/" id))))
+                   (let* ((scm (find-static-module-file id))
+                         (system? (and (installed-aot? id scm) #t)))
                      (let (module (hash ("module" id) ("scm" scm) ("system" system?)))
                        (when (member id separate-procedures)
                          (hash-put! module "host_layout" "separate-procedures"))

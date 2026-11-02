@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later */
 #define ___VERSION 409008
 #include "gambit.h"
+#ifdef GERBIL_SCHEME_RUST_PACKAGE_TOOLS
+#include "package-tools-home.h"
+#endif
 
 #include <stdint.h>
 #include <string.h>
@@ -19,6 +22,15 @@ ___END_C_LINKAGE
 
 /* 0 = never initialized, 1 = running, 2 = finalized and not restartable. */
 static int gerbil_scheme_rust_state = 0;
+#if defined(GERBIL_SCHEME_RUST_PACKAGE_TOOLS) && (defined(__unix__) || defined(__APPLE__))
+/* Native build/test owns Gerbil child processes for the duration of the call.
+ * Save the handler installed by the actual runtime, not a private SDK symbol.
+ * Ordinary Rust ownership and its original handler resume after the operation. */
+static struct sigaction package_child_action;
+static int package_child_action_ready = 0;
+static int package_image_live = 0;
+#endif
+
 /* Exact failed startup branch, SDK status, host errno and processor count. */
 static int64_t setup_diagnostic[4] = {0, 0, 0, 0};
 int32_t gerbil_scheme_instance_setup_diagnostic(int64_t *out) {
@@ -141,6 +153,10 @@ static int32_t runtime_init_program(
   ___setup_params_reset(&params);
   params.version = ___VERSION;
   params.linker = linker;
+#ifdef GERBIL_SCHEME_RUST_PACKAGE_TOOLS
+  params.gambitdir = package_toolchain_path_0;
+  params.gambitdir_map = package_toolchain_map;
+#endif
   if (single_processor) params.parallelism_level = 1;
   /*
    * The default entry retains Gambit's policy; the explicit single-processor
@@ -157,6 +173,12 @@ static int32_t runtime_init_program(
   }
   ___SCMOBJ initialized = ___setup(&params);
   setup_diagnostic[1] = ___FIXNUMP(initialized) ? ___INT(initialized) : (int64_t)initialized;
+#if defined(GERBIL_SCHEME_RUST_PACKAGE_TOOLS) && (defined(__unix__) || defined(__APPLE__))
+  if (initialized == ___FIX(___NO_ERR)) {
+    package_child_action_ready = sigaction(SIGCHLD, NULL, &package_child_action) == 0;
+    package_image_live = linker == ___LNK_gerbil__scheme__rust__linker;
+  }
+#endif
   int host_restored = gerbil_host_io_restore(&host);
   if (host_restored != 0) setup_diagnostic[2] = errno;
   if (initialized == ___FIX(___NO_ERR)) setup_diagnostic[3] = ___VMSTATE->processor_count;
@@ -214,3 +236,64 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
   int restored = gerbil_host_signals_restore(&signals);
   return captured == 0 && restored == 0 ? 0 : 4;
 }
+
+#ifdef GERBIL_SCHEME_RUST_PACKAGE_TOOLS
+extern int32_t gerbil_scheme_rust_package_build_scheme(const char *directory);
+extern int32_t gerbil_scheme_rust_package_test_scheme(const char *directory, const char *tests);
+extern int32_t gerbil_scheme_rust_package_stage_scheme(const char *directory, const char *source, const char *output);
+extern int32_t gerbil_scheme_rust_package_paths_scheme(const char *prefix, const char *libraries);
+extern int32_t gerbil_scheme_rust_package_main_scheme(const char *directory, const void *arguments, unsigned int count);
+static GerbilStatus package_enter(gerbil_host_io *host) {
+  if (gerbil_scheme_rust_state != 1)
+    return gerbil_scheme_rust_state == 2 ? GERBIL_STATUS_RUNTIME_FINALIZED : GERBIL_STATUS_NOT_INITIALIZED;
+  if (!package_image_live) return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
+  if (gerbil_host_io_capture(host) != 0) return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
+#if defined(__unix__) || defined(__APPLE__)
+  if (!package_child_action_ready || sigaction(SIGCHLD, &package_child_action, NULL) != 0) {
+    gerbil_host_io_restore(host);
+    return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
+  }
+#endif
+  return GERBIL_STATUS_OK;
+}
+static GerbilStatus package_leave(gerbil_host_io *host, int32_t code, int32_t *result) {
+  if (gerbil_host_io_restore(host) != 0) return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
+  *result = code;
+  return GERBIL_STATUS_OK;
+}
+GerbilStatus gerbil_scheme_rust_package_build_cstr(const char *directory, int32_t *result) {
+  if (directory == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;
+  gerbil_host_io host;
+  GerbilStatus status = package_enter(&host);
+  if (status != GERBIL_STATUS_OK) return status;
+  return package_leave(&host, gerbil_scheme_rust_package_build_scheme(directory), result);
+}
+GerbilStatus gerbil_scheme_rust_package_test_cstr(const char *directory, const char *tests, int32_t *result) {
+  if (directory == NULL || tests == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;
+  gerbil_host_io host;
+  GerbilStatus status = package_enter(&host);
+  if (status != GERBIL_STATUS_OK) return status;
+  return package_leave(&host, gerbil_scheme_rust_package_test_scheme(directory, tests), result);
+}
+GerbilStatus gerbil_scheme_rust_package_stage_cstr(const char *directory, const char *source, const char *output, int32_t *result) {
+  if (directory == NULL || source == NULL || output == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;
+  gerbil_host_io host;
+  GerbilStatus status = package_enter(&host);
+  if (status != GERBIL_STATUS_OK) return status;
+  return package_leave(&host, gerbil_scheme_rust_package_stage_scheme(directory, source, output), result);
+}
+GerbilStatus gerbil_scheme_rust_package_paths_cstr(const char *prefix, const char *libraries, int32_t *result) {
+  if (prefix == NULL || libraries == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;
+  gerbil_host_io host;
+  GerbilStatus status = package_enter(&host);
+  if (status != GERBIL_STATUS_OK) return status;
+  return package_leave(&host, gerbil_scheme_rust_package_paths_scheme(prefix, libraries), result);
+}
+GerbilStatus gerbil_scheme_rust_package_main_cstr(const char *directory, const void *arguments, unsigned int count, int32_t *result) {
+  if (directory == NULL || (count != 0 && arguments == NULL) || result == NULL) return GERBIL_STATUS_NULL_POINTER;
+  gerbil_host_io host;
+  GerbilStatus status = package_enter(&host);
+  if (status != GERBIL_STATUS_OK) return status;
+  return package_leave(&host, gerbil_scheme_rust_package_main_scheme(directory, arguments, count), result);
+}
+#endif

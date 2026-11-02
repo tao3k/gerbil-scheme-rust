@@ -48,3 +48,6 @@ pub mod tool_environment;
 mod instance_backend;
 #[cfg(all(feature = "isolated-instances", target_os = "macos"))]
 pub mod instances;
+
+#[cfg(feature = "package-tools")]
+pub use runtime::PackageCallOutcome;

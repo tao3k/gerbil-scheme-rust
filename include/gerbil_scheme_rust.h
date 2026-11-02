@@ -234,6 +234,16 @@ GerbilStatus gerbil_scheme_rust_pair_cdr(GerbilValueHandle value,
 GerbilStatus gerbil_scheme_rust_pair_parts(GerbilValueHandle value,
                                            GerbilPair *out);
 
+/* Opt-in package-tools image; call only on its live VM owner thread.
+ * Every input span/argument must remain readable through return. Result must
+ * be writable, disjoint, and is unchanged on transport failure. Package status
+ * is separate from transport status. These are bridge exports, not CLI calls. */
+GerbilStatus gerbil_scheme_rust_package_build(GerbilBorrowedUtf8 directory, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_test(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 tests, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_stage(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 source, GerbilBorrowedUtf8 output, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_paths(GerbilBorrowedUtf8 prefix, GerbilBorrowedUtf8 libraries, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_main(GerbilBorrowedUtf8 directory, const GerbilBorrowedUtf8 *arguments, size_t count, int32_t *result);
+
 #ifdef __cplusplus
 }
 #endif

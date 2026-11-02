@@ -20,6 +20,7 @@ isolated-instances = ["dep:libc"]
 tokio-dispatch = ["isolated-instances", "dep:tokio"]
 arrival-clock = ["tokio-dispatch", "tokio/net"]
 external-program = ["gerbil-scheme-sys/external-program"]
+package-tools = ["gerbil-scheme-sys/package-tools"]
 
 [dev-dependencies]
 divan.workspace = true
@@ -95,3 +96,8 @@ harness = false
 
 [lints]
 workspace = true
+
+[[test]]
+name = "package_tools"
+path = "tests/unit/targets/package_tools.rs"
+required-features = ["package-tools"]

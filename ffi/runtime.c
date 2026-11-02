@@ -12,6 +12,7 @@
 #endif
 #include "../include/gerbil_scheme_rust.h"
 #include "host_io.h"
+#include "host_environment.h"
 
 ___BEGIN_C_LINKAGE
 #ifndef GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM
@@ -229,9 +230,12 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
     return 8;
   }
 
+  gerbil_host_environment environment;
+  if (gerbil_host_environment_capture(&environment) != 0) return 4;
   gerbil_host_signals signals;
   int captured = gerbil_host_signals_capture(&signals);
   ___cleanup();
+  gerbil_host_environment_restore(&environment);
   gerbil_scheme_rust_state = 2;
   int restored = gerbil_host_signals_restore(&signals);
   return captured == 0 && restored == 0 ? 0 : 4;

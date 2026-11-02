@@ -16,6 +16,7 @@ fn build_test_and_failures_share_the_existing_owner() {
         return;
     }
     let root = fixture();
+    let environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
     let previous_prefix = std::env::var_os("GERBIL_PATH");
     let previous_cores = std::env::var_os("GERBIL_BUILD_CORES");
     let runtime = initialize();
@@ -98,6 +99,7 @@ fn build_test_and_failures_share_the_existing_owner() {
     assert_eq!(status, GerbilStatus::InvalidValue);
     assert_eq!(result, -123);
     drop(runtime);
+    assert_environment_after_close(&environment);
     // SAFETY: valid transport; finalized runtime must reject without altering the result.
     assert_eq!(
         unsafe { gerbil_scheme_rust_package_build(directory.into(), &raw mut result) },
@@ -191,4 +193,19 @@ fn configure(runtime: &GerbilRuntime, root: &std::path::Path) {
             .unwrap(),
         70
     );
+}
+
+fn assert_environment_after_close(
+    expected: &std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString>,
+) {
+    // Ordinary host allocations must remain safe after VM cleanup. Cover the
+    // environment pointer-table allocation sizes without dereferencing a saved pointer.
+    let retained: Vec<_> = (expected.len()..expected.len() * 2 + 16)
+        .map(|size| vec![0x55u8; size * std::mem::size_of::<usize>()])
+        .collect();
+    assert!(
+        &std::env::vars_os().collect::<std::collections::BTreeMap<_, _>>() == expected,
+        "host environment changed after VM cleanup"
+    );
+    std::hint::black_box(retained);
 }

@@ -125,3 +125,25 @@ switches implement this policy.
 The complete local one-processor actor entry naturally finished all nine cases
 in a cold 11m30s invocation, including checksum, fault-control and final cleanup
 observations. This is separate from remote CI and from package-tools C ABI qualification.
+
+* Host environment survives native shutdown
+
+The first Darwin CI run completes all foreign calls and returns from VM cleanup,
+then receives SIGSEGV. Local allocator churn after cleanup reproduces the defect:
+the crash is in platform_strlen called by Rust vars_os, reading the overwritten
+0x5555555555555550 pointer. This is a concrete use-after-free counterexample;
+the previous natural-exit fixture did not establish environment lifetime.
+
+Gambit's [[https://github.com/gambit/gambit/blob/master/lib/os_shell.c][shell environment implementation]] can extend the process environment
+pointer table, then free that table during cleanup without replacing environ.
+Restoring variable values alone is insufficient. The bridge now captures a deep
+host-owned copy before shutdown and installs it immediately after native cleanup.
+The surviving table and strings transfer to the host process environment's
+lifetime. Snapshot failure refuses cleanup acknowledgement. This is finalization
+work, not a request-path allocation or a new environment-variable control.
+
+The strengthened test retains the whole environment, performs ordinary host
+allocations after VM teardown and checks exact preservation without printing
+potentially sensitive values. It keeps natural exit and the original deadlines.
+A separate MallocScribble diagnostic reaches a child compiler failure earlier
+and is retained as inconclusive for this focused post-shutdown counterexample.

@@ -59,6 +59,7 @@ filegroup(
         "build.ss",
         "ffi/runtime.c",
         "ffi/host_io.h",
+        "ffi/host_environment.h",
         "gerbil.pkg",
     ],
 )

@@ -40,6 +40,7 @@ fn run_native_build() {
     println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm.sha256");
     println!("cargo:rerun-if-changed=../../ffi/runtime.c");
     println!("cargo:rerun-if-changed=../../ffi/host_io.h");
+    println!("cargo:rerun-if-changed=../../ffi/host_environment.h");
 
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let workspace = manifest_dir

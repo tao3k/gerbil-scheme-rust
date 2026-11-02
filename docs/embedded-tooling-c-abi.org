@@ -54,7 +54,8 @@ from direct public build/test invocation.
 Native dependency discovery belongs to this package's build declaration.
 =build.ss= and low-level program staging include the same =scheme/link-options.ss=
 declaration, using the native =std/make pkg-config= procedure for OpenSSL,
-zlib and SQLite with =--libs --keep-system-libs=. Staging records
+zlib and SQLite with =--libs --keep-system-libs=. This retains explicit search
+paths even when ordinary =--libs= would filter system directories. Staging records
 these target flags before caller additions and the installed Gerbil link flags.
 An old installation path is not a reason to probe alternate host libraries in a
 downstream consumer. Missing target package metadata fails staging naturally.
@@ -66,7 +67,10 @@ The host supplies its target pkg-config environment, including keg-only package
 metadata when needed. Compiler/linker selection and package metadata search are
 separate inputs: configuring pkg-config does not select the C compiler.
 =gerbil test -g -v 5 t/link-options-test.ss= checks ordinary staging, preservation
-of explicit flag ordering and refusal when target metadata is unavailable.
+of explicit flag ordering, retained system directories and refusal when target
+metadata is unavailable. Cargo's pkg-config environment invalidation applies to
+the default image that consumes these inputs; the external lifecycle-only
+archive does not depend on another consumer's pkg-config search path.
 
 Each call scopes its directory, expander context and standard Gerbil paths.
 Prefix binding is immutable for the tooling owner's lifetime. Standard

@@ -43,7 +43,8 @@
       (call-with-temporary-directory "program-link-system-paths"
         (lambda (directory)
           (let ((previous (getenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" #f))
-                (target (pkg-config "openssl" "--variable=libdir")))
+                (target (pkg-config "libcrypto" "--variable=libdir")))
+            (check (string-empty? target) => #f)
             (dynamic-wind
               (lambda () (setenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" target))
               (lambda ()

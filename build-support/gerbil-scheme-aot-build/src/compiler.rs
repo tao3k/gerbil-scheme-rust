@@ -27,13 +27,6 @@ fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM");
     println!("cargo:rerun-if-changed=../../build.ss");
     println!("cargo:rerun-if-changed=../../scheme/link-options.ss");
-    for variable in [
-        "PKG_CONFIG_PATH",
-        "PKG_CONFIG_LIBDIR",
-        "PKG_CONFIG_SYSROOT_DIR",
-    ] {
-        println!("cargo:rerun-if-env-changed={variable}");
-    }
     println!("cargo:rerun-if-changed=../../scheme/package-clean.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
@@ -95,6 +88,15 @@ fn run_native_build() {
         return;
     }
 
+    // Only the default image consumes this package's native link declaration.
+    // External-program consumers own their staging inputs independently.
+    for variable in [
+        "PKG_CONFIG_PATH",
+        "PKG_CONFIG_LIBDIR",
+        "PKG_CONFIG_SYSROOT_DIR",
+    ] {
+        println!("cargo:rerun-if-env-changed={variable}");
+    }
     let mut canonical_build = gerbil_command(workspace.join("build.ss"));
     canonical_build
         .arg("compile")

@@ -13,6 +13,7 @@ pub(super) fn exercises_utf8_bulk_conversion(runtime: &GerbilRuntime) {
     ] {
         let value = runtime.string_from_utf8(&text).expect("root UTF-8 string");
         assert_eq!(value.len().into_result().unwrap(), text.chars().count());
+        checks_exact_utf8_capacity(runtime, &text);
         assert_eq!(value.to_string().into_result().unwrap(), text);
         assert_eq!(value.to_string().into_result().unwrap(), text);
         let snapshot = value.to_utf8_bytes().into_result().unwrap();
@@ -187,4 +188,63 @@ pub(super) fn checks_borrowed_bytevector_bulk_copy(runtime: &GerbilRuntime, valu
         GerbilStatus::InvalidValue
     );
     assert_eq!(sentinel, [0xA5; 4]);
+}
+
+fn checks_exact_utf8_capacity(runtime: &GerbilRuntime, text: &str) {
+    let input = runtime.bytevector_from_bytes(text.as_bytes()).unwrap();
+    let mut string = gerbil_scheme_sys::GerbilRootId(0);
+    // SAFETY: the byte root is live on this owner and the output is disjoint.
+    assert_eq!(
+        unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_utf8_to_string(
+                input.root_id(),
+                &raw mut string,
+            )
+        },
+        GerbilStatus::Ok
+    );
+    drop(input);
+    let mut guarded = vec![0xA5; text.len() + 2];
+    let mut written = usize::MAX;
+    // SAFETY: the root belongs to this live owner. The interior admits exactly
+    // the UTF-8 byte capacity, with disjoint live canaries and result storage.
+    let status = unsafe {
+        gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+            string,
+            guarded.as_mut_ptr().add(1),
+            text.len(),
+            &raw mut written,
+        )
+    };
+    assert_eq!(
+        status,
+        GerbilStatus::Ok,
+        "exact UTF-8 byte capacity must suffice"
+    );
+    assert_eq!(written, text.len());
+    assert_eq!(&guarded[1..=text.len()], text.as_bytes());
+    assert_eq!(guarded[0], 0xA5);
+    assert_eq!(guarded[text.len() + 1], 0xA5);
+    if !text.is_empty() {
+        guarded.fill(0xA5);
+        written = usize::MAX;
+        // SAFETY: a readable root, bounded writable interior and disjoint result.
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                string,
+                guarded.as_mut_ptr().add(1),
+                text.len() - 1,
+                &raw mut written,
+            )
+        };
+        assert_eq!(status, GerbilStatus::InvalidValue);
+        assert_eq!(written, usize::MAX);
+        assert_eq!(guarded[0], 0xA5);
+        assert!(guarded[text.len()..].iter().all(|byte| *byte == 0xA5));
+    }
+    // SAFETY: this test owns the independent string root and releases it once.
+    assert_eq!(
+        unsafe { gerbil_scheme_sys::gerbil_scheme_rust_root_release(string) },
+        GerbilStatus::Ok
+    );
 }

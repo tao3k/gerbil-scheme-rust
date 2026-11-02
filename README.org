@@ -237,6 +237,28 @@ The [[file:.github/actions/setup-gerbil/action.yml][shared setup action]] suppli
 Consumers pin that action to a commit, rather than copying its installer.
 The local benchmark workflow does not download or rebuild the installed SDK.
 
+The default runtime exposes package build/test through its =build= module
+and the existing C ABI. The =external-program= profile retains consumer-owned
+programme linking. =GerbilRuntime::build_package= loads ordinary
+=build.ss= and invokes its native main; =test_package= runs native GxTest.
+Transport status and the tool result are separate: a returned 42 is a failed
+GxTest run, not admission. Calls remain on the runtime owner thread and use
+native Gerbil child-process handling for their duration; use the existing build
+host without concurrent unrelated host children. No Gerbil CLI is launched to
+dispatch these operations. SDK bootstrap still uses the ordinary native builder.
+
+The same boundary compiles an existing =build.ss= declaration through native
+=std/make= and calls the existing programme/resource-closure producers. Metadata
+imports use the existing rooted Scheme object ABI. These calls introduce no
+Rust Scheme-expression planner or string-array request protocol. The existing
+programme metadata observer still owns its separate native GxI subprocess;
+build/test dispatch itself remains in the caller process.
+
+Downstream Cargo checks use =just bridge-cargo= with the standard SDK
+configuration. Library link flags come from =build.ss=
+the =std/make= pkg-config helpers into the existing compiler graph; Rust validates the receipt
+without another host package probe.
+
 * Documentation and license
 
 - [[file:docs/00-index.org][Documentation index]]

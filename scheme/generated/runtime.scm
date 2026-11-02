@@ -1,109 +1,109 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1793610016)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1793626241)
   (begin
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-add-i64
-      (lambda (_%left786%_ _%right787%_) (+ _%left786%_ _%right787%_)))
+      (lambda (_%left811%_ _%right812%_) (+ _%left811%_ _%right812%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-is-even-i64
-      (lambda (_%value784%_) (if (even? _%value784%_) '1 '0)))
+      (lambda (_%value809%_) (if (even? _%value809%_) '1 '0)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-compare-i64
-      (lambda (_%left778%_ _%right779%_)
-        (if (< _%left778%_ _%right779%_)
+      (lambda (_%left803%_ _%right804%_)
+        (if (< _%left803%_ _%right804%_)
             '-1
-            (if (> _%left778%_ _%right779%_) '1 '0))))
+            (if (> _%left803%_ _%right804%_) '1 '0))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-next-root-id '1)
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
       (make-table 'test: eqv? 'weak-keys: '#f 'weak-values: '#f))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing
       (let () (declare (not safe)) (##gensym 'missing-root)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-string
-      (lambda (_%value776%_)
-        (if (string? _%value776%_)
+      (lambda (_%value801%_)
+        (if (string? _%value801%_)
             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-             _%value776%_)
+             _%value801%_)
             '0)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector
-      (lambda (_%value774%_)
-        (if (u8vector? _%value774%_)
+      (lambda (_%value799%_)
+        (if (u8vector? _%value799%_)
             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-             _%value774%_)
+             _%value799%_)
             '0)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-object
-      (lambda (_%value772%_)
+      (lambda (_%value797%_)
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-         _%value772%_)))
+         _%value797%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
-      (lambda (_%exception763%_)
-        (let ((__tmp9757
-               (lambda (_%_765%_) '"Scheme exception (formatting failed)"))
-              (__tmp9756
+      (lambda (_%exception788%_)
+        (let ((__tmp9205
+               (lambda (_%_790%_) '"Scheme exception (formatting failed)"))
+              (__tmp9204
                (lambda ()
-                 (let ((_%message770%_
+                 (let ((_%message795%_
                         (call-with-output-string
-                         (lambda (_%port768%_)
+                         (lambda (_%port793%_)
                            (let ()
                              (declare (not safe))
                              (display-exception__%
-                              _%exception763%_
-                              _%port768%_))))))
+                              _%exception788%_
+                              _%port793%_))))))
                    (substring
-                    _%message770%_
+                    _%message795%_
                     '0
                     (min '4096
                          (let ()
                            (declare (not safe))
-                           (##string-length _%message770%_))))))))
+                           (##string-length _%message795%_))))))))
           (declare (not safe))
-          (__with-catch __tmp9757 __tmp9756))))
+          (__with-catch __tmp9205 __tmp9204))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call
-      (lambda (_%root755%_ _%procedure756%_)
+      (lambda (_%root780%_ _%procedure781%_)
         (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
-        (let ((__tmp9759
-               (lambda (_%exception758%_)
+        (let ((__tmp9207
+               (lambda (_%exception783%_)
                  (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
-                        _%exception758%_))
+                        _%exception783%_))
                  '0))
-              (__tmp9758
+              (__tmp9206
                (lambda ()
-                 (let ((_%value761%_
+                 (let ((_%value786%_
                         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
-                         _%root755%_)))
-                   (if (eq? _%value761%_
+                         _%root780%_)))
+                   (if (eq? _%value786%_
                             gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)
                        '0
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-                        (_%procedure756%_ _%value761%_)))))))
+                        (_%procedure781%_ _%value786%_)))))))
           (declare (not safe))
-          (__with-catch __tmp9759 __tmp9758))))
+          (__with-catch __tmp9207 __tmp9206))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-      (lambda (_%value751%_)
-        (let ((_%root-id753%_
+      (lambda (_%value776%_)
+        (let ((_%root-id778%_
                gerbil-scheme-rust/scheme/runtime#gerbil-rs-next-root-id))
           (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-next-root-id
-                (+ _%root-id753%_ '1))
+                (+ _%root-id778%_ '1))
           (let ()
             (declare (not safe))
             (##table-set!
              gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
-             _%root-id753%_
-             _%value751%_))
-          _%root-id753%_)))
+             _%root-id778%_
+             _%value776%_))
+          _%root-id778%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
-      (lambda (_%root-id749%_)
+      (lambda (_%root-id774%_)
         (let ()
           (declare (not safe))
           (##table-ref
            gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
-           _%root-id749%_
+           _%root-id774%_
            gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!
-      (lambda (_%root-id747%_)
+      (lambda (_%root-id772%_)
         (if (eq? (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
-                  _%root-id747%_)
+                  _%root-id772%_)
                  gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)
             '#f
             (begin
@@ -111,98 +111,98 @@
                 (declare (not safe))
                 (##table-set!
                  gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-values
-                 _%root-id747%_))
+                 _%root-id772%_))
               '#t))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-collection-view
-      (lambda (_%value741%_ _%kind742%_)
-        (let ((_%$e744%_ _%kind742%_))
-          (if (eq? '0 _%$e744%_)
-              (if (vector? _%value741%_) _%value741%_ '#f)
-              (if (eq? '1 _%$e744%_)
-                  (if (list? _%value741%_) (list->vector _%value741%_) '#f)
-                  (if (eq? '2 _%$e744%_)
-                      (if (pair? _%value741%_)
+      (lambda (_%value766%_ _%kind767%_)
+        (let ((_%$e769%_ _%kind767%_))
+          (if (eq? '0 _%$e769%_)
+              (if (vector? _%value766%_) _%value766%_ '#f)
+              (if (eq? '1 _%$e769%_)
+                  (if (list? _%value766%_) (list->vector _%value766%_) '#f)
+                  (if (eq? '2 _%$e769%_)
+                      (if (pair? _%value766%_)
                           (vector (let ()
                                     (declare (not safe))
-                                    (##car _%value741%_))
+                                    (##car _%value766%_))
                                   (let ()
                                     (declare (not safe))
-                                    (##cdr _%value741%_)))
+                                    (##cdr _%value766%_)))
                           '#f)
                       '#f))))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-indexed-value
-      (lambda (_%root733%_ _%index734%_)
-        (let ((_%value736%_
+      (lambda (_%root758%_ _%index759%_)
+        (let ((_%value761%_
                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
-                _%root733%_)))
-          (if (= _%index734%_ '-1)
-              _%value736%_
-              (if (and (>= _%index734%_ '0)
-                       (vector? _%value736%_)
-                       (< _%index734%_
+                _%root758%_)))
+          (if (= _%index759%_ '-1)
+              _%value761%_
+              (if (and (>= _%index759%_ '0)
+                       (vector? _%value761%_)
+                       (< _%index759%_
                           (let ()
                             (declare (not safe))
-                            (##vector-length _%value736%_))))
-                  (vector-ref _%value736%_ _%index734%_)
+                            (##vector-length _%value761%_))))
+                  (vector-ref _%value761%_ _%index759%_)
                   gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-identifier-packet
-      (lambda (_%value702%_)
-        (let* ((_%values704%_
-                (if (vector? _%value702%_) _%value702%_ (vector _%value702%_)))
-               (_%count706%_
-                (let () (declare (not safe)) (##vector-length _%values704%_)))
-               (_%names708%_
-                (let () (declare (not safe)) (##make-vector _%count706%_)))
-               (_%kinds710%_
-                (let () (declare (not safe)) (##make-u8vector _%count706%_))))
-          (let _%prepare713%_ ((_%index715%_ '0) (_%capacity716%_ '0))
-            (if (= _%index715%_ _%count706%_)
-                (vector _%names708%_ _%kinds710%_ _%capacity716%_)
-                (let* ((_%item718%_ (vector-ref _%values704%_ _%index715%_))
-                       (_%kind723%_
-                        (if (symbol? _%item718%_)
+      (lambda (_%value727%_)
+        (let* ((_%values729%_
+                (if (vector? _%value727%_) _%value727%_ (vector _%value727%_)))
+               (_%count731%_
+                (let () (declare (not safe)) (##vector-length _%values729%_)))
+               (_%names733%_
+                (let () (declare (not safe)) (##make-vector _%count731%_)))
+               (_%kinds735%_
+                (let () (declare (not safe)) (##make-u8vector _%count731%_))))
+          (let _%prepare738%_ ((_%index740%_ '0) (_%capacity741%_ '0))
+            (if (= _%index740%_ _%count731%_)
+                (vector _%names733%_ _%kinds735%_ _%capacity741%_)
+                (let* ((_%item743%_ (vector-ref _%values729%_ _%index740%_))
+                       (_%kind748%_
+                        (if (symbol? _%item743%_)
                             '0
-                            (if (keyword? _%item718%_) '1 '-1)))
-                       (_%name728%_
-                        (let ((_%$e725%_ _%kind723%_))
-                          (if (eq? '0 _%$e725%_)
-                              (symbol->string _%item718%_)
-                              (if (eq? '1 _%$e725%_)
-                                  (keyword->string _%item718%_)
+                            (if (keyword? _%item743%_) '1 '-1)))
+                       (_%name753%_
+                        (let ((_%$e750%_ _%kind748%_))
+                          (if (eq? '0 _%$e750%_)
+                              (symbol->string _%item743%_)
+                              (if (eq? '1 _%$e750%_)
+                                  (keyword->string _%item743%_)
                                   '#f)))))
-                  (if _%name728%_
-                      (let ((_%next731%_
-                             (+ _%capacity716%_
+                  (if _%name753%_
+                      (let ((_%next756%_
+                             (+ _%capacity741%_
                                 (* '4
                                    (let ()
                                      (declare (not safe))
-                                     (##string-length _%name728%_))))))
-                        (if (fixnum? _%next731%_)
+                                     (##string-length _%name753%_))))))
+                        (if (fixnum? _%next756%_)
                             (begin
                               (vector-set!
-                               _%names708%_
-                               _%index715%_
-                               _%name728%_)
+                               _%names733%_
+                               _%index740%_
+                               _%name753%_)
                               (u8vector-set!
-                               _%kinds710%_
-                               _%index715%_
-                               _%kind723%_)
-                              (_%prepare713%_ (+ _%index715%_ '1) _%next731%_))
+                               _%kinds735%_
+                               _%index740%_
+                               _%kind748%_)
+                              (_%prepare738%_ (+ _%index740%_ '1) _%next756%_))
                             '#f))
                       '#f)))))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-result-batch-pending
-      (lambda (_%batch700%_)
-        (if _%batch700%_ (vector-ref _%batch700%_ '0) '0)))
+      (lambda (_%batch725%_)
+        (if _%batch725%_ (vector-ref _%batch725%_ '0) '0)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-clear-result-batch!
-      (lambda (_%batch696%_)
-        (if _%batch696%_
+      (lambda (_%batch721%_)
+        (if _%batch721%_
             (begin
               (vector-for-each
-               (lambda (_%slot698%_)
-                 (vector-set! _%slot698%_ '1 '#f)
-                 (vector-set! _%slot698%_ '0 '#f))
-               (vector-ref _%batch696%_ '1))
-              (vector-set! _%batch696%_ '0 '0))
+               (lambda (_%slot723%_)
+                 (vector-set! _%slot723%_ '1 '#f)
+                 (vector-set! _%slot723%_ '0 '#f))
+               (vector-ref _%batch721%_ '1))
+              (vector-set! _%batch721%_ '0 '0))
             '#!void)))
     (namespace
      ("gerbil-scheme-rust/scheme/runtime#"
@@ -1414,90 +1414,90 @@
                  8)
                 (else 15))))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-rational?
-      (lambda (_%value694%_)
-        (if (rational? _%value694%_) (exact? _%value694%_) '#f)))
+      (lambda (_%value719%_)
+        (if (rational? _%value719%_) (exact? _%value719%_) '#f)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-composite-view
-      (lambda (_%value656%_ _%kind657%_)
-        (let ((_%$e659%_ _%kind657%_))
-          (if (or (eq? '0 _%$e659%_) (eq? '1 _%$e659%_))
-              (let ((_g9760_ (if (= _%kind657%_ '0)
+      (lambda (_%value681%_ _%kind682%_)
+        (let ((_%$e684%_ _%kind682%_))
+          (if (or (eq? '0 _%$e684%_) (eq? '1 _%$e684%_))
+              (let ((_g9208_ (if (= _%kind682%_ '0)
                                  (values gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-rational?
                                          numerator
                                          denominator)
                                  (values number? real-part imag-part))))
                 (begin
                   #!void
-                  (let ((_%valid?665%_
+                  (let ((_%valid?690%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g9760_ 0)))
-                        (_%left666%_
+                           (##values-ref _g9208_ 0)))
+                        (_%left691%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g9760_ 1)))
-                        (_%right667%_
+                           (##values-ref _g9208_ 1)))
+                        (_%right692%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g9760_ 2))))
-                    (let* ((_%items669%_
-                            (if (vector? _%value656%_)
-                                _%value656%_
-                                (vector _%value656%_)))
-                           (_%count671%_
+                           (##values-ref _g9208_ 2))))
+                    (let* ((_%items694%_
+                            (if (vector? _%value681%_)
+                                _%value681%_
+                                (vector _%value681%_)))
+                           (_%count696%_
                             (let ()
                               (declare (not safe))
-                              (##vector-length _%items669%_)))
-                           (_%out673%_ (make-vector (* '2 _%count671%_))))
-                      (let _%loop676%_ ((_%index678%_ '0))
-                        (if (= _%index678%_ _%count671%_)
-                            _%out673%_
-                            (let ((_%item680%_
-                                   (vector-ref _%items669%_ _%index678%_)))
-                              (if (_%valid?665%_ _%item680%_)
+                              (##vector-length _%items694%_)))
+                           (_%out698%_ (make-vector (* '2 _%count696%_))))
+                      (let _%loop701%_ ((_%index703%_ '0))
+                        (if (= _%index703%_ _%count696%_)
+                            _%out698%_
+                            (let ((_%item705%_
+                                   (vector-ref _%items694%_ _%index703%_)))
+                              (if (_%valid?690%_ _%item705%_)
                                   (begin
                                     (vector-set!
-                                     _%out673%_
-                                     (* '2 _%index678%_)
-                                     (_%left666%_ _%item680%_))
+                                     _%out698%_
+                                     (* '2 _%index703%_)
+                                     (_%left691%_ _%item705%_))
                                     (vector-set!
-                                     _%out673%_
-                                     (+ '1 (* '2 _%index678%_))
-                                     (_%right667%_ _%item680%_))
-                                    (_%loop676%_ (+ _%index678%_ '1)))
+                                     _%out698%_
+                                     (+ '1 (* '2 _%index703%_))
+                                     (_%right692%_ _%item705%_))
+                                    (_%loop701%_ (+ _%index703%_ '1)))
                                   '#f))))))))
-              (if (eq? '2 _%$e659%_)
-                  (if (or (table? _%value656%_)
+              (if (eq? '2 _%$e684%_)
+                  (if (or (table? _%value681%_)
                           (let ()
                             (declare (not safe))
                             (##structure-direct-instance-of?
-                             _%value656%_
+                             _%value681%_
                              'HashTable::t)))
-                      (let ((_%out685%_
+                      (let ((_%out710%_
                              (make-vector
                               (* '2
-                                 (if (table? _%value656%_)
+                                 (if (table? _%value681%_)
                                      (let ()
                                        (declare (not safe))
-                                       (##table-length _%value656%_))
+                                       (##table-length _%value681%_))
                                      (let ()
                                        (declare (not safe))
-                                       (hash-length _%value656%_))))))
-                            (_%index686%_ '0))
-                        ((if (table? _%value656%_)
+                                       (hash-length _%value681%_))))))
+                            (_%index711%_ '0))
+                        ((if (table? _%value681%_)
                              table-for-each
-                             (lambda (_%visit688%_ _%table689%_)
+                             (lambda (_%visit713%_ _%table714%_)
                                (let ()
                                  (declare (not safe))
-                                 (hash-for-each _%visit688%_ _%table689%_))))
-                         (lambda (_%key691%_ _%item692%_)
-                           (vector-set! _%out685%_ _%index686%_ _%key691%_)
+                                 (hash-for-each _%visit713%_ _%table714%_))))
+                         (lambda (_%key716%_ _%item717%_)
+                           (vector-set! _%out710%_ _%index711%_ _%key716%_)
                            (vector-set!
-                            _%out685%_
-                            (+ _%index686%_ '1)
-                            _%item692%_)
-                           (set! _%index686%_ (+ _%index686%_ '2)))
-                         _%value656%_)
-                        _%out685%_)
+                            _%out710%_
+                            (+ _%index711%_ '1)
+                            _%item717%_)
+                           (set! _%index711%_ (+ _%index711%_ '2)))
+                         _%value681%_)
+                        _%out710%_)
                       '#f)
                   '#f)))))
     (namespace
@@ -1630,254 +1630,254 @@
                  (vector-length snapshot))
                 token))))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring-delimiter
-      (lambda (_%code651%_)
-        (if (= _%code651%_ '-1)
+      (lambda (_%code676%_)
+        (if (= _%code676%_ '-1)
             '#f
-            (if (and (>= _%code651%_ '0)
-                     (<= _%code651%_ '1114111)
-                     (not (<= '55296 _%code651%_ '57343)))
-                (integer->char _%code651%_)
+            (if (and (>= _%code676%_ '0)
+                     (<= _%code676%_ '1114111)
+                     (not (<= '55296 _%code676%_ '57343)))
+                (integer->char _%code676%_)
                 '#!void))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-upper-hex-digits
       '"0123456789ABCDEF")
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-upper-hex-digit
-      (lambda (_%value649%_)
+      (lambda (_%value674%_)
         (string-ref
          gerbil-scheme-rust/scheme/runtime#gerbil-rs-upper-hex-digits
-         _%value649%_)))
+         _%value674%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-hex-value
-      (lambda (_%character643%_)
-        (if (char<=? '#\0 _%character643%_ '#\9)
-            (- (char->integer _%character643%_)
+      (lambda (_%character668%_)
+        (if (char<=? '#\0 _%character668%_ '#\9)
+            (- (char->integer _%character668%_)
                (let () (declare (not safe)) (##char->integer '#\0)))
-            (if (char<=? '#\A _%character643%_ '#\F)
+            (if (char<=? '#\A _%character668%_ '#\F)
                 (+ '10
-                   (- (char->integer _%character643%_)
+                   (- (char->integer _%character668%_)
                       (let () (declare (not safe)) (##char->integer '#\A))))
-                (if (char<=? '#\a _%character643%_ '#\f)
+                (if (char<=? '#\a _%character668%_ '#\f)
                     (+ '10
-                       (- (char->integer _%character643%_)
+                       (- (char->integer _%character668%_)
                           (let ()
                             (declare (not safe))
                             (##char->integer '#\a))))
                     '-1)))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->bytestring
-      (lambda (_%value623%_ _%delimiter624%_)
-        (if (and (u8vector? _%value623%_)
-                 (or (not _%delimiter624%_) (char? _%delimiter624%_)))
-            (let* ((_%length629%_ (u8vector-length _%value623%_))
-                   (_%delimiter-count631%_
-                    (if (and (> _%length629%_ '0) _%delimiter624%_)
-                        (- _%length629%_ '1)
+      (lambda (_%value648%_ _%delimiter649%_)
+        (if (and (u8vector? _%value648%_)
+                 (or (not _%delimiter649%_) (char? _%delimiter649%_)))
+            (let* ((_%length654%_ (u8vector-length _%value648%_))
+                   (_%delimiter-count656%_
+                    (if (and (> _%length654%_ '0) _%delimiter649%_)
+                        (- _%length654%_ '1)
                         '0))
-                   (_%bytestring633%_
+                   (_%bytestring658%_
                     (make-string
-                     (+ (* _%length629%_ '2) _%delimiter-count631%_))))
-              (let _%lp636%_ ((_%index638%_ '0) (_%offset639%_ '0))
-                (if (< _%index638%_ _%length629%_)
-                    (let ((_%byte641%_
-                           (u8vector-ref _%value623%_ _%index638%_)))
-                      (if (and (> _%index638%_ '0) _%delimiter624%_)
+                     (+ (* _%length654%_ '2) _%delimiter-count656%_))))
+              (let _%lp661%_ ((_%index663%_ '0) (_%offset664%_ '0))
+                (if (< _%index663%_ _%length654%_)
+                    (let ((_%byte666%_
+                           (u8vector-ref _%value648%_ _%index663%_)))
+                      (if (and (> _%index663%_ '0) _%delimiter649%_)
                           (begin
                             (string-set!
-                             _%bytestring633%_
-                             _%offset639%_
-                             _%delimiter624%_)
-                            (set! _%offset639%_ (+ _%offset639%_ '1)))
+                             _%bytestring658%_
+                             _%offset664%_
+                             _%delimiter649%_)
+                            (set! _%offset664%_ (+ _%offset664%_ '1)))
                           '#!void)
                       (string-set!
-                       _%bytestring633%_
-                       _%offset639%_
+                       _%bytestring658%_
+                       _%offset664%_
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-upper-hex-digit
-                        (arithmetic-shift _%byte641%_ '-4)))
+                        (arithmetic-shift _%byte666%_ '-4)))
                       (string-set!
-                       _%bytestring633%_
-                       (+ _%offset639%_ '1)
+                       _%bytestring658%_
+                       (+ _%offset664%_ '1)
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-upper-hex-digit
-                        (bitwise-and _%byte641%_ '15)))
-                      (_%lp636%_ (+ _%index638%_ '1) (+ _%offset639%_ '2)))
+                        (bitwise-and _%byte666%_ '15)))
+                      (_%lp661%_ (+ _%index663%_ '1) (+ _%offset664%_ '2)))
                     '#!void))
-              _%bytestring633%_)
+              _%bytestring658%_)
             '#f)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-hex-byte
-      (lambda (_%bytestring617%_ _%offset618%_)
-        (let ((_%high620%_
+      (lambda (_%bytestring642%_ _%offset643%_)
+        (let ((_%high645%_
                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-hex-value
-                (string-ref _%bytestring617%_ _%offset618%_)))
-              (_%low621%_
+                (string-ref _%bytestring642%_ _%offset643%_)))
+              (_%low646%_
                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-hex-value
-                (string-ref _%bytestring617%_ (+ _%offset618%_ '1)))))
-          (if (and (>= _%high620%_ '0) (>= _%low621%_ '0))
-              (+ (arithmetic-shift _%high620%_ '4) _%low621%_)
+                (string-ref _%bytestring642%_ (+ _%offset643%_ '1)))))
+          (if (and (>= _%high645%_ '0) (>= _%low646%_ '0))
+              (+ (arithmetic-shift _%high645%_ '4) _%low646%_)
               '-1))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring->u8vector
-      (lambda (_%bytestring582%_ _%delimiter583%_)
-        (if (and (string? _%bytestring582%_)
-                 (or (not _%delimiter583%_) (char? _%delimiter583%_)))
-            (let* ((_%length588%_ (string-length _%bytestring582%_))
-                   (_%valid-length?593%_
-                    (if _%delimiter583%_
-                        (let ((_%$e590%_ (zero? _%length588%_)))
-                          (if _%$e590%_
-                              _%$e590%_
-                              (zero? (modulo (+ _%length588%_ '1) '3))))
-                        (zero? (modulo _%length588%_ '2))))
-                   (_%byte-count595%_
-                    (if _%delimiter583%_
-                        (quotient (+ _%length588%_ '1) '3)
-                        (quotient _%length588%_ '2)))
-                   (_%value597%_
-                    (if _%valid-length?593%_
-                        (make-u8vector _%byte-count595%_)
+      (lambda (_%bytestring607%_ _%delimiter608%_)
+        (if (and (string? _%bytestring607%_)
+                 (or (not _%delimiter608%_) (char? _%delimiter608%_)))
+            (let* ((_%length613%_ (string-length _%bytestring607%_))
+                   (_%valid-length?618%_
+                    (if _%delimiter608%_
+                        (let ((_%$e615%_ (zero? _%length613%_)))
+                          (if _%$e615%_
+                              _%$e615%_
+                              (zero? (modulo (+ _%length613%_ '1) '3))))
+                        (zero? (modulo _%length613%_ '2))))
+                   (_%byte-count620%_
+                    (if _%delimiter608%_
+                        (quotient (+ _%length613%_ '1) '3)
+                        (quotient _%length613%_ '2)))
+                   (_%value622%_
+                    (if _%valid-length?618%_
+                        (make-u8vector _%byte-count620%_)
                         '#f)))
-              (if _%value597%_
-                  (let _%lp600%_ ((_%index602%_ '0))
-                    (if (< _%index602%_ _%byte-count595%_)
-                        (let* ((_%offset604%_
-                                (if _%delimiter583%_
-                                    (* _%index602%_ '3)
-                                    (* _%index602%_ '2)))
-                               (_%delimiter-valid?612%_
-                                (let ((_%$e606%_ (not _%delimiter583%_)))
-                                  (if _%$e606%_
-                                      _%$e606%_
-                                      (let ((_%$e609%_ (zero? _%index602%_)))
-                                        (if _%$e609%_
-                                            _%$e609%_
-                                            (eq? _%delimiter583%_
+              (if _%value622%_
+                  (let _%lp625%_ ((_%index627%_ '0))
+                    (if (< _%index627%_ _%byte-count620%_)
+                        (let* ((_%offset629%_
+                                (if _%delimiter608%_
+                                    (* _%index627%_ '3)
+                                    (* _%index627%_ '2)))
+                               (_%delimiter-valid?637%_
+                                (let ((_%$e631%_ (not _%delimiter608%_)))
+                                  (if _%$e631%_
+                                      _%$e631%_
+                                      (let ((_%$e634%_ (zero? _%index627%_)))
+                                        (if _%$e634%_
+                                            _%$e634%_
+                                            (eq? _%delimiter608%_
                                                  (string-ref
-                                                  _%bytestring582%_
-                                                  (- _%offset604%_ '1))))))))
-                               (_%byte614%_
-                                (if _%delimiter-valid?612%_
+                                                  _%bytestring607%_
+                                                  (- _%offset629%_ '1))))))))
+                               (_%byte639%_
+                                (if _%delimiter-valid?637%_
                                     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-hex-byte
-                                     _%bytestring582%_
-                                     _%offset604%_)
+                                     _%bytestring607%_
+                                     _%offset629%_)
                                     '#f)))
-                          (if (and _%byte614%_ (>= _%byte614%_ '0))
+                          (if (and _%byte639%_ (>= _%byte639%_ '0))
                               (begin
                                 (u8vector-set!
-                                 _%value597%_
-                                 _%index602%_
-                                 _%byte614%_)
-                                (_%lp600%_ (+ _%index602%_ '1)))
+                                 _%value622%_
+                                 _%index627%_
+                                 _%byte639%_)
+                                (_%lp625%_ (+ _%index627%_ '1)))
                               '#f))
-                        _%value597%_))
+                        _%value622%_))
                   '#f))
             '#f)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytevector->bytestring-root
-      (lambda (_%value577%_ _%delimiter-code578%_)
-        (let ((_%bytestring580%_
+      (lambda (_%value602%_ _%delimiter-code603%_)
+        (let ((_%bytestring605%_
                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->bytestring
-                _%value577%_
+                _%value602%_
                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring-delimiter
-                 _%delimiter-code578%_))))
-          (if _%bytestring580%_
+                 _%delimiter-code603%_))))
+          (if _%bytestring605%_
               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-               _%bytestring580%_)
+               _%bytestring605%_)
               '0))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring->bytevector-root
-      (lambda (_%bytestring572%_ _%delimiter-code573%_)
-        (let ((_%bytevector575%_
+      (lambda (_%bytestring597%_ _%delimiter-code598%_)
+        (let ((_%bytevector600%_
                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring->u8vector
-                _%bytestring572%_
+                _%bytestring597%_
                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-bytestring-delimiter
-                 _%delimiter-code573%_))))
-          (if _%bytevector575%_
+                 _%delimiter-code598%_))))
+          (if _%bytevector600%_
               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-               _%bytevector575%_)
+               _%bytevector600%_)
               '0))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->uint
-      (lambda (_%value563%_ _%byte-order564%_ _%size565%_)
-        (let _%lp567%_ ((_%index569%_
-                         (if (= _%byte-order564%_ '0) '0 (- _%size565%_ '1)))
-                        (_%result570%_ '0))
-          (if (if (= _%byte-order564%_ '0)
-                  (< _%index569%_ _%size565%_)
-                  (>= _%index569%_ '0))
-              (_%lp567%_
-               (if (= _%byte-order564%_ '0)
-                   (+ _%index569%_ '1)
-                   (- _%index569%_ '1))
+      (lambda (_%value588%_ _%byte-order589%_ _%size590%_)
+        (let _%lp592%_ ((_%index594%_
+                         (if (= _%byte-order589%_ '0) '0 (- _%size590%_ '1)))
+                        (_%result595%_ '0))
+          (if (if (= _%byte-order589%_ '0)
+                  (< _%index594%_ _%size590%_)
+                  (>= _%index594%_ '0))
+              (_%lp592%_
+               (if (= _%byte-order589%_ '0)
+                   (+ _%index594%_ '1)
+                   (- _%index594%_ '1))
                (bitwise-ior
-                (arithmetic-shift _%result570%_ '8)
-                (u8vector-ref _%value563%_ _%index569%_)))
-              _%result570%_))))
+                (arithmetic-shift _%result595%_ '8)
+                (u8vector-ref _%value588%_ _%index594%_)))
+              _%result595%_))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->sint
-      (lambda (_%value552%_ _%byte-order553%_ _%size554%_)
-        (if (zero? _%size554%_)
+      (lambda (_%value577%_ _%byte-order578%_ _%size579%_)
+        (if (zero? _%size579%_)
             '0
-            (let* ((_%uint556%_
+            (let* ((_%uint581%_
                     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->uint
-                     _%value552%_
-                     _%byte-order553%_
-                     _%size554%_))
-                   (_%bits558%_ (* _%size554%_ '8))
-                   (_%sign-bit560%_ (arithmetic-shift '1 (- _%bits558%_ '1))))
-              (if (zero? (bitwise-and _%uint556%_ _%sign-bit560%_))
-                  _%uint556%_
-                  (- _%uint556%_ (arithmetic-shift '1 _%bits558%_)))))))
+                     _%value577%_
+                     _%byte-order578%_
+                     _%size579%_))
+                   (_%bits583%_ (* _%size579%_ '8))
+                   (_%sign-bit585%_ (arithmetic-shift '1 (- _%bits583%_ '1))))
+              (if (zero? (bitwise-and _%uint581%_ _%sign-bit585%_))
+                  _%uint581%_
+                  (- _%uint581%_ (arithmetic-shift '1 _%bits583%_)))))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-uint->u8vector
-      (lambda (_%uint541%_ _%byte-order542%_ _%size543%_)
-        (let ((_%value545%_ (make-u8vector _%size543%_)))
-          (let _%lp547%_ ((_%index549%_ '0) (_%rest550%_ _%uint541%_))
-            (if (< _%index549%_ _%size543%_)
+      (lambda (_%uint566%_ _%byte-order567%_ _%size568%_)
+        (let ((_%value570%_ (make-u8vector _%size568%_)))
+          (let _%lp572%_ ((_%index574%_ '0) (_%rest575%_ _%uint566%_))
+            (if (< _%index574%_ _%size568%_)
                 (begin
                   (u8vector-set!
-                   _%value545%_
-                   (if (= _%byte-order542%_ '0)
-                       (- _%size543%_ _%index549%_ '1)
-                       _%index549%_)
-                   (bitwise-and _%rest550%_ '255))
-                  (_%lp547%_
-                   (+ _%index549%_ '1)
-                   (arithmetic-shift _%rest550%_ '-8)))
+                   _%value570%_
+                   (if (= _%byte-order567%_ '0)
+                       (- _%size568%_ _%index574%_ '1)
+                       _%index574%_)
+                   (bitwise-and _%rest575%_ '255))
+                  (_%lp572%_
+                   (+ _%index574%_ '1)
+                   (arithmetic-shift _%rest575%_ '-8)))
                 '#!void))
-          _%value545%_)))
+          _%value570%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-sint->u8vector
-      (lambda (_%sint537%_ _%byte-order538%_ _%size539%_)
+      (lambda (_%sint562%_ _%byte-order563%_ _%size564%_)
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-uint->u8vector
-         (if (< _%sint537%_ '0)
-             (+ _%sint537%_ (arithmetic-shift '1 (* _%size539%_ '8)))
-             _%sint537%_)
-         _%byte-order538%_
-         _%size539%_)))
+         (if (< _%sint562%_ '0)
+             (+ _%sint562%_ (arithmetic-shift '1 (* _%size564%_ '8)))
+             _%sint562%_)
+         _%byte-order563%_
+         _%size564%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector->uint
-      (lambda (_%root-id531%_ _%byte-order532%_ _%size533%_)
-        (let ((_%value535%_
+      (lambda (_%root-id556%_ _%byte-order557%_ _%size558%_)
+        (let ((_%value560%_
                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
-                _%root-id531%_)))
-          (if (u8vector? _%value535%_)
+                _%root-id556%_)))
+          (if (u8vector? _%value560%_)
               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->uint
-               _%value535%_
-               _%byte-order532%_
-               _%size533%_)
+               _%value560%_
+               _%byte-order557%_
+               _%size558%_)
               '0))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector->sint
-      (lambda (_%root-id525%_ _%byte-order526%_ _%size527%_)
-        (let ((_%value529%_
+      (lambda (_%root-id550%_ _%byte-order551%_ _%size552%_)
+        (let ((_%value554%_
                (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
-                _%root-id525%_)))
-          (if (u8vector? _%value529%_)
+                _%root-id550%_)))
+          (if (u8vector? _%value554%_)
               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-u8vector->sint
-               _%value529%_
-               _%byte-order526%_
-               _%size527%_)
+               _%value554%_
+               _%byte-order551%_
+               _%size552%_)
               '0))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-uint->bytevector-root
-      (lambda (_%uint521%_ _%byte-order522%_ _%size523%_)
+      (lambda (_%uint546%_ _%byte-order547%_ _%size548%_)
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-uint->u8vector
-          _%uint521%_
-          _%byte-order522%_
-          _%size523%_))))
+          _%uint546%_
+          _%byte-order547%_
+          _%size548%_))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-sint->bytevector-root
-      (lambda (_%sint517%_ _%byte-order518%_ _%size519%_)
+      (lambda (_%sint542%_ _%byte-order543%_ _%size544%_)
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
          (gerbil-scheme-rust/scheme/runtime#gerbil-rs-sint->u8vector
-          _%sint517%_
-          _%byte-order518%_
-          _%size519%_))))
+          _%sint542%_
+          _%byte-order543%_
+          _%size544%_))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-i64-min
       (- (arithmetic-shift '1 '63)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-i64-max
@@ -1885,32 +1885,32 @@
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-u64-max
       (- (arithmetic-shift '1 '64) '1))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer?
-      (lambda (_%value515%_)
-        (if (integer? _%value515%_) (exact? _%value515%_) '#f)))
+      (lambda (_%value540%_)
+        (if (integer? _%value540%_) (exact? _%value540%_) '#f)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer-fits-i64?
-      (lambda (_%value513%_)
+      (lambda (_%value538%_)
         (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer?
-             _%value513%_)
+             _%value538%_)
             (<= gerbil-scheme-rust/scheme/runtime#gerbil-rs-i64-min
-                _%value513%_
+                _%value538%_
                 gerbil-scheme-rust/scheme/runtime#gerbil-rs-i64-max)
             '#f)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer-fits-u64?
-      (lambda (_%value511%_)
+      (lambda (_%value536%_)
         (if (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-integer?
-             _%value511%_)
+             _%value536%_)
             (<= '0
-                _%value511%_
+                _%value536%_
                 gerbil-scheme-rust/scheme/runtime#gerbil-rs-u64-max)
             '#f)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-i64->exact-integer-root
-      (lambda (_%value509%_)
+      (lambda (_%value534%_)
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-         _%value509%_)))
+         _%value534%_)))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-u64->exact-integer-root
-      (lambda (_%value507%_)
+      (lambda (_%value532%_)
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
-         _%value507%_)))
+         _%value532%_)))
     (namespace
      ("gerbil-scheme-rust/scheme/runtime#"
       gerbil-rs-abi-version-native

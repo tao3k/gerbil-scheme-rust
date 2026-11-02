@@ -1,5 +1,5 @@
 //! Direct C ABI package operations on the existing native runtime owner.
-use super::{GerbilRuntime, NativeError};
+use super::{CollectionKind, GerbilRuntime, IdentifierKind, NativeError, RootedSchemeObject};
 use gerbil_scheme_sys::{GerbilBorrowedUtf8, GerbilStatus};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -134,29 +134,6 @@ impl GerbilRuntime {
         package_result("package main", status, code)
     }
 
-    /// Stage the compiler-owned complete program manifest for a package entry.
-    /// # Errors
-    /// Returns owner/image/transport errors; nonzero status retains staging failure.
-    pub fn stage_package_program(
-        &self,
-        directory: &str,
-        source: &str,
-        output: &str,
-    ) -> Result<i32, NativeError> {
-        self.check_thread()?;
-        let mut code = 0;
-        // SAFETY: all UTF-8 borrows and output remain live through foreign return.
-        let status = unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_package_stage(
-                directory.into(),
-                source.into(),
-                output.into(),
-                &raw mut code,
-            )
-        };
-        package_result("package program stage", status, code)
-    }
-
     /// Execute the ordinary native `build.ss` entry without a Gerbil CLI child.
     /// # Errors
     /// Rejects thread/lifecycle errors and invalid UTF-8 transport. A nonzero
@@ -205,6 +182,103 @@ impl GerbilRuntime {
         }
         Ok(result)
     }
+    /// Compile an existing native build.ss specification, without parsing it in Rust.
+    /// # Errors
+    /// Same owner/transport requirements and native result semantics as `build_package`.
+    pub fn build_package_spec(
+        &self,
+        directory: &str,
+        specification: &str,
+    ) -> Result<i32, NativeError> {
+        self.check_thread()?;
+        let mut result = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_package_build_spec(
+                GerbilBorrowedUtf8::from(directory),
+                GerbilBorrowedUtf8::from(specification),
+                &raw mut result,
+            )
+        };
+        if status != GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "native package specification",
+                code: status as i32,
+            });
+        }
+        Ok(result)
+    }
+
+    /// Stage an already compiled entry through the SDK's native graph producer.
+    /// Imports use the existing native symbol/list/root ABI, not a new carrier.
+    /// # Errors
+    /// Returns native owner, conversion or transport errors and native result codes.
+    pub fn stage_package_program(
+        &self,
+        source: &str,
+        output: &str,
+        runtime_imports: &[&str],
+    ) -> Result<i32, NativeError> {
+        self.check_thread()?;
+        let imports = self.root_package_imports(runtime_imports)?;
+        let mut result = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_package_stage(
+                GerbilBorrowedUtf8::from(source),
+                GerbilBorrowedUtf8::from(output),
+                imports.root_id(),
+                &raw mut result,
+            )
+        };
+        if status != GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "native programme graph",
+                code: status as i32,
+            });
+        }
+        Ok(result)
+    }
+
+    /// Stage the SDK's existing native module resource closure.
+    /// # Errors
+    /// Returns owner/transport errors and nonzero native operation results.
+    pub fn stage_package_load_closure(
+        &self,
+        runtime_imports: &[&str],
+        output: &str,
+    ) -> Result<i32, NativeError> {
+        self.check_thread()?;
+        let imports = self.root_package_imports(runtime_imports)?;
+        let mut result = 0;
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_package_load_closure(
+                imports.root_id(),
+                GerbilBorrowedUtf8::from(output),
+                &raw mut result,
+            )
+        };
+        if status != GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "native load closure",
+                code: status as i32,
+            });
+        }
+        Ok(result)
+    }
+
+    fn root_package_imports(
+        &self,
+        runtime_imports: &[&str],
+    ) -> Result<RootedSchemeObject<'_>, NativeError> {
+        let symbols = runtime_imports
+            .iter()
+            .map(|name| self.intern_identifier(IdentifierKind::Symbol, name))
+            .collect::<Result<Vec<_>, _>>()?;
+        let references: Vec<_> = symbols.iter().collect();
+        let imports = self
+            .collection_from_objects(CollectionKind::List, &references)?
+            .into_object();
+        Ok(imports)
+    }
 }
 
 fn package_result(
@@ -245,7 +319,7 @@ impl CompilerEnvironment {
             .map(|(name, _)| (name.to_owned(), std::env::var_os(name)))
             .collect();
         for (name, value) in projection.get_envs() {
-            // SAFETY: package-tools requires exclusive host environment access
+            // SAFETY: default build tooling requires exclusive host environment access
             // from initialization through teardown. No Scheme owner exists yet.
             unsafe {
                 restore_variable(name, value);

@@ -1,5 +1,5 @@
-//! Checked UTF-8 transport for the native, owner-local package tools.
-use crate::{GerbilBorrowedUtf8, GerbilStatus};
+//! Checked UTF-8 transport for the native, owner-local package build/test.
+use crate::{GerbilBorrowedUtf8, GerbilRootId, GerbilStatus};
 use std::{ffi::CString, os::raw::c_char};
 
 unsafe extern "C" {
@@ -33,7 +33,7 @@ unsafe fn directory_string(value: GerbilBorrowedUtf8) -> Result<CString, GerbilS
 /// Execute the package's ordinary `build.ss` main in this live native owner.
 /// The operation result is separate from transport status; failure leaves it unchanged.
 /// # Safety
-/// The package-tools runtime must be live on its owner thread. Spans must remain
+/// The default build runtime must be live on its owner thread. Spans must remain
 /// readable and result must be null or writable and not overlap those spans.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gerbil_scheme_rust_package_build(
@@ -95,12 +95,6 @@ pub unsafe extern "C" fn gerbil_scheme_rust_package_test(
 }
 
 unsafe extern "C" {
-    fn gerbil_scheme_rust_package_stage_cstr(
-        directory: *const c_char,
-        source: *const c_char,
-        output: *const c_char,
-        result: *mut i32,
-    ) -> GerbilStatus;
     fn gerbil_scheme_rust_package_paths_cstr(
         prefix: *const c_char,
         libraries: *const c_char,
@@ -112,42 +106,6 @@ unsafe extern "C" {
         count: u32,
         result: *mut i32,
     ) -> GerbilStatus;
-}
-/// Invoke the owner-local package stage operation with checked borrowed text.
-/// # Safety
-/// The tooling image must be live on its owner thread. All input spans must
-/// be readable and the nonnull output writable and disjoint for this call.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn gerbil_scheme_rust_package_stage(
-    directory: GerbilBorrowedUtf8,
-    source: GerbilBorrowedUtf8,
-    output: GerbilBorrowedUtf8,
-    result: *mut i32,
-) -> GerbilStatus {
-    if result.is_null() {
-        return GerbilStatus::NullPointer;
-    }
-    let directory = match unsafe { directory_string(directory) } {
-        Ok(text) => text,
-        Err(status) => return status,
-    };
-    let source = match unsafe { directory_string(source) } {
-        Ok(text) => text,
-        Err(status) => return status,
-    };
-    let output = match unsafe { directory_string(output) } {
-        Ok(text) => text,
-        Err(status) => return status,
-    };
-    // SAFETY: converted strings and output remain live for the complete call.
-    unsafe {
-        gerbil_scheme_rust_package_stage_cstr(
-            directory.as_ptr(),
-            source.as_ptr(),
-            output.as_ptr(),
-            result,
-        )
-    }
 }
 /// Invoke the owner-local package paths operation with checked borrowed text.
 /// # Safety
@@ -205,9 +163,14 @@ pub unsafe extern "C" fn gerbil_scheme_rust_package_main(
     };
     let mut strings = Vec::with_capacity(count);
     for argument in arguments {
-        let text = match unsafe { directory_string(*argument) } {
-            Ok(text) => text,
-            Err(status) => return status,
+        let text = if argument.is_empty() {
+            CString::default()
+        } else {
+            // SAFETY: the caller retains this nonempty argument span.
+            match unsafe { directory_string(*argument) } {
+                Ok(text) => text,
+                Err(status) => return status,
+            }
         };
         strings.push(text);
     }
@@ -216,4 +179,99 @@ pub unsafe extern "C" fn gerbil_scheme_rust_package_main(
     unsafe {
         gerbil_scheme_rust_package_main_cstr(directory.as_ptr(), pointers.as_ptr(), length, result)
     }
+}
+
+unsafe extern "C" {
+    fn gerbil_scheme_rust_package_load_closure_cstr(
+        imports: GerbilRootId,
+        output: *const c_char,
+        result: *mut i32,
+    ) -> GerbilStatus;
+    fn gerbil_scheme_rust_package_build_spec_cstr(
+        directory: *const c_char,
+        specification: *const c_char,
+        result: *mut i32,
+    ) -> GerbilStatus;
+    fn gerbil_scheme_rust_package_stage_cstr(
+        source: *const c_char,
+        output: *const c_char,
+        imports: GerbilRootId,
+        result: *mut i32,
+    ) -> GerbilStatus;
+}
+
+/// Compile an existing build.ss specification through native std/make.
+/// # Safety
+/// Same live-owner, span and output requirements as `package_build`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_package_build_spec(
+    directory: GerbilBorrowedUtf8,
+    specification: GerbilBorrowedUtf8,
+    result: *mut i32,
+) -> GerbilStatus {
+    if result.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    let directory = match unsafe { directory_string(directory) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let specification = match unsafe { directory_string(specification) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    unsafe {
+        gerbil_scheme_rust_package_build_spec_cstr(
+            directory.as_ptr(),
+            specification.as_ptr(),
+            result,
+        )
+    }
+}
+
+/// Call the existing native programme graph producer with rooted imports.
+/// # Safety
+/// Same live-owner and spans as `package_build`. Imports must be a live root in
+/// that owner; result must be writable and must not overlap the borrowed spans.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_package_stage(
+    source: GerbilBorrowedUtf8,
+    output: GerbilBorrowedUtf8,
+    imports: GerbilRootId,
+    result: *mut i32,
+) -> GerbilStatus {
+    if result.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    let source = match unsafe { directory_string(source) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let output = match unsafe { directory_string(output) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    unsafe {
+        gerbil_scheme_rust_package_stage_cstr(source.as_ptr(), output.as_ptr(), imports, result)
+    }
+}
+
+/// Stage the existing native expander load closure from rooted module symbols.
+/// # Safety
+/// Imports must belong to the live owner. Output and result obey `package_build`
+/// borrowing requirements and must not overlap.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_package_load_closure(
+    imports: GerbilRootId,
+    output: GerbilBorrowedUtf8,
+    result: *mut i32,
+) -> GerbilStatus {
+    if result.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    let output = match unsafe { directory_string(output) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    unsafe { gerbil_scheme_rust_package_load_closure_cstr(imports, output.as_ptr(), result) }
 }

@@ -97,6 +97,28 @@ typedef struct GerbilBorrowedVector {
   size_t len;
 } GerbilBorrowedVector;
 
+/* Default runtime build/test; live owner-thread calls. Operation result is
+ * separate from transport status (0 success, 42 test failure, 70 exception).
+ * UTF-8 spans are checked; result remains unchanged on transport errors. */
+/* Tool calls use Gerbil's native process-global child handling until return.
+ * Use the existing build host without concurrent unrelated host children. */
+GerbilStatus gerbil_scheme_rust_package_build(GerbilBorrowedUtf8 directory, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_clean(GerbilBorrowedUtf8 directory, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_test(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 tests, int32_t *result);
+
+GerbilStatus gerbil_scheme_rust_package_paths(GerbilBorrowedUtf8 prefix, GerbilBorrowedUtf8 libraries, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_main(GerbilBorrowedUtf8 directory, const GerbilBorrowedUtf8 *arguments, size_t count, int32_t *result);
+
+/* Compile an existing declaration; its contents remain Scheme-owned. */
+GerbilStatus gerbil_scheme_rust_package_build_spec(GerbilBorrowedUtf8 directory,
+    GerbilBorrowedUtf8 specification, int32_t *result);
+/* Metadata imports are an existing owner-local rooted Scheme symbol list. */
+GerbilStatus gerbil_scheme_rust_package_stage(GerbilBorrowedUtf8 source, GerbilBorrowedUtf8 output,
+    GerbilRootId imports, int32_t *result);
+
+GerbilStatus gerbil_scheme_rust_package_load_closure(GerbilRootId imports,
+    GerbilBorrowedUtf8 output, int32_t *result);
+
 uint32_t gerbil_scheme_rust_abi_version(void);
 int32_t gerbil_scheme_rust_runtime_init(void);
 struct ___global_state_struct;
@@ -233,17 +255,6 @@ GerbilStatus gerbil_scheme_rust_pair_cdr(GerbilValueHandle value,
                                          GerbilValueHandle *out);
 GerbilStatus gerbil_scheme_rust_pair_parts(GerbilValueHandle value,
                                            GerbilPair *out);
-
-/* Opt-in package-tools image; call only on its live VM owner thread.
- * Every input span/argument must remain readable through return. Result must
- * be writable, disjoint, and is unchanged on transport failure. Package status
- * is separate from transport status. These are bridge exports, not CLI calls. */
-GerbilStatus gerbil_scheme_rust_package_build(GerbilBorrowedUtf8 directory, int32_t *result);
-GerbilStatus gerbil_scheme_rust_package_clean(GerbilBorrowedUtf8 directory, int32_t *result);
-GerbilStatus gerbil_scheme_rust_package_test(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 tests, int32_t *result);
-GerbilStatus gerbil_scheme_rust_package_stage(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 source, GerbilBorrowedUtf8 output, int32_t *result);
-GerbilStatus gerbil_scheme_rust_package_paths(GerbilBorrowedUtf8 prefix, GerbilBorrowedUtf8 libraries, int32_t *result);
-GerbilStatus gerbil_scheme_rust_package_main(GerbilBorrowedUtf8 directory, const GerbilBorrowedUtf8 *arguments, size_t count, int32_t *result);
 
 #ifdef __cplusplus
 }

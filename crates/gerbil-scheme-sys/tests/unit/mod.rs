@@ -12,6 +12,8 @@ use crate::{
     gerbil_scheme_rust_value_is_pair,
 };
 
+#[cfg(not(feature = "external-program"))]
+mod abi_build;
 mod abi_integer_bytes;
 mod scenario_benchmark_suite;
 mod scheme_exact_integer;

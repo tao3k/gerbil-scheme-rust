@@ -80,7 +80,7 @@ jobs:
 
   # Cargo and Bazel own independent build graphs. Keep both complete gates,
   # without spending Bazel's watchdog budget on Cargo compilation first.
-  package-tools:
+  build-api:
     name: C ABI package tooling (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -102,11 +102,13 @@ jobs:
         with:
           release-root: ${{ env.GERBIL_RELEASE_ROOT }}
       - name: Direct build, clean, GxTest, cancellation and natural exit
-        run: cargo test -p gerbil-scheme --features package-tools --test package_tools --locked -- --nocapture
+        run: |
+          cargo test -p gerbil-scheme-sys --lib --locked -- --nocapture
+          cargo test -p gerbil-scheme --test runtime_lifecycle --test build --locked -- --nocapture
 
   # Lint and execution have independent Cargo request graphs. Keep both exact
   # checks; do not make one job prepare both complete images sequentially.
-  package-tools-lint:
+  build-api-lint:
     name: C ABI package tooling lint (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -127,8 +129,10 @@ jobs:
         uses: ./.github/actions/setup-gerbil
         with:
           release-root: ${{ env.GERBIL_RELEASE_ROOT }}
-      - name: Check the exact C ABI package-tools target
-        run: cargo clippy -p gerbil-scheme --features package-tools --test package_tools --locked -- -D warnings
+      - name: Check the exact default C ABI build targets
+        run: |
+          cargo clippy -p gerbil-scheme-sys --lib --tests --locked -- -D warnings
+          cargo clippy -p gerbil-scheme --test runtime_lifecycle --test build --locked -- -D warnings
 
   bazel:
     name: Bazel bindings (${{ matrix.os }})

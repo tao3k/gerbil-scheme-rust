@@ -3,7 +3,8 @@
 
 * API and ownership
 
-Enable the opt-in =package-tools= Cargo feature on =gerbil-scheme=. The existing
+The default =gerbil-scheme= runtime exposes package operations through its
+=build= module, backed by =scheme/build.ss= and =abi_build.rs=. The existing
 =GerbilRuntime= owns the one-shot, thread-affine VM. No second tooling session,
 frontend subprocess wrapper or consumer-owned scheduler is introduced.
 
@@ -14,7 +15,9 @@ frontend subprocess wrapper or consumer-owned scheduler is introduced.
 | clean_package | Invoke the package-owned build.ss clean action through the same C ABI owner |
 | run_package_main | Call the actual build.ss main with ordinary checked arguments |
 | test_package | Call :gerbil/tools/gxtest main with explicit test selection |
-| stage_package_program | Stage the existing compiler-owned complete AOT manifest |
+| stage_package_program | Stage the compiler-owned AOT manifest with rooted module imports |
+| build_package_spec | Compile an existing Scheme declaration using std/make |
+| stage_package_load_closure | Stage the existing rooted module resource closure |
 | build_package_cancellable / clean_package_cancellable / test_package_cancellable | Reject before entry or retain the entered result through return |
 
 The safe API checks the live owner thread. =gerbil-scheme-sys= validates borrowed
@@ -33,10 +36,9 @@ tooling archive. Regeneration remains =just bridge-regenerate=; checks and
 source hashes are never disabled or edited by hand.
 
 The C bridge admits package operations only when initialization used the
-matching default tooling linker. A different downstream linked program does
-not gain that capability merely by initializing a VM. The package-tools image
-can coexist with the external-program Cargo feature; an explicitly initialized
-external graph still fails its tooling-image identity check.
+matching default linker. A different downstream linked program does not gain
+that capability merely by initializing a VM. The existing =external-program=
+profile retains consumer-owned linking and omits the default build API.
 
 The paired installation is supplied through Gambit's setup parameters,
 including gambitdir and gambitdir_map. Child gsc processes receive Gambit's
@@ -82,14 +84,16 @@ cleanup while foreign work is pending.
 
 A zero result alone does not admit a build or test batch. Consumers must check
 expected artifacts and the complete nonempty case/module inventory. GxTest's
-own discovery, assertions and failure code remain authoritative. Its repeated
-suite objects can retain subtests; do not infer fresh source evaluation from a
-new expander context. Freeze source/dependency inputs and use a new build host
-for a different source cut.
+own discovery, assertions and failure code remain authoritative. Before each
+request, the native test selector reloads and evaluates the selected test entries;
+library dependencies remain cached. This prevents suite objects from accumulating
+subtests across repeated requests. A regression issues three requests and requires
+exactly three case executions; the previous implementation executed six. Freeze
+source/dependency inputs and use a new build host for a different source cut.
 
 * Executable evidence
 
-=just bridge-package-tools= runs the real package integration test and strict
+=just bridge-build= runs the real package integration test and strict
 Clippy. The existing test-child isolation convention supervises actual output,
 15-second total time and five-second idle time. Failure cleanup cannot become
 a passing natural-exit receipt. The Tokio supervisor uses available host cores.
@@ -98,8 +102,11 @@ The fixture exercises actual compilation and artifacts, same-process owner
 identity, passing and failing official tests, a failed path, immutable prefix,
 pre-entry cancellation, cancellation after a real entered test, subsequent
 owner use, program staging, actual build.ss arguments, malformed UTF-8,
-post-close refusal and natural VM/process shutdown. The first complete local
-execution naturally exits in 2.11 seconds with 12 workers. Strict lint and
+post-close refusal and natural VM/process shutdown. A historical source cut
+reported a 2.11-second local natural exit with 12 workers. That observation does
+not qualify the latest PR source: the macOS job at =6552c7f= completed its body
+and cleanup marker, then failed with SIGSEGV. Its full log is retained; natural
+exit admission remains open until the failure is reproduced and repaired. Strict lint and
 cross-platform CI are separate receipts; this fixture does not qualify the
 complete MRR package or establish a performance distribution.
 
@@ -155,7 +162,7 @@ The complete MRR build exposed Homebrew GCC reading Nix SDK headers through
 ambient CPATH. The former command entry already excluded unrelated compiler
 settings, but the C ABI owner had not reused that projection. The existing
 shared tool_environment source now owns that single projection. The AOT process
-builder and opt-in tooling VM both consume it. The VM applies it before setup
+builder and default tooling VM both consume it. The VM applies it before setup
 and restores the original values after teardown; there is no compiler command
 spawn or consumer-owned environment policy on this path. Explicit downstream
 program initialization retains its original environment.
@@ -186,7 +193,7 @@ A retained Apple linker crash reports stack exhaustion in markLive while Rust's
 executable dead-strip traversal walks the complete Scheme graph. The exact
 snapshot later replays successfully; that replay does not erase the crash or
 establish a deterministic failure. The package now reuses existing program-image
-link assembly to package the opt-in Darwin tooling graph as one shared image.
+link assembly to package the default Darwin tooling graph as one shared image.
 Rust links its C ABI instead of traversing the graph again as executable atoms.
 Linux retains the existing archive path. No caller RUSTFLAGS, linker replacement,
 stack enlargement, dependency update or weaker test gate implements this boundary.
@@ -251,3 +258,107 @@ static lint now have independent jobs with the same exact commands and unchanged
 per-job limits. Both remain required workflow checks. No output cache, artifact
 existence shortcut or weaker 15-second / five-second runtime gate implements this
 separation. The cancelled whole job remains unqualified despite its passed test.
+
+* SDK-owned regression acceptance (2026-11-02)
+
+The SDK owns admission of the complete C ABI, not just a downstream Library's
+build return code. Existing sys unit tests now independently compile the public
+C declarations and type-check the Rust exports, check malformed UTF-8/argument
+arrays and unchanged result sentinels, and preserve an empty ordinary argv
+string through transport to the lifecycle fence. The empty-argument case first
+failed with InvalidValue; copying an empty CString fixes it without relaxing
+nonempty directory validation. No new package fixture or feature is introduced.
+
+A second regression uses the existing =scheme/runtime-host.ss= and native
+=std/make= / =gerbil-rs-stage-program=. It checks the actual emitted module
+identities, not just the presence of program.json. Before repair, the compiler
+context selected the stale source-tree =scheme/runtime.ssi= after native make;
+that interface omitted the codec dependency although the generated interface
+contained it. The real SDK host graph included runtime but zero utf8 modules.
+The source-tree SSI and its special tracking are removed. Interfaces now come
+from canonical native compilation. The same four sys ABI tests pass, including
+exactly one codec module in the emitted consumer graph.
+
+The initial hypothesis that opaque foreign bodies themselves caused this
+omission was disproved by the native compiler's import traversal and interface
+origin. The attempted helper refactor was reverted; no wrapper or manual
+module-list repair remains. Do not attribute this missing-dependency regression
+to the Apple linker crash or to the remote post-cleanup SIGSEGV.
+
+Existing conversion contracts additionally check exact UTF-8 byte capacity,
+insufficient capacity with unchanged length output, guard bytes, empty input,
+embedded NUL, Unicode and multiple chunks. The exact-capacity case first failed
+with InvalidValue. The encoder now preflights actual widths within each existing
+256-scalar, allocation-free, interrupt-disabled leaf before writing. It retains
+all real type/scalar/range rejection. The former ASCII offset bound is explicitly
+accepted when its bytes fit; four-byte scalar input retains the corresponding
+true insufficient-capacity rejection. Runtime, build/test, natural exit and
+strict lint still require their separate current-source receipts.
+
+Investigation receipts are private ignored logs; failed source validation,
+original remote SIGSEGV, native Apple markLive stack-overflow reports and vendor
+linker snapshots are retained. No upstream patch, dead-strip disabling, expanded
+stack, compiler substitution or relaxed acceptance gate is used.
+
+Current-source local receipts: all 21 sys tests pass, the public runtime lifecycle
+and build/test integration targets pass with natural process exit, and strict
+Clippy passes for both owners. The existing Scheme codec conformance test passes
+all 1,112,064 Unicode scalar values against the official implementation. The
+existing bridge-build recipe and its macOS/Linux CI job now include the sys ABI
+contracts and runtime conversion test, rather than qualifying package calls alone.
+The 15-second total and five-second idle limits are unchanged. One existing
+runtime report test remains explicitly ignored; it is not counted as a pass.
+These are local current-source results, not a green remote PR or a clean-checkout
+receipt. Clean-source validation remains required before downstream promotion.
+
+* Concurrent PR integration checkpoint
+
+The original PR branch was rebased onto =fde6079bc42652b3095439b46f8ba8364e07f3ed=.
+The four concurrent commits retain host-environment storage after cleanup, reuse
+the compiler environment, package the Darwin default image, and delegate clean
+to Scheme. Their expanded compiled-consumer, cleanup, poisoned-header and
+post-shutdown allocation checks are retained in the renamed existing build test.
+The exact-three-executions regression is integrated into the same existing
+passing case. Execution and lint remain separate CI jobs with unchanged limits.
+Receipts from =6552c7f= qualify that earlier source cut only. The first isolated
+source archive attempt failed before ABI tests because the sandbox refused the
+standard build-gate cache directory; that failure is retained. It is not evidence
+of an ABI failure or clean-checkout acceptance. No gate was disabled.
+
+* Evidence-retention incident
+
+At approximately 21:37 local time on 2026-11-02, the ASCENT investigation
+cache directory disappeared while qualification was still running. No removal
+of that directory was issued by this migration work. Earlier statements that
+raw failure logs and linker snapshots are retained describe their prior state;
+their current availability is no longer established. Source stashes and isolated
+source snapshots survive. The completed local commands and counts remain in the
+conversation tool receipts, but those excerpts do not replace complete raw logs.
+The affected isolated run is not accepted as a retained clean-source receipt.
+An unchanged entrypoint may be executed again to obtain a complete retained log;
+that repetition must not erase the incident or select a favorable result.
+Subsequent receipts are stored separately under the system temporary directory.
+Full historical failure retention remains an explicit limitation.
+
+* Retained isolated-source result
+
+The isolated source export is HEAD =fde6079= plus the explicitly owned migration
+changes, excluding pending actor/service edits. It initially had no target or
+installed package prefix. Its full bridge-build invocation naturally returned
+zero, but the removed log prevents a complete retained cold-build receipt.
+An unchanged repeat in that source export, using its generated cache, has a
+complete retained log: 21 sys tests, the real build/clean/GxTest test and runtime
+conversion test pass, as do both strict Clippy commands. The supervised process
+naturally exits in 3.942791625 seconds with 12 workers and unchanged 15/5-second
+limits. The passing-case counter is exactly three. This is not a latency gain
+claim, a replacement cold-build receipt, or complete downstream acceptance.
+
+The same isolated export passes 29 AOT library tests and 19 integration tests;
+seven existing AOT tests remain ignored. The native scheme-contracts entry
+passes official codec parity for all 1,112,064 Unicode scalars, invalid-scalar
+and bounded-type rejection, snapshot independence and root release/GC isolation.
+One existing runtime latency report remains ignored. Format checking passes.
+The independent source export does not include pending owner/service edits and
+is not presented as a fresh Git-clone receipt. Remote CI, Linux and the ASCENT
+consumer remain separate acceptance boundaries. No downstream dependency REV is
+promoted by these SDK-owned results.

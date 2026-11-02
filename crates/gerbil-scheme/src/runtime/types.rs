@@ -17,8 +17,8 @@ use std::thread::ThreadId;
 pub struct GerbilRuntime {
     pub(super) owner: ThreadId,
     pub(super) _not_send_or_sync: PhantomData<Rc<()>>,
-    #[cfg(feature = "package-tools")]
-    pub(super) _toolchain_environment: Option<super::package_tools::CompilerEnvironment>,
+    #[cfg(not(feature = "external-program"))]
+    pub(super) _toolchain_environment: Option<super::build::CompilerEnvironment>,
 }
 
 /// Public receipt describing the initialized native runtime binding surface.

@@ -124,11 +124,12 @@ pub use scheme_flonum::{
 #[path = "../tests/unit/mod.rs"]
 mod tests;
 
-#[cfg(feature = "package-tools")]
-mod abi_package_tools;
-#[cfg(feature = "package-tools")]
-pub use abi_package_tools::{
-    gerbil_scheme_rust_package_build, gerbil_scheme_rust_package_clean,
+#[cfg(not(feature = "external-program"))]
+mod abi_build;
+#[cfg(not(feature = "external-program"))]
+pub use abi_build::{
+    gerbil_scheme_rust_package_build, gerbil_scheme_rust_package_build_spec,
+    gerbil_scheme_rust_package_clean, gerbil_scheme_rust_package_load_closure,
     gerbil_scheme_rust_package_main, gerbil_scheme_rust_package_paths,
     gerbil_scheme_rust_package_stage, gerbil_scheme_rust_package_test,
 };

@@ -34,7 +34,6 @@ fn run_native_build() {
     println!("cargo:rerun-if-changed=../../scheme/runtime-object-kinds.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime-composites.ss");
     println!("cargo:rerun-if-changed=../../scheme/utf8.ss");
-    println!("cargo:rerun-if-changed=../../scheme/runtime.ssi");
     println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm");
     println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm");
     println!("cargo:rerun-if-changed=../../scheme/generated/runtime.scm.sha256");
@@ -58,9 +57,7 @@ fn run_native_build() {
         println!("cargo:rerun-if-changed={}", input.display());
     }
 
-    if env::var_os("CARGO_FEATURE_EXTERNAL_PROGRAM").is_some()
-        && env::var_os("CARGO_FEATURE_PACKAGE_TOOLS").is_none()
-    {
+    if env::var_os("CARGO_FEATURE_EXTERNAL_PROGRAM").is_some() {
         let runtime_object = out_dir.join("runtime.o");
         run(
             gerbil_command(&gsc)
@@ -99,106 +96,13 @@ fn run_native_build() {
 
     let generated_native_scm =
         gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__runtime.scm");
-    let native_scm = sync_generated_scm(&workspace, &generated_native_scm, "runtime");
-    let utf8_scm = sync_generated_scm(
+    sync_generated_scm(&workspace, &generated_native_scm, "runtime");
+    sync_generated_scm(
         &workspace,
         &gerbil_path.join("lib/static/gerbil-scheme-rust__scheme__utf8.scm"),
         "utf8",
     );
-    if env::var_os("CARGO_FEATURE_PACKAGE_TOOLS").is_some() {
-        build_package_tools(&workspace, &out_dir, &gerbil_path, &gsc);
-        return;
-    }
-    let utf8_c = out_dir.join("utf8.c");
-    let utf8_object = out_dir.join("utf8.o");
-    // Gambit derives the C linker identity from the target basename. Keep it
-    // aligned with runtime.scm, independently of the Scheme namespace name.
-    let native_c = out_dir.join("runtime.c");
-    let native_object = out_dir.join("runtime.o");
-    let linker_c = out_dir.join("linker.c");
-    let linker_object = out_dir.join("linker.o");
-    let runtime_object = out_dir.join("lifecycle.o");
-
-    run(
-        gerbil_command(&gsc)
-            .args([
-                OsStr::new("-link"),
-                OsStr::new("-linker-name"),
-                OsStr::new("gerbil_scheme_rust_linker"),
-                OsStr::new("-o"),
-            ])
-            .arg(&linker_c)
-            .arg(&utf8_scm)
-            .arg(&native_scm),
-        "generate Gambit linker",
-    );
-    let compile_expression = format!(
-        "(compile-file-to-target {} output: {} module-name: \"gerbil-scheme-rust/scheme/runtime\")",
-        scheme_string(&native_scm),
-        scheme_string(&native_c),
-    );
-    run(
-        gerbil_command(&gsc).arg("-e").arg(compile_expression),
-        "generate named Gerbil module C",
-    );
-    compile_c(
-        &gsc,
-        &native_c,
-        &native_object,
-        "compile Gerbil module object",
-    );
-    let utf8_expression = format!(
-        "(compile-file-to-target {} output: {} module-name: \"gerbil-scheme-rust/scheme/utf8\")",
-        scheme_string(&utf8_scm),
-        scheme_string(&utf8_c),
-    );
-    run(
-        gerbil_command(&gsc).arg("-e").arg(utf8_expression),
-        "generate named UTF-8 module C",
-    );
-    compile_c(&gsc, &utf8_c, &utf8_object, "compile UTF-8 module object");
-    run(
-        gerbil_command(&gsc)
-            .args([
-                OsStr::new("-obj"),
-                OsStr::new("-cc-options"),
-                OsStr::new("-O2 -Dmain=gerbil_scheme_rust_gambit_main"),
-                OsStr::new("-o"),
-            ])
-            .arg(&linker_object)
-            .arg(&linker_c),
-        "compile Gambit linker",
-    );
-    compile_c(
-        &gsc,
-        &workspace.join("ffi/runtime.c"),
-        &runtime_object,
-        "compile runtime lifecycle shim",
-    );
-
-    let mut archive_build = cc::Build::new();
-    archive_build
-        .cargo_metadata(false)
-        .out_dir(&out_dir)
-        .object(&runtime_object)
-        .object(&linker_object)
-        .object(&native_object)
-        .object(&utf8_object)
-        .try_compile("gerbil_scheme_rust_native")
-        .expect("archive native binding objects");
-
-    let prefix = gerbil_prefix(&gsc);
-    println!("cargo:rustc-link-search=native={}", out_dir.display());
-    println!(
-        "cargo:rustc-link-search=native={}",
-        prefix.join("lib").display()
-    );
-    println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
-    println!("cargo:rustc-link-lib=static=gambit");
-    println!("cargo:rustc-link-lib=dylib=m");
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
-        println!("cargo:rustc-link-lib=dylib=dl");
-    }
+    build_default_program(&workspace, &out_dir, &gerbil_path, &gsc);
 }
 
 fn sync_generated_scm(workspace: &Path, native_scm: &Path, module: &str) -> PathBuf {
@@ -245,21 +149,6 @@ fn sync_generated_scm(workspace: &Path, native_scm: &Path, module: &str) -> Path
         fs::copy(native_scm, &transient_scm).expect("stage fresh native SCM with stable basename");
         transient_scm
     }
-}
-
-fn compile_c(gsc: &OsStr, source: &Path, object: &Path, operation: &str) {
-    run(
-        gerbil_command(gsc)
-            .args([
-                OsStr::new("-obj"),
-                OsStr::new("-cc-options"),
-                OsStr::new("-O2"),
-                OsStr::new("-o"),
-            ])
-            .arg(object)
-            .arg(source),
-        operation,
-    );
 }
 
 fn gerbil_prefix(gsc: &OsStr) -> PathBuf {
@@ -348,13 +237,14 @@ fn run(command: &mut Command, operation: &str) {
 }
 
 // Gerbil bootstrap only. Package operations after initialization use the native C ABI.
-fn build_package_tools(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsStr) {
-    let stage = out.join("package-tools");
+fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsStr) {
+    let stage = out.join("build");
     fs::create_dir_all(&stage).expect("native Gerbil program output");
     for source in [
-        "scheme/package-tools.ss",
+        "scheme/build.ss",
         "scheme/program-build.ss",
         "scheme/program-metadata.ss",
+        "scheme/python-package.ss",
     ] {
         println!(
             "cargo:rerun-if-changed={}",
@@ -364,23 +254,23 @@ fn build_package_tools(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsStr)
     let expression = format!(
         "(load {}) (import :gerbil-scheme-rust/scheme/program-build) (gerbil-rs-stage-program {} {} '(:gerbil/core :gerbil/compiler :gerbil/tools/gxtest) link-options: (gerbil-scheme-rust-link-options))",
         scheme_string(&workspace.join("build.ss")),
-        scheme_string(&workspace.join("scheme/package-tools.ss")),
+        scheme_string(&workspace.join("scheme/build.ss")),
         scheme_string(&stage)
     );
     run(
         gerbil_command("gxi")
             .args(["-e", &expression])
             .env("GERBIL_PATH", prefix),
-        "Gerbil package-tools graph",
+        "Gerbil build graph",
     );
     let receipt = crate::build_program_archive(crate::ProgramArchiveRequest {
         manifest: &stage.join("program.json"),
         gsc: Path::new(gsc),
-        archive_name: "gerbil_scheme_package_tools",
+        archive_name: "gerbil_scheme_build",
         linker_name: "gerbil_scheme_rust_linker",
-        out_dir: &out.join("package-tools-archive"),
+        out_dir: &out.join("build-archive"),
     })
-    .expect("Gerbil package-tools archive");
+    .expect("Gerbil build archive");
     let home = gerbil_prefix(gsc);
     let mappings = [
         home.to_str()
@@ -403,35 +293,30 @@ fn build_package_tools(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsStr)
         ));
     }
     header.push_str("static ___UCS_2STRING package_toolchain_map[] = {package_toolchain_path_1, package_toolchain_path_2, package_toolchain_path_3, 0};\n");
-    fs::write(out.join("package-tools-home.h"), header)
-        .expect("write paired Gerbil installation mapping");
-    let lifecycle_options = format!("-O2 -DGERBIL_SCHEME_RUST_PACKAGE_TOOLS -I{}", out.display());
+    fs::write(out.join("build-home.h"), header).expect("write paired Gerbil installation mapping");
+    let lifecycle_options = format!("-O2 -DGERBIL_SCHEME_RUST_BUILD -I{}", out.display());
     let lifecycle = out.join("lifecycle.o");
     run(
         gerbil_command(gsc)
             .args(["-obj", "-cc-options", &lifecycle_options, "-o"])
             .arg(&lifecycle)
             .arg(workspace.join("ffi/runtime.c")),
-        "Gerbil package-tools lifecycle",
+        "Gerbil build lifecycle",
     );
-    publish_package_tools_image(&receipt, &lifecycle, out);
+    publish_default_image(&receipt, &lifecycle, out);
 }
 
-fn publish_package_tools_image(
-    receipt: &crate::NativeArchiveLinkReceipt,
-    lifecycle: &Path,
-    out: &Path,
-) {
+fn publish_default_image(receipt: &crate::NativeArchiveLinkReceipt, lifecycle: &Path, out: &Path) {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         // Keep the complete tooling graph in its package-owned native image.
         // Rust's executable dead-strip traversal recursively walks large Scheme
         // constant graphs and can exhaust Apple's linker stack. Native image
         // assembly reuses the existing owner; no caller linker override is needed.
-        let image = out.join("libgerbil_scheme_package_tools.dylib");
+        let image = out.join("libgerbil_scheme_build.dylib");
         crate::instance::link_program_image(receipt, lifecycle, &image, &[], Some(&image))
-            .expect("link Gerbil package-tools image");
+            .expect("link Gerbil default build image");
         println!("cargo:rustc-link-search=native={}", out.display());
-        println!("cargo:rustc-link-lib=dylib=gerbil_scheme_package_tools");
+        println!("cargo:rustc-link-lib=dylib=gerbil_scheme_build");
         return;
     }
     cc::Build::new()

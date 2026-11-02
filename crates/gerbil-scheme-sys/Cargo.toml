@@ -12,7 +12,6 @@ publish = false
 
 [features]
 external-program = []
-package-tools = []
 
 [lints]
 workspace = true
@@ -21,4 +20,5 @@ workspace = true
 gerbil-scheme-aot-build.workspace = true
 gerbil-scheme-rust-project-harness-policy.workspace = true
 [dev-dependencies]
+serde_json.workspace = true
 gerbil-scheme-rust-project-harness = { path = "../../build-support/gerbil-scheme-rust-project-harness", package = "gerbil-scheme-rust-project-harness" }

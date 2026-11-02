@@ -1,5 +1,9 @@
 # Bridge-owned qualification; model checks never substitute for FFI or latency tests.
-build_env := if os() == "macos" { "env -u SDKROOT CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=/usr/bin/cc" } else { "env" }
+# Native tool discovery stays here; build.ss resolves its own library flags.
+export PATH := if os() == "macos" {
+    `dirname "$(command -v xcrun)"` + ":" + `brew --prefix` + "/bin:" + env("PATH")
+} else { env("PATH") }
+build_env := if os() == "macos" { "env -u SDKROOT" } else { "env" }
 model-check:
     quint typecheck specs/bridge_handoff.qnt
     quint test specs/bridge_handoff.qnt --main bridge_handoff_small --seed 1
@@ -33,6 +37,14 @@ vm-model-check:
 
 bridge-instance-inputs:
     {{ build_env }} cargo test -p gerbil-scheme-qualification --test build_inputs --locked
+
+# Use this existing SDK environment for downstream Cargo consumers too.
+bridge-cargo +args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    gerbil_home="$(gxi -e '(display (gerbil-home))')"
+    gerbil_gcc="$(gxi -e '(display (getenv "GERBIL_GCC" "gcc"))')"
+    {{ build_env }} GERBIL_HOME="$gerbil_home" GERBIL_GSC="${GERBIL_GSC:-$gerbil_home/bin/gsc}" GERBIL_GCC="$gerbil_gcc" GAMBOPT="${GAMBOPT:+$GAMBOPT,}~~=$gerbil_home,~~bin=$gerbil_home/bin,~~lib=$gerbil_home/lib" cargo {{ args }}
 
 bridge-test:
     {{ build_env }} cargo test -p gerbil-scheme --test runtime_lifecycle calls_scalar_export_in_process -- --nocapture
@@ -337,6 +349,8 @@ native-mailbox-backpressure-model-check:
     quint run specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
 
 # Real official build/GxTest calls, cancellation and natural VM teardown.
-bridge-package-tools:
-    {{ build_env }} cargo test -p gerbil-scheme --features package-tools --test package_tools --locked -- --nocapture
-    {{ build_env }} cargo clippy -p gerbil-scheme --features package-tools --test package_tools --locked -- -D warnings
+bridge-build:
+    {{ build_env }} cargo test -p gerbil-scheme-sys --lib --locked -- --nocapture
+    {{ build_env }} cargo test -p gerbil-scheme --test runtime_lifecycle --test build --locked -- --nocapture
+    {{ build_env }} cargo clippy -p gerbil-scheme-sys --lib --tests --locked -- -D warnings
+    {{ build_env }} cargo clippy -p gerbil-scheme --test runtime_lifecycle --test build --locked -- -D warnings

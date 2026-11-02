@@ -7,6 +7,7 @@
 (extern namespace: #f
   gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk-c
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
+  gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!)
 
 ;; Differential checks against the installed official codec, covering every
@@ -50,7 +51,7 @@
 (displayln "UTF8-CONFORMANCE surrogate-rejection=OK")
 
 ;; Private bulk-leaf rejection must not touch output before validating bounds.
-(let ((output (make-u8vector 1024 #xa5)) (text (make-string 257 #\a)))
+(let ((output (make-u8vector 1024 #xa5)) (text (make-string 257 (integer->char #x1f600))))
   (for-each
    (lambda (bounds)
      (unless (< (apply gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk-c
@@ -70,6 +71,18 @@
               text text 0 1 0) 0)
     (error "UTF-8 chunk accepted string as bytevector"))
   (displayln "UTF8-CONFORMANCE bounded-bulk-type-rejection=OK"))
+
+;; Exact ASCII byte bounds are sufficient. Preserve the former offset case
+;; as a positive control; the four-byte-scalar case above still rejects before
+;; writing when that same span is genuinely too small.
+(let ((output (make-u8vector 1024 #xa5)) (text (make-string 257 #\a)))
+  (unless (= (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk-c
+               text output 0 256 1) 257)
+    (error "UTF-8 chunk rejected exact ASCII bounds"))
+  (unless (and (= (u8vector-ref output 0) #xa5)
+               (equal? (subu8vector output 1 257) (make-u8vector 256 97))
+               (equal? (subu8vector output 257 1024) (make-u8vector 767 #xa5)))
+    (error "UTF-8 chunk exceeded exact ASCII bounds")))
 
 ;; The same Scheme string changes in place, not just between distinct roots.
 ;; Earlier bytevectors must remain independent and the next conversion must
@@ -105,7 +118,8 @@
   (unless (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release! token)
     (error "live root release failed"))
   (##gc)
-  (when (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref token)
+  (unless (eq? (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref token)
+               gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing)
     (error "released root remained visible"))
   (when (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release! token)
     (error "duplicate root release succeeded"))

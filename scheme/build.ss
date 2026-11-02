@@ -4,8 +4,11 @@
         (only-in :gerbil/runtime/init gerbil-load-expander!)
         (rename-in (only-in :gerbil/tools/gxtest main) (main package-test-main))
         (only-in "runtime.ss" gerbil-rs-exception-message)
-        (only-in "program-build.ss" gerbil-rs-stage-program))
+        (only-in "program-build.ss" gerbil-rs-stage-program)
+        (only-in :std/source this-source-file)
+        (only-in :gerbil/tools/env setup-local-pkg-env!))
 (export main)
+(extern namespace: gerbil/tools/gxtest collect-files)
 (C-ffi-macrology)
 (C-declare "#include <stdint.h>")
 
@@ -95,13 +98,6 @@
       (package-invoke-main
         (map (lambda (index) (package-argument arguments index)) (iota count))))))
 
-(def (package-stage directory source output)
-  (call-package directory
-    (lambda ()
-      (create-directory* (path-expand output))
-      (gerbil-rs-stage-program (path-expand source) (path-expand output))
-      0)))
-
 (extern package-argument)
 
 (def (with-test-progress action)
@@ -144,29 +140,82 @@
         (lambda ()
           (unless (and (string? tests) (not (string-empty? tests)))
             (error "nonempty package test path required"))
+          ;; Evaluate selected entries once for this request; dependencies remain cached.
+          (for-each (lambda (file) (import-module file #t #t))
+                    (collect-files [tests]))
           (package-test-main "-g" "-v" "5" "--" tests))))))
 
+(def (package-build-spec directory specification)
+  (call-package directory
+    (lambda ()
+      (setup-local-pkg-env! #t)
+      (load (path-expand "build.ss" (current-directory)))
+      (eval-syntax '(import (only-in :std/make make)))
+      ((eval 'make) ((eval (string->symbol specification)))
+        srcdir: (current-directory)
+        libdir: (path-expand "lib" (gerbil-path)) optimize: #t))))
+
+;; The imports arrive through the SDK's existing rooted Scheme object ABI.
+;; No expression parser, argument protocol, or downstream compiler plan is used.
+(def (package-stage source output imports)
+  (call-package (current-directory)
+    (lambda ()
+      (unless (and (list? imports) (andmap symbol? imports))
+        (error "native runtime imports must be a rooted symbol list"))
+      (let* ((entry (path-expand source))
+             (destination (path-expand output))
+             (sdk-root (path-expand ".." (path-directory (this-source-file)))))
+        ;; Read the SDK owner's native link declaration, not host package probes.
+        (load (path-expand "build.ss" sdk-root))
+        (eval-syntax `(import (only-in ,(path-expand "scheme/program-build.ss" sdk-root)
+                               gerbil-rs-stage-program)))
+        (create-directory* destination)
+        ((eval 'gerbil-rs-stage-program) entry destination imports
+          link-options: ((eval 'gerbil-scheme-rust-link-options)))
+        ;; write-json returns a byte count; that is data, not a tool exit code.
+        (void)))))
+
+(def (package-load-closure imports output)
+  (call-package (current-directory)
+    (lambda ()
+      (unless (and (list? imports) (andmap symbol? imports))
+        (error "native runtime imports must be a rooted symbol list"))
+      (let (sdk-root (path-expand ".." (path-directory (this-source-file))))
+        (eval-syntax `(import (only-in ,(path-expand "scheme/python-package.ss" sdk-root)
+                               gerbil-rs-stage-load-closure)))
+        ((eval 'gerbil-rs-stage-load-closure) imports (path-expand output))
+        (void)))))
+
 (begin-foreign
-  (namespace ("gerbil-scheme-rust/scheme/package-tools#" package-argument))
+  (namespace ("gerbil-scheme-rust/scheme/build#" package-argument))
   (define package-argument
     (c-lambda ((pointer void) unsigned-int) UTF-8-string
       "___result = ((const char *const *)___arg1)[___arg2];"))
   (c-define (package-main-entry directory arguments count) (UTF-8-string (pointer void) unsigned-int) int32
     "gerbil_scheme_rust_package_main_scheme" ""
-    (gerbil-scheme-rust/scheme/package-tools#package-main-arguments directory arguments count))
-  (c-define (package-stage-entry directory source output) (UTF-8-string UTF-8-string UTF-8-string) int32
-    "gerbil_scheme_rust_package_stage_scheme" ""
-    (gerbil-scheme-rust/scheme/package-tools#package-stage directory source output))
+    (gerbil-scheme-rust/scheme/build#package-main-arguments directory arguments count))
   (c-define (package-paths-entry prefix libraries) (UTF-8-string UTF-8-string) int32
     "gerbil_scheme_rust_package_paths_scheme" ""
-    (gerbil-scheme-rust/scheme/package-tools#call-package (current-directory)
-      (lambda () (gerbil-scheme-rust/scheme/package-tools#package-configure prefix libraries))))
+    (gerbil-scheme-rust/scheme/build#call-package (current-directory)
+      (lambda () (gerbil-scheme-rust/scheme/build#package-configure prefix libraries))))
   (c-define (package-build-entry directory) (UTF-8-string) int32
     "gerbil_scheme_rust_package_build_scheme" ""
-    (gerbil-scheme-rust/scheme/package-tools#package-build directory))
+    (gerbil-scheme-rust/scheme/build#package-build directory))
   (c-define (package-clean-entry directory) (UTF-8-string) int32
     "gerbil_scheme_rust_package_clean_scheme" ""
-    (gerbil-scheme-rust/scheme/package-tools#package-clean directory))
+    (gerbil-scheme-rust/scheme/build#package-clean directory))
   (c-define (package-test-entry directory tests) (UTF-8-string UTF-8-string) int32
     "gerbil_scheme_rust_package_test_scheme" ""
-    (gerbil-scheme-rust/scheme/package-tools#package-test directory tests)))
+    (gerbil-scheme-rust/scheme/build#package-test directory tests))
+  (c-define (package-build-spec-entry directory specification) (UTF-8-string UTF-8-string) int32
+    "gerbil_scheme_rust_package_build_spec_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-build-spec directory specification))
+  (c-define (package-stage-entry source output imports)
+    (UTF-8-string UTF-8-string int64) int32
+    "gerbil_scheme_rust_package_stage_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-stage source output
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref imports)))
+  (c-define (package-load-closure-entry imports output) (int64 UTF-8-string) int32
+    "gerbil_scheme_rust_package_load_closure_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-load-closure
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref imports) output)))

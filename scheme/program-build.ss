@@ -178,10 +178,7 @@
                         (scm (if installed? static
                                (path-expand (string-append (static-module-name (string->symbol id)) ".scm")
                                             directory)))
-                        (system? (and installed?
-                                      (or (string-prefix? "gerbil/" id) (string-prefix? "std/" id))
-                                      (file-exists? (string-append (path-strip-extension scm) ".c"))
-                                      (file-exists? (string-append (path-strip-extension scm) ".o")))))
+                        (system? (and installed? (installed-aot? id scm))))
                    (unless installed?
                      (when (file-exists? scm) (delete-file scm))
                      (copy-file source scm))

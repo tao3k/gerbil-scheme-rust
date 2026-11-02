@@ -25,7 +25,7 @@ pub(super) fn run() -> bool {
         std::fs::create_dir_all(&poisoned).unwrap();
         std::fs::write(poisoned.join("stdio.h"), "#error unrelated host compiler headers leaked into Gerbil\n").unwrap();
         let mut command = tokio::process::Command::new(std::env::current_exe().unwrap());
-        command.args(["--exact", "package_tools::build_test_and_failures_share_the_existing_owner", "--nocapture"])
+        command.args(["--exact", "build::build_test_and_failures_share_the_existing_owner", "--nocapture"])
             .env(CHILD, "1").stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
         command.env("CPATH", &poisoned).env("SDKROOT", "/nix/store/invalid-host-sdk");
         #[cfg(unix)]

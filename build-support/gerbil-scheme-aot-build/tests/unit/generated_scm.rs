@@ -39,7 +39,6 @@ fn generated_scm_input_fingerprint_tracks_all_build_inputs() {
     )
     .expect("write composite include");
     fs::write(workspace.join("scheme/utf8.ss"), "encoder-v1\n").expect("write utf8.ss");
-    fs::write(workspace.join("scheme/runtime.ssi"), "ffi-v1\n").expect("write native.ssi");
     let original = workspace_input_fingerprint(&workspace);
     fs::write(workspace.join("scheme/package-clean.ss"), "clean-v2\n")
         .expect("change package cleanup source");

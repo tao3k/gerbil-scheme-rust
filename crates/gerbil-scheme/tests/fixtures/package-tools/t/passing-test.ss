@@ -5,5 +5,9 @@
     (test-case "same process and compiled macro"
       (call-with-output-file (list path: "test-owner.txt" truncate: #t)
         (lambda (port) (write (##os-getpid) port)))
-      (check-equal? (answer) 42)
+      (let ((runs (if (file-exists? "test-runs.txt")
+                      (call-with-input-file "test-runs.txt" read) 0)))
+      (call-with-output-file (list path: "test-runs.txt" truncate: #t)
+        (lambda (p) (write (+ runs 1) p))))
+    (check-equal? (answer) 42)
       (check-equal? (answer-literal) 42))))

@@ -14,7 +14,6 @@ const INPUT_PATHS: &[&str] = &[
     "scheme/runtime-object-kinds.ss",
     "scheme/runtime-composites.ss",
     "scheme/utf8.ss",
-    "scheme/runtime.ssi",
 ];
 
 pub(crate) fn workspace_input_fingerprint(workspace: &Path) -> String {

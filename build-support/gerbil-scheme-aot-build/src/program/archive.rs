@@ -16,7 +16,7 @@ use crate::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -832,52 +832,24 @@ fn native_link_options(
             return Err(format!("unsupported compiler-owned link option {option:?}"));
         }
     }
-    if let Some(paths) = std::env::var_os("LIBRARY_PATH") {
-        search.extend(std::env::split_paths(&paths).filter(|path| path.is_absolute()));
-    }
-    complete_sdk_dependency_search(&mut search, &libraries, |package, static_only| {
-        pkg_config::Config::new()
-            .cargo_metadata(false)
-            .statik(static_only)
-            .probe(package)
-            .map(|library| library.link_paths)
-            .map_err(|error| format!("resolve Gerbil dependency {package}: {error}"))
-    })?;
+    validate_sdk_dependency_search(&search, &libraries)?;
     Ok((search, libraries))
 }
 
-fn complete_sdk_dependency_search(
-    search: &mut Vec<PathBuf>,
+fn validate_sdk_dependency_search(
+    search: &[PathBuf],
     libraries: &[NativeLinkLibrary],
-    mut resolve: impl FnMut(&str, bool) -> Result<Vec<PathBuf>, String>,
 ) -> Result<(), String> {
-    // The compiler receipt must locate non-platform SDK archives, including
-    // implicit Linux multiarch paths and a relocated Homebrew SDK. Consumers
-    // must not rediscover this toolchain or probe packages themselves.
-    let mut directories: HashSet<PathBuf> = search.iter().cloned().collect();
     for library in libraries {
         let static_name = library.as_str().strip_prefix("static=");
         let name = static_name.unwrap_or(library.as_str());
-        let static_only = static_name.is_some();
-        let package = match name {
-            "crypto" => "libcrypto",
-            "ssl" => "libssl",
-            "z" => "zlib",
-            "sqlite3" => "sqlite3",
-            _ => continue,
-        };
-        let file = format!("lib{name}.a");
-        if locate_sdk_library(search, name, static_only) {
+        if !matches!(name, "crypto" | "ssl" | "z" | "sqlite3") {
             continue;
         }
-        for path in resolve(package, static_only)? {
-            if path.is_absolute() && directories.insert(path.clone()) {
-                search.push(path);
-            }
-        }
-        if !locate_sdk_library(search, name, static_only) {
+        if !locate_sdk_library(search, name, static_name.is_some()) {
             return Err(format!(
-                "Gerbil SDK dependency unavailable: {file}; static={static_only}"
+                "Gerbil SDK dependency unavailable: lib{name}; static={}",
+                static_name.is_some()
             ));
         }
     }
@@ -893,9 +865,9 @@ fn locate_sdk_library(search: &[PathBuf], name: &str, static_only: bool) -> bool
         &["a", "so", "dylib"]
     };
     search.iter().any(|path| {
-        extensions
-            .iter()
-            .any(|extension| path.join(format!("lib{name}.{extension}")).is_file())
+        extensions.iter().any(|extension| {
+            path.is_absolute() && path.join(format!("lib{name}.{extension}")).is_file()
+        })
     })
 }
 

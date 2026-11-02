@@ -73,13 +73,10 @@ fn ffi_runtime_is_the_default_api_without_an_opt_in_alias() {
         .skip(1)
         .filter(|target| target.contains("required-features"))
         .collect();
-    assert_eq!(
-        gated_targets.len(),
-        1,
+    assert!(
+        gated_targets.is_empty(),
         "ordinary runtime targets must stay unconditional"
     );
-    assert!(gated_targets[0].contains("name = \"package_tools\""));
-    assert!(gated_targets[0].contains("required-features = [\"package-tools\"]"));
     let syntax = syn::parse_file(api).expect("valid public Rust API");
     let runtime = syntax
         .items

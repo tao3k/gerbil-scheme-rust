@@ -29,8 +29,8 @@
 ;; Caller-owned storage follows c_intf.c's bounded buffer convention. Rust's
 ;; allocation is stable across Scheme polls; no Scheme body pointer is retained.
 (def (gerbil-rs-encode-utf8-into str pointer capacity)
-  (let* ((length (string-length str)) (maximum (* 4 length)))
-    (unless (and (fixnum? maximum) (fixnum? capacity) (>= capacity maximum))
+  (let (length (string-length str))
+    (unless (and (fixnum? capacity) (>= capacity 0))
       (error "UTF-8 caller capacity cannot admit encoding"))
     (let loop ((start 0) (written 0))
       (if (##fx< start length)
@@ -83,10 +83,28 @@ const ___U64 length = ___STRINGSIZE(str);
 const ___U64 capacity = ___INT(size);
 const ___U64 start = ___INT(first), end = ___INT(last), output_start = ___INT(position);
 if (start > end || end > length || end - start > 256 ||
-    output_start > capacity || 4 * (end - start) > capacity - output_start ||
+    output_start > capacity ||
     (end > start && !output))
   return ___FIX(-2);
 const ___C *source = ___CAST(const ___C*, ___BODY_AS(str, ___tSTRING));
+/* Preflight at most 256 scalars before writing this chunk. Keep required <=
+   available, so subtraction cannot underflow; required is at most 1024 bytes.
+   A caller needs the actual byte capacity, not the four-byte upper bound. */
+const ___U64 available = capacity - output_start;
+___U64 required = 0;
+for (___U64 i = start; i < end; ++i) {
+  const ___U32 c = source[i];
+  ___U64 width;
+  if (c <= 0x7f) width = 1;
+  else if (c <= 0x7ff) width = 2;
+  else if (c <= 0xffff) {
+    if ((c >> 11) == 0x1b) return ___FIX(-1);
+    width = 3;
+  } else if (c <= 0x10ffff) width = 4;
+  else return ___FIX(-1);
+  if (width > available - required) return ___FIX(-2);
+  required += width;
+}
 /* c_intf.c's output-cursor convention, within the checked local leaf only.
    Handle an empty null destination before any pointer arithmetic. */
 if (start == end) return ___FIX((___S64)output_start);

@@ -1,5 +1,5 @@
 //! Actual C ABI dispatch; the official builder and `GxTest` stay in this process.
-#[path = "package_tools/supervisor.rs"]
+#[path = "build/supervisor.rs"]
 mod supervisor;
 use gerbil_scheme::{GerbilRuntime, PackageCallOutcome};
 use gerbil_scheme_sys::{
@@ -84,6 +84,11 @@ fn build_test_and_failures_share_the_existing_owner() {
             .unwrap(),
         0
     );
+    assert_eq!(
+        fs::read_to_string(root.join("test-runs.txt")).unwrap(),
+        "3",
+        "the three requests must each execute the selected case exactly once"
+    );
     stage_and_clean(&runtime, &root);
     assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
     assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
@@ -109,7 +114,11 @@ fn stage_and_clean(runtime: &GerbilRuntime, root: &std::path::Path) {
     let stage = root.join("program");
     assert_eq!(
         runtime
-            .stage_package_program(directory, "answer.ss", stage.to_str().unwrap())
+            .stage_package_program(
+                root.join("answer.ss").to_str().unwrap(),
+                stage.to_str().unwrap(),
+                &[]
+            )
             .unwrap(),
         0
     );

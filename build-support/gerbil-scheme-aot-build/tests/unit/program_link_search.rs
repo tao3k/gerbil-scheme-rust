@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
-use super::{NativeLinkLibrary, complete_sdk_dependency_search};
+use super::{NativeLinkLibrary, validate_sdk_dependency_search};
 use std::{
     fs,
     sync::atomic::{AtomicU64, Ordering},
@@ -23,25 +23,18 @@ fn fixture() -> Fixture {
 }
 
 #[test]
-fn receipt_locates_implicit_archives_once_without_changing_link_order() {
+fn native_receipt_is_validated_without_changing_link_order() {
     let root = fixture();
     fs::write(root.0.join("libcrypto.a"), "target crypto").unwrap();
-    let mut search = vec![root.0.join("old-cellar")];
+    let search = vec![root.0.join("old-cellar"), root.0.clone()];
     let libraries = vec![
         NativeLinkLibrary::new("crypto"),
         NativeLinkLibrary::new("crypto"),
         NativeLinkLibrary::new("m"),
         NativeLinkLibrary::new("dl"),
     ];
-    let mut probes = Vec::new();
-    complete_sdk_dependency_search(&mut search, &libraries, |package, static_only| {
-        assert!(!static_only);
-        probes.push(package.to_owned());
-        Ok(vec![root.0.clone(), root.0.clone()])
-    })
-    .unwrap();
-    assert_eq!(probes, ["libcrypto"]);
-    assert_eq!(search.len(), 2);
+    validate_sdk_dependency_search(&search, &libraries).unwrap();
+    assert_eq!(search, [root.0.join("old-cellar"), root.0.clone()]);
     assert_eq!(
         libraries
             .iter()
@@ -49,55 +42,27 @@ fn receipt_locates_implicit_archives_once_without_changing_link_order() {
             .collect::<Vec<_>>(),
         ["crypto", "crypto", "m", "dl"]
     );
-    complete_sdk_dependency_search(&mut search, &libraries, |_, _| panic!("already located"))
-        .unwrap();
 }
 
 #[test]
-fn receipt_rejects_missing_static_archive_and_relative_package_paths() {
+fn missing_native_archive_is_rejected_without_a_host_package_fallback() {
     let root = fixture();
     let libraries = vec![NativeLinkLibrary::new("ssl")];
-    let mut search = Vec::new();
-    assert!(
-        complete_sdk_dependency_search(&mut search, &libraries, |_, _| Ok(vec![
-            "relative".into(),
-            root.0.clone()
-        ]))
-        .is_err()
-    );
-    assert_eq!(search.as_slice(), std::slice::from_ref(&root.0));
-    assert!(
-        complete_sdk_dependency_search(&mut Vec::new(), &libraries, |_, _| Err(
-            "unavailable target package".into()
-        ))
-        .is_err()
-    );
+    assert!(validate_sdk_dependency_search(&[root.0.clone()], &libraries).is_err());
+    fs::write(root.0.join("libcrypto.a"), "other library").unwrap();
+    assert!(validate_sdk_dependency_search(&[root.0.clone()], &libraries).is_err());
+    fs::write(root.0.join("libssl.a"), "target ssl").unwrap();
+    validate_sdk_dependency_search(&[root.0.clone()], &libraries).unwrap();
 }
 
 #[test]
 fn dynamic_dependency_is_not_reinterpreted_as_a_static_archive() {
     let root = fixture();
     fs::write(root.0.join("libcrypto.dylib"), "target crypto").unwrap();
-    let mut search = Vec::new();
-    complete_sdk_dependency_search(
-        &mut search,
-        &[NativeLinkLibrary::new("crypto")],
-        |package, static_only| {
-            assert_eq!(package, "libcrypto");
-            assert!(!static_only);
-            Ok(vec![root.0.clone()])
-        },
-    )
-    .unwrap();
+    let search = [root.0.clone()];
+    validate_sdk_dependency_search(&search, &[NativeLinkLibrary::new("crypto")]).unwrap();
     assert!(
-        complete_sdk_dependency_search(
-            &mut search,
-            &[NativeLinkLibrary::new("static=crypto")],
-            |_, static_only| {
-                assert!(static_only);
-                Ok(vec![root.0.clone()])
-            }
-        )
-        .is_err()
+        validate_sdk_dependency_search(&search, &[NativeLinkLibrary::new("static=crypto")])
+            .is_err()
     );
 }

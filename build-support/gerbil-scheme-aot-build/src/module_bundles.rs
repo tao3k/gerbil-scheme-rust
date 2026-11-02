@@ -1,7 +1,7 @@
 //! Coalesce compiler-owned dynamic modules without changing logical initialization.
 use crate::program::{
-    cached_native_output, compile_native_object, native_build_parallelism,
-    native_input_fingerprint, publish_native_output_fingerprint,
+    CFunctionLayout, ObjectCompilation, cached_native_output, compile_native_object,
+    native_build_parallelism, native_input_fingerprint, publish_native_output_fingerprint,
 };
 use crate::{
     CargoDirectiveKind, NativeArchiveLinkReceipt, ProgramArchiveObservation,
@@ -262,8 +262,11 @@ fn compile(gsc: &Path, module: &Module, options: &str) -> Result<(), String> {
         gsc,
         &module.c,
         &module.object,
-        "dynamic-module-object-v1",
-        options,
+        ObjectCompilation {
+            identity: "dynamic-module-object-v1",
+            options,
+            layout: CFunctionLayout::CompilerDefault,
+        },
         ProgramArchiveOperation {
             phase: "native-object",
             operation: "compile dynamic module",

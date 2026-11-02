@@ -1,10 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-use super::{ProgramArchiveObservation, ProgramArchiveObserver, compile_program_module};
+use super::{
+    CFunctionLayout, ProgramArchiveObservation, ProgramArchiveObserver, compile_program_module,
+};
 use std::fs;
 use std::sync::Mutex;
 
 const INPUT: &str = include_str!("scenarios/program-content-cache/inputs/module.scm");
+
+#[test]
+fn module_function_layout_is_explicit_and_unknown_layouts_refuse() {
+    let mut value =
+        serde_json::json!({"module":"example/module","scm":"module.scm","system":false});
+    let baseline: super::ProgramModule = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(baseline.host_layout, CFunctionLayout::CompilerDefault);
+    value["host_layout"] = "separate-procedures".into();
+    let separate: super::ProgramModule = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(separate.host_layout, CFunctionLayout::SeparateProcedures);
+    value["host_layout"] = "unknown-layout".into();
+    assert!(serde_json::from_value::<super::ProgramModule>(value).is_err());
+}
 
 #[test]
 fn unchanged_compiler_path_does_not_cache_changed_sdk_abi_or_driver() {
@@ -92,6 +107,7 @@ fn unchanged_native_input_reuses_content_addressed_output() {
         &output,
         "example/module",
         &options,
+        CFunctionLayout::CompilerDefault,
         &observations,
     )
     .expect("initial native compilation");
@@ -101,6 +117,7 @@ fn unchanged_native_input_reuses_content_addressed_output() {
         &output,
         "example/module",
         &options,
+        CFunctionLayout::CompilerDefault,
         &observations,
     )
     .expect("cached native compilation");
@@ -111,6 +128,7 @@ fn unchanged_native_input_reuses_content_addressed_output() {
         &output,
         "example/module",
         &options,
+        CFunctionLayout::CompilerDefault,
         &observations,
     )
     .expect("invalidated native compilation");
@@ -124,9 +142,22 @@ fn unchanged_native_input_reuses_content_addressed_output() {
         &output,
         "example/module",
         &changed,
+        CFunctionLayout::CompilerDefault,
         &observations,
     )
     .expect("header-only change invalidates native object");
+    for _ in 0..2 {
+        compile_program_module(
+            &compiler,
+            &input,
+            &output,
+            "example/module",
+            &changed,
+            CFunctionLayout::SeparateProcedures,
+            &observations,
+        )
+        .expect("layout change invalidates once, then reuses the matching object");
+    }
     let outside = root.join("nested");
     fs::create_dir(&outside).expect("create separate include root");
     assert!(
@@ -147,8 +178,8 @@ fn unchanged_native_input_reuses_content_addressed_output() {
             .expect("read compiler log")
             .lines()
             .count(),
-        3,
-        "unchanged inputs cache; source-only and header-only changes recompile"
+        4,
+        "unchanged inputs cache; source, header and function-layout changes recompile"
     );
     assert!(
         observations
@@ -181,6 +212,7 @@ fn actual_gcc_module_completes_with_bounded_load_motion_policy() {
         &object,
         "owned/diagnostic-module",
         "-O2 -Dmain=mrr_grammar_gambit_main",
+        CFunctionLayout::CompilerDefault,
         &Observations(Mutex::new(Vec::new())),
     )
     .unwrap();

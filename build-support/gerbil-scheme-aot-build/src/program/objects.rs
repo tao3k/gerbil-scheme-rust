@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 //! Owned bounded native compilation, including SDK metadata policy.
 use super::{
-    ProgramArchiveObserver, ProgramArchiveOperation, compile_native_object,
-    native_build_parallelism, observe_program_archive_operation,
+    CFunctionLayout, ObjectCompilation, ProgramArchiveObserver, ProgramArchiveOperation,
+    compile_native_object, native_build_parallelism, observe_program_archive_operation,
 };
 use std::path::{Path, PathBuf};
 use std::sync::{
@@ -10,9 +10,17 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
+pub(super) struct ProgramObject {
+    pub source: PathBuf,
+    pub object: PathBuf,
+    pub module: String,
+    pub deferred: bool,
+    pub layout: CFunctionLayout,
+}
+
 pub(super) fn compile_program_modules(
     gsc: &Path,
-    sources: &[(PathBuf, PathBuf, String, bool)],
+    sources: &[ProgramObject],
     cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
@@ -31,15 +39,23 @@ pub(super) fn compile_program_modules(
 
 fn compile_program_modules_inner(
     gsc: &Path,
-    sources: &[(PathBuf, PathBuf, String, bool)],
+    sources: &[ProgramObject],
     cc_options: &str,
     observer: &dyn ProgramArchiveObserver,
     worker_count: usize,
 ) -> Result<(), String> {
     if worker_count <= 1 {
-        for (source, object, module, deferred) in sources {
-            let options = metadata_compile_options(cc_options, *deferred);
-            compile_program_module(gsc, source, object, module, &options, observer)?;
+        for item in sources {
+            let options = metadata_compile_options(cc_options, item.deferred);
+            compile_program_module(
+                gsc,
+                &item.source,
+                &item.object,
+                &item.module,
+                &options,
+                item.layout,
+                observer,
+            )?;
         }
         return Ok(());
     }
@@ -54,13 +70,19 @@ fn compile_program_modules_inner(
                         return;
                     }
                     let index = next.fetch_add(1, Ordering::Relaxed);
-                    let Some((source, object, module, deferred)) = sources.get(index) else {
+                    let Some(item) = sources.get(index) else {
                         return;
                     };
-                    let options = metadata_compile_options(cc_options, *deferred);
-                    if let Err(error) =
-                        compile_program_module(gsc, source, object, module, &options, observer)
-                    {
+                    let options = metadata_compile_options(cc_options, item.deferred);
+                    if let Err(error) = compile_program_module(
+                        gsc,
+                        &item.source,
+                        &item.object,
+                        &item.module,
+                        &options,
+                        item.layout,
+                        observer,
+                    ) {
                         *failure.lock().expect("native build failure lock") = Some(error);
                         return;
                     }
@@ -90,14 +112,18 @@ pub(super) fn compile_program_module(
     object: &Path,
     module: &str,
     cc_options: &str,
+    layout: CFunctionLayout,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
     compile_native_object(
         gsc,
         source,
         object,
-        "program-module-object-v1",
-        cc_options,
+        ObjectCompilation {
+            identity: "program-module-object-v1",
+            options: cc_options,
+            layout,
+        },
         ProgramArchiveOperation {
             phase: "native-object",
             operation: "compile program module",

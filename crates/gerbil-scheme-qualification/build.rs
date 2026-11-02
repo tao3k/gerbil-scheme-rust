@@ -119,7 +119,7 @@ fn main() {
     // Debug formatting admits ordinary Cargo paths as quoted Scheme strings.
     // The package compiler adapter, not Rust, discovers the complete module graph.
     let expression = format!(
-        "(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (for-each (lambda (module) (compile-module module [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t])) [{:?} {:?} {:?} {:?} {:?}]) (gerbil-rs-stage-program {:?} {:?})",
+        "(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (for-each (lambda (module) (compile-module module [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t])) [{:?} {:?} {:?} {:?} {:?}]) (gerbil-rs-stage-program {:?} {:?} [] [\"gerbil-scheme-rust/qualification/actors\"])",
         gerbil_path
             .join("lib")
             .to_str()

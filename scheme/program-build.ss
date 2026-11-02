@@ -15,7 +15,7 @@
   (let (id (symbol->string (expander-context-id context)))
     (or (string-prefix? "gerbil/" id) (string-prefix? "std/" id))))
 
-(def (gerbil-rs-stage-program source output-dir (runtime-imports []))
+(def (gerbil-rs-stage-program source output-dir (runtime-imports []) (separate-procedures []))
   (let* ((output (path-expand "program" output-dir))
          (context (import-module source))
          (dependencies (find-runtime-module-deps context))
@@ -30,6 +30,9 @@
                             (append (filter system-context? contexts)
                                     (filter (lambda (ctx) (not (system-context? ctx)))
                                             contexts)))))))
+    (unless (and (list? separate-procedures)
+                 (andmap (lambda (id) (and (string? id) (member id ids))) separate-procedures))
+      (error "procedure layout requires compiler-known module identities" separate-procedures))
     ;; The entry module's main must return normally without entering an event
     ;; loop. Its ordinary exports become callable after shared runtime setup.
     (compile-exe source [invoke-gsc: #f keep-scm: #t optimize: #t output-file: output])
@@ -39,7 +42,10 @@
             (map (lambda (id)
                    (let ((scm (find-static-module-file id))
                          (system? (or (string-prefix? "gerbil/" id) (string-prefix? "std/" id))))
-                     (hash ("module" id) ("scm" scm) ("system" system?))))
+                     (let (module (hash ("module" id) ("scm" scm) ("system" system?)))
+                       (when (member id separate-procedures)
+                         (hash-put! module "host_layout" "separate-procedures"))
+                       module)))
                  ids)))
       (when (pair? runtime-imports)
         (let* ((stub (string-append output "__exe.scm"))

@@ -71,21 +71,44 @@ entry need not terminate the host process. The build entry must be bound to the
 actual package declaration; do not replace it with a new build language, generic
 shell arguments or arbitrary caller-provided eval strings.
 
-* Tooling session contract
+* Compiler-owned function layout
 
-The proposed C surface uses opaque, owner-checked sessions and typed structures:
+The qualification actor image has 8,364 generated labels, below the existing
+20,000-label generic GCC threshold, but still produced one expensive host C
+function. The cancelled owner jobs were waiting in that compiler, not in a
+failed Rust or Scheme assertion. The compiler-owned staging manifest now admits
+the optional per-module host_layout values compiler-default and
+separate-procedures; unknown values reject. Only the qualification actor module
+selects separate-procedures, using Gambit's supported SINGLE_HOST_LIMIT=1.
+Other modules retain their existing policy. Resolved options participate in
+the existing object fingerprint, so changing layout recompiles that object and
+an identical repeat reuses it. Optimization, ABI, actual host CPU capacity and
+watchdogs are unchanged. No consumer CI linker flags or compiler environment
+switches implement this policy.
 
-#+begin_src c
-GerbilStatus gerbil_scheme_rust_tooling_build(
-    GerbilToolingSession *, const GerbilBuildRequest *, GerbilBuildReceipt *);
-GerbilStatus gerbil_scheme_rust_tooling_test(
-    GerbilToolingSession *, const GerbilTestRequest *, GerbilTestReceipt *);
-#+end_src
+The complete local one-processor actor entry naturally finished all nine cases
+in a cold 11m30s invocation, including checksum, fault-control and final cleanup
+observations. This is separate from remote CI and from the still-missing C ABI
+build/test exports.
 
-These signatures specify the required boundary; they are not existing exported
-symbols. Checked session admission, cancellation observation and close/join are
-also required before this surface is production-ready. Reuse the existing status,
-root and exception conventions rather than a second foreign-object framework.
+* Existing API composition
+
+Use the existing =LinkedGerbilProgram= and
+=GerbilRuntime::initialize_program= to admit the tooling graph. Bind the
+Scheme-owned build and test exports through =bind_object_export= or
+=bind_bytes_export=, and invoke their existing =call= interface with owned,
+typed request values. These are actual bridge APIs. The Scheme entries call
+the official package build and gxtest procedures through Gambit's supported
+C interface. No separate opaque tooling-session object, generic command
+protocol or source-selection environment variable is required.
+
+The selected toolchain does not thereby acquire hypothetical official C
+symbols named gerbil_build or gerbil_test. Binding an official Scheme
+procedure through the supported C interface is the intended composition.
+The complete admitted compiler/test image and those bound procedure exports
+remain implementation obligations; the current command-backed compiler does
+not establish them. Reuse the existing status, root, exception and close/join
+contracts instead of another foreign-object framework.
 
 An admitted session binds its image/module closure, ABI, package source cut,
 rooted entry points and owner generation before accepting an operation. Build

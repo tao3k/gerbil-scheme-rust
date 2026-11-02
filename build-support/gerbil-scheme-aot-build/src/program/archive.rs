@@ -49,6 +49,22 @@ struct ProgramModule {
     system: bool,
     #[serde(default)]
     deferred: bool,
+    #[serde(default)]
+    host_layout: CFunctionLayout,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum CFunctionLayout {
+    #[default]
+    CompilerDefault,
+    SeparateProcedures,
+}
+
+pub(crate) struct ObjectCompilation<'a> {
+    pub identity: &'a str,
+    pub options: &'a str,
+    pub layout: CFunctionLayout,
 }
 
 /// Named inputs for a compiler-owned linked program archive.
@@ -304,7 +320,7 @@ fn read_manifest(
 
 struct StagedProgram {
     objects: Vec<PathBuf>,
-    compile_sources: Vec<(PathBuf, PathBuf, String, bool)>,
+    compile_sources: Vec<super::objects::ProgramObject>,
     linker_c: PathBuf,
     linker_object: PathBuf,
 }
@@ -384,12 +400,13 @@ fn stage_program(
                     );
                     linker_inputs.push(source.clone());
                     let object = request.out_dir.join(format!("module_{index}.o"));
-                    compile_sources.push((
+                    compile_sources.push(super::objects::ProgramObject {
                         source,
-                        object.clone(),
-                        module.module.clone(),
-                        module.deferred,
-                    ));
+                        object: object.clone(),
+                        module: module.module.clone(),
+                        deferred: module.deferred,
+                        layout: module.host_layout,
+                    });
                     objects.push(object);
                 }
             }
@@ -519,8 +536,11 @@ fn compile_program(
         request.gsc,
         &plan.stub.with_extension("c"),
         &stub_object,
-        "program-startup-object-v1",
-        "-O2",
+        ObjectCompilation {
+            identity: "program-startup-object-v1",
+            options: "-O2",
+            layout: CFunctionLayout::CompilerDefault,
+        },
         ProgramArchiveOperation {
             phase: "native-object",
             operation: "compile program startup",
@@ -534,8 +554,11 @@ fn compile_program(
         request.gsc,
         &linker_c,
         &linker_object,
-        "program-linker-object-v1",
-        &linker_options,
+        ObjectCompilation {
+            identity: "program-linker-object-v1",
+            options: &linker_options,
+            layout: CFunctionLayout::CompilerDefault,
+        },
         ProgramArchiveOperation {
             phase: "native-object",
             operation: "compile program linker",
@@ -555,11 +578,15 @@ pub(crate) fn compile_native_object(
     gsc: &Path,
     source: &Path,
     object: &Path,
-    domain: &str,
-    cc_options: &str,
+    compilation: ObjectCompilation<'_>,
     operation: ProgramArchiveOperation<'_>,
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
+    let ObjectCompilation {
+        identity: domain,
+        options: cc_options,
+        layout,
+    } = compilation;
     // Gambit's configured compiler owns its ABI flags. Only its declared GCC
     // backend supports these diagnostic options; never substitute ambient CC.
     let gcc = configured_gambit_gcc(gsc);
@@ -569,7 +596,14 @@ pub(crate) fn compile_native_object(
     // multiple host functions for large modules, avoiding one enormous GCC CFG.
     // Reuse the header's optimization threshold rather than inventing a second
     // numeric resource limit. This policy is independent of verbosity.
-    let cc_options = if gcc && operation.phase == "native-object" {
+    let cc_options = if layout == CFunctionLayout::SeparateProcedures {
+        // Gambit's supported multiple-host lowering preserves O2 and the paired
+        // C ABI while avoiding one giant C function for a finite test image.
+        format!(
+            "{cc_options} -D___SINGLE_HOST_LIMIT=1{}",
+            if gcc { " -fno-gcse-lm" } else { "" }
+        )
+    } else if gcc && operation.phase == "native-object" {
         format!("{cc_options} -fno-gcse-lm -D___SINGLE_HOST_LIMIT=___OPTIMIZED_MODULE_LIMIT")
     } else {
         cc_options.to_owned()

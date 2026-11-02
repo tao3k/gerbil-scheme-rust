@@ -48,11 +48,11 @@ fn native_receipt_is_validated_without_changing_link_order() {
 fn missing_native_archive_is_rejected_without_a_host_package_fallback() {
     let root = fixture();
     let libraries = vec![NativeLinkLibrary::new("ssl")];
-    assert!(validate_sdk_dependency_search(&[root.0.clone()], &libraries).is_err());
+    assert!(validate_sdk_dependency_search(std::slice::from_ref(&root.0), &libraries).is_err());
     fs::write(root.0.join("libcrypto.a"), "other library").unwrap();
-    assert!(validate_sdk_dependency_search(&[root.0.clone()], &libraries).is_err());
+    assert!(validate_sdk_dependency_search(std::slice::from_ref(&root.0), &libraries).is_err());
     fs::write(root.0.join("libssl.a"), "target ssl").unwrap();
-    validate_sdk_dependency_search(&[root.0.clone()], &libraries).unwrap();
+    validate_sdk_dependency_search(std::slice::from_ref(&root.0), &libraries).unwrap();
 }
 
 #[test]

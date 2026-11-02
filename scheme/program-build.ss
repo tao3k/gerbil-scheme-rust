@@ -3,7 +3,7 @@
 (import :gerbil/compiler
         :gerbil/expander
         (only-in :std/list/list delete-duplicates/hash)
-        (only-in :std/make pkg-config-libs)
+        (only-in :std/make pkg-config)
         (only-in :std/encoding/json write-json))
 (export gerbil-rs-stage-program)
 
@@ -12,7 +12,8 @@
 ;; The versioned compiler adapter lives here, never in a downstream Rust
 ;; parser. These are the same native graph operations used by compile-exe.
 (extern namespace: gxc
-  find-runtime-module-deps find-static-module-file static-module-name gerbil-runtime-modules)
+  find-runtime-module-deps find-static-module-file static-module-name gerbil-runtime-modules
+  current-compile-gsc-options gcc-ld-options)
 
 (def (system-context? context)
   (let (id (symbol->string (expander-context-id context)))
@@ -26,8 +27,11 @@
        (file-exists? (string-append (path-strip-extension scm) ".c"))
        (file-exists? (string-append (path-strip-extension scm) ".o"))))
 
-(def (gerbil-rs-stage-program source output-dir (runtime-imports []) (separate-procedures []) link-options: (declared-link-options []))
-  (let* ((output (path-expand "program" output-dir))
+(def (gerbil-rs-stage-program source output-dir (runtime-imports []) (separate-procedures []) gsc-options: (gsc-options []))
+  (let* ((native-gsc-options
+           (append ["-ld-options" (string-join (gerbil-scheme-rust-link-options) " ")]
+                   gsc-options))
+         (output (path-expand "program" output-dir))
          (context (import-module source))
          (dependencies (find-runtime-module-deps context))
          (contexts
@@ -46,12 +50,12 @@
       (error "procedure layout requires compiler-known module identities" separate-procedures))
     ;; The entry module's main must return normally without entering an event
     ;; loop. Its ordinary exports become callable after shared runtime setup.
-    (compile-exe source [invoke-gsc: #f keep-scm: #t optimize: #t output-file: output])
+    (compile-exe source [invoke-gsc: #f keep-scm: #t optimize: #t output-file: output
+                         gsc-options: native-gsc-options])
     (let* ((home (gerbil-home))
-           ;; All staging clients receive the same owner-declared target paths.
-           ;; Installed Gerbil metadata remains required, but its historical -L
-           ;; directories cannot hide the current pkg-config declaration.
-           (link-options (append (gerbil-scheme-rust-link-options) declared-link-options
+           (link-options (append
+              (parameterize ((current-compile-gsc-options native-gsc-options))
+                (gcc-ld-options))
               (call-with-input-file (path-expand "lib/libgerbil.ldd" home) read)))
            (modules
             (map (lambda (id)

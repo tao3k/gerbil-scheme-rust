@@ -42,7 +42,7 @@ impl ProgramArchiveObserver for Progress {
     fn observe_source_input(&self, source: &std::path::Path) {
         // Cargo already tracks original producer sources below. Watching this
         // build's regenerated staging inputs creates a self-invalidating build.
-        // SDK-owned sources/headers remain external inputs and must be tracked.
+        // Integration-library sources and toolchain headers remain external inputs and must be tracked.
         if inputs::external_input(source, &self.out) {
             println!("cargo:rerun-if-changed={}", source.display());
         }
@@ -119,7 +119,7 @@ fn main() {
     // Debug formatting admits ordinary Cargo paths as quoted Scheme strings.
     // The package compiler adapter, not Rust, discovers the complete module graph.
     let expression = format!(
-        "(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (for-each (lambda (module) (compile-module module [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t])) [{:?} {:?} {:?} {:?} {:?}]) (gerbil-rs-stage-program {:?} {:?} [] [\"gerbil-scheme-rust/qualification/actors\"])",
+        r#"(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (for-each (lambda (module) (compile-module module [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t])) [{:?} {:?} {:?} {:?} {:?}]) (gerbil-rs-stage-program {:?} {:?} [] ["gerbil-scheme-rust/qualification/actors"] )"#,
         gerbil_path
             .join("lib")
             .to_str()

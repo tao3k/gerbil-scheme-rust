@@ -1,3 +1,4 @@
+#!/usr/bin/env gxi
 (import :std/build-script (only-in "package-clean" clean-package-modules!))
 (call-with-output-file (list path: "build-owner.txt" truncate: #t)
   (lambda (port) (write (##os-getpid) port)))

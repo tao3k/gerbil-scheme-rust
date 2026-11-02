@@ -1,7 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 (import :std/test :std/io/tempfile :std/encoding/json
         (only-in :std/error Error?)
-        (only-in :std/make pkg-config-libs)
+        (only-in :std/make pkg-config)
         (only-in :std/source this-source-file)
         (only-in :gerbil/runtime/loader add-load-path!)
         :gerbil/compiler
@@ -14,7 +14,7 @@
     (create-directory* library)
     (add-load-path! library)
     (compile-module source [output-dir: library invoke-gsc: #f optimize: #t static: #t])
-    (gerbil-rs-stage-program source directory link-options: explicit)
+    (gerbil-rs-stage-program source directory gsc-options: ["-ld-options" (string-join explicit " ")])
     (parameterize ((current-json-read-options (make-JSONReadOptions object-as-hash: #t)))
       (let (flags (hash-ref (call-with-input-file (path-expand "program.json" directory) read-json)
                            "link_options"))
@@ -26,7 +26,7 @@
       (call-with-temporary-directory "program-link-options"
         (lambda (directory)
           (let ((expected (filter (lambda (flag) (not (string-empty? flag)))
-                            (string-split (pkg-config-libs "openssl" "zlib" "sqlite3") #\space)))
+                            (string-split (pkg-config "openssl" "--libs" "--keep-system-libs" "zlib" "sqlite3") #\space)))
                 (actual (stage-link-options directory [])))
             (check-equal? (take actual (length expected)) expected)
             (for-each (lambda (flag) (check (member flag actual) ? pair?))
@@ -36,9 +36,22 @@
         (lambda (directory)
           (let* ((explicit '("-L/consumer-target" "-lconsumer" "-lconsumer"))
                  (expected (filter (lambda (flag) (not (string-empty? flag)))
-                             (string-split (pkg-config-libs "openssl" "zlib" "sqlite3") #\space)))
+                             (string-split (pkg-config "openssl" "--libs" "--keep-system-libs" "zlib" "sqlite3") #\space)))
                  (actual (stage-link-options directory explicit)))
             (check-equal? (take (drop actual (length expected)) (length explicit)) explicit)))))
+    (test-case "system-directory suppression cannot drop declared target paths"
+      (call-with-temporary-directory "program-link-system-paths"
+        (lambda (directory)
+          (let ((previous (getenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" #f))
+                (target (pkg-config "openssl" "--variable=libdir")))
+            (dynamic-wind
+              (lambda () (setenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" target))
+              (lambda ()
+                (check (member (string-append "-L" target)
+                               (stage-link-options directory [])) ? pair?))
+              (lambda ()
+                (if previous (setenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" previous)
+                    (setenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH"))))))))
     (test-case "missing target package metadata cannot fall back to installed Gerbil paths"
       (call-with-temporary-directory "program-link-missing"
         (lambda (directory)

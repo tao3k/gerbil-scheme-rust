@@ -4,4 +4,4 @@
 (export main)
 
 (def (main . _args)
-  (displayln (gerbil-rs-add-i64 40 2)))
+  (void))

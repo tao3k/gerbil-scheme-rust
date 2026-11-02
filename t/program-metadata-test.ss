@@ -1,6 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 (import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build
         :std/encoding/json (only-in :std/list/list delete-duplicates/hash)
+        (only-in :std/make pkg-config)
         (only-in :gerbil/runtime/loader add-load-path!))
 
 (def (main output)
@@ -8,13 +9,35 @@
          (ordinary (path-expand "ordinary" output))
          (expanded (path-expand "expanded" output))
          (explicit-empty (path-expand "explicit-empty" output))
+         (native-options (path-expand "native-options" output))
          (library (path-expand "lib" output)))
-    (for-each create-directory* [ordinary expanded explicit-empty library])
+    (for-each create-directory* [ordinary expanded explicit-empty native-options library])
     (add-load-path! library)
     (compile-module source [output-dir: library invoke-gsc: #f optimize: #t static: #t])
     (gerbil-rs-stage-program source ordinary)
     (gerbil-rs-stage-program source explicit-empty [])
     (gerbil-rs-stage-program source expanded '(:gerbil/compiler/base))
+    ;; Standard compiler options must reach both compile-exe and its link plan.
+    ;; This extends the same source case; no package or source fixture is added.
+    (gerbil-rs-stage-program source native-options [] []
+      gsc-options: ["-cc-options" "-DNATIVE_OPTIONS_CONTRACT=1"
+                    "-ld-options" "-Lcontract-first -lcrypto"
+                    "-ld-options" "-Lcontract-last -lssl"])
+    (let ((read-plan (lambda (directory)
+                       (parameterize ((current-json-read-options
+                                         (make-JSONReadOptions object-as-hash: #t)))
+                         (call-with-input-file (path-expand "program.json" directory) read-json)))))
+      (def (options directory)
+        (let (value (hash-ref (read-plan directory) "link_options"))
+          (if (vector? value) (vector->list value) value)))
+      (unless (equal? (options native-options)
+                     (append
+                       (filter (lambda (flag) (not (string-empty? flag)))
+                         (string-split (pkg-config "openssl" "--libs" "--keep-system-libs" "zlib" "sqlite3") #\space))
+                       ["-Lcontract-first" "-lcrypto" "-Lcontract-last" "-lssl"]
+                       (call-with-input-file (path-expand "lib/libgerbil.ldd" (gerbil-home)) read)))
+        (error "native compiler options changed order, included CC flags, or were dropped"))
+      (displayln "PROGRAM-NATIVE-OPTIONS-OK source=Gerbil-gsc-options order=preserved"))
     (let* ((read-plan (lambda (directory)
                         (let (plan (parameterize ((current-json-read-options
                                                    (make-JSONReadOptions object-as-hash: #t)))

@@ -8,7 +8,42 @@
         gerbil-rs-is-even-i64
         gerbil-rs-compare-i64)
 
-(import (only-in "utf8" gerbil-rs-encode-utf8 gerbil-rs-encode-utf8-into))
+(import (only-in "utf8" gerbil-rs-encode-utf8 gerbil-rs-encode-utf8-into)
+        (only-in :gerbil/runtime/loader load-module load-path set-load-path!)
+        (only-in :gerbil/runtime/init gerbil-load-expander!))
+
+(def (gerbil-rs-observe-module-work action)
+  (let (resolver ##get-module)
+    (def (observe module)
+      (displayln "GERBIL-BUILD module-resolve " module)
+      (force-output)
+      (resolver module))
+    (dynamic-wind
+      (lambda () (##get-module-set! observe))
+      action
+      (lambda () (##get-module-set! resolver)))))
+
+(def (gerbil-rs-load-build library)
+  (with-catch
+    (lambda (failure)
+      (display-exception failure (current-error-port))
+      (force-output (current-error-port))
+      4)
+    (lambda ()
+      (let (previous (load-path))
+        (dynamic-wind
+          (lambda () (set-load-path! (cons library previous)))
+          (lambda ()
+            (gerbil-rs-observe-module-work
+              (lambda ()
+                (displayln "GERBIL-BUILD native-library entered")
+                (force-output)
+                (load-module "gerbil-scheme-rust/scheme/build")
+                (gerbil-load-expander!)
+                (displayln "GERBIL-BUILD native-library returned")
+                (force-output)
+                0)))
+          (lambda () (set-load-path! previous)))))))
 
 (def (gerbil-rs-abi-version) 1)
 (def (gerbil-rs-add-i64 left right) (+ left right))
@@ -407,6 +442,10 @@ END-C
                      value source length))
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector value)
         0)))
+  (c-define (gerbil-rs-load-build-native library)
+    (UTF-8-string) int32 "gerbil_scheme_rust_load_build_scheme" ""
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-load-build library))
+
   (c-define (gerbil-rs-abi-version-native)
     () unsigned-int32
     "gerbil_scheme_rust_abi_version"
@@ -973,3 +1012,35 @@ END-C
       "gerbil_scheme_rust_scheme_object_pair_cdr_raw"
       "extern"
     (if (pair? value) (cdr value) #f)))
+
+;; Stable C projections stay in the core; native build procedures load on demand.
+(begin-foreign
+  (c-define (package-main-entry directory arguments count) (UTF-8-string (pointer void) unsigned-int) int32
+    "gerbil_scheme_rust_package_main_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-main-arguments directory arguments count))
+  (c-define (package-paths-entry prefix libraries) (UTF-8-string UTF-8-string) int32
+    "gerbil_scheme_rust_package_paths_scheme" ""
+    (gerbil-scheme-rust/scheme/build#call-package (current-directory)
+      (lambda () (gerbil-scheme-rust/scheme/build#package-configure prefix libraries))))
+  (c-define (package-build-entry directory) (UTF-8-string) int32
+    "gerbil_scheme_rust_package_build_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-build directory))
+  (c-define (package-clean-entry directory) (UTF-8-string) int32
+    "gerbil_scheme_rust_package_clean_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-clean directory))
+  (c-define (package-test-entry directory tests) (UTF-8-string UTF-8-string) int32
+    "gerbil_scheme_rust_package_test_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-test directory tests))
+  (c-define (package-build-spec-entry directory specification) (UTF-8-string UTF-8-string) int32
+    "gerbil_scheme_rust_package_build_spec_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-build-spec directory specification))
+  (c-define (package-stage-entry source output imports)
+    (UTF-8-string UTF-8-string int64) int32
+    "gerbil_scheme_rust_package_stage_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-stage source output
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref imports)))
+  (c-define (package-load-closure-entry imports output) (int64 UTF-8-string) int32
+    "gerbil_scheme_rust_package_load_closure_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-load-closure
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref imports) output))
+)

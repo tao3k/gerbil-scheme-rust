@@ -3,4 +3,4 @@
 ;;; Resolve only at build time, using the caller's target pkg-config environment.
 (def (gerbil-scheme-rust-link-options)
   (filter (lambda (flag) (not (string-empty? flag)))
-    (string-split (pkg-config-libs "openssl" "zlib" "sqlite3") #\space)))
+    (string-split (pkg-config "openssl" "--libs" "--keep-system-libs" "zlib" "sqlite3") #\space)))

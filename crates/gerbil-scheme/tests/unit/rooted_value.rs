@@ -224,13 +224,18 @@ fn raw_scalar_batch_contracts(runtime: &GerbilRuntime) {
 
 fn caller_owned_utf8_span_contracts(runtime: &GerbilRuntime) {
     use gerbil_scheme_sys::{GerbilRootId, GerbilStatus};
-    let text = runtime.string_from_utf8("a\0汉字😀").unwrap();
-    let string_root = acquire_string_root(runtime, "a\0汉字😀");
+    let expected_text = "a\0汉字😀";
+    let text = runtime.string_from_utf8(expected_text).unwrap();
+    let string_root = acquire_string_root(runtime, expected_text);
     let wrong = runtime.bytevector_from_bytes(b"wrong").unwrap();
     let mut output = [0xa5; 20];
     let mut written = usize::MAX;
     for (root, capacity, expected) in [
-        (string_root, 19, GerbilStatus::InvalidValue),
+        (
+            string_root,
+            expected_text.len() - 1,
+            GerbilStatus::InvalidValue,
+        ),
         (string_root, usize::MAX, GerbilStatus::InvalidValue),
         (wrong.root_id(), 20, GerbilStatus::InvalidValue),
         (GerbilRootId(0), 20, GerbilStatus::InvalidValue),
@@ -262,22 +267,24 @@ fn caller_owned_utf8_span_contracts(runtime: &GerbilRuntime) {
         },
         GerbilStatus::NullPointer
     );
-    // SAFETY: valid exclusive span and separate output count on the live owner.
-    assert_eq!(
-        unsafe {
-            gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
-                string_root,
-                output.as_mut_ptr(),
-                output.len(),
-                &raw mut written,
-            )
-        },
-        GerbilStatus::Ok
-    );
-    assert_eq!(&output[..written], "a\0汉字😀".as_bytes());
-    assert!(output[written..].iter().all(|byte| *byte == 0xa5));
+    for capacity in [expected_text.len(), 19, output.len()] {
+        // SAFETY: valid exclusive span and separate output count on the live owner.
+        assert_eq!(
+            unsafe {
+                gerbil_scheme_sys::gerbil_scheme_rust_root_string_encode_into(
+                    string_root,
+                    output.as_mut_ptr(),
+                    capacity,
+                    &raw mut written,
+                )
+            },
+            GerbilStatus::Ok
+        );
+        assert_eq!(&output[..written], expected_text.as_bytes());
+        assert!(output[written..].iter().all(|byte| *byte == 0xa5));
+    }
     let owned = text.to_string().into_result().unwrap();
-    assert_eq!(owned, "a\0汉字😀");
+    assert_eq!(owned, expected_text);
     assert!(owned.capacity() >= 20);
     let empty_root = acquire_string_root(runtime, "");
     // SAFETY: zero-length null span admits no write.

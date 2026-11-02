@@ -6,6 +6,7 @@
 ;; Test internals without widening the standalone library's public API.
 (extern namespace: #f
   gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk-c
+  gerbil-scheme-rust/scheme/runtime#gerbil-rs-observe-module-work
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!)
@@ -129,3 +130,45 @@
   (unless (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release! bytes)
     (error "retained bytevector root release failed"))
   (displayln "ROOT-REGISTRY strong-GC release isolation=OK"))
+
+;; A package operation must restore the native resolver after success, nested
+;; observation and exceptions; a subsequent unrelated operation keeps its owner.
+(let ((original ##get-module) (requests []))
+  (def (reference module)
+    (set! requests (cons module requests))
+    'resolved)
+  (def (observe action)
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-observe-module-work action))
+  (dynamic-wind
+    (lambda () (##get-module-set! reference))
+    (lambda ()
+      (unless (eq? (observe (lambda () (##get-module 'success))) 'resolved)
+        (error "module observer changed resolver result"))
+      (unless (eq? ##get-module reference)
+        (error "module observer leaked after successful return"))
+      (let ((caught #f) (outer #f))
+        (observe
+          (lambda ()
+            (set! outer ##get-module)
+            (with-catch
+              (lambda (failure) (set! caught failure))
+              (lambda ()
+                (observe
+                  (lambda ()
+                    (##get-module 'nested)
+                    (raise 'expected-resolver-test-failure)))))
+            (unless (and (eq? caught 'expected-resolver-test-failure)
+                         (eq? ##get-module outer))
+              (error "nested resolver observation changed exception or owner")))))
+      (unless (eq? ##get-module reference)
+        (error "module observer leaked after nested exception"))
+      (with-catch void
+        (lambda () (observe (lambda () (raise 'expected-outer-failure)))))
+      (unless (and (eq? ##get-module reference)
+                   (eq? (##get-module 'after-failure) 'resolved)
+                   (equal? (reverse requests) '(success nested after-failure)))
+        (error "resolver delegation or failure restoration changed" requests)))
+    (lambda () (##get-module-set! original)))
+  (unless (eq? ##get-module original)
+    (error "resolver test leaked native process state"))
+  (displayln "MODULE-RESOLVER success exception nesting delegation restoration=OK"))

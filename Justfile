@@ -38,7 +38,7 @@ vm-model-check:
 bridge-instance-inputs:
     {{ build_env }} cargo test -p gerbil-scheme-qualification --test build_inputs --locked
 
-# Use this existing SDK environment for downstream Cargo consumers too.
+# Use this existing Gerbil toolchain environment for downstream Cargo consumers too.
 bridge-cargo +args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -154,7 +154,7 @@ smp-check:
 bridge-vm-capabilities:
     {{ build_env }} cargo test -p gerbil-scheme --test unit_test vm_capabilities --locked -- --nocapture
 
-# Execute a producer-owned SDK contract without copying it into the bridge.
+# Execute a producer-owned toolchain contract without copying it into the bridge.
 bridge-sdk-contract source:
     gxi "{{ source }}"
 
@@ -227,7 +227,7 @@ bridge-python-dispatch-stress python="python3" *args:
 bridge-python-resident-dispatch-ab python="python3" *args:
     "{{ python }}" examples/python-ledger/tests/bench_resident_dispatch.py {{ args }}
 
-# Explicit code leases, real SDK module retirement and fork rejection.
+# Explicit code leases, real native module retirement and fork rejection.
 bridge-python-image-retirement python="python3" *args:
     "{{ python }}" examples/python-ledger/tests/test_image_retirement.py {{ args }}
 

@@ -1,5 +1,5 @@
 name: Set up pinned Gerbil
-description: Install the SDK's immutable Gerbil release and its host prerequisites
+description: Install the pinned immutable Gerbil toolchain and its host prerequisites
 
 inputs:
   release-root:

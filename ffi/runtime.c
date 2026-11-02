@@ -242,6 +242,7 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
 }
 
 #ifdef GERBIL_SCHEME_RUST_BUILD
+extern int32_t gerbil_scheme_rust_load_build_scheme(const char *library);
 extern int32_t gerbil_scheme_rust_package_build_scheme(const char *directory);
 extern int32_t gerbil_scheme_rust_package_clean_scheme(const char *directory);
 extern int32_t gerbil_scheme_rust_package_test_scheme(const char *directory, const char *tests);
@@ -261,6 +262,10 @@ static GerbilStatus package_enter(gerbil_host_io *host) {
     return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
   }
 #endif
+  if (gerbil_scheme_rust_load_build_scheme(package_library_path) != 0) {
+    gerbil_host_io_restore(host);
+    return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
+  }
   return GERBIL_STATUS_OK;
 }
 static GerbilStatus package_leave(gerbil_host_io *host, int32_t code, int32_t *result) {

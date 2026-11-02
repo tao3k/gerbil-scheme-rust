@@ -15,6 +15,7 @@ fn initialized_runtime_crosses_the_live_gerbil_abi() {
 
     let started = Instant::now();
     let runtime = GerbilRuntime::initialize().expect("initialize the live Gerbil runtime");
+    let initialization_elapsed = started.elapsed();
 
     assert_eq!(
         runtime.abi_version().expect("query the live ABI version"),
@@ -54,8 +55,9 @@ fn initialized_runtime_crosses_the_live_gerbil_abi() {
     );
     let elapsed = started.elapsed();
     eprintln!(
-        "scenario benchmark receipt: id=runtime-round-trip scalar_calls=30000 elapsed_ns={}",
+        "scenario benchmark receipt: id=runtime-round-trip scalar_calls=30000 elapsed_ns={} initialization_ns={}",
         elapsed.as_nanos(),
+        initialization_elapsed.as_nanos(),
     );
     assert!(
         elapsed <= scenario.benchmark.max_total.as_duration(),

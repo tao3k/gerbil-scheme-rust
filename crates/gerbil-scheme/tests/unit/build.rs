@@ -6,6 +6,8 @@ use gerbil_scheme_sys::{
     GerbilBorrowedUtf8, GerbilStatus, gerbil_scheme_rust_package_build,
     gerbil_scheme_rust_package_clean,
 };
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use std::{
@@ -225,6 +227,8 @@ fn fixture() -> std::path::PathBuf {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, source).unwrap();
     }
+    #[cfg(unix)]
+    fs::set_permissions(root.join("build.ss"), fs::Permissions::from_mode(0o755)).unwrap();
     root
 }
 

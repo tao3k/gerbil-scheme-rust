@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
-use super::{NativeLinkLibrary, validate_sdk_dependency_search};
+use super::{NativeLinkLibrary, validate_native_dependency_search};
 use std::{
     fs,
     sync::atomic::{AtomicU64, Ordering},
@@ -33,7 +33,7 @@ fn native_receipt_is_validated_without_changing_link_order() {
         NativeLinkLibrary::new("m"),
         NativeLinkLibrary::new("dl"),
     ];
-    validate_sdk_dependency_search(&search, &libraries).unwrap();
+    validate_native_dependency_search(&search, &libraries).unwrap();
     assert_eq!(search, [root.0.join("old-cellar"), root.0.clone()]);
     assert_eq!(
         libraries
@@ -48,11 +48,11 @@ fn native_receipt_is_validated_without_changing_link_order() {
 fn missing_native_archive_is_rejected_without_a_host_package_fallback() {
     let root = fixture();
     let libraries = vec![NativeLinkLibrary::new("ssl")];
-    assert!(validate_sdk_dependency_search(std::slice::from_ref(&root.0), &libraries).is_err());
+    assert!(validate_native_dependency_search(std::slice::from_ref(&root.0), &libraries).is_err());
     fs::write(root.0.join("libcrypto.a"), "other library").unwrap();
-    assert!(validate_sdk_dependency_search(std::slice::from_ref(&root.0), &libraries).is_err());
+    assert!(validate_native_dependency_search(std::slice::from_ref(&root.0), &libraries).is_err());
     fs::write(root.0.join("libssl.a"), "target ssl").unwrap();
-    validate_sdk_dependency_search(std::slice::from_ref(&root.0), &libraries).unwrap();
+    validate_native_dependency_search(std::slice::from_ref(&root.0), &libraries).unwrap();
 }
 
 #[test]
@@ -60,9 +60,9 @@ fn dynamic_dependency_is_not_reinterpreted_as_a_static_archive() {
     let root = fixture();
     fs::write(root.0.join("libcrypto.dylib"), "target crypto").unwrap();
     let search = [root.0.clone()];
-    validate_sdk_dependency_search(&search, &[NativeLinkLibrary::new("crypto")]).unwrap();
+    validate_native_dependency_search(&search, &[NativeLinkLibrary::new("crypto")]).unwrap();
     assert!(
-        validate_sdk_dependency_search(&search, &[NativeLinkLibrary::new("static=crypto")])
+        validate_native_dependency_search(&search, &[NativeLinkLibrary::new("static=crypto")])
             .is_err()
     );
 }

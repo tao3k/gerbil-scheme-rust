@@ -250,6 +250,7 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
     fs::create_dir_all(&stage).expect("native Gerbil program output");
     for source in [
         "scheme/build.ss",
+        "scheme/runtime-host.ss",
         "scheme/program-build.ss",
         "scheme/link-options.ss",
         "scheme/program-metadata.ss",
@@ -261,8 +262,8 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
         );
     }
     let expression = format!(
-        "(import :gerbil-scheme-rust/scheme/program-build) (gerbil-rs-stage-program {} {} '(:gerbil/core :gerbil/compiler :gerbil/tools/gxtest))",
-        scheme_string(&workspace.join("scheme/build.ss")),
+        "(import :gerbil-scheme-rust/scheme/program-build) (gerbil-rs-stage-program {} {} '())",
+        scheme_string(&workspace.join("scheme/runtime-host.ss")),
         scheme_string(&stage)
     );
     run(
@@ -301,6 +302,19 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
         ));
     }
     header.push_str("static ___UCS_2STRING package_toolchain_map[] = {package_toolchain_path_1, package_toolchain_path_2, package_toolchain_path_3, 0};\n");
+    let library = prefix.join("lib");
+    let mut bytes = library
+        .to_str()
+        .expect("native package library UTF-8 path")
+        .as_bytes()
+        .iter()
+        .map(u8::to_string)
+        .collect::<Vec<_>>();
+    bytes.push("0".to_owned());
+    header.push_str(&format!(
+        "static const unsigned char package_library_bytes[] = {{{}}};\n#define package_library_path ((const char *)package_library_bytes)\n",
+        bytes.join(",")
+    ));
     fs::write(out.join("build-home.h"), header).expect("write paired Gerbil installation mapping");
     let lifecycle_options = format!("-O2 -DGERBIL_SCHEME_RUST_BUILD -I{}", out.display());
     let lifecycle = out.join("lifecycle.o");

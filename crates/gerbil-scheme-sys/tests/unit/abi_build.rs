@@ -145,7 +145,7 @@ fn valid_empty_main_argument_reaches_lifecycle_guard() {
 }
 
 #[test]
-fn sdk_runtime_host_retains_the_abi_codec_dependency() {
+fn native_runtime_host_retains_the_abi_codec_dependency() {
     let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -153,7 +153,7 @@ fn sdk_runtime_host_retains_the_abi_codec_dependency() {
         .unwrap();
     let prefix = std::path::Path::new(env!("OUT_DIR")).join("gerbil-path");
     let output = std::env::temp_dir().join(format!(
-        "sdk-abi-closure-{}-{}",
+        "native-abi-closure-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -162,7 +162,7 @@ fn sdk_runtime_host_retains_the_abi_codec_dependency() {
     ));
     std::fs::create_dir(&output).unwrap();
     // JSON string escaping is compatible with these ordinary Scheme path
-    // strings. Only SDK-owned source and output paths enter the expression.
+    // strings. Only integration-library source and output paths enter the expression.
     let expression = format!(
         "(import :std/make :gerbil-scheme-rust/scheme/program-build) (make '(\"scheme/runtime-host\") srcdir: {} libdir: {} optimize: #t) (gerbil-rs-stage-program {} {})",
         serde_json::to_string(workspace).unwrap(),
@@ -177,7 +177,7 @@ fn sdk_runtime_host_retains_the_abi_codec_dependency() {
         .unwrap();
     assert!(
         result.status.success(),
-        "SDK producer failed ({}); retained {}: stdout={} stderr={}",
+        "Native producer failed ({}); retained {}: stdout={} stderr={}",
         result.status,
         output.display(),
         String::from_utf8_lossy(&result.stdout),
@@ -196,9 +196,47 @@ fn sdk_runtime_host_retains_the_abi_codec_dependency() {
                 .filter(|module| module["module"] == required)
                 .count(),
             1,
-            "public SDK ABI must initialize {required} exactly once; retained {}",
+            "public native ABI must initialize {required} exactly once; retained {}",
             output.display()
         );
     }
     std::fs::remove_dir_all(output).unwrap();
+}
+
+#[test]
+fn default_image_keeps_build_available_without_eager_compiler_initialization() {
+    let path = std::path::Path::new(env!("OUT_DIR")).join("build/program.json");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let modules = manifest["modules"].as_array().unwrap();
+    for (required, deferred) in [
+        ("gerbil-scheme-rust/scheme/runtime-host", false),
+        ("gerbil-scheme-rust/scheme/runtime", false),
+        ("gerbil-scheme-rust/scheme/utf8", false),
+    ] {
+        let selected: Vec<_> = modules.iter().filter(|m| m["module"] == required).collect();
+        assert_eq!(selected.len(), 1, "unique native module {required}");
+        assert_eq!(
+            selected[0]["deferred"].as_bool().unwrap_or(false),
+            deferred,
+            "native initialization boundary for {required}"
+        );
+    }
+    for excluded in [
+        "gerbil-scheme-rust/scheme/build",
+        "gerbil/tools/gxtest",
+        "gerbil/compiler",
+    ] {
+        assert!(
+            !modules.iter().any(|m| m["module"] == excluded),
+            "native build library must not become eager core dependency: {excluded}"
+        );
+    }
+    let build = std::path::Path::new(env!("OUT_DIR"))
+        .join("gerbil-path/lib/gerbil-scheme-rust/scheme/build.o1");
+    assert!(
+        build.is_file(),
+        "native package product required: {}",
+        build.display()
+    );
 }

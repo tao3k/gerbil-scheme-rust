@@ -149,7 +149,7 @@ pub trait ProgramArchiveObserver: Sync {
     /// Records one build transition.
     fn observe(&self, observation: ProgramArchiveObservation<'_>);
 
-    /// Records a Scheme, SDK or header input consumed by the AOT graph.
+    /// Records a Scheme, toolchain or header input consumed by the AOT graph.
     fn observe_source_input(&self, _source: &Path) {}
 }
 
@@ -246,7 +246,7 @@ pub fn build_program_archive_with_contract(
         observer,
         ProgramArchiveOperation {
             phase: "native-link-inputs",
-            operation: "admit SDK library dependencies",
+            operation: "admit native library dependencies",
             subject: None,
         },
         || native_link_options(&plan),
@@ -517,7 +517,7 @@ fn compile_program(
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<NativeStaticLinkPlan, String> {
     // Compiler runtime discovery belongs to the admitted compiler lane, not
-    // manifest/SDK admission. Rejection fixtures need not create a Cargo CC
+    // manifest/toolchain admission. Rejection fixtures need not create a Cargo CC
     // environment before their missing/failed Scheme compiler is observed.
     if cfg!(target_os = "macos") {
         let runtime = discover_darwin_compiler_runtime()?;
@@ -756,13 +756,13 @@ fn native_inputs_fingerprint(
         hasher.update((input_bytes.len() as u64).to_le_bytes());
         hasher.update(input_bytes);
     }
-    // Compiler metadata alone cannot detect an in-place SDK header/driver
+    // Compiler metadata alone cannot detect an in-place toolchain header/driver
     // change. Hash the ABI and configured compile policy, not the large runtime
     // archive: Cargo tracks that archive for relinking above.
     for input in crate::discovery::gambit_sdk_inputs(&compiler) {
         if input.ends_with("gambit.h") || input.ends_with("gambuild-C") {
             let bytes = fs::read(&input)
-                .map_err(|error| format!("read SDK input {}: {error}", input.display()))?;
+                .map_err(|error| format!("read toolchain input {}: {error}", input.display()))?;
             hasher.update((bytes.len() as u64).to_le_bytes());
             hasher.update(bytes);
         }
@@ -838,11 +838,11 @@ fn native_link_options(
             return Err(format!("unsupported compiler-owned link option {option:?}"));
         }
     }
-    validate_sdk_dependency_search(&search, &libraries)?;
+    validate_native_dependency_search(&search, &libraries)?;
     Ok((search, libraries))
 }
 
-fn validate_sdk_dependency_search(
+fn validate_native_dependency_search(
     search: &[PathBuf],
     libraries: &[NativeLinkLibrary],
 ) -> Result<(), String> {
@@ -852,9 +852,9 @@ fn validate_sdk_dependency_search(
         if !matches!(name, "crypto" | "ssl" | "z" | "sqlite3") {
             continue;
         }
-        if !locate_sdk_library(search, name, static_name.is_some()) {
+        if !locate_native_library(search, name, static_name.is_some()) {
             return Err(format!(
-                "Gerbil SDK dependency unavailable: lib{name}; static={}",
+                "native link dependency unavailable: lib{name}; static={}",
                 static_name.is_some()
             ));
         }
@@ -862,9 +862,9 @@ fn validate_sdk_dependency_search(
     Ok(())
 }
 
-fn locate_sdk_library(search: &[PathBuf], name: &str, static_only: bool) -> bool {
+fn locate_native_library(search: &[PathBuf], name: &str, static_only: bool) -> bool {
     // Ordered linker precedence is semantic. Probe one basename rather than
-    // enumerating every archive in each SDK/system library directory.
+    // enumerating every archive in each toolchain/system library directory.
     let extensions: &[&str] = if static_only {
         &["a"]
     } else {

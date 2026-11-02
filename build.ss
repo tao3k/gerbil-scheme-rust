@@ -1,7 +1,7 @@
 #!/usr/bin/env gxi
 ;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(import :std/build-script (only-in :std/make pkg-config-libs)
+(import :std/build-script (only-in :std/make pkg-config)
         (only-in "scheme/package-clean" clean-package-modules!))
 (export gerbil-scheme-rust-link-options)
 (include "scheme/link-options.ss")
@@ -14,6 +14,7 @@
       "scheme/runtime-object-kinds.ss" "scheme/runtime-composites.ss")))
     (gxc: "scheme/service-budget" (extra-inputs: ("scheme/service-progress.ss"
       "scheme/service-work.ss" "scheme/service-work-activation.ss" "scheme/service-work-turn.ss" "scheme/service-runtime.ss" "scheme/service-native.ss")))
+    "scheme/runtime-host"
     "scheme/actor-batch"
     (gxc: "scheme/async-service" (extra-inputs: ("scheme/service-port-wake.ss")))
     "scheme/program-metadata"

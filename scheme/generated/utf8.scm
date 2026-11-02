@@ -1,6 +1,6 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/utf8::timestamp 1793333956)
+  (define gerbil-scheme-rust/scheme/utf8::timestamp 1793585676)
   (begin
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8
       (lambda (_%str485%_)

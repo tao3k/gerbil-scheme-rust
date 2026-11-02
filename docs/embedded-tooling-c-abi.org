@@ -42,6 +42,13 @@ capacity and the one-job bound. This establishes environment propagation, not
 whole-build speedup, successful linking, or completion of remote CI. Existing
 resource cleanup, cancellation and wall/idle watchdogs remain unchanged.
 
+The tracked SCM provenance includes =build.ss=. Changing its compiler-worker
+declaration invalidates that input receipt even when the Scheme API is
+unchanged. Regenerate through =just bridge-regenerate= and retain the compiler's
+actual output and external receipts together. Unit tests alone do not establish
+that this source-bound generated-artifact gate passes. Do not hand-edit hashes
+or disable =GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM= to conceal the mismatch.
+
 * Source audit and actual gap
 
 =crates/gerbil-scheme-build/src/lib.rs= currently implements

@@ -1,7 +1,8 @@
 #!/usr/bin/env gxi
 ;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(import :std/build-script (only-in :std/make pkg-config-libs))
+(import :std/build-script (only-in :std/make pkg-config-libs)
+        (only-in "scheme/package-clean" clean-package-modules!))
 (export gerbil-scheme-rust-link-options)
 (def (gerbil-scheme-rust-link-options)
   (filter (lambda (flag) (not (string-empty? flag)))
@@ -24,3 +25,12 @@
     "scheme/python-package")
   optimize: #t
   parallelize: (##cpu-count))
+
+(def package-build-main main)
+(def (main . arguments)
+  (let (result (apply package-build-main arguments))
+    (when (equal? arguments ["clean"])
+      (clean-package-modules!
+        (pgetq package: (call-with-input-file "gerbil.pkg" read))
+        (getenv "GERBIL_PATH" (path-expand "~/.gerbil"))))
+    result))

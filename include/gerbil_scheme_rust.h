@@ -239,6 +239,7 @@ GerbilStatus gerbil_scheme_rust_pair_parts(GerbilValueHandle value,
  * be writable, disjoint, and is unchanged on transport failure. Package status
  * is separate from transport status. These are bridge exports, not CLI calls. */
 GerbilStatus gerbil_scheme_rust_package_build(GerbilBorrowedUtf8 directory, int32_t *result);
+GerbilStatus gerbil_scheme_rust_package_clean(GerbilBorrowedUtf8 directory, int32_t *result);
 GerbilStatus gerbil_scheme_rust_package_test(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 tests, int32_t *result);
 GerbilStatus gerbil_scheme_rust_package_stage(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 source, GerbilBorrowedUtf8 output, int32_t *result);
 GerbilStatus gerbil_scheme_rust_package_paths(GerbilBorrowedUtf8 prefix, GerbilBorrowedUtf8 libraries, int32_t *result);

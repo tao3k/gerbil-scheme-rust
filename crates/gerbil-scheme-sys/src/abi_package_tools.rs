@@ -7,6 +7,10 @@ unsafe extern "C" {
         directory: *const c_char,
         result: *mut i32,
     ) -> GerbilStatus;
+    fn gerbil_scheme_rust_package_clean_cstr(
+        directory: *const c_char,
+        result: *mut i32,
+    ) -> GerbilStatus;
     fn gerbil_scheme_rust_package_test_cstr(
         directory: *const c_char,
         tests: *const c_char,
@@ -45,6 +49,25 @@ pub unsafe extern "C" fn gerbil_scheme_rust_package_build(
     };
     // SAFETY: checked strings and output remain live through the native call.
     unsafe { gerbil_scheme_rust_package_build_cstr(directory.as_ptr(), result) }
+}
+
+/// Invoke the package-owned ordinary clean action without a CLI child.
+/// # Safety
+/// Same owner, readable-span and output requirements as `package_build`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_package_clean(
+    directory: GerbilBorrowedUtf8,
+    result: *mut i32,
+) -> GerbilStatus {
+    if result.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    let directory = match unsafe { directory_string(directory) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    // SAFETY: checked strings and output remain live through the owner call.
+    unsafe { gerbil_scheme_rust_package_clean_cstr(directory.as_ptr(), result) }
 }
 
 /// Run native `GxTest` without starting another Gerbil command-line process.

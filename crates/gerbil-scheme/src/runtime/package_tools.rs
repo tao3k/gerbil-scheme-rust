@@ -18,6 +18,33 @@ pub enum PackageCallOutcome {
 }
 
 impl GerbilRuntime {
+    /// Invoke the package's official `build.ss clean` action on this VM owner.
+    /// Package code owns generated-output cleanup; this does not unload modules
+    /// or classify artifacts in Rust. A new source cut requires a new host.
+    /// Bind package paths explicitly before requesting cleanup.
+    /// # Errors
+    /// Returns checked owner/image/transport errors and preserves package status.
+    pub fn clean_package(&self, directory: &str) -> Result<i32, NativeError> {
+        self.check_thread()?;
+        let mut code = 0;
+        // SAFETY: owner checked; borrowed directory and output stay live.
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_package_clean(directory.into(), &raw mut code)
+        };
+        package_result("package clean", status, code)
+    }
+
+    /// Apply the existing entry/drain cancellation contract to package cleanup.
+    /// # Errors
+    /// Preserves the same owner, image and transport errors as `clean_package`.
+    pub fn clean_package_cancellable(
+        &self,
+        directory: &str,
+        cancelled: &AtomicBool,
+    ) -> Result<PackageCallOutcome, NativeError> {
+        self.package_call(cancelled, || self.clean_package(directory))
+    }
+
     /// Run a package build with a monotonic caller-owned cancellation flag.
     ///
     /// The flag must never be reset while this call is pending. The acquire

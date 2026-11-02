@@ -243,6 +243,7 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
 
 #ifdef GERBIL_SCHEME_RUST_PACKAGE_TOOLS
 extern int32_t gerbil_scheme_rust_package_build_scheme(const char *directory);
+extern int32_t gerbil_scheme_rust_package_clean_scheme(const char *directory);
 extern int32_t gerbil_scheme_rust_package_test_scheme(const char *directory, const char *tests);
 extern int32_t gerbil_scheme_rust_package_stage_scheme(const char *directory, const char *source, const char *output);
 extern int32_t gerbil_scheme_rust_package_paths_scheme(const char *prefix, const char *libraries);
@@ -271,6 +272,13 @@ GerbilStatus gerbil_scheme_rust_package_build_cstr(const char *directory, int32_
   GerbilStatus status = package_enter(&host);
   if (status != GERBIL_STATUS_OK) return status;
   return package_leave(&host, gerbil_scheme_rust_package_build_scheme(directory), result);
+}
+GerbilStatus gerbil_scheme_rust_package_clean_cstr(const char *directory, int32_t *result) {
+  if (directory == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;
+  gerbil_host_io host;
+  GerbilStatus status = package_enter(&host);
+  if (status != GERBIL_STATUS_OK) return status;
+  return package_leave(&host, gerbil_scheme_rust_package_clean_scheme(directory), result);
 }
 GerbilStatus gerbil_scheme_rust_package_test_cstr(const char *directory, const char *tests, int32_t *result) {
   if (directory == NULL || tests == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;

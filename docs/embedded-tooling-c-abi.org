@@ -11,10 +11,11 @@ frontend subprocess wrapper or consumer-owned scheduler is introduced.
 |-----+--------------------|
 | configure_package_paths | Bind one immutable package prefix and standard library search path |
 | build_package | Load the package build.ss and call its main with compile |
+| clean_package | Invoke the package-owned build.ss clean action through the same C ABI owner |
 | run_package_main | Call the actual build.ss main with ordinary checked arguments |
 | test_package | Call :gerbil/tools/gxtest main with explicit test selection |
 | stage_package_program | Stage the existing compiler-owned complete AOT manifest |
-| build_package_cancellable / test_package_cancellable | Reject before entry or retain the entered result through return |
+| build_package_cancellable / clean_package_cancellable / test_package_cancellable | Reject before entry or retain the entered result through return |
 
 The safe API checks the live owner thread. =gerbil-scheme-sys= validates borrowed
 UTF-8 spans and arrays, copies C strings for the call and retains every borrow
@@ -200,3 +201,53 @@ under the original 15-second wall / five-second idle gate, and strict runtime
 and AOT-owner Clippy pass. The OpenSSL dependency is selected by standard
 pkg-config configuration matching the Gerbil package; a concurrent host keg
 change is recorded separately from the linker recursion failure.
+
+* Package cleanup is a Scheme action
+
+=clean_package= and its checked C export =gerbil_scheme_rust_package_clean=
+invoke the package's ordinary =build.ss clean= on the existing VM owner. This
+matches the action to which official GxPkg delegates current-package cleanup,
+without launching the build script as another process. Cleanup requires an
+explicitly bound package prefix; the generic main entry enforces the same
+precondition for the clean action before loading package code.
+
+The root build.ss retains standard PackageSpec cleanup and then delegates
+remaining module sidecars to =scheme/package-clean.ss=. That Scheme module
+reads its declared namespace from the package identity and removes only the
+namespace under the selected library prefix. Traversal includes hidden outputs,
+excludes dot/parent entries and uses lstat semantics to unlink symbolic links
+without following them. Errors propagate as package failure; repeated clean is
+idempotent. Cargo remains the owner of its OUT_DIR and compiled tooling image.
+Explicit caller-owned staging directories have their separate lifetime. Package
+cleanup does not unload the live VM or establish a fresh source cut.
+
+Rust transports the typed action and result. It does not enumerate SSI/object
+files, infer cleanup from timestamps or use generated-file existence to decide
+whether the action should run. Build-product, clean-product and staging assertions
+now live in actual Scheme =t/*-test.ss= fixtures. Rust copies those source inputs
+and checks only invocation status, process identity, cancellation and host lifetime.
+
+The real sequence builds a module and macro, checks their compiled products in
+GxTest, refuses a cancelled clean before entry, cleans, verifies that the generated
+namespace is gone, repeats clean, rebuilds and imports the compiled module.
+Hidden outputs and a link to another package exercise the traversal boundary;
+source inputs and the other package remain. Missing directories, unbound prefixes,
+malformed UTF-8 and calls after final close must refuse. Success, failure and
+cancellation still require natural exit under the original gates. A syntax error
+in the first native fixture and its failed transcript remain in ignored cache;
+that failed run is not counted as acceptance.
+
+The final local clean-action fixture naturally exits in 2.95 seconds with 12
+workers; strict Clippy passes. The complete AOT owner entry also passes 29 library
+and 19 input/protocol tests; its seven existing opt-in scenarios remain unchanged.
+The initial source-fingerprint fixture failure was repaired by including and
+independently mutating the real cleanup source, preserving the previous runtime
+input invalidation checks.
+
+Darwin CI at the preceding implementation revision completed the real C ABI test
+with three executing-host workers and natural exit in 3.56 seconds. That job then
+hit its 30-minute limit while preparing the distinct Clippy graph. Execution and
+static lint now have independent jobs with the same exact commands and unchanged
+per-job limits. Both remain required workflow checks. No output cache, artifact
+existence shortcut or weaker 15-second / five-second runtime gate implements this
+separation. The cancelled whole job remains unqualified despite its passed test.

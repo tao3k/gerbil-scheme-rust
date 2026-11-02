@@ -26,6 +26,7 @@ fn run_native_build() {
     println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM");
     println!("cargo:rerun-if-env-changed=GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM");
     println!("cargo:rerun-if-changed=../../build.ss");
+    println!("cargo:rerun-if-changed=../../scheme/package-clean.ss");
     println!("cargo:rerun-if-changed=../../gerbil.pkg");
     println!("cargo:rerun-if-changed=../../scheme/runtime.ss");
     println!("cargo:rerun-if-changed=../../scheme/runtime-collections.ss");

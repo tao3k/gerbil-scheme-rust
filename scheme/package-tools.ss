@@ -80,17 +80,19 @@
           (if (and (exact-integer? result) (<= -2147483648 result 2147483647))
             result 0))))))
 
+(def (package-invoke-main arguments)
+  (when (and (pair? arguments) (equal? (car arguments) "clean") (not package-paths))
+    (error "package cleanup requires explicitly bound package paths"))
+  (load (path-expand "build.ss" (current-directory)))
+  (apply (eval 'main) arguments))
 (def (package-main directory arguments)
-  (call-package directory
-    (lambda ()
-      (load (path-expand "build.ss" (current-directory)))
-      (apply (eval 'main) arguments))))
+  (call-package directory (lambda () (package-invoke-main arguments))))
 (def (package-build directory) (package-main directory ["compile"]))
+(def (package-clean directory) (package-main directory ["clean"]))
 (def (package-main-arguments directory arguments count)
   (call-package directory
     (lambda ()
-      (load (path-expand "build.ss" (current-directory)))
-      (apply (eval 'main)
+      (package-invoke-main
         (map (lambda (index) (package-argument arguments index)) (iota count))))))
 
 (def (package-stage directory source output)
@@ -162,6 +164,9 @@
   (c-define (package-build-entry directory) (UTF-8-string) int32
     "gerbil_scheme_rust_package_build_scheme" ""
     (gerbil-scheme-rust/scheme/package-tools#package-build directory))
+  (c-define (package-clean-entry directory) (UTF-8-string) int32
+    "gerbil_scheme_rust_package_clean_scheme" ""
+    (gerbil-scheme-rust/scheme/package-tools#package-clean directory))
   (c-define (package-test-entry directory tests) (UTF-8-string UTF-8-string) int32
     "gerbil_scheme_rust_package_test_scheme" ""
     (gerbil-scheme-rust/scheme/package-tools#package-test directory tests)))

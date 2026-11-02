@@ -128,7 +128,7 @@ mod tests;
 mod abi_package_tools;
 #[cfg(feature = "package-tools")]
 pub use abi_package_tools::{
-    gerbil_scheme_rust_package_build, gerbil_scheme_rust_package_main,
-    gerbil_scheme_rust_package_paths, gerbil_scheme_rust_package_stage,
-    gerbil_scheme_rust_package_test,
+    gerbil_scheme_rust_package_build, gerbil_scheme_rust_package_clean,
+    gerbil_scheme_rust_package_main, gerbil_scheme_rust_package_paths,
+    gerbil_scheme_rust_package_stage, gerbil_scheme_rust_package_test,
 };

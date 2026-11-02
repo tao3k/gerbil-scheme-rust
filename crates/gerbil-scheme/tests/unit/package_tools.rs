@@ -2,7 +2,10 @@
 #[path = "package_tools/supervisor.rs"]
 mod supervisor;
 use gerbil_scheme::{GerbilRuntime, PackageCallOutcome};
-use gerbil_scheme_sys::{GerbilBorrowedUtf8, GerbilStatus, gerbil_scheme_rust_package_build};
+use gerbil_scheme_sys::{
+    GerbilBorrowedUtf8, GerbilStatus, gerbil_scheme_rust_package_build,
+    gerbil_scheme_rust_package_clean,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use std::{
@@ -21,6 +24,8 @@ fn build_test_and_failures_share_the_existing_owner() {
     let previous_cores = std::env::var_os("GERBIL_BUILD_CORES");
     let runtime = initialize();
     let directory = root.to_str().unwrap();
+    assert_eq!(runtime.clean_package(directory).unwrap(), 70);
+    assert_eq!(runtime.run_package_main(directory, &["clean"]).unwrap(), 70);
     configure(&runtime, &root);
     let cancelled = AtomicBool::new(true);
     assert_eq!(
@@ -31,13 +36,16 @@ fn build_test_and_failures_share_the_existing_owner() {
     );
     assert!(!root.join("build-owner.txt").exists());
     let cwd = std::env::current_dir().unwrap();
-    assert_compiled_package(&runtime, &root);
+    assert_eq!(runtime.build_package(directory).unwrap(), 0);
+    clean_and_rebuild(&runtime, directory);
     assert_eq!(
         fs::read_to_string(root.join("build-owner.txt")).unwrap(),
         std::process::id().to_string()
     );
     assert_eq!(
-        runtime.test_package(directory, "passing-test.ss").unwrap(),
+        runtime
+            .test_package(directory, "t/passing-test.ss")
+            .unwrap(),
         0
     );
     assert_eq!(
@@ -45,11 +53,15 @@ fn build_test_and_failures_share_the_existing_owner() {
         std::process::id().to_string()
     );
     assert_eq!(
-        runtime.test_package(directory, "failing-test.ss").unwrap(),
+        runtime
+            .test_package(directory, "t/failing-test.ss")
+            .unwrap(),
         42
     );
     assert_eq!(
-        runtime.test_package(directory, "passing-test.ss").unwrap(),
+        runtime
+            .test_package(directory, "t/passing-test.ss")
+            .unwrap(),
         0
     );
     assert_eq!(
@@ -59,11 +71,40 @@ fn build_test_and_failures_share_the_existing_owner() {
         70
     );
     assert_eq!(std::env::current_dir().unwrap(), cwd);
+    assert_eq!(
+        runtime
+            .clean_package(root.join("missing").to_str().unwrap())
+            .unwrap(),
+        70
+    );
     entered_cancellation(&runtime, &root);
     assert_eq!(
-        runtime.test_package(directory, "passing-test.ss").unwrap(),
+        runtime
+            .test_package(directory, "t/passing-test.ss")
+            .unwrap(),
         0
     );
+    stage_and_clean(&runtime, &root);
+    assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
+    assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
+    let invalid = [0xffu8];
+    assert_directory_rejection(
+        GerbilBorrowedUtf8 {
+            ptr: invalid.as_ptr().cast(),
+            len: invalid.len(),
+        },
+        GerbilStatus::InvalidValue,
+    );
+    drop(runtime);
+    assert_environment_after_close(&environment);
+    assert_directory_rejection(directory.into(), GerbilStatus::RuntimeFinalized);
+    println!("PACKAGE-C-ABI-CLEANUP-OK owner={}", std::process::id());
+    assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
+    assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
+}
+
+fn stage_and_clean(runtime: &GerbilRuntime, root: &std::path::Path) {
+    let directory = root.to_str().unwrap();
     println!("PACKAGE-STEP stage entered");
     let stage = root.join("program");
     assert_eq!(
@@ -73,8 +114,29 @@ fn build_test_and_failures_share_the_existing_owner() {
         0
     );
     println!("PACKAGE-STEP stage returned");
-    assert!(stage.join("program.json").is_file());
-    assert!(stage.join("program__exe.scm").is_file());
+    assert_eq!(
+        runtime
+            .test_package(directory, "t/program-staged-test.ss")
+            .unwrap(),
+        0
+    );
+    assert_eq!(runtime.clean_package(directory).unwrap(), 0);
+    assert_eq!(
+        fs::read_to_string(std::path::Path::new(directory).join("clean-owner.txt")).unwrap(),
+        std::process::id().to_string()
+    );
+    assert_eq!(
+        runtime
+            .test_package(directory, "t/products-clean-test.ss")
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        runtime
+            .test_package(directory, "t/program-staged-test.ss")
+            .unwrap(),
+        0
+    );
     assert_eq!(runtime.run_package_main(directory, &["meta"]).unwrap(), 0);
     assert_eq!(
         runtime
@@ -82,33 +144,21 @@ fn build_test_and_failures_share_the_existing_owner() {
             .unwrap(),
         70
     );
-    assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
-    assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
-    let invalid = [0xffu8];
-    let mut result = -123;
-    // SAFETY: readable span and writable output; invalid UTF-8 must be rejected.
-    let status = unsafe {
-        gerbil_scheme_rust_package_build(
-            GerbilBorrowedUtf8 {
-                ptr: invalid.as_ptr().cast(),
-                len: invalid.len(),
-            },
-            &raw mut result,
-        )
-    };
-    assert_eq!(status, GerbilStatus::InvalidValue);
-    assert_eq!(result, -123);
-    drop(runtime);
-    assert_environment_after_close(&environment);
-    // SAFETY: valid transport; finalized runtime must reject without altering the result.
-    assert_eq!(
-        unsafe { gerbil_scheme_rust_package_build(directory.into(), &raw mut result) },
-        GerbilStatus::RuntimeFinalized
-    );
-    assert_eq!(result, -123);
-    println!("PACKAGE-C-ABI-CLEANUP-OK owner={}", std::process::id());
-    assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
-    assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
+}
+
+fn assert_directory_rejection(directory: GerbilBorrowedUtf8, expected: GerbilStatus) {
+    type Action = unsafe extern "C" fn(GerbilBorrowedUtf8, *mut i32) -> GerbilStatus;
+    let actions: [Action; 2] = [
+        gerbil_scheme_rust_package_build,
+        gerbil_scheme_rust_package_clean,
+    ];
+    for action in actions {
+        let mut code = -123;
+        // SAFETY: each test span is backed by a live Rust buffer. Both rejected
+        // paths must leave the writable result unchanged without entering Scheme.
+        assert_eq!(unsafe { action(directory, &raw mut code) }, expected);
+        assert_eq!(code, -123);
+    }
 }
 
 fn fixture() -> std::path::PathBuf {
@@ -119,28 +169,73 @@ fn fixture() -> std::path::PathBuf {
     let root = std::env::temp_dir().join(format!("gerbil-package-{}-{stamp}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     println!("PACKAGE-FIXTURE={}", root.display());
-    fs::write(root.join("gerbil.pkg"), "(package: package-fixture)\n").unwrap();
-    fs::write(root.join("build.ss"), "(import :std/build-script)\n(call-with-output-file (list path: \"build-owner.txt\" truncate: #t) (lambda (p) (write (##os-getpid) p)))\n(defbuild-script '(\"answer\"))\n").unwrap();
-    fs::write(
-        root.join("answer.ss"),
-        "(export answer answer-literal main)\n(def (answer) 42)\n(defrule (answer-literal) 42)\n(def (main . _) (void))\n",
-    )
-    .unwrap();
-    fs::write(root.join("passing-test.ss"), "(import :std/test :package-fixture/answer)\n(export passing-test)\n(def passing-test (test-suite \"C ABI package owner\" (test-case \"same process\" (call-with-output-file (list path: \"test-owner.txt\" truncate: #t) (lambda (p) (write (##os-getpid) p))) (check-equal? (answer) 42) (check-equal? (answer-literal) 42))))\n").unwrap();
-    fs::write(root.join("failing-test.ss"), "(import :std/test :package-fixture/answer)\n(export failing-test)\n(def failing-test (test-suite \"Retained failure\" (test-case \"negative control\" (check-equal? (answer) 41))))\n").unwrap();
+    let sources = [
+        (
+            "gerbil.pkg",
+            include_str!("../fixtures/package-tools/gerbil.pkg"),
+        ),
+        (
+            "build.ss",
+            include_str!("../fixtures/package-tools/build.ss"),
+        ),
+        (
+            "answer.ss",
+            include_str!("../fixtures/package-tools/answer.ss"),
+        ),
+        (
+            "package-clean.ss",
+            include_str!("../../../../scheme/package-clean.ss"),
+        ),
+        (
+            "t/passing-test.ss",
+            include_str!("../fixtures/package-tools/t/passing-test.ss"),
+        ),
+        (
+            "t/failing-test.ss",
+            include_str!("../fixtures/package-tools/t/failing-test.ss"),
+        ),
+        (
+            "t/cancel-test.ss",
+            include_str!("../fixtures/package-tools/t/cancel-test.ss"),
+        ),
+        (
+            "t/products-built-test.ss",
+            include_str!("../fixtures/package-tools/t/products-built-test.ss"),
+        ),
+        (
+            "t/products-clean-test.ss",
+            include_str!("../fixtures/package-tools/t/products-clean-test.ss"),
+        ),
+        (
+            "t/program-staged-test.ss",
+            include_str!("../fixtures/package-tools/t/program-staged-test.ss"),
+        ),
+    ];
+    for (name, source) in sources {
+        let path = root.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, source).unwrap();
+    }
     root
 }
 
-fn assert_compiled_package(runtime: &GerbilRuntime, root: &std::path::Path) {
-    assert_eq!(runtime.build_package(root.to_str().unwrap()).unwrap(), 0);
-    for artifact in ["answer.ssi", "answer.o1", "answer~0.o1", "answer~1.o1"] {
-        let path = root.join("prefix/lib/package-fixture").join(artifact);
-        assert!(
-            fs::metadata(&path).unwrap().len() > 0,
-            "missing compiled artifact: {}",
-            path.display()
-        );
-    }
+fn clean_and_rebuild(runtime: &GerbilRuntime, directory: &str) {
+    let built = "t/products-built-test.ss";
+    let cleaned = "t/products-clean-test.ss";
+    assert_eq!(runtime.test_package(directory, built).unwrap(), 0);
+    assert_eq!(
+        runtime
+            .clean_package_cancellable(directory, &AtomicBool::new(true))
+            .unwrap(),
+        PackageCallOutcome::CancelledBeforeEntry
+    );
+    assert_eq!(runtime.test_package(directory, built).unwrap(), 0);
+    assert_eq!(runtime.clean_package(directory).unwrap(), 0);
+    assert_eq!(runtime.test_package(directory, cleaned).unwrap(), 0);
+    assert_eq!(runtime.clean_package(directory).unwrap(), 0);
+    assert_eq!(runtime.test_package(directory, cleaned).unwrap(), 0);
+    assert_eq!(runtime.build_package(directory).unwrap(), 0);
+    assert_eq!(runtime.test_package(directory, built).unwrap(), 0);
 }
 
 fn initialize() -> GerbilRuntime {
@@ -157,7 +252,6 @@ fn initialize() -> GerbilRuntime {
 
 fn entered_cancellation(runtime: &GerbilRuntime, root: &std::path::Path) {
     let directory = root.to_str().unwrap();
-    fs::write(root.join("cancel-test.ss"), "(import :std/test)\n(export cancel-test)\n(def cancel-test (test-suite \"Cancellation drain\" (test-case \"entered\" (call-with-output-file \"entered\" (lambda (p) (display \"entered\" p))) (let loop () (unless (file-exists? \"release\") (thread-sleep! 0.001) (loop))) (check #t => #t))))\n").unwrap();
     let cancellation = AtomicBool::new(false);
     std::thread::scope(|scope| {
         let root = &root;
@@ -176,7 +270,7 @@ fn entered_cancellation(runtime: &GerbilRuntime, root: &std::path::Path) {
         });
         assert_eq!(
             runtime
-                .test_package_cancellable(directory, "cancel-test.ss", cancellation)
+                .test_package_cancellable(directory, "t/cancel-test.ss", cancellation)
                 .unwrap(),
             PackageCallOutcome::Completed {
                 code: 0,

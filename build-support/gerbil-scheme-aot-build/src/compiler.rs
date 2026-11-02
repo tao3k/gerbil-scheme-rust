@@ -413,15 +413,35 @@ fn build_package_tools(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsStr)
             .arg(workspace.join("ffi/runtime.c")),
         "Gerbil package-tools lifecycle",
     );
+    publish_package_tools_image(&receipt, &lifecycle, out);
+}
+
+fn publish_package_tools_image(
+    receipt: &crate::NativeArchiveLinkReceipt,
+    lifecycle: &Path,
+    out: &Path,
+) {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        // Keep the complete tooling graph in its package-owned native image.
+        // Rust's executable dead-strip traversal recursively walks large Scheme
+        // constant graphs and can exhaust Apple's linker stack. Native image
+        // assembly reuses the existing owner; no caller linker override is needed.
+        let image = out.join("libgerbil_scheme_package_tools.dylib");
+        crate::instance::link_program_image(receipt, lifecycle, &image, &[], Some(&image))
+            .expect("link Gerbil package-tools image");
+        println!("cargo:rustc-link-search=native={}", out.display());
+        println!("cargo:rustc-link-lib=dylib=gerbil_scheme_package_tools");
+        return;
+    }
     cc::Build::new()
         .cargo_metadata(false)
         .out_dir(out)
-        .object(&lifecycle)
+        .object(lifecycle)
         .try_compile("gerbil_scheme_rust_native")
         .expect("archive native lifecycle");
     println!("cargo:rustc-link-search=native={}", out.display());
     println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
-    for directive in receipt.cargo_directives {
+    for directive in &receipt.cargo_directives {
         println!("{}", directive.line());
     }
 }

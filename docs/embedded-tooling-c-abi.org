@@ -164,3 +164,39 @@ stdio.h and an invalid inherited SDKROOT. Actual Scheme compilation must pass,
 and the exact original host environment must be restored after shutdown.
 The real MRR failure remains in ignored cache; passing the focused poison
 counterexample does not replace full consumer acceptance.
+
+* Compiled consumers and real work observation
+
+The complete fixture now requires nonempty SSI and module/runtime/macro object
+files and imports the compiled package by its declared identity. Its runtime
+procedure and exported macro are checked by official GxTest. A source-relative
+import alone could bypass the package artifacts and is insufficient evidence.
+
+The complete MRR inventory exposed a missing observation path at grammar
+preparation. Test calls now scope the official expander import/evaluation
+callbacks and observe runtime loader entry/return, delegating to the captured
+original operations and restoring them on every unwind. These are actual work
+events; no timer output or deadline extension is involved. Consumers may forward
+their producer's existing Parser trace through normal test process configuration.
+
+* Darwin program-image packaging
+
+A retained Apple linker crash reports stack exhaustion in markLive while Rust's
+executable dead-strip traversal walks the complete Scheme graph. The exact
+snapshot later replays successfully; that replay does not erase the crash or
+establish a deterministic failure. The package now reuses existing program-image
+link assembly to package the opt-in Darwin tooling graph as one shared image.
+Rust links its C ABI instead of traversing the graph again as executable atoms.
+Linux retains the existing archive path. No caller RUSTFLAGS, linker replacement,
+stack enlargement, dependency update or weaker test gate implements this boundary.
+
+The shared image has a package-owned absolute install identity in its build
+output. It is qualified for that persistent build host and paired Gerbil
+installation, not arbitrary relocation. Its code mapping lasts for the host
+process lifetime. GerbilRuntime remains the single affine VM owner; this is
+packaging, not another VM, a new scheduler or a security isolation boundary.
+The complete local fixture naturally exits in 4.00 seconds with 12 workers,
+under the original 15-second wall / five-second idle gate, and strict runtime
+and AOT-owner Clippy pass. The OpenSSL dependency is selected by standard
+pkg-config configuration matching the Gerbil package; a concurrent host keg
+change is recorded separately from the linker recursion failure.

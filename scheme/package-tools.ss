@@ -102,12 +102,47 @@
 
 (extern package-argument)
 
+(def (with-test-progress action)
+  (def (report stage value)
+    (displayln "PACKAGE-TOOLS " stage " " value)
+    (force-output))
+  (let ((importer (current-expander-module-import))
+        (evaluator (current-expander-module-eval))
+        (loader load-module))
+    ;; Compiled nested imports use the runtime loader while source evaluation
+    ;; is quiet. Preserve the existing loader's admission and error semantics.
+    (dynamic-wind
+      (lambda ()
+        (set! load-module
+          (lambda (path)
+            (report "runtime load entered" path)
+            (let (result (loader path))
+              (report "runtime load returned" path)
+              result))))
+      (lambda () (parameterize
+      ((current-expander-module-import
+         (lambda (path reload?)
+           (report "import entered" path)
+           (let (context (importer path reload?))
+             (report "import returned" path)
+             context)))
+       (current-expander-module-eval
+         (lambda (context)
+           (report "evaluation entered" (expander-context-id context))
+           (let (result (evaluator context))
+             (report "evaluation returned" (expander-context-id context))
+             result))))
+        (action)))
+      (lambda () (set! load-module loader)))))
+
 (def (package-test directory tests)
-  (call-package directory
+  (with-test-progress
     (lambda ()
-      (unless (and (string? tests) (not (string-empty? tests)))
-        (error "nonempty package test path required"))
-      (package-test-main "-g" "-v" "5" "--" tests))))
+      (call-package directory
+        (lambda ()
+          (unless (and (string? tests) (not (string-empty? tests)))
+            (error "nonempty package test path required"))
+          (package-test-main "-g" "-v" "5" "--" tests))))))
 
 (begin-foreign
   (namespace ("gerbil-scheme-rust/scheme/package-tools#" package-argument))

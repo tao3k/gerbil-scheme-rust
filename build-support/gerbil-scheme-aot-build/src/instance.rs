@@ -68,14 +68,35 @@ pub fn build_native_instance_image(
         true,
     )
     .map_err(|e| e.to_string())?;
+    let exports: Vec<_> = INSTANCE_EXPORTS
+        .iter()
+        .chain(request.exports.iter())
+        .copied()
+        .collect();
+    link_program_image(request.archive, &object, request.output, &exports, None)?;
+    Ok(request.output.to_path_buf())
+}
+
+/// Shared program-image link assembly; this does not create another VM owner.
+pub(crate) fn link_program_image(
+    archive: &NativeArchiveLinkReceipt,
+    object: &Path,
+    output: &Path,
+    exports: &[&str],
+    install_name: Option<&Path>,
+) -> Result<(), String> {
     let compiler = discover_native_c_compiler().map_err(|e| e.to_string())?;
     let mut link = Command::new(compiler.program);
     link.arg("-dynamiclib")
         .arg("-o")
-        .arg(request.output)
-        .arg(&object)
-        .arg(&request.archive.archive_file);
-    for directive in &request.archive.cargo_directives {
+        .arg(output)
+        .arg(object)
+        .arg(&archive.archive_file);
+    if let Some(name) = install_name {
+        link.args(["-Xlinker", "-install_name", "-Xlinker"])
+            .arg(name);
+    }
+    for directive in &archive.cargo_directives {
         match directive.kind {
             CargoDirectiveKind::RustcLinkSearch => {
                 link.arg(format!(
@@ -88,17 +109,17 @@ pub fn build_native_instance_image(
                     .value
                     .trim_start_matches("static=")
                     .trim_start_matches("dylib=");
-                if name != request.archive.archive_name {
+                if name != archive.archive_name {
                     link.arg(format!("-l{name}"));
                 }
             }
         }
     }
-    for name in INSTANCE_EXPORTS.iter().chain(request.exports.iter()) {
+    for name in exports {
         link.arg(format!("-Wl,-exported_symbol,_{name}"));
     }
     run_native_process(&mut link, "link owner runtime image", true).map_err(|e| e.to_string())?;
-    Ok(request.output.to_path_buf())
+    Ok(())
 }
 const INSTANCE_EXPORTS: &[&str] = &[
     "gerbil_scheme_instance_abi",

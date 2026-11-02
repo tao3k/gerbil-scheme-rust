@@ -31,7 +31,7 @@ fn build_test_and_failures_share_the_existing_owner() {
     );
     assert!(!root.join("build-owner.txt").exists());
     let cwd = std::env::current_dir().unwrap();
-    assert_eq!(runtime.build_package(directory).unwrap(), 0);
+    assert_compiled_package(&runtime, &root);
     assert_eq!(
         fs::read_to_string(root.join("build-owner.txt")).unwrap(),
         std::process::id().to_string()
@@ -123,12 +123,24 @@ fn fixture() -> std::path::PathBuf {
     fs::write(root.join("build.ss"), "(import :std/build-script)\n(call-with-output-file (list path: \"build-owner.txt\" truncate: #t) (lambda (p) (write (##os-getpid) p)))\n(defbuild-script '(\"answer\"))\n").unwrap();
     fs::write(
         root.join("answer.ss"),
-        "(export answer main)\n(def (answer) 42)\n(def (main . _) (void))\n",
+        "(export answer answer-literal main)\n(def (answer) 42)\n(defrule (answer-literal) 42)\n(def (main . _) (void))\n",
     )
     .unwrap();
-    fs::write(root.join("passing-test.ss"), "(import :std/test \"answer.ss\")\n(export passing-test)\n(def passing-test (test-suite \"C ABI package owner\" (test-case \"same process\" (call-with-output-file (list path: \"test-owner.txt\" truncate: #t) (lambda (p) (write (##os-getpid) p))) (check-equal? (answer) 42))))\n").unwrap();
-    fs::write(root.join("failing-test.ss"), "(import :std/test \"answer.ss\")\n(export failing-test)\n(def failing-test (test-suite \"Retained failure\" (test-case \"negative control\" (check-equal? (answer) 41))))\n").unwrap();
+    fs::write(root.join("passing-test.ss"), "(import :std/test :package-fixture/answer)\n(export passing-test)\n(def passing-test (test-suite \"C ABI package owner\" (test-case \"same process\" (call-with-output-file (list path: \"test-owner.txt\" truncate: #t) (lambda (p) (write (##os-getpid) p))) (check-equal? (answer) 42) (check-equal? (answer-literal) 42))))\n").unwrap();
+    fs::write(root.join("failing-test.ss"), "(import :std/test :package-fixture/answer)\n(export failing-test)\n(def failing-test (test-suite \"Retained failure\" (test-case \"negative control\" (check-equal? (answer) 41))))\n").unwrap();
     root
+}
+
+fn assert_compiled_package(runtime: &GerbilRuntime, root: &std::path::Path) {
+    assert_eq!(runtime.build_package(root.to_str().unwrap()).unwrap(), 0);
+    for artifact in ["answer.ssi", "answer.o1", "answer~0.o1", "answer~1.o1"] {
+        let path = root.join("prefix/lib/package-fixture").join(artifact);
+        assert!(
+            fs::metadata(&path).unwrap().len() > 0,
+            "missing compiled artifact: {}",
+            path.display()
+        );
+    }
 }
 
 fn initialize() -> GerbilRuntime {

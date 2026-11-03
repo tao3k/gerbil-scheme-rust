@@ -331,7 +331,9 @@ fn clean_and_rebuild(runtime: &GerbilRuntime, directory: &str) {
 }
 
 fn initialize() -> GerbilRuntime {
-    GerbilRuntime::initialize().unwrap_or_else(|failure| {
+    let start = Instant::now();
+    eprintln!("PACKAGE-OWNER initialization entered");
+    let runtime = GerbilRuntime::initialize().unwrap_or_else(|failure| {
         unsafe extern "C" {
             fn gerbil_scheme_instance_setup_diagnostic(out: *mut i64) -> i32;
         }
@@ -339,7 +341,12 @@ fn initialize() -> GerbilRuntime {
         // SAFETY: the C helper writes exactly four diagnostic words after setup.
         let status = unsafe { gerbil_scheme_instance_setup_diagnostic(diagnostic.as_mut_ptr()) };
         panic!("runtime setup failed: {failure:?}; diagnostic={diagnostic:?}; status={status}");
-    })
+    });
+    eprintln!(
+        "PACKAGE-OWNER initialization returned elapsed={:?}",
+        start.elapsed()
+    );
+    runtime
 }
 
 fn entered_cancellation(runtime: &GerbilRuntime, root: &std::path::Path) {

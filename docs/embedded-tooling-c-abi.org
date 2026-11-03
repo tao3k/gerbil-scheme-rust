@@ -547,6 +547,25 @@ is introduced.
 
 * Native local-package discovery regression (2026-11-03)
 
+** Remote gate follow-up
+
+At =ff50ec4= the Darwin C ABI and Bazel jobs both fail the new local-prefix
+case at the unchanged five-second output deadline, before the first library
+load observation. This does not establish whether initialization, filesystem
+preparation, or package loading stalled. The existing test now records actual
+owner initialization entry and return with elapsed time. These are completed
+phase observations, not a timer or an alternative deadline; both package cases
+retain the 15-second wall and five-second output gates and natural teardown.
+
+The Darwin bindings job completes every executed step successfully, but its
+aggregate exceeds its 30-minute job budget. Compiler controls consumed six
+minutes before the independent workspace graph. The exact compiler controls
+and metadata commands now run in a separate platform-matrix job, retaining
+their command arguments and the 30-minute limit. Workspace check, tests,
+benchmarks and strict Clippy remain required. This is scheduling separation,
+not evidence that the local-prefix timeout is fixed. Exact-head remote
+qualification remains required.
+
 The real ASCENT consumer at candidate =9207638= failed before its build script
 could import Yuanxu: the C ABI loaded build.ss without first selecting the local
 package environment. Explicitly configured small cases did not cover that

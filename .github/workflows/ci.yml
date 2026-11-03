@@ -40,12 +40,6 @@ jobs:
       - name: Cargo format
         run: cargo fmt --all --check
 
-      - name: Scheme compiler output and diagnostic controls
-        run: cargo test -p gerbil-scheme-aot-build --lib --locked
-      - name: Paired Gambit GCC object identity
-        if: runner.os == 'Linux'
-        run: cargo test -p gerbil-scheme-aot-build --lib --locked actual_gambit_diagnostic_modes_preserve_object_bytes -- --ignored --exact program::process::process_tests::actual_gambit_diagnostic_modes_preserve_object_bytes --nocapture
-
       - name: Cargo gates
         env:
           GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM: "1"
@@ -55,16 +49,6 @@ jobs:
           cargo bench -p gerbil-scheme --bench ffi --profile dev --locked -- --test
           cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
           cargo clippy --workspace --all-targets --locked -- -D warnings
-
-      - name: Qualify opt-in compiler-owned metadata carriers
-        run: |
-          export GERBIL_PATH="$RUNNER_TEMP/metadata-package"
-          export GERBIL_LOADPATH="$GERBIL_PATH/lib"
-          gxi build.ss compile
-          gxi scheme/runtime-test.ss
-          gxi -e '(import (only-in :gerbil/tools/gxtest main)) (exit (main "-g" "-v" "5" "t/link-options-test.ss"))'
-          gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
-          gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"
 
       - name: Record unsupported SMP qualification
         run: |
@@ -79,6 +63,41 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_one_worker_control
           cargo bench -p gerbil-scheme-qualification --features actor-aot --bench actors --profile dev --locked -- --test tokio_machine_workers
           cargo clippy -p gerbil-scheme-qualification --features actor-aot --all-targets --locked -- -D warnings
+
+  # Compiler controls do not depend on workspace execution. Their separate
+  # Cargo graph previously consumed six minutes of the same 30-minute budget.
+  compiler-controls:
+    name: Scheme compiler and metadata controls (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
+      - name: Scheme compiler output and diagnostic controls
+        run: cargo test -p gerbil-scheme-aot-build --lib --locked
+      - name: Paired Gambit GCC object identity
+        if: runner.os == 'Linux'
+        run: cargo test -p gerbil-scheme-aot-build --lib --locked actual_gambit_diagnostic_modes_preserve_object_bytes -- --ignored --exact program::process::process_tests::actual_gambit_diagnostic_modes_preserve_object_bytes --nocapture
+      - name: Qualify opt-in compiler-owned metadata carriers
+        run: |
+          export GERBIL_PATH="$RUNNER_TEMP/metadata-package"
+          export GERBIL_LOADPATH="$GERBIL_PATH/lib"
+          gxi build.ss compile
+          gxi scheme/runtime-test.ss
+          gxi -e '(import (only-in :gerbil/tools/gxtest main)) (exit (main "-g" "-v" "5" "t/link-options-test.ss"))'
+          gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
+          gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"
 
   # Cargo and Bazel own independent build graphs. Keep both complete gates,
   # without spending Bazel's watchdog budget on Cargo compilation first.

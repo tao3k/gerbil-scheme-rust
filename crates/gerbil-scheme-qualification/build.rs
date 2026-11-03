@@ -30,7 +30,7 @@ impl ProgramArchiveObserver for Progress {
     }
 }
 
-fn main() {
+fn track_native_sources() {
     println!("cargo:rerun-if-env-changed=GERBIL_HOME");
     println!("cargo:rerun-if-env-changed=GERBIL_GSC");
     println!("cargo:rerun-if-env-changed=GERBIL_GXI");
@@ -41,6 +41,13 @@ fn main() {
     println!("cargo:rerun-if-changed=scheme/instance-green.ss");
     println!("cargo:rerun-if-changed=scheme/instance-orders.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-actor-arrival.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-mailbox-backpressure.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-mailbox-observation.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-owner-watch.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-owner-scope.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-ready-edge.ss");
+    println!("cargo:rerun-if-changed=scheme/instance-source-plan.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service-lease.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service-activation.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service-turn.ss");
@@ -49,6 +56,10 @@ fn main() {
     println!("cargo:rerun-if-changed=scheme/utf8-inline-control.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-buffer-control.ss");
     println!("cargo:rerun-if-changed=scheme/utf8-baseline-control.ss");
+}
+
+fn main() {
+    track_native_sources();
     let actor_aot = env::var_os("CARGO_FEATURE_ACTOR_AOT").is_some();
     let instance_probe = env::var_os("CARGO_FEATURE_INSTANCE_PROBE").is_some();
     if !actor_aot && !instance_probe {

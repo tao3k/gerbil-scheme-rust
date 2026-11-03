@@ -10,6 +10,9 @@ type NumericServiceCreate =
 #[cfg(feature = "tokio-dispatch")]
 type NumericServiceEnter =
     unsafe extern "C" fn(i32, *const *const u8, *const u64, u64, u64, *const i64, u64, i64) -> i64;
+#[cfg(feature = "tokio-dispatch")]
+type TaggedNumericServiceCreate =
+    unsafe extern "C" fn(i32, *const u8, u64, *const i64, u64, *const i64, u64) -> i64;
 #[derive(Debug)]
 pub(super) struct NativeApi {
     pub setup_diagnostic: Option<unsafe extern "C" fn(*mut i64) -> i32>,
@@ -20,7 +23,11 @@ pub(super) struct NativeApi {
     #[cfg(feature = "tokio-dispatch")]
     pub numeric_service_create: Option<NumericServiceCreate>,
     #[cfg(feature = "tokio-dispatch")]
+    pub tagged_numeric_service_create: Option<TaggedNumericServiceCreate>,
+    #[cfg(feature = "tokio-dispatch")]
     pub numeric_service_enter: Option<NumericServiceEnter>,
+    #[cfg(feature = "tokio-dispatch")]
+    pub exchange: Option<super::exchange_api::ExchangeApi>,
     #[cfg(feature = "tokio-dispatch")]
     pub numeric_batch_transfer: Option<super::numeric_snapshot::Transfer>,
     pub numeric_size: unsafe extern "C" fn(i64, i64, i32) -> i64,
@@ -79,7 +86,11 @@ impl NativeApi {
                 #[cfg(feature = "tokio-dispatch")]
                 numeric_service_create: numeric_service(handle),
                 #[cfg(feature = "tokio-dispatch")]
+                tagged_numeric_service_create: tagged_service(handle),
+                #[cfg(feature = "tokio-dispatch")]
                 numeric_service_enter: numeric_entry(handle),
+                #[cfg(feature = "tokio-dispatch")]
+                exchange: super::exchange_api::ExchangeApi::load(handle),
                 #[cfg(feature = "tokio-dispatch")]
                 numeric_batch_transfer: super::numeric_snapshot::Transfer::load(handle),
                 numeric_create: std::mem::transmute::<
@@ -177,5 +188,15 @@ unsafe fn result_slot(handle: *mut c_void) -> Option<unsafe extern "C" fn(i64, u
             .map(|address| {
                 std::mem::transmute::<*mut c_void, unsafe extern "C" fn(i64, u64) -> i64>(address)
             })
+    }
+}
+
+#[cfg(feature = "tokio-dispatch")]
+unsafe fn tagged_service(handle: *mut c_void) -> Option<TaggedNumericServiceCreate> {
+    // SAFETY: optional owner-local constructor ABI, resolved before SDK setup.
+    unsafe {
+        symbol(handle, c"gerbil_scheme_rust_tagged_numeric_service_create")
+            .ok()
+            .map(|address| std::mem::transmute::<*mut c_void, TaggedNumericServiceCreate>(address))
     }
 }

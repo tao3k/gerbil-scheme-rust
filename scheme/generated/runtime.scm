@@ -1,6 +1,6 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1792766643)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1793066582)
   (begin
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))
@@ -37,9 +37,9 @@
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
       (lambda (_%exception760%_)
-        (let ((__tmp7917
+        (let ((__tmp9556
                (lambda (_%_762%_) '"Scheme exception (formatting failed)"))
-              (__tmp7916
+              (__tmp9555
                (lambda ()
                  (let ((_%message767%_
                         (call-with-output-string
@@ -57,17 +57,17 @@
                            (declare (not safe))
                            (##string-length _%message767%_))))))))
           (declare (not safe))
-          (__with-catch __tmp7917 __tmp7916))))
+          (__with-catch __tmp9556 __tmp9555))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call
       (lambda (_%root752%_ _%procedure753%_)
         (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
-        (let ((__tmp7919
+        (let ((__tmp9558
                (lambda (_%exception755%_)
                  (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
                         _%exception755%_))
                  '0))
-              (__tmp7918
+              (__tmp9557
                (lambda ()
                  (let ((_%value758%_
                         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
@@ -78,7 +78,7 @@
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
                         (_%procedure753%_ _%value758%_)))))))
           (declare (not safe))
-          (__with-catch __tmp7919 __tmp7918))))
+          (__with-catch __tmp9558 __tmp9557))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
       (lambda (_%value748%_)
         (let ((_%root-id750%_
@@ -243,6 +243,7 @@
       gerbil-rs-numeric-batch-value
       gerbil-rs-numeric-header-at
       gerbil-rs-numeric-service-create
+      gerbil-rs-tagged-numeric-service-create
       gerbil-rs-numeric-row-pointer
       gerbil-rs-numeric-row-size
       gerbil-rs-numeric-service-enter
@@ -541,6 +542,64 @@
                     (if value
                         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
                          (vector operation value))
+                        0))))))))
+    (c-define
+     (gerbil-rs-tagged-numeric-service-create
+      kind
+      bytes
+      size
+      tag
+      tag-size
+      header
+      length)
+     (int32 (pointer unsigned-int8)
+            unsigned-int64
+            (pointer int64)
+            unsigned-int64
+            (pointer int64)
+            unsigned-int64)
+     int64
+     "gerbil_scheme_rust_tagged_numeric_service_create"
+     "extern"
+     (with-exception-catcher
+      (lambda (_exception) 0)
+      (lambda ()
+        (if (not (<= 2 length 4))
+            0
+            (let ((operation (make-s64vector length))
+                  (metadata (make-s64vector tag-size)))
+              (let loop ((index 0))
+                (when (< index length)
+                  (s64vector-set!
+                   operation
+                   index
+                   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at
+                    header
+                    index))
+                  (loop (+ index 1))))
+              (let loop ((index 0))
+                (when (< index tag-size)
+                  (s64vector-set!
+                   metadata
+                   index
+                   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at
+                    tag
+                    index))
+                  (loop (+ index 1))))
+              (if (not (and (= (s64vector-ref operation 0) 1)
+                            (>= (s64vector-ref operation 1) -1)
+                            (or (< length 3)
+                                (<= 0 (s64vector-ref operation 2) 1))
+                            (or (< length 4)
+                                (positive? (s64vector-ref operation 3)))))
+                  0
+                  (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-value
+                                kind
+                                bytes
+                                size)))
+                    (if value
+                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+                         (vector operation (vector metadata value)))
                         0))))))))
     (c-define
      (gerbil-rs-numeric-service-enter
@@ -1158,7 +1217,7 @@
       (lambda (_%value653%_ _%kind654%_)
         (let ((_%$e656%_ _%kind654%_))
           (if (or (eq? '0 _%$e656%_) (eq? '1 _%$e656%_))
-              (let ((_g7920_ (if (= _%kind654%_ '0)
+              (let ((_g9559_ (if (= _%kind654%_ '0)
                                  (values gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-rational?
                                          numerator
                                          denominator)
@@ -1168,15 +1227,15 @@
                   (let ((_%valid?662%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g7920_ 0)))
+                           (##values-ref _g9559_ 0)))
                         (_%left663%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g7920_ 1)))
+                           (##values-ref _g9559_ 1)))
                         (_%right664%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g7920_ 2))))
+                           (##values-ref _g9559_ 2))))
                     (let* ((_%items666%_
                             (if (vector? _%value653%_)
                                 _%value653%_

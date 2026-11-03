@@ -92,7 +92,7 @@ pub(super) fn open(
     )?;
     if initialized.len() != 4
         || initialized[0] != 0
-        || !matches!(initialized[1], 1..=32)
+        || !matches!(initialized[1], 1..=34)
         || !(1..=64).contains(&initialized[2])
         || initialized[3] != count
     {
@@ -251,7 +251,9 @@ impl Pump<'_> {
             self.wake,
             super::SchemeServicePhase::Advance,
             || {
-                if cycle {
+                if self.wake.exchange.load(Ordering::Acquire) {
+                    super::service_cycle::harvest_exchange(self.image, self.jobs.len())
+                } else if cycle {
                     super::service_cycle::harvest(
                         self.image,
                         self.completed.take().map(|t| t.epoch),
@@ -510,6 +512,30 @@ impl Pump<'_> {
             ProducerStep::Progress | ProducerStep::Waiting => Ok(false),
         }
     }
+    // The existing explicit feed bound also covers resident producers. Publish
+    // a bounded runnable set before the next Scheme scheduling opportunity.
+    // This is not a handler execution budget: Scheme may block/yield at any time.
+    fn feed_registered(
+        &mut self,
+        requests: &mpsc::Receiver<Request>,
+        maximum: usize,
+    ) -> Result<(), InstanceError> {
+        for _ in 1..maximum {
+            if self.wake.closed.load(Ordering::Acquire) {
+                break;
+            }
+            // Ordinary lifecycle/control/short input wins before each new
+            // producer entry; leave its FIFO custody to the next owner turn.
+            if let Some(request) = self.next_request(requests) {
+                self.deferred = Some(request);
+                break;
+            }
+            if !self.refill_retired()? {
+                break;
+            }
+        }
+        Ok(())
+    }
     fn feed(
         &mut self,
         first: Request,
@@ -673,6 +699,7 @@ impl Pump<'_> {
                 ) {
                     ProducerStep::Service(request) => {
                         self.receive(request)?;
+                        self.feed_registered(requests, feed_limit)?;
                         continue;
                     }
                     ProducerStep::Progress => continue,

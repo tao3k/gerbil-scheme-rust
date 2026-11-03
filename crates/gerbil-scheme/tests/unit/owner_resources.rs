@@ -120,3 +120,75 @@ fn resource_destructor_panic_reports_retirement_failure_without_losing_join() {
         super::ImageMappingState::Quarantined
     );
 }
+
+fn directory_test_root(label: &str) -> std::path::PathBuf {
+    use std::os::unix::fs::DirBuilderExt;
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "gsr-directory-test-{label}-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&root)
+        .unwrap();
+    root
+}
+
+#[test]
+fn stale_process_directory_does_not_block_or_modify_new_owner_resources() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = directory_test_root("stale");
+    let previous = root.join(format!("gerbil-owners-{}-0", std::process::id()));
+    std::fs::create_dir(&previous).unwrap();
+    let sentinel = previous.join("retained-image");
+    std::fs::write(&sentinel, b"retained by another lifetime").unwrap();
+    let created = super::create_owner_directory(&root).unwrap();
+    assert_ne!(created, previous);
+    assert_eq!(
+        std::fs::read(&sentinel).unwrap(),
+        b"retained by another lifetime"
+    );
+    assert_eq!(
+        std::fs::metadata(&created).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn concurrent_owner_directories_are_exclusive_and_private() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = directory_test_root("parallel");
+    let directories = std::thread::scope(|scope| {
+        let workers = (0..12)
+            .map(|_| {
+                let root = &root;
+                scope.spawn(move || {
+                    (0..16)
+                        .map(|_| super::create_owner_directory(root).unwrap())
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>();
+        workers
+            .into_iter()
+            .flat_map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    let unique = directories
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(unique.len(), 192);
+    for directory in directories {
+        assert_eq!(directory.parent(), Some(root.as_path()));
+        assert_eq!(
+            std::fs::metadata(directory).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}

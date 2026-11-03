@@ -47,6 +47,7 @@ pub(super) fn contract(runtime: &tokio::runtime::Runtime, progress: &mpsc::Sende
     let mut pool = InstancePool::start(&descriptor(false), cfg).unwrap();
     let dispatch = pool.dispatcher();
     dispatch.configure_owner_budgets(4, Some(32)).unwrap();
+    element_snapshots::contract(&dispatch, progress);
     dispatch
         .configure_scheme_service_completion_on(0, SchemeServiceCompletion::PipelineCycle)
         .unwrap()

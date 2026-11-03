@@ -16,6 +16,8 @@ enum Retention {
     Batch,
     #[cfg(feature = "tokio-dispatch")]
     Entry,
+    #[cfg(feature = "tokio-dispatch")]
+    Exchange,
 }
 impl RetainedValue {
     #[must_use]
@@ -38,13 +40,16 @@ impl<'vm> NativeSession<'vm> {
         self.local(&value)?;
         let mut roots = self.image.retained.borrow_mut();
         let internal = usize::from(self.image.service_root.get().is_some())
-            + usize::from(self.image.entry_root.get().is_some());
+            + usize::from(self.image.entry_root.get().is_some())
+            + usize::from(self.image.exchange_root.get().is_some());
         let slot: Option<&std::cell::Cell<Option<u64>>> = match kind {
             Retention::Application => None,
             #[cfg(feature = "tokio-dispatch")]
             Retention::Batch => Some(&self.image.service_root),
             #[cfg(feature = "tokio-dispatch")]
             Retention::Entry => Some(&self.image.entry_root),
+            #[cfg(feature = "tokio-dispatch")]
+            Retention::Exchange => Some(&self.image.exchange_root),
         };
         if slot.is_some_and(|slot| slot.get().is_some())
             || (slot.is_none() && roots.len() - internal >= 65536)
@@ -67,7 +72,7 @@ impl<'vm> NativeSession<'vm> {
             owner: self.image.receipt.owner,
         })
     }
-    fn retained_id(&self, value: RetainedValue) -> Result<i64, InstanceError> {
+    pub(super) fn retained_id(&self, value: RetainedValue) -> Result<i64, InstanceError> {
         if value.image != self.image.identity {
             return Err(InstanceError::InvalidConfig("foreign retained owner"));
         }
@@ -98,6 +103,9 @@ impl<'vm> NativeSession<'vm> {
         }
         if self.image.entry_root.get() == Some(value.id) {
             self.image.entry_root.set(None);
+        }
+        if self.image.exchange_root.get() == Some(value.id) {
+            self.image.exchange_root.set(None);
         }
         // SAFETY: unique arena ownership was removed immediately before release.
         if unsafe { (self.image.release)(root) } != 1 {
@@ -170,6 +178,25 @@ impl<'vm> NativeSession<'vm> {
     }
     pub(super) fn retain_entry(&self, value: NativeRoot<'vm>) -> Result<(), InstanceError> {
         self.retain_root(value, Retention::Entry).map(|_| ())
+    }
+    pub(super) fn retain_exchange(&self, value: NativeRoot<'vm>) -> Result<(), InstanceError> {
+        self.retain_root(value, Retention::Exchange).map(|_| ())
+    }
+    pub(super) fn exchange_id(&self) -> Option<i64> {
+        self.image
+            .exchange_root
+            .get()
+            .and_then(|id| self.image.retained.borrow().get(&id).copied())
+    }
+    pub(super) fn clear_exchange(&self) -> Result<(), InstanceError> {
+        if let Some(id) = self.image.exchange_root.get() {
+            self.release_retained(RetainedValue {
+                image: self.image.identity,
+                id,
+                owner: self.owner_index(),
+            })?;
+        }
+        Ok(())
     }
     pub(super) fn entry_id(&self) -> Option<i64> {
         self.image

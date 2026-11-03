@@ -1,0 +1,360 @@
+{
+  "date": "2026-10-30",
+  "role": "User-accepted latency reference for PR branch integration; not full performance acceptance",
+  "baseline_source_revision": "19e164f5ac23681d1e2915bc4dea9489a7cb482a",
+  "historical_p99_reference_ns": 298000,
+  "accepted_frozen_replay_p99_ns": 402000,
+  "workload": {
+    "owners": 1,
+    "scheme_workers": 4,
+    "transfer_frames": 3,
+    "rate": 500000,
+    "seconds": 10,
+    "messages": 5000000,
+    "warmup_rate": 1000,
+    "warmup_seconds": 1,
+    "watchdog_seconds": 5,
+    "original_debt_guard": 128
+  },
+  "replay_order": [
+    "clean-19e164f",
+    "historical-0298",
+    "integrated-pr18-tree",
+    "rejected-cold-report-extraction"
+  ],
+  "replays": [
+    {
+      "cohort": "clean-19e164f",
+      "source_revision": "19e164f5ac23681d1e2915bc4dea9489a7cb482a",
+      "exact_host_source_identity_proven": true,
+      "artifact_sha256": {
+        "owner_wait_diagnostic.dylib": "938c1bf43acda30ddb7367adf09be7d18c99dc801ab536562dce836cb46e34f8",
+        "gerbil_actor_arrival": "7efdc6fe4fa9dc6a1257466939241bfabb0c28b211b55d13ddaf5d38e9dca3c1"
+      },
+      "args": [
+        "--owner-wait-scope",
+        "--rate=500000",
+        "--seconds=10"
+      ],
+      "metrics": {
+        "accepted": 5000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 2158459,
+        "completed": 5000000,
+        "completed_per_second": 500000.0166500005,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 9999999667,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 9999998000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "diagnostic_observer_enabled",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "native_500k_original_guard"
+        },
+        "planned": 5000000,
+        "rate": 500000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 10,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 1667,
+          "last_publication_elapsed_ns": 9999998500,
+          "maximum_due_unconsumed_messages": 1081,
+          "maximum_pending_source_messages": 1079,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 132786
+        },
+        "successful_planned_to_consumed_p999_ns": 1282000,
+        "successful_planned_to_consumed_p99_ns": 402000,
+        "warmup": false,
+        "watchdog_seconds": 5,
+        "window": 128
+      },
+      "clean_shutdown": true,
+      "exit_status": 0,
+      "raw_sha256": "5ad773d942f12e4865156d5ef58797f7ce4bf369d07b6ddccf2e5ebe3f78993a"
+    },
+    {
+      "cohort": "historical-0298",
+      "source_revision": null,
+      "exact_host_source_identity_proven": false,
+      "artifact_sha256": {
+        "gerbil_actor_arrival": "2b016d1d934ed5de55041d095e0a71801c4aa0b9a61f1cc643a83f0bdf56f289",
+        "owner_wait_diagnostic.dylib": "92eba95f7972033f4c9980344f0d62070ed38ea8f5c8e9513a1f9692141900d1"
+      },
+      "args": [
+        "--owner-wait-scope",
+        "--rate=500000",
+        "--seconds=10"
+      ],
+      "metrics": {
+        "accepted": 5000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 58204042,
+        "completed": 5000000,
+        "completed_per_second": 500000.0083000001,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 9999999834,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 9999998000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "diagnostic_observer_enabled",
+            "historical_p99_exceeded_or_missing",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "native_500k_original_guard"
+        },
+        "planned": 5000000,
+        "rate": 500000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 10,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 1834,
+          "last_publication_elapsed_ns": 9999998500,
+          "maximum_due_unconsumed_messages": 29104,
+          "maximum_pending_source_messages": 29102,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 929065
+        },
+        "successful_planned_to_consumed_p999_ns": 56244000,
+        "successful_planned_to_consumed_p99_ns": 49849000,
+        "warmup": false,
+        "watchdog_seconds": 5,
+        "window": 128
+      },
+      "clean_shutdown": true,
+      "exit_status": 0,
+      "raw_sha256": "3816869616bdb9f342c5ffd5df6b1b443fdf47b93471e875cc4c666acae75906"
+    },
+    {
+      "cohort": "integrated-pr18-tree",
+      "integration_parents": [
+        "1c54c43025ea53002f536f0f37d5877047941da8",
+        "19e164f5ac23681d1e2915bc4dea9489a7cb482a"
+      ],
+      "runtime_manifest_sha256": "8467bd8bebbe2306992fa150afc74609b93d7f328f6b006c090ca6a6bc473d99",
+      "artifact_sha256": {
+        "binary": "68e6899cd18f3c1d93a54e0eb20859aa086d1e17c797d37f8a6a1feed670a551",
+        "image": "fa405648274b0f8cc88bdf21dbbec56a730990b2b77b506c75665460f4067b1d"
+      },
+      "args": [
+        "--owner-wait-scope",
+        "--rate=500000",
+        "--seconds=10"
+      ],
+      "metrics": {
+        "accepted": 5000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 2279583,
+        "completed": 5000000,
+        "completed_per_second": 500000.0208500009,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 9999999583,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 9999998000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "diagnostic_observer_enabled",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "native_500k_original_guard"
+        },
+        "planned": 5000000,
+        "rate": 500000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 10,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 1583,
+          "last_publication_elapsed_ns": 9999998500,
+          "maximum_due_unconsumed_messages": 1142,
+          "maximum_pending_source_messages": 1140,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 103051
+        },
+        "successful_planned_to_consumed_p999_ns": 484000,
+        "successful_planned_to_consumed_p99_ns": 350000,
+        "warmup": false,
+        "watchdog_seconds": 5,
+        "window": 128
+      },
+      "clean_shutdown": true,
+      "exit_status": 0,
+      "raw_sha256": "dccadfdb9fb1d9743c79ca011a43e449579f72528927846737e5149fc89b3c70"
+    },
+    {
+      "cohort": "rejected-cold-report-extraction",
+      "adopted": false,
+      "causal_attribution_established": false,
+      "artifact_sha256": {
+        "binary": "084fb71db75e4bc250ca5a89e4950e39d0ecaa3d73cad069fdbfba4f505a9d6e",
+        "image": "fa405648274b0f8cc88bdf21dbbec56a730990b2b77b506c75665460f4067b1d"
+      },
+      "metrics": {
+        "accepted": 5000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 289228083,
+        "completed": 5000000,
+        "completed_per_second": 495951.2913175424,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 10081635208,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 9999998000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "diagnostic_observer_enabled",
+            "historical_p99_exceeded_or_missing",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "native_500k_original_guard"
+        },
+        "planned": 5000000,
+        "rate": 500000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 10,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 81637208,
+          "last_publication_elapsed_ns": 10081633083,
+          "maximum_due_unconsumed_messages": 144616,
+          "maximum_pending_source_messages": 144614,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 1902618
+        },
+        "successful_planned_to_consumed_p999_ns": 288308000,
+        "successful_planned_to_consumed_p99_ns": 270485000,
+        "warmup": false,
+        "watchdog_seconds": 5,
+        "window": 128
+      },
+      "clean_shutdown": true,
+      "exit_status": 0,
+      "raw_sha256": "c817e34c0897b75ae5da9c8ea88a799ec278218266af8dbc942824375d72ac47"
+    }
+  ],
+  "integration": {
+    "pr_number": 18,
+    "pr_head_before": "1c54c43025ea53002f536f0f37d5877047941da8",
+    "benchmark_of_merged_tree": true,
+    "retained_pr_changes": [
+      "Atomically reserved private owner directories",
+      "Owner-local borrowed element snapshots",
+      "Process-isolated native qualification",
+      "Bounded protocol CI partitioning and separate lint/Actor jobs"
+    ],
+    "defaults_changed": false,
+    "post_checkpoint_runtime_candidates_included": false,
+    "full_performance_admission": false,
+    "merged_tree_p99_ns": 350000,
+    "merged_tree_p999_ns": 484000,
+    "runtime_input_manifest_retained_outside_git": true,
+    "restored_binary_equals_measured_0350": true,
+    "restored_image_equals_measured_0350": true,
+    "bench_runtime_source_restored": true,
+    "scoped_length_lint_expectation": "Only clippy::too_many_lines on the frozen run function; ordinary artifacts byte-identical to measured pair",
+    "final_runtime_source_manifest_sha256": "103bc7c256b4e1c62e1a62432774f4e5ce4327b0f6bd835ff925811d4683ffda"
+  },
+  "validation": {
+    "format": "passed",
+    "owner_strict_clippy": "passed",
+    "qualification_strict_clippy": "passed with documented frozen-function length expectation",
+    "native_c_and_report_cases": 17,
+    "native_gc_exception_continuation_scope_cases": 1,
+    "service_native_contract_cases": 1,
+    "service_native_contract_seconds": 43.4,
+    "scope_model_cases": 13,
+    "frame_model_cases": 9,
+    "service_suite_compiles": true,
+    "full_remote_ci": "pending",
+    "initial_sandbox_vm_denial_retained": true,
+    "recovery_model_cases": 15
+  }
+}

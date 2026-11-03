@@ -34,6 +34,44 @@ impl<'entry> SchemeServiceInput<'entry> {
     ) -> Result<NativeRoot<'vm>, InstanceError> {
         super::service::envelope(session, &self.header[..self.length], Some(value))
     }
+    /// Construct a service envelope whose payload is `[s64vector tag, numeric data]`
+    /// in one owner-local Scheme construction frame. Child values never acquire
+    /// temporary external roots. Submission still uses the ordinary Actor endpoint.
+    /// All numeric families retain their existing sealed type/copy contract.
+    /// # Errors
+    /// Missing image capability, cumulative input quota/overflow or native construction.
+    pub fn tagged_numeric<'vm, T: NumericElement>(
+        &self,
+        session: &NativeSession<'vm>,
+        tag: &[i64],
+        values: &[T],
+    ) -> Result<NativeRoot<'vm>, InstanceError> {
+        let create = session.image.native.tagged_numeric_service_create.ok_or(
+            InstanceError::InvalidConfig("tagged numeric service constructor unavailable"),
+        )?;
+        // Same charge as separate tag/data vectors, two pair vectors, and header.
+        let bytes = std::mem::size_of_val(tag)
+            .checked_add(std::mem::size_of_val(values))
+            .and_then(|bytes| bytes.checked_add(self.length * std::mem::size_of::<i64>()))
+            .and_then(|bytes| bytes.checked_add(4 * std::mem::size_of::<&NativeRoot<'_>>()))
+            .ok_or(InstanceError::InvalidConfig(
+                "tagged numeric service input overflow",
+            ))?;
+        session.input(bytes)?;
+        // SAFETY: sealed numeric layouts; borrowed slices and header live through
+        // synchronous copying on this owner. Only a new parent root is returned.
+        session.own(unsafe {
+            create(
+                T::KIND,
+                values.as_ptr().cast(),
+                values.len() as u64,
+                tag.as_ptr(),
+                tag.len() as u64,
+                self.header.as_ptr(),
+                self.length as u64,
+            )
+        })
+    }
     /// Construct a native numeric Actor batch and its service envelope together
     /// when the selected policy supports it. No Rust pointer is retained by Scheme.
     /// # Errors
@@ -85,7 +123,33 @@ impl<'entry> SchemeServiceInput<'entry> {
 /// an application payload root cannot be returned as a completed admission.
 #[derive(Debug)]
 pub struct SchemeServiceSubmission<'vm> {
-    pub(super) receipt: NativeRoot<'vm>,
+    receipt: Receipt<'vm>,
+}
+#[derive(Debug)]
+enum Receipt<'vm> {
+    Root(NativeRoot<'vm>),
+    Identity(i64),
+}
+impl SchemeServiceSubmission<'_> {
+    pub(super) fn id(
+        &self,
+        session: &NativeSession<'_>,
+    ) -> Result<super::service::JobId, InstanceError> {
+        let id = match &self.receipt {
+            Receipt::Identity(id) => *id,
+            Receipt::Root(root) => {
+                let ids = session.copy_numeric::<i64>(root)?;
+                if ids.len() != 1 {
+                    return Err(InstanceError::InvalidConfig("Scheme service identity"));
+                }
+                ids[0]
+            }
+        };
+        if id <= 0 {
+            return Err(InstanceError::InvalidConfig("Scheme service identity"));
+        }
+        Ok(super::service::JobId(id))
+    }
 }
 impl SchemeServiceInput<'_> {
     fn begin_entry(&self) -> Result<(), InstanceError> {
@@ -106,7 +170,57 @@ impl SchemeServiceInput<'_> {
     ) -> Result<SchemeServiceSubmission<'vm>, InstanceError> {
         session.local(value)?;
         self.begin_entry()?;
-        super::service::call(session, value).map(|receipt| SchemeServiceSubmission { receipt })
+        super::service::call(session, value).map(|receipt| SchemeServiceSubmission {
+            receipt: Receipt::Root(receipt),
+        })
+    }
+    /// Copy a tagged numeric payload and submit it in one native call. Only a
+    /// scalar job identity returns; no input, envelope or receipt root escapes.
+    /// # Errors
+    /// Missing capability, input quota, duplicate attempt or Scheme exception.
+    pub fn enter_tagged_numeric<'vm, T: NumericElement>(
+        &self,
+        session: &NativeSession<'vm>,
+        tag: &[i64],
+        values: &[T],
+    ) -> Result<SchemeServiceSubmission<'vm>, InstanceError> {
+        let capability = session
+            .exchange_id()
+            .ok_or(InstanceError::InvalidConfig("native exchange disabled"))?;
+        let api = session
+            .image
+            .native
+            .exchange
+            .ok_or(InstanceError::InvalidConfig("native exchange unavailable"))?;
+        let bytes = std::mem::size_of_val(tag)
+            .checked_add(std::mem::size_of_val(values))
+            .and_then(|n| n.checked_add(self.length * std::mem::size_of::<i64>()))
+            .and_then(|n| n.checked_add(4 * std::mem::size_of::<&NativeRoot<'_>>()))
+            .ok_or(InstanceError::InvalidConfig(
+                "tagged numeric service input overflow",
+            ))?;
+        session.input(bytes)?;
+        self.begin_entry()?;
+        // SAFETY: exclusive owner, sealed numeric layout; all spans are copied
+        // synchronously before return. Scheme retains no Rust pointer.
+        let id = unsafe {
+            (api.enter)(
+                capability,
+                T::KIND,
+                values.as_ptr().cast(),
+                values.len() as u64,
+                tag.as_ptr(),
+                tag.len() as u64,
+                self.header.as_ptr(),
+                self.length as u64,
+            )
+        };
+        if id <= 0 {
+            return Err(session.exchange_failure());
+        }
+        Ok(SchemeServiceSubmission {
+            receipt: Receipt::Identity(id),
+        })
     }
     /// Construct and admit numeric input in Scheme. With the explicit capability,
     /// no input/header/envelope root is published to Rust; only the identity
@@ -156,6 +270,8 @@ impl SchemeServiceInput<'_> {
                     entry,
                 )
             })
-            .map(|receipt| SchemeServiceSubmission { receipt })
+            .map(|receipt| SchemeServiceSubmission {
+                receipt: Receipt::Root(receipt),
+            })
     }
 }

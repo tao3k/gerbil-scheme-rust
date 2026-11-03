@@ -5,10 +5,7 @@ use super::{
 };
 use crate::NumericElement;
 use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, atomic::AtomicBool},
     time::{Duration, Instant},
 };
 use tokio::sync::oneshot;
@@ -61,8 +58,8 @@ pub trait SchemeServiceRequest: Send + 'static {
         let value = self.construct(session)?;
         input.wrap(session, &value)
     }
-    /// Construct and admit one service input. The returned root is the native
-    /// identity receipt, not the payload. Use the context's submission methods
+    /// Construct and admit one service input. The opaque submission contains the
+    /// native identity receipt, never the payload. Use the context's submission methods
     /// so an attempted entry remains visible even if native code fails.
     /// # Errors
     /// Construction, quotas, service admission or caught Scheme exceptions.
@@ -73,6 +70,21 @@ pub trait SchemeServiceRequest: Send + 'static {
     ) -> Result<super::SchemeServiceSubmission<'vm>, InstanceError> {
         let value = self.construct_service(session, input)?;
         input.submit(session, &value)
+    }
+    /// Project a result through its owner-local slot. The default preserves all
+    /// Scheme types; bounded numeric consumers may avoid a temporary value root.
+    /// # Errors
+    /// Native custody, type, quota or application validation failure.
+    fn project_service(
+        self,
+        session: &NativeSession<'_>,
+        output: &super::SchemeServiceOutput<'_>,
+    ) -> Result<Self::Output, InstanceError>
+    where
+        Self: Sized,
+    {
+        let value = output.rooted(session)?;
+        self.project(session, &value)
     }
     /// Project a completed Scheme value before releasing its temporary root.
     /// # Errors
@@ -160,7 +172,9 @@ impl InstanceDispatcher {
                 "short service requires one stateless work unit",
             ));
         }
-        self.validate_service_on(owner, &message)?;
+        if self.owner_port(owner).is_none() {
+            self.validate_service_on(owner, &message)?;
+        }
         if units != reservation.units {
             return Err(InstanceError::InvalidConfig(
                 "Scheme reservation work mismatch",
@@ -183,7 +197,11 @@ impl InstanceDispatcher {
                 submitted: std::cell::Cell::new(false),
             })),
         };
-        self.enqueue(owner, request)?;
+        if let Some(port) = self.owner_port(owner) {
+            port?.publish(request, short, lane)?;
+        } else {
+            self.enqueue(owner, request)?;
+        }
         Ok(AsyncInstanceTicket { response })
     }
     pub(super) fn validate_service_on<M: SchemeServiceRequest>(
@@ -193,32 +211,16 @@ impl InstanceDispatcher {
     ) -> Result<(), InstanceError> {
         let short = message.short_service();
         let lane = message.lane();
-        {
-            let senders = self
-                .admission
-                .senders
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let target = senders.owners.get(owner).ok_or(InstanceError::Closed)?;
-            let wake = target
-                .wake
-                .as_ref()
-                .ok_or(InstanceError::InvalidConfig("Scheme service not enabled"))?;
-            if short && wake.service_version.load(Ordering::Acquire) < 2 {
-                return Err(InstanceError::InvalidConfig(
-                    "Scheme service lacks short scheduling capability",
-                ));
-            }
-            if wake.closed.load(Ordering::Acquire) {
-                return Err(InstanceError::Closed);
-            }
-            if lane.is_some_and(|lane| lane.0 >= wake.lanes.load(Ordering::Acquire)) {
-                return Err(InstanceError::InvalidConfig(
-                    "Scheme service lane out of range",
-                ));
-            }
+        if let Some(port) = self.owner_port(owner) {
+            return port?.validate(short, lane);
         }
-        Ok(())
+        let senders = self
+            .admission
+            .senders
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let target = senders.owners.get(owner).ok_or(InstanceError::Closed)?;
+        super::owner_admission::validate(target.wake.as_ref(), short, lane)
     }
 }
 /// Opaque owner-local identity; never a Scheme pointer or cross-owner authority.
@@ -313,11 +315,7 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
                 let context =
                     super::SchemeServiceInput::new(header, length, start.fused, &self.submitted);
                 let token = self.message.enter_service(session, &context)?;
-                let ids = session.copy_numeric::<i64>(&token.receipt)?;
-                if ids.len() != 1 || ids[0] <= 0 {
-                    return Err(InstanceError::InvalidConfig("Scheme service identity"));
-                }
-                Ok(JobId(ids[0]))
+                token.id(session)
             },
             |value| {
                 result = Some(value.0);
@@ -340,11 +338,9 @@ impl<M: SchemeServiceRequest> Job for TypedJob<M> {
             completed.input,
             completed.output,
             |session| {
-                let value = match completed.ready {
-                    Some(ready) => ready.project(session, &slot_taken)?,
-                    None => command(session, &[2, completed.id.0], None)?,
-                };
-                message.project(session, &value)
+                let output =
+                    super::SchemeServiceOutput::new(completed.id, completed.ready, &slot_taken);
+                message.project_service(session, &output)
             },
             |value| {
                 if completed.retire_before_publish && slot_taken.get() {

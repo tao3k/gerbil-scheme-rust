@@ -59,6 +59,8 @@
 
 - [[file:30-39-status/30.09-owner-wakeup-gc-and-runtime-contract.org][30.09 Owner wakeup, native GC timing and explicit Scheme VM runtime contract]]
 
+- [[file:30-39-status/30.96-owner-claimed-short-baseline.org][30.96 Running-owner short admission and retained baseline replay]]
+
 * Documentation contract
 
 Design documents state ownership, invariants, non-goals, and checked

@@ -60,7 +60,7 @@
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-numeric-span gerbil-rs-numeric-create gerbil-rs-numeric-size gerbil-rs-numeric-copy
    gerbil-rs-numeric-value gerbil-rs-numeric-batch-create
-   gerbil-rs-numeric-batch-value gerbil-rs-numeric-header-at gerbil-rs-numeric-service-create
+   gerbil-rs-numeric-batch-value gerbil-rs-numeric-header-at gerbil-rs-numeric-service-create gerbil-rs-tagged-numeric-service-create
    gerbil-rs-numeric-row-pointer gerbil-rs-numeric-row-size gerbil-rs-numeric-service-enter gerbil-rs-numeric-batch-snapshot gerbil-rs-numeric-batch-copy gerbil-rs-numeric-write-size))
  (namespace ("gerbil-scheme-rust/scheme/runtime#"
    gerbil-rs-identifier-create gerbil-rs-identifiers-prepare gerbil-rs-identifiers-copy
@@ -221,6 +221,30 @@ END-C
              (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-batch-value kind pointers sizes count quantum)))
                (if value
                  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store! (vector operation value)) 0))))))))
+ ;; One construction frame owns all child values; only the complete envelope
+ ;; becomes an external root. Tags are application data, never handler policy.
+ (c-define (gerbil-rs-tagged-numeric-service-create kind bytes size tag tag-size header length)
+   (int32 (pointer unsigned-int8) unsigned-int64 (pointer int64) unsigned-int64 (pointer int64) unsigned-int64) int64
+   "gerbil_scheme_rust_tagged_numeric_service_create" "extern"
+   (with-exception-catcher (lambda (_exception) 0)
+     (lambda ()
+       (if (not (<= 2 length 4)) 0
+         (let ((operation (make-s64vector length)) (metadata (make-s64vector tag-size)))
+           (let loop ((index 0))
+             (when (< index length)
+               (s64vector-set! operation index (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at header index))
+               (loop (+ index 1))))
+           (let loop ((index 0))
+             (when (< index tag-size)
+               (s64vector-set! metadata index (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-header-at tag index))
+               (loop (+ index 1))))
+           (if (not (and (= (s64vector-ref operation 0) 1) (>= (s64vector-ref operation 1) -1)
+                         (or (< length 3) (<= 0 (s64vector-ref operation 2) 1))
+                         (or (< length 4) (positive? (s64vector-ref operation 3))))) 0
+             (let ((value (gerbil-scheme-rust/scheme/runtime#gerbil-rs-numeric-value kind bytes size)))
+               (if value
+                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
+                   (vector operation (vector metadata value))) 0))))))))
  (c-define (gerbil-rs-numeric-service-enter kind pointers sizes count quantum header length capability)
    (int32 (pointer void) (pointer unsigned-int64) unsigned-int64 unsigned-int64 (pointer int64) unsigned-int64 int64) int64
    "gerbil_scheme_rust_numeric_service_enter" "extern"
@@ -511,3 +535,5 @@ END-C
                  (vector-set! batch 0 (- (vector-ref batch 0) 1)) result)
                0))
            0))))))
+
+(include "runtime-exchange.ss")

@@ -138,7 +138,7 @@ impl Mapping {
         };
         Some(handle)
     }
-    /// Caller already holds the lifecycle lock; setup has never been attempted.
+    /// Setup has never been attempted. Only loader-owned state can be retired;\n    /// no native SDK transaction or application finalizer runs on this mapping.
     pub(super) fn reject_uninitialized(&self) -> bool {
         let handle = Self::take_resident(&mut self.lock());
         handle.is_none_or(|handle| self.close_handle(handle))

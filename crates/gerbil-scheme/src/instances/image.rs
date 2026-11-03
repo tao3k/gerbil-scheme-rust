@@ -54,6 +54,7 @@ pub(super) struct Image {
     pub(super) next_retained: Cell<u64>,
     pub(super) service_root: Cell<Option<u64>>,
     pub(super) entry_root: Cell<Option<u64>>,
+    pub(super) exchange_root: Cell<Option<u64>>,
     live: bool,
     file: PathBuf,
     _owner: PhantomData<Rc<()>>,
@@ -132,6 +133,7 @@ impl Image {
     ) -> Result<Self, InstanceError> {
         let start = Instant::now();
         let image_path = path.to_owned();
+        let lifecycle = load_guard(mapping.identity);
         let opened = open_image(path)?;
         mapping.loaded(opened);
         let handle = opened.as_ptr();
@@ -179,6 +181,7 @@ impl Image {
             let native = NativeApi::load(handle)?;
             mapping.bind_modules(handle)?;
             let identity = mapping.identity;
+            super::lifecycle_trace::event(identity, "sdk-enter");
             INITIALIZATION_ATTEMPTED.store(true, std::sync::atomic::Ordering::Release);
             let status = setup(u32::try_from(owner).expect("bounded owner"));
             let setup_phase = phase();
@@ -198,6 +201,8 @@ impl Image {
                     cleanup: rollback,
                 });
             }
+            drop(lifecycle);
+            super::lifecycle_trace::event(identity, "sdk-ready");
             let image = Self {
                 identity,
                 mapping,
@@ -213,6 +218,7 @@ impl Image {
                 next_retained: Cell::new(1),
                 service_root: Cell::new(None),
                 entry_root: Cell::new(None),
+                exchange_root: Cell::new(None),
                 roots,
                 gc,
                 input,
@@ -220,12 +226,7 @@ impl Image {
                 length,
                 copy,
                 release,
-                receipt: OwnerReceipt {
-                    owner,
-                    state: state(),
-                    processors: processors(),
-                    setup_time: start.elapsed(),
-                },
+                receipt: setup_receipt(owner, start, state, processors),
                 live: true,
                 file: image_path,
                 _owner: PhantomData,
@@ -356,6 +357,9 @@ impl Image {
         if self.entry_root.get().is_some_and(|id| id >= first) {
             self.entry_root.set(None);
         }
+        if self.exchange_root.get().is_some_and(|id| id >= first) {
+            self.exchange_root.set(None);
+        }
         for (_, root) in roots {
             // SAFETY: each removed arena entry owns exactly one local native root.
             if unsafe { (self.release)(root) } != 1 {
@@ -366,6 +370,7 @@ impl Image {
     fn release_retained(&self) {
         self.service_root.set(None);
         self.entry_root.set(None);
+        self.exchange_root.set(None);
         for (_, root) in std::mem::take(&mut *self.retained.borrow_mut()) {
             // SAFETY: store exclusively owns these roots on this fixed owner.
             if unsafe { (self.release)(root) } != 1 {
@@ -409,6 +414,13 @@ impl Image {
         let status = if native_cleanup_attempted {
             // SAFETY: accepted queue drained, application finalizer succeeded,
             // and no external roots remain. Unverified quiescence is quarantined.
+            // Application finalizers, root release and file/loader retirement
+            // must never occupy the SDK process-hook transaction.
+            super::lifecycle_trace::event(self.identity, "cleanup-wait");
+            let _lifecycle = super::pool::LIFECYCLE
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            super::lifecycle_trace::event(self.identity, "cleanup-enter");
             unsafe { (self.cleanup)() }
         } else {
             finalizer_status
@@ -504,4 +516,32 @@ fn open_image(path: &Path) -> Result<std::ptr::NonNull<c_void>, InstanceError> {
         let _ = std::fs::remove_file(path);
         InstanceError::Loader(message)
     })
+}
+
+fn load_guard(identity: u64) -> std::sync::MutexGuard<'static, ()> {
+    super::lifecycle_trace::event(identity, "preflight-begin");
+    // SDK TLS setup can itself consult dyld. Serialize loader admission
+    // with setup/cleanup, but never arbitrary application finalizers.
+    super::lifecycle_trace::event(identity, "native-load-wait");
+    let lifecycle = super::pool::LIFECYCLE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    super::lifecycle_trace::event(identity, "native-load-enter");
+    lifecycle
+}
+
+fn setup_receipt(
+    owner: usize,
+    start: Instant,
+    state: unsafe extern "C" fn() -> usize,
+    processors: unsafe extern "C" fn() -> u32,
+) -> OwnerReceipt {
+    // SAFETY: load calls only after successful SDK setup on this fixed owner.
+    let (state, processors) = unsafe { (state(), processors()) };
+    OwnerReceipt {
+        owner,
+        state,
+        processors,
+        setup_time: start.elapsed(),
+    }
 }

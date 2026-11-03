@@ -33,6 +33,8 @@ pub(super) struct Wake {
     #[cfg(feature = "tokio-dispatch")]
     pub native_cycle: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
+    pub exchange: AtomicBool,
+    #[cfg(feature = "tokio-dispatch")]
     pub prepared_cycle: AtomicBool,
     #[cfg(feature = "tokio-dispatch")]
     pub pipeline_cycle: AtomicBool,
@@ -109,6 +111,8 @@ impl Wake {
                 feed_limit: AtomicUsize::new(1),
                 #[cfg(feature = "tokio-dispatch")]
                 native_cycle: AtomicBool::new(false),
+                #[cfg(feature = "tokio-dispatch")]
+                exchange: AtomicBool::new(false),
                 #[cfg(feature = "tokio-dispatch")]
                 prepared_cycle: AtomicBool::new(false),
                 #[cfg(feature = "tokio-dispatch")]

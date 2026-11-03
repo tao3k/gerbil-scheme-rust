@@ -6,11 +6,13 @@ license.workspace = true
 publish = false
 
 [features]
+arrival-prebuilt = ["dep:gerbil-scheme", "gerbil-scheme/arrival-clock", "dep:serde_json"]
 actor-aot = ["dep:gerbil-scheme", "dep:gerbil-scheme-sys", "dep:divan", "dep:tokio", "dep:simdutf8"]
 instance-probe = ["dep:divan", "dep:tokio"]
 instance-library = ["instance-probe", "dep:gerbil-scheme", "gerbil-scheme/isolated-instances", "dep:serde_json", "dep:gerbil-scheme-python"]
 
 arrival-clock = ["instance-dispatch", "gerbil-scheme/arrival-clock"]
+owner-wait-diagnostic = ["arrival-clock"]
 
 instance-dispatch = ["instance-library", "gerbil-scheme/tokio-dispatch", "dep:rayon", "gerbil-scheme-python/owner-dispatch"]
 
@@ -29,6 +31,7 @@ gerbil-scheme-aot-build.workspace = true
 
 [dev-dependencies]
 libc = "=0.2.186"
+serde_json.workspace = true
 
 [[bench]]
 name = "actors"
@@ -103,3 +106,13 @@ required-features = ["instance-dispatch"]
 name = "single_vm_service"
 harness = false
 required-features = ["instance-dispatch"]
+
+[[bench]]
+name = "gerbil_actor_arrival"
+harness = false
+required-features = ["arrival-prebuilt"]
+
+[[test]]
+name = "mailbox_terminal_histogram"
+path = "tests/mailbox_terminal_histogram.rs"
+required-features = ["arrival-prebuilt"]

@@ -26,9 +26,18 @@ impl Shared {
     }
     pub(super) fn publish(
         &self,
+        batch: VecDeque<Request>,
+        cancelled: &AtomicBool,
+        deadline: std::time::Instant,
+    ) -> Result<(), InstanceError> {
+        self.publish_bounded(batch, cancelled, deadline, usize::MAX)
+    }
+    pub(super) fn publish_bounded(
+        &self,
         mut batch: VecDeque<Request>,
         cancelled: &AtomicBool,
         deadline: std::time::Instant,
+        bound: usize,
     ) -> Result<(), InstanceError> {
         let notify = {
             let mut requests = self
@@ -46,6 +55,9 @@ impl Shared {
             }
             if std::time::Instant::now() >= deadline {
                 return Err(InstanceError::Timeout);
+            }
+            if batch.len() > bound.saturating_sub(requests.len()) {
+                return Err(InstanceError::QueueFull);
             }
             let notify = requests.is_empty();
             requests.append(&mut batch);
@@ -66,6 +78,27 @@ impl Shared {
             self.sealed.store(true, Ordering::Release);
         }
         self.wake();
+    }
+    /// Remove only a still-staged request. `Source::take` uses this same mutex,
+    /// so withdrawal and owner claim have one winner. Destructors/wakes run outside.
+    pub(super) fn withdraw(&self, started: &Arc<AtomicBool>) -> bool {
+        let request = {
+            let mut requests = self
+                .requests
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            requests
+                .iter()
+                .position(|r| Arc::ptr_eq(&r.started, started))
+                .and_then(|index| requests.remove(index))
+        };
+        if let Some(request) = request {
+            drop(request);
+            self.wake();
+            true
+        } else {
+            false
+        }
     }
     pub(super) fn head_units(&self) -> Option<usize> {
         let requests = self

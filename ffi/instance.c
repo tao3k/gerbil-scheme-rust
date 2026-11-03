@@ -43,10 +43,18 @@ int32_t gerbil_scheme_instance_setup(uint32_t owner) {
     return 4;
   }
 #endif
-  setup_phase = 1;
 #if defined(__APPLE__)
-  gerbil_timer_init_owner();
+  int timer_status = gerbil_timer_init_owner();
+  if (timer_status != 0) {
+    setup_diagnostic[0] = 5;
+    setup_diagnostic[2] = timer_status;
+    /* An unsuccessful loader rollback retains its reference and code. */
+    if (timer_status == EIO) setup_phase = 1;
+    pthread_fchdir_np(-1);
+    return 4; /* SDK/notifier not entered; phase one only if rollback failed. */
+  }
 #endif
+  setup_phase = 1;
   int32_t status = gerbil_scheme_rust_runtime_init_program_single_processor(GERBIL_INSTANCE_LINKER);
 #if defined(__APPLE__)
   if (status == 0 && gerbil_timer_status() != 0) {

@@ -10,6 +10,12 @@
 #include <time.h>
 #include <limits.h>
 static pthread_mutex_t gerbil_timer_lock = PTHREAD_MUTEX_INITIALIZER;
+#ifdef GERBIL_OWNER_TIMER_INTERVAL
+static int gerbil_timer_observed_lock(pthread_mutex_t *);
+#define GERBIL_TIMER_LOCK() gerbil_timer_observed_lock(&gerbil_timer_lock)
+#else
+#define GERBIL_TIMER_LOCK() pthread_mutex_lock(&gerbil_timer_lock)
+#endif
 static pthread_cond_t gerbil_timer_changed = PTHREAD_COND_INITIALIZER;
 static struct sigaction gerbil_timer_action;
 static int gerbil_timer_action_set;
@@ -23,7 +29,36 @@ static int gerbil_timer_closed;
 static int gerbil_timer_failure;
 static int gerbil_timer_masked;
 static int gerbil_timer_pending;
-static void gerbil_timer_init_owner(void) { gerbil_timer_owner = pthread_self(); }
+typedef int (*gerbil_system_mask_fn)(int, const sigset_t *, sigset_t *);
+static gerbil_system_mask_fn gerbil_system_mask;
+/* Called once on the owner before any SDK setup or notifier creation. Keep the
+ * provider alive through the existing post-join module retirement protocol.
+ * No failed lookup is published and no resolver runs in the mask hot path. */
+static int gerbil_timer_init_owner(void) {
+  /* Reserve retirement metadata before taking the loader reference, so an
+   * allocation failure never strands a provider handle. */
+  struct gerbil_retired_module *entry = malloc(sizeof(*entry));
+  if (!entry) return ENOMEM;
+  /* Darwin's libc umbrella retains the pthread provider dependency. Pin it
+   * BEFORE resolving, avoiding a dladdr filename borrowed across an unload.
+   * Do not silently replace an interposed RTLD_DEFAULT provider with libc. */
+  void *handle = dlopen("/usr/lib/libSystem.B.dylib", RTLD_NOW | RTLD_LOCAL);
+  if (!handle) { free(entry); return ENOSYS; }
+  entry->handle = handle;
+  gerbil_system_mask_fn mask = (gerbil_system_mask_fn)dlsym(RTLD_DEFAULT, "pthread_sigmask");
+  if (!mask || mask == pthread_sigmask || dlsym(handle, "pthread_sigmask") != (void *)mask) {
+    if (dlclose(handle) != 0) {
+      gerbil_module_enqueue(entry); /* Keep the image quarantined on rollback failure. */
+      return EIO;
+    }
+    free(entry);
+    return ENOSYS;
+  }
+  gerbil_module_enqueue(entry);
+  gerbil_timer_owner = pthread_self();
+  gerbil_system_mask = mask;
+  return 0;
+}
 static uint64_t gerbil_timer_now(void) {
   struct timespec value;
   if (clock_gettime(CLOCK_MONOTONIC, &value) != 0) {
@@ -112,13 +147,12 @@ int sigaction(int signal_number, const struct sigaction *action, struct sigactio
   return 0;
 }
 int pthread_sigmask(int how, const sigset_t *set, sigset_t *previous) {
-  typedef int (*real_mask)(int, const sigset_t *, sigset_t *);
-  real_mask system_mask = (real_mask)dlsym(RTLD_DEFAULT, "pthread_sigmask");
-  if (system_mask == NULL || system_mask == pthread_sigmask) return ENOSYS;
+  gerbil_system_mask_fn system_mask = gerbil_system_mask;
+  if (system_mask == NULL) return ENOSYS;
   int status = system_mask(how, set, previous);
   if (status != 0 || set == NULL || !pthread_equal(pthread_self(), gerbil_timer_owner)) return status;
   int contains = sigismember(set, SIGALRM);
-  pthread_mutex_lock(&gerbil_timer_lock);
+  GERBIL_TIMER_LOCK();
   if (how == SIG_SETMASK) gerbil_timer_masked = contains == 1;
   else if (contains == 1 && how == SIG_BLOCK) gerbil_timer_masked = 1;
   else if (contains == 1 && how == SIG_UNBLOCK) gerbil_timer_masked = 0;
@@ -202,3 +236,5 @@ static int gerbil_timer_cleanup(void) {
   }
   return status;
 }
+
+#undef GERBIL_TIMER_LOCK

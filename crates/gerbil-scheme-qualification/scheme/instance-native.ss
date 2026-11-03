@@ -37,3 +37,13 @@
  (c-define (owner-native-call root) (int64) int64 "gerbil_owner_native_call" "extern"
   (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
     gerbil-scheme-rust/qualification/actors#instance-native-call)))
+
+;; Optional, cold terminal take using the existing strong-root native types.
+(begin-foreign
+ (c-define (owner-mailbox-failure root) (int64) int64 "gerbil_owner_mailbox_failure" "extern"
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
+    (lambda (command) (mailbox-failure-take! command actor-arrival-percentile)))))
+(begin-foreign
+ (c-define (owner-mailbox-failure-contract root) (int64) int64 "gerbil_owner_mailbox_failure_contract" "extern"
+  (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call root
+    (lambda (command) (mailbox-failure-contract! command actor-arrival-percentile)))))

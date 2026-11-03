@@ -83,6 +83,13 @@ impl<M: SchemeServiceRequest> SchemeServiceRequest for Checked<M> {
     ) -> Result<super::SchemeServiceSubmission<'vm>, InstanceError> {
         self.message.enter_service(session, input)
     }
+    fn project_service(
+        self,
+        session: &NativeSession<'_>,
+        output: &super::SchemeServiceOutput<'_>,
+    ) -> Result<Self::Output, InstanceError> {
+        self.message.project_service(session, output)
+    }
     fn project(
         self,
         session: &NativeSession<'_>,

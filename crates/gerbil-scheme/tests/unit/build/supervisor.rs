@@ -52,12 +52,13 @@ pub(super) fn run() -> bool {
         let mut err = [0; 4096];
         let (mut out_open, mut err_open) = (true, true);
         let mut status = None;
+        let mut progress = Vec::new();
         while status.is_none() || out_open || err_open {
             tokio::select! {
                 result = child.wait(), if status.is_none() => { status = Some(result.unwrap()); }
                 read = stdout.read(&mut out), if out_open => {
                     let count = read.unwrap(); out_open = count != 0;
-                    if count != 0 { std::io::stdout().write_all(&out[..count]).unwrap(); idle = tokio::time::Instant::now() + Duration::from_secs(5); }
+                    if count != 0 { std::io::stdout().write_all(&out[..count]).unwrap(); acknowledge_progress(&mut progress, &out[..count], pid); idle = tokio::time::Instant::now() + Duration::from_secs(5); }
                 }
                 read = stderr.read(&mut err), if err_open => {
                     let count = read.unwrap(); err_open = count != 0;
@@ -87,4 +88,29 @@ pub(super) fn run() -> bool {
     });
     drop(runtime);
     true
+}
+
+// The foreign call waits for this receipt. Buffered-until-return output must
+// fail the existing deadline; an entered event must reach the actual pipe.
+fn acknowledge_progress(pending: &mut Vec<u8>, bytes: &[u8], pid: u32) {
+    pending.extend_from_slice(bytes);
+    while let Some(end) = pending.iter().position(|byte| *byte == b'\n') {
+        let line: Vec<_> = pending.drain(..=end).collect();
+        let line = std::str::from_utf8(&line).unwrap();
+        if let Some(path) = line.trim_end().strip_prefix("PACKAGE-CANCEL-READY=") {
+            let path = std::path::Path::new(path);
+            assert_eq!(path.file_name().unwrap(), "output-observed");
+            assert!(
+                path.parent()
+                    .unwrap()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with(&format!("gerbil-package-{pid}-"))
+            );
+            assert!(!path.exists(), "foreign output receipt was replayed");
+            std::fs::write(path, "received before foreign return").unwrap();
+        }
+    }
 }

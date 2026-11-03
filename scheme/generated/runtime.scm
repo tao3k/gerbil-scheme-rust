@@ -1,7 +1,21 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/runtime::timestamp 1793640265)
+  (define gerbil-scheme-rust/scheme/runtime::timestamp 1793669135)
   (begin
+    (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-build-output-observer
+      (make-parameter '#f))
+    (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-flush-build-output!
+      (lambda ()
+        (force-output (current-output-port))
+        (force-output (current-error-port))
+        (let ((_%observer890%_
+               (let ()
+                 (declare (not safe))
+                 (gerbil-scheme-rust/scheme/runtime#gerbil-rs-build-output-observer))))
+          (if _%observer890%_
+              (gerbil-scheme-rust/scheme/runtime#gerbil-rs-forward-output-c
+               _%observer890%_)
+              '#!void))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-observe-module-work
       (lambda (_%action879%_)
         (let ((_%resolver881%_ ##get-module))
@@ -12,7 +26,7 @@
                         (displayln
                          '"GERBIL-BUILD module-resolve "
                          _%module887%_))
-                      (force-output)
+                      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-flush-build-output!)
                       (_%resolver881%_ _%module887%_))))
             (dynamic-wind
              (lambda ()
@@ -26,25 +40,25 @@
                  (##get-module-set! _%resolver881%_))))))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-load-build
       (lambda (_%library815%_)
-        (let ((__tmp9224
+        (let ((__tmp9238
                (lambda (_%failure817%_)
-                 (let ((__tmp9225 (current-error-port)))
+                 (let ((__tmp9239 (current-error-port)))
                    (declare (not safe))
-                   (display-exception__% _%failure817%_ __tmp9225))
+                   (display-exception__% _%failure817%_ __tmp9239))
                  (force-output (current-error-port))
                  '4))
-              (__tmp9220
+              (__tmp9234
                (lambda ()
                  (let ((_%previous820%_
                         (let () (declare (not safe)) (load-path))))
-                   (let ((__tmp9223
+                   (let ((__tmp9237
                           (lambda ()
                             (let* ((_%paths823%_
                                     (cons _%library815%_ _%previous820%_))
                                    (_%paths828%_ _%paths823%_))
                               (declare (not safe))
                               (__set-load-path! _%paths828%_))))
-                         (__tmp9222
+                         (__tmp9236
                           (lambda ()
                             (gerbil-scheme-rust/scheme/runtime#gerbil-rs-observe-module-work
                              (lambda ()
@@ -52,7 +66,7 @@
                                  (declare (not safe))
                                  (displayln
                                   '"GERBIL-BUILD native-library entered"))
-                               (force-output)
+                               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-flush-build-output!)
                                (let* ((_%modpath845%_
                                        '"gerbil-scheme-rust/scheme/build")
                                       (_%modpath850%_ _%modpath845%_))
@@ -65,18 +79,18 @@
                                  (declare (not safe))
                                  (displayln
                                   '"GERBIL-BUILD native-library returned"))
-                               (force-output)
+                               (gerbil-scheme-rust/scheme/runtime#gerbil-rs-flush-build-output!)
                                '0))))
-                         (__tmp9221
+                         (__tmp9235
                           (lambda ()
                             (let* ((_%paths863%_ _%previous820%_)
                                    (_%paths868%_ _%paths863%_))
                               (declare (not safe))
                               (__set-load-path! _%paths868%_)))))
                      (declare (not safe))
-                     (##dynamic-wind __tmp9223 __tmp9222 __tmp9221))))))
+                     (##dynamic-wind __tmp9237 __tmp9236 __tmp9235))))))
           (declare (not safe))
-          (__with-catch __tmp9224 __tmp9220))))
+          (__with-catch __tmp9238 __tmp9234))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-abi-version
       (lambda () '1))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-add-i64
@@ -112,9 +126,9 @@
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
       (lambda (_%exception788%_)
-        (let ((__tmp9227
+        (let ((__tmp9241
                (lambda (_%_790%_) '"Scheme exception (formatting failed)"))
-              (__tmp9226
+              (__tmp9240
                (lambda ()
                  (let ((_%message795%_
                         (call-with-output-string
@@ -132,17 +146,17 @@
                            (declare (not safe))
                            (##string-length _%message795%_))))))))
           (declare (not safe))
-          (__with-catch __tmp9227 __tmp9226))))
+          (__with-catch __tmp9241 __tmp9240))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-call
       (lambda (_%root780%_ _%procedure781%_)
         (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error '#f)
-        (let ((__tmp9229
+        (let ((__tmp9243
                (lambda (_%exception783%_)
                  (set! gerbil-scheme-rust/scheme/runtime#gerbil-rs-call-error
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-exception-message
                         _%exception783%_))
                  '0))
-              (__tmp9228
+              (__tmp9242
                (lambda ()
                  (let ((_%value786%_
                         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
@@ -153,7 +167,7 @@
                        (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
                         (_%procedure781%_ _%value786%_)))))))
           (declare (not safe))
-          (__with-catch __tmp9229 __tmp9228))))
+          (__with-catch __tmp9243 __tmp9242))))
     (define gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-store!
       (lambda (_%value776%_)
         (let ((_%root-id778%_
@@ -1495,7 +1509,7 @@
       (lambda (_%value681%_ _%kind682%_)
         (let ((_%$e684%_ _%kind682%_))
           (if (or (eq? '0 _%$e684%_) (eq? '1 _%$e684%_))
-              (let ((_g9230_ (if (= _%kind682%_ '0)
+              (let ((_g9244_ (if (= _%kind682%_ '0)
                                  (values gerbil-scheme-rust/scheme/runtime#gerbil-rs-exact-rational?
                                          numerator
                                          denominator)
@@ -1505,15 +1519,15 @@
                   (let ((_%valid?690%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g9230_ 0)))
+                           (##values-ref _g9244_ 0)))
                         (_%left691%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g9230_ 1)))
+                           (##values-ref _g9244_ 1)))
                         (_%right692%_
                          (let ()
                            (declare (not safe))
-                           (##values-ref _g9230_ 2))))
+                           (##values-ref _g9244_ 2))))
                     (let* ((_%items694%_
                             (if (vector? _%value681%_)
                                 _%value681%_
@@ -1988,6 +2002,7 @@
          _%value532%_)))
     (namespace
      ("gerbil-scheme-rust/scheme/runtime#"
+      gerbil-rs-forward-output-c
       gerbil-rs-abi-version-native
       gerbil-rs-add-i64-native
       gerbil-rs-is-even-i64-native
@@ -2088,12 +2103,19 @@
                length))
            (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector value)
            0)))
+    (define gerbil-rs-forward-output-c
+      (c-lambda
+       ((pointer void))
+       int
+       "___return((*(int (**)(void))___arg1)());"))
     (c-define
-     (gerbil-rs-load-build-native library)
-     (UTF-8-string)
+     (gerbil-rs-load-build-native library forward)
+     (UTF-8-string (pointer void))
      int32
      "gerbil_scheme_rust_load_build_scheme"
      ""
+     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-build-output-observer
+      forward)
      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-load-build library))
     (c-define
      (gerbil-rs-abi-version-native)

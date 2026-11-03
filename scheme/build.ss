@@ -10,6 +10,7 @@
 (export main)
 (extern namespace: gerbil/tools/gxtest collect-files)
 (extern namespace: gerbil-scheme-rust/scheme/runtime gerbil-rs-observe-module-work)
+(extern namespace: gerbil-scheme-rust/scheme/runtime gerbil-rs-flush-build-output!)
 (C-ffi-macrology)
 (C-declare "#include <stdint.h>")
 
@@ -122,7 +123,7 @@
 (def (with-test-progress action)
   (def (report stage value)
     (displayln "PACKAGE-TOOLS " stage " " value)
-    (force-output))
+    (gerbil-rs-flush-build-output!))
   (let ((importer (current-expander-module-import))
         (evaluator (current-expander-module-eval)))
     ;; Native resolver observation belongs to call-package. Source expansion

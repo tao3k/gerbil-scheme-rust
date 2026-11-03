@@ -566,6 +566,52 @@ benchmarks and strict Clippy remain required. This is scheduling separation,
 not evidence that the local-prefix timeout is fixed. Exact-head remote
 qualification remains required.
 
+** Genuine output must cross the C ABI before return
+
+The host descriptor guard previously replayed its private stdout/stderr files
+only after an entire foreign call returned. Scheme's force-output therefore
+did not imply that the supervising pipe observed the work. This is a concrete
+observability defect even when a sufficiently fast call passes its deadline.
+The host guard must retain private file descriptions so Gambit's file-status
+changes cannot propagate into the embedding host's inherited descriptors.
+
+The existing module resolver and test import/evaluation observations now flush
+their Scheme ports and invoke an owner-local C output callback. The guard uses
+pread with a per-stream delivery cursor, preserving the write offset shared
+with Scheme and compiler children. Partial writes advance only the delivered
+cursor; final restoration drains only remaining bytes, closes every private
+stream and restores descriptors and signals. A forwarding error is sticky and
+prevents a successful transport result. Per-stream byte order is retained;
+no total order between stdout and stderr is claimed.
+
+The callback pointer storage has process lifetime. Only a live affine C ABI
+entry installs an active host guard; nested entry is rejected, and every
+success/failure exit clears that stack pointer. Standalone Scheme loading has
+no observer by default. The first draft used unsupported Gambit C-to-Scheme
+function conversion and crashed; the replacement uses the ordinary pointer
+ABI to address typed callback storage and a Scheme parameter for observer
+binding. The failed build, crash report and unsuccessful regeneration are
+retained locally, rather than treated as passing evidence.
+
+The existing cancellation case emits an entered-work receipt. Its supervising
+Tokio process must receive that receipt on the real pipe before acknowledging
+it; the joined cancellation observer then releases the waiting Scheme call.
+Replay only after return cannot satisfy this handshake. No timer-generated
+output, extra timeout, additional runtime owner or compiler policy is added.
+Successful cases also remove their own test directories after package cleanup,
+VM teardown and environment checks. Test-owned staging cleanup does not change
+the package clean action's narrower ownership contract.
+
+The final local =just bridge-build= run passes 22 sys tests, both package
+cases, the existing runtime lifecycle case and both strict Clippy commands.
+The two supervised cases exit naturally in 5.078172542 and 7.811096292 seconds
+with 12 host workers and unchanged 15/5-second gates. The existing unsupported
+lifecycle case remains ignored; this is not additional coverage. A test-only
+mutation disabling the output observer fails the unchanged idle gate at
+9.580319792 seconds total, while the ordinary local-prefix case still passes.
+Restoring the fixture produces the full passing run above. These are
+functional/negative-control receipts, not paired performance measurements.
+
 The real ASCENT consumer at candidate =9207638= failed before its build script
 could import Yuanxu: the C ABI loaded build.ss without first selecting the local
 package environment. Explicitly configured small cases did not cover that

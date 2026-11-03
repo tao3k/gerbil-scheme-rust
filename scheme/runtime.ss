@@ -11,12 +11,20 @@
 (import (only-in "utf8" gerbil-rs-encode-utf8 gerbil-rs-encode-utf8-into)
         (only-in :gerbil/runtime/loader load-module load-path set-load-path!)
         (only-in :gerbil/runtime/init gerbil-load-expander!))
+(extern gerbil-rs-forward-output-c)
+
+(def gerbil-rs-build-output-observer (make-parameter #f))
+(def (gerbil-rs-flush-build-output!)
+  (force-output (current-output-port))
+  (force-output (current-error-port))
+  (let (observer (gerbil-rs-build-output-observer))
+    (when observer (gerbil-rs-forward-output-c observer))))
 
 (def (gerbil-rs-observe-module-work action)
   (let (resolver ##get-module)
     (def (observe module)
       (displayln "GERBIL-BUILD module-resolve " module)
-      (force-output)
+      (gerbil-rs-flush-build-output!)
       (resolver module))
     (dynamic-wind
       (lambda () (##get-module-set! observe))
@@ -37,11 +45,11 @@
             (gerbil-rs-observe-module-work
               (lambda ()
                 (displayln "GERBIL-BUILD native-library entered")
-                (force-output)
+                (gerbil-rs-flush-build-output!)
                 (load-module "gerbil-scheme-rust/scheme/build")
                 (gerbil-load-expander!)
                 (displayln "GERBIL-BUILD native-library returned")
-                (force-output)
+                (gerbil-rs-flush-build-output!)
                 0)))
           (lambda () (set-load-path! previous)))))))
 
@@ -301,6 +309,7 @@
 (begin-foreign
   (namespace
    ("gerbil-scheme-rust/scheme/runtime#"
+   gerbil-rs-forward-output-c
    gerbil-rs-abi-version-native
    gerbil-rs-add-i64-native
    gerbil-rs-is-even-i64-native
@@ -442,8 +451,11 @@ END-C
                      value source length))
         (gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-bytevector value)
         0)))
-  (c-define (gerbil-rs-load-build-native library)
-    (UTF-8-string) int32 "gerbil_scheme_rust_load_build_scheme" ""
+  (define gerbil-rs-forward-output-c
+    (c-lambda ((pointer void)) int "___return((*(int (**)(void))___arg1)());"))
+  (c-define (gerbil-rs-load-build-native library forward)
+    (UTF-8-string (pointer void)) int32 "gerbil_scheme_rust_load_build_scheme" ""
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-build-output-observer forward)
     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-load-build library))
 
   (c-define (gerbil-rs-abi-version-native)

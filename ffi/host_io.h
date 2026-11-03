@@ -35,8 +35,38 @@ typedef struct {
   int saved[3];
   int descriptor_flags[3];
   FILE *private_stream[3];
+  off_t forwarded[3];
+  int forward_error;
   gerbil_host_signals signals;
 } gerbil_host_io;
+
+/* Read without moving the open-file-description offset shared by Scheme and
+ * compiler children. Each byte is forwarded once, including the final drain. */
+static int gerbil_host_io_forward(gerbil_host_io *host) {
+  if (host->forward_error) return -1;
+  for (int fd = 1; fd < 3; ++fd) {
+    if (host->private_stream[fd] == NULL || host->saved[fd] < 0) continue;
+    char bytes[8192];
+    for (;;) {
+      ssize_t count = pread(fileno(host->private_stream[fd]), bytes, sizeof(bytes), host->forwarded[fd]);
+      if (count < 0 && errno == EINTR) continue;
+      if (count < 0) goto failed;
+      if (count == 0) break;
+      ssize_t offset = 0;
+      while (offset < count) {
+        ssize_t written = write(host->saved[fd], bytes + offset, (size_t)(count - offset));
+        if (written < 0 && errno == EINTR) continue;
+        if (written <= 0) goto failed;
+        offset += written;
+        host->forwarded[fd] += written;
+      }
+    }
+  }
+  return 0;
+failed:
+  host->forward_error = 1;
+  return -1;
+}
 
 static FILE *gerbil_private_stream(void) {
   FILE *stream = tmpfile();
@@ -56,7 +86,7 @@ static FILE *gerbil_private_stream(void) {
 }
 
 static int gerbil_host_io_restore(gerbil_host_io *host) {
-  int result = 0;
+  int result = gerbil_host_io_forward(host);
   for (int fd = 0; fd < 3; ++fd) {
     if (host->saved[fd] >= 0) {
       if (dup2(host->saved[fd], fd) < 0 ||
@@ -71,21 +101,6 @@ static int gerbil_host_io_restore(gerbil_host_io *host) {
   for (int fd = 0; fd < 3; ++fd) {
     FILE *stream = host->private_stream[fd];
     if (stream == NULL) continue;
-    if (fd != 0 && result == 0) {
-      char bytes[8192];
-      if (fseek(stream, 0, SEEK_SET) != 0) result = -1;
-      size_t length;
-      while (result == 0 && (length = fread(bytes, 1, sizeof(bytes), stream)) > 0) {
-        size_t offset = 0;
-        while (offset < length) {
-          ssize_t written = write(fd, bytes + offset, length - offset);
-          if (written < 0 && errno == EINTR) continue;
-          if (written <= 0) { result = -1; break; }
-          offset += (size_t)written;
-        }
-      }
-      if (ferror(stream)) result = -1;
-    }
     if (fclose(stream) != 0) result = -1;
     host->private_stream[fd] = NULL;
   }

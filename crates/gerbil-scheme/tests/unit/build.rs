@@ -187,6 +187,7 @@ fn build_test_and_failures_share_the_existing_owner() {
     println!("PACKAGE-C-ABI-CLEANUP-OK owner={}", std::process::id());
     assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
     assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
+    fs::remove_dir_all(root).unwrap();
 }
 
 fn stage_and_clean(runtime: &GerbilRuntime, root: &std::path::Path) {
@@ -357,10 +358,10 @@ fn entered_cancellation(runtime: &GerbilRuntime, root: &std::path::Path) {
         let cancellation = &cancellation;
         let observer = scope.spawn(move || {
             let start = Instant::now();
-            while !root.join("entered").exists() {
+            while !root.join("entered").exists() || !root.join("output-observed").exists() {
                 assert!(
                     start.elapsed() < Duration::from_secs(15),
-                    "Scheme did not enter before the unchanged gate"
+                    "Scheme entry/output was not observed before the unchanged gate"
                 );
                 std::thread::sleep(Duration::from_millis(1));
             }

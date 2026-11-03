@@ -1,0 +1,219 @@
+#+TITLE: Atomic result construction on the complete Gerbil Actor cycle
+#+STARTUP: overview
+
+* Outcome and preserved controls
+
+A native result-construction change is implemented on the actual order-handler
+path and retained as an isolated incremental candidate. Both original complete
+profiles improve the observed primary metrics against the previously retained
+callback-plus-typed-input image. There is one pair per rate; repeatable gains are
+not established. The new candidate does NOT pass absolute latency/backlog gates;
+5M also fails the three-second whole-native-call goal. This isolated candidate is checkpointed without performance admission; no PR is merged.
+
+Keep all three independent images: original GCC, typed-input control and callback
+control. The historical approximately 0.3 ms reference is not replaced or claimed
+reproduced at these higher rates. SDK, defaults, waits, four resident workers,
+three frames, original deadlines, arrival plans and the 128 threshold are unchanged.
+No Rust per-message entries, queue expansion, new scheduler or adaptive-mode
+configuration was added.
+
+* Whole-cycle ownership and recurring work
+
+Source constructs a fresh native input after obtaining an existing free frame,
+sends it to its worker, then consumes a real validated reply before clearing roots
+and returning capacity. The worker executes the actual order handler, independent
+oracle and immutable id/frame reply. Eager replenishment and both standard Mailbox
+deliveries remain. The new change is within Actor execution, after arithmetic and
+next-rank, not in the optional observation or error-report path.
+
+The original result suffix allocates a zero-filled s64vector[21], fills five
+header fields and loops over sixteen SKU totals. That is 21 initial zero values
+followed by 21 field writes at the source level. The result is not observable
+until complete, but its allocation must remain AFTER next-rank returns: a retained
+rank continuation must create another fresh result on each return. Reusing the
+accumulator as the returned object or allocating a reusable result before rank
+would break that ownership property. Those earlier counterexamples remain valid.
+
+The implementation factors the original checked suffix into one defrules builder.
+The ordinary kernel retains it. The native kernel reads the current scalar fields
+AFTER rank, checks that all 21 values are fixnums, and uses Gambit's existing
+native s64vector constructor. Any non-fixnum uses the original checked builder,
+including valid signed64 bignums and original conversion/type/range failures.
+No arithmetic, mutable accumulation, checkpoint, handler or oracle is rewritten.
+There is no persistent 18-slot state, pooled result, pre-rank allocation or cached
+snapshot across continuation returns.
+
+The installed gsc probe emits BEGIN_ALLOC_S64VECTOR(21), twenty-one element
+initializers, END_ALLOC_S64VECTOR and the normal heap check. It creates no list
+or foreign buffer and fully initializes the object before returning/exposure.
+The actual native kernel has that same atomic construction site; the checked
+make/fill loop remains only as its generic fallback. Generated source site counts
+alone are not used to assert benefit: the declared 1M/5M input/rank/worker bounds
+make all successful normal-profile fields fixnums, and complete native profiles
+then validate every actual result through the unchanged independent oracle.
+
+* Complete costs and untested performance domains
+
+The fast path removes the separate zero-initialization pass and the Scheme-level
+sixteen-SKU output loop. It still allocates one fresh result of the same shape.
+It does not remove the sixteen-slot generic arithmetic accumulator or its mutable
+semantics. The 21 fixnum checks previously applied by native field writes are
+now a collective eligibility test. Reading scalar fields early and retaining the
+original fallback adds code and transient value handling, which are charged too.
+
+| Native kernel static fact | Callback control | Result candidate |
+|---------------------------+------------------+------------------|
+| Generated C bytes | 78533 | 84487 |
+| Atomic 21-field native-constructor sites | 0 | 1 |
+| Checked make-s64vector sites | 1 | 1, retained fallback |
+| Explicit poll sites, all branches | 13 | 13 |
+| Closure allocation sites | 0 | 0 |
+| Maximum Scheme stack adjustment, words | 15 | 15 |
+| ARM64 instruction lines, including fallback | 1940 | 2174 |
+| SP-relative instruction lines in that host | 0 | 0 |
+
+The code gets larger, not smaller. These counts do not represent executed
+instructions, total GC roots, exact hot-path CPU or a promise of unchanged
+scheduling opportunities. The ordinary checked path and native fallback remain
+in that compiled host. A native constructor is a bounded 21-field operation,
+not an unpreemptible batch of application requests. Arithmetic/work checkpoints
+retain their original Scheme execution, suspension and continuation mechanisms.
+
+General non-fixnum requests incur an extra eligibility/snapshot attempt before
+fallback. Their values/errors are qualified below, but their throughput was NOT
+measured in these fixed short profiles. No universal-library speedup or improved
+GC pause bound is claimed. The macro source and exact image inputs are retained
+in single-vm-audit/mailbox-result-construction.json and local build artifacts.
+
+* QNT, actual VM semantics and build closure
+
+mailbox_result_construction imports the existing joint custody/Actor model, plus
+the canonical retention/admission contract. It models complete field initialization,
+truthful fixnum representation premises, generic fallback/first-failure order,
+and distinct result identities for multiple rank returns. It preserves the
+pre-rank-reuse counterexample and real consumption before capacity return. The
+model does not predict physical cost or manufacture a qualified relative gain.
+
+The final entry runs 19 scenarios (including nine imported joint scenarios),
+and 500 bounded traces of at most 60 steps, seed 1, checking debtSplitSafe. It is
+not an exhaustive theorem or native performance acceptance. Source range and
+ownership obligations, compiler output and native tests remain separate evidence.
+
+A cold op-66 correctness entry is compiled into the SAME isolated image. A small
+Rust native bench reader calls that entry once; it is not the performance reader.
+It qualifies 21 differential cases against the original checked arithmetic/result
+path, with the independent oracle also checking normal IDs. Cases include signed64
+IDs, valid non-fixnum quantities/rank, invalid records, final signed64 overflow,
+non-numeric result fields and exact #f exceptions. The real kernel additionally
+executes two rank-continuation replays (three fresh results), two checkpoint replays
+(three results with the original mutable accumulator behavior), GC in those
+extents, checkpoint exception identity, actual green sleep, and an actually
+blocked latch released by another green thread. All helpers are joined.
+
+The frozen native host reader also passes typed GC, exception unwind, multi-shot
+continuations across FFI, Actor failure drain/reuse, terminal receipt and clean
+shutdown. Those cross-FFI tests and the kernel-specific continuation tests are
+complementary. The cold fixture is in another process from each performance arm;
+it never substitutes synthetic work or clocks into the measured main path.
+
+Actor object compilation uses the unchanged GCC/O2 multiple-C-procedure policy.
+The original Gambit program linker regenerates link metadata for the added cold
+global/entry; no SDK object is rebuilt. Compile peak RSS is 884621312 bytes.
+Link-metadata objects and the Rust reader stay below 1.4 GiB peak, within the same
+8 GiB guard, with no owned orphans. Strict Clippy passes for the new Rust reader.
+Only one heavy Actor-object build was performed after the final fixture staging.
+
+* Full 1M and 5M incremental A/B
+
+Same frozen native Rust performance reader and original Node spawnSync/regular-file
+launcher, inherited environment, A then B, fresh VM per arm. Original 1000/s
+one-second warmup is excluded; each main plans arrivals for one second. Build and
+contract checks finish before the main profiles. No profiler, new per-message
+clock/counter, rate reduction, rerun or expanded matrix was introduced.
+
+| Offered/s | Arm | Successful | Success/s | p99 ms | p99.9 ms | Rejected | Peak due-unconsumed | Whole native call s |
+|-----------+-----+------------+-----------+--------+----------+----------+---------------------+---------------------|
+| 1000000 | Frozen callback control | 1000000 | 977431.23 | 23.025 | 23.257 | 0 | 23295 | 1.036502 |
+| 1000000 | Native result candidate | 1000000 | 995244.02 | 6.393 | 6.740 | 0 | 6746 | 1.017941 |
+| 5000000 | Frozen callback control | 5000000 | 991199.31 | 4003.894 | 4040.554 | 0 | 4010659 | 5.099227 |
+| 5000000 | Native result candidate | 5000000 | 1003202.51 | 3943.455 | 3980.261 | 0 | 4000404 | 5.038517 |
+
+| Offered/s | Throughput change | p99 change | Peak change | Enclosing owner CPU change |
+|-----------+-------------------+------------+-------------+----------------------------|
+| 1000000 | +1.82% | -72.23% | -71.04% | -1.75% |
+| 5000000 | +1.21% | -1.51% | -0.26% | -1.26% |
+
+Every planned message is consumed. Both rates/arms have zero timeout/native error,
+zero remaining staged/native work and clean shutdown. Latency spans original
+planned arrival through real successful consumption, using the same one-microsecond
+upper-bound buckets. Throughput divides completed count by inner elapsed time,
+including post-offer drain; it is not offered rate, HTTP RPS or independently
+measured external ingress. Backlog percentiles and p50/p95 remain NOT COLLECTED
+by this frozen reader. No prefix or warmup quantile is presented as full acceptance.
+
+The current control observations are kept separate from all previous results of
+that same frozen image. One pair per rate provides observations, not a measured
+noise envelope or repeatable effect. The enlarged-code candidate is retained
+because of the current complete evidence; it is not promoted on static counts.
+The historical approximately 0.3 ms reference remains separate. Both profiles
+still fail original latency and backlog 128; the 5M profile also exceeds the
+three-second whole-call goal. Strict reader failure statuses remain in the logs.
+
+| Enclosing observation | 1M control | 1M candidate | 5M control | 5M candidate |
+|-----------------------+------------+--------------+------------+--------------|
+| Owner CPU s | 1.024799 | 1.006898 | 5.078612 | 5.014642 |
+| GC count | 39 | 39 | 191 | 191 |
+| GC CPU ms | 15.400 | 16.155 | 75.899 | 77.185 |
+| GC wall ms | 15.413 | 16.150 | 76.013 | 77.133 |
+
+GC times rise slightly in this pair; that observation is retained rather than
+hidden by primary-metric gains. No repeatable GC regression or pause improvement
+is established. These envelopes include setup/report work, not exclusive result
+construction or scheduler CPU. Do not derive exact phase savings, a GC pause
+bound or OS attribution from aggregate differences.
+
+* Where the remaining debt resides
+
+The candidate reports source-pending peaks 6744 at 1M and 4000402 at 5M. Reported
+due-unconsumed peaks are 6746 and 4000404. They need not occur at the same instant.
+The original source accounting gives, at EACH sampling point:
+
+  due - completed = (due - next) + (next - completed)
+
+The last term is bounded by three physical frames. Therefore the two maxima
+can differ by at most three even without matching timestamps. The reused QNT
+checks this same source/physical-custody partition; it adds no runtime observation.
+This is evidence that the roughly four million requests are mostly unpublished
+source ordinal debt, NOT four million payload objects inside Actor mailboxes.
+It does not rank CPU phases or prove that adding frames would fix capacity.
+
+The new constructor reduces real repeated work, but the remaining complete-cycle
+service rate is still roughly 1M/s under a 5M/s plan. To meet 128 at the final
+planned 5M arrival requires at least 4999872 actual consumptions by that time,
+plus valid pause/recovery and per-request bounds throughout. Zero rejection with
+seconds of drain is not production admission. The next structural cost case must
+address this full-cycle deficit; changing the benchmark window, offering less
+work, increasing queue capacity or attributing it to the machine is not a remedy.
+
+An eligible future handoff direction must remove a recurring request-delivery or
+park/wake operation while preserving eager replacement and exact source retirement.
+Simple slot routing alone does not establish that saving, and the rejected
+ready-first packet loop must not be restarted. Active-worker refill needs an
+explicit atomic claim-versus-park protocol, truthful Actor affinity, fully
+initialized publication, mandatory consumption of any queued wake token, and
+exception/continuation/close draining. No new runtime handoff scheme is implemented
+or claimed profitable in this result-construction experiment.
+
+* Retained artifacts and admission
+
+The new image is an independent isolated candidate. Original GCC, typed-input and
+callback controls plus the performance reader are SHA-verified and never replaced.
+Raw sources, C/object/link inputs, the native correctness reader and complete main
+records remain under .ci/mailbox-result-construction-20261104 in the persistent
+repository. The portable receipt also embeds the actual result macro/instantiation
+source so the change is inspectable without relying on temporary directories.
+
+Research retention remains separate from absolute acceptance and confirmation of
+relative performance. No confirmed regression is established in this single pair;
+no claim of completed backlog resolution is made. No SDK/default/threshold changes,
+commit, push, merge, automation or interruption of other tasks occurred.

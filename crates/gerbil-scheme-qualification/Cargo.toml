@@ -116,3 +116,8 @@ required-features = ["arrival-prebuilt"]
 name = "mailbox_terminal_histogram"
 path = "tests/mailbox_terminal_histogram.rs"
 required-features = ["arrival-prebuilt"]
+
+[[bench]]
+name = "result_construction_contracts"
+harness = false
+required-features = ["arrival-prebuilt"]

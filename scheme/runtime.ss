@@ -1,6 +1,6 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(export gerbil-rs-exception-message gerbil-rs-result-batch-pending gerbil-rs-clear-result-batch!
+(export gerbil-rs-observe-module-work gerbil-rs-exception-message gerbil-rs-result-batch-pending gerbil-rs-clear-result-batch!
         gerbil-rs-root-string gerbil-rs-root-bytevector
         gerbil-rs-root-object gerbil-rs-rooted-call
         gerbil-rs-abi-version
@@ -20,11 +20,13 @@
   (let (observer (gerbil-rs-build-output-observer))
     (when observer (gerbil-rs-forward-output-c observer))))
 
-(def (gerbil-rs-observe-module-work action)
+(def (gerbil-rs-observe-module-work action (progress-port (current-output-port)))
   (let (resolver ##get-module)
     (def (observe module)
-      (displayln "GERBIL-BUILD module-resolve " module)
-      (gerbil-rs-flush-build-output!)
+      ;; Only resolver diagnostics use this port; action output keeps its owner.
+      (parameterize ((current-output-port progress-port))
+        (displayln "GERBIL-BUILD module-resolve " module)
+        (gerbil-rs-flush-build-output!))
       (resolver module))
     (dynamic-wind
       (lambda () (##get-module-set! observe))

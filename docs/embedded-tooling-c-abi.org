@@ -668,3 +668,37 @@ only the API documentation was clarified afterward. The first draft's full
 environment-map diagnostics are redacted in its retained log; the original
 log digest, failure trace and differing key names remain recorded. No raw logs
 or environment values are published to Git.
+
+* Dynamic GxTest CLI and independent progress output
+
+The existing =scheme/build= module accepts =test <package-directory> <test-path>=
+through its normal =main= entry. It delegates to the same =package-test= adapter
+as the C ABI: official GxTest owns discovery, Suites, failure status and cleanup.
+An empty argument list retains tooling-image initialization. No Rust command
+wrapper, alternate build catalog or additional VM owner is introduced.
+
+=gerbil-rs-observe-module-work= is a public Scheme scope with an optional progress
+port. Its default preserves existing build-host output. Selecting stderr lets
+isolated dynamic children retain captured business stdout while forwarding real
+resolver operations to their parent's watchdog. The action's output port stays
+unchanged; nested return values, exceptions and resolver restoration retain the
+existing contract. Progress is emitted only when the official resolver is called.
+
+The embedded adapter calls GxTest's existing functional =run-tests= entry after
+its standard module has initialized. The process-oriented =main= may invoke
+=exit= in supported Gerbil distributions; it cannot own an embedded call's
+unwind. Discovery and Suite execution still belong to GxTest. The dynamic CLI
+returns naturally for status zero and publishes a nonzero status only after
+package scopes have restored their state. The C ABI returns that same status
+to its host without terminating the host process.
+
+Orgize's complete source Suite now exercises this shared entry: 230 Cases and
+18 Suites, with the independent intentional-failure control retaining status 42.
+Darwin qualification enables the platform's read-only =DYLD_PRINT_APIS= diagnostic
+for the child so actual =dlclose= operations remain visible during full cleanup.
+There is no timer-generated output, image pinning, unload suppression or change
+to the 120-second wall and five-second silence gates. A prior post-=OK= stack
+sample placed execution in Gambit's dynamic-module cleanup and dyld unloading;
+terminal test output alone did not establish process completion.
+
+Platform reference: [[https://github.com/apple-oss-distributions/dyld/blob/main/dyld/DyldAPIs.cpp][Apple dyld API implementation]].

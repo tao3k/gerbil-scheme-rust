@@ -6,7 +6,6 @@
 ;; Test internals without widening the standalone library's public API.
 (extern namespace: #f
   gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk-c
-  gerbil-scheme-rust/scheme/runtime#gerbil-rs-observe-module-work
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-root-missing
   gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-release!)
@@ -138,7 +137,7 @@
     (set! requests (cons module requests))
     'resolved)
   (def (observe action)
-    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-observe-module-work action))
+    (gerbil-rs-observe-module-work action))
   (dynamic-wind
     (lambda () (##get-module-set! reference))
     (lambda ()
@@ -172,3 +171,23 @@
   (unless (eq? ##get-module original)
     (error "resolver test leaked native process state"))
   (displayln "MODULE-RESOLVER success exception nesting delegation restoration=OK"))
+
+;; Captured business output must remain independent from inherited progress.
+(let ((original ##get-module)
+      (trace (open-output-string))
+      (business (open-output-string)))
+  (dynamic-wind
+    (lambda () (##get-module-set! (lambda (_) 'resolved)))
+    (lambda ()
+      (parameterize ((current-output-port business))
+        (unless (eq? (gerbil-rs-observe-module-work
+                        (lambda () (display "business-result") (##get-module 'port-probe))
+                        trace)
+                     'resolved)
+          (error "progress port changed resolver result")))
+      (unless (equal? (get-output-string business) "business-result")
+        (error "progress contaminated business output"))
+      (unless (string-contains (get-output-string trace) "module-resolve port-probe")
+        (error "progress did not reach the selected port")))
+    (lambda () (##get-module-set! original)))
+  (displayln "MODULE-OBSERVER separate-progress-port=OK"))

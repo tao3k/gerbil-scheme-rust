@@ -8,13 +8,25 @@
         (only-in :std/source this-source-file)
         (only-in :gerbil/tools/env setup-local-pkg-env!))
 (export main)
-(extern namespace: gerbil/tools/gxtest collect-files)
+;; Retain the public module initializer; use its functional runner in the VM.
+(extern namespace: gerbil/tools/gxtest collect-files run-tests)
 (extern namespace: gerbil-scheme-rust/scheme/runtime gerbil-rs-observe-module-work)
 (extern namespace: gerbil-scheme-rust/scheme/runtime gerbil-rs-flush-build-output!)
 (C-ffi-macrology)
 (C-declare "#include <stdint.h>")
 
-(def (main . _) (gerbil-load-expander!))
+;; The ordinary dynamic CLI shares the C ABI adapter and official GxTest owner.
+(def (main . arguments)
+  (gerbil-load-expander!)
+  (match arguments
+    ([] (void))
+    (["test" directory tests]
+     (let (code (package-test directory tests))
+       ;; Successful runs return naturally. Publish a failed tool status only
+       ;; after package paths, resolver scopes and the official runner unwind.
+       (unless (zero? code) (exit code))
+       (void)))
+    (else (error "expected: test <package-directory> <test-path>" arguments))))
 
 ;; One tooling VM binds one immutable package prefix. This is not an alternate
 ;; environment-control protocol: calls scope Gerbil's existing standard paths.
@@ -154,7 +166,9 @@
           ;; Evaluate selected entries once for this request; dependencies remain cached.
           (for-each (lambda (file) (import-module file #t #t))
                     (collect-files [tests]))
-          (package-test-main "-g" "-v" "5" "--" tests))))))
+          ;; CLI main may call exit before package scopes can unwind. The official
+          ;; functional runner keeps discovery, execution and status in GxTest.
+          (run-tests [tests] #f [] 5))))))
 
 (def (package-build-spec directory specification)
   (call-package directory

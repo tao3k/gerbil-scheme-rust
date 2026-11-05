@@ -335,3 +335,15 @@ native-mailbox-backpressure:
 native-mailbox-backpressure-model-check:
     quint test specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --seed 1 --backend typescript
     quint run specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
+
+# Historical failures and source evidence must be checked before new research.
+# Model labels remain external proof obligations; this never runs a benchmark.
+mailbox-research-gate-check:
+    quint typecheck specs/mailbox_research_gate.qnt
+    quint test specs/mailbox_measurement_contract.qnt --main mailbox_measurement_tests --seed 1 --max-samples 1 --backend typescript
+    quint test specs/mailbox_resource_contract.qnt --main mailbox_resource_tests --seed 1 --max-samples 1 --backend typescript
+    quint test specs/actor_service_calculus.qnt --main actor_service_cost_tests --seed 1 --max-samples 1 --backend typescript
+    quint test specs/mailbox_research_gate.qnt --main mailbox_research_gate_tests --seed 1 --max-samples 1 --backend typescript
+    quint test specs/mailbox_layout_entry.qnt --main mailbox_layout_entry_tests --seed 1 --max-samples 1 --backend typescript
+    quint typecheck specs/mailbox_result_construction.qnt
+    quint test specs/mailbox_result_construction.qnt --main mailbox_result_construction --seed 1 --max-samples 1 --backend typescript

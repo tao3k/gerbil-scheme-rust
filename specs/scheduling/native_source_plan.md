@@ -127,3 +127,29 @@ The [published checkpoint record](checkpoints/native-source-plan-0317ms-20261027
 contains every structured event, including the 23.044 ms control and 351 > 128
 failure. Publication adds source/evidence, not a new benchmark result or a claim
 of production acceptance. No raw logs, patches, traces or binaries are committed.
+
+## Eligibility and debt at the two frozen rates
+
+The 6D and 7F op62 sources both sample the monotonic clock before supply.
+They derive exact due count with inverse schedule arithmetic and already
+maintain the next planned timestamp for the source deadline. At the two
+frozen integral periods (2,000 and 1,000 ns), an early-negative check can
+use that cursor: if the next ordinal is not due, the current due count
+equals the published prefix. The current clock, custody, counters, deadline
+and wait policy can remain in place. Once a request is due, retain the exact
+inverse calculation. A timestamp comparison alone does not say how many
+ordinals are owed and cannot be used to limit refill to one.
+
+The finite QNT checks cover both periods, the equality boundary, a saturated
+arrival cap and valid published prefixes. The fractional example at 3/10
+shows why nominal forward rounding cannot replace inverse eligibility:
+the next planned timestamp is 3, but at clock 3 the existing inverse
+formula counts just the initial arrival. This is retained as a counterexample
+to applying an integral-period specialization to general rates.
+
+This candidate would remove inverse arithmetic only on early drive samples.
+It adds a cursor load/comparison and branch on eligible samples, which
+dominate a continuously backlogged run. It cannot advance a source turn
+during a scheduling gap. Without generated cost evidence and a justified
+early-sample mix it is not admitted as a throughput or backlog improvement.
+No runtime change, observer or workload was introduced.

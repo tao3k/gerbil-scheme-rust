@@ -57,6 +57,25 @@ module native_source_plan {
   run integerAndFractionalTransitionIdentityTest=init.then(all {
     assert(1.to(9).forall(r => 0.to(20).forall(n =>
       (n*units/r)+(units/r)+(if ((n*units)%r+units%r>=r) 1 else 0)==((n+1)*units)/r))),idle})
+  // Op62 has a fixed drive sample; it can use the next timestamp only
+  // as an early-negative predicate. A positive check still needs exact debt.
+  pure def legacyDue(now:int,period:int,total:int):int =
+    if (now/period+1<total) now/period+1 else total
+  pure def frozenDueWithEarlyNegative(now:int,issued:int,period:int,total:int):int =
+    if (issued==total or now<issued*period) issued else legacyDue(now,period,total)
+  run frozenSourceEarlyNegativeRetainsDueAndRefillTest = assert(
+    Set(1000,2000).forall(period => 1.to(5).forall(total =>
+      0.to(6).forall(tick => Set(0,1,period-1).forall(offset => {
+        val now=tick*period+offset
+        val due=legacyDue(now,period,total)
+        0.to(due).forall(issued => frozenDueWithEarlyNegative(now,issued,period,total)==due)
+      })))))
+  run sourceEligibilityIsNotOneItemOfDueDebtTest = assert(
+    8000>=1*2000 and legacyDue(8000,2000,10)==5)
+  // At fractional rates, the existing forward and inverse rounding
+  // are not interchangeable at every integer clock boundary.
+  run fractionalTimestampCannotReplaceLegacyDueTest = assert(
+    original(1)==3 and 3*rate/units+1==1)
   action step={nondet id=Set(2,3,4).oneOf()
     any {offer(id),feed(id),enter(id),admit(id),submit(id),start(id),finish(id),project(id),
       verify(id),retire(id),release(id),publish(id),consume(id),close,idle}}

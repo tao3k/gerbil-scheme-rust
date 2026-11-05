@@ -176,9 +176,221 @@ module mailbox_joint_cycle {
     val bad={numerator:1,denominator:2,latencyNs:40}
     val fair={sourceNs:0,workerNs:0,externalNs:0,readyNs:0,pauseTotalNs:0}
     val incompleteEvidence={cost:"qualified-upper",availability:"unqualified-probe-opportunity",
-      fairness:"qualified-progress",retirementTail:"included",sourceMatched:true,privateInbox:true,rewoundCursor:true}
+      fairness:"qualified-progress",retirementTail:"included",sourceMatched:true,readPrivateInbox:false,rewoundCursor:false}
     assert(gate::effectiveCycle(cand,good)<gate::effectiveCycle(ref,good) and
       gate::conditionsFit(goal,ref,good,fair) and not(gate::conditionsFit(goal,cand,bad,fair)) and
       not(gate::claimSupported(goal,cand,good,fair,incompleteEvidence)))
+  }
+  // One completed member releases exactly one credit and lets the source
+  // supply a peer while the other members of the original packet remain.
+  run partialPacketRetirementCanFeedIndependentPeerTest=cpu3
+    .then(success(1,1)).then(harvestDirect).then(consume(1)).then(endHarvestEager)
+    .then(arrive(4)).then(reserveEager(4)).then(seal).then(chooseOwner(2)).then(publish(4,2)).then(flush(2))
+    .then(success(2,4)).then(harvestDirect).then(consume(4)).then(endHarvestEager)
+    .then(all {assert(safe),assert(mp::outstanding==Set(2,3)),
+      assert(charged==2),assert(consumedRequests==Set(1,4)),stay})
+
+  // Coverage of explicit service suspension says nothing about a raw park.
+  // A closed CPU range still needs a separate ready-to-visible bound when
+  // the runtime can interrupt it at an existing poll.
+  pure def prefixExitCovered(ready:Set[int],mayLeave:Set[str],flushes:Set[str]):bool =
+    ready==Set() or mayLeave.subseteq(flushes)
+
+  run WindExitDoesNotCoverMailboxParkOrRuntimePollTest={
+    val ordinary=Set("normal","exception","continuation-exit")
+    val explicit=ordinary.union(Set("service-suspend"))
+    val raw=explicit.union(Set("raw-mailbox-park"))
+    val poll=ordinary.union(Set("runtime-poll"))
+    assert(prefixExitCovered(Set(41),explicit,explicit) and
+      not(prefixExitCovered(Set(41),raw,explicit)) and
+      not(prefixExitCovered(Set(41),poll,ordinary)) and
+      prefixExitCovered(Set(),raw,explicit))
+  }
+
+  // This set abstraction checks eligibility only. Existing packet custody
+  // and FIFO rules still apply to the actual handoff.
+  pure def eligibleReadyPrefix(verified:Set[int],published:Set[int],
+      current:int,activation:int,open:bool):Set[int] =
+    if(open and current==activation) verified.exclude(published) else Set()
+
+  run WindReplayDoesNotRepublishAnAlreadyCommittedReadyPrefixTest=assert(
+    eligibleReadyPrefix(Set(41),Set(),2,2,true)==Set(41) and
+    eligibleReadyPrefix(Set(41),Set(41),2,2,true)==Set() and
+    eligibleReadyPrefix(Set(41,42),Set(41),2,2,true)==Set(42) and
+    eligibleReadyPrefix(Set(41,42),Set(41),3,2,true)==Set() and
+    eligibleReadyPrefix(Set(41,42),Set(41),2,2,false)==Set())
+
+  // Separate above-limit runs by distinct returns on intervening turns.
+  // Every breach after the first in its run immediately refills one frame.
+  pure def oneReplacementFloor(total:int,aboveLimit:int):int =
+    if (2*aboveLimit>total+1) 2*aboveLimit-total-1 else 0
+
+  // With three frames, grouping current-turn sends can save at most
+  // two sends for three publications. No route or packing charge included.
+  pure def sameTurnSendSavingCeiling(total:int,aboveLimit:int):int =
+    2*(total-oneReplacementFloor(total,aboveLimit))/3
+
+  run FrozenEagerRefillLeavesTooFewSameTurnRequestBatchesTest=assert(
+    oneReplacementFloor(1000000,998385)==996769 and
+    sameTurnSendSavingCeiling(1000000,998385)==2154 and
+    oneReplacementFloor(5000000,4999857)==4999713 and
+    sameTurnSendSavingCeiling(5000000,4999857)==191)
+
+  // An unclassified handler may park without leaving a dynamic extent.
+  // Publish the ready prefix before entering it. Even a closed member
+  // needs an independent wall bound on execution and reply visibility.
+  pure def mayCarryReadyIntoMember(ready:Set[int],closed:bool,wallBoundKnown:bool,
+      now:int,workWall:int,visibleWall:int,earliestDeadline:int):bool =
+    ready==Set() or (closed and wallBoundKnown and workWall>=0 and visibleWall>=0 and
+      now+workWall+visibleWall<earliestDeadline)
+
+  run ReadyPrefixMustPublishBeforeOpenMemberCanParkTest={
+    val prefix=Set(40)
+    assert(not(mayCarryReadyIntoMember(prefix,false,true,100,5,2,110)) and
+      not(mayCarryReadyIntoMember(prefix,true,false,100,5,2,110)) and
+      mayCarryReadyIntoMember(prefix,true,true,100,5,2,110) and
+      not(mayCarryReadyIntoMember(prefix,true,true,100,7,3,110)) and
+      mayCarryReadyIntoMember(Set(),false,false,100,0,0,110))
+  }
+
+  // The existing immutable reply object can identify the ready claim.
+  // A post-send store is forbidden because the source may already have
+  // recycled the slot. Only the source clears a committed frame.
+  type PrefixClaim={ordinal:int,token:int,phase:str}
+  pure def claimReady(f:PrefixClaim,expectedToken:int,destination:str):PrefixClaim =
+    if(f.phase=="ready" and f.token==expectedToken) {...f,phase:destination}
+    else f
+
+  run PrefixReplayCannotClaimRecycledSameOrdinalFrameTest={
+    val old={ordinal:41,token:1,phase:"ready"}
+    val first=claimReady(old,1,"sending")
+    val fresh={...old,token:2}
+    assert(first.phase=="sending" and claimReady(first,1,"sending")==first and
+      fresh.ordinal==old.ordinal and claimReady(fresh,1,"sending")==fresh and
+      claimReady(fresh,2,"sending").phase=="sending")
+  }
+
+  run PrefixCancelAndSendClaimHaveOneWinnerTest={
+    val ready={ordinal:41,token:1,phase:"ready"}
+    val revoked=claimReady(ready,1,"revoked")
+    val sending=claimReady(ready,1,"sending")
+    assert(revoked.phase=="revoked" and claimReady(revoked,1,"sending")==revoked and
+      sending.phase=="sending" and claimReady(sending,1,"revoked")==sending)
+  }
+
+  // One Mailbox dequeue transfers the whole immutable packet. An
+  // internal exception does not return the unread cursor to the FIFO.
+  type ReadyPacketFailure={normal:Set[int],failed:int,unread:List[int],inbox:List[int]}
+  pure def readyPacketCleanup(f:ReadyPacketFailure,joined:bool):List[int] =
+    if(joined) List(f.failed).concat(f.unread).concat(f.inbox) else List()
+
+  run ReadyPacketFailureMustDrainLocalSuffixBeforeLaterMailboxRepliesTest={
+    val stop={normal:Set(40),failed:41,unread:List(42),inbox:List(43)}
+    val cleanup=readyPacketCleanup(stop,true)
+    assert(readyPacketCleanup(stop,false)==List() and
+      cleanup==List(41,42,43) and stop.inbox!=cleanup and
+      stop.normal.intersect(Set(41,42,43))==Set() and
+      stop.unread.concat(stop.inbox)==List(42,43))
+  }
+
+  // A public self-send appends behind any peer that already published.
+  // The source must consume a dequeued suffix before taking the inbox.
+  run RequeueCannotRestoreDequeuedPacketSuffixFifoTest={
+    val suffix=List(41)
+    val inbox=List(42)
+    assert(suffix.concat(inbox)==List(41,42) and
+      inbox.concat(suffix)==List(42,41) and
+      suffix.concat(inbox)!=inbox.concat(suffix))
+  }
+
+  // A selector in the existing identity error arm need not preserve
+  // the ordinary machine layout. These are static matched counts.
+  run ColdPacketIdentitySelectorChangedOrdinaryReceiveLayoutTest={
+    val stock={instructions:5614,positiveActiveTaken:false,cursor:false}
+    val identity={...stock,instructions:5663,positiveActiveTaken:true}
+    assert(identity.instructions>stock.instructions and
+      identity.positiveActiveTaken!=stock.positiveActiveTaken and not(identity.cursor))
+  }
+
+  // With no polling, a split refiller parked for its only eligible frame
+  // needs a notification after the separate consumer returns the credit.
+  // Relocating supply can therefore retain both Mailbox legs.
+  type TurnCustody={supply:int,worker:int,consumer:int,
+    independentReturnWake:bool,refillerParked:bool}
+  pure def perFrameMailboxLegs(t:TurnCustody):int =
+    (if(t.supply!=t.worker) 1 else 0) +
+    (if(t.worker!=t.consumer) 1 else 0) +
+    (if(t.consumer!=t.supply and t.refillerParked and not(t.independentReturnWake)) 1 else 0)
+
+  run movingSupplyToWorkerCanTradeRequestSendForCreditWakeTest={
+    val original={supply:1,worker:2,consumer:1,
+      independentReturnWake:false,refillerParked:true}
+    val relocated={...original,supply:2}
+    val fused={...relocated,consumer:2}
+    assert(perFrameMailboxLegs(original)==2 and
+      perFrameMailboxLegs(relocated)==2 and
+      perFrameMailboxLegs(fused)==0 and
+      perFrameMailboxLegs({...relocated,independentReturnWake:true})==1)
+  }
+
+  // Co-location is an eligibility refinement, not an early credit
+  // return or authority to move arbitrary Scheme dynamic extents.
+  type LocalTurn={nativeRequests:int,mailboxQuiescent:bool,
+    closedWork:bool,affine:bool,contextFree:bool,internalConsumer:bool}
+  pure def localTurnEligible(t:LocalTurn):bool =
+    t.nativeRequests==0 and t.mailboxQuiescent and t.closedWork and
+      not(t.affine) and t.contextFree and t.internalConsumer
+
+  run localTurnRequiresAQuiescentCutAndActualLocalConsumptionTest={
+    val local={nativeRequests:0,mailboxQuiescent:true,closedWork:true,
+      affine:false,contextFree:true,internalConsumer:true}
+    assert(localTurnEligible(local) and
+      not(localTurnEligible({...local,nativeRequests:1})) and
+      not(localTurnEligible({...local,mailboxQuiescent:false})) and
+      not(localTurnEligible({...local,closedWork:false})) and
+      not(localTurnEligible({...local,affine:true})) and
+      not(localTurnEligible({...local,contextFree:false})) and
+      not(localTurnEligible({...local,internalConsumer:false})))
+  }
+
+  // Actual short handler fixture under a positive budget. The input tag,
+  // handler and oracle agree, but the current owner can execute before the
+  // separately scheduled Actor has acquired the same lease.
+  run shortValueEquivalenceDoesNotAuthorizeLeaseOwnerSubstitutionTest={
+    val route={nativeRequests:0,mailboxQuiescent:true,closedWork:true,
+      affine:false,contextFree:false,internalConsumer:true}
+    val contextFree={...route,contextFree:true}
+    val split={requestedAt:1,queuedAt:2,releaseAt:4,verifiedAt:5,valid:true}
+    val local={requestedAt:1,verifiedAt:3,valid:true}
+    assert(local.valid and split.valid and split.requestedAt==local.requestedAt and
+      split.queuedAt<local.verifiedAt and local.verifiedAt<split.releaseAt and
+      split.releaseAt<split.verifiedAt and
+      localTurnEligible(contextFree) and not(localTurnEligible(route)))
+  }
+
+  // Only the closed local FIFO guarantees a consecutive live prefix.
+  // The original multiple-worker path can retire a later request first.
+  pure def localRingSlots(retired:int,published:int):Set[int] =
+    0.to(2).filter(offset=>offset<published-retired).map(offset=>(retired+offset)%3)
+
+  run localRingWrapPreservesThreeCreditsAndImmediateRefillTest=assert(
+    0.to(17).forall(retired => 0.to(3).forall(live => {
+      val published=retired+live
+      val slots=localRingSlots(retired,published)
+      val firstSlot=retired%3
+      val nextSlot=published%3
+      slots.size()==live and
+        (live==0 or slots.contains(firstSlot)) and
+        (live==3 or not(slots.contains(nextSlot))) and
+        (live==0 or localRingSlots(retired+1,published)==slots.exclude(Set(firstSlot))) and
+        (live!=3 or (firstSlot==nextSlot and
+          localRingSlots(retired+1,published+1)==slots))
+    })))
+
+  run localRingCannotReplaceAnExistingOutOfOrderWorkerSetTest={
+    val previouslyPublished=Set(0,1,2)
+    val actualLive=previouslyPublished.exclude(Set(1))
+    assert(actualLive.size()==2 and localRingSlots(1,3)==Set(1,2) and
+      actualLive!=localRingSlots(1,3))
   }
 }

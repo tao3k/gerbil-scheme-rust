@@ -82,6 +82,25 @@ module native_ready_wake {
     .then(all {assert(selected!=4),assert(issued==1),assert(safety),idle})
     .then(consume(selected)).then(consume(4)).then(takeWake).then(close)
     .then(all {assert(p::live==Set()),assert(p::consumed==Set(2,3,4)),assert(safety),idle})
+  // Slot order can differ from completion publication order.
+  // In this trace, the original reply mailbox starts with the occupant of slot 1.
+  run rotatingReadyScanCanOvertakeFirstPublishedReplyTest=init
+    .then(offer(2)).then(feed(2)).then(offer(3)).then(feed(3))
+    .then(enter(p::frames.get(1))).then(admit(p::frames.get(1))).then(submit(p::frames.get(1))).then(start(p::frames.get(1))).then(finish(p::frames.get(1)))
+    .then(project(p::frames.get(1))).then(verify(p::frames.get(1))).then(retire(p::frames.get(1))).then(release(p::frames.get(1))).then(publish(p::frames.get(1))).then(signal(p::frames.get(1)))
+    .then(enter(p::frames.get(0))).then(admit(p::frames.get(0))).then(submit(p::frames.get(0))).then(start(p::frames.get(0))).then(finish(p::frames.get(0)))
+    .then(project(p::frames.get(0))).then(verify(p::frames.get(0))).then(retire(p::frames.get(0))).then(release(p::frames.get(0))).then(publish(p::frames.get(0))).then(signal(p::frames.get(0)))
+    .then(all {assert(safety),assert(issued==1),assert(selected==p::frames.get(0)),idle})
+
+  // A lone completion arriving after park has to notify once. Taking the
+  // frame and returning its credit cannot substitute for waking the source.
+  run singletonAfterParkStillNeedsOneNotificationTest=init.then(offer(2)).then(feed(2))
+    .then(enter(2)).then(admit(2)).then(submit(2)).then(start(2)).then(finish(2))
+    .then(project(2)).then(verify(2)).then(retire(2)).then(release(2)).then(park)
+    .then(publish(2)).then(all {assert(receiverParked),assert(not(queued)),assert(safety),idle})
+    .then(signal(2)).then(takeWake).then(consume(2))
+    .then(all {assert(issued==1),assert(taken==1),assert(safety),idle})
+
   run nonAtomicNotificationClaimMutationTest=init
     .then(offer(2)).then(feed(2)).then(offer(3)).then(feed(3))
     .then(enter(2)).then(admit(2)).then(submit(2)).then(start(2)).then(finish(2))
@@ -94,4 +113,118 @@ module native_ready_wake {
     any {offer(id),feed(id),enter(id),admit(id),submit(id),start(id),finish(id),
       project(id),verify(id),retire(id),release(id),publish(id),signal(id),takeWake,
       consume(id),park,close,idle}}
+}
+
+// Refine the same frame protocol with publication order and an atomic wait
+// registration. The queue holds only frame identities, never extra payloads.
+module native_ready_fifo {
+  import native_mailbox_backpressure as p from "./native_mailbox_backpressure"
+
+  type Edge = { fifo:List[int], wait:str, issued:int, taken:int }
+  var edge:Edge
+  val safe = and {
+    p::safety,
+    edge.fifo.length() <= 2,
+    edge.fifo.indices().map(i => edge.fifo[i]) == p::ready,
+    edge.fifo.length() == p::ready.size(),
+    edge.issued - edge.taken == (if (edge.wait == "claimed" or edge.wait == "queued") 1 else 0),
+    implies(edge.wait == "armed", edge.fifo == List())
+  }
+
+  action keep = edge' = edge
+  action init = all { p::init, edge' = {fifo:List(),wait:"running",issued:0,taken:0} }
+  action check = all { p::idle, keep }
+  action prepare(id:int):bool = all {p::offer(id),keep}
+    .then(all {p::feed(id),keep}).then(all {p::enter(id),keep})
+    .then(all {p::admit(id),keep}).then(all {p::submit(id),keep})
+    .then(all {p::start(id),keep}).then(all {p::finish(id),keep})
+    .then(all {p::project(id),keep}).then(all {p::verify(id),keep})
+    .then(all {p::retire(id),keep}).then(all {p::release(id),keep})
+
+  action arm = all {
+    edge.wait == "running", edge.fifo == List(), p::idle,
+    edge' = {...edge, wait:"armed"}
+  }
+  action publish(id:int):bool = all {
+    p::publish(id),
+    edge' = if (edge.wait == "armed")
+      {...edge, fifo:edge.fifo.append(id), wait:"claimed", issued:edge.issued+1}
+      else {...edge, fifo:edge.fifo.append(id)}
+  }
+  action send = all {
+    edge.wait == "claimed", p::idle, edge' = {...edge, wait:"queued"}
+  }
+  // Source may win the CPU after arming but before sleeping. A claimed wake
+  // cannot be revoked by the source; consume it before arming another wait.
+  action disarm = all {
+    edge.wait == "armed", p::idle, edge' = {...edge, wait:"running"}
+  }
+  action acknowledge = all {
+    edge.wait == "queued", p::idle,
+    edge' = {...edge, wait:"running", taken:edge.taken+1}
+  }
+  action consume(id:int):bool = all {
+    edge.wait != "armed", edge.fifo != List(), edge.fifo[0] == id, p::consume(id),
+    edge' = {...edge, fifo:edge.fifo.slice(1,edge.fifo.length())}
+  }
+  // Once wait is committed, the source receives before taking a frame.
+  // The wake acknowledgement and head removal share one transaction.
+  action takeWoken(id:int):bool = all {
+    edge.wait == "queued", edge.fifo != List(), edge.fifo.head() == id, p::consume(id),
+    edge' = {...edge, fifo:edge.fifo.tail(), wait:"running", taken:edge.taken+1}
+  }
+  action close = all {
+    edge.wait == "running", edge.fifo == List(), p::close, keep
+  }
+  action unsafeArmWithoutRecheck = all {
+    edge.wait == "running", p::idle, edge' = {...edge, wait:"armed"}
+  }
+
+  run publicationBeforeArmPreservesOpportunityTest = init.then(prepare(2)).then(publish(2))
+    .then(all {assert(safe),assert(edge.issued==0),check})
+    .then(consume(2)).then(close)
+  run armBeforePublicationWakesExactlyOnceTest = init.then(prepare(2)).then(prepare(3))
+    .then(arm).then(publish(3)).then(publish(2))
+    .then(all {assert(safe),assert(edge.wait=="claimed"),assert(edge.issued==1),check})
+    .then(send).then(acknowledge).then(consume(3)).then(consume(2)).then(close)
+  run committedReceiveFusesAcknowledgementAndHeadRemovalTest = init
+    .then(prepare(2)).then(prepare(3)).then(arm).then(publish(3)).then(publish(2))
+    .then(all {assert(safe),assert(edge.wait=="claimed"),assert(p::consumed==Set()),check})
+    .then(send).then(takeWoken(3))
+    .then(all {assert(safe),assert(edge.fifo==List(2)),assert(edge.issued==edge.taken),
+      assert(p::consumed==Set(3)),check})
+    .then(prepare(4)).then(publish(4))
+    .then(all {assert(safe),assert(edge.fifo==List(2,4)),assert(edge.issued==1),check})
+    .then(consume(2)).then(consume(4)).then(close)
+  run consumedResultLeavesOldWakeForDrainTest = init.then(prepare(2)).then(arm).then(publish(2))
+    .then(consume(2)).then(send).then(acknowledge)
+    .then(all {assert(safe),assert(edge.fifo==List()),assert(p::consumed==Set(2)),check})
+    .then(close)
+  run fifoReturnsOneFrameAndRefillsWithoutWaitingForPeerTest = init.then(prepare(2)).then(prepare(3))
+    .then(publish(3)).then(publish(2)).then(consume(3)).then(prepare(4)).then(publish(4))
+    .then(all {assert(safe),assert(edge.fifo==List(2,4)),assert(edge.issued==0),check})
+    .then(consume(2)).then(consume(4)).then(close)
+  // Reusing the Mailbox's wait cannot make an out-of-band frame visible
+  // to its inbox check. A separate publication needs a queue entry or its
+  // own synchronized wait predicate.
+  action unsafePublishOutsideWaitQueue(id:int):bool = all {p::publish(id),keep}
+  run outOfBandPublicationCannotReuseMailboxWaitTest = init.then(prepare(2)).then(arm)
+    .then(unsafePublishOutsideWaitQueue(2))
+    .then(all {assert(edge.fifo==List()),assert(edge.wait=="armed"),
+      assert(p::ready==Set(2)),assert(not(safe)),check})
+  run staleEmptyCheckCanParkOverPublishedResultTest = init.then(prepare(2)).then(publish(2))
+    .then(unsafeArmWithoutRecheck).then(all {assert(not(safe)),check})
+  run disarmBeforePublishNeedsNoWakeTest = init.then(prepare(2)).then(arm).then(disarm).then(publish(2))
+    .then(all {assert(safe),assert(edge.issued==0),check}).then(consume(2)).then(close)
+  action step = {
+    nondet id = Set(2,3,4).oneOf()
+    any {
+      all {p::offer(id),keep}, all {p::feed(id),keep}, all {p::enter(id),keep},
+      all {p::admit(id),keep}, all {p::submit(id),keep}, all {p::start(id),keep},
+      all {p::finish(id),keep}, all {p::project(id),keep}, all {p::verify(id),keep},
+      all {p::retire(id),keep}, all {p::release(id),keep},
+      publish(id), arm, disarm, send, acknowledge, consume(id), close, check
+    }
+  }
+
 }

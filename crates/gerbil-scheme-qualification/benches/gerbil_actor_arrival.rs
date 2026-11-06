@@ -11,9 +11,12 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 const GATE: Duration = Duration::from_secs(5);
+fn capacity_research() -> bool {
+    std::env::args().any(|arg| arg == "--capacity-research")
+}
 #[path = "gerbil_actor_arrival/wait_evidence.rs"]
 mod wait_evidence;
 const ARRIVAL_WINDOW: usize = 128;
@@ -202,6 +205,12 @@ impl NativePath {
 }
 impl NativePath {
     fn assert_rate(self, rate: u64, backpressure_compare: bool) {
+        if capacity_research() {
+            assert_eq!(rate, 1_000_000);
+            assert!(matches!(self, NativePath::BackpressureSchedule));
+            assert!(!backpressure_compare && !scope_diagnostic(self));
+            return;
+        }
         if matches!(
             self,
             NativePath::Backpressure
@@ -276,6 +285,7 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
     // AtomicU64 has the aligned C atomic-word representation used by this
     // Darwin qualification bridge. The owner closure keeps the allocation live
     // until the synchronous Scheme call has returned or unwound.
+    let whole_begin = Instant::now();
     let receipt = pool
         .dispatcher()
         .submit_native_on(0, move |session| {
@@ -320,6 +330,7 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
         .unwrap()
         .wait(Duration::from_secs(seconds) + GATE)
         .unwrap();
+    let whole_call_ns = u64::try_from(whole_begin.elapsed().as_nanos()).unwrap();
     drop(watchdog);
     let (core, debt) = receipt.split_at(8);
     let [
@@ -363,7 +374,7 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
         assert!(debt.is_empty());
         serde_json::Value::Null
     };
-    let admission = MailboxSample {
+    let sample = MailboxSample {
         rate,
         seconds,
         warmup,
@@ -383,19 +394,27 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
         maximum_due_unconsumed: source
             .get("maximum_due_unconsumed_messages")
             .and_then(serde_json::Value::as_i64),
-    }
-    .failures();
+    };
+    let admission = if capacity_research() && !warmup {
+        sample.capacity_research_failures(whole_call_ns)
+    } else {
+        sample.failures()
+    };
+    let admission_scope = if capacity_research() {
+        "capacity_1m_three_second_goal"
+    } else {
+        "native_500k_original_guard"
+    };
     let passed = admission.is_empty();
-    println!(
-        "{}",
-        json!({"event":"gerbil_actor_arrival","mailbox":path!=NativePath::Service,"ready_drain_pipeline":matches!(path,NativePath::Pipeline|NativePath::Direct),"diagnostic_no_actor_handoff":path==NativePath::Direct,"native_data_access":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"data_access_edge_contract":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"diagnostic_native_observation":path==NativePath::BackpressureObserved,"diagnostic_owner_watch":matches!(path,NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent),"scoped_user_initiated_qos":matches!(path,NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent),"native_source_park":path==NativePath::BackpressurePark,"warmup":warmup,"rate":rate,"seconds":seconds,
-        "owned_source_schedule":path==NativePath::BackpressureSchedule,"native_coalesced_wake":path==NativePath::BackpressureCoalesced,"performance_admission":{"passed":passed,"failures":admission,"scope":"native_500k_original_guard"},
+    let mut value = json!({"event":"gerbil_actor_arrival","mailbox":path!=NativePath::Service,"ready_drain_pipeline":matches!(path,NativePath::Pipeline|NativePath::Direct),"diagnostic_no_actor_handoff":path==NativePath::Direct,"native_data_access":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"data_access_edge_contract":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"diagnostic_native_observation":path==NativePath::BackpressureObserved,"diagnostic_owner_watch":matches!(path,NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent),"scoped_user_initiated_qos":matches!(path,NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent),"native_source_park":path==NativePath::BackpressurePark,"warmup":warmup,"rate":rate,"seconds":seconds,
+        "owned_source_schedule":path==NativePath::BackpressureSchedule,"native_coalesced_wake":path==NativePath::BackpressureCoalesced,"performance_admission":{"passed":passed,"failures":admission,"scope":admission_scope},
         "planned":planned,"completed":completed,"accepted":completed,"rejected":rejected,"failed":0,"accepted_timeouts":0,"remaining_staged":0,"remaining_native":0,"source_backpressure":source,"snapshot_gc_duplicate_and_unread_close_contract":matches!(path,NativePath::Pipeline|NativePath::Direct),
         "completed_per_second":f64::from(u32::try_from(*completed).unwrap())/Duration::from_nanos(u64::try_from(*elapsed).unwrap()).as_secs_f64(),"rejection_percent":100.0*f64::from(u32::try_from(*rejected).unwrap())/f64::from(u32::try_from(*planned).unwrap()),
         "elapsed_ns":elapsed,"offered_elapsed_ns":offered_elapsed,"successful_planned_to_consumed_p99_ns":p99,
         "successful_planned_to_consumed_p999_ns":p999,"latency_bucket_upper_bound_ns":1000,"all_arrival_max_generator_lag_ns":max_lag,
-        "owners":1,"scheme_workers":if path==NativePath::Direct {0}else{4},"native_active":3,"window":128,"rust_per_message_entries":0,"watchdog_seconds":5,"defaults_changed":false})
-    );
+        "owners":1,"scheme_workers":if path==NativePath::Direct {0}else{4},"native_active":3,"window":128,"rust_per_message_entries":0,"watchdog_seconds":5,"defaults_changed":false});
+    value["whole_native_call_ns"] = json!(whole_call_ns);
+    println!("{value}");
     passed
 }
 fn option(name: &str, default: u64) -> u64 {
@@ -525,11 +544,14 @@ fn check_strict_scope(path: NativePath, rate: u64, seconds: u64) {
                         | NativePath::BackpressureCoalesced
                         | NativePath::BackpressureSchedule
                 )
-                && rate == 500_000
-                && seconds == 10
+                && (if capacity_research() {
+                    rate == 1_000_000 && seconds == 1
+                } else {
+                    rate == 500_000 && seconds == 10
+                })
                 && !std::env::args().any(|arg| arg.ends_with("-compare")
                     || matches!(arg.as_str(), "--trace-gate" | "--native-clock-anchor")),
-            "strict admission requires one unobserved native mailbox arm at 500k/s for ten seconds"
+            "strict admission requires the unchanged original profile or explicit one-million capacity profile"
         );
     }
 }
@@ -669,8 +691,18 @@ fn select_path() -> NativePath {
 
 fn main() {
     trace_gate();
-    let rate = option("--rate=", 500_000);
-    let seconds = option("--seconds=", 10);
+    let rate = option(
+        "--rate=",
+        if capacity_research() {
+            1_000_000
+        } else {
+            500_000
+        },
+    );
+    let seconds = option("--seconds=", if capacity_research() { 1 } else { 10 });
+    if capacity_research() {
+        assert_eq!((rate, seconds), (1_000_000, 1));
+    }
     assert!((1..=1_000_000).contains(&rate) && (1..=10).contains(&seconds));
     let access_compare = std::env::args().any(|s| s == "--access-compare");
     let backpressure_compare = std::env::args().any(|s| s == "--backpressure-compare");

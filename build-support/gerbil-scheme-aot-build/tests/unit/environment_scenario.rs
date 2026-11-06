@@ -8,6 +8,7 @@ fn build_children_and_object_workers_use_the_executing_host_capacity() {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "compiler::environment_tests::build_children_and_object_workers_use_the_executing_host_capacity", "--nocapture"])
             .env(CHILD, "1")
+            .env_remove("NUM_JOBS")
             .env("GERBIL_BUILD_CORES", "stale-untrusted-count")
             .output().unwrap();
         assert!(
@@ -91,5 +92,58 @@ fn darwin_system_linker_resolves_through_clean_selected_sdk_command() {
     assert!(
         !path.starts_with("/nix/store"),
         "foreign SDK linker selected"
+    );
+}
+
+#[test]
+fn native_object_workers_obey_cargo_budget_without_changing_host_discovery() {
+    const CHILD: &str = "GERBIL_NATIVE_BUDGET_RECEIPT";
+    if std::env::var_os(CHILD).is_none() {
+        let host = std::thread::available_parallelism().unwrap().get();
+        for budget in [
+            "1".to_owned(),
+            (host + 1).to_string(),
+            "0".to_owned(),
+            "invalid".to_owned(),
+        ] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "compiler::environment_tests::native_object_workers_obey_cargo_budget_without_changing_host_discovery", "--nocapture"])
+                .env(CHILD, "1").env("NUM_JOBS", &budget)
+                .env("GERBIL_BUILD_CORES", "stale-untrusted-count")
+                .output().unwrap();
+            assert!(
+                output.status.success(),
+                "budget={budget}: {}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        return;
+    }
+    let budget = std::env::var("NUM_JOBS")
+        .unwrap()
+        .parse::<std::num::NonZeroUsize>();
+    if budget.is_err() {
+        let outcome =
+            std::panic::catch_unwind(|| crate::program::native_build_parallelism(usize::MAX));
+        assert!(
+            outcome.is_err(),
+            "actual compiler pool accepted an invalid Cargo budget"
+        );
+        return;
+    }
+    let actual = crate::program::native_build_parallelism(usize::MAX);
+    let budget = budget.unwrap().get();
+    let host = std::thread::available_parallelism().unwrap().get();
+    assert_eq!(actual, host.min(budget));
+    assert_eq!(crate::program::native_build_parallelism(1), 1);
+    let output = gerbil_command("printenv")
+        .arg("GERBIL_BUILD_CORES")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap().trim(),
+        host.to_string()
     );
 }

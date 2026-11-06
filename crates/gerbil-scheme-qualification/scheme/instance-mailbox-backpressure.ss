@@ -1,17 +1,22 @@
 ;; Qualification-only native exchange. The source retains ordinal debt, never
 ;; an unbounded list of payloads. The original timestamps and deadline include
 ;; that debt. Three existing execution credits own three transfer frames.
+;; Admission only, called once before any source work. Original paths keep
+;; their 500k profile; only the owned-plan path accepts the explicit 1M profile.
+(def (mailbox-backpressure-rate? rate owned-plan?)
+  (and (integer? rate) (<= 1 rate (if owned-plan? 1000000 500000))))
+
 (defrules define-mailbox-backpressure ()
  ((_ name observe? watch? park? coalesce? owned-plan? scoped?)
  (def (name command)
   (let* ((header (vector-ref command 0)) (rate (s64vector-ref header 1))
          (seconds (s64vector-ref header 2)) (progress (s64vector-ref header 3))
          (state (orders-endpoint (vector (s64vector 15)))))
-    (unless (and (= (s64vector-length header) (mailbox-scoped-header-length scoped? observe? watch?)) (<= 1 rate 500000) (<= 1 seconds 10)
+    (unless (and (= (s64vector-length header) (mailbox-scoped-header-length scoped? observe? watch?)) (mailbox-backpressure-rate? rate owned-plan?) (<= 1 seconds 10)
                  (positive? progress) (zero? (s64vector-ref state 0))
                  (zero? (s64vector-ref state 3)) (zero? (s64vector-ref state 7))
                  (not orders-native-access?))
-      (error "native backpressure requires idle original handler, at most 500k/s"))
+      (error "native backpressure requires idle original handler and a valid selected rate profile"))
     (when (mailbox-scoped-access scoped? (s64vector-ref header 0)) (actor-arrival-access-contract!))
     (when observe? (mailbox-clock-contract!))
     (let* ((receiver (current-thread)) (workers (make-vector 4 #f))

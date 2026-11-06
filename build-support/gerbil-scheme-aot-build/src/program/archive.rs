@@ -603,11 +603,11 @@ pub(crate) fn compile_native_object(
     // Reuse the header's optimization threshold rather than inventing a second
     // numeric resource limit. This policy is independent of verbosity.
     let cc_options = if layout == CFunctionLayout::SeparateProcedures {
-        // Gambit's supported multiple-host lowering preserves O2 and the paired
-        // C ABI while avoiding one giant C function for a finite test image.
+        // Preserve the qualified separate-procedure lowering, including jump
+        // layout. SINGLE_HOST_LIMIT alone leaves inline jumps enabled and does
+        // not reproduce the frozen Actor object's compilation contract.
         format!(
-            "{cc_options} -D___SINGLE_HOST_LIMIT=1{}",
-            if gcc { " -fno-gcse-lm" } else { "" }
+            "{cc_options} -U___SINGLE_HOST -U___INLINE_JUMPS -D___MULTIPLE_HOSTS -D___DONT_INLINE_JUMPS"
         )
     } else if gcc && operation.phase == "native-object" {
         format!("{cc_options} -fno-gcse-lm -D___SINGLE_HOST_LIMIT=___OPTIMIZED_MODULE_LIMIT")
@@ -821,7 +821,18 @@ fn observe_cached(
 
 pub(crate) fn native_build_parallelism(job_count: usize) -> usize {
     let configured = crate::parallelism::host_build_parallelism();
-    configured.min(job_count.max(1))
+    // Cargo's own build-script budget bounds nested native compiler processes.
+    // Host discovery and Scheme child capacity remain host-owned; a stale
+    // GERBIL_BUILD_CORES value still cannot override them. No new knob/default.
+    let cargo_budget = std::env::var_os("NUM_JOBS").map_or(configured, |value| {
+        value
+            .to_str()
+            .expect("Cargo NUM_JOBS must be UTF-8")
+            .parse::<std::num::NonZeroUsize>()
+            .expect("Cargo NUM_JOBS must be a positive integer")
+            .get()
+    });
+    configured.min(cargo_budget).min(job_count.max(1))
 }
 
 fn native_link_options(

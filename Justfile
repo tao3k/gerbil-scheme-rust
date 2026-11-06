@@ -354,3 +354,14 @@ bridge-build:
     {{ build_env }} cargo test -p gerbil-scheme --test runtime_lifecycle --test build --locked -- --nocapture
     {{ build_env }} cargo clippy -p gerbil-scheme-sys --lib --tests --locked -- -D warnings
     {{ build_env }} cargo clippy -p gerbil-scheme --test runtime_lifecycle --test build --locked -- -D warnings
+
+# Frozen result-construction semantics; not a latency prediction.
+mailbox-result-construction-model-check:
+    quint typecheck specs/mailbox_result_construction.qnt
+    quint test specs/mailbox_result_construction.qnt --main mailbox_result_construction --seed 1 --max-samples 1 --backend typescript
+
+owner-timer-cache-contract:
+    {{build_env}} cargo test -p gerbil-scheme-qualification --test owner_timer_cache --locked -- --nocapture
+
+mailbox-result-construction-contract:
+    {{build_env}} cargo bench -p gerbil-scheme-qualification --features instance-dispatch,arrival-prebuilt --bench result_construction_contracts --profile dev --locked

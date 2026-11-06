@@ -59,6 +59,7 @@ fn track_native_sources() {
     println!("cargo:rerun-if-changed=scheme/instance-native.ss");
     println!("cargo:rerun-if-changed=scheme/instance-green.ss");
     println!("cargo:rerun-if-changed=scheme/instance-orders.ss");
+    println!("cargo:rerun-if-changed=scheme/result-construction-contract.ss");
     println!("cargo:rerun-if-changed=scheme/instance-service.ss");
     println!("cargo:rerun-if-changed=scheme/instance-actor-arrival.ss");
     println!("cargo:rerun-if-changed=scheme/instance-mailbox-backpressure.ss");

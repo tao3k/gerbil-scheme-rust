@@ -21,6 +21,17 @@ void gerbil_scheme_instance_bind_loader(gerbil_instance_close_fn close_function)
 void gerbil_scheme_instance_code_leases(uint64_t count) {
   __atomic_store_n(&gerbil_code_leases, count, __ATOMIC_SEQ_CST);
 }
+/* Transfer preallocated retirement metadata and its owned loader reference to
+ * the existing post-join queue. No allocation occurs in this transfer. */
+static void gerbil_module_enqueue(struct gerbil_retired_module *entry) {
+  entry->next = NULL;
+  os_unfair_lock_lock(&gerbil_module_lock);
+  if (gerbil_modules_tail) gerbil_modules_tail->next = entry;
+  else gerbil_modules = entry;
+  gerbil_modules_tail = entry;
+  ++gerbil_module_count;
+  os_unfair_lock_unlock(&gerbil_module_lock);
+}
 /* The export allow-list hides this definition. Only this image's statically
  * linked SDK binds here. Constructors can still close non-VM loader handles. */
 int dlclose(void *handle) {
@@ -38,20 +49,15 @@ int dlclose(void *handle) {
 #else
   struct gerbil_retired_module *entry = malloc(sizeof(*entry));
 #endif
-  os_unfair_lock_lock(&gerbil_module_lock);
-  if (!entry) {
-    if (gerbil_module_capture_failures != UINT64_MAX) ++gerbil_module_capture_failures;
-    os_unfair_lock_unlock(&gerbil_module_lock);
-    return -1; /* Keep the loader reference; cleanup reports capture failure. */
+  if (entry) {
+    entry->handle = handle;
+    gerbil_module_enqueue(entry);
+    return 0;
   }
-  entry->handle = handle;
-  entry->next = NULL;
-  if (gerbil_modules_tail) gerbil_modules_tail->next = entry;
-  else gerbil_modules = entry;
-  gerbil_modules_tail = entry;
-  ++gerbil_module_count;
+  os_unfair_lock_lock(&gerbil_module_lock);
+  if (gerbil_module_capture_failures != UINT64_MAX) ++gerbil_module_capture_failures;
   os_unfair_lock_unlock(&gerbil_module_lock);
-  return 0;
+  return -1; /* Keep the loader reference; cleanup reports capture failure. */
 }
 uint64_t gerbil_scheme_instance_pending_modules(void) {
   os_unfair_lock_lock(&gerbil_module_lock);

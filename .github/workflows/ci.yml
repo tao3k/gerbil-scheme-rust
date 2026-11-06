@@ -218,6 +218,10 @@ jobs:
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-release
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --mapping-foreign-tls
           cargo bench -p gerbil-scheme-qualification --features instance-library --bench instance_resources --profile dev --locked -- --module-capture-failure
+      - name: Cached timer provider and result construction contracts
+        run: |
+          cargo test -p gerbil-scheme-qualification --test owner_timer_cache --locked -- --nocapture
+          cargo bench -p gerbil-scheme-qualification --features instance-dispatch,arrival-prebuilt --bench result_construction_contracts --profile dev --locked
       - name: Rust owner cost bench smoke
         run: cargo bench -p gerbil-scheme-qualification --features instance-library --bench owner_costs --profile dev --locked -- --test
       - name: Scheme runtime capabilities and reuse
@@ -347,4 +351,7 @@ jobs:
       - name: Install pinned Quint CLI
         run: npm install --global @informalsystems/quint@0.33.0
       - name: Check lifecycle scenarios, sampled traces and negative controls
-        run: cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture
+        run: |
+          quint typecheck specs/mailbox_result_construction.qnt
+          quint test specs/mailbox_result_construction.qnt --main mailbox_result_construction --seed 1 --max-samples 1 --backend typescript
+          cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_protocol_scenarios_and_controls --locked -- --ignored --exact --nocapture

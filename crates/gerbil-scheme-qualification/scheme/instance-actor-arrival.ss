@@ -102,9 +102,14 @@
     (let loop ((line 0))
       (when (< line 4)
         (let (offset (+ 2 (* line 3)))
-          (s64vector-set! data offset (modulo (+ id line) 16))
-          (s64vector-set! data (1+ offset) (1+ (modulo line 5)))
-          (s64vector-set! data (+ offset 2) (modulo (+ (* id 17) (* line 31)) 10000)))
+          ;; Arithmetic remains checked before each narrowly scoped typed store.
+          ;; data is fresh s64[14]; line=0..3 proves these three offsets/ranges.
+          (let (sku (modulo (+ id line) 16))
+            (let () (declare (not safe)) (s64vector-set! data offset sku)))
+          (let ((position (1+ offset)) (quantity (1+ (modulo line 5))))
+            (let () (declare (not safe)) (s64vector-set! data position quantity)))
+          (let ((position (+ offset 2)) (cents (modulo (+ (* id 17) (* line 31)) 10000)))
+            (let () (declare (not safe)) (s64vector-set! data position cents))))
         (loop (1+ line))))
     (vector (s64vector 77 1) data)))
 (def (actor-arrival-verify! id value)

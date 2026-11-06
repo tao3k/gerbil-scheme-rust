@@ -20,6 +20,38 @@ pub struct MailboxSample {
 }
 
 impl MailboxSample {
+    /// Explicit million-message profile; original latency and debt guards apply.
+    #[must_use]
+    pub fn capacity_research_failures(&self, whole_call_ns: u64) -> Vec<&'static str> {
+        [
+            (
+                self.rate == 1_000_000 && self.seconds == 1 && !self.warmup,
+                "capacity_load_not_covered",
+            ),
+            (!self.observed, "diagnostic_observer_enabled"),
+            (
+                self.planned == 1_000_000 && self.completed == self.planned && self.rejected == 0,
+                "planned_corpus_not_completed",
+            ),
+            (
+                (1..=3_000_000_000).contains(&whole_call_ns),
+                "whole_main_stage_exceeded_three_seconds",
+            ),
+            (
+                (1..=HISTORICAL_P99_NS).contains(&self.p99_ns),
+                "historical_p99_exceeded_or_missing",
+            ),
+            (
+                self.maximum_due_unconsumed
+                    .is_some_and(|n| (0..=ORIGINAL_WINDOW).contains(&n)),
+                "original_outstanding_window_exceeded_or_missing",
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(ok, reason)| (!ok).then_some(reason))
+        .collect()
+    }
+
     /// Return every failed condition; absent coverage must never become a pass.
     #[must_use]
     pub fn failures(&self) -> Vec<&'static str> {
@@ -126,5 +158,103 @@ mod tests {
             ..qualifying()
         };
         assert_eq!(sample.failures(), ["all_planned_messages_not_completed"]);
+    }
+    #[test]
+    fn million_profile_keeps_original_latency_debt_and_complete_population() {
+        let base = MailboxSample {
+            rate: 1_000_000,
+            seconds: 1,
+            planned: 1_000_000,
+            completed: 1_000_000,
+            ..qualifying()
+        };
+        assert!(base.capacity_research_failures(3_000_000_000).is_empty());
+        assert!(!base.capacity_research_failures(0).is_empty());
+        assert_eq!(
+            base.capacity_research_failures(3_000_000_001),
+            ["whole_main_stage_exceeded_three_seconds"]
+        );
+        assert!(
+            !MailboxSample {
+                p99_ns: HISTORICAL_P99_NS + 1,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                maximum_due_unconsumed: Some(129),
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                maximum_due_unconsumed: None,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                maximum_due_unconsumed: Some(-1),
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                observed: true,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                warmup: true,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                planned: 999_999,
+                completed: 999_999,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                completed: 999_999,
+                rejected: 1,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                rate: 500_000,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
+        assert!(
+            !MailboxSample {
+                seconds: 10,
+                ..base
+            }
+            .capacity_research_failures(1)
+            .is_empty()
+        );
     }
 }

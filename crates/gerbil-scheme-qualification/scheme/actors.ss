@@ -26,6 +26,7 @@ package: gerbil-scheme-rust/qualification
 (include "instance-orders.ss")
 (include "instance-service.ss")
 (include "instance-actor-arrival.ss")
+(include "result-construction-contract.ss")
 (include "instance-mailbox-observation.ss")
 (include "instance-owner-watch.ss")
 (include "instance-ready-edge.ss")

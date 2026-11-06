@@ -106,7 +106,27 @@ module mailbox_measurement_contract {
     not(exclusiveGcCpuClaimAllowed(708625,100000,false,true)) and
     not(exclusiveGcCpuClaimAllowed(708625,900000,true,true)) and
     exclusiveGcCpuClaimAllowed(708625,100000,true,true)
+  // Matched PR op62 images, one million planned arrivals and a five-second
+  // deadline. GC measurements enclose the owner call and are not a tail gate.
+  pure val lowerCollectionCostDoesNotAdmitTheHistogramCandidate={
+    val work={...sampleWork,deadlineSeconds:5}
+    val control={outcome:{...sampleOutcome,work:work,
+      key:{...sampleKey,artifact:"pr18-matched-control"},
+      p99Ns:2993000,p999Ns:3088000,peak:3113,wholeNs:1011121917},
+      collections:74,gcWallNs:27418613}
+    val candidate={outcome:{...sampleOutcome,work:work,
+      key:{...sampleKey,artifact:"pr18-matched-histogram"},
+      p99Ns:6562000,p999Ns:6782000,peak:6789,wholeNs:1015049875},
+      collections:39,gcWallNs:15584707}
+    outcomeMatches(control.outcome,work,control.outcome.key) and
+    outcomeMatches(candidate.outcome,work,candidate.outcome.key) and
+    candidate.collections<control.collections and candidate.gcWallNs<control.gcWallNs and
+    candidate.outcome.p99Ns>control.outcome.p99Ns and candidate.outcome.peak>control.outcome.peak and
+    not(absolutePassed(control.outcome,sampleLimits)) and
+    not(absolutePassed(candidate.outcome,sampleLimits))
+  }
   pure val measurementChecks=and {negativeAllocationWithNoGcCannotBeClampedIntoEvidence,
+    lowerCollectionCostDoesNotAdmitTheHistogramCandidate,
     gcWallEnvelopeIsNotExclusiveCpuOrAStallCause,countCannotBeSubstitutedByAComponent,
     aDifferentInvocationImageOrRouteIsNotTheSameOutcome,warmupAndCleanupCannotStandInForMain,
     negativePeakIsMissingEvidenceNotZeroBacklog,unknownOrCrossingPeakUncertaintyCannotPass,
@@ -120,6 +140,7 @@ module mailbox_measurement_tests {
   import mailbox_measurement_contract.*
   run signedAllocationTest=assert(negativeAllocationWithNoGcCannotBeClampedIntoEvidence)
   run gcWallIsNotCpuTest=assert(gcWallEnvelopeIsNotExclusiveCpuOrAStallCause)
+  run gcReductionDoesNotAdmitHistogramTest=assert(lowerCollectionCostDoesNotAdmitTheHistogramCandidate)
   run componentCountTest=assert(countCannotBeSubstitutedByAComponent)
   run outcomeIdentityTest=assert(aDifferentInvocationImageOrRouteIsNotTheSameOutcome)
   run mainPhaseTest=assert(warmupAndCleanupCannotStandInForMain)

@@ -27,7 +27,10 @@
                              (vector 2 -1 'free #f #f #f))
                      (vector (vector 0 -1 'free #f #f) (vector 1 -1 'free #f #f)
                              (vector 2 -1 'free #f #f))))
-           (histogram (make-u64vector 5000000 0)) (total (* rate seconds))
+           ;; Retain the qualified owned-plan allocation profile. Gambit's
+           ;; live histogram affects heap sizing and collection frequency.
+           (histogram (make-u64vector (if owned-plan? 10000000 5000000) 0))
+           (total (* rate seconds))
            (next 0) (completed 0) (active 0) (max-debt 0) (max-outstanding 0)
            (max-lag 0) (last-publish 0) (over-window 0) (start 0) (stopped? #f)
            (watch-before #f) (watch-after #f)

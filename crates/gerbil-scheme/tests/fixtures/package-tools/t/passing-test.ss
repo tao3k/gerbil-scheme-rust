@@ -1,6 +1,12 @@
 (import :std/test :std/actor (only-in :std/error Timeout?) :package-fixture/answer)
 (export passing-test)
 
+;; Top-level evaluation is separately observable from executing the Case.
+(let (runs (if (file-exists? "test-imports.txt")
+               (call-with-input-file "test-imports.txt" read) 0))
+  (call-with-output-file (list path: "test-imports.txt" truncate: #t)
+    (lambda (port) (write (+ runs 1) port))))
+
 ;; Exercise the installed v0.19 interaction API, not a replacement actor runtime.
 (def (check-native-actor-contract)
   (let* ((protocol "/gerbil-scheme-rust/qualification/v0")

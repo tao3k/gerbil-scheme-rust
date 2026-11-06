@@ -166,11 +166,17 @@
           (def files (collect-files [tests]))
           (when (null? files)
             (error "package test selection contains no files" tests))
-          ;; Reload exactly the files admitted by discovery. Pass those file
-          ;; names to GxTest so a second directory scan cannot change the roster.
-          (for-each (lambda (file) (import-module file #t #t)) files)
-          ;; The functional runner returns the verdict before the VM scope unwinds.
-          (run-tests files #f [] 5))))))
+          ;; GxTest already imports and evaluates each suite. Scope reload to
+          ;; its first import of each selected file so dependencies remain cached.
+          (let ((pending files) (importer (current-expander-module-import)))
+            (parameterize
+              ((current-expander-module-import
+                 (lambda (path reload?)
+                   (let (selected? (member path pending))
+                     (when selected?
+                       (set! pending (filter (lambda (file) (not (equal? file path))) pending)))
+                     (importer path (or (and selected? #t) reload?))))))
+              (run-tests files #f [] 5))))))))
 
 (def (package-build-spec directory specification)
   (call-package directory

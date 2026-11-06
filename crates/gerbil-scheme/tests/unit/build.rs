@@ -88,7 +88,9 @@ fn local_package_environment_is_selected_before_loading_build_script() {
     assert_eq!(runtime.clean_package(directory).unwrap(), 0);
     assert!(!prefix.join("lib/package-fixture/answer.o1").exists());
     assert!(prefix.join("lib/unrelated/keep").is_file());
+    println!("PACKAGE-STEP runtime cleanup entered");
     drop(runtime);
+    println!("PACKAGE-STEP runtime cleanup returned");
     assert_environment_after_close(&environment);
     fs::remove_dir_all(root).unwrap();
     println!(
@@ -172,6 +174,11 @@ fn build_test_and_failures_share_the_existing_owner() {
         "3",
         "the three requests must each execute the selected case exactly once"
     );
+    assert_eq!(
+        fs::read_to_string(root.join("test-imports.txt")).unwrap(),
+        "3",
+        "each request must evaluate the selected suite module once"
+    );
     stage_and_clean(&runtime, &root);
     assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
     assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
@@ -183,7 +190,9 @@ fn build_test_and_failures_share_the_existing_owner() {
         },
         GerbilStatus::InvalidValue,
     );
+    println!("PACKAGE-STEP runtime cleanup entered");
     drop(runtime);
+    println!("PACKAGE-STEP runtime cleanup returned");
     assert_environment_after_close(&environment);
     assert_directory_rejection(directory.into(), GerbilStatus::RuntimeFinalized);
     println!("PACKAGE-C-ABI-CLEANUP-OK owner={}", std::process::id());

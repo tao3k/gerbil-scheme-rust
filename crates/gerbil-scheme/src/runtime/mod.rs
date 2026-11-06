@@ -6,10 +6,10 @@
 //! values, `integer` implements exact-integer conversion, `lifecycle` owns
 //! Gerbil runtime entry points, and `value` owns safe value interpretation.
 
-#[cfg(not(feature = "external-program"))]
-mod build;
 #[cfg(feature = "arrow")]
 mod arrow;
+#[cfg(not(feature = "external-program"))]
+mod build;
 #[cfg(feature = "arrow")]
 pub use arrow::{ArrowBatchExport, LinkedArrowExport};
 mod capabilities;

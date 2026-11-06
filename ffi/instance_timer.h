@@ -10,6 +10,12 @@
 #include <time.h>
 #include <limits.h>
 static pthread_mutex_t gerbil_timer_lock = PTHREAD_MUTEX_INITIALIZER;
+#ifdef GERBIL_OWNER_TIMER_INTERVAL
+static int gerbil_timer_observed_lock(pthread_mutex_t *);
+#define GERBIL_TIMER_LOCK() gerbil_timer_observed_lock(&gerbil_timer_lock)
+#else
+#define GERBIL_TIMER_LOCK() pthread_mutex_lock(&gerbil_timer_lock)
+#endif
 static pthread_cond_t gerbil_timer_changed = PTHREAD_COND_INITIALIZER;
 static struct sigaction gerbil_timer_action;
 static int gerbil_timer_action_set;
@@ -146,7 +152,7 @@ int pthread_sigmask(int how, const sigset_t *set, sigset_t *previous) {
   int status = system_mask(how, set, previous);
   if (status != 0 || set == NULL || !pthread_equal(pthread_self(), gerbil_timer_owner)) return status;
   int contains = sigismember(set, SIGALRM);
-  pthread_mutex_lock(&gerbil_timer_lock);
+  GERBIL_TIMER_LOCK();
   if (how == SIG_SETMASK) gerbil_timer_masked = contains == 1;
   else if (contains == 1 && how == SIG_BLOCK) gerbil_timer_masked = 1;
   else if (contains == 1 && how == SIG_UNBLOCK) gerbil_timer_masked = 0;
@@ -230,3 +236,5 @@ static int gerbil_timer_cleanup(void) {
   }
   return status;
 }
+
+#undef GERBIL_TIMER_LOCK

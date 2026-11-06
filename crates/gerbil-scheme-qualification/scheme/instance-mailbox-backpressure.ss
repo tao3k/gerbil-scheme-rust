@@ -9,6 +9,7 @@
 (defrules define-mailbox-backpressure ()
  ((_ name observe? watch? park? coalesce? owned-plan? scoped?)
  (def (name command)
+  (mailbox-failure-reset!)
   (let* ((header (vector-ref command 0)) (rate (s64vector-ref header 1))
          (seconds (s64vector-ref header 2)) (progress (s64vector-ref header 3))
          (state (orders-endpoint (vector (s64vector 15)))))
@@ -16,7 +17,7 @@
                  (positive? progress) (zero? (s64vector-ref state 0))
                  (zero? (s64vector-ref state 3)) (zero? (s64vector-ref state 7))
                  (not orders-native-access?))
-      (error "native backpressure requires idle original handler and a valid selected rate profile"))
+      (error "native backpressure requires idle original handler, a valid selected rate profile"))
     (when (mailbox-scoped-access scoped? (s64vector-ref header 0)) (actor-arrival-access-contract!))
     (when observe? (mailbox-clock-contract!))
     (let* ((receiver (current-thread)) (workers (make-vector 4 #f))
@@ -114,7 +115,7 @@
               (mailbox-scoped-source scoped? scope-generation now due next completed active)
               (when (and (positive? debt)
                          (>= (- now (if owned-plan? (mailbox-source-plan-time plan) (planned next))) 5000000000))
-                (error "native source debt exceeded five seconds"))
+                (begin (mailbox-failure-seal! command 'source-deadline now start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (error "native source debt exceeded five seconds")))
               ;; Source eligibility is arithmetic, retaining every original
               ;; arrival, not a loop allocating or rejecting catch-up messages.
               (let supply ((slot 0))
@@ -141,7 +142,7 @@
               (let* ((message (begin
                        (when observe? (mailbox-observe! observer dispatch next))
                        (if coalesce? (mailbox-take-ready edge) (thread-receive 5 #f)))))
-                (unless (or coalesce? message) (error "native completion exceeded five seconds"))
+                (unless (or coalesce? message) (begin (mailbox-failure-seal! command 'completion-wait (owner-wait-trace 1 0) start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (error "native completion exceeded five seconds")))
                 ;; A wake may describe results already taken by the fast path.
                 ;; It returns no credit, fabricates no progress, and never waits
                 ;; for a whole batch. Recheck the service cycle immediately.
@@ -152,14 +153,14 @@
                        (slot (vector-ref frame 0)))
                   (unless (and (<= 0 slot 2) (eq? frame (vector-ref frames slot))
                                (= id (vector-ref frame 1)) (eq? (vector-ref frame 2) 'ready))
-                    (error "stale or duplicate native completion frame"))
-                  (when (vector-ref frame 4) (raise (vector-ref frame 3)))
+                    (begin (mailbox-failure-seal! command 'frame-identity (owner-wait-trace 1 0) start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (error "stale or duplicate native completion frame")))
+                  (when (vector-ref frame 4) (mailbox-failure-seal! command 'worker-exception (owner-wait-trace 1 0) start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (raise (vector-ref frame 3)))
                   (let* ((now (owner-wait-trace 1 0))
                          (latency (- now (if owned-plan? (vector-ref frame 5) (planned id))))
                          (bucket (quotient latency 1000)))
-                    (unless (< latency 5000000000) (error "native request exceeded five seconds"))
+                    (unless (< latency 5000000000) (begin (mailbox-failure-seal! command 'request-deadline now start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (error "native request exceeded five seconds")))
                     (u64vector-set! histogram bucket (1+ (u64vector-ref histogram bucket))))
-                  (unless (zero? (mailbox-scoped-progress scoped? scope-generation progress)) (error "native verified progress deadline"))
+                  (unless (zero? (mailbox-scoped-progress scoped? scope-generation progress)) (begin (mailbox-failure-seal! command 'progress-deadline (owner-wait-trace 1 0) start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (error "native verified progress deadline")))
                   ;; Only verified consumption returns custody and capacity.
                   (vector-set! frame 3 #f) (vector-set! frame 4 #f)
                   (vector-set! frame 1 -1) (vector-set! frame 2 'free)

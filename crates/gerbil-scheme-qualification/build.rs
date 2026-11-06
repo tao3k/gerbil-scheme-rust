@@ -63,6 +63,7 @@ fn track_native_sources() {
     println!("cargo:rerun-if-changed=scheme/instance-service.ss");
     println!("cargo:rerun-if-changed=scheme/instance-actor-arrival.ss");
     println!("cargo:rerun-if-changed=scheme/instance-mailbox-backpressure.ss");
+    println!("cargo:rerun-if-changed=scheme/mailbox-failure.ss");
     println!("cargo:rerun-if-changed=scheme/instance-mailbox-observation.ss");
     println!("cargo:rerun-if-changed=scheme/instance-owner-watch.ss");
     println!("cargo:rerun-if-changed=scheme/instance-owner-scope.ss");
@@ -114,13 +115,14 @@ fn main() {
         .expect("compile producer modules");
     let source = package.join("scheme/actors.ss");
     let controls = package.join("scheme/utf8-controls.ss");
+    let mailbox_failure = package.join("scheme/mailbox-failure.ss");
     let inline_control = package.join("scheme/utf8-inline-control.ss");
     let buffer_control = package.join("scheme/utf8-buffer-control.ss");
     let baseline_control = package.join("scheme/utf8-baseline-control.ss");
     // Debug formatting admits ordinary Cargo paths as quoted Scheme strings.
     // The package compiler adapter, not Rust, discovers the complete module graph.
     let expression = format!(
-        r#"(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (for-each (lambda (module) (compile-module module [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t])) [{:?} {:?} {:?} {:?} {:?}]) (gerbil-rs-stage-program {:?} {:?} [] ["gerbil-scheme-rust/qualification/actors"] )"#,
+        r#"(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (for-each (lambda (module) (compile-module module [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t])) [{:?} {:?} {:?} {:?} {:?} {:?}]) (gerbil-rs-stage-program {:?} {:?} [] ["gerbil-scheme-rust/qualification/actors"] )"#,
         gerbil_path
             .join("lib")
             .to_str()
@@ -131,6 +133,9 @@ fn main() {
             .to_str()
             .expect("UTF-8 baseline control path"),
         controls.to_str().expect("UTF-8 controls path"),
+        mailbox_failure
+            .to_str()
+            .expect("UTF-8 mailbox failure path"),
         source.to_str().expect("UTF-8 source path"),
         source.to_str().expect("UTF-8 source path"),
         stage.to_str().expect("UTF-8 stage path")

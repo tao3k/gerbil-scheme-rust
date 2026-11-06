@@ -28,6 +28,71 @@ module native_source_wait {
     (asleep and p::pending!=Set()) implies timerWake}
   val noIdleSpin=not(spun)
   val admission=and {safety,noIdleSpin}
+  // This direct port is only for an empty source. A byte is a wake
+  // hint; native acknowledgment and the original plan decide its meaning.
+  type DirectPortWake={closed:bool,parkedGeneration:int,
+    currentGeneration:int,acknowledged:int,now:int,eligibleAt:int}
+  pure def directPortDisposition(w:DirectPortWake):str =
+    if(w.closed) "closed"
+    else if(w.parkedGeneration!=w.currentGeneration or w.acknowledged==0)
+      "invalidated"
+    else if(w.acknowledged!=w.parkedGeneration or w.now<w.eligibleAt)
+      "recheck"
+    else "supply"
+
+  run directPortCancelAndCloseCannotSupplyOrReturnFrameTest=init.then(park)
+    .then(all {assert({
+      val due={closed:false,parkedGeneration:2,currentGeneration:2,
+        acknowledged:2,now:100,eligibleAt:100}
+      directPortDisposition(due)=="supply" and
+      directPortDisposition({...due,acknowledged:0})=="invalidated" and
+      directPortDisposition({...due,closed:true})=="closed" and
+      directPortDisposition({...due,currentGeneration:3})=="invalidated" and
+      directPortDisposition({...due,now:99})=="recheck" and
+      p::live==Set()
+    }),idle
+    })
+
+  pure def directPortCanRead(open:bool,captured:int,current:int):bool =
+    open and captured==current
+
+  // EOF unblocks the reader. The separately retained writer status
+  // decides whether this is an ordinary close or the original failure.
+  pure def directPortReadOutcome(eof:bool,closed:bool,writerError:int):str =
+    if(writerError!=0) "writer-error"
+    else if(closed) "closed"
+    else if(eof) "unexpected-eof"
+    else "check-generation"
+
+  run directPortWriterErrorSurvivesCloseAndFencesReplayTest=init.then(park)
+    .then(all {
+      assert(directPortCanRead(true,1,1)),
+      assert(not(directPortCanRead(false,1,2))),
+      assert(not(directPortCanRead(true,1,2))),
+      assert(directPortReadOutcome(true,true,9)=="writer-error"),
+      assert(directPortReadOutcome(true,true,0)=="closed"),
+      assert(directPortReadOutcome(true,false,0)=="unexpected-eof"),
+      assert(p::live==Set()),idle
+    })
+
+  // The source owns arm and acknowledgment. It cannot arm again
+  // while the existing request or its unread notification is live.
+  pure def directPortCanArm(entered:bool,closed:bool,armed:bool,pending:bool):bool =
+    entered and not(closed or armed or pending)
+  pure def directPortEligibilityTime(planned:int,carry:int):int =
+    planned + (if(carry==0) 0 else 1)
+
+  run directPortUsesEligibilityCeilingAndSingleOutstandingArmTest=init.then(park)
+    .then(all {
+      assert(directPortEligibilityTime(100,0)==100),
+      assert(directPortEligibilityTime(100,1)==101),
+      assert(directPortCanArm(true,false,false,false)),
+      assert(not(directPortCanArm(true,false,true,false))),
+      assert(not(directPortCanArm(true,false,false,true))),
+      assert(not(directPortCanArm(true,true,false,false))),
+      assert(p::live==Set()),idle
+    })
+
   action unsafeBusyYield=all {p::pending==Set(),p::live==Set(),p::idle,asleep'=false,timerWake'=timerWake,spun'=true}
   action unsafeParkActive=all {p::idle,asleep'=true,timerWake'=false,spun'=spun}
   action unsafeLoseWake=all {p::idle,asleep'=asleep,timerWake'=false,spun'=spun}
@@ -116,6 +181,46 @@ module native_service_recovery {
     assert(recoveryNs(21249084,500000,1000000)==21249084),idle})
   run increasingQueueCannotChangeRecoveryTimeTest=init.then(all {
     assert(recoveryNs(21249084,500000,600000)>21249084),idle})
+  // Count actual consumption against the arrivals due within the same window.
+  pure def requiredConsumptions(debt:int,newlyDue:int,limit:int):int =
+    if (debt+newlyDue<=limit) 0 else debt+newlyDue-limit
+
+  run frozen6DRecoveryDemandTest=init.then(all {
+    assert(requiredConsumptions(351,0,128)==223),
+    assert(requiredConsumptions(351,500,128)==723),
+    assert(requiredConsumptions(351,5000,128)==5223),idle})
+  run frozen7FRecoveryDemandTest=init.then(all {
+    assert(requiredConsumptions(6746,0,128)==6618),
+    assert(requiredConsumptions(6746,1000,128)==7618),
+    assert(requiredConsumptions(6746,10000,128)==16618),idle})
+  run debtAtOrBelowLimitOnlyRequiresConsumptionOfExcessTest=init.then(all {
+    assert(requiredConsumptions(100,28,128)==0),
+    assert(requiredConsumptions(100,29,128)==1),idle})
+
+  // Upper bound for a half-open interval on the original arrival schedule.
+  pure def arrivalsDuring(durationNs:int,rate:int):int =
+    (durationNs*rate+999999999)/1000000000
+
+  // During the offered interval, every phase of a periodic schedule
+  // contributes at least floor(duration * rate) due arrivals.
+  pure def minimumDueDuring(durationNs:int,rate:int):int =
+    durationNs*rate/1000000000
+
+  run noOwnerRetirementCanBreachBothFrozenGatesTest=init.then(all {
+    assert(requiredConsumptions(0,minimumDueDuring(258000,500000),128)==1),
+    assert(requiredConsumptions(0,minimumDueDuring(129000,1000000),128)==1),
+    assert(requiredConsumptions(120,minimumDueDuring(9000,1000000),128)==1),idle})
+
+  run failedMillionRatePeaksNeedMoreThanOneShortPauseTest=init.then(all {
+    assert({
+      val shortPause=arrivalsDuring(50000000,1000000)
+      shortPause==50000 and
+    // Outside the pause, consumption must keep pace for this bound to apply.
+      128+shortPause<915441 and 128+shortPause<931464 and
+    // Otherwise this much debt had to predate a single 50 ms pause.
+      915441-shortPause==865441 and 931464-shortPause==881464
+    }),idle})
+
   run subArrivalServiceCannotCatchUpTest=init.then(all {
     assert(recoveryNs(21249084,500000,450000)== -1),idle})
   action step=idle

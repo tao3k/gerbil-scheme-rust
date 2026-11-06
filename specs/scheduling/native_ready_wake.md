@@ -193,3 +193,216 @@ contains the exact replay command, artifact identities and full structured
 benchmark events. No new performance run is attributed to the publication REV.
 The independent investigation checkout stays restored. PR #18 is not merged or
 used as this checkpoint's destination branch.
+
+## Reassessment at the frozen 7F source
+
+Operation 62 still uses the scheduled path's immutable reply pair and native
+mailbox order. The existing edge is not a FIFO substitute: if slot 1 publishes
+first and slot 0 publishes next, a cursor at slot 0 selects the later result.
+The QNT trace retains that counterexample even though the ownership invariant
+holds. Stale wake acknowledgement returns no frame, and a singleton published
+after the receiver parks still requires one notification.
+
+The original singleton pays for the reply pair and a mailbox send/receive.
+The edge can avoid the pair, but a parked singleton still pays for that
+send/receive, plus the publication CAS, edge acknowledgement, and ready scans
+before waiting and after acknowledgement. The historical 6.09% notification
+saving does not amortize an additional operation of unknown cost on every
+completion. FIFO would also require recording publication order rather than
+recovering it from a frame scan.
+
+A bounded FIFO of generation-tagged completions with a receiver wait state is
+a distinct design. Only the transition from a parked receiver without an
+outstanding wake should issue a wake. A ready receiver should pop one result
+and retain immediate refill after each returned frame. Publication order and
+the check that arms parking must share a linearization boundary. Any already
+issued wake still needs acknowledgement or joined-worker teardown. This
+design can remove a notification while the source is runnable, but its FIFO
+publication and park synchronization costs have not been shown to pay for
+themselves. No runtime variant is admitted and no 1M/s pair is started.
+
+## Bounded FIFO and wait registration model
+
+The new refinement reuses the mailbox/frame model. Publication appends the
+request identity and atomically converts an armed wait into a claimed wake.
+Claim and send are distinct steps. The source can consume the result before
+the worker sends, but then must still acknowledge that old wake before it can
+arm again or close. Acknowledgement cannot free a frame. FIFO consumption
+removes exactly one verified result, and its credit permits the next input
+while older ready siblings remain queued. Arming from a stale empty check is
+an explicit mutation rejected by the invariant.
+
+The source model uses the existing two-slot reduction. The 7F implementation
+has three frames. A native implementation would need a bounded, allocation-free
+FIFO with one synchronization boundary shared by append, head removal and
+wait registration. Merely replacing the current rotating scan with a FIFO
+while retaining the current unconditional empty-token claim does not add
+the running-receiver fast path.
+
+The operation ledger for one result has two cases. With the receiver running,
+the proposed FIFO can skip the reply pair and mailbox send/receive, but it
+still needs synchronized append and head removal. With the receiver already
+parked, it additionally needs wait registration and wake claim/acknowledgement
+and still incurs mailbox send/receive. Claim can share append's transaction;
+acknowledgement can potentially share head removal's transaction. The parked
+case thus saves the pair but does not save a notification. The existing
+historical edge counters measure coalescing with an outstanding token, not
+how often this new wait protocol would actually find the source runnable.
+They cannot populate that cost equation. No production patch or performance
+result is admitted on the basis of these model transitions.
+
+## Isolated packed FIFO cost check
+
+The local fixture under `.ci/ready-fifo-cost` packs three frame indices and
+receiver wait state into one atomic word. It retains frame ownership until
+consumption; it neither stores a Scheme object nor substitutes for the native
+Mailbox. Its assertions cover FIFO under immediate slot refill, one wake when
+an armed receiver gains multiple completions, and acknowledgement of a wake
+after the receiver already removed its result. The fixture passed with GCC
+16.2.0, `-O2 -mcpu=apple-m1`. The test uses a compiler trap for assertion
+failure. The first test link could not resolve the SDK assertion symbol.
+
+With assertions excluded, GCC emits an acquire load and an acquire/release
+CAS for publication, and an acquire load and acquire/release CAS for the
+receiver update. Neither function calls another function, allocates, or uses
+the stack. A failed CAS retries. There is no ready-frame scan.
+
+| Successful singleton, no CAS retry | Added FIFO work | Reply Mailbox work |
+|------------------------------------+-----------------+--------------------|
+| Source running | Two acquire loads and two CAS operations | Reply pair and send/receive avoided |
+| Source already armed | Three acquire loads and three CAS operations, including arming | Pair avoided; send/receive retained |
+| Source consumes before wake delivery | One additional receiver update to acknowledge the stale wake | Old wake still has to be received |
+
+The parked row includes the arm that precedes publication. Its acknowledgement
+is fused with FIFO removal; if the result was consumed early, acknowledgement
+requires a separate update instead. A fixture notification is a return flag:
+Scheme token handling, runtime rooting and the real park boundary are outside
+this assembly count. These instruction counts establish structural costs,
+not cycle costs or the running/parked mix of op62. The running path may pay
+for itself; the parked path saves only the pair while adding synchronization.
+Without a justified mix and cost comparison the candidate is not admitted.
+
+Source SHA-256:
+`03d60b65d2b0c451574264529e9775b600c0e4146e6075bab2ad8a5e3052930f`.
+Assembly SHA-256:
+`a4afe1b8c5bad89cb5a99e1f69164d626c82df6238a7e28476a62ebae583d3c5`.
+
+## Gerbil Mailbox singleton fixture
+
+The compiled isolation module under `.ci/ready-fifo-cost` uses real
+`thread-send`, `thread-receive` and Gambit vector CAS. The generated C has
+two vector CAS sites, one for publication and one for receiver updates.
+Both arms use the same resident green worker, one reusable frame, request
+mailbox, verification and frame retirement. The original sends the immutable
+reply pair. The candidate publishes the slot and sends a wake only after
+the source has armed. The stale scenario consumes the result before taking
+and acknowledging the queued wake. Its comparator is the original running
+scenario with the same scheduling handshake.
+
+One fixture run used A/B/B/A order for each scenario, with 250,000 exchanges
+per block. Only block boundaries read the clock. The running and stale
+scenarios use a common worker-turn marker so the source deliberately takes
+after publication. The parked scenario uses the blocking receive path
+without that marker. It does not measure whether each individual receive
+blocked, or estimate the runtime path mix. No business handler, admission
+load, percentile or op62 observation was run.
+
+| Scenario | Original ns/exchange | FIFO ns/exchange | Paired FIFO minus original, ns/exchange |
+|----------+----------------------+------------------+-----------------------------------------|
+| Running | 340.257 | 321.308 | -15.025, -22.872 |
+| Armed, then receive | 499.944 | 520.072 | -83.955, +124.212 |
+| Consume before wake acknowledgement | 335.291 | 343.547 | +16.336, +0.175 |
+
+The running arm saved 18.95 ns/exchange on average. The parked pair changed
+sign with order, and the stale wake path did not show a gain in either
+pair. For illustration only, the means would require about 51.5 percent
+running-path replies to break even in a mixture of running and parked paths,
+before charging stale drains. The sign reversal makes that estimate unsuitable
+as an acceptance threshold. The historical 6.09 percent coalescing figure
+comes from a different mechanism and cannot provide the mixture for op62.
+The fixture also deliberately excludes the business handler and interleaving
+of three active frames. The existing evidence does not establish positive
+net cost on the original service cycle, so no runtime integration is admitted.
+
+An initial run relying on one yield failed to establish the worker turn.
+The common fixture marker corrected that assumption, and the failed receipt
+is retained. The executable uses the installed Gerbil with a dynamically
+loaded GCC-compiled fixture module after the standalone static link failed
+against local SDK and library paths. Fixture source SHA-256:
+`0e8c6b22fa9d0f9a461ba4dfeb7a06d8c3b335735eda09a345bef1ca2c722bac`.
+Compiled module SHA-256:
+`649adbce05018b4c038d9d2403b1d2d4604775163c7ee74f32419f2cf995b34a`.
+
+## Op62 path mix and committed receive
+
+The scheduled op62 loop supplies free frames before its timed mailbox receive.
+If there is no active frame, its separate idle branch yields. The receipt's
+`native_source_park: false` describes that idle-source policy. It says
+nothing about whether the timed completion receive found an existing reply.
+The 1M record contains 1,000,000 consumptions, three physical frames, a
+6,744 peak source debt and 998,385 samples over the outstanding guard.
+Those samples describe source debt and live custody, not mailbox occupancy
+at receive. One schedule can have a reply already queued at the same source
+counts where another schedule still needs its worker to run. The retained
+receipt gives no useful numeric bound on the running/parked fraction.
+
+After an atomic empty-check and arm, the source can commit to receiving the
+wake before removing a result. The acknowledgement and FIFO head removal
+then use a single state update. A worker delayed between claim and send
+still owes the wake. The source does not take a frame during that gap,
+so this path cannot turn its current wake into an empty acknowledgement.
+The new QNT case checks that the first result returns its own credit,
+that the next input can reuse it while an older sibling remains queued,
+and that no additional wake is issued. Actual frame release must still
+follow the existing source-side validation, independently of the FIFO pop.
+
+The parked fixture already measured acknowledgement fused with pop.
+Committing to receive removes the separate stale-drain update in that
+scenario, but does not remove the parked arm or improve the measured
+parked singleton's operation count. The existing Mailbox wait checks its
+own inbox. A separate FIFO must register its wait against the same state
+that publication updates. Dropping that registration reintroduces the
+model's stale-empty-check counterexample. Arming on the previous pop
+instead would cover source validation and refill, issuing wakes while
+the source is still running. Absorbing the arm requires a scheduler-owned
+wait operation coupled to FIFO publication. No such operation was found
+in the current path, and modifying the SDK is outside this experiment.
+
+The prior fixture's roughly 51.5 percent running-path break-even estimate
+remains illustrative, since its parked deltas disagree in sign. The
+committed-receive scenario closes an ownership alternative, not the
+performance gate. No fixture or business workload was rerun.
+
+## Reuse of the installed Mailbox boundary
+
+The installed Gambit reports ea114fc, matching the locally available source
+revision ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f. The installed mailbox
+declarations and library symbols agree with the local source interfaces.
+Gerbil's local Actor send delegates to `thread-send`. In Gambit
+`lib/_thread.scm`, `##thread-send` checks the heap, locks the mailbox, appends
+one value, unlocks, and signals its condition variable. The corresponding
+receive first checks for a queued node, then on an empty result locks and
+rechecks that same FIFO before committing the condition wait. Signal does
+not append a second message. An empty condition wait queue needs no thread
+to be put back on the run queue. The notification here is distinct from
+the separate Scheme wake-token message in the ready-edge prototype.
+
+The mailbox already owns the only useful combined wait boundary. A ready
+frame outside the inbox cannot satisfy its empty check. Publishing it without
+an inbox entry and relying on a later completion to wake the source can strand
+the last result or delay the first retirement. The new model counterexample
+covers the empty-inbox case. Joining multiple ready results into one inbox
+entry would require a publisher that already owns the others in publication
+order, or synchronized shared staging. Op62's independent workers publish
+one verified frame at a time. Waiting to collect a batch delays its first
+result and therefore its credit and next refill.
+
+The source also separates allocation from handoff: `lib/_fifo#.scm` allocates
+a queue-node pair for every send. The op62 reply value is another pair with
+the immutable request identity and the mutable frame. A packed identity may
+remove that outer pair, but it retains the node allocation, enqueue, receive
+and condition signaling and adds decoding plus slot lookup. Passing a bare
+mutable frame drops stale-generation protection. Private mailbox fields
+would couple the library to runtime internals and are outside this candidate.
+No alternative examined removes a recurring handoff within the current public
+boundary while preserving FIFO, independent retirement and immediate refill.

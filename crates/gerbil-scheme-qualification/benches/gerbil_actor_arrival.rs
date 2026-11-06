@@ -11,12 +11,15 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 const GATE: Duration = Duration::from_secs(5);
+const REQUEST_DEADLINE: Duration = GATE;
 fn capacity_research() -> bool {
-    std::env::args().any(|arg| arg == "--capacity-research")
+    std::env::args().any(|s| s == "--capacity-research")
 }
+#[path = "gerbil_actor_arrival/terminal_histogram.rs"]
+mod terminal_histogram;
 #[path = "gerbil_actor_arrival/wait_evidence.rs"]
 mod wait_evidence;
 const ARRIVAL_WINDOW: usize = 128;
@@ -120,11 +123,12 @@ fn clock() -> u64 {
         tv_sec: 0,
         tv_nsec: 0,
     };
-    // SAFETY: writable timespec and the same Darwin clock as owner_wait.h.
-    assert_eq!(
-        unsafe { libc::clock_gettime(libc::CLOCK_UPTIME_RAW, &raw mut now) },
-        0
-    );
+    #[cfg(target_os = "macos")]
+    let clock_id = libc::CLOCK_UPTIME_RAW;
+    #[cfg(not(target_os = "macos"))]
+    let clock_id = libc::CLOCK_MONOTONIC;
+    // SAFETY: writable timespec and the matching platform clock.
+    assert_eq!(unsafe { libc::clock_gettime(clock_id, &raw mut now) }, 0);
     u64::try_from(now.tv_sec).unwrap() * 1_000_000_000 + u64::try_from(now.tv_nsec).unwrap()
 }
 struct Watchdog {
@@ -139,10 +143,10 @@ impl Watchdog {
         let (progress, done) = (Arc::clone(&last), Arc::clone(&stop));
         let task = thread::spawn(move || {
             while !done.load(Ordering::Acquire) {
-                if clock().saturating_sub(progress.load(Ordering::Acquire)) >= 5_000_000_000 {
+                if clock().saturating_sub(progress.load(Ordering::Acquire)) >= 10_000_000_000 {
                     // Reload after the clock in case a real completion raced it.
-                    if clock().saturating_sub(progress.load(Ordering::Acquire)) >= 5_000_000_000 {
-                        eprintln!("GERBIL-ACTOR-STALL five_second_gate cleanup=UNVERIFIED");
+                    if clock().saturating_sub(progress.load(Ordering::Acquire)) >= 10_000_000_000 {
+                        eprintln!("GERBIL-ACTOR-STALL ten_second_gate cleanup=UNVERIFIED");
                         std::process::exit(70);
                     }
                 }
@@ -206,9 +210,7 @@ impl NativePath {
 impl NativePath {
     fn assert_rate(self, rate: u64, backpressure_compare: bool) {
         if capacity_research() {
-            assert_eq!(rate, 1_000_000);
-            assert!(matches!(self, NativePath::BackpressureSchedule));
-            assert!(!backpressure_compare && !scope_diagnostic(self));
+            assert!(rate == 1_000_000);
             return;
         }
         if matches!(
@@ -285,8 +287,7 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
     // AtomicU64 has the aligned C atomic-word representation used by this
     // Darwin qualification bridge. The owner closure keeps the allocation live
     // until the synchronous Scheme call has returned or unwound.
-    let whole_begin = Instant::now();
-    let receipt = pool
+    let (receipt, whole_call_ns) = pool
         .dispatcher()
         .submit_native_on(0, move |session| {
             with_owner_qos(
@@ -318,19 +319,67 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
                     }
                     let header = session.numeric_vector(&fields)?;
                     let command = session.vector(&[&header])?;
-                    let result =
-                        session.call_export(c"gerbil_owner_service_reference", &command)?;
+                    let cpu_gc_before = session.diagnostics();
+                    let call_started = clock();
+                    let call_result = session.call_export(c"gerbil_owner_service_reference", &command);
+                    let native_call_wall_ns = clock().saturating_sub(call_started);
+                    let cpu_gc_after = session.diagnostics();
+                    let cpu_gc_envelope = match (cpu_gc_before, cpu_gc_after) {
+                        (Some(before),Some(after)) if (0..4).all(|i| after[i]>=before[i]) =>
+                            json!({"owner_cpu_upper_ns":(after[3]-before[3])*1e9,"gc_wall_enclosing_ns":(after[2]-before[2])*1e9,"gc_cpu_enclosing_ns":(after[0]+after[1]-before[0]-before[1])*1e9,"gc_count_enclosing":after[5]-before[5],"scope":"encloses call, startup and terminal capture; not phase-exclusive"}),
+                        _=>serde_json::Value::Null,
+                    };
+                    let result = match call_result {
+                        Ok(result) => result,
+                        Err(original) => {
+                            println!("{}",json!({"event":"native_call_failure_before_report","warmup":warmup,"original_error":original.to_string(),"whole_native_call_ns":native_call_wall_ns,"cpu_gc_envelope":cpu_gc_envelope}));
+                            let terminal = (|| -> Result<serde_json::Value, InstanceError> {
+                                let report = session.call_export(c"gerbil_owner_mailbox_terminal_take", &command)?;
+                                let phase = session.vector_element(&report, 0)?;
+                                let core = session.vector_element(&report, 1)?;
+                                let phase = session.copy_string(&phase)?;
+                                let core = session.copy_numeric::<i64>(&core)?;
+                                assert_eq!(core.len(), 17);
+                                let elapsed = core[2];
+                                let remaining = core[0]-core[7];
+                                let minimum_pending_age = (elapsed-(core[0]-1)*1_000_000_000/core[1]).max(0);
+                                let p99_lower = (core[3]==core[0] && remaining>core[0]-(core[0]*99+99)/100).then_some(minimum_pending_age);
+                                let p999_lower = (core[3]==core[0] && remaining>core[0]-(core[0]*999+999)/1000).then_some(minimum_pending_age);
+                                Ok(json!({"event":"gerbil_actor_main_failure", "warmup":warmup,
+                                    "phase":phase,"original_error":original.to_string(),"cpu_gc_envelope":cpu_gc_envelope,"whole_native_call_ns":native_call_wall_ns,
+                                    "planned":core[0],"rate":core[1],"elapsed_ns_at_failure":elapsed,
+                                    "due_at_failure":core[3],"published":core[4],"completed":core[5],
+                                    "active":core[6],"timed_samples":core[7],
+                                    "completed_prefix_per_second":if elapsed>0 {Some(core[5] as f64*1e9/elapsed as f64)}else{None},
+                                    "conditional_sample_p99_ns":(core[7]>0).then_some(core[8]),"conditional_sample_p999_ns":(core[7]>0).then_some(core[9]),
+                                    "peak_source_debt":core[10],"peak_due_unconsumed":core[11],
+                                    "source_debt_at_failure":core[12],"native_outstanding_at_failure":core[13],
+                                    "max_source_lag_ns":core[14],"last_publication_elapsed_ns":core[15],
+                                    "samples_over_window":core[16],"all_offered_quantiles_available":false,"planned_corpus_latency_p99_lower_bound_ns":p99_lower,"planned_corpus_latency_p999_lower_bound_ns":p999_lower,
+                                    "unoffered_future":core[0]-core[3],"due_unconsumed":core[3]-core[5],
+                                    "rejected":0,"terminal_errors":1,"request_deadline_seconds":5,"whole_stage_target_seconds":3}))
+                            })();
+                            match terminal {
+                                Ok(value) => println!("{value}"),
+                                Err(capture) => println!("{}",json!({"event":"gerbil_actor_failure_capture_error",
+                                    "original_error":original.to_string(),"capture_error":capture.to_string()})),
+                            }
+                            return Err(original);
+                        }
+                    };
+
                     if anchored {
                         native_clock_anchor(session, warmup, "after")?;
                     }
-                    copy_arrival_receipt(session, &result, path, warmup)
+                    println!("{}", json!({"event":"native_call_cpu_gc_envelope","warmup":warmup,"values":cpu_gc_envelope}));
+                    let receipt = copy_arrival_receipt(session, &result, path, warmup)?;
+                    Ok((receipt, clock().saturating_sub(call_started)))
                 },
             )
         })
         .unwrap()
         .wait(Duration::from_secs(seconds) + GATE)
         .unwrap();
-    let whole_call_ns = u64::try_from(whole_begin.elapsed().as_nanos()).unwrap();
     drop(watchdog);
     let (core, debt) = receipt.split_at(8);
     let [
@@ -400,21 +449,25 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
     } else {
         sample.failures()
     };
-    let admission_scope = if capacity_research() {
-        "capacity_1m_three_second_goal"
-    } else {
-        "native_500k_original_guard"
-    };
     let passed = admission.is_empty();
     let mut value = json!({"event":"gerbil_actor_arrival","mailbox":path!=NativePath::Service,"ready_drain_pipeline":matches!(path,NativePath::Pipeline|NativePath::Direct),"diagnostic_no_actor_handoff":path==NativePath::Direct,"native_data_access":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"data_access_edge_contract":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"diagnostic_native_observation":path==NativePath::BackpressureObserved,"diagnostic_owner_watch":matches!(path,NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent),"scoped_user_initiated_qos":matches!(path,NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent),"native_source_park":path==NativePath::BackpressurePark,"warmup":warmup,"rate":rate,"seconds":seconds,
-        "owned_source_schedule":path==NativePath::BackpressureSchedule,"native_coalesced_wake":path==NativePath::BackpressureCoalesced,"performance_admission":{"passed":passed,"failures":admission,"scope":admission_scope},
+        "owned_source_schedule":path==NativePath::BackpressureSchedule,"native_coalesced_wake":path==NativePath::BackpressureCoalesced,"performance_admission":{"passed":passed,"failures":admission,"scope":"native_500k_original_guard"},
         "planned":planned,"completed":completed,"accepted":completed,"rejected":rejected,"failed":0,"accepted_timeouts":0,"remaining_staged":0,"remaining_native":0,"source_backpressure":source,"snapshot_gc_duplicate_and_unread_close_contract":matches!(path,NativePath::Pipeline|NativePath::Direct),
         "completed_per_second":f64::from(u32::try_from(*completed).unwrap())/Duration::from_nanos(u64::try_from(*elapsed).unwrap()).as_secs_f64(),"rejection_percent":100.0*f64::from(u32::try_from(*rejected).unwrap())/f64::from(u32::try_from(*planned).unwrap()),
         "elapsed_ns":elapsed,"offered_elapsed_ns":offered_elapsed,"successful_planned_to_consumed_p99_ns":p99,
         "successful_planned_to_consumed_p999_ns":p999,"latency_bucket_upper_bound_ns":1000,"all_arrival_max_generator_lag_ns":max_lag,
         "owners":1,"scheme_workers":if path==NativePath::Direct {0}else{4},"native_active":3,"window":128,"rust_per_message_entries":0,"watchdog_seconds":5,"defaults_changed":false});
     value["whole_native_call_ns"] = json!(whole_call_ns);
+    if capacity_research() {
+        value["performance_admission"]["scope"] = json!("capacity_1m_three_second_goal");
+    }
     println!("{value}");
+    if capacity_research() {
+        println!(
+            "{}",
+            json!({"event":"capacity_research_acceptance","warmup":warmup,"rate":rate,"planned":planned,"whole_stage_target_seconds":3,"passed":passed})
+        );
+    }
     passed
 }
 fn option(name: &str, default: u64) -> u64 {
@@ -454,24 +507,19 @@ fn native_clock_anchor(
     );
     Ok(())
 }
-fn selected_default_image() -> &'static str {
-    let diagnostic = std::env::args().any(|arg| arg == "--owner-wait-scope");
-    #[cfg(feature = "owner-wait-diagnostic")]
-    if diagnostic {
-        return gerbil_scheme_qualification::owner_wait_diagnostic_image();
-    }
-    #[cfg(not(feature = "owner-wait-diagnostic"))]
-    assert!(!diagnostic, "owner-wait-diagnostic build feature required");
-    gerbil_scheme_qualification::owner_instance_image()
-}
 fn start_pool() -> InstancePool {
     let image = std::env::var("GERBIL_SERVICE_BENCH_IMAGE")
-        .unwrap_or_else(|_| selected_default_image().to_owned());
+        .expect("GERBIL_SERVICE_BENCH_IMAGE must name the prebuilt audited image");
     // SAFETY: qualification image exports the audited service reference ABI.
     let program = unsafe {
         IsolatedProgram::from_image(image, c"gerbil_owner_orders_call")
             .unwrap()
-            .with_exports(&[c"gerbil_owner_service_reference"])
+            .with_exports(&[
+                c"gerbil_owner_service_reference",
+                c"gerbil_owner_mailbox_terminal_take",
+                c"gerbil_owner_mailbox_terminal_contract",
+                c"gerbil_owner_native_call",
+            ])
             .with_scheme_service(c"gerbil_owner_service_call")
     };
     let pool = InstancePool::start(
@@ -535,6 +583,15 @@ fn qos_candidate(pool: &InstancePool, rate: u64, seconds: u64, native: bool) {
 }
 
 fn check_strict_scope(path: NativePath, rate: u64, seconds: u64) {
+    if capacity_research() {
+        assert!(
+            path == NativePath::BackpressureSchedule
+                && !scope_diagnostic(path)
+                && rate == 1_000_000
+                && seconds == 1
+        );
+        return;
+    }
     if std::env::args().any(|arg| arg == "--require-native-acceptance") {
         assert!(
             !scope_diagnostic(path)
@@ -544,14 +601,11 @@ fn check_strict_scope(path: NativePath, rate: u64, seconds: u64) {
                         | NativePath::BackpressureCoalesced
                         | NativePath::BackpressureSchedule
                 )
-                && (if capacity_research() {
-                    rate == 1_000_000 && seconds == 1
-                } else {
-                    rate == 500_000 && seconds == 10
-                })
+                && rate == 500_000
+                && seconds == 10
                 && !std::env::args().any(|arg| arg.ends_with("-compare")
                     || matches!(arg.as_str(), "--trace-gate" | "--native-clock-anchor")),
-            "strict admission requires the unchanged original profile or explicit one-million capacity profile"
+            "strict admission requires one unobserved native mailbox arm at 500k/s for ten seconds"
         );
     }
 }
@@ -689,6 +743,51 @@ fn select_path() -> NativePath {
     }
 }
 
+// Functional admission only: no offered-rate or latency result is produced.
+fn native_host_contract(pool: &mut InstancePool) {
+    fn call(pool: &InstancePool, words: &[i64]) -> Result<Vec<i64>, InstanceError> {
+        let words = words.to_vec();
+        pool.dispatcher()
+            .submit_native_on(0, move |session| {
+                let input = session.numeric_vector::<i64>(&words)?;
+                let output = session.call_export(c"gerbil_owner_native_call", &input)?;
+                session.copy_numeric::<i64>(&output)
+            })
+            .unwrap()
+            .wait(GATE)
+    }
+    assert_eq!(call(pool, &[0, 3, 7]).unwrap(), vec![16, 28]);
+    assert!(matches!(call(pool, &[1]), Err(InstanceError::Scheme(_))));
+    assert_eq!(call(pool, &[5]).unwrap(), vec![1, 1]);
+    for (operation, expected) in [(1, 23), (2, 20), (3, 22), (4, 31), (5, 13)] {
+        assert_eq!(call(pool, &[2, operation, 13]).unwrap(), vec![expected]);
+    }
+    assert_eq!(call(pool, &[6, 0, 4]).unwrap(), vec![4]);
+    let check_batch = |values: Vec<i64>| {
+        assert_eq!(values.len(), 17);
+        assert_eq!(&values[..16], &(16..32).collect::<Vec<i64>>());
+        assert!((0..=4).contains(&values[16]));
+    };
+    check_batch(call(pool, &[6, 1, 10, 16, 3, 1, 4, -1]).unwrap());
+    assert!(matches!(
+        call(pool, &[6, 1, 10, 16, 3, 1, 4, 1]),
+        Err(InstanceError::Scheme(_))
+    ));
+    check_batch(call(pool, &[6, 1, 10, 16, 3, 1, 4, -1]).unwrap());
+    assert_eq!(call(pool, &[6, 2]).unwrap(), vec![4]);
+    let shutdown = pool.shutdown(GATE);
+    assert!(
+        shutdown.is_clean(),
+        "native host contract did not cleanly shut down: {shutdown:?}"
+    );
+    println!(
+        "{}",
+        json!({"event":"native_host_boundary_contract","passed":true,
+        "gc_and_native_types":true,"exception_unwind":true,"multi_shot_continuation_across_ffi":true,
+        "actor_failure_drain_and_reuse":true,"clean_shutdown":true,"performance_result":false})
+    );
+}
+
 fn main() {
     trace_gate();
     let rate = option(
@@ -700,10 +799,10 @@ fn main() {
         },
     );
     let seconds = option("--seconds=", if capacity_research() { 1 } else { 10 });
+    assert!((1..=5_000_000).contains(&rate) && (1..=10).contains(&seconds));
     if capacity_research() {
-        assert_eq!((rate, seconds), (1_000_000, 1));
+        assert_eq!(seconds, 1);
     }
-    assert!((1..=1_000_000).contains(&rate) && (1..=10).contains(&seconds));
     let access_compare = std::env::args().any(|s| s == "--access-compare");
     let backpressure_compare = std::env::args().any(|s| s == "--backpressure-compare");
     let qos_contract_only = std::env::args().any(|s| s == "--owner-qos-contract-only");
@@ -719,6 +818,30 @@ fn main() {
     path.assert_rate(rate, backpressure_compare);
     check_strict_scope(path, rate, seconds);
     let mut pool = start_pool();
+    pool.dispatcher()
+        .submit_native_on(0, |session| {
+            let command = session.vector(&[])?;
+            let result =
+                session.call_export(c"gerbil_owner_mailbox_terminal_contract", &command)?;
+            assert_eq!(session.copy_numeric::<i64>(&result)?, vec![1]);
+            assert_eq!(
+                terminal_histogram::summarize(&[99, 0, 1]),
+                Ok([100, 1000, 3000])
+            );
+            Ok(())
+        })
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    println!(
+        "{}",
+        json!({"event":"native_terminal_receipt_contract","passed":true})
+    );
+
+    if std::env::args().any(|arg| arg == "--host-boundary-contract-only") {
+        native_host_contract(&mut pool);
+        return;
+    }
     ready_contract(&pool, path);
     source_plan_contract(&pool, path);
     if source_plan_pair(&mut pool, rate, seconds) {

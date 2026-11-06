@@ -55,6 +55,8 @@ static void mailbox_owner_read_clock(struct mailbox_owner_clock *sample) {
  * runs per completion; self CPU/GC reads run once per original source window or
  * at the end of a witnessed stall. No progress notification is manufactured. */
 void gerbil_mailbox_native_progress(uint64_t previous, uint64_t now) {
+  /* The fixed owner starts and stops this private-image watch. */
+  if (!mailbox_owner_watch.active) return;
   if (!mailbox_owner_watch_owner) return;
   int witness = previous >= mailbox_owner_watch.started &&
     previous == __atomic_load_n(&mailbox_owner_watch.witness_begin, __ATOMIC_ACQUIRE);

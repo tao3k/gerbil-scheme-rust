@@ -12,10 +12,13 @@ publish = false
 [dependencies]
 gerbil-scheme-sys.workspace = true
 simdutf8.workspace = true
+arrow-array = { workspace = true, optional = true }
+arrow-schema = { workspace = true, optional = true }
 libc = { version = "=0.2.186", optional = true }
 tokio = { workspace = true, optional = true, features = ["time"] }
 
 [features]
+arrow = ["dep:arrow-array", "dep:arrow-schema"]
 isolated-instances = ["dep:libc"]
 tokio-dispatch = ["isolated-instances", "dep:tokio"]
 arrival-clock = ["tokio-dispatch", "tokio/net"]

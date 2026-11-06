@@ -45,6 +45,8 @@ pkg-config = "0.3"
 cbindgen = "0.29.4"
 divan = "0.1.21"
 simdutf8 = "0.1.5"
+arrow-array = { version = "58.4.0", features = ["ffi"] }
+arrow-schema = "58.4.0"
 tokio = { version = "1", features = ["full"] }
 gerbil-scheme-aot-build = { path = "build-support/gerbil-scheme-aot-build" }
 gerbil-scheme-rust-project-harness-policy = { path = "build-support/gerbil-scheme-rust-project-harness-policy" }

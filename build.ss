@@ -16,6 +16,7 @@
       "scheme/service-work.ss" "scheme/service-work-activation.ss" "scheme/service-work-turn.ss" "scheme/service-runtime.ss" "scheme/service-native.ss")))
     "scheme/runtime-host"
     "scheme/actor-batch"
+    "scheme/arrow"
     (gxc: "scheme/async-service" (extra-inputs: ("scheme/service-port-wake.ss")))
     "scheme/program-metadata"
     (gxc: "scheme/program-build" (extra-inputs: ("scheme/link-options.ss")))

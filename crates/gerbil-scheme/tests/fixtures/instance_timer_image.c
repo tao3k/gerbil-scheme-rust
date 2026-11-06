@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
+#include "instance_loader.h"
 static _Atomic int notifier_alive;
 static void *(*notifier_entry)(void *);
 static void *joined_entry(void *argument) {
@@ -30,8 +31,11 @@ static void tick(int signal_number) { (void)signal_number; atomic_fetch_add(&cou
 #define API __attribute__((visibility("default")))
 API int timer_retiring(void) { return atomic_load(&notifier_alive); }
 API unsigned timer_count(void) { return atomic_load(&count); }
+API int timer_open(gerbil_instance_close_fn close_function) {
+  gerbil_scheme_instance_bind_loader(close_function);
+  return gerbil_timer_init_owner();
+}
 API int timer_start(long first, long period) {
-  gerbil_timer_init_owner();
   struct sigaction action = {0};
   action.sa_handler = tick;
   sigemptyset(&action.sa_mask);
@@ -55,3 +59,8 @@ API int timer_invalid(void) {
   return setitimer(ITIMER_REAL, &interval, NULL) == -1 && errno == EINVAL;
 }
 API void timer_close(void) { if (gerbil_timer_cleanup() != 0 || gerbil_timer_status() != 0) abort(); }
+API int timer_release(void) {
+  return gerbil_scheme_instance_pending_modules() == 1
+      && gerbil_scheme_instance_release_modules() == 0
+      && gerbil_scheme_instance_pending_modules() == 0;
+}

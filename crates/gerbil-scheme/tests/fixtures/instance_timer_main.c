@@ -14,6 +14,7 @@ typedef struct {
   int (*invalid)(void);
   void (*close)(void);
   int (*retiring)(void);
+  int (*release)(void);
 } Timer;
 static volatile sig_atomic_t host_ticks;
 static void host_tick(int number) { (void)number; ++host_ticks; }
@@ -26,9 +27,12 @@ static Timer load(const char *path) {
   void *image = dlopen(path, RTLD_NOW | RTLD_LOCAL);
   if (!image) fprintf(stderr, "%s\n", dlerror());
   assert(image);
+  int (*open_timer)(int (*)(void *)) = dlsym(image,"timer_open");
+  assert(open_timer && open_timer(dlclose) == 0);
   Timer timer = {image, dlsym(image,"timer_count"), dlsym(image,"timer_start"),
-    dlsym(image,"timer_mask"), dlsym(image,"timer_invalid"), dlsym(image,"timer_close"), dlsym(image,"timer_retiring")};
-  assert(timer.count && timer.start && timer.mask && timer.invalid && timer.close);
+    dlsym(image,"timer_mask"), dlsym(image,"timer_invalid"), dlsym(image,"timer_close"),
+    dlsym(image,"timer_retiring"), dlsym(image,"timer_release")};
+  assert(timer.count && timer.start && timer.mask && timer.invalid && timer.close && timer.retiring && timer.release);
   return timer;
 }
 static void wait_ticks(Timer timer, unsigned minimum) {
@@ -72,9 +76,10 @@ int main(int argc, char **argv) {
   wait_ticks(b,other+5);
   assert(a.count() == stopped);
   a.close();
+  assert(a.release());
   assert(dlclose(a.image) == 0);
   wait_ticks(b,other+7);
-  b.close(); assert(!b.retiring()); assert(dlclose(b.image) == 0);
+  b.close(); assert(!b.retiring()); assert(b.release()); assert(dlclose(b.image) == 0);
   double deadline = now()+2;
   while (host_ticks == 0) { assert(now()<deadline); usleep(500); }
   assert(sigaction(SIGALRM,NULL,&current) == 0 && current.sa_handler == host_tick);

@@ -11,7 +11,7 @@ mod arrow;
 #[cfg(not(feature = "external-program"))]
 mod build;
 #[cfg(feature = "arrow")]
-pub use arrow::{ArrowBatchExport, LinkedArrowExport};
+pub use arrow::{ArrowArrayExport, ArrowBatchExport, LinkedArrowExport, LinkedArrowProducer};
 mod capabilities;
 mod integer;
 mod lifecycle;

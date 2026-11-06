@@ -50,6 +50,13 @@ jobs:
           cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
           cargo clippy --workspace --all-targets --locked -- -D warnings
 
+      - name: Arrow C Data native round trip
+        run: |
+          cargo test -p gerbil-scheme --features arrow --lib --locked runtime::arrow::
+          cargo clippy -p gerbil-scheme --features arrow --lib --locked -- -D warnings
+          cargo test -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked
+          cargo clippy -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked -- -D warnings
+
       - name: Record unsupported SMP qualification
         run: |
           echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned Gerbil toolchain does not support. This is not an SMP pass.'

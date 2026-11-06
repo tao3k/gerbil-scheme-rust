@@ -92,6 +92,39 @@ fn main() -> Result<(), gerbil_scheme::NativeError> {
 }
 #+end_src
 
+** Arrow C Data
+
+Enable the Rust =gerbil-scheme/arrow= feature to exchange native Arrow arrays
+and record batches with an initialized AOT Scheme owner. Build the Scheme
+module through the ordinary =build.ss= package entrypoint and import
+=:gerbil-scheme-rust/scheme/arrow=.
+
+- =ArrowBatchExport= and =ArrowArrayExport= retain the Arrow buffers for the
+  duration of a synchronous =bind_arrow_export= call. The Scheme view expires
+  when the call returns or raises.
+- =gerbil-rs-arrow-ref= projects Arrow nulls, primitive values, decimal and
+  temporal values, text and binary, nested containers, unions, dictionaries
+  and run-end arrays. The schema view exposes the original format, field
+  name, flags and metadata. Temporal values use exact ticks in the schema's
+  unit, and decimals become exact Scheme numbers. The null sentinel is
+  distinct from a valid =#f=.
+- =bind_arrow_producer= accepts an AOT producer that initializes owned
+  =ArrowArray= and =ArrowSchema= descriptors. A Scheme producer can use
+  =gerbil-rs-arrow-output= and =gerbil-rs-arrow-export-physical!= to supply
+  a schema-directed layout with homogeneous Scheme vectors. The SDK copies
+  those vectors into C-owned storage. Rust imports that storage through
+  Arrow's native C Data importer. The producer's release callbacks must
+  remain usable after the Scheme owner exits and on a Rust consumer thread.
+
+The handoff shares Arrow buffers. Projecting a string, bytevector or nested
+cell into an ordinary Scheme value materializes that value. Application
+mappings for Scheme-specific objects such as symbols, procedures, rational
+numbers outside a declared decimal scale and arbitrary hash tables need an
+explicit Arrow representation.
+
+Run the native SDK round trip with
+=cargo test -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked=.
+
 * Benchmarks and evidence
 
 Benchmarks live under =benches/= and run through Justfile entry points.

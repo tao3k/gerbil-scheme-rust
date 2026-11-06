@@ -47,3 +47,16 @@ pub fn owner_failure_image(after_native_setup: bool) -> &'static str {
 pub fn owner_capture_failure_image() -> &'static str {
     env!("GERBIL_OWNER_FAIL_CAPTURE_IMAGE")
 }
+
+/// The compiler-owned Gerbil graph for the Arrow C Data round trip.
+#[cfg(feature = "arrow-aot")]
+#[must_use]
+pub fn linked_arrow_program() -> gerbil_scheme::LinkedGerbilProgram {
+    unsafe extern "C" {
+        fn ___LNK_gerbil__arrow__qualification(
+            state: *mut gerbil_scheme_sys::GerbilGlobalState,
+        ) -> *mut gerbil_scheme_sys::GerbilModuleOrLink;
+    }
+    // SAFETY: build.rs links the complete Arrow qualification graph.
+    unsafe { gerbil_scheme::LinkedGerbilProgram::from_linker(___LNK_gerbil__arrow__qualification) }
+}

@@ -23,7 +23,7 @@ pub use gerbil_scheme_sys::{
 
 mod runtime;
 #[cfg(feature = "arrow")]
-pub use runtime::{ArrowBatchExport, LinkedArrowExport};
+pub use runtime::{ArrowArrayExport, ArrowBatchExport, LinkedArrowExport, LinkedArrowProducer};
 pub use runtime::{
     BigIntegerBuffer, BinaryInteger, CollectionKind, IdentifierBuffer, IdentifierKind, NumberKind,
     NumericBuffer, NumericElement, ObjectKind, RootedObjectBatch, RootedSchemeCollection,

@@ -83,7 +83,8 @@ fn main() {
     track_native_sources();
     let actor_aot = env::var_os("CARGO_FEATURE_ACTOR_AOT").is_some();
     let instance_probe = env::var_os("CARGO_FEATURE_INSTANCE_PROBE").is_some();
-    if !actor_aot && !instance_probe {
+    let arrow_aot = env::var_os("CARGO_FEATURE_ARROW_AOT").is_some();
+    if !actor_aot && !instance_probe && !arrow_aot {
         return;
     }
     let workspace = source_workspace()
@@ -113,6 +114,12 @@ fn main() {
             "actor qualification producer modules",
         )
         .expect("compile producer modules");
+    if arrow_aot {
+        build_arrow_program(&workspace, &package, &out, &gerbil_path, &progress);
+    }
+    if !actor_aot && !instance_probe {
+        return;
+    }
     let source = package.join("scheme/actors.ss");
     let controls = package.join("scheme/utf8-controls.ss");
     let mailbox_failure = package.join("scheme/mailbox-failure.ss");
@@ -173,5 +180,55 @@ fn main() {
         for directive in receipt.cargo_directives {
             println!("{}", directive.line());
         }
+    }
+}
+
+fn build_arrow_program(
+    workspace: &std::path::Path,
+    package: &std::path::Path,
+    out: &std::path::Path,
+    gerbil_path: &std::path::Path,
+    progress: &Progress,
+) {
+    println!("cargo:rerun-if-changed=scheme/arrow-qualification.ss");
+    let source = package.join("scheme/arrow-qualification.ss");
+    let stage = out.join("arrow-stage");
+    fs::create_dir_all(&stage).expect("Arrow stage directory");
+    let expression = format!(
+        r"(import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build) (compile-module {:?} [output-dir: {:?} invoke-gsc: #f optimize: #t static: #t]) (gerbil-rs-stage-program {:?} {:?})",
+        source.to_str().expect("UTF-8 Arrow source path"),
+        gerbil_path
+            .join("lib")
+            .to_str()
+            .expect("UTF-8 library path"),
+        source.to_str().expect("UTF-8 Arrow source path"),
+        stage.to_str().expect("UTF-8 Arrow stage path"),
+    );
+    let mut command = gerbil_command("gxi");
+    command
+        .args(["-e", &expression])
+        .current_dir(workspace)
+        .env("GERBIL_PATH", gerbil_path);
+    progress
+        .run(
+            &mut command,
+            "program-graph",
+            "Arrow qualification compiler graph",
+        )
+        .expect("stage Arrow compiler-owned graph");
+    let gsc = discover_gambit_gsc_from_env().expect("paired Gambit compiler");
+    let receipt = build_program_archive_observed(
+        ProgramArchiveRequest {
+            manifest: &stage.join("program.json"),
+            gsc: &gsc,
+            archive_name: "gerbil_arrow_qualification",
+            linker_name: "gerbil_arrow_qualification",
+            out_dir: &out.join("arrow-archive"),
+        },
+        progress,
+    )
+    .expect("full Gerbil Arrow program archive");
+    for directive in receipt.cargo_directives {
+        println!("{}", directive.line());
     }
 }

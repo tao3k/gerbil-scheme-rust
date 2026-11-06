@@ -14,7 +14,7 @@ frontend subprocess wrapper or consumer-owned scheduler is introduced.
 | build_package | Load the package build.ss and call its main with compile |
 | clean_package | Invoke the package-owned build.ss clean action through the same C ABI owner |
 | run_package_main | Call the actual build.ss main with ordinary checked arguments |
-| test_package | Call :gerbil/tools/gxtest main with explicit test selection |
+| test_package | Run the official functional GxTest harness over a nonempty file selection |
 | stage_package_program | Stage the compiler-owned AOT manifest with rooted module imports |
 | build_package_spec | Compile an existing Scheme declaration using std/make |
 | stage_package_load_closure | Stage the existing rooted module resource closure |
@@ -27,7 +27,18 @@ These are not hypothetical official C symbols named gerbil_build or gerbil_test.
 The Scheme adapter calls existing Gerbil procedures; it does not replace
 PackageSpec, the compiler, the test harness or the package's build language.
 
+The package entry preserves init-owned build dispatch. For a Yuanxu build,
+use =build_package= or =run_package_main= so the package's =build.ss= can
+consume and publish its selected projection. =build_package_spec= is the
+lower-level interface for a plain =std/make= specification.
+
+For tests, GxTest discovers explicit files and directories. The Bridge
+rejects empty discovery and passes that same roster through import and
+execution. This follows the explicit-file boundary of Yuanxu test
+admission while keeping the result and cleanup inside the existing VM.
+
 * Admitted image
+
 
 The default image initializes the native runtime-host, core and UTF-8 modules.
 Stable C projections live in that core. Package implementation =scheme/build.ss=

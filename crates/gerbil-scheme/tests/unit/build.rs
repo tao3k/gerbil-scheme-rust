@@ -83,6 +83,8 @@ fn local_package_environment_is_selected_before_loading_build_script() {
         std::env::vars_os().collect::<std::collections::BTreeMap<_, _>>() == active_environment,
         "package call changed the active owner's environment"
     );
+    fs::create_dir(root.join("empty-tests")).unwrap();
+    assert_eq!(runtime.test_package(directory, "empty-tests").unwrap(), 70);
     assert_eq!(runtime.clean_package(directory).unwrap(), 0);
     assert!(!prefix.join("lib/package-fixture/answer.o1").exists());
     assert!(prefix.join("lib/unrelated/keep").is_file());

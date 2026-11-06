@@ -14,7 +14,6 @@ use std::{
     time::Duration,
 };
 const GATE: Duration = Duration::from_secs(5);
-const REQUEST_DEADLINE: Duration = GATE;
 fn capacity_research() -> bool {
     std::env::args().any(|s| s == "--capacity-research")
 }
@@ -343,19 +342,22 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
                                 let elapsed = core[2];
                                 let remaining = core[0]-core[7];
                                 let minimum_pending_age = (elapsed-(core[0]-1)*1_000_000_000/core[1]).max(0);
-                                let p99_lower = (core[3]==core[0] && remaining>core[0]-(core[0]*99+99)/100).then_some(minimum_pending_age);
-                                let p999_lower = (core[3]==core[0] && remaining>core[0]-(core[0]*999+999)/1000).then_some(minimum_pending_age);
+                                let tail_lower = (core[3]==core[0] && remaining>core[0]-(core[0]*99+99)/100).then_some(minimum_pending_age);
+                                let extreme_lower = (core[3]==core[0] && remaining>core[0]-(core[0]*999+999)/1000).then_some(minimum_pending_age);
                                 Ok(json!({"event":"gerbil_actor_main_failure", "warmup":warmup,
                                     "phase":phase,"original_error":original.to_string(),"cpu_gc_envelope":cpu_gc_envelope,"whole_native_call_ns":native_call_wall_ns,
                                     "planned":core[0],"rate":core[1],"elapsed_ns_at_failure":elapsed,
                                     "due_at_failure":core[3],"published":core[4],"completed":core[5],
                                     "active":core[6],"timed_samples":core[7],
-                                    "completed_prefix_per_second":if elapsed>0 {Some(core[5] as f64*1e9/elapsed as f64)}else{None},
+                                    "completed_prefix_per_second":u64::try_from(elapsed).ok().filter(|&ns| ns > 0).map(|ns| {
+                                        let completed = u32::try_from(core[5]).expect("completed count fits the admitted workload");
+                                        f64::from(completed) / Duration::from_nanos(ns).as_secs_f64()
+                                    }),
                                     "conditional_sample_p99_ns":(core[7]>0).then_some(core[8]),"conditional_sample_p999_ns":(core[7]>0).then_some(core[9]),
                                     "peak_source_debt":core[10],"peak_due_unconsumed":core[11],
                                     "source_debt_at_failure":core[12],"native_outstanding_at_failure":core[13],
                                     "max_source_lag_ns":core[14],"last_publication_elapsed_ns":core[15],
-                                    "samples_over_window":core[16],"all_offered_quantiles_available":false,"planned_corpus_latency_p99_lower_bound_ns":p99_lower,"planned_corpus_latency_p999_lower_bound_ns":p999_lower,
+                                    "samples_over_window":core[16],"all_offered_quantiles_available":false,"planned_corpus_latency_p99_lower_bound_ns":tail_lower,"planned_corpus_latency_p999_lower_bound_ns":extreme_lower,
                                     "unoffered_future":core[0]-core[3],"due_unconsumed":core[3]-core[5],
                                     "rejected":0,"terminal_errors":1,"request_deadline_seconds":5,"whole_stage_target_seconds":3}))
                             })();
@@ -788,6 +790,28 @@ fn native_host_contract(pool: &mut InstancePool) {
     );
 }
 
+fn terminal_receipt_contract(pool: &InstancePool) {
+    pool.dispatcher()
+        .submit_native_on(0, |session| {
+            let command = session.vector(&[])?;
+            let result =
+                session.call_export(c"gerbil_owner_mailbox_terminal_contract", &command)?;
+            assert_eq!(session.copy_numeric::<i64>(&result)?, vec![1]);
+            assert_eq!(
+                terminal_histogram::summarize(&[99, 0, 1]),
+                Ok([100, 1000, 3000])
+            );
+            Ok(())
+        })
+        .unwrap()
+        .wait(GATE)
+        .unwrap();
+    println!(
+        "{}",
+        json!({"event":"native_terminal_receipt_contract","passed":true})
+    );
+}
+
 fn main() {
     trace_gate();
     let rate = option(
@@ -818,25 +842,7 @@ fn main() {
     path.assert_rate(rate, backpressure_compare);
     check_strict_scope(path, rate, seconds);
     let mut pool = start_pool();
-    pool.dispatcher()
-        .submit_native_on(0, |session| {
-            let command = session.vector(&[])?;
-            let result =
-                session.call_export(c"gerbil_owner_mailbox_terminal_contract", &command)?;
-            assert_eq!(session.copy_numeric::<i64>(&result)?, vec![1]);
-            assert_eq!(
-                terminal_histogram::summarize(&[99, 0, 1]),
-                Ok([100, 1000, 3000])
-            );
-            Ok(())
-        })
-        .unwrap()
-        .wait(GATE)
-        .unwrap();
-    println!(
-        "{}",
-        json!({"event":"native_terminal_receipt_contract","passed":true})
-    );
+    terminal_receipt_contract(&pool);
 
     if std::env::args().any(|arg| arg == "--host-boundary-contract-only") {
         native_host_contract(&mut pool);

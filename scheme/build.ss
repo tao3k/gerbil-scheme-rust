@@ -163,12 +163,14 @@
           (unless (and (string? tests) (not (string-empty? tests)))
             (error "nonempty package test path required"))
           (setup-package-env! #f)
-          ;; Evaluate selected entries once for this request; dependencies remain cached.
-          (for-each (lambda (file) (import-module file #t #t))
-                    (collect-files [tests]))
-          ;; CLI main may call exit before package scopes can unwind. The official
-          ;; functional runner keeps discovery, execution and status in GxTest.
-          (run-tests [tests] #f [] 5))))))
+          (def files (collect-files [tests]))
+          (when (null? files)
+            (error "package test selection contains no files" tests))
+          ;; Reload exactly the files admitted by discovery. Pass those file
+          ;; names to GxTest so a second directory scan cannot change the roster.
+          (for-each (lambda (file) (import-module file #t #t)) files)
+          ;; The functional runner returns the verdict before the VM scope unwinds.
+          (run-tests files #f [] 5))))))
 
 (def (package-build-spec directory specification)
   (call-package directory

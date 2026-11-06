@@ -103,6 +103,8 @@ fn build_test_and_failures_share_the_existing_owner() {
     if supervisor::run() {
         return;
     }
+    let started = Instant::now();
+    let report = |phase| eprintln!("PACKAGE-STEP {phase} elapsed={:?}", started.elapsed());
     let root = fixture();
     let environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
     let previous_prefix = std::env::var_os("GERBIL_PATH");
@@ -122,7 +124,9 @@ fn build_test_and_failures_share_the_existing_owner() {
     assert!(!root.join("build-owner.txt").exists());
     let cwd = std::env::current_dir().unwrap();
     assert_eq!(runtime.build_package(directory).unwrap(), 0);
+    report("initial build returned");
     clean_and_rebuild(&runtime, directory);
+    report("clean and rebuild returned");
     assert_eq!(
         fs::read_to_string(root.join("build-owner.txt")).unwrap(),
         std::process::id().to_string()
@@ -179,7 +183,9 @@ fn build_test_and_failures_share_the_existing_owner() {
         "3",
         "each request must evaluate the selected suite module once"
     );
+    report("test and cancellation controls returned");
     stage_and_clean(&runtime, &root);
+    report("stage and clean returned");
     assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
     assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
     let invalid = [0xffu8];
@@ -190,9 +196,9 @@ fn build_test_and_failures_share_the_existing_owner() {
         },
         GerbilStatus::InvalidValue,
     );
-    println!("PACKAGE-STEP runtime cleanup entered");
+    report("runtime cleanup entered");
     drop(runtime);
-    println!("PACKAGE-STEP runtime cleanup returned");
+    report("runtime cleanup returned");
     assert_environment_after_close(&environment);
     assert_directory_rejection(directory.into(), GerbilStatus::RuntimeFinalized);
     println!("PACKAGE-C-ABI-CLEANUP-OK owner={}", std::process::id());

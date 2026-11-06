@@ -50,13 +50,6 @@ jobs:
           cargo bench -p gerbil-scheme --bench tokio_transport --profile dev --locked -- --test
           cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: Arrow C Data native round trip
-        run: |
-          cargo test -p gerbil-scheme --features arrow --lib --locked runtime::arrow::
-          cargo clippy -p gerbil-scheme --features arrow --lib --locked -- -D warnings
-          cargo test -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked
-          cargo clippy -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked -- -D warnings
-
       - name: Record unsupported SMP qualification
         run: |
           echo '::notice::SKIPPED: Scheme multi-processor qualification requires multiple-threaded-vms, which the pinned Gerbil toolchain does not support. This is not an SMP pass.'
@@ -87,6 +80,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
       - name: Set up immutable Gerbil release
         uses: ./.github/actions/setup-gerbil
         with:
@@ -105,6 +100,12 @@ jobs:
           gxi -e '(import (only-in :gerbil/tools/gxtest main)) (exit (main "-g" "-v" "5" "t/link-options-test.ss"))'
           gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
           gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"
+      - name: Arrow C Data native round trip
+        run: |
+          cargo test -p gerbil-scheme --features arrow --lib --locked runtime::arrow::
+          cargo clippy -p gerbil-scheme --features arrow --lib --locked -- -D warnings
+          cargo test -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked
+          cargo clippy -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked -- -D warnings
 
   # Cargo and Bazel own independent build graphs. Keep both complete gates,
   # without spending Bazel's watchdog budget on Cargo compilation first.

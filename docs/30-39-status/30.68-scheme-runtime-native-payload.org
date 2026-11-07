@@ -1,0 +1,263 @@
+#+TITLE: Scheme Runtime boundaries and native payload admission
+#+OPTIONS: toc:2
+
+* Publication status
+
+This report records a withdrawn experiment. Its local implementation commit
+=34a8718a22b05b679c8311c01e4b811ef4b1bce8= was archived and removed from the
+publication branch after the failed performance comparison. The generic payload
+shortcut and its benchmark path are no longer in the active implementation.
+Descriptions below are historical evidence, not current API recommendations.
+The Runtime/type work remains under review; no regressed candidate was pushed.
+
+* Decision and scope
+
+The runtime itself belongs in the existing lifecycle model. Separate request
+queues alone do not isolate a VM's allocator, collector, runnable Scheme threads,
+foreign-call host continuation, or result retirement. Rust distributes owned
+inputs across fixed owners; each owner retains its complete Scheme runtime.
+The native compilation chain, default completion policy and execution budgets
+remain unchanged. No SMP work or additional dispatcher matrix is included.
+
+This change adds a general rooted-payload admission operation and fills concrete
+numeric-tower and table-construction gaps in =NativeSession=. It does not replace
+Scheme object identity with Rust hashing, JSON, text numbers, or copied closures.
+
+* What the existing evidence actually establishes
+
+The preceding native-roundtrip capture reported CPU throughput +6.4879% and mixed
+short native p99 +9.92495%. Those results and its watchdog failures remain valid
+historical negatives. The new comparison does not chain gains across captures.
+
+Joining the seven largest mixed candidate short latencies with their own stage
+observations gives 473.959--512.333 us actual latency, 410.709--506.375 us pending,
+1.583--3.750 us construction, and 0.834--1.208 us projection. Some of those requests
+also have material admission delay (up to 105.875 us). The corresponding seven
+control requests have 431.166--518.416 us actual latency, 420.167--510.458 us pending,
+1.041--1.916 us construction and 0.708--1.125 us projection.
+
+These are same-request observations, not subtraction of pooled percentiles.
+The intervals have their original overlapping scopes and must not be summed.
+Detailed entry and GC diagnostics were disabled in this unobserved capture;
+zero diagnostic placeholders do not prove zero owner wait. The observations
+locate the dominant measured interval after submission. They do not distinguish
+Scheme runnable wait, native event blocking, OS runnable wait, collector CPU,
+or collector wall-clock delay. A large relative construction regression from a
+small base does not establish that construction caused the short p99 regression.
+
+* Runtime protocol and ownership
+
+1. A bounded prepared input consists only of Rust-owned values and existing
+   request/work reservations. It can be cancelled without a Scheme root.
+2. Native construction creates transient owner-local roots. The same processor
+   and heap remain shared with Scheme workers; the Scheme host continuation may
+   be suspended while other green threads execute. A foreign entry is not an
+   exclusive allocation or uninterrupted execution interval.
+3. =SchemeServiceInput::submit_payload= accepts any local =NativeRoot=. When the
+   explicitly retained native submission capability and optional payload ABI
+   are present, it invokes that capability with the payload and the original
+   lane/class/work metadata. It does not allocate a command header vector and
+   outer envelope. The logical cumulative input quota remains identical.
+4. The attempt marker is set immediately before native submission. Unknown
+   failures after this fence follow existing close/drain rules; they cannot
+   re-enter as an unsubmitted request. Repeated attempts are rejected. The
+   payload remains rooted until native admission returns.
+5. The capability calls the original Scheme submission function: identity,
+   capacity validation, Actor affinity, short/bulk queues, cooperative budget,
+   exceptions, readiness epochs and shutdown remain Scheme-owned.
+6. Retiring a result still releases its own roots and permits independently.
+   The generic operation does not recycle an application input graph, move a
+   live Scheme object to another VM, or lend a heap pointer to Rust.
+
+The new symbol is optional. Without the explicit capability or on an older
+image, the operation uses the existing =wrap=/=submit= path. Existing custom
+=construct_service= overrides are not bypassed. Completion-policy changes revoke
+capabilities using the existing protocol. No new global root registry is added.
+
+* Reusing the model
+
+=specs/owner_lifecycle.qnt= extends =service_sharing= rather than adding a second
+capacity/root model. Its existing =prepared= set tracks reservations; the new
+=constructing= and =payloads= subsets distinguish transient native construction
+and a constructed payload from a root-free Rust preparation. Neither transient
+state is a Scheme service root or an accepted service identity.
+
+The refinement exposes construction start/finish, rooted-payload entry,
+capability revocation, and pre-entry discard. Native construction finish,
+entry, harvest, slot transfer and projection require a running owner outside GC.
+Closing prevents new acceptance; discard clears transient custody and releases
+the existing reservation; join requires both transient sets empty. Existing
+service-root, completion epoch, per-result credit and post-entry drain rules
+remain the authority for accepted jobs.
+
+New small/wide witnesses cover GC plus OS suspension during construction,
+resume and entry, pre-entry close/discard, revocation without admission, and a
+mutation that incorrectly advances construction during GC. The sampled step
+includes the new operations. Ticks are abstract delays; the model does not
+predict p99, allocator cost, real GC duration, or OS scheduling. A model pass is
+not native FFI or performance acceptance.
+
+* Scheme-to-Rust type coverage
+
+| Native value | Owner-bound Rust API | Semantics |
+|--------------+----------------------+-----------|
+| Exact integers | Existing =BinaryInteger= | Canonical sign and binary magnitude, no narrowing |
+| Rational and rectangular complex numbers | New =number_batch= / =number_components= with existing =NumberKind= | Scheme canonicalizes; exact components remain rooted |
+| Strong Gambit tables | New =hash_table= with existing =TableEquality= | Official eq?, eqv?, equal?; last duplicate value wins |
+| Gerbil HashTable implementation | New =gerbil_hash_table= | Preserves native Gerbil dispatch and key equality |
+| Scalars, strings, bytevectors, numeric vectors, lists and vectors | Existing native constructors/projections | Reused without serialization |
+| Procedures, continuations and application classes | Existing opaque owner-local roots and application-defined projection | Scheme retains execution and identity; no automatic Send conversion |
+
+Numeric component projection checks the vector length and complete output bound
+before creating a shallow snapshot. The selected components remain rooted after
+the original numeric parent is dropped and GC runs. Native number construction
+uses the existing composite ABI; zero denominators and wrong families fail.
+Complex values can normalize to real values. Table snapshots preserve child
+identity after parent release; iteration order remains unspecified.
+
+This is a concrete coverage extension, not a claim that every Scheme class has
+an automatically generated Rust data representation. In particular, copying an
+identifier's spelling does not copy symbol identity, and copying a continuation
+into another VM is not an authorized transfer.
+
+* Targeted comparison
+
+Both arms use the previous complete native numeric round trip: same live four
+VMs, PipelineCycle, explicit numeric native-entry capability and private child
+snapshot/bulk copy. Candidate alone submits native short-request payloads
+without the extra command envelope. No dispatcher, thread-count, wake threshold,
+work budget, input graph, result projection or workload changes between arms.
+
+#+begin_src sh
+cargo bench -p gerbil-scheme-qualification --features instance-dispatch \
+  --bench scheme_service --locked -- \
+  --progress-fair-ab --fixed-short-selective --payload-entry-ab
+#+end_src
+
+The existing O2 native build is used. The comparison is five AB/BA blocks,
+10 samples per arm and workload, 8192 orders plus 64 probes per sample,
+Tokio two Rust workers, four fixed native owners, slot limit 4, work budget 32,
+active producer budget 3, batch 8, Scheme quantum/budget/feed 1, NativePort,
+Selective wake, ProgressFair supply, observation Off and coupled refill Off.
+The native progress watchdog remains 5 seconds; the outer capture limit is
+120 seconds. Probe construction timestamps retain their original scope;
+bulk construction includes native submission in both arms.
+
+* Results and admission
+
+The immutable capture completed normally in 7.281 seconds (40 measured sample
+rows, four aggregate rows, configuration and cleanup). Both arms used all four
+owners, 1088 results per sample, conserved every published offer as entered or
+withdrawn, and closed with four joined owners, zero roots and removed image files.
+
+| Metric | CPU control -> candidate | Mixed control -> candidate |
+|--------+--------------------------+----------------------------|
+| Orders/s | 385136.604 -> 388102.351 (+0.770%) | 63683.882 -> 63460.073 (-0.351%) |
+| Short native p99 (us) | 443.000 -> 451.666 (+1.956%) | 543.833 -> 1403.625 (+158.099%) |
+| Short admission p99 (us) | 83.583 -> 864.584 (+934.402%) | 96.625 -> 2085.584 (+2058.431%) |
+| Short pending p99 (us) | 386.917 -> 421.292 (+8.884%) | 506.625 -> 1249.167 (+146.566%) |
+| Short scheduled p99 (us) | 2236.291 -> 7703.417 (+244.473%) | 2015.250 -> 24478.583 (+1114.667%) |
+| Bulk service p99 (us) | 594.375 -> 646.458 (+8.763%) | 3575.250 -> 5039.417 (+40.953%) |
+| Maximum owner finish spread (us) | 429.708 -> 434.709 (+1.164%) | 2031.500 -> 1666.208 (-17.981%) |
+
+This is a negative latency result. Mixed short p99 +158.099% and mixed throughput
+-0.351% do not satisfy the objective. CPU throughput +0.770% is a small measured
+change, not a demonstrated new durable gain. CPU owner spread also worsened
++1.164%, raw minimum progress fell 1880 -> 1704, and minimum short overlap fell
+40 -> 39. Mixed owner spread improved -17.981%, while raw minimum progress fell
+1976 -> 1912. Mixed Actor-peer minimum remains zero; overlap alone is not a
+starvation proof. Completion groups fell 4114 -> 4104 (CPU) and 4633 -> 4575
+(mixed), for 10880 results per arm/load. The unchanged bulk path does not imply
+unchanged observed stage distributions.
+
+The largest mixed candidate excursions concentrate in block 1: its AB/BA
+samples have maximum short actual latencies 1692.958/2288.459 us, admission
+3663.083/4354.042 us and scheduled 11884.667/25669.500 us. Control actual maxima
+in that block are 549.958/595.042 us. CPU also has a candidate excursion in
+block 2 (scheduled maximum 8646.708 us). These are within-sample maxima, not the
+pooled p99 values above. The scheduled and admission excursions expose a wider
+host-side progress problem; no same-spike blocked/runnable evidence was recorded,
+so the capture cannot attribute it to the new ABI, OS scheduling, or GC. No
+outlier is removed and the capture is not rerun to obtain a favorable number.
+
+Across 10240 bulk intervals per arm/load, CPU construction+submission p99 is
+382.917 -> 378.125 us and projection p99 8.625 -> 9.792 us. Mixed construction
+p99 is 471.833 -> 501.917 us and projection p99 17.875 -> 21.208 us. Projection
+intervals over 100 us rise 8 -> 12 (CPU) and 13 -> 27 (mixed). These negatives
+are retained despite no change to the bulk transfer algorithm.
+
+No default is promoted. The generic API remains an explicit capability-based
+operation; the benchmark flag is experimental. The previous native-roundtrip
+comparison remains separate and is not retroactively replaced by this capture.
+
+** Reproducible identity
+
+- Parent revision: =3d53f5484653f6fe1d66740b1720d711349a4cef=.
+- Binary SHA-256: =4491c2ade499a96bdffaa99e0124da52f64c8f2f61fad78e8652a02cb357034f=.
+- Native image SHA-256: =94458842d343e6fe42d0938a20ee9fc5733dacf35568ac139c08bdac60dda8fe=.
+- Frozen source archive SHA-256: =63dee0da2366a94a4b4f9ef64c3148a4f02bf443c07d1a1af42ccaa68c414441=.
+
+Raw captures, logs and the immutable source archive remain local evidence;
+none is tracked in Git. The commands and repository-relative source paths are
+the public reproduction contract.
+
+** Native and model acceptance
+
+The focused native integration passed 3/3 in 37.37 seconds. New checks exercise
+real rational normalization, rejected zero denominator, exact negative integer
+components beyond machine width, complex-to-real normalization, parent release
+plus forced GC, wrong numeric families, Gambit/Gerbil table family and duplicate
+key semantics, native payload exceptions followed by healthy work, and duplicate
+submission rejection. Existing continuation, cancellation, timeout, backpressure,
+prepared input, root-limit, close/drain and cleanup scenarios remain in that gate.
+This does not constitute a new long-duration RSS soak or universal unload proof.
+
+The existing completion-model harness passed in 293.61 seconds, including the
+new runtime witnesses in small/wide domains and the ten historical required
+counterexamples. The initial focused runtime-domain check also passed 4/4.
+Native acceptance does not substitute for performance acceptance, nor conversely.
+Final Clippy (qualification and isolated-instance-only features), generated-source
+verification with updates disabled, formatting and diff checks also passed.
+
+The native build first rejected an unmatched Scheme form; that source error was
+fixed before regeneration. Clippy then rejected two documentation spellings and
+a missing test-trait method; those were repaired. Failed build logs are retained
+privately. Generated Scheme and whole-file provenance receipts were regenerated
+through Cargo's normal Gerbil build path, with no embedded hash comment added.
+
+* Next protocol direction
+
+The structural bottleneck to address next is the interaction of three progress
+rights: Scheme runnable short work, the foreign host continuation, and ready
+result retirement. Fewer FFI transitions cannot establish a service opportunity,
+and input/output micro-optimizations cannot prove isolation from a shared heap.
+The existing model now distinguishes the input custody states needed to reason
+about that interaction; it still abstracts the exact Gambit runnable queue.
+
+The next design must specify who owes the next service opportunity and what
+native event discharges it, across accepted short work, ready epochs and refill.
+It must preserve the original reservation and fixed-owner entry fence, avoid
+holding result credit while waiting for new construction, and keep input
+preparation bounded and root-free until native construction starts. Scheme must
+own the cooperative scheduling decision. A synchronous wait for arbitrary user
+code, a Rust preemption loop, or a smaller heuristic threshold is not a proven
+resolution. The mixed-tail objective and historical watchdog attribution remain
+open; this report does not claim full performance closure.
+
+
+* Watchdog boundary
+
+The historical first-port exit 70 remains unattributed. The later pre-main
+Cargo-path launch rejection has separate exact-executable loader-policy
+evidence; passing an identical-byte copy does not admit the rejected path.
+The preceding native-roundtrip exit 70 also remains unattributed: its last
+receipt precedes the native-cycle contract. A later diagnostic near-stall
+showed owner startup in dynamic-loader segment mapping/fcntl rather than a
+collector stack; it does not attribute the failed run. New passing tests cannot
+rewrite any of these failures. No watchdog threshold is relaxed here.
+
+* Joint Runtime progress follow-up
+
+See [[file:30.69-joint-scheme-progress.org][Joint Scheme dispatch, wake and completion progress]] for the implemented
+Scheme-owned protocol, current model/native receipts, both targeted comparisons
+and the decision to keep the current candidate uncommitted.

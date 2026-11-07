@@ -63,7 +63,7 @@ pub(super) fn build_search_packet(
     let mut hits = Vec::new();
     let mut type_surfaces = Vec::new();
     let mut semantic_handles = Vec::new();
-    let mut native_syntax_facts = Vec::new();
+    let mut syntax_facts = Vec::new();
     let mut findings = Vec::new();
     let mut next_actions = Vec::new();
     let mut notes = Vec::new();
@@ -117,7 +117,7 @@ pub(super) fn build_search_packet(
             "find" => push_finding(&remaining, &mut findings),
             "next" => push_next_actions(remaining.join(" "), None, &mut next_actions),
             "def" | "call" | "api" => push_hit(tag, &remaining, &mut hits),
-            "fact" => push_native_syntax_fact(&remaining, &mut native_syntax_facts),
+            "fact" => push_syntax_fact(&remaining, &mut syntax_facts),
             "handle" if options.view != "policy" => {
                 push_handle(&remaining, &mut semantic_handles);
             }
@@ -163,7 +163,7 @@ pub(super) fn build_search_packet(
                 hits,
                 type_surfaces,
                 semantic_handles,
-                native_syntax_facts,
+                syntax_facts,
                 findings,
                 next_actions,
                 notes,
@@ -186,7 +186,7 @@ pub(super) fn build_search_packet(
             hits,
             type_surfaces,
             semantic_handles,
-            native_syntax_facts,
+            syntax_facts,
             findings,
             next_actions,
             notes,
@@ -204,7 +204,7 @@ struct PacketCollections {
     hits: Vec<Value>,
     type_surfaces: Vec<Value>,
     semantic_handles: Vec<Value>,
-    native_syntax_facts: Vec<Value>,
+    syntax_facts: Vec<Value>,
     findings: Vec<Value>,
     next_actions: Vec<Value>,
     notes: Vec<Value>,
@@ -225,7 +225,7 @@ fn base_packet(
         &header_fields,
     );
     let syntax_refs = attach_syntax_refs_to_search_items(&mut collections.items);
-    append_native_syntax_relation_edges(&collections.native_syntax_facts, &mut collections.edges);
+    append_syntax_relation_edges(&collections.syntax_facts, &mut collections.edges);
     let mut packet = json!({
         "schemaId": SCHEMA_ID,
         "schemaVersion": SCHEMA_VERSION,
@@ -251,7 +251,7 @@ fn base_packet(
         "hits": collections.hits,
         "typeSurfaces": collections.type_surfaces,
         "semanticHandles": collections.semantic_handles,
-        "nativeSyntaxFacts": collections.native_syntax_facts,
+        "nativeSyntaxFacts": collections.syntax_facts,
         "findings": collections.findings,
         "nextActions": collections.next_actions,
         "notes": collections.notes,
@@ -347,9 +347,9 @@ fn base_packet(
     packet
 }
 
-#[path = "native_syntax.rs"]
-mod native_syntax;
-use native_syntax::append_native_syntax_relation_edges;
+#[path = "syntax.rs"]
+mod syntax;
+use syntax::append_syntax_relation_edges;
 
 fn reasoning_profiles_enabled(options: &SemanticSearchJsonOptions) -> bool {
     matches!(render_mode(options), "graph" | "seeds" | "both" | "facts")
@@ -709,7 +709,7 @@ fn push_handle(tokens: &[&str], semantic_handles: &mut Vec<Value>) {
     semantic_handles.push(handle);
 }
 
-fn push_native_syntax_fact(tokens: &[&str], native_syntax_facts: &mut Vec<Value>) {
+fn push_syntax_fact(tokens: &[&str], syntax_facts: &mut Vec<Value>) {
     let Some(id) = tokens.first() else {
         return;
     };
@@ -759,7 +759,7 @@ fn push_native_syntax_fact(tokens: &[&str], native_syntax_facts: &mut Vec<Value>
         "lineRange": format!("{line}:{line}"),
         });
     }
-    native_syntax_facts.push(fact);
+    syntax_facts.push(fact);
 }
 
 fn push_external_type_hit(tokens: &[&str], hits: &mut Vec<Value>, type_surfaces: &mut Vec<Value>) {

@@ -1,0 +1,247 @@
+#+TITLE: Independent Short Notification and Mixed Tail Attribution
+#+DATE: 2026-10-22
+
+* Starting evidence and CI
+
+Continue =71b0b1a5683bc43910162a00d5a483c5cf120ea6= on PR #18.
+Its [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39625092732][exact-head CI]] passed Ubuntu bindings, Ubuntu Bazel, Quint and the
+fixed-owner native job at final inspection. Mac bindings remained running and
+Mac Bazel was cancelled with no step detail in the API. No cause for that
+cancellation or complete remote acceptance is inferred. In particular, the predecessor FFI timing repair passed Ubuntu
+Bazel remotely. Publication of this follow-up requires separate new-head CI.
+
+The prior mixed short p99 regression was 8.845 -> 16.231 ms (+83.51%) in capture B.
+Capture A went in the opposite direction, 19.802 -> 11.326 ms. The original 640
+probe observations per arm and serial nominal 500-us arrival policy are retained.
+Per-sample tails include owner entry waiting, occasional construction/pending
+work and projection spikes. The percentage is a real retained observation, not
+proof of one universal cause or a stable population effect.
+
+* Concrete notification dependency
+
+The coalesced transport first claims =pending=true= and then locks/writes its
+pipe. A second publisher can return =Coalesced= while the first publisher is
+paused before its write, leaving the native reader without a new byte. This is
+not demonstrated root loss: the first publisher still owes a notification. It
+is a latency dependency on that publisher's progress and legacy writer mutex.
+A coalesced short receipt alone cannot identify whether its outstanding byte
+was already written. The old model explicitly separates publication and delivery.
+
+The actual real-pipe fault control injects a claimed-but-unwritten notification.
+Coalescing leaves the pipe unreadable. With the old writer mutex still held,
+the explicit short notification publishes a byte from another thread within
+the unchanged five-second guard; ordinary bulk notification still coalesces.
+Eight concurrent publishers deliver all 256 bytes. Actual kernel saturation
+returns Full with readable input; closing the reader returns Failed without
+SIGPIPE and marks the wake failed. These controls prove the transport property,
+not a wall-clock p99 or an OS scheduling guarantee.
+
+* Final actual API
+
+=configure_scheme_service_notification_on(owner, SchemeServiceNotification::ShortIndependent)=
+is explicit and leaves =Coalesced= as the default. Enqueue obtains the already
+validated =SchemeServiceRequest::short_service= declaration. Those explicitly declared short
+publications bypass pending-flag borrowing and the writer mutex, using an atomic
+one-byte nonblocking write. Bulk publication retains coalescing. Close also
+writes independently when this policy is selected. No source-name or payload
+length heuristic classifies requests, and no Scheme object crosses owners.
+
+The shared wake object owns the descriptor until all notifier references drop.
+A full pipe already contains an observable wake; errors remain failures.
+The existing clear/recheck inbox protocol is unchanged. Concurrent policy changes
+may add redundant bytes but cannot remove accepted work. Unobserved requests
+read no diagnostic clocks. No Rust green-thread scheduler, SDK patch, native
+optimization downgrade or timeout extension is introduced. Scheme retains
+Actors, IO/timers, native types, GC, exceptions and multishot continuations.
+
+The unchanged Quint lifecycle model is reused for publication/delivery and root
+conservation. It does not model publisher preemption, pipe buffering, kernel
+wake timestamps or unconditional liveness. The real descriptor control is a
+separate refinement obligation, not a claim that model success fixes latency.
+
+* Disentangling time
+
+Paired publication/write/dequeue timestamps and owner-phase overlap remain
+opt-in. Enclosing GC CPU is now retained alongside GC wall time. These full
+phase counters are not clipped CPU measurements for the overlapped request.
+Old captures lacking GC CPU remain unknown rather than zero. A successful write
+records kernel byte acceptance, not the instant the owner resumes user code.
+
+Native select events distinguish timeout, signal and descriptor-ready returns.
+An interval after a completed notification write but before native select returns
+contains native wait/wake handling and possible OS descheduling. Without kernel
+runnable timestamps and descriptor-specific readiness evidence it cannot be
+split into isolated kernel delivery, SDK IO scheduling and runnable-thread delay.
+Post-construction Scheme service waiting remains a separate cost.
+
+The GC CPU clock scope itself required correction. In the admitted Gambit revision,
+[[https://github.com/gambit/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/lib/os_time.c#L807-L822][process time uses getrusage(RUSAGE_SELF)]], and
+[[https://github.com/gambit/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/lib/mem.c#L6954-L7065][GC accumulates those process-time deltas across its interval]]. The admitted
+archive's os_time object independently confirms argument zero at the getrusage
+relocation in process_times. The FFI exposes these SDK values separately from
+CLOCK_THREAD_CPUTIME_ID for the owner. GC CPU is therefore process CPU observed
+during a VM's GC interval, including other VM/Rust threads; it is not isolated
+collector or owner CPU. It must not be summed across owners or subtracted from
+GC wall to derive OS delay. Public Rust field documentation now states this
+scope. No SDK counter is modified or replaced by a guessed value.
+
+* Retained full-publication prototype
+
+Before narrowing the policy, a private prototype wrote independently for every
+host publication. Two complete unobserved captures each ran 40 samples and clean
+native shutdown on the same four VMs/image per capture. Native port wake, budget
+one, class routing, feed one, batch eight, two Tokio workers and FIFO observation
+were fixed in both arms. Only notification transport differed.
+
+| Capture/load | Orders/s coalesced -> all-independent | Change | Actual short p99, ms | Scheduled short p99, ms | Batch service p99, ms |
+|--------------+--------------------------------------+--------+----------------------+-------------------------+----------------------|
+| A CPU        | 38,883 -> 46,552                     | +19.72% | 19.984 -> 23.129     | 189.904 -> 119.611       | 10.102 -> 10.663      |
+| A mixed      | 16,965 -> 22,058                     | +30.03% | 17.599 -> 8.209      | 123.624 -> 96.579        | 33.245 -> 26.703      |
+| B CPU        | 43,390 -> 39,287                     | -9.46%  | 55.995 -> 22.953     | 658.623 -> 335.726       | 16.446 -> 16.924      |
+| B mixed      | 22,297 -> 25,031                     | +12.26% | 13.395 -> 19.534     | 139.669 -> 91.294        | 27.398 -> 27.514      |
+
+Minimum normalized owner progress declined in all four prototype rows:
+98.125 -> 97.297%, 98.467 -> 98.238%, 98.020 -> 96.429%, and
+98.456 -> 98.438%, respectively. Maximum finish spread was
+7.767 -> 10.715, 19.658 -> 18.720, 3.875 -> 58.027 and 3.881 -> 8.438 ms.
+Actor peer minima were 1 -> 1, 0 -> 0, 0 -> 1 and 0 -> 0. The B mixed actual
+short p99 still regressed and B CPU throughput regressed. This prototype was
+not retained as an additional public policy or promoted by selecting its A result.
+Its frozen sources, failed first warmup and full negative captures stay private.
+The final policy limits independent publication to the class needing it; that
+choice does not itself prove why the prototype CPU observation declined.
+
+* Final directed results
+
+An intermediate unconditional short-only candidate preserved mixed throughput
+and reduced mixed actual p99 twice, but CPU throughput declined in both captures.
+Its two clean 40-sample captures remain under a separate frozen source identity.
+
+| Capture/load | Orders/s coalesced -> short-independent | Change | Actual short p99, ms | Scheduled short p99, ms | Batch service p99, ms |
+|--------------+----------------------------------------+--------+----------------------+-------------------------+----------------------|
+| A CPU        | 73,407 -> 49,330                       | -32.80% | 39.695 -> 15.673     | 292.451 -> 131.996       | 7.575 -> 8.556        |
+| A mixed      | 20,494 -> 22,136                       | +8.01%  | 26.986 -> 10.637     | 291.474 -> 128.932       | 26.632 -> 19.256      |
+| B CPU        | 75,972 -> 48,423                       | -36.26% | 19.837 -> 27.059     | 143.176 -> 162.643       | 5.559 -> 10.360       |
+| B mixed      | 23,620 -> 23,970                       | +1.48%  | 11.879 -> 9.421      | 243.130 -> 133.251       | 22.987 -> 25.015      |
+
+Minimum normalized progress was 98.095 -> 98.068%, 98.454 -> 98.406%,
+98.182 -> 98.354%, and 98.795 -> 98.374%. Maximum owner finish spread was
+7.232 -> 13.704, 6.959 -> 27.085, 33.126 -> 4.832 and 15.507 -> 20.460 ms.
+Actor peer minima remained zero in all rows. This intermediate candidate does
+not satisfy a throughput-preserving CPU claim, even with mixed-tail improvement.
+
+A further wait-phase-gated prototype attempted to avoid extra notifications
+outside host wait. It passed real-pipe controls and a native capability fixture,
+but its first performance capture stopped after 23 samples with the unchanged
+five-second watchdog: last event was a real same-load sample, exit 70 and cleanup
+UNVERIFIED. Only its CPU aggregate completed (throughput -1.35%); mixed results
+and full native shutdown did not. It is not a successful full capture, not a
+proven lost-wake diagnosis and not relabeled as OS interference. Its frozen
+source/binary/partial rows remain private. The wait hint, scope and conditional
+notification were removed from the final library instead of retrying the failed
+route or widening a gate.
+
+The final implementation is the stable unconditional short-only policy in the
+second table. The executable source matches its frozen snapshot; subsequent Rust comments
+clarify the SDK process-CPU scope and maintained documentation records results.
+The frozen archive remains unchanged rather than being relabeled as a new build. Mixed actual
+short p99 improves twice while mixed throughput improves, but CPU throughput
+regresses twice. Overall throughput/tail/fairness acceptance is therefore NOT
+closed. The explicit policy permits evaluating that trade-off; defaults remain
+coalesced. A root cause for every OS/native wait or the rejected prototype stall
+has not been established. No kernel/GC/scheduler fix is claimed.
+
+* Final paired GC/notification diagnostics
+
+One final observed pair completed all 40 samples and clean native shutdown.
+Every candidate short probe had a real Written receipt (1,280 across both loads),
+so candidate tails do not borrow another publisher's pending notification. This
+is diagnostic evidence, not a third unobserved throughput acceptance capture.
+
+In candidate slowest-one-percent observations, publication-to-dequeue occupied
+70.6% of CPU-load actual latency and 99.2% of mixed-load actual latency. On mixed
+load, wait overlapped 91.0%, submit 8.1% and advance 0.1%; native select overlapped
+63.8%. All analyzed tails had complete retained history. The corresponding
+control mixed coverage was queue 64.8%, wait 49.5%, retire 15.3%, select 40.7%.
+These are matched interval overlaps, not subtraction of unrelated p99 values.
+
+- A mixed candidate probe took 28.900 ms. Its notification completed in about
+  two microseconds, but it spent 28.516 ms overlapping native wait; the enclosing
+  wait used 0.220-ms owner CPU and had zero GC. A timeout requested 0.952 ms and
+  returned 14.578 ms after publication; another native select began about
+  13.899 ms later. That intervening gap is not select time and cannot be labeled
+  collector work. Kernel scheduling versus SDK IO/thread resumption remains
+  unseparated; a successful write does not prove which descriptors were selected.
+- A second mixed probe took 23.391 ms, with 23.250-ms wait overlap, 0.064-ms
+  enclosing owner CPU and zero GC. Its Written receipt preceded a descriptor-ready
+  select return about 23.198 ms after publication.
+- A separate mixed probe overlapped 10.287 ms of an 11.246-ms advance phase. That
+  phase recorded 11.197-ms GC wall, 0.995-ms owner CPU and 1.995-ms SDK GC process
+  CPU. The process counter exceeding total owner CPU illustrates the scope issue;
+  it does not mean the collector computed for 1.995 ms on this owner. The owner
+  phase contains at least about 10.251 ms without owner CPU, but attribution to
+  kernel scheduling, collector blocking or another cause is not established.
+- A CPU-load submit phase similarly recorded 32.944-ms wall, 1.071-ms owner CPU,
+  32.871-ms GC wall and 4.931-ms SDK GC process CPU. The probe overlapped only
+  12.135 ms of that phase; full counters are not assigned to the clipped overlap.
+
+The publication dependency is directly repaired and mixed short tails improve
+in the two stable captures. Remaining tails are predominantly native wait with
+little owner CPU, plus distinct GC-overlapping phases. They are not evidence
+that the Scheme computation must be moved to Rust. CPU throughput/fairness
+regressions prevent a general performance promotion; further work needs actual
+kernel/descriptor or GC blocking evidence rather than another unmeasured default.
+
+
+* Native verification and retained failures
+
+The final three real-pipe controls passed. The four-VM actual service fixture
+passed in 5.66 seconds total with original per-progress deadlines: native types,
+GC, same-Actor multishot continuations, exceptions and panic recovery, class
+routing, backpressure/abandonment, host wake and close. Four owners joined,
+external roots were zero, copied files were removed and descriptors returned.
+This is capability/resource acceptance; its wake timings under compiler activity
+are not a short-latency performance result.
+
+Initial development failures are retained: the new test used a forbidden parent
+glob import; a saturation control incorrectly assumed writing 64 KiB was enough
+to observe Full; an unobserved warmup treated null diagnostic entries as wake
+failures. Repairs use explicit imports, actual observed capacity within a finite
+safety guard, and observation-only receipt checks. The failed warmup produced
+no timed samples or verified cleanup and is not admitted as a completed capture.
+No gate or performance expectation was weakened to convert a failure to success.
+
+* Frozen artifacts and reproduction
+
+Stable short-only binary SHA-256:
+=b1b1780ae95843a08e38efed36f2a8941ebdf01a92c7674e3990b4ad0d794163=.
+Native image SHA-256 (same in both arms and all three local prototypes):
+=306ac7a148bc4e444ae210ee1f734150beba352bca4789d32c8f629d97b22f46=.
+Stable private source archive SHA-256:
+=79591fed166c9e14cb9d4d86c2da4b2eb3aaf4711ca949b9b6b8dc31e64cc11d=.
+This fresh image differs from the predecessor's image identity; no absolute
+cross-capture throughput comparison is made. Scheme sources and O2 flags were
+unchanged; each actual A/B uses its one identical image and stable VM identities.
+Our compiler work finished before capture; other host tasks were not paused.
+Shared-host observations are not exclusive-machine performance guarantees.
+
+#+begin_src text
+just bridge-scheme-service-benchmark --notification-ab
+just bridge-scheme-service-benchmark --notification-ab --phase-observation
+cargo test -p gerbil-scheme --features tokio-dispatch --lib service_wake::tests --locked -- --nocapture
+cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+cargo clippy -p gerbil-scheme --features tokio-dispatch --lib --tests --locked -- -D warnings
+cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --test scheme_service --locked -- -D warnings
+#+end_src
+
+Use the repository's admitted SDK/build environment. Full captures each alternate
+AB/BA for ten samples per arm/load, 8,192 native orders and 64 native short probes.
+Startup is untimed; the native five-second progress gate stays unchanged. Raw
+logs, binaries, source archives, disassembly and rejected prototypes stay outside
+Git. New-head CI remains independent from local checks.
+
+The existing native CI job explicitly runs the real-pipe controls with the Tokio
+feature and both unobserved/observed notification benchmark smoke modes. No job,
+thread matrix or timeout is added. Both exact CI smoke commands passed locally with four joins, zero roots and
+removed copied files. These receipts check the actual CI argument path and
+cleanup; they are not performance samples.

@@ -1,0 +1,247 @@
+#+TITLE: Shared Capacity Notification and Late Owner Binding
+#+DATE: 2026-10-22
+
+* Scope and predecessor
+
+Predecessor =55ac286c491b977130fe8a161a77e0b16742f7e0= passed all six
+supported PR #18 CI jobs. The unsupported SMP job was skipped. This work keeps
+the native O2 compilation chain, Scheme execution, and existing defaults.
+
+The two protocol changes are explicit opt-ins. They address coordination before
+native construction; they do not change Scheme algorithms or substitute a Rust
+runtime for Scheme Actors, green threads, GC, continuations, or exceptions.
+
+* Ownership protocol
+
+| Phase | Owned resources | Cancellation / close |
+|-------+-----------------+----------------------|
+| Waiting for pending slot | Rust request only | Drop or finite admission timeout releases the waiter |
+| Shared short queue | Rust request and bounded pending slot; no owner or native credit | Cancel removes that exact request; close drains the queue |
+| Owner claim | Per-owner short quota plus real work/request credits; owner becomes fixed under the admission fence | A racing cancellation cannot retract a committed claim |
+| Scheme construction through projection | Fixed owner, original native types, internal Scheme graph and temporary roots | Caller timeout/drop abandons observation; accepted work still retires on its owner |
+| Retirement | Projection/root balance completes before native credits return | Credit notification is immediate, including partial-reservation cancellation |
+
+=InstanceDispatcher::configure_scheme_short_pool= installs one queue and freezes
+native budget identities until shutdown. Its clones share the pending bound
+and per-owner active quota; this facility does not consume bulk producer
+registration. Stateful Actor lanes use the existing explicit-owner APIs.
+=SchemeShortPool::submit= returns a normal =RoutedSchemeTicket= only after claim,
+so its owner is real, rather than a placeholder for an unassigned request.
+
+Every owner checks the shared queue between Scheme service turns. At most one
+shared short claim alternates with an ordinary owner turn. Only the owner can
+construct native payloads; Scheme retains intra-VM scheduling and class budgets.
+This is cooperative fairness, not preemption or a wall-clock service guarantee.
+The configured short quota is shared by this facility's clones, not unrelated
+routers or direct callers.
+
+Publication and claim use admission-fence then queue-lock ordering. User data
+destruction, result sends, semaphore returns, and native notifications happen
+after unlocking. Shared source references to owner wake ports and admission are
+weak, so a retained queue handle does not own an image or pipe descriptor.
+
+Owner failure can close this facility independently of the pool table fence.
+Close marks pending admission closed before acquiring the queue for drain;
+publication rechecks that closed state *under the queue lock*. Checking only
+before locking permits an overtaken publisher to enqueue after the drain.
+Configuration also rechecks owner liveness after installing all ports. A
+controlled interleaving test blocks publication on the queue, closes admission,
+and proves that publication rejects without leaving a queued payload or permit.
+
+The owner clears its coalesced wake, then rechecks both inbox and shared queue
+before waiting in Scheme. Enqueue and capacity return notify live configured
+owners while shared work remains. This includes host-side partial-reservation
+cancellation: otherwise a queue could remain asleep despite usable credits.
+
+* Shared capacity notification
+
+=ReselectProgressNotified= retains the existing native-occupancy ranking and
+FIFO scanner per class. It enables a Tokio =Notified= future *before* scanning
+all eligible owners. Events during the scan remain observable before await;
+multiple returns can coalesce. No partial class/work/slot reservation crosses
+the wait and no retry timer or extra polling thread is introduced.
+
+The existing watch strategies retain a receiver for their whole lifetime.
+Capacity publication uses watch =send= while such consumers exist, plus
+=notify_waiters= for armed notified consumers. With no watch consumer, the
+notification-only path avoids the watch payload write lock. Close and owner
+failure publish through the same event path, then waiters recheck live state.
+
+Credit visibility and notification are never deferred across arbitrary user
+projection callbacks: a callback may itself depend on newly available capacity.
+
+* Model and native qualification
+
+The existing =owner_lifecycle.qnt= is extended rather than duplicated. It reuses
+pool staging/claim, committed ownership, capacity accounting, and native-root
+drain. New scenarios cover registration before scan, coalesced delivery to both
+class scanners, cancelled registration, close notification, and dynamic short
+claim followed by observation timeout and drain. A scan-before-registration
+negative control deliberately demonstrates the lost notification window.
+
+The existing model CI gate includes =capacityProtocolStep= and =shortPoolStep=
+sampled traces. Model delivery is abstract: no claim about OS scheduling latency,
+CPU time, hard deadlines, or native GC correctness follows from these checks.
+
+Native controls exercise unassigned cancellation/expiry with pending capacity
+one, a blocked-owner bypass, invalid declarations, native-budget freeze,
+accepted timeout with a live projection root, simultaneous queued/capacity-waiter
+close, and accepted-root drain. Both watch and notified router strategies run
+capacity-return/cancellation/close controls. Existing continuation, GC, exception,
+producer, native-capacity, and descriptor-return checks remain enabled.
+
+* Directed comparison
+
+The Rust bench comparison is =--pool-protocol-ab=. Both arms configure the
+shared facility, use owner-local bulk supply, four live VMs, two Tokio workers,
+O2 Scheme work, batch eight, feed one, cooperative budget one, native-port wake,
+request slots four and work credits 32 per owner. The control publishes short
+requests from the host using watch-backed =ReselectProgress=. The candidate
+lets owners claim shared unassigned short requests. Its unused router retains
+no watch receiver. Both use identical native short execution and projection.
+
+Admission timing ends at host publication in the control and owner claim in the
+candidate. Therefore component timing is not directly interchangeable;
+end-to-end throughput and latency are the comparison criteria. Observation is
+off. This joint comparison cannot isolate notification and late-binding effects.
+
+Raw logs, native artifacts and source manifests remain private. Reproduction
+uses the existing build system and repo-relative commands:
+
+#+begin_src text
+just bridge-scheme-service-benchmark --test --pool-protocol-ab
+just bridge-scheme-service-benchmark --pool-protocol-ab
+#+end_src
+
+* Result and admission decision
+
+The initial full directed capture, before the final owner-failure close-fence
+repair, completed with 40 samples: ten per arm/load,
+8,192 orders and 64 short probes per sample. Both arms shared the same four live
+VMs. No profiler, native counter polling or owner-state sampler ran during timing.
+Other local tasks were left untouched; outside-timing host snapshots show an
+unrelated Scheme worker consuming approximately one CPU. This is shared-host
+matched evidence, not a claim that the machine was completely idle.
+
+| Load | Metric | Host publication control | Owner-claim candidate | Change |
+|------+--------+--------------------------+-----------------------+--------|
+| CPU | Orders/s, median bulk duration | 414,541 | 419,125 | +1.11% |
+| CPU | Pooled short p99, ms | 0.393209 | 0.356667 | -9.29% |
+| CPU | Minimum owner progress | 98.7500% | 98.7705% | +0.0205 percentage points |
+| CPU | Maximum owner finish spread, ms | 0.395583 | 0.397333 | +0.44% |
+| Mixed | Orders/s, median bulk duration | 67,065 | 66,758 | -0.46% |
+| Mixed | Pooled short p99, ms | 0.450625 | 0.459000 | +1.86% |
+| Mixed | Minimum owner progress | 98.7854% | 98.8048% | +0.0194 percentage points |
+| Mixed | Maximum owner finish spread, ms | 1.315959 | 1.577917 | +19.91% |
+
+Per-sample short p99 ranges remain visible: CPU control 0.301792–0.462084 ms,
+candidate 0.060666–0.400708 ms; mixed control 0.409875–0.540625 ms, candidate
+0.077708–0.506583 ms. At least 36 CPU probes and all 64 mixed probes overlapped
+bulk completion in every sample. The CPU short-owner distribution also became
+more concentrated: control =[173,146,163,158]=, candidate =[308,142,98,92]=
+across 640 probes. This is neither a starvation proof nor an equal-placement
+result. The candidate does not enforce equal owner counts.
+
+The preceding smoke capture also remains retained: mixed throughput improved
+but short p99 increased from 0.065708 to 0.561209 ms. Its 256-order/eight-probe
+workload is a correctness smoke, not a replacement for the full comparison.
+
+There is no overall performance admission. Mixed throughput, pooled p99 and
+maximum finish spread all worsened; the small CPU throughput gain is not an
+established general speedup. The protocol remains experimental and explicit;
+defaults are unchanged. Pipeline throughput is the objective, and higher CPU
+usage alone is not a regression criterion.
+
+Late binding removes fixed-owner inbox waiting as a routing obligation, but it
+does not eliminate shared Scheme execution/GC time. The candidate's admission
+boundary includes waiting for an owner claim, and post-admission time can be zero
+because native construction may precede the caller's resumed future. Moving time
+between these fields is not an end-to-end improvement. Broadcast notification,
+claim/placement acknowledgement, and owner-local Scheme class scheduling remain
+specific optimization candidates. This capture does not isolate their costs or
+establish OS runnable/blocking or GC CPU attribution. No additional profiler
+capture or unchanged full-matrix rerun was used to manufacture a positive result.
+
+The frozen samples' =class_routing= strategy flag indicates construction of the
+class-aware strategy. The candidate uses the shared short API, not host router
+submission: =deferred_short_owner_claim=true= and =owner_reselection=false= identify
+that actual path. =producer_progress_routing=false=; bulk supply uses =OwnerLocal=
+in both arms. The unused candidate router retains no watch receiver.
+
+* Verification and source identity
+
+- All 22 focused protocol units passed; an additional synchronous-waker control checks
+  that internally held partial credits are restored before cancellation publishes.
+- Native capacity and producer suites passed; the Scheme-service suite passed
+  all three tests, including the expanded four-owner close/root/FD fixture.
+- Warnings-denied library and qualification bench/native-test Clippy passed.
+- The existing aggregate Quint gate passed both scenario domains, sampled safety
+  traces, and required mutation counterexamples, including the two new step sets.
+- Smoke and full A/B both joined four owners, reported roots =[0,0,0,0]=,
+  reached service quiescence and removed image files.
+
+Frozen benchmark SHA-256:
+=03e5f62cde9f3bfe6c6859c34964f543ade14ad9bd77e883f5b56cde729a6845=.
+Native image SHA-256:
+=0e79bb79f9686fc36e13e1be76deda04ae1877e370a081a096f32a61e53c3d16=.
+Private source archive SHA-256:
+=201aefc14c1d1f37a0343b63ecd8944eff28230ac2437fc9332a8f75546a71ef=.
+Native image identity was checked again after timing. The initial runtime snapshot remains retained unchanged. A final review then
+identified the independent owner-failure close/publication race described below;
+its corrected binary and directed comparison receive a separate identity.
+
+* Final close-fenced comparison
+
+The deterministic owner-failure publication test and all 22 protocol units
+passed after repair. The affected native Scheme-service suite passed all three
+tests in 8.60 seconds with its original per-progress watchdog; warnings-denied
+qualification Clippy also passed. The existing model was unchanged by this
+implementation correction, so its completed aggregate gate was reused.
+
+Only the affected directed pair was recaptured, once, with the final binary;
+no matrix expansion or profiler was added. Forty full samples completed and
+four owners joined with zero roots, service quiescence and removed files.
+
+| Load | Metric | Control | Final candidate | Change |
+|------+--------+---------+-----------------+--------|
+| CPU | Orders/s | 433,315 | 435,694 | +0.55% |
+| CPU | Pooled short p99, ms | 0.398084 | 0.081208 | -79.60% |
+| CPU | Minimum owner progress | 98.7552% | 98.7552% | unchanged |
+| CPU | Maximum owner finish spread, ms | 0.320208 | 0.430834 | +34.55% |
+| Mixed | Orders/s | 66,077 | 68,271 | +3.32% |
+| Mixed | Pooled short p99, ms | 0.542208 | 0.459791 | -15.20% |
+| Mixed | Minimum owner progress | 98.7654% | 98.8048% | +0.0394 percentage points |
+| Mixed | Maximum owner finish spread, ms | 1.711750 | 1.654833 | -3.33% |
+
+The final pair improves mixed throughput and pooled short p99, while CPU owner
+finish spread worsens. CPU short placement remains concentrated: control
+=[151,168,167,154]= versus candidate =[336,141,99,64]=. The corresponding mixed
+counts are =[187,145,152,156]= and =[193,185,128,134]=. These are 640 probes per
+arm/load, not guaranteed equal-placement or starvation bounds.
+
+The earlier mixed throughput/p99/finish-spread regression remains valid for its
+own snapshot. The close-fence correction is required for correctness; this
+comparison does not prove that the correction caused the different performance
+outcome. Cross-capture variation and the CPU finish-spread regression prevent a
+stable general-speedup or default-policy promotion. The next algorithm question
+is selective owner wake/claim coordination and Scheme class progress, rather
+than collecting another unchanged timing matrix. Fixed-order broadcast and a
+second placement acknowledgement are concrete coordination costs, but their
+individual contributions have not been measured here.
+
+Final benchmark SHA-256:
+=c7a8129409156aa5fe12e8c86dad51240fea0ad357331e7df26105adfa4f9339=.
+Final private source archive SHA-256:
+=8ce50df2e68153b73ec403116d15800f9a198e0cad665f8ec9acdd2810311440=.
+The native image hash is unchanged from the initial comparison and was verified
+after timing. Subsequent publication edits change documentation only. Both source
+snapshots, complete result sets and build-policy failures remain private and
+retain their original identities.
+
+* Follow-up clock and protocol scope
+
+[[file:30.54-selective-wake-and-nonexclusive-claim.org][Selective wake qualification]] separates notification duty from nonexclusive
+claim and retains its negative results. Historical =probe_actual= values above
+measure request start to native projection completion, not Tokio caller resume;
+caller admission/scheduled-probe delays must not be read as native CPU time.
+No historical receipt or result identity is rewritten by this clarification.

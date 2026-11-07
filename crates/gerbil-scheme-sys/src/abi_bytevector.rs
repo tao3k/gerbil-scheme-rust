@@ -17,6 +17,42 @@ unsafe extern "C" {
         value: GerbilValueHandle,
         index: i64,
     ) -> i32;
+    fn gerbil_scheme_rust_scheme_object_bytevector_copy_raw(
+        value: GerbilValueHandle,
+        output: *mut u8,
+        len: u64,
+    ) -> i64;
+}
+
+/// Copy a runtime-backed Scheme bytevector into exactly sized Rust/C storage.
+///
+/// Success initializes every output byte. A type or length mismatch leaves
+/// output untouched. Empty vectors accept a null destination.
+///
+/// # Safety
+///
+/// The runtime must be initialized on its owner thread, and `value` must be a
+/// live Scheme object. Nonempty output must be writable for `len` bytes and
+/// cannot overlap Scheme storage. No body pointer survives the synchronous call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_bytevector_copy(
+    value: GerbilValueHandle,
+    output: *mut u8,
+    len: usize,
+) -> GerbilStatus {
+    if value == 0 || (len > 0 && output.is_null()) {
+        return GerbilStatus::NullPointer;
+    }
+    let (Ok(length), Ok(expected)) = (u64::try_from(len), i64::try_from(len)) else {
+        return GerbilStatus::InvalidValue;
+    };
+    if unsafe { gerbil_scheme_rust_scheme_object_bytevector_copy_raw(value, output, length) }
+        == expected
+    {
+        GerbilStatus::Ok
+    } else {
+        GerbilStatus::InvalidValue
+    }
 }
 
 /// Export a Scheme bytevector fixture through a checked `GerbilValueHandle`.

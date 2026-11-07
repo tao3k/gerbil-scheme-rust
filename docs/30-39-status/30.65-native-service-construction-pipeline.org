@@ -1,0 +1,253 @@
+#+title: Native service input construction and retirement-bounded pipeline
+#+options: toc:nil num:nil
+
+* Baseline and decision
+
+The predecessor commit =1e6c6ac= has all six supported CI checks successful in
+[[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39888042508][run 39888042508]]; the separate unsupported SMP job is skipped.
+[[file:30.64-bounded-input-preparation.org][30.64]] implements the root-free preparation boundary but retains its CPU
+throughput and tail regressions. This follow-up compares that PreparedCycle
+with an explicit PipelineCycle using the same current native image and VMs.
+
+The existing numeric batch constructor already constructs a complete Actor
+batch natively. Reimplementing it in Rust would duplicate the native mechanism.
+The remaining avoidable work is constructing the service header/envelope in
+separate foreign calls and returning to collection after each fresh submission.
+
+The actual library now combines the native numeric payload, service header and
+envelope in one foreign construction entry, then replenishes the owner from
+retired-request opportunities before the next collection. Rust distributes
+work across complete owner runtimes. Scheme owns execution, Actors/green
+threads, continuations, exceptions and GC. Snapshot remains the default; neither
+optimization moves Scheme scheduling into Rust or introduces SMP.
+
+* One bounded owner cycle
+
+| Boundary | Ownership and ordering |
+|----------+------------------------|
+| Prepare | At most one owned Rust input per owner, using existing source/active/slot/work budgets; no Image, NativeSession or new Scheme root |
+| Harvest | One existing native batch transfer acquires the ready token and result slots |
+| Retire | Each projection clears its slot/root and returns its own native/stream credits |
+| Ready frontier | All harvested slots retire and the batch guard drops before any new typed Scheme construction |
+| Refill | At most one attempt per retired result; actual capacity and work admission authorize each new request independently |
+| Native entry | Recheck cancellation, deadline and close for each prepared input; construct and submit on the same fixed owner |
+| Next collection | Collect after the bounded refill, rather than unconditionally after every single new input |
+
+The refill opportunities count retired requests, not work units. They do not
+replace the independent work semaphore: a newly priced large job still needs
+its full charge. The opportunity budget is local to this cycle and unused
+opportunities disappear; they cannot accumulate across future turns. No new
+window, timeout, fill timer, capacity registry or default is introduced.
+
+Ordinary inbox FIFO/control messages stop refill. A successfully claimed shared
+short request is deferred to the ordinary owner turn and also stops refill.
+Native lifecycle messages are not overtaken. A prepared producer input is still
+rechecked immediately before entry. Pending peer offers stay in the original
+revocable port during ready retirement and use the original claim/entry fence
+only at refill. Construction/entry uses existing native error handling; a failed
+result transfer retains the original drain credits until native close.
+
+The bound limits refill attempts and prepared inputs, not elapsed constructor
+time. Generic application constructors can perform arbitrary native work;
+Scheme cooperative scheduling and its existing work budgets remain authoritative.
+There is no preemption guarantee or unbounded starvation-freedom claim.
+
+* Typed construction API and native ABI
+
+#+begin_src rust
+dispatcher
+    .configure_scheme_service_completion_on(owner, SchemeServiceCompletion::PipelineCycle)?
+    .wait(timeout)?;
+// Existing typed stream/pool submission APIs remain the entry path.
+#+end_src
+
+Service ABI 11 advertises policy mode 5. Selection checks both service version
+and the optional image-local =gerbil_scheme_rust_numeric_service_create= symbol
+before changing native policy or Rust owner flags. Production and qualification
+export lists include this symbol. Isolated instances without Tokio keep the
+corresponding module, field, initializer and type alias feature-gated.
+
+=SchemeServiceRequest::construct_service= receives an opaque
+=SchemeServiceInput= context. Its default calls the existing arbitrary
+=construct= method and wraps that payload with the stable admission metadata.
+Thus custom Scheme values, affine requests, exceptions and continuations retain
+the existing path. Composition wrappers =Checked= and =RoutedRequest= forward
+this optional construction capability while preserving their snapped declarations.
+
+The built-in =NumericServiceBatch= uses =SchemeServiceInput::numeric_batch=.
+Under PreparedCycle this constructs the original payload then its header and
+envelope. Under PipelineCycle one synchronous native call constructs all three,
+with only the final parent receiving an external strong root. Both paths share
+the same native numeric payload builder, layouts and byte-copy operations.
+No Rust pointer survives that synchronous copy. Generic requests need not opt in.
+A custom override must preserve its normal constructor semantics; it is not a
+license to change the declared lane, class, work charge or application payload.
+
+The native constructor checks kind, row count, quantum and service-header shape.
+Rust validates sealed numeric layouts and cumulative input charge before entry:
+payload charge plus the service-header elements and outer-vector references.
+It uses the same total charge as the ordinary wrapper path, with checked size
+arithmetic. A quota rejection cannot silently fall back to an uncharged route.
+There is no JSON transport, Rust translation of Scheme, or substitute scheduler.
+
+* Executable acceptance and evidence limits
+
+The final native suite passes 3/3 in 28.15 seconds, alongside the dedicated
+watchdog control 1/1 in 5.00 seconds. Controller wall time is 77.73 seconds,
+including compilation and package-cache activity. Native acceptance covers:
+
+- the existing four-VM lifecycle, native GC, multi-shot continuation affinity,
+  exceptions, generic construction/projection failure and close-drain controls;
+- PreparedCycle and PipelineCycle at the held three-ready-result frontier,
+  each with continue/cancel/deadline-expiry/close, no premature fourth constructor,
+  root checks during GC, credit/registration return, zero roots and removed files;
+- both policies constructing and inspecting all nine numeric families, signed
+  and unsigned extremes, finite floating values, empty rows and header metadata
+  across a real GC, followed by generic service submission and projection;
+- exact cumulative input quota and one byte below it in each policy;
+- existing FIFO/short-priority controls extended to both policies.
+
+No new native watchdog failure occurred in this round. The five-second meaningful
+progress deadline and 120-second performance controller are unchanged. The
+historical first-port failure still lacks native frames, last real progress and
+an exact failed image. A bounded review of the retained journal supplies no new
+attribution. That failure remains UNATTRIBUTED with cleanup UNVERIFIED; current
+passes cannot close it. No unchanged failed workload is rerun to manufacture
+an explanation. Phase chatter still cannot renew the watchdog deadline.
+
+The existing owner lifecycle/shared-resource model now includes a local refill
+budget. Retirement creates an opportunity; post-retirement prepared entry spends
+one; end-of-cycle/close discards unused opportunities. Native root, reservation,
+capacity, ready-token and cancellation rules stay in the same model. Two new
+positive witnesses show multiple entries after one ready frontier and cancel/
+close cleanup. The required no-retirement-credit mutation is found in both
+completion domains. The final focused gate passes in 140.93 seconds (139.08 in
+the test), with ten required counterexamples and 1000-sample/64-step seed-42
+lanes, including PipelineCycle. These finite checks do not prove native memory
+safety, latency, OS scheduling or unbounded liveness.
+
+Qualification and model-harness Clippy pass. Isolated-only compilation passes.
+Three typed receipt tests cover policy 5 and reject unknown policy 6. Generated
+SCM is regenerated through the original Cargo/Gerbil path, then checked with
+update disabled. Actual generated content and external whole-file receipts are
+updated; no source-comment digest is added. The final O2 release build passes
+in 39.23 seconds. An intermediate loader-length lint failure is retained and
+fixed by extracting the typed optional-symbol loader, without a lint waiver.
+
+* One matched A/B
+
+One frozen capture exits 0 in 6.534 seconds. Both arms use four identical live
+VMs and the same native image, Tokio two Rust workers, ProgressFair bulk supply,
+Selective short routing, NativePort wake, slot/work budgets 4/32, three active
+bulk batches, batch size eight and Scheme quantum/feed/native budget one.
+Each sample has 8192 real orders and 64 short requests. Five alternating AB/BA
+blocks yield ten samples per arm/load, 40 samples total. Observation is Off.
+Own builds/models/profilers/pollers are finished during capture; other tasks
+are untouched. No expanded thread/runtime matrix or default change is made.
+
+The benchmark's numeric bulk request delegates to the actual public construction
+API in both arms. Its bulk construction interval now covers the complete service
+envelope in both arms; short native-payload timing keeps its existing scope.
+Do not compare these stage absolutes with older captures as if scope were
+unchanged. The ordinary generic path remains exercised by the native controls.
+
+All samples satisfy workload identity, actual native policy readback, four owner
+participation, 1088 retired results per sample and offer publications equal to
+withdrawals plus entries. Every sample ends with zero owned token, claimed slot,
+queued ready result and pending opportunity. Final cleanup joins all four,
+reports roots [0,0,0,0], quiescent services and removed image files. This is not
+an RSS soak or proof that every SDK mapping unloads.
+
+Throughput uses median bulk completion duration; p99 pools ten samples per arm/
+load; owner finish spread is the maximum sample spread. All changes below are
+within this capture, not comparisons against previous heads.
+
+| Load | Metric | PreparedCycle | PipelineCycle | Change |
+|------+--------+---------------+---------------+--------|
+| cpu | Orders/s | 325089.040 | 364885.556 | +12.24% |
+| cpu | Native short p99 (us) | 590.250 | 506.209 | -14.24% |
+| cpu | Scheduled short p99 (us) | 25956.709 | 11476.125 | -55.79% |
+| cpu | Short admission p99 (us) | 1647.167 | 819.250 | -50.26% |
+| cpu | Short pending p99 (us) | 455.125 | 475.833 | +4.55% |
+| cpu | Short construction p99 (us) | 10.250 | 11.000 | +7.32% |
+| cpu | Short projection p99 (us) | 6.083 | 3.458 | -43.15% |
+| cpu | Bulk service p99 (us) | 1101.416 | 950.792 | -13.68% |
+| cpu | Bulk pending p99 (us) | 1039.125 | 853.625 | -17.85% |
+| cpu | Owner finish spread (us) | 717.917 | 458.834 | -36.09% |
+| mixed | Orders/s | 65748.807 | 64159.291 | -2.42% |
+| mixed | Native short p99 (us) | 533.000 | 492.708 | -7.56% |
+| mixed | Scheduled short p99 (us) | 13286.542 | 1982.583 | -85.08% |
+| mixed | Short admission p99 (us) | 1319.709 | 100.167 | -92.41% |
+| mixed | Short pending p99 (us) | 480.833 | 474.708 | -1.27% |
+| mixed | Short construction p99 (us) | 8.667 | 6.375 | -26.45% |
+| mixed | Short projection p99 (us) | 2.792 | 2.334 | -16.40% |
+| mixed | Bulk service p99 (us) | 6831.375 | 1952.208 | -71.42% |
+| mixed | Bulk pending p99 (us) | 6680.083 | 1890.083 | -71.71% |
+| mixed | Owner finish spread (us) | 2373.083 | 1646.083 | -30.64% |
+
+For the same 10880 results per arm/load, CPU harvest batches fall 4837 to 4115
+(-14.93%); mixed falls 5417 to 4644 (-14.27%). This is an actual reduction in
+cycle transitions, alongside the constructor's statically reduced foreign
+entries; the aggregate capture does not apportion the benefit between them.
+Minimum owner progress fractions are 0.987179/0.987500 for CPU and 0.988/0.988
+for mixed; raw minima are 1848/1896 and 1976/1976. Short overlap minima are
+45/40 of 64 for CPU and 64/64 for mixed. Actor-peer minima are 1/1 and 0/0.
+No owner is filtered, and these are not universal fairness guarantees.
+
+Offline stage analysis reuses the same samples, with no new workload run:
+
+| Load | Stage | PreparedCycle p50/p99 (us) | PipelineCycle p50/p99 (us) |
+|------+-------+--------------------------+--------------------------|
+| cpu | Bulk construction | 3.291/369.625 | 2.542/388.042 |
+| cpu | Bulk projection/retirement | 5.750/16.042 | 5.625/16.167 |
+| mixed | Bulk construction | 3.458/417.000 | 2.750/439.916 |
+| mixed | Bulk projection/retirement | 5.958/20.083 | 5.833/16.834 |
+
+Construction medians improve, while construction p99 worsens in both loads.
+CPU short pending p99 rises 4.55%, short construction p99 rises 7.32%, and short
+overlap falls. Mixed throughput falls 2.42%. These negatives are retained even
+though native short p99 and owner finish spread improve in both loads and CPU
+throughput rises 12.24%. The large mixed bulk-p99 ratio is an observed pooled
+tail, not a guarantee of the same improvement in another run.
+
+Decision: retain PipelineCycle as an explicit experiment, NOT a default promotion.
+The CPU throughput gain and reduced cycle count support this architecture over
+per-input collect transitions. They do not establish a uniform workload win.
+The next optimization should address remaining constructor tail and supply/
+retirement interaction without sacrificing the native execution pipeline, not
+increase a wake/window threshold or repeat the entire matrix. This combined
+candidate does not independently identify construction versus refill causality.
+
+Stage wall time can include allocation, GC and descheduling. No same-spike OS
+runnable/blocked evidence is collected, and pooled quantiles cannot be subtracted
+into causal waits. Process GC CPU and owner thread CPU retain separate scopes.
+CPU utilization increases alone are not classified as performance regression.
+
+* Reproduction and identities
+
+#+begin_src sh
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-regenerate
+cargo test -p gerbil-scheme-qualification --features instance-dispatch \
+  --test scheme_service --test service_watchdog --locked
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test \
+  owner_model::owner_completion_scenarios_and_control --locked -- \
+  --ignored --exact --nocapture
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-scheme-service-benchmark \
+  --progress-fair-ab --fixed-short-selective --pipeline-cycle-ab
+#+end_src
+
+- Release executable SHA-256: =c5563fc854e4c7f185408b88353c46c99b8b66f1028f5bb1a4d2ac7909e17e97=.
+- Native image SHA-256: =46483b633ba878384dca271118dd48942de7f4b93951315b801a722bccf4e6d2=.
+- Source archive SHA-256: =2a50e5833f909bd697946439945396054ea8c7f8866a0c9864bf1cc2d587f3e9=.
+
+Private evidence binds exact measured sources, executable, image, samples and
+controller/cleanup receipts. Only this final report is authored afterward;
+runtime/build/model/test/benchmark source hashes are checked unchanged at
+publication. No raw logs, binaries, archives, patches or private absolute paths
+are committed. New-head remote CI remains separate from local acceptance.
+
+* Follow-up
+
+[[file:30.66-coupled-owner-refill.org][30.66]] isolates bounded FIFO/short/supply refill arbitration with the same
+fused native constructor in both arms. Its remaining negative results do not
+replace this capture or justify default promotion.

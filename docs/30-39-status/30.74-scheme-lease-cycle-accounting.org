@@ -1,0 +1,233 @@
+#+title: Scheme successful-return accrual and lease-cycle settlement
+#+startup: overview
+
+* Status and evidence boundary
+
+Uncommitted ABI18 candidate. Defaults unchanged; directed A/B not accepted.
+PR #18 published base =9015091750e58f6f1f8eee7d45f44d59ee1fadf0= has six successful
+CI checks and unsupported SDK SMP skipped. Those checks do not cover this WIP.
+
+[[file:30.73-immutable-scheme-plans.org][ABI17]] reduced allocation representation but failed performance acceptance:
+CPU throughput +4.918%, CPU short pooled p99 +11.047%; mixed throughput -1.798%,
+mixed short pooled p99 -4.902%. Seven of ten mixed throughput pairs regressed.
+These results are retained. No new OS/GC attribution follows from stage quantiles.
+
+* One receipt per semantic transition
+
+The prior protocol carried normal/report flags through dynamic-wind, then
+credited whole work and diagnostics at unwind. Sliced work already accrued to
+the current lease. The new protocol aligns those ownership boundaries:
+
+| Transition | Authority and update | Never implied |
+|------------+----------------------+---------------|
+| First plan selection | Invocation freezes descriptor; Scheme reports one selected plan | A completed computation |
+| Successful whole return | Epoch checked; private return site inherits acquired owner/class; declaration accrues to lease | Root retirement, result delivery, instruction count |
+| Sliced checkpoint | Existing bounded checkpoint accrues actual reported work | Credit for an unreported suffix |
+| Nested unit exit | Existing lease depth decreases; accumulated work remains owned by outer lease | Another flush or another success credit |
+| Outer release / suspension | Existing lease flush transfers accumulated work to its class total and resets accumulator | Admission capacity release |
+| Exceptional or continuation escape | Wind exit releases lease; no successful-return credit site reached | Rollback of completed nested or checkpoint work |
+| Reentry | Reacquire lease; retain original immutable plan | A new selection report or replacement-epoch authority |
+
+Each multishot successful return charges its retained declaration again. This is
+conservative logical work, not exact partial-replay CPU accounting. A subsequent
+exceptional replay cannot inherit success: no normal-return flag exists. Old
+policy returns/checkpoints remain inert under the policy identity fence. An old
+48-record continuation does not become compliant with a new four-record bound.
+
+Invocation state retains only its first descriptor. It is not pooled, and the
+three wind callbacks remain. Public layout validation, cold metadata publication,
+class permission invalidation and complete Scheme continuations/actors/GC stay
+intact. Whole-return accrual executes before wind exit while the Scheme lease is
+still owned; a suspended nested invocation first settles the lease through the
+existing suspension boundary, then restores its depth on reacquisition.
+
+Selection reports now describe first selection, including escaped unfinished
+invocations, rather than waiting for first unwind. Successful work is visible in
+the existing work snapshot as accrued plus settled work. Final idle counts retain
+the same conservation contract. Reporting cannot retire native roots or capacity.
+
+This changes the accounting protocol, not a threshold. It can add an accumulator
+write on whole-return paths; fewer flags are not assumed to outweigh that cost.
+Existing per-unit lease acquisition/release remains, so this candidate does not
+claim to eliminate all service-cycle locking or explain every latency spike.
+
+* Actual API and bounded qualification
+
+=configure_scheme_service_cycle_plan_on= selects idle ABI18 operation 29 using
+=SchemeWorkExecutionPolicy=, with exact receipt mode 3. ABI17 operation28 remains
+the matched control. Request/work capacities, class budget, Actor quantum and
+native result projection are unchanged. Rust only distributes across instances.
+
+Native controls reuse the complete ABI17 continuation/epoch/class suite under
+cycle mode, including parked A/completed B/exception, successful and exceptional
+multishot replay, nested class rejection, saved checkpoint rejection, smaller
+policy replacement, and budget disable while suspended. New temporal controls
+observe selection before unwind, nested success before outer return, settlement
+inside suspension, and outer exception after successful nested work. Existing
+actual lifecycle tests use the new Rust endpoint and retain root/GC controls.
+
+The same Runtime activation state adds accrued/settled fields, successful-return
+credit, outer exit/suspension settlement and resumption. The old model mode is
+retained. Existing CPU/root/capacity lifecycle remains authoritative. Directed
+witnesses cover nested success then outer escape, suspension without duplicate
+settlement, multishot success/exception/success, stale-policy reentry, and accepted
+close/drain. A required mutation adds accrued work to settled without resetting
+it; conservation must fail. Model success is not native or performance admission.
+
+* Matched performance gate
+
+From the repository root with Cargo and the native SDK on PATH:
+
+#+begin_src text
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --cycle-accounting-ab
+#+end_src
+
+This compares ABI17 versus ABI18 using four same live VMs/image, O2, Tokio two
+workers, window4/work32, batch8, four/48 work bounds, unchanged Scheme Actor
+quantum and actual native S64 workload. Both arms use joint dispatch. Cold cache
+construction remains timed. Five AB/BA blocks give ten paired windows per load.
+Both arms must conserve work, selections, starts and 1088 independent results.
+No broader matrix or repeated unchanged sampling is authorized by a negative.
+
+Wait for compiler-free conditions without pausing other tasks. Preserve raw
+samples privately, including negatives; no profiler attaches to timed work. CPU
+utilization is distinct from throughput and latency. Retain pooled and paired
+estimates, fairness, cleanup and the unchanged five-second meaningful-progress
+watchdog. A successful increment alone cannot admit the entire unpublished stack;
+that requires its separate same-image protocol control against joint/work off.
+Historical watchdog failures remain open unless evidence identifies their cause.
+
+* Failures retained before acceptance
+
+The initial Quint gate failed because new primitive actions were placed in the
+scenario module without its private lifecycle import. They were moved into the
+existing resource-owner module; the invariant and sample bounds were not relaxed.
+
+Two native attempts failed the unchanged shared-checkpoint identity assertion
+(two other tests passed). The diagnostic confirmed cycle mode and four-record
+span. Inspection of the actual archived producer C found no cycle-unit symbol:
+std/build tracked service-progress but omitted service-work and its activation
+include. New endpoint code had therefore linked against an older budget object.
+The canonical build.ss now declares both includes as extra inputs. Cargo already
+tracked the producer Scheme directory; no Python/Bash build replacement was added.
+No performance sample was taken from either mismatched artifact. The two failed
+native attempts do not attest complete teardown; their failure records remain
+private. This is distinct from historical watchdog attribution.
+
+Private whole-return accrual does not repeat the owner/class checks required by
+public saved checkpoints: its before hook acquired the captured context lease,
+suspension restores it before returning, nested cross-class relabel is rejected,
+and unchanged policy identity excludes disabled/replaced budgets. The accumulator
+has no exported arbitrary-credit function. Existing release still checks owner.
+This removes duplicate validation by ownership structure, not by disabling checks
+on public checkpoints or weakening the continuation contract.
+
+* Correctness receipts before the directed performance gate
+
+The final native integration gate passed all three tests in 33.66 s, including
+the strengthened exception control and private return-ownership path. Four
+owners joined with zero roots, files removed and returned descriptors. Initial
+open failures, native typed GC, continuation affinity, exception/backpressure,
+cancellation/expiry and accepted drain all remained covered. Final strict Clippy
+and generated-artifact update passed; the O2 release image is prepared separately.
+The successful native gate did not widen the five-second progress deadline.
+
+The complete reused Runtime model passed in 522.32 s (550.215 s including the
+controller), across both domains and all 24 required counterexamples, including
+the duplicate-settlement mutation. Model SHA-256:
+=05f5795da629645f564c49bb4b223cf1a94a1d66c2967825b6a745f9013b7820=.
+No later model changes were made. This is finite protocol evidence, not a proof
+of native allocation, wall-time fairness or performance improvement.
+
+The earlier rebuilt native gate also passed (85.37 s), before the final private
+ownership-check removal and strengthened catch control. It is not substituted
+for the final native receipt. Historical watchdog failures remain unattributed;
+these passing runs and the concrete build dependency fix do not close them.
+
+* Final O2 representation and capture precondition
+
+Final generated-artifact verification and formatting passed. The release bench
+build passed. Actual same-image C contains both ABI17 and ABI18 execution units.
+Neither uses mutable boxes; both retain three wind closures. Captured environment
+slots change from 5+2+2 to 5+4+1, so fewer activation fields do not imply every
+closure became smaller. C SHA-256:
+=6099759ed53bd92dc3689972d8d2a73317669398b9bb12c082f5203c67f6c779=.
+
+The first capture check deferred because other compilers were active. It created
+no manifest or timed samples and did not pause any task. This is a precondition
+deferral, not a failed or successful performance result.
+
+* Directed performance outcome: not accepted
+
+The capture passed its two compiler-free checks; before/after boundary lists were
+empty. All our correctness/model/build controllers had exited. No other task
+was paused. This is bounded interference observation, not continuous OS tracing.
+Forty samples completed in 6.843 s with no timeout. Both arms conserved all
+logical work, 8256 plan selections, 64 short starts and 1088 results per window.
+Four owners joined, roots were zero, files removed and service quiesced.
+
+| Load / metric | ABI17 control | ABI18 candidate | Change |
+|---------------+---------------+-----------------+--------|
+| CPU orders/s | 330329.241 | 347632.359 | +5.238% |
+| CPU pooled short p99, us | 399.875 | 392.750 | -1.782% |
+| CPU pooled bulk p99, us | 1092.416 | 651.916 | -40.323% |
+| CPU maximum owner finish spread, us | 437.750 | 370.084 | -15.458% |
+| Mixed orders/s | 63094.536 | 62714.896 | -0.602% |
+| Mixed pooled short p99, us | 542.208 | 507.875 | -6.332% |
+| Mixed pooled bulk p99, us | 2527.708 | 2684.625 | +6.208% |
+| Mixed maximum owner finish spread, us | 1549.125 | 2094.833 | +35.227% |
+
+Paired medians remain separate: CPU throughput +10.523% (9/10 improved), short
+p99 +16.195% (5/10 improved), bulk p99 -10.634% (8/10 improved), finish spread
+-19.632% (6/10 improved). Mixed throughput -1.255% (4/10 improved), short p99
+-6.279% (6/10 improved), bulk p99 +6.729% (3/10 improved), finish spread +3.582%
+(4/10 improved). The worst CPU short pair is +475.234%; worst mixed short is
++57.086%, and worst mixed bulk +192.119%. Pooled short improvement is not stable
+per-window latency acceptance. Per-window p99 is the maximum of 64 probes;
+pooled p99 uses 640 probes and therefore a different estimator.
+
+Observed work handoffs fell from 788 to 533 for CPU and 583 to 474 for mixed.
+That is not proof of causation: arrival overlap, grants and scheduling interact,
+and stage walls overlap. CPU construction p99 increased 62.726%; mixed admission
+p99 increased 31.084%. Neither a GC nor an OS-wakeup attribution is established.
+CPU utilization was not measured. No historical negative magnitude is compared
+causally against this different same-image control.
+
+Performance admission fails on mixed throughput/bulk latency/fairness and unstable
+CPU short tails. No repeated unchanged capture, broader matrix, whole-stack
+protocol gate, commit, push or default change follows this result. The semantic
+accrual/settlement contract passed; stable overall performance did not.
+
+Host SHA-256:
+=dda1d66210bb10ad2efed11ee949f783d77b3bb08a5aaf601416e61d3c2616c6=.
+Native image SHA-256:
+=142af1e4bbccc454da37b4404d42f47c413d50fb7bb65c1a6595959946891dd7=.
+Pre-result source archive SHA-256:
+=1bf05ba9df3754dd89dbdee343598cf5da27005bcb7fc9c42b735359c37220f6=.
+This outcome section was added after that snapshot. Raw samples, audits and
+failures remain private. Successful native/capture exits do not attribute the
+remaining historical watchdog incidents; the progress deadline stays five seconds.
+
+* Architectural consequence before another candidate
+
+The actual path still enters a separate work-layout dynamic-wind and obtains /
+releases a Scheme lease for each of 8256 declared units. The Actor executor also
+has its own item-progress publication, quantum boundary, coordinator acknowledgement
+and service completion transition. Moving credit ownership alone did not merge
+those execution lifetimes or remove those independent boundaries. This is a
+source-level structural observation, not attribution of the measured p99.
+
+The next design question is a Scheme-owned execution extent for an Actor turn:
+can item invocations borrow its lease and immutable plan, with suspension at
+existing Actor/cooperative boundaries, while standalone short invocations retain
+their own extent? Before implementation, the existing model must make borrowed
+extent ownership, remaining work, scheduler-boundary release, multishot reentry
+after turn completion and per-result retirement explicit. A batch cannot simply
+hold a lease across an existing yield, which would prevent a competing short
+Scheme thread from obtaining it; nor can eight 48-record items become one
+uninterruptible declaration. No such fusion is implemented or claimed here.
+
+This changes the granularity of the scheduling contract, rather than relocating
+the same counter again or relaxing a threshold. The current candidate remains
+unaccepted and defaults unchanged. Rust must continue to dispatch only across
+instances; Scheme owns all internal execution, suspension and reentry.

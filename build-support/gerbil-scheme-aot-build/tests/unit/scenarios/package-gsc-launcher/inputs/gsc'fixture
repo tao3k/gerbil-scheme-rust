@@ -1,0 +1,3 @@
+#!/bin/sh
+printf '%s\n' "$@" > "$GSC_ARGV_RECEIPT"
+exit "${GSC_EXIT_STATUS:-0}"

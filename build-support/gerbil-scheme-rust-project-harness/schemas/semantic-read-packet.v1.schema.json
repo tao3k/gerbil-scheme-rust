@@ -181,7 +181,7 @@
       "type": "array",
       "description": "Parser-owned syntax facts used to select or repair the read window.",
       "items": {
-        "$ref": "semantic-native-syntax-fact-index.v1.schema.json#/$defs/nativeSyntaxFact"
+        "$ref": "semantic-syntax-fact-index.v1.schema.json#/$defs/nativeSyntaxFact"
       }
     },
     "truncated": {

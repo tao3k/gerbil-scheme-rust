@@ -1,0 +1,276 @@
+#+TITLE: Scheme Runtime joint execution and retirement protocol
+#+OPTIONS: toc:2
+
+* Reason for the protocol
+
+The aggregate-credit experiment in
+[[file:30.83-scheme-execution-retirement-progress.org]] was rejected. It could
+not distinguish a runnable short request from an externally suspended one, or
+useful execution from an exceptional completion. Do not infer a unique OS/GC
+cause from that negative result or recapture the rejected image.
+
+The actual suspension interface previously represented external waits, Actor
+barriers and cooperative yields with one operation. The next decision must use
+those different states, retaining the existing short/bulk class arbitration,
+maximum declared span and per-result retirement contract.
+
+* Managed Scheme execution contexts
+
+A service job registers one context before dispatch; each active Actor turn
+registers an independent child before mailbox delivery. Contexts are not result
+roots, admission units or proof of physical CPU execution. There is no new
+context allocation per item handler. Both A/B arms record identical events.
+
+| Phase | Entry event | Exit event |
+|-------+-------------+------------|
+| Runnable | Accepted dispatch, cooperative release/yield, external resumption | Lease registration, suspension, terminal unwind |
+| Lease wait | Existing budget acquisition/registration | The receiving Scheme thread obtains the grant |
+| Lease owned | Receiving acquisition returns | Outermost release, suspension or unwind |
+| External wait | Explicit service suspension, including native timers or I/O | Suspension returns or unwinds |
+| Actor barrier | Coordinator waits for independent child turns | Join returns or unwinds |
+| Retired context | Dynamic extent exits normally, exceptionally or by continuation escape | Its own continuation reenters, within retained epoch ownership |
+
+The typed =running= observation means received lease ownership, not OS running
+state or instruction progress. Ready results have their own custody count,
+including queued ready graphs, claimed completion identities and pending native
+batch slots. They are not included in context totals.
+
+An Actor barrier is not itself runnable work or external I/O. Its children have
+independent contexts, so suspending the coordinator does not conceal runnable
+children or count it as another executor. A cooperative yield remains runnable;
+it is not relabeled as external wait. Explicit suspension can track a context
+even when it holds no lease, which matters for the Actor coordinator.
+
+The existing before/after hooks perform the transitions at registration,
+received acquisition and release. No handler polling, timer, additional outer
+lease or per-record check is added. Existing immutable layout selection and
+continuation-specific plan bounds remain. Nested leases retain one owned
+context. Dynamic-wind balances escape, multishot reentry and exceptions;
+retained old epochs cannot mutate the current ledger through an acquire hook.
+
+* One native service-cycle decision
+
+=RuntimeReadyFirst= and =RuntimeFair= enable the same context ledger, native
+types and workload. Only the second selects from the joint state:
+
+| State at harvest | RuntimeFair decision |
+|------------------+----------------------|
+| Short result ready | Harvest directly, short first |
+| Short dispatch/runnable/lease wait exists, no short result ready | One existing Scheme pass, then bounded harvest |
+| Bulk ready, no runnable short obligation | Harvest directly |
+| Empty, managed runnable or lease-wait work exists | One existing Scheme pass, recheck |
+| Empty, only external waits/barriers remain | Return empty; existing Scheme native wait owns mailbox/timers/wake-port progress |
+| Terminal graphs only | Direct bounded harvest |
+
+Every path uses at most the existing one explicit pass. Native wait does not
+insert a second debt checkpoint for these two observed policies. Class
+arbitration decides actual receiving grants; a scheduler opportunity does not
+acknowledge any grant. After the one opportunity, bulk ready results are still
+harvested in the same boundary, so short arrivals cannot indefinitely fence
+bulk retirement. Nothing makes a whole batch an uninterruptible unit.
+
+Arbitrary application blocking that bypasses explicit suspension cannot be
+classified as external. General Scheme code and continuations remain supported;
+this is an application-managed cooperative contract, not OS preemption or a
+wall-clock latency bound. Runtime decisions remain entirely Scheme-owned.
+Rust continues cross-instance dispatch and owner-bound native projection.
+
+* Ownership, types and validation
+
+The actual opt-in API is =configure_scheme_service_boundary_plan_on= with
+=SchemeServiceCyclePolicy::{RuntimeReadyFirst,RuntimeFair}=. The native ABI29/30
+receipt keeps existing first-grant, continuation and completion policies.
+=scheme_runtime_progress_on= returns typed class pairs for runnable, lease wait,
+external wait, Actor barrier and lease-owned contexts, plus entered/retired,
+service passes, native-wait decisions and ready-result custody. Decode requires
+nonnegative values, valid flags and =active + retired = entered= without overflow.
+These observations transfer no root, slot, permit or routing ownership.
+
+State transitions run inside an existing VM/owner. No new foreign thread reads
+or lock inversion is introduced; no service lock is held across a yield or wait.
+Cancellation and timeout before entry return existing reservation credit;
+after entry, accepted Scheme work owns its resources through terminal drain.
+Closing revokes existing fences and drains accepted work independently of future
+caller polling. Every projected result keeps its own root/credit retirement.
+
+The existing Runtime model reuses blocked workers, runnable jobs, lease waiters,
+receiving grants, completion custody and close actions. It does not substitute
+context counters for those states. Directed witnesses cover external-only
+parking, external resumption, runnable short work before bulk harvest, blocked
+short work allowing bulk drain, bounded pass consumption and two mutations.
+Finite safety does not establish unconditional scheduler/OS liveness.
+
+Native controls verify a real externally suspended continuation, the choice
+between one control pass and native waiting, claimed completion custody,
+distinct waiting/received lease states, GC and exceptional multishot reentry.
+Actual Rust API jobs exercise the Actor children and validate final context,
+ready-root and capacity conservation. Existing cancel, timeout and close tests
+remain required.
+
+* Targeted performance admission
+
+One comparison uses the same four live VMs/image, O2, Tokio2, window4, work32,
+batch8, Actor quantum1, class/feed1, work quantum4/maximum48, five AB/BA blocks
+for CPU and mixed loads, ObservationOff. Both arms observe the same lifecycle
+state. Native progress stays five seconds and the controller120 seconds.
+
+Require exact work/results/plan/grant/context conservation and complete native
+cleanup. Inspect throughput, short actual/scheduled p99, bulk p99 and owner
+finish spread. Keep negative results and defaults unchanged. No expanded matrix,
+unchanged-source retry or performance publication is justified by model success.
+The historical watchdog remains unattributed without its missing failure image
+and native progress; current passes cannot retroactively close that failure.
+
+* Tokio, fixed owner, Actor and green-thread refinement
+
+The existing Runtime model now connects all three execution layers, rather than
+calling every Scheme task a worker. Tokio polls a submission future, publishes
+a bounded owner request, then awaits an owned result without retaining a Tokio
+execution worker. Dedicated native owners keep VM affinity. Each bulk Actor
+coordinator dispatches two abstract children with independent runnable,
+lease-wait, selected-grant, received-lease, external-wait and terminal phases.
+Two children preserve the join and ownership protocol; the native workload still
+uses its existing four Actor workers and batch eight.
+
+| Actual source boundary | Existing-model refinement |
+|------------------------+---------------------------|
+| =async_dispatch.rs=: timeout awaits the oneshot receiver | Tokio submission/reply polling, await, timeout/drop and owned reply observation |
+| =service.rs=: reserve, enqueue and sender callback | Admission with existing slot/work credit, fixed owner mailbox and reply publication |
+| =service_loop.rs=: projection followed by permit retirement | Owned Rust projection, reply publication/observation, then independent native credit retirement |
+| =actor-batch.ss=: coordinator join and independent active children | Parent barrier, child mailbox dispatch, child lease selection/receipt, work and external suspension |
+| =service-budget.ss=: acquisition/release/suspension | Existing lease arbitration and class-aware runnable/external transitions |
+| =async-service.ss= and native wake port | Scheme native wait, split host notification/delivery, and separate OS sleep |
+
+Tokio never executes Scheme work or migrates an entered VM. Pending futures
+cannot occupy execution worker slots. Native result publication does not need
+a free Tokio worker, and a future can observe a Rust reply before the owner has
+dropped its retained capacity permit. The model preserves that interval rather
+than declaring observation to be retirement. A dropped future does not abandon
+its accepted Scheme graph or children.
+
+An Actor batch cannot publish its result before all children terminate. Child
+lease selection is distinct from the receiving green thread's grant; only child
+execution advances its logical-work receipt. Externally suspended children can
+resume and complete while Tokio has no executing poll. Scheme native wait may
+still run those children and timers: OS sleep is a separate transition that
+requires local quiescence and the existing inbox/notification recheck.
+
+Directed witnesses cover reply observation before permit return, caller drop
+and close with accepted children, and native waiting with external child
+resumption. Mutation controls reject a waiting future retaining a Tokio worker,
+early Actor-batch publication and OS parking over runnable Actor children.
+Existing owner affinity, cancel/timeout, capacity, roots, ready-token and
+registration rules remain shared, not copied into a second lifecycle model.
+
+This finite refinement has a one-worker Tokio domain and two children to expose
+resource cycles. It is not Tokio's internal work-stealing implementation or a
+model of nanosecond costs. OS/GC progress and arbitrary external I/O readiness
+are environment actions. Model success qualifies these protocol guards; native
+A/B still decides the performance result.
+
+* Qualification and incremental result
+
+The extended existing gate passed138 directed witnesses before the final
+exported-step/capacity scenario refinement. The final model source passes16
+cross-layer directed witnesses and400 random sequences of at most64 steps,
+including single/two Tokio execution slots and capacity waits. All receipts
+retain their own model hashes; an earlier random invocation failed because it
+named an unexported step, and was repaired with an explicit scenario entry.
+The extra capacity witness observes a reply while its permit is still retained,
+parks another submission without a Tokio worker, then lets owner retirement
+release capacity before that future polls again.
+
+Native qualification passed3 tests in32.58s, including real suspension,
+lease-wait/receipt, Actor state drain, GC, multishot replay, exceptions,
+cancellation, timeout and close. Four owners joined, roots returned to0, files
+were removed and FDs returned; native close was5.176583ms. Strict Clippy, O2
+release construction, final formatting and canonical generated-source checks
+passed. Declaring the new include invalidated the build-input receipt, which
+was refreshed with the existing compiler-owned generation path. Incomplete-form,
+continuation-fixture arity and oversized-fixture lint failures remain retained;
+none was a runtime watchdog outcome.
+
+The first comparison used identical lifecycle accounting in both arms. After
+compilers ended naturally, one capture produced40 samples in7.486s, exit0 and
+empty stderr. Native image and host identities stayed unchanged; compiler
+boundaries were empty. Each window retired5184 contexts,1088 result graphs and
+exact declared work; cleanup joined4 owners with0 roots and removed files.
+Boundary checks do not exclude every possible mid-window host effect.
+
+| Load | Paired throughput | Actual short p99 | Scheduled short p99 | Bulk p99 | Owner finish spread |
+|------+-------------------+------------------+---------------------+----------+---------------------|
+| CPU | +3.84% | -9.75% | +1.30% | -6.77% | +1.04% |
+| Mixed | +1.07% | -21.54% | -6.02% | -2.82% | -0.51% |
+
+Throughput improved in9/10 pairs for both loads. Actual short p99 improved in
+6/10 CPU and7/10 mixed pairs; owner spread improved in only5/10 pairs for both.
+Pooled CPU throughput improved1.08%, actual short p99 improved12.87% and bulk
+p99 improved38.83%. Pooled mixed throughput improved1.36%, actual short p99
+improved48.64% and bulk p99 improved24.43%. These pooled values do not erase
+paired regressions or prove a stable fairness improvement. The CPU minimum
+Actor peer-progress diagnostic fell to0; all four owners still completed work.
+Do not infer starvation freedom from completion alone.
+
+Work handoffs changed745->224 for CPU and644->154 for mixed. Active boundary
+passes changed5101->4743 and6702->5559, respectively. This is a changed service
+protocol with fewer forced transitions, not repeated yield tuning. It does not
+uniquely attribute instruction, OS or GC costs.
+
+This incremental result is not publication admission: both arms pay identical
+context bookkeeping. One distinct =--runtime-cost-ab= control compares the
+complete enabled protocol with unobserved ReadyFirst in the same image, load
+and native type path. It measures enablement cost without expanding thread/VM
+matrices or recapturing the incremental experiment. CPU spread and scheduled
+p99 remain explicit negative incremental results. Defaults stay unchanged.
+
+
+* Net enablement result: implementation rejected
+
+After a manual quiet check found no compiler activity, the distinct net-control
+capture produced40 samples in9.290s, exit0 and empty stderr. Both compiler
+boundaries were empty, source/host/image identities stayed unchanged, and the
+image was exactly the same as the incremental comparison. The control recorded
+no Runtime contexts; the candidate entered/retired5184 per window. Both arms
+conserved1088 result graphs, declared work, plans and receiving-grant receipts.
+All four owners joined with0 roots and removed files. No default changed.
+
+| Load | Paired throughput | Actual short p99 | Scheduled short p99 | Bulk p99 | Owner finish spread |
+|------+-------------------+------------------+---------------------+----------+---------------------|
+| CPU | -9.30% | +5.11% | +5.44% | +13.06% | +33.53% |
+| Mixed | +0.88% | -35.33% | +4.87% | +26.51% | +2.64% |
+
+CPU throughput improved in only1/10 pairs; mixed throughput improved in6/10.
+Pooled throughput changed-18.70%/-1.80% for CPU/mixed, actual short p99
+-1.87%/-33.10%, bulk p99+56.37%/+1.69% and maximum owner spread+56.58%/+29.78%.
+The paired and pooled metrics do not establish net performance acceptance.
+The observed short-tail benefit does not erase the throughput, bulk and
+fairness negatives. No repeated capture of this image or thread/VM matrix was
+used to seek a favorable result. Neither comparison qualifies the whole
+unpublished stack against a published build.
+
+Work handoffs fell713->417 for CPU and531->222 for mixed, but fewer handoffs
+were not sufficient for performance. Source review identifies redundant phase
+mirroring in every budget acquire/release: existing budget ownership and wait
+queues already describe those lease facts. The next implementation should use
+those authoritative states and maintain context eligibility at dispatch,
+actual blocking/resumption, Actor turn lifetime and terminal unwind. Keep
+uncontended handler plans free of repeated mirror transitions. Do not add a
+yield layer or recycle continuation-owned mutable context records.
+
+This is a concrete source-backed optimization direction, not proof that the
+entire measured regression is bookkeeping cost. The two independent captures
+must not be subtracted to manufacture an instruction/GC/OS decomposition.
+The joint model and positive incremental result remain useful protocol evidence;
+the current full implementation is rejected and remains unpublished.
+
+An initial net-benchmark lint rejected a nested else-if; it was flattened
+without suppression before capture. All compile, model-entry, generated-receipt
+and benchmark failures remain recorded privately. Raw logs and binaries were
+not added to GitHub. A proposed bounded local polling command was rejected by
+automatic approval review as Automation; it did not execute. Subsequent checks
+were manual, and no background monitor or Automation was created.
+
+The historical watchdog log was re-inspected: it records exit70 without the
+native progress, phase, stack or exact image hash needed for attribution.
+That failure's cleanup remains unverified. Current successful native and
+performance captures do not close it. No commit or push was made.

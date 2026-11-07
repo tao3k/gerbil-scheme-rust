@@ -87,7 +87,7 @@ jobs:
             --skip cli_search_fzf_renders_fuzzy_frontier
             --skip cli_search_guide_renders_typed_reasoning_profiles
             --skip cli_search_owner_items_graph_prioritizes_symbol_code_frontier
-            --skip cli_search_query_routes_code_shaped_use_through_native_syntax_facts
+            --skip cli_search_query_routes_code_shaped_use_through_syntax_facts
             --skip cli_search_views_render_rfc_line_protocol
             --skip public_large_codex_web_search_flow_connects_prime_to_workspace_symbol_axes
             --skip public_large_tokio_bytes_flow_connects_prime_to_dependency_api_and_docs_axes

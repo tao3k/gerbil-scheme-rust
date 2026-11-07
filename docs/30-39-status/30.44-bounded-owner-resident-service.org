@@ -1,0 +1,293 @@
+#+title: Bounded Owner-Resident Native Scheme Service Supply
+#+date: 2026-10-22
+
+* Scope
+
+Continue [[file:30.43-service-owner-wake-boundary.org][the native owner wake investigation]] from PR #18 head
+=85f374fdcd61b0ca75e47df07850fb75ba17f30b=. Its
+[[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39711888377][exact-head CI]] passed every supported job; unsupported SMP stayed skipped.
+The optional implementation moves
+bounded independent input supply onto the existing fixed owner. Scheme retains
+execution, Actors, green threads, continuations, exceptions, timers and GC.
+Rust supplies owned typed payloads and distributes work across instances; it
+does not select or replace Scheme green-thread execution. Native Scheme/C O2,
+the SDK, all library defaults and existing five-second native gates are unchanged.
+
+* Actual API and admission contract
+
+#+begin_src rust
+let mut stream = dispatch.submit_scheme_service_stream_on(
+    independent_requests,
+    SchemeServiceStreamConfig {
+        owner: 0,
+        maximum_active: 3,
+        maximum_staged_work: 256,
+        timeout: Duration::from_secs(5),
+    },
+).await?;
+while let Some(result) = stream.next(Duration::from_secs(5)).await {
+    let (owned_projection, native_completed_at) = result?;
+    // Only owned Rust results leave the fixed Scheme owner.
+}
+#+end_src
+
+The input count is nonzero and at most the existing native queue capacity.
+Every original work/lane/execution/trace declaration is frozen before awaiting
+registration. Declared work is nonzero, each request fits its captured native
+work budget, and aggregate staged work fits the explicit stream bound. Active
+requests have a separate positive bound no greater than that same capacity
+object's immutable slot limit. It is not inferred from a racing free-slot count.
+An equal-numbered capacity reconfiguration is still a different epoch.
+
+These are count and application-declared work bounds, not an exact byte bound
+for arbitrary Rust values. Application-owned Rust payload retention is explicit;
+constructed native payloads/results retain the existing transfer limits. Work
+units are not CPU-time predictions. The stream accepts explicitly independent
+requests without an Actor lane. Dependent/affine requests keep their existing
+owner-pinned APIs and full Scheme semantics.
+
+Poll registration and =next= inside a Tokio runtime with its time driver enabled.
+The fixed native owner itself does not run a Tokio executor.
+
+Registration reuses the existing per-owner producer semaphore, inbox publication
+and close/epoch fence. Numeric producers and service producers cannot register
+concurrently on one owner. Staging acquires neither a native request slot nor
+Scheme roots. Each supplied request separately acquires an active-stream credit
+and the existing native work/request pair, rechecks cancellation, deadline and
+owner epoch/close state, then commits to the original typed Scheme service job.
+The owner checks its ordinary inbox between supply turns; queued short work
+retains the existing path into Scheme's short queue. Sustained external inbox
+traffic is not an unconditional producer-liveness guarantee.
+
+The accepted path remains =TypedJob::start=, Scheme's native asynchronous service,
+and =TypedJob::complete= through the common native execution/root-balance path.
+No new Scheme command or alternate payload representation is introduced. Scheme
+chooses actual Actor/green-thread execution and cooperative class grants.
+
+* Cancellation, expiry and drain
+
+- =cancel()= and dropping the stream reject only unadmitted staged work.
+  =InstanceError::Cancelled= names that outcome. Cancellation after the final
+  admission fence cannot retract a committed entry even before construction.
+- Registration and all later admission attempts share one absolute deadline.
+  Timing out =next()= consumes that delivery observation, not the accepted task.
+  Entered Scheme is never preempted or migrated.
+- Cancelling a pending acquisition drops its partial work/slot future and active
+  credit. Returning partial internal Tokio work allocations uses the original
+  capacity-return notification protocol.
+- The producer registration stays held until all committed jobs have completed
+  native projection/root balance and returned their active credits. Rejected
+  staged requests do not release a registration that still owns accepted work.
+- Once only accepted work remains, the producer exposes no admission deadline.
+  The owner waits on the native Scheme event instead of repeatedly polling an
+  expired deadline. Positive finite waits are rounded up to microseconds, never
+  down to the ABI's zero/infinite sentinel; overflow saturates positively. A
+  separate unit control covers sub-microsecond and maximum finite durations.
+  Completed work returns its semaphore credit; the owner pump
+  observes final drain directly without an additional explicit self-notification.
+- The public handle holds only a weak reference to its cancellation signal.
+  Keeping a fully consumed handle retains no wake descriptor/image through that
+  signal. Unconsumed application outputs keep their ordinary resource ownership.
+
+* Matched native workload
+
+The exclusive =--resident-ab= Rust bench uses the same four VMs and image, two
+Tokio workers, original input/owner partition, 8,192 native 48-line orders, batches
+of eight, and 64 native four-line short probes. Both arms use general batch
+service plus native short service, native port wake, cooperative budget one,
+feed one, coalesced notifications, four request slots and 32 work units per owner.
+No OS priority is changed. Bulk owner placement is fixed in both arms; short
+routing uses the same explicit reselection router in both. This avoids treating
+an owner-routing change as a supply improvement.
+
+The control uses the existing host-refilled service API with three bulk credits
+per owner and the 128-ticket flow ceiling. The candidate uses the new public API
+with three active requests per owner and at most 32 staged batches per owner,
+256 staged work units each. Both retain the original host input corpus; this is
+not a claim of identical Rust peak memory. Candidate staging and control ticket
+retention are distinct scopes, each explicitly bounded. Each original typed
+constructor, Scheme handler, payload, output projection and final result position
+is unchanged. FIFO result observation is retained. The experiment measures the
+complete supply mechanism, not an isolated primitive or an OS-free latency.
+
+Startup/configuration are outside timing. Ten samples per arm/load alternate
+AB/BA. Actual and serial nominal-500-us scheduled short latency remain distinct;
+the probe driver is not a fixed open-loop arrival process. All negative rows
+and all probe-overlap/fairness observations must be retained. No default is
+promoted from this experiment.
+
+* Protocol model
+
+The existing =owner_lifecycle.qnt= is extended, not duplicated. A producer's
+active limit is separate from pool slots/work. Normal and reserved admission
+check it. Open-state cancellation removes only staged work and its reservations;
+accepted Scheme roots/credits remain until ready/take/completion and final
+producer retirement. Deterministic scenarios cover window reuse, cancellation
+with accepted graphs and an active-window bypass mutation. The sampled stream
+step and targeted mutation are wired into the existing Rust model driver.
+Partial semaphore implementation, weak descriptor lifetime, native construction,
+GC, continuations, actual shutdown and OS timing remain native obligations.
+
+
+* Native closure and model controls
+
+The final nine semaphore/pipe/finite-wait controls pass (0.05 seconds execution).
+The existing ordinary numeric producer fixture passes (2.89 seconds), and the
+extended four-VM Scheme service fixture passes (5.83 seconds), using unchanged
+five-second native progress/request gates. These execution times exclude builds.
+The fixture includes:
+
+- Active-window saturation and an actual short result while two Scheme batches
+  are suspended and further producer work is staged.
+- Cancelled registration wait, explicit staged cancellation, absolute admission
+  expiry, consumed delivery timeout and dropped stream handles. Accepted graphs
+  remain live and drain before the producer registration returns.
+- A native partial-work acquisition: four ordinary jobs hold 25 work units and
+  all request slots; a producer awaiting eight internally holds the remaining
+  seven. Cancellation refunds all seven before the ordinary jobs complete.
+- No expired-deadline busy loop while accepted Scheme work is suspended, checked
+  with the existing native Advance counter rather than a speed threshold.
+- Native GC, constructor/projection panic controls, a Scheme exception and an
+  independent successful successor through the common typed path. Existing
+  continuation/affinity and initialization-failure cases remain in the fixture.
+- Close with both accepted and staged producer work: accepted results complete,
+  staged work returns Closed, four owners join, roots balance, copied files are
+  removed and descriptors return. A fully consumed stream handle is deliberately
+  kept alive across the final FD count to qualify its weak cancellation signal.
+
+Both focused Clippy gates pass with warnings denied. The exact new dev-profile
+CI smoke and the final release/phase smoke each produce eight valid rows and
+clean native shutdown. No new jobs, matrix or watchdog change: the existing native
+CI job adds the resident smoke and runs =instances::= core controls, including
+all prior pipe/capacity controls and the finite-wait boundary case.
+
+Quint typecheck and 35 existing/extended small scenarios pass. The sampled stream
+step admits 1,000 traces of up to 64 transitions with seed one and no safety
+violation. The active-limit bypass has a required counterexample from a targeted
+safe initial state; a separate stutter/safety control verifies that initial state.
+This does not constitute full symbolic verification or OS-latency acceptance.
+
+The first public function was rejected by the Rust source policy for combining
+validation, staging and publication; a named staging helper repaired the source
+without a suppression. Initial lint failures (borrowed operation configuration,
+private benchmark type visibility and broad test/measurement functions) were
+repaired and their logs retained. An initial model invocation used a wrong module
+name and failed. A broad random mutation search missed the active-limit defect;
+it is not counted as a negative-control pass. The targeted safe-state mutation
+exposes it. Earlier self-notifying producer and pre-rounding smoke/native builds
+remain superseded correctness receipts, not final performance qualifications.
+No failed native watchdog route was retried or converted into a pass.
+
+* Same-VM performance observations
+
+Two final unobserved captures each complete 40 samples and clean four-VM teardown.
+Each arm/load has ten AB/BA samples on the same VM identities and image within
+its capture. No own compiler/model run was active during capture; other host tasks
+were not paused. These are matched local observations, not a quiet-host or
+portable scheduling guarantee. Every sample and every negative is retained.
+
+| Capture/load | Orders/s host -> resident | Change | Short actual p99 ms | Scheduled p99 ms | Batch service p99 ms | Minimum normalized owner progress % |
+|--------------+---------------------------+--------+---------------------+------------------+----------------------+-------------------------------------|
+| A CPU | 20,666.63 -> 84,523.03 | +308.98% | 45.658 -> 49.683 | 521.273 -> 734.613 | 20.227 -> 11.598 | 10.547 -> 13.672 |
+| A mixed | 15,288.49 -> 16,098.37 | +5.30% | 15.352 -> 37.567 | 264.213 -> 679.771 | 22.694 -> 38.998 | 64.453 -> 63.672 |
+| B CPU | 20,554.88 -> 53,024.48 | +157.97% | 21.133 -> 45.611 | 343.953 -> 611.022 | 10.668 -> 21.572 | 17.578 -> 12.500 |
+| B mixed | 14,218.17 -> 15,662.71 | +10.16% | 12.610 -> 11.935 | 261.443 -> 322.765 | 25.767 -> 28.618 | 78.125 -> 54.688 |
+
+CPU throughput improves 4.09x/2.58x and mixed throughput improves in both captures.
+CPU short actual p99 worsens 8.81%/115.83%; mixed short actual p99 worsens 144.70%
+in A and improves 5.35% in B. Scheduled p99 worsens in all four pairs. Batch service
+p99 regresses in three pairs; it starts at native construction and excludes staged
+admission waiting, so it is not end-to-end bulk latency. Native throughput gain
+therefore does not admit general tail or fairness improvement. Unobserved mixed
+post-admission/preconstruction p99 changes 13.985 -> 37.482 ms in A and
+12.538 -> 11.869 ms in B; admission p99 changes 0.390 -> 0.625 and
+1.053 -> 0.953 ms. These are separate distributions, not additive tail shares.
+
+Probe-overlap minima are 57 -> 28 (A CPU), 64 -> 46 (A mixed), 64 -> 17 (B CPU)
+and 64 -> 64 (B mixed). Faster bulk completion changes how many serial probes
+actually overlap it; neither idle probes nor incomplete overlap are silently
+filtered. Actor-peer minima are zero in every arm/load. Maximum owner finish spread
+changes 522.162 -> 299.198, 312.768 -> 238.851, 269.984 -> 271.886 and
+197.566 -> 215.709 ms respectively. Fixed bulk placement is intentionally common
+to both arms: these weaker progress values must not be compared to earlier
+per-request dynamically routed captures as if only supply had changed.
+
+A separate same-source phase capture also completes all 40 samples and clean
+shutdown. Its CPU throughput is 31,100.11 -> 65,614.26 orders/s, mixed throughput
+11,251.23 -> 15,829.74; actual short p99 is 25.835 -> 22.106 ms and
+25.985 -> 21.794 ms. These instrumented improvements do not replace the contrary
+unobserved tail rows.
+
+Summing the four owners' recorded Wait wall intervals over ten samples gives
+10,833.54 -> 4,348.63 ms for CPU and 24,345.16 -> 18,778.01 ms for mixed. These
+are overlapping owner-phase sums, not elapsed time or isolated OS delay; Wait can
+run native Scheme green threads as well as block/deschedule. The CPU reduction
+is consistent with less dependence on host refill but does not establish that
+all saved time was kernel wake overhead.
+
+For each diagnostic arm/load, sort its 640 actual short latencies and inspect
+the seven entries starting at index =floor(640 * 99 / 100)=. Compute each queue
+publication-to-dequeue, native Wait overlap and native select overlap against
+that *same request*. The median ratios, with no history loss, are:
+
+| Load/arm | Tail actual range ms | Queue/actual % | Wait/queue % | Select/queue % |
+|----------+----------------------+----------------+--------------+----------------|
+| CPU host | 25.835--52.613 | 99.82 | 91.50 | 0.00 |
+| CPU resident | 22.106--33.303 | 26.04 | 0.00 | 0.00 |
+| Mixed host | 25.985--38.973 | 99.82 | 99.76 | 0.27 |
+| Mixed resident | 21.794--41.936 | 99.69 | 100.00 | 2.27 |
+
+Resident CPU tails include distinct paths: pre-dequeue Advance/Submit/Wait,
+20--30 ms after construction before projection, and one 27.286 ms owner-turn to
+construction-mark interval. No single wait-only or construction-only explanation
+fits all of them. Mixed tails remain mostly pre-dequeue Wait, often outside the
+recorded select interval. Own short construction/projection are generally much
+smaller; construction-to-projection counters for the shown worst cases do not record a
+collection. This does not exclude GC before those counters were sampled.
+Unrecorded kernel runnable time, allocator/diagnostic boundary work, Scheme
+scheduling and OS preemption are not independently separated. SDK GC CPU remains
+process-scoped and is never summed/subtracted as if it were isolated owner CPU.
+
+* Frozen artifacts and reproduction
+
+Final binary SHA-256:
+=cfc67615ecbf977f720e6bd52b1677af60ef22b91b98a85d4bdb7dfa7b6daa40=.
+Native image SHA-256:
+=306ac7a148bc4e444ae210ee1f734150beba352bca4789d32c8f629d97b22f46=,
+identical to the predecessor's image. Source archive SHA-256:
+=fb33c0a7fe4780645ee0f290ec7a17b947d66bd18b0d10e954f5c963930b0471=.
+Model SHA-256:
+=1ce01a4d0935ac66a8bbb06c8ea9216f4b9e7ff49fe6657515da5a39cb2d3579=.
+All 993 runtime source inputs, including the new API/runner/bench files, and the
+actual executed image were verified unchanged after capture. Final report prose
+is appended afterward. Raw logs/JSON, source archives, binaries and images remain
+private; only maintained English source and condensed evidence are published.
+
+#+begin_src sh
+just bridge-scheme-service-benchmark --test --resident-ab
+just bridge-scheme-service-benchmark --resident-ab
+just bridge-scheme-service-benchmark --resident-ab --phase-observation
+cargo test -p gerbil-scheme --features tokio-dispatch --lib instances:: --locked
+cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --test owner_producer --locked -- --nocapture
+quint test specs/owner_lifecycle.qnt --main owner_lifecycle_small --seed 1
+quint run specs/owner_lifecycle.qnt --main owner_lifecycle_small --step streamStep --invariant safety --seed 1 --max-samples 1000 --max-steps 64
+#+end_src
+
+* Admission decision and remaining gap
+
+The bounded native supply API, cancellation/backpressure/deadline/close protocol
+and the directed native controls are implemented. The observed CPU and mixed
+throughput gains justify retaining this explicit experiment. Defaults remain
+unchanged; tail/fairness and industrial performance acceptance remain open.
+RSS convergence and universal image unloading are not re-certified here.
+
+The short router accounts for its routed requests; directly staged bulk work
+also has native budgets and an active window but does not become that router's
+bulk ledger. Both arms deliberately share that limitation. A free native credit
+still does not identify a promptly runnable owner. Fixed staged placement can
+also leave fast owners finished while other owners retain independent backlog.
+These are concrete next integration boundaries for producer progress, short
+owner selection and pooled independent supply, not evidence for raising priority,
+weakening Scheme semantics or changing the default algorithm. Reuse this baseline
+and the current model/native protocol; do not expand the thread matrix or restore
+the rejected wait-phase hint to conceal the remaining tails.

@@ -48,7 +48,7 @@ Owns Gerbil compiler helpers usable from normal Rust code and build scripts.
 - Package/native AOT build plans that do not encode Marlin-specific identity.
 - Stable receipts for generic compiler/build actions.
 
-** ~gerbil-scheme-native-build~
+** ~gerbil-scheme-aot-build~
 
 Owns native build helpers.
 

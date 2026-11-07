@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "purpose": "Archive a matched PR #18 histogram experiment. Fewer collections are a measured benefit; latency and backlog gates failed.",
+  "source": {
+    "control": "43416f3f9c4d85d9e2d4464707d5e56a54f31906",
+    "originalControlBuild": "adcef01c2f5bb9f136e6c936b1e532cd6843522e",
+    "candidate": "The Scheme source in the commit containing this record."
+  },
+  "workload": {
+    "owners": 1,
+    "schemeWorkers": 4,
+    "frames": 3,
+    "ratePerSecond": 1000000,
+    "offeredSeconds": 1,
+    "planned": 1000000,
+    "warmup": {
+      "ratePerSecond": 1000,
+      "offeredSeconds": 1
+    },
+    "deadlineSeconds": 5,
+    "tailFrom": "planned arrival",
+    "tailTo": "verified consumption",
+    "bucketWidthNs": 1000,
+    "peakMeaning": "Due by the original schedule and not yet consumed"
+  },
+  "gates": {
+    "p99Ns": 418000,
+    "peak": 128,
+    "wholeMainNs": 3000000000
+  },
+  "method": {
+    "argv": [
+      "--capacity-research",
+      "--backpressure-owned-schedule",
+      "--rate=1000000",
+      "--seconds=1",
+      "--require-native-acceptance"
+    ],
+    "readerSha256": "667407bd6f9d72e059bf0238e20f2b1968a60efab1e0743eb697a6bec1cdc3d1",
+    "armOrder": [
+      "control",
+      "histogram"
+    ],
+    "trialsPerArm": 1,
+    "originalControlImageSha256": "69c6564d193484a55b9f78382bc74d8b4aac0337173bf4c29bc64ce9372a0423",
+    "controlRelinkSectionDifferences": [
+      "__TEXT,__text",
+      "__TEXT,__text_startup",
+      "__TEXT,__stubs",
+      "__TEXT,__init_offsets",
+      "__TEXT,__unwind_info",
+      "__DATA_CONST,__const",
+      "__DATA,__data"
+    ],
+    "layout": "arm64 Darwin, SDK 26.5, min deployment 26.0, GCC 16 with Gambit separate procedures at O2",
+    "link": "Both images were relinked with the original PR adapter, marker, archive order, export list and dependency versions. Exactly one of 144 archive members differed.",
+    "construction": "Generate the two Actor modules via the existing Cargo qualification build. Keep the original module timestamp. Compile the generated C with the listed gsc flags and replace only the Actor object in the candidate copy of the original archive. Relink both arms with identical inputs and options.",
+    "gscCcOptions": "-O2 -U___SINGLE_HOST -U___INLINE_JUMPS -D___MULTIPLE_HOSTS -D___DONT_INLINE_JUMPS",
+    "collectorScope": "Owner-call envelope including startup and terminal capture, not per-episode timing",
+    "candidateHostContractPassed": true,
+    "parallelCompilersDetectedAtArmBoundaries": false
+  },
+  "observations": [
+    {
+      "arm": "control",
+      "imageSha256": "14689f4dbba5fdc380b52f97aa74b29c356f4986f8f3b0316ee254d386634c02",
+      "startedUtc": "2026-11-06T07:31:23.869Z",
+      "endedUtc": "2026-11-06T07:31:26.994Z",
+      "histogramBuckets": 5000000,
+      "completed": 1000000,
+      "rejected": 0,
+      "errors": 0,
+      "timeouts": 0,
+      "completedPerSecond": 998424.9018480679,
+      "elapsedNs": 1001577583,
+      "p99Ns": 2993000,
+      "p999Ns": 3088000,
+      "peakDueUnconsumed": 3113,
+      "peakDueUnpublished": 3111,
+      "finalPublicationNs": 1001576333,
+      "wholeNativeCallNs": 1011121917,
+      "collections": 74,
+      "gcCpuNs": 27505000,
+      "gcWallNs": 27418613,
+      "enclosingOwnerCpuNs": 1002865209,
+      "admission": {
+        "failures": [
+          "historical_p99_exceeded_or_missing",
+          "original_outstanding_window_exceeded_or_missing"
+        ],
+        "passed": false,
+        "scope": "capacity_1m_three_second_goal"
+      },
+      "clean": true,
+      "exitCode": 101
+    },
+    {
+      "arm": "histogram",
+      "imageSha256": "8352128123e95928df31f57ece96fd41ddc341a14c81e34449af0fa8b3b02acb",
+      "startedUtc": "2026-11-06T07:31:32.071Z",
+      "endedUtc": "2026-11-06T07:31:34.716Z",
+      "histogramBuckets": 10000000,
+      "completed": 1000000,
+      "rejected": 0,
+      "errors": 0,
+      "timeouts": 0,
+      "completedPerSecond": 996027.0145753704,
+      "elapsedNs": 1003988833,
+      "p99Ns": 6562000,
+      "p999Ns": 6782000,
+      "peakDueUnconsumed": 6789,
+      "peakDueUnpublished": 6787,
+      "finalPublicationNs": 1003987541,
+      "wholeNativeCallNs": 1015049875,
+      "collections": 39,
+      "gcCpuNs": 15607000,
+      "gcWallNs": 15584707,
+      "enclosingOwnerCpuNs": 1006812917,
+      "admission": {
+        "failures": [
+          "historical_p99_exceeded_or_missing",
+          "original_outstanding_window_exceeded_or_missing"
+        ],
+        "passed": false,
+        "scope": "capacity_1m_three_second_goal"
+      },
+      "clean": true,
+      "exitCode": 101
+    }
+  ],
+  "decision": "Checkpoint only. The candidate reduced GC and regressed p99 and peak backlog in this pair. Keep both arms and the negative result for research."
+}

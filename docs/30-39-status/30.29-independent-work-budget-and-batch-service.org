@@ -1,0 +1,272 @@
+#+TITLE: Independent owner work budgets and native batch service boundaries
+#+STARTUP: overview
+
+* Scope and predecessor
+
+This follows [[file:30.28-shared-owner-capacity-and-batch-fairness.org][30.28]], preserving its failed and negative comparisons. The predecessor
+is =53d1dc705683d3b42f0eeaaa8a71085cc9a62d14= on PR #18. Its exact-head CI is
+checked independently from the local qualification below; a prior pass is never
+transferred to a new commit.
+
+The observed gap is structural: four request slots at batch eight can hold 32
+bulk items per owner, while four slots at batch one hold only four. Internal
+Scheme yields do not let a short Rust queue entry enter the active native call.
+This refinement separates request count from declared work and measures the
+remaining indivisible service turn. No thread/VM matrix is added.
+
+* Admission protocol
+
+=configure_owner_budgets(slots, Some(work))= creates independent per-owner bounds.
+The slot count must fit the existing native queue; work must be positive and fit
+the semaphore counter. =configure_owner_capacity(slots)= retains slot-only behavior.
+No capacity mechanism is enabled by default, and existing Python mode selection
+is unchanged.
+
+Every native numeric batch method, including synchronous, asynchronous and
+profiled methods, charges its actual item count. Generic native and byte methods
+charge one unit; applications can explicitly declare a different weight with
+=submit_native_weighted_backpressured_on=. A declared work unit is not an inferred
+CPU cost, byte count, GC cost or prediction of an arbitrary Scheme program.
+An indivisible batch larger than the enabled work budget is rejected, never
+silently split or left waiting for an impossible reservation.
+
+Backpressured admission acquires work before a request slot under one finite
+shared deadline. Every waiting path uses this order; no waiter holds a slot while
+waiting for work. Tokio can partially allocate a multi-unit reservation. Cancelling
+or timing out before acceptance returns that partial allocation. Immediate methods
+try both resources without waiting and retain =QueueFull= behavior.
+
+Both resources travel with the accepted native request through actual execution,
+result delivery and abandoned-reply rollback. Receiver timeout does not release
+either resource. Quiescent reconfiguration checks both resources; stale generation
+identity cannot enqueue into a replacement budget. Closing wakes waiters on both
+resources and drains already accepted Scheme work. Semaphore close, permit release,
+request destruction and foreign wakers stay outside the admission mutex.
+
+FIFO weighted admission can delay a small request behind a large reservation.
+The pool bounds reserved/accepted work, not the total number of external caller
+futures. The existing flow driver also bounds pending reservations per owner and
+invocation. Neither mechanism establishes an arbitrary-client latency SLO or a
+starvation theorem.
+
+* Scheme service boundary
+
+A numeric batch remains one complete native turn, with unchanged whole-batch
+exception acknowledgement/drain and Actor/green-thread scheduling. Scheme retains
+macros, arbitrary procedures/types, continuations, dynamic-wind and GC. Rust
+only handles cross-instance admission, dispatch and lifetime. The SDK, native
+compiler path and Scheme source are unchanged.
+
+The observed owner service span is entry to native completion:
+
+#+begin_example
+service = native construction + Scheme execution/scheduling/GC
+        + native result projection + root retirement/balance checking
+#+end_example
+
+Final receiver delivery and capacity return follow that marker. The profiled API
+also records API-entry-to-owner-entry and Scheme-entry-to-return spans, plus GC
+counter deltas. Diagnostics between markers and OS preemption remain included;
+these are wall-clock observations, not pure CPU attribution.
+
+With work eight, a batch cannot exceed eight declared items and the owner cannot
+hold more than eight reserved/accepted item units at once. This bounds the work
+count, not arbitrary handler duration. A temporal bound additionally requires
+application bounds on each handler, GC and host scheduling. No hard preemption,
+forced continuation migration, weakened exception semantics or hidden timeout
+increase is introduced. Scheme-internal yields cannot shorten the Rust queue's
+non-preemptible service turn.
+
+* Directed same-VM experiment
+
+Only one AB/BA pair is run: four native VMs, two Tokio workers, request slots four,
+batch eight, work budget 32 versus eight. Both arms use the same opt-in profiled
+native batch API and the identical independent invoice oracle. Historical
+unprofiled rates are not directly comparable to this new executable.
+
+Each full sample uses 8,192 bulk orders of 48 lines and 64 short four-line probes
+at a nominal 500-microsecond interval. The probe producer is closed-loop and keeps
+its original scheduled timestamps after a delayed result. Report both scheduled
+p99 and actual-entry-to-delivery p99; nominal wake lateness includes inherited
+lateness and runtime scheduling, not pure Tokio/OS wake cost. Per-row subtraction
+is done before taking quantiles. No quantiles from different rows are subtracted.
+
+Bulk inputs are generated outside timing; payload cloning, native work, result
+projection and the independent oracle remain inside elapsed time. Probe fixture
+construction/cloning is inside its admission span. Each arm warms 256 orders;
+five forward/reverse blocks yield ten measured samples per arm. Reconfiguration
+requires all slot and work credits to return; native VM identities are unchanged.
+Each owner exercises a real bad eight-item Scheme turn and subsequent recovery.
+The five-second startup/progress/observation gates remain unchanged.
+
+* Native and finite-model controls
+
+The real =owner_capacity= and =owner_dispatch_faults= targets pass. Weighted controls
+cover zero/oversized charge rejection, item charging on old batch APIs, exhausted
+work with free request slots, partial multi-unit cancellation, admission timeout,
+receiver timeout retaining both resources, panic recovery and close waking a
+partially allocated waiter. The existing controls retain forced-GC multi-shot
+continuations across FFI, dynamic-wind and clean four-owner joins with zero roots
+and removed copied files. Injected panic diagnostics remain in the external log.
+
+The existing =owner_lifecycle.qnt= is extended rather than replaced. Job 1 has
+weight eight, the other jobs weight one. Full work reservations before slot
+acquisition are represented separately from slot reservations and accepted work.
+Both finite domains pass 19 scenarios, 1,000 sampled traces of at most 64 steps,
+and the six existing mutation counterexamples. Tokio's partial allocation and
+waker mechanics remain native/code checks, not model conclusions. No new symbolic,
+unbounded safety or liveness theorem is claimed.
+
+* Artifact and portable reproduction
+
+Use the existing Cargo/SDK recipe from the repository root:
+
+#+begin_example
+just bridge-owner-capacity-benchmark --test
+just bridge-owner-capacity-benchmark
+#+end_example
+
+External evidence names are =work-budget-manifest.json=, =work-budget-build.jsonl=,
+=work-budget-native.log=, =work-budget-model.log= and the matching sample captures.
+Raw captures, binaries, host snapshots and logs remain outside Git. The manifest
+records source hashes, parent identity and the actual Cargo artifact record.
+
+Frozen executable SHA-256:
+=dc6a2a602d70c2d74c6aaa3abaf297ddd289ed4e64db3b27bf0345c839aa8c81=.
+Native image SHA-256:
+=772e86e8bda56ca1fa523bd5c4023b61b191137243ac9e34a6bb40c7f0a09437=,
+byte-identical to the predecessor's qualified image. The executable changes because
+Rust admission and benchmark observation change. No installed Python wheel,
+additional memory soak or SDK change is claimed by this directed experiment.
+
+
+* Matched results and retained negatives
+
+Two complete cohorts use the same frozen executable and native image. Each has
+40 samples, four result summaries, four real Scheme fault/recovery controls and a
+clean four-owner shutdown with zero roots and removed files. No failed performance
+capture is discarded. Host snapshots show concurrent compiler activity; these are
+shared-host paired observations, not a quiet-host certification. The A cohort
+also has a 79.691 ms CPU batch service outlier. No production default is promoted.
+
+All times below are milliseconds. Throughput is bulk orders per second; each arm
+has ten samples. The complete-workload rate also includes the fixed probe schedule
+and is retained separately in the external captures.
+
+| Cohort/load | Bulk rate 32 -> 8 | Rate change | Scheduled probe p99 32 -> 8 | Actual-entry probe p99 32 -> 8 |
+|-------------+-------------------+-------------+-----------------------------+--------------------------------|
+| A / CPU | 260873 -> 165238 | -36.7% | 49.424 -> 61.762 | 3.793 -> 4.175 |
+| A / mixed | 16638 -> 16758 | +0.7% | 549.821 -> 232.137 | 30.422 -> 15.844 |
+| B / CPU | 448529 -> 414511 | -7.6% | 14.279 -> 2.517 | 1.583 -> 1.114 |
+| B / mixed | 24101 -> 23421 | -2.8% | 391.189 -> 158.359 | 13.901 -> 7.140 |
+
+The mixed scheduled and actual-entry tails improve in both cohorts. CPU throughput
+regresses in both; CPU p99 reverses direction across cohorts. The item budget is
+therefore a usable opt-in admission boundary, not a universally faster setting.
+
+** Same-probe phase attribution
+
+Each row below is the actual probe selected by its arm's actual-entry p99 rank.
+The phase spans are from that very probe, not independently ranked quantiles.
+Queue/admission is API entry to owner entry. The remainder includes fixture/type
+validation before dispatch and delivery after native completion.
+
+| Cohort/load | Work | Actual entry -> delivery | Admission + owner queue | Native service | Before-dispatch + after-completion |
+|-------------+------+--------------------------+-------------------------+----------------+------------------------------------|
+| A / CPU | 32 | 3.793 | 3.714 | 0.006 | 0.072 |
+| A / CPU | 8 | 4.175 | 4.103 | 0.043 | 0.029 |
+| A / mixed | 32 | 30.422 | 27.685 | 0.023 | 2.714 |
+| A / mixed | 8 | 15.844 | 14.765 | 1.032 | 0.047 |
+| B / CPU | 32 | 1.583 | 1.347 | 0.019 | 0.217 |
+| B / CPU | 8 | 1.114 | 0.331 | 0.564 | 0.219 |
+| B / mixed | 32 | 13.901 | 12.711 | 0.250 | 0.940 |
+| B / mixed | 8 | 7.140 | 6.984 | 0.052 | 0.103 |
+
+At the mixed p99 boundary, waiting before owner entry dominates the actual probe's
+native service in both arms and both cohorts. This supports reducing admitted
+work ahead of short requests; it does not establish a faster Scheme evaluator.
+All 5,120 measured probes have nonnegative same-row decompositions. GC counts and
+native phase spans remain in the raw captures, including every outlier.
+
+** Service durations and handoff cost
+
+| Cohort/load | Bulk service p99 32 -> 8 | Observed bulk service max 32 -> 8 | Bulk Scheme span p99 32 -> 8 |
+|-------------+--------------------------+----------------------------------+-----------------------------|
+| A / CPU | 0.900 -> 1.037 | 4.892 -> 79.691 | 0.198 -> 0.476 |
+| A / mixed | 8.433 -> 6.167 | 25.818 -> 32.146 | 7.748 -> 5.637 |
+| B / CPU | 0.439 -> 0.428 | 1.488 -> 1.175 | 0.298 -> 0.073 |
+| B / mixed | 3.341 -> 3.367 | 7.880 -> 10.387 | 3.252 -> 3.244 |
+
+In mixed cohort B the bulk service p99 is essentially unchanged while actual-entry
+probe p99 approximately halves. The primary improvement in that cohort is reduced
+waiting, not faster execution/GC. The observed maxima are finite receipts only;
+none is an enforced wall-clock bound.
+
+There is a measurable pipeline cost. Reconstruct each owner's entry/completion
+intervals for both bulk batches and probes. Restrict to the common bulk-active
+window, from the latest first bulk entry to the earliest last bulk completion.
+The gaps outside these native service intervals include result delivery, credit
+return, queue/handoff and host scheduling. They are not pure Tokio time or an
+OS-idle counter. Probe-only tails after bulk completion are excluded.
+
+| Cohort/load | Median outside-service gap fraction, work 32 -> 8 |
+|-------------+----------------------------------------------------|
+| A / CPU | 9.57% -> 32.69% |
+| A / mixed | 0.90% -> 13.23% |
+| B / CPU | 4.92% -> 25.30% |
+| B / mixed | 0.18% -> 2.74% |
+
+With work eight, a full eight-item batch exhausts the work credits. Another full
+batch cannot enter the owner queue until real completion returns credits and its
+Rust producer resumes. The common-window gaps increase in both cohorts. This
+identifies a pipeline/handoff cost consistent with the CPU throughput loss; the
+shared host prevents assigning all of it to Tokio scheduling alone. It would be
+incorrect to claim that merely shrinking the budget solves the full performance
+problem, or to hide the loss by altering the default.
+
+** Finite progress and qualification decision
+
+| Cohort/load | Minimum owner progress at first owner finish, 32 -> 8 | Minimum probes completing during bulk, 32 -> 8 |
+|-------------+-------------------------------------------------------+------------------------------------------------|
+| A / CPU | 848 -> 624 of 2048 | 35 -> 64 of 64 |
+| A / mixed | 1824 -> 1896 of 2048 | 55 -> 64 of 64 |
+| B / CPU | 984 -> 1344 of 2048 | 25 -> 33 of 64 |
+| B / mixed | 1752 -> 1648 of 2048 | 56 -> 64 of 64 |
+
+All short probes complete before bulk finishes in the mixed candidate samples.
+Bulk-owner progress is not uniformly better: mixed cohort B regresses, and CPU
+cohort A also regresses. The Scheme Actor peer minimum is zero in mixed samples
+in both cohorts; the CPU minima are zero in A and one in B. No internal Actor
+fairness improvement or starvation-freedom result is claimed.
+
+The protocol is implemented and natively exercised. The performance policy stays
+explicit and unpromoted. The next architecture boundary is maintaining bounded
+Scheme-native service work while avoiding a Rust replenishment gap after every
+full turn. It must preserve whole-turn exception/drain, continuation ownership
+and Scheme scheduling. More Rust dispatch threads or a larger blind batch do not
+remove the measured service boundary. This report does not claim that future
+refinement has already been implemented or accepted.
+
+
+* Validation and publication gate
+
+The affected native benchmark/test targets and core library pass strict Clippy.
+The core library also passes with the Tokio dispatch feature disabled. Formatting,
+diff whitespace checks and the source/executable/image identity audit pass.
+The two real native targets, smoke and full A/B captures pass their own bounded
+execution/cleanup gates independently from the finite model.
+
+At the last predecessor CI inspection, four active jobs pass: fixed-owner native
+lifecycle, Quint, Ubuntu Cargo bindings and Ubuntu Bazel bindings. The macOS Cargo
+and Bazel gates are still running; Scheme SMP is explicitly skipped. This pending
+state is not an exact-head remote pass. Publication of the follow-up must not
+cancel the predecessor run; the follow-up then requires its own exact-head CI.
+
+
+* Follow-up: bounded producer on the native owner
+
+The predecessor =53d1dc7= subsequently completed all six active CI jobs; =66b3a1a=
+was then pushed to PR #18 and has its own exact-head CI run. This report's results
+and earlier pending-CI observation remain historical receipts.
+[[file:30.30-bounded-native-owner-producer.org][30.30]] holds batch/work/slot limits fixed while removing per-turn host replenishment.
+It retains this report's CPU regressions and adds its own negatives and failure.

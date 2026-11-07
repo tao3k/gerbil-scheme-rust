@@ -1,0 +1,141 @@
+#+title: Fixed Rust Owners with Native Scheme Runtime Instances
+#+date: 2026-10-19
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Scope and repository identity
+
+This local qualification belongs to =tao3k/gerbil-scheme-rust=, branch
+=codex/typed-fold-aot=, base HEAD =bb71bbb5ad91bbaef2035979319514c7ced4c4ca=.
+The checkout contains concurrent unrelated edits. The JSON receipt records the
+exact qualification source digests and the generated image digest; the base
+HEAD alone does not identify the tested dirty tree. This is local execution,
+not exact-head CI or a release receipt.
+
+Rust owns OS threads, task admission, queues and scalar result delivery.
+Scheme owns its heap, closures, continuations, dynamic bindings, exceptions
+and computation. No Scheme computation is translated into Rust in this lane.
+The existing Gerbil compiler graph produces Scheme-to-C native objects through
+=gerbil-scheme-aot-build=. The test does not introduce a second build system.
+
+* Existing FFI and the instance boundary
+
+The bridge's production =GerbilRuntime= remains owner-affine and one-shot.
+Its C setup entry points are =gerbil_scheme_rust_runtime_init_program= and
+=gerbil_scheme_rust_runtime_init_program_single_processor=, with
+=gerbil_scheme_rust_runtime_cleanup= for teardown. This change does not remove
+those guards or admit a production executor.
+
+The existing =instance-probe= feature supplies private Darwin dynamic library
+images. Each image carries separate statically linked native runtime state;
+its =gerbil_instance_probe_init/cleanup/batch/marker/state= exports are loaded
+by the existing diagnostic loader. The new scalar =lifecycle= export exercises
+Scheme state without exposing Scheme pointers to Rust. Each instance now sets
+=parallelism_level= to one and rejects setup if the actual processor count is
+not one. Each image remains =!Send= and =!Sync= and stays on its fixed Rust owner.
+
+Distinct GSTATE addresses and Scheme markers are asserted. This is an
+independent runtime image experiment, not several VM records sharing one
+GSTATE. Process memory, signals and timers are still shared resources. Separate
+Scheme heaps do not imply process-level fault isolation.
+
+* Executed lifecycle checks
+
+The native executable completed all of the following:
+
+- Initialize two fixed owners and verify one actual processor per instance.
+- Reject duplicate initialization while the instance is live.
+- Capture a 65,536-element Scheme vector in a continuation; return a scalar
+  to Rust while only the saved Scheme continuation retains that vector.
+- Allocate fresh vectors and explicitly collect eight times on each later
+  resume entry. Check every captured payload element after collection.
+- Restore the same continuation twice through separate foreign calls, with
+  exact independent owner results. The test's shift/reset delimiter is
+  expressed in Scheme =call/cc=; Rust stores no continuation or Scheme object.
+- Check Scheme thread identity and captured dynamic parameter bindings during
+  resumption, and restored outer bindings at subsequent foreign entry.
+- Check balanced =dynamic-wind= entry/exit counts through multi-shot resumption
+  and a caught Scheme exception.
+- Clear the saved root and collect; destroy the first instance and join its
+  owner while the second retains its continuation. Resume that continuation,
+  collect again and run another native batch before destroying the survivor.
+- Confirm completed cleanup rejects repeated cleanup, reinitialization and
+  later Scheme batch entry. The finalized checks execute C guards only.
+- Prove four owners have entered Scheme concurrently using the existing
+  synchronous Scheme-to-host rendezvous. A host queue alone is not accepted
+  as proof of simultaneous Scheme entry.
+
+A five-second observer watchdog advances only after real owner responses,
+completed batches or joins. A stalled run exits 70 and reports cleanup as
+unverified. The existing startup and foreign-response gates remain five
+seconds. Scheme execution is not protected by a shared host mutex; setup and
+cleanup transitions in the existing pool are serialized for process hooks.
+
+* Equal-load A/B
+
+A uses one fixed owner and one native instance. B uses four fixed owners with
+four private instances. Both use the same image and Scheme checksum algorithm,
+the same total jobs, rounds and expected checksum. B partitions those jobs;
+it does not reduce total arithmetic work. Every native batch performs GC
+before computation. Both pools remain initialized during measurement.
+
+Each of six loads runs ten ABBA blocks, giving 20 complete samples per variant
+and 240 checked samples overall. The median averages the two middle samples.
+Measured time includes host admission, foreign calls, per-instance GC,
+computation and result validation; initialization is recorded separately.
+A batch enters Scheme once in A and once per owner in B. This is a coarse
+batch boundary, not a foreign call for every arithmetic step.
+
+| Jobs | Rounds | A median ms | B median ms | A/B |
+|------+--------+-------------+-------------+-----|
+| 1,000 | 32 | 0.117000 | 0.120021 | 0.975 |
+| 10,000 | 32 | 0.377229 | 0.268187 | 1.407 |
+| 100,000 | 32 | 2.723729 | 0.916541 | 2.972 |
+| 1,000 | 4,096 | 3.277854 | 0.957541 | 3.423 |
+| 10,000 | 4,096 | 31.767229 | 8.507292 | 3.734 |
+| 100,000 | 4,096 | 319.042187 | 82.734521 | 3.856 |
+
+For the smallest load B is 2.6% slower. Heavy loads improve by 3.42x to 3.86x
+in this local run. These are synthetic checksum results; the lifecycle checks
+establish tested semantic behavior separately. They do not measure continuation
+throughput, application throughput, queue saturation or request-tail latency.
+
+Initialization including image copies cost 0.403 seconds for A and 1.920 seconds
+for B. Cleanup and owner joins cost 2.022 ms and 1.978 ms respectively. Image
+code stays loaded in both cases. The machine and selected SDK are recorded in
+the JSON receipt. No native or Rust compiler was observed in process snapshots
+immediately before and after this final run; no additional qualification build
+was launched during its measurements. General host scheduling noise remains.
+
+* Reproduce and inspect
+
+#+begin_src sh
+just bridge-instance-lifecycle --test
+just bridge-instance-lifecycle
+cargo clippy -p gerbil-scheme-qualification --features instance-probe \
+  --bench instance_lifecycle --bench instances --release --locked -- -D warnings
+#+end_src
+
+The smoke command and complete run both exited zero. The focused Clippy gate
+passed with warnings denied. The initial pre-change instance probe smoke also
+completed; it is not substituted for the new continuation/lifecycle checks.
+
+- Complete final native log and all ABBA samples
+- Source/image identity and independently checked sample summary
+
+* Remaining admission limits
+
+The result supports continuing the fixed-owner, isolated runtime image approach
+on the selected Darwin SDK without replacing Scheme semantics. It does not
+admit the public production runtime as a parallel executor. No hot unload,
+in-process crash containment, signal/timer coexistence under all events,
+initialization-failure rollback, leak freedom, sanitizer acceptance, portability
+or remote CI result follows. The checks cover the specific delimited Scheme
+resumption pattern above; arbitrary continuations escaping foreign frames or
+moving between owners are not admitted.
+
+Scheme roots, continuations and native pointers remain local to an instance.
+Only explicitly owned host values may cross queues. Any later public executor
+must preserve this boundary and qualify its resource and failure contracts.

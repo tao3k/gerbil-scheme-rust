@@ -1,0 +1,72 @@
+;; Frozen pre-repair scheduler, qualification only. Never installed as a library.
+;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+;;; Fixed-owner mailbox actors. No Rust scheduler or foreign Scheme references.
+
+(defstruct control-actor-batch (workers busy closed))
+(defstruct control-actor-turn (reply input output quantum width))
+
+(def (control-actor-turn-run! handler worker turn)
+  (let loop ((index worker) (done 0) (ok #t))
+    (if (>= index (vector-length (control-actor-turn-input turn))) ok
+      (let (success
+            (with-catch (lambda (_) #f)
+              (lambda ()
+                (vector-set! (control-actor-turn-output turn) index
+                  (handler worker (vector-ref (control-actor-turn-input turn) index)))
+                #t)))
+        (when (and (positive? (control-actor-turn-quantum turn))
+                   (zero? (modulo (1+ done) (control-actor-turn-quantum turn))))
+          (thread-yield!))
+        (loop (+ index (control-actor-turn-width turn)) (1+ done) (and ok success))))))
+(def (control-actor-batch-worker handler worker)
+  (let loop ()
+    (let (turn (thread-receive))
+      (unless (eq? turn 'stop)
+        (thread-send (control-actor-turn-reply turn) (control-actor-turn-run! handler worker turn))
+        (loop)))))
+(def (make-gerbil-rs-control-actor-batch handler count)
+  (unless (and (procedure? handler) (integer? count) (<= 1 count 64))
+    (error "invalid Scheme actor service"))
+  (let (workers (make-vector count))
+    (let loop ((worker 0))
+      (when (< worker count)
+        (vector-set! workers worker (spawn (lambda () (control-actor-batch-worker handler worker))))
+        (loop (1+ worker))))
+    (make-control-actor-batch workers #f #f)))
+(def (control-actor-batch-check! service)
+  (when (or (control-actor-batch-closed service) (control-actor-batch-busy service))
+    (error "Scheme actor service closed or reentered")))
+(def (control-actor-batch-execute! service input quantum)
+  (let* ((workers (control-actor-batch-workers service)) (count (vector-length workers))
+         (output (make-vector (vector-length input)))
+         (turn (make-control-actor-turn (current-thread) input output quantum count)))
+    (vector-for-each (lambda (worker) (thread-send worker turn)) workers)
+    ;; Every actor drains every assigned item even after a handler exception.
+    ;; No turn or acknowledgement may survive the synchronous foreign entry.
+    (let loop ((left count) (ok #t))
+      (if (zero? left)
+        (if ok output (error "Scheme actor batch handler failed"))
+        (let (reply (thread-receive)) (loop (1- left) (and ok reply)))))))
+(def (gerbil-rs-control-actor-batch! service envelope)
+  (control-actor-batch-check! service)
+  (unless (and (vector? envelope) (= (vector-length envelope) 2)
+               (s64vector? (vector-ref envelope 0))
+               (= (s64vector-length (vector-ref envelope 0)) 1)
+               (vector? (vector-ref envelope 1)))
+    (error "invalid native actor batch envelope"))
+  (let ((quantum (s64vector-ref (vector-ref envelope 0) 0))
+        (input (vector-ref envelope 1)))
+    (unless (and (<= 0 quantum 256) (<= 1 (vector-length input) 256))
+      (error "native actor batch bound"))
+    (dynamic-wind
+      (lambda () (set! (control-actor-batch-busy service) #t))
+      ;; A private coordinator owns acknowledgements; the application's foreign
+      ;; entry thread may already have unrelated mailbox traffic.
+      (lambda () (thread-join! (spawn (lambda () (control-actor-batch-execute! service input quantum)))))
+      (lambda () (set! (control-actor-batch-busy service) #f)))))
+(def (gerbil-rs-control-actor-batch-close! service)
+  (control-actor-batch-check! service)
+  (vector-for-each (lambda (worker) (thread-send worker 'stop)) (control-actor-batch-workers service))
+  (vector-for-each thread-join! (control-actor-batch-workers service))
+  (set! (control-actor-batch-workers service) #())
+  (set! (control-actor-batch-closed service) #t))

@@ -27,21 +27,21 @@ Current Rust ABI evidence:
 - Scalar native operations cover i64 identity/addition, i64 parity, and i64
   comparison; integer/bytevector conversions additionally cover machine =u64=
   and =i64= with explicit byte order, width, and truncation policy.
-- =native-value-surface= scenario covers safe UTF-8, opaque value handles, and
+- =value-surface= scenario covers safe UTF-8, opaque value handles, and
   callback trampoline behavior.
 - =source_surface= integration tests cover the Scheme ASP source-surface export
-  set, the =scheme/native.ss= FFI contract, and the rule that
-  =scheme/asp/native-surface.ss= stays out of the runtime build.
+  set, the =scheme/runtime.ss= FFI contract, and the rule that
+  =scheme/asp/abi-surface.ss= stays out of the runtime build.
 
 Current Scheme source-surface evidence:
 
-- =scheme/native.ss= remains the runtime implementation owner.
-- =scheme/native.ssi= is the tracked V19 compiler-generated interface for the
-  Scheme exports; =scheme/native.ss= owns the native FFI symbol contract.
-- =scheme/asp/native-surface.ss= is still the temporary ASP-projected
+- =scheme/runtime.ss= remains the runtime implementation owner.
+- =scheme/runtime.ssi= is the tracked V19 compiler-generated interface for the
+  Scheme exports; =scheme/runtime.ss= owns the native FFI symbol contract.
+- =scheme/asp/abi-surface.ss= is still the temporary ASP-projected
   workaround for the source-surface view; it must stay out of =build.ss= and can
-  be retired once the provider projects =scheme/native.ss= plus
-  =scheme/native.ssi= directly.
+  be retired once the provider projects =scheme/runtime.ss= plus
+  =scheme/runtime.ssi= directly.
 - The current projected selector set is exactly 27 selectors:
   =gerbil_scheme_rust_abi_version=, =gerbil_scheme_rust_runtime_init=,
   =gerbil_scheme_rust_runtime_cleanup=, =gerbil_scheme_rust_identity_i64=,
@@ -66,7 +66,7 @@ Current Scheme source-surface evidence:
   =gerbil_scheme_rust_native_value_shape=,
   =gerbil_scheme_rust_native_error_shape=, and
   =gerbil_scheme_rust_native_result_shape=.
-- Direct provider projection of the real =scheme/native.ss= FFI/export owner is
+- Direct provider projection of the real =scheme/runtime.ss= FFI/export owner is
   not yet closed and remains a provider/source-surface TODO.
 - No current Scheme selector exists for symbol, keyword, general pair/list,
   vector, procedure, ports, continuations, or advanced Scheme objects.
@@ -87,22 +87,22 @@ keeps this table aligned with the Scheme source-surface projection.
 
 | Family | Scheme selector | Raw ABI | Safe Rust surface | Ownership/rooting | Nullability | Failure policy | Scenario |
 | status | =gerbil_scheme_rust_status_shape= | =GerbilStatus= | =NativeError::status= | copy status code | not pointer-backed | unknown status preserves code | =status-contract= |
-| runtime lifecycle | =gerbil_scheme_rust_runtime_handle_shape= | process-global native runtime init/cleanup | =GerbilRuntime= and =GerbilRuntimeReceipt= | one-shot process-global owner, thread-affine safe handle | not pointer-backed | live re-entry returns =AlreadyInitialized=; finalized runtime returns =RuntimeFinalized=; wrong-thread is blocked by =!Send=/=!Sync= and defensively checked | =native-runtime-round-trip= |
-| i64 | =gerbil_scheme_rust_i64_shape= | =i64= | =GerbilRuntime::{identity_i64,add_i64}= | copy scalar | not pointer-backed | overflow maps to =IntegerOverflow= | =native-identity-round-trip= |
-| bool | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return plus Scheme boolean handle | =GerbilRuntime::is_even_i64= and =GerbilValue::as_boolean= | copy scalar or runtime-borrowed Scheme object | not pointer-backed | status fail-closed before bool projection; raw provenance rejected | =native-runtime-round-trip= |
+| runtime lifecycle | =gerbil_scheme_rust_runtime_handle_shape= | process-global native runtime init/cleanup | =GerbilRuntime= and =GerbilRuntimeReceipt= | one-shot process-global owner, thread-affine safe handle | not pointer-backed | live re-entry returns =AlreadyInitialized=; finalized runtime returns =RuntimeFinalized=; wrong-thread is blocked by =!Send=/=!Sync= and defensively checked | =runtime-round-trip= |
+| i64 | =gerbil_scheme_rust_i64_shape= | =i64= | =GerbilRuntime::{identity_i64,add_i64}= | copy scalar | not pointer-backed | overflow maps to =IntegerOverflow= | =identity-round-trip= |
+| bool | =gerbil_scheme_rust_bool_shape= | =GerbilStatus= plus Rust =bool= return plus Scheme boolean handle | =GerbilRuntime::is_even_i64= and =GerbilValue::as_boolean= | copy scalar or runtime-borrowed Scheme object | not pointer-backed | status fail-closed before bool projection; raw provenance rejected | =runtime-round-trip= |
 | comparison | =gerbil_scheme_rust_comparison_shape= | =i32= comparison result | =GerbilRuntime::compare_i64= | copy scalar | not pointer-backed | invalid result maps to =InvalidComparisonResult= | =invalid-comparison-fail-closed= |
-| nil | =gerbil_scheme_rust_nil_shape= | =GerbilValueHandle= | =GerbilValue::as_nil= and =SchemeNil= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-null objects and raw provenance fail closed | =native-runtime-round-trip= |
-| void | =gerbil_scheme_rust_void_shape= | =GerbilValueHandle= | =GerbilValue::as_void= and =SchemeVoid= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer and nil | non-void objects and raw provenance fail closed | =native-runtime-round-trip= |
-| fixnum | =gerbil_scheme_rust_fixnum_shape= | =GerbilFixnum= | =GerbilValue::{is_fixnum,as_fixnum,as_fixnum_i64}= | runtime-borrowed Scheme object | not pointer-backed | non-fixnum and raw provenance fail closed | =native-runtime-round-trip= |
+| nil | =gerbil_scheme_rust_nil_shape= | =GerbilValueHandle= | =GerbilValue::as_nil= and =SchemeNil= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-null objects and raw provenance fail closed | =runtime-round-trip= |
+| void | =gerbil_scheme_rust_void_shape= | =GerbilValueHandle= | =GerbilValue::as_void= and =SchemeVoid= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer and nil | non-void objects and raw provenance fail closed | =runtime-round-trip= |
+| fixnum | =gerbil_scheme_rust_fixnum_shape= | =GerbilFixnum= | =GerbilValue::{is_fixnum,as_fixnum,as_fixnum_i64}= | runtime-borrowed Scheme object | not pointer-backed | non-fixnum and raw provenance fail closed | =runtime-round-trip= |
 | exact integer | =gerbil_scheme_rust_exact_integer_shape= | =GerbilValueHandle=, =GerbilRootId=, =i64=, and =u64= | =SchemeExactInteger= and =RootedSchemeExactInteger= checked projections | runtime-borrowed Scheme object or single-owner Scheme root | non-zero handle or positive root token | non-exact and out-of-range values fail closed without truncation | =exact-integer-projection-round-trip= |
-| char | =gerbil_scheme_rust_char_shape= | =GerbilChar= | =GerbilValue::{is_char,as_char}= | runtime-borrowed Scheme object | not pointer-backed | invalid Unicode scalar and raw provenance fail closed | =native-runtime-round-trip= |
-| flonum | =gerbil_scheme_rust_flonum_shape= | =GerbilFlonum= | =GerbilValue::{is_flonum,as_flonum}= | runtime-borrowed Scheme object | not pointer-backed | non-flonum and raw provenance fail closed | =native-runtime-round-trip= |
-| bytevector | =gerbil_scheme_rust_bytevector_shape= | =GerbilValueHandle= | =GerbilValue::as_bytevector= and =SchemeBytevector= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-bytevector objects and raw provenance fail closed | =native-runtime-round-trip= |
+| char | =gerbil_scheme_rust_char_shape= | =GerbilChar= | =GerbilValue::{is_char,as_char}= | runtime-borrowed Scheme object | not pointer-backed | invalid Unicode scalar and raw provenance fail closed | =runtime-round-trip= |
+| flonum | =gerbil_scheme_rust_flonum_shape= | =GerbilFlonum= | =GerbilValue::{is_flonum,as_flonum}= | runtime-borrowed Scheme object | not pointer-backed | non-flonum and raw provenance fail closed | =runtime-round-trip= |
+| bytevector | =gerbil_scheme_rust_bytevector_shape= | =GerbilValueHandle= | =GerbilValue::as_bytevector= and =SchemeBytevector= | runtime-borrowed Scheme object | non-zero handle, distinct from null pointer | non-bytevector objects and raw provenance fail closed | =runtime-round-trip= |
 | rooted bytes | =gerbil_scheme_rust_rooted_bytes_shape= | =GerbilRootId= | =RootedSchemeString= and =RootedSchemeBytevector= | single-owner Scheme root released by Rust =Drop= | positive root token, zero is conversion failure | invalid input and stale roots fail closed | =bytevector-bytestring-round-trip= |
 | integer/bytevector conversion | =gerbil_scheme_rust_integer_bytes_shape= | =u64=, =i64=, =GerbilRootId=, and =GerbilStatus= | =ByteOrder=, =IntegerWidth=, =IntegerEncoding=, =IntegerDecoding=, runtime encode and bytevector decode methods | copy integer input/result and single-owner rooted bytevector output | integer values are not pointer-backed; root token must be positive | invalid width/status fail closed and truncation requires explicit opt-in | =integer-bytevector-round-trip= |
-| borrowed UTF-8 | =gerbil_scheme_rust_utf8_shape= | =GerbilBorrowedUtf8= | =GerbilUtf8= | borrowed Rust UTF-8 bytes | empty string may use null pointer with zero length | non-UTF-8 is reserved for future bytevector surface | =native-value-surface= |
+| borrowed UTF-8 | =gerbil_scheme_rust_utf8_shape= | =GerbilBorrowedUtf8= | =GerbilUtf8= | borrowed Rust UTF-8 bytes | empty string may use null pointer with zero length | non-UTF-8 is reserved for future bytevector surface | =value-surface= |
 | opaque value handle | =gerbil_scheme_rust_value_handle_shape= | =GerbilValueHandle= | =GerbilValue<'runtime>= | runtime-borrowed word-sized opaque handle, not rooted | zero rejected before FFI crossing | zero maps to =NullPointer= status | =backed-value-family-surface= |
-| i64 callback | =gerbil_scheme_rust_i64_callback_shape= | =GerbilI64Callback= | =GerbilI64Callback= and =GerbilI64CallbackAbi= | borrowed callback/context pair | null context rejected before Rust call | panic contained at native boundary | =native-value-surface= |
+| i64 callback | =gerbil_scheme_rust_i64_callback_shape= | =GerbilI64Callback= | =GerbilI64Callback= and =GerbilI64CallbackAbi= | borrowed callback/context pair | null context rejected before Rust call | panic contained at native boundary | =value-surface= |
 | native value | =gerbil_scheme_rust_native_value_shape= | current backed C ABI value families | =GerbilRuntime=, =GerbilUtf8=, =GerbilValue=, and =GerbilI64Callback= | aggregate of scalar, borrowed, handle, and callback shapes | explicit per concrete shape | delegated to concrete backed value family | =backed-value-family-surface= |
 | native error | =gerbil_scheme_rust_native_error_shape= | =GerbilStatus= | =NativeError= | Rust safe-boundary error enum | optional status projection | unknown status preserves code | =source-surface-sync= |
 | native result | =gerbil_scheme_rust_native_result_shape= | =GerbilStatus= plus native value payload | =Result<T, NativeError>= | ok native value or native error | delegated to value/error shape | fail-closed | =source-surface-sync= |
@@ -343,10 +343,10 @@ keeps this table aligned with the Scheme source-surface projection.
 * Scenario and performance checklist
 
 - [X] =status-contract= scenario.
-- [X] =native-runtime-round-trip= scenario.
-- [X] =native-identity-round-trip= scenario.
-- [X] =native-ffi-steady-state= scenario.
-- [X] =native-value-surface= scenario.
+- [X] =runtime-round-trip= scenario.
+- [X] =identity-round-trip= scenario.
+- [X] =ffi-steady-state= scenario.
+- [X] =value-surface= scenario.
 - [X] =source-surface-sync= scenario.
 - [X] =backed-value-family-surface= scenario.
 - [X] =bytevector-bytestring-round-trip= scenario.
@@ -366,13 +366,13 @@ keeps this table aligned with the Scheme source-surface projection.
 
 * ASP/source-surface checklist
 
-- [X] ASP workaround owner exists: =scheme/asp/native-surface.ss=.
+- [X] ASP workaround owner exists: =scheme/asp/abi-surface.ss=.
 - [X] Workaround projects current scalar and backed shape selectors:
   runtime/status/i64/bool/comparison/fixnum/char/flonum/bytevector/rooted-bytes
   /integer-bytes/exact-integer/UTF-8/value-handle/nil/void/i64-callback/native-value
   /native-error/native-result plus scalar exports.
-- [ ] Direct provider projection for real =scheme/native.ss= FFI/export owner.
-- [ ] Fix or document the current =scheme/native.ss= provider blocker:
+- [ ] Direct provider projection for real =scheme/runtime.ss= FFI/export owner.
+- [ ] Fix or document the current =scheme/runtime.ss= provider blocker:
   parser-owned search requires a provider query-pack descriptor and exact query
   currently returns no owner items.
 - [ ] Selector set for every public Scheme export.
@@ -405,9 +405,9 @@ keeps this table aligned with the Scheme source-surface projection.
 The immediate next implementation slice should close the mismatch between the
 Rust safe surface and the Scheme ASP surface:
 
-- [X] Add =gerbil_scheme_rust_utf8_shape= to =scheme/asp/native-surface.ss=.
+- [X] Add =gerbil_scheme_rust_utf8_shape= to =scheme/asp/abi-surface.ss=.
 - [X] Add =gerbil_scheme_rust_i64_callback_shape= to
-  =scheme/asp/native-surface.ss=.
+  =scheme/asp/abi-surface.ss=.
 - [X] Extend =gerbil_scheme_rust_native_value_shape= with explicit
   non-zero/runtime-borrowed/GC-not-rooted value semantics.
 - [ ] Extend =gerbil_scheme_rust_native_result_shape= or add a new result-family

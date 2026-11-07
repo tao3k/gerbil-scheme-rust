@@ -74,7 +74,7 @@ fn agent_r016_broad_linear_algorithm_snapshot() {
 }
 
 #[test]
-fn agent_r017_native_iterator_idiom_snapshot() {
+fn agent_r017_iterator_idiom_snapshot() {
     let temp = TempDir::new().expect("temp dir");
     let root = temp.path();
     write_manifest(root, "agent-r017-native-iterator");
@@ -86,7 +86,7 @@ fn agent_r017_native_iterator_idiom_snapshot() {
         root,
         "RUST-AGENT-ITER-PUBLIC-017",
         1,
-        "agent_r017_native_iterator_idiom",
+        "agent_r017_iterator_idiom",
     );
 }
 

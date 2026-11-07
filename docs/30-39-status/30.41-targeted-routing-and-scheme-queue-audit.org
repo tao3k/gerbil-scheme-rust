@@ -1,0 +1,200 @@
+#+TITLE: Targeted Routing, Scheme Queue and Contract Audit
+#+DATE: 2026-10-22
+
+* Evidence boundary
+
+Audit source: =acd1a624deb4bcfba2aa277bc383876fadde5467= on PR #18.
+Its [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39633863255][exact-head CI]] completed successfully, including the fixed-owner
+native lifecycle and Quint jobs. The explicitly unsupported SMP job was skipped.
+CI success is functional acceptance, not performance acceptance.
+
+The two complete notification captures in [[file:30.40-independent-notification-and-mixed-tail.org][30.40]] retain CPU throughput losses
+of 32.80% and 36.26%. Mixed throughput improves 8.01% and 1.48%, with lower mixed
+short actual p99 in both captures; batch p99 and fairness do not consistently
+improve. No default is promoted. The following source findings do not prove the
+cause of those measured losses. This audit changes no runtime algorithm.
+
+* Contract dimensions that must stay separate
+
+The existing native type boundary already prevents temporary Scheme roots from
+leaving their fixed owner. Numeric payloads use native construction/projection;
+there is no reason to replace them with JSON or a Rust evaluator.
+
+| Dimension | Current representation | Gap / required distinction |
+|-----------+------------------------+----------------------------|
+| Host routing class | submit_short / submit_batch | Owner selection and class quota; not the Scheme execution queue |
+| Scheme execution class | short_service boolean | Explicit general/short class; a short route may deliberately use general execution as a matched control |
+| Affinity | owner argument and optional SchemeServiceLane | A lane number alone is not a pool/owner identity; public session tokens should bind both before supporting reusable session handles |
+| Work charge | work_units usize | Outstanding resource charge, not remaining CPU, bytes or elapsed service time |
+| Cooperation | explicit Scheme unit/suspension scopes | Unit counts do not enforce duration; arbitrary uninstrumented Scheme remains supported |
+| Lifetime stage | router outstanding counts | Waiting for admission, native queued, running, suspended and completed awaiting projection are conflated |
+| Notification | Coalesced / Written / Full / Failed | Publication/delivery receipts, not owner runnable or execution acknowledgements |
+| Timeout | Duration at API boundary | Admission timeout and caller result timeout do not cancel accepted native work |
+| CPU scope | owner thread CPU and SDK GC process CPU | Must remain distinct in any cost estimator; never subtract process GC CPU from owner CPU |
+
+Do not reject every route/execution class mismatch: the existing priority A/B
+intentionally holds the host route fixed while changing Scheme execution class.
+A future typed declaration must express that pair explicitly, and snapshot it
+once before reservation. It must not infer class from payload length or change
+an existing control into a different workload. A class declaration also cannot
+certify that arbitrary Scheme code has a bounded duration.
+
+* A. Admission-aware stateless routing
+
+** Source finding
+
+[[file:../../crates/gerbil-scheme/src/instances/routing/policy.rs][routing/policy.rs]] chooses and charges one owner before awaiting that
+owner's class semaphore and native capacity. [[file:../../crates/gerbil-scheme/src/instances/routing/charge.rs][routing/charge.rs]] retains the
+charge until projection/failure. A request can remain pinned in admission while
+another owner becomes available. Closed-owner filtering occurs before the wait;
+there is no reselection step. This is a possible head-of-line dependency, not a
+measured attribution of the existing notification regression.
+
+The short score prefers short count, total request count, then batch work.
+The batch score prefers declared outstanding batch work. Neither score knows
+whether that work is runnable, suspended in Scheme IO, or awaiting projection.
+Counting an IO-suspended batch as remaining CPU can distort a time-based score.
+
+** Candidate protocol
+
+1. Preserve explicit owner/lane affinity. Only stateless, not-yet-published work
+   is eligible for selection or reselection.
+2. Wait for class capacity at router scope before committing an owner. Select an
+   eligible owner and atomically reserve the relevant class and native credits;
+   release partial acquisitions before waiting. Avoid reserve-all fanout.
+3. When no owner can accept, register one cancellation-safe waiter against a
+   capacity-change generation, then recheck before sleeping. A generation change
+   is durable; a Notify event alone is not the capacity predicate.
+4. Use bounded FIFO or age-based class admission so reselection cannot let new
+   arrivals continually overtake an old waiter. Do not retry-poll from Tokio.
+5. Commit the owner at native publication. Keep permits and charge through
+   projection/root retirement after publication, even if the caller disappears.
+
+This requires a reservation primitive shared with dispatcher capacity, not a
+second router-only ledger that guesses native credit availability. Independent
+routers/direct callers currently share native limits but not class quotas;
+a stronger pool-wide class reservation claim requires pool-owned state.
+Capacity reconfiguration, close and cancellation must invalidate waiting
+reservations without revoking already accepted work.
+
+** Directed acceptance
+
+Latch stateless work on owner A, queue one admissible request, then release
+capacity only on B. The request must proceed on B before A is released. Check
+cancellation at each reservation stage, timeout and pool close, with zero credit
+leaks and no duplicate construction. Keep the existing same-VM mixed/CPU pair;
+change routing only, preserve class declarations and request order policy.
+
+* B. Scheme-owned eligible queues without backlog scans
+
+** Source finding
+
+[[file:../../scheme/async-service.ss][async-service.ss]] appends each queued job to a linked list. This copies a
+prefix proportional to current queue length. Repeated queued insertion can
+therefore do quadratic list work. service-pop! scans past jobs affine to other
+workers and rebuilds the skipped prefix. Short jobs have no lane, so they do not
+need this eligibility scan. Existing completion FIFOs already use two lists.
+
+These are proven source complexity costs. Their contribution at the current
+four-slot owner limit is unmeasured and may be small. They do not explain a
+36% throughput loss by themselves.
+
+** Candidate representation and equivalence
+
+Use one two-list FIFO for stateless general work, one FIFO per affine Actor,
+and one shared short FIFO. Keep the existing monotonic job identity as arrival
+sequence. For a general worker turn, compare the head identity of its own lane
+with the stateless head and take the older eligible job. Preserve the current
+short/general turn arbitration separately.
+
+For each worker, the old general list's first eligible job is exactly the older
+of those two heads: ineligible lanes cannot affect its choice. Short jobs remain
+FIFO. This preserves eligibility and within-class ordering without relocating
+Scheme state. Enqueue and dequeue become amortized constant time; an occasional
+FIFO reversal is still linear in that queue length, so no worst-case constant
+latency claim follows. If reversal is measured in the tail, use a Scheme deque
+or bounded ring rather than merely renaming the two-list queue.
+
+Queue ownership and roots stay in Scheme. Update initialization, pending-job
+lookup, failure/exception drain and close together. Remove every queue reference
+on close; do not equate host external-root count zero with an empty Scheme graph.
+
+** Directed acceptance
+
+Compare old eligible-list selection with the new representation for mixed
+stateless/lane sequences and each worker/class turn; require the same selected
+job or idle decision. Test exception, retained continuation, lane ordering and
+shutdown with nonempty queues. Measure queue operations/allocation separately
+from end-to-end throughput at the existing window; do not enlarge the matrix
+just to obtain a favorable backlog case.
+
+* C. Scheme execution fairness with explicit unit semantics
+
+[[file:../../scheme/service-budget.ss][service-budget.ss]] arbitrates an owner-local cooperative unit lease by class
+streak. Applications opt into unit and suspension scopes. It neither measures
+unit duration nor preempts arbitrary Scheme computation. The job-level worker
+alternation and unit-level class lease are distinct arbitration layers.
+
+A count-based class streak bounds overtakes at instrumented checkpoints; it
+cannot bound wall-clock delay when one unit includes a long computation, GC or
+an unwrapped blocking operation. Four private VMs also share host CPU and
+process memory pressure; separate queues do not physically isolate those costs.
+
+Candidate: define an application-specific maximum work slice, then keep
+class debt across such slices, releasing the lease around native waits. Charge
+actual Scheme-owned progress at checkpoint boundaries. If weighted/deficit
+arbitration is needed, define comparable cost units first; do not use requested
+batch width as measured CPU or wall time (which includes OS delay). Bound
+service debt and retain bulk progress as well as short progress. Add no Rust
+polling timer or forced continuation migration. General Scheme execution remains
+available when a handler cannot offer the cooperative service guarantee.
+
+Directed acceptance: same handler outputs and continuation behavior, short and
+bulk progress under continuous contention, unequal unit costs, suspension and
+exception exits. Record achieved checkpoint spacing rather than claiming a hard
+latency guarantee. Do not silently reduce workload to make short requests pass.
+
+* D. Wake and completion are separate obligations
+
+The independent-short pipe repair removes borrowing another publisher's pending
+claim. Observed tails still overlap native Wait and select; a successful write
+does not prove which descriptor select monitored or when an OS thread resumed.
+Do not reintroduce the rejected wait-phase hint from 30.40: its five-second stall
+has not been diagnosed. Do not attribute all remaining latency to the OS.
+
+Before another wake algorithm, establish descriptor-specific native wait entry,
+readiness consumption and host publication ordering with a bounded fault control.
+Any replacement coalescing protocol needs a durable obligation until the owner
+acknowledges/rechecks publication, including close and completion producers.
+A sampled in-wait boolean cannot carry that obligation.
+
+Completion projection is synchronous on the fixed owner. Its cost depends on
+result shape and bytes, not only job count. Retain native roots through bounded
+projection/retirement and observe output volume before adding a byte budget.
+Deferring projection must not release request/work permits early or let completed
+Scheme graphs accumulate without a separate bound.
+
+* Model reuse and implementation order
+
+Reuse =owner_lifecycle= and =service_sharing= in [[file:../../specs/owner_lifecycle.qnt][owner_lifecycle.qnt]]. The latter
+has a constant ASSIGNED map and abstracts queue representation and work duration;
+it does not currently prove dynamic owner selection or queue complexity.
+Extend the existing model with pre-publication selection/reservation/commit and
+cancellation conservation before claiming adaptive-routing safety. Compare the
+new queue against the existing eligible-order abstraction rather than building
+a second lifecycle model. Finite safety runs cannot establish unconditional
+progress while OS/GC can pause, or certify native p99.
+
+1. Close reservation/reselection semantics and explicit route/execution class
+   declarations. Verify idle-owner admission and permit conservation first.
+2. Change Scheme queue representation independently, retaining eligible order.
+   Run the existing native capability/drain fixture plus its focused controls.
+3. Introduce cost-aware Scheme service slices only after the workload exposes
+   trustworthy progress units; preserve full general execution capability.
+4. Diagnose the failed wake-hint branch before considering another wake policy.
+
+Use one algorithm delta per directed same-VM/load A/B. Freeze source/image
+identity and retain all negative outcomes. Primary outcome is throughput, with
+actual/scheduled short p99, batch p99 and owner/Actor progress reported together.
+Higher CPU use alone is not a regression. No default, timeout, VM count, host
+scheduler or optimization level changes are part of this audit.

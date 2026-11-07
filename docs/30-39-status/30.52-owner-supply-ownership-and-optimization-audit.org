@@ -1,0 +1,200 @@
+#+title: Owner supply ownership and evidence-driven optimization audit
+#+date: 2026-10-22
+
+* Stop repeating captures without a candidate
+
+The working predecessor is PR #18 head =944434ae187f8374def4c48ba110111c0367bedd=.
+Its exact-head run =39764216889= completed successfully: both Cargo jobs, both
+Bazel jobs, fixed-owner native lifecycle and Quint passed. Unsupported SMP was
+explicitly skipped. New-head CI is a separate gate from this local candidate.
+Existing 34 ms, kernel-recorded sub-millisecond and
+sparse-point 6.224 ms observations retain their original scope and identities.
+The latter bounds owner non-CPU time but does not classify complete blocked or
+runnable intervals. No routing improvement is inferred from an unreproduced tail.
+
+One interpretation needs correction: Off/State changes both request entry marks
+and Mach polling. The retained 12.2% CPU p99 regression is combined observation
+cost, not isolated causal evidence against the sampler alone. Entry marks use
+shared mutexes; polling adds a thread, timers, kernel queries and buffering.
+Apple XNU's [[https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/osfmk/kern/thread.c][thread-info implementation]] can update lazy scheduler bookkeeping.
+These mechanisms make observer interference plausible, but their individual
+contributions are unmeasured. A frozen unprofiled replay also lacked the 34 ms
+p99, so profiler presence is not a necessary explanation. Repeating those same
+captures is not the next optimization step.
+
+* Repository-grounded cost and protocol map
+
+| Site | Code fact | Optimization target | Evidence boundary |
+|------+-----------+---------------------+-------------------|
+| Short publication | Reserved requests enter a fixed owner's FIFO | Delay owner commitment for independent short inputs | Spare capacity is not proof of owner readiness; published/rooted work must not be stolen |
+| ServiceProducer | A boxed acquire future is created per new reservation, even with free credits | Keep pending reservation state with the owner; avoid unnecessary waiters | A saturated pipeline still needs a FIFO waiter |
+| StreamJob | An already boxed Job is boxed again to retain one active permit | Retain the permit in the native retirement guard | Cancellation, exceptions and projection must preserve credit/root lifetime |
+| Producer open fence | Weak Admission upgrade and global sender lock occur before and after acquisition | Cache registered identity with a close-fenced invalidation token in the opt-in path | Registration must prevent replacement; closing must invalidate at the original fence |
+| Shared source | Head inspection, take and post-take inspection lock the source separately | Claim/reprice in fewer shared critical sections | Preserve heterogeneous work charges, readiness barrier and refunds |
+| Capacity retirement | Each guard release publishes to the pool-wide watch channel | Coalesce retirement notifications without delaying credit visibility | Version/wait registration and close notification must remain lossless |
+
+Arc cloning does not copy Scheme payloads. It retains cross-thread ownership.
+Moving arbitrary native roots into Rust work stealing or replacing transport Arc
+with Rc would violate the existing Send/owner contract. Local borrowing, fewer
+temporary clones and fewer boxed envelopes are appropriate candidates. Cache-line
+padding or weaker atomic orderings are not admitted without evidence. None of
+these static costs explains all of a millisecond-scale non-CPU interval.
+
+The priority is ownership and shared coordination first, then a shared short
+claim protocol. Thread-count sweeps and another router score adjustment do not
+repair early owner commitment. Stateless Rust inputs can remain unassigned until
+a ready owner reserves their real credits; actor-affine/session work must remain
+pinned. Claiming, cancellation, expiry and close must share a final admission
+boundary. Already accepted Scheme jobs retain their owner and drain normally.
+This identifies the next protocol work; it does not claim it is implemented here.
+
+* Actual owner-local ownership candidate
+
+The actual pool API now accepts =SchemeServiceSupplyAdmission= explicitly via
+=submit_scheme_service_pool_stream_with_admission=. The ordinary API and fixed
+owner stream retain =Queued=. No VM, optimization, routing, capacity, wake or
+cooperative-budget default changes.
+
+The opt-in =OwnerLocal= candidate starts with two related ownership changes:
+
+1. Pending units and their future are one typed Pending state. A ready active/
+   work/slot reservation needs no boxed future. If credits are unavailable, the
+   normal asynchronous FIFO path is registered immediately; subsequent polls
+   retain its place. A changed shared head cancels/refunds the old reservation.
+2. Stream active credit is stored in CapacityPermit's existing native retirement
+   guard. The original boxed Job goes directly into Scheme service admission;
+   no second StreamJob box/vtable forwarding layer is allocated. Credit remains
+   retained until projection or error cleanup returns native work/slot credits.
+
+This removes the wrapper even when the pipeline is saturated and a waiter is
+necessary. It does not make the whole request allocation-free: payloads, typed
+jobs, result tickets and Scheme allocation remain. Native guards gain an optional
+active-credit field in both compiled arms. Immediate attempts can add atomic/
+Arc operations before falling back under contention. These are real trade-offs.
+No custom unsafe allocator, new dependency, foreign scheduler, Scheme compiler
+change or new build system is introduced.
+
+A preliminary ready-only revision was frozen before adding native guard ownership.
+Two five-block captures did not show stable CPU throughput/p99 benefit: CPU
+throughput changed -0.45% and +2.58%; CPU p99 changed -6.76% and +8.06%. Mixed
+throughput changed +0.90%/+0.17%. The first mixed control had a much larger tail;
+its 57.1% p99 reduction is not promoted as a repeatable gain. This rejected
+performance claim led to the ownership revision, not more repetitions of it.
+
+* Credit-ownership revision before cached identity
+
+=--supply-admission-ab= is one directed Queued/OwnerLocal pair. Both arms keep the
+same four live native VMs and O2 image, 8192 orders/64 probes, two Tokio workers,
+batch eight, NativePort, cooperative budget one, feed one, native slots four/work
+32 and three active bulk callbacks per owner. Five blocks alternate AB/BA,
+producing ten samples per arm/load. Both arms use pooled supply and identical
+progress-aware short routing. Observation Off, zero per-request native snapshots
+and no clock observer are asserted. No profiler runs.
+
+| Load | Orders/s Queued -> OwnerLocal | Actual short p99 ms | Minimum progress | Maximum finish spread ms |
+|------+------------------------------+---------------------+------------------+--------------------------|
+| CPU | 398376 -> 404299 | 0.398958 -> 0.418667 | 98.70% -> 98.78% | 0.368959 -> 0.463916 |
+| Mixed | 67391 -> 67538 | 0.495167 -> 0.448500 | 98.78% -> 98.80% | 1.302875 -> 1.703208 |
+
+CPU throughput improved 1.49% in this run, but short p99 regressed 4.94% and
+maximum finish spread worsened. Mixed throughput changed only +0.22%; mixed p99
+improved 9.42% while maximum finish spread worsened 30.7%. Normalized minimum
+progress stayed near 98.8%; that does not erase finish-spread negatives. These
+small throughput changes do not establish the requested fundamental performance
+improvement. No default promotion or 34 ms repair is claimed. Keep the opt-in
+actual-API candidate reproducible and pursue shared coordination/late claim next.
+
+Both loads completed correct native results, quiesced Scheme, joined four owners,
+returned zero external roots and removed copied image files. This historical
+credit-only revision is frozen as executable SHA256
+=5b4793531803b1f588c74c56c66fc35002ec67dba0cb1360ec4910e64e1e720e=.
+It predates the registered-identity change below; its result is not relabeled.
+
+* Registered identity and close invalidation
+
+Inspection found an existing protocol guarantee: configure rejects capacity
+replacement whenever the producer registration permit is held. Registration
+also validates the capacity pointer under the admission table lock. A live
+producer therefore need not upgrade Weak Admission and lock that whole table
+again on every open check merely to establish the same identity.
+
+The final opt-in path caches the registration's wake identity and an
+=Arc<AtomicBool>= accepting token. Pool close stores false under the existing
+admission mutex, immediately before removing the sender table. Semaphore close,
+notifications and callbacks still run after unlocking. Backend readiness and
+owner closed/failed flags remain checked before commitment. Deadline and
+cancellation checks, native credit reservations and rooted ownership are unchanged.
+A close racing after the final successful check drains that accepted work as
+before. Only the bool token survives independently; it does not retain Admission,
+owner channels, images or native roots. Queued retains its original table checks.
+
+This removes global Admission reference-count writes and table locking from
+OwnerLocal's repeated checks by using a registration invariant. It does not
+remove shared-source or capacity-notification coordination. The invalidation
+point remains in the existing close transition; no duplicate lifecycle model is
+needed. The actual native close test covers both strategies simultaneously.
+
+One final five-block, same-live-VM A/B used the identical inputs and native
+settings, with observations Off in both arms:
+
+| Load | Orders/s Queued -> OwnerLocal | Actual short p99 ms | Minimum progress | Maximum finish spread ms |
+|------+------------------------------+---------------------+------------------+--------------------------|
+| CPU | 424264 -> 426776 | 0.377625 -> 0.412583 | 98.79% -> 98.77% | 0.370084 -> 0.438166 |
+| Mixed | 67424 -> 67833 | 0.440250 -> 0.421667 | 98.81% -> 98.80% | 1.306375 -> 1.228667 |
+
+Throughput changed +0.59% CPU/+0.61% mixed. CPU short p99 regressed 9.26%, with
+worse CPU finish spread; mixed p99 improved 4.22% and finish spread improved.
+These small throughput differences do not establish global admission locking as
+the dominant bottleneck for this workload. The implementation removes specific
+coordination/ownership costs, but no default or broad speedup is admitted.
+Both compiled arms share the revised private guard layout; this is not a direct
+comparison against an untouched published executable. Source/binary identity is
+kept separate from the earlier credit-only and ready-only revisions.
+
+The final executable SHA256 is
+=bae734a99cdf844b8ca15427d5e5a2407e15fb1f6cb000b0c146df0d11ffac13=.
+It completed correct results, Scheme quiescence, four joins, zero external roots
+and copied-file removal. Raw logs, source snapshots, binaries and failures stay
+outside Git. No new profiler acquisition or thread-count matrix was needed.
+The next higher-impact protocol targets remain pool-wide retirement notification
+coordination and late owner claim for independent short inputs. The historical
+34 ms blocked/runnable attribution remains open and is not a prerequisite for
+identifying these code-level costs; it is a prerequisite for claiming that tail
+has been repaired.
+
+* Correctness and remaining gates
+
+Native service fixtures run both admission policies through construction and
+projection panic, Scheme exception/recovery, heterogeneous work, exact FIFO
+identity, owner affinity, blocked-owner bypass, registration cancellation/timeout,
+active limits, cancellation, expiry and accepted drain. The final native fixture
+passed in 5.30 s total, retaining its existing five-second progress watchdog.
+Shutdown simultaneously accepts/drains work in both policies while rejecting
+remaining uncommitted work. The instance unit gate passed 18 tests, including
+five acquisition controls and three registered-admission controls: FIFO work
+waiters, partial reservations, cancellation/repricing, active retention, closing
+a pending reservation, close invalidation before out-of-lock callbacks,
+registration-stable capacity identity and no dispatcher retention by the token. Model/finite-allocation evidence is not native
+acceptance. This refines existing admission/retirement transitions; no duplicate
+Quint model or synthetic runtime success is introduced.
+
+Focused warnings-denied Clippy passed. The new A/B smoke is wired into the existing
+native CI job, without adding a matrix. The final dev-profile directed smoke also completed eight samples with clean
+four-owner shutdown, zero roots and copied-file removal. An initial external-program unit-test
+link invocation lacked the embedded root-release symbol; the supported existing
+Tokio-dispatch unit feature graph passed. Preliminary doc/function-size lint
+failures were repaired without suppressions. Those command failures are retained
+privately, not converted into native passes. A preliminary shutdown fixture
+incorrectly placed its new stream on owner 2, already reserved by the existing
+partial-work shutdown control. The unchanged five-second watchdog exited 70;
+that receipt has unverified cleanup. Moving the new independent stream to free
+owner 3 fixes the fixture conflict; the corrected native fixture passed. The
+failed invocation is retained, not reported as successful cleanup. New-head CI
+and the directed smoke remain separate receipts from the predecessor CI.
+
+* Follow-up: capacity notification and late binding
+
+[[file:30.53-shared-capacity-and-late-owner-binding.org][The protocol follow-up]] implements explicit notified reselection and a bounded
+owner-claimed short queue, including independent owner-failure close fencing.
+It retains both the initial mixed-load regression and the final directed result,
+with separate identities. Existing defaults and complete Scheme execution remain.

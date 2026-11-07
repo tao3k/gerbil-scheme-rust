@@ -16,6 +16,18 @@ pub const GERBIL_SCHEME_RUST_ABI_ID: &[u8] = b"gerbil-scheme-rust.binding.v1\0";
 /// ABI major version.  A mismatch must fail closed.
 pub const GERBIL_SCHEME_RUST_ABI_VERSION: u32 = 1;
 
+/// Representation-stable scalar projection; public header defines the tags.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct GerbilScalarProjection {
+    /// Scalar kind, independent of Gambit's private tags.
+    pub tag: u32,
+    /// Reserved, zero on successful projection.
+    pub reserved: u32,
+    /// Signed integer, character, boolean, or IEEE-754 payload.
+    pub bits: u64,
+}
+
 /// Repository-relative path to the public C header for this ABI.
 pub const GERBIL_SCHEME_RUST_HEADER_PATH: &str = "include/gerbil_scheme_rust.h";
 
@@ -574,8 +586,15 @@ pub(crate) unsafe fn checked_scheme_object_predicate(
     out: *mut GerbilBoolean,
     predicate: unsafe extern "C" fn(GerbilValueHandle) -> i32,
 ) -> GerbilStatus {
-    if value == 0 || out.is_null() {
+    if out.is_null() {
         return GerbilStatus::NullPointer;
+    }
+    if value == 0 {
+        // Fixnum/exact-integer predicates handle zero in their typed wrappers.
+        unsafe {
+            *out = GerbilBoolean::FALSE;
+        }
+        return GerbilStatus::Ok;
     }
 
     // SAFETY: caller proves the Gerbil runtime/module is initialized and
@@ -599,9 +618,6 @@ pub(crate) unsafe fn checked_scheme_object_fixture(
     // SAFETY: caller proves the Gerbil runtime/module is initialized. The
     // raw Gerbil export returns Gambit's universal Scheme object word.
     let value = unsafe { fixture() };
-    if value == 0 {
-        return GerbilStatus::NullPointer;
-    }
 
     // SAFETY: caller provided a non-null output pointer for one handle.
     unsafe {
@@ -782,9 +798,6 @@ unsafe fn checked_scheme_object_projection(
     }
 
     let projected = unsafe { projection(value) };
-    if projected == 0 {
-        return GerbilStatus::NullPointer;
-    }
 
     // SAFETY: caller provided a non-null output pointer for one handle.
     unsafe {
@@ -825,7 +838,7 @@ unsafe extern "C" {
     /// The caller must link the native support library that owns this symbol.
     pub fn gerbil_scheme_rust_identity_i64(value: i64) -> i64;
 
-    /// Scalar proof exported by `scheme/native.ss` through Gambit's official
+    /// Scalar proof exported by `scheme/runtime.ss` through Gambit's official
     /// `c-define` C interface.
     ///
     /// # Safety
@@ -834,7 +847,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_add_i64(left: i64, right: i64) -> i64;
 
-    /// Scalar predicate exported by `scheme/native.ss` through Gambit's
+    /// Scalar predicate exported by `scheme/runtime.ss` through Gambit's
     /// official `c-define` C interface.
     ///
     /// # Safety
@@ -843,7 +856,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_is_even_i64(value: i64) -> i32;
 
-    /// Three-way scalar comparison exported by `scheme/native.ss` through
+    /// Three-way scalar comparison exported by `scheme/runtime.ss` through
     /// Gambit's official `c-define` C interface.
     ///
     /// # Safety
@@ -852,7 +865,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_compare_i64(left: i64, right: i64) -> i32;
 
-    /// Raw `scheme-object` fixture exported by `scheme/native.ss`.
+    /// Raw `scheme-object` fixture exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -860,7 +873,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_null_value_raw() -> GerbilValueHandle;
 
-    /// Raw Scheme pair fixture exported by `scheme/native.ss`.
+    /// Raw Scheme pair fixture exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -868,7 +881,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_fixture_pair_raw() -> GerbilValueHandle;
 
-    /// Raw proper Scheme list fixture exported by `scheme/native.ss`.
+    /// Raw proper Scheme list fixture exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -876,7 +889,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_fixture_proper_list_raw() -> GerbilValueHandle;
 
-    /// Raw improper Scheme list fixture exported by `scheme/native.ss`.
+    /// Raw improper Scheme list fixture exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -884,7 +897,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_fixture_improper_list_raw() -> GerbilValueHandle;
 
-    /// Raw Scheme-object true fixture exported by `scheme/native.ss`.
+    /// Raw Scheme-object true fixture exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -892,7 +905,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_fixture_true_raw() -> GerbilValueHandle;
 
-    /// Raw Scheme-object false fixture exported by `scheme/native.ss`.
+    /// Raw Scheme-object false fixture exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -908,7 +921,7 @@ unsafe extern "C" {
 
     pub(crate) fn gerbil_scheme_rust_fixture_char_non_bmp_raw() -> GerbilValueHandle;
 
-    /// Raw Scheme-object pair predicate exported by `scheme/native.ss`.
+    /// Raw Scheme-object pair predicate exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -916,7 +929,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_is_pair_raw(value: GerbilValueHandle) -> i32;
 
-    /// Raw Scheme-object proper-list predicate exported by `scheme/native.ss`.
+    /// Raw Scheme-object proper-list predicate exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -924,7 +937,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_is_list_raw(value: GerbilValueHandle) -> i32;
 
-    /// Raw Scheme-object null predicate exported by `scheme/native.ss`.
+    /// Raw Scheme-object null predicate exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -932,7 +945,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_is_null_raw(value: GerbilValueHandle) -> i32;
 
-    /// Raw Scheme-object boolean predicate exported by `scheme/native.ss`.
+    /// Raw Scheme-object boolean predicate exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -940,7 +953,7 @@ unsafe extern "C" {
     /// current process and that the exporting module remains loaded.
     pub fn gerbil_scheme_rust_scheme_object_is_boolean_raw(value: GerbilValueHandle) -> i32;
 
-    /// Raw Scheme-object boolean value projection exported by `scheme/native.ss`.
+    /// Raw Scheme-object boolean value projection exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -958,7 +971,7 @@ unsafe extern "C" {
 
     pub(crate) fn gerbil_scheme_rust_scheme_object_char_value_raw(value: GerbilValueHandle) -> i32;
 
-    /// Raw Scheme-object pair car projection exported by `scheme/native.ss`.
+    /// Raw Scheme-object pair car projection exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///
@@ -968,7 +981,7 @@ unsafe extern "C" {
         value: GerbilValueHandle,
     ) -> GerbilValueHandle;
 
-    /// Raw Scheme-object pair cdr projection exported by `scheme/native.ss`.
+    /// Raw Scheme-object pair cdr projection exported by `scheme/runtime.ss`.
     ///
     /// # Safety
     ///

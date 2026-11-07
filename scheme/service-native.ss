@@ -1,0 +1,38 @@
+;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+;;; Native Scheme scheduling eligibility; no shadow job/turn activation ledger.
+(defstruct service-native (budget sources))
+(def (gerbil-rs-native-state budget)
+  (let (work (service-budget-work budget)) (and work (service-work-native work))))
+(def (gerbil-rs-native-runnable? budget thread (control-lock #f))
+  (let (state (thread-state thread))
+    (or (thread-state-running? state)
+        (and (thread-state-waiting? state)
+             (let (on (thread-state-waiting-for state))
+               ;; Waiting for a Scheme processor is runnable, not external I/O.
+               ;; Known control mutexes are released before this decision runs.
+               (or (processor? on) (eq? on (service-budget-lock budget))
+                   (and control-lock (eq? on control-lock))))))))
+(def (gerbil-rs-native-source-add! state key probe)
+  (budget-locked (service-native-budget state) (lambda ()
+    (unless (assq key (service-native-sources state))
+      (set! (service-native-sources state) (cons (cons key probe) (service-native-sources state)))))))
+(def (gerbil-rs-native-source-remove! state key)
+  (budget-locked (service-native-budget state) (lambda ()
+    (set! (service-native-sources state)
+      (filter (lambda (entry) (not (eq? key (car entry)))) (service-native-sources state))))))
+(def (gerbil-rs-native-budget-short? budget)
+  (budget-locked budget (lambda ()
+    (or (not (budget-empty? (service-budget-short budget)))
+        (and (service-budget-owner budget) (service-budget-last budget))))))
+(def (gerbil-rs-native-has-sources? budget)
+  (let (state (gerbil-rs-native-state budget)) (and state (pair? (service-native-sources state)))))
+(def (gerbil-rs-native-source-short? budget)
+  (let (state (gerbil-rs-native-state budget))
+    ;; Immutable list spines permit a borrowed snapshot. Probes run outside
+    ;; service/budget locks and cannot grant, acknowledge or retire resources.
+    (and state (let loop ((sources (service-native-sources state)))
+      (and (pair? sources) (or ((cdr (car sources))) (loop (cdr sources))))))))
+(def (gerbil-rs-native-snapshot budget)
+  (budget-locked budget (lambda ()
+    (let (state (gerbil-rs-native-state budget))
+      (if state (s64vector 1 (length (service-native-sources state))) (s64vector 0 0))))))

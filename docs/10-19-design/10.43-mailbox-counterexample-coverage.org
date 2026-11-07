@@ -1,0 +1,397 @@
+#+title: Mailbox counterexample coverage and evidence boundaries
+
+* Scope and unchanged references
+
+This audit consolidates retained failures before any new runtime candidate. It
+changes models and their check entrypoint only. It does not run a performance
+benchmark, modify the SDK or production path, relax the 128 backlog limit, or
+certify the cause of a natural watchdog failure.
+
+| Reference | Offered load | Total | p99 | p99.9 | Peak debt | Admission |
+|-----------+--------------+-------+-----+-------+-----------+-----------|
+| 6d4ec27 | 500,000/s for 10 s | 5,000,000 | 0.317 ms | 0.431 ms | 351 | Not passed |
+| 7f915df | 1,000,000/s for 1 s | 1,000,000 | 6.393 ms | 6.740 ms | 6,746 | Not passed |
+
+These are different workload/startup cohorts. The 7F reader and image were
+hash-verified against the original frozen receipt in the preceding audit;
+that is not a new performance reproduction. Original 6D bytes remain unverified
+in this bounded audit. Rebuilt images cannot claim original-byte identity.
+The retained 7F 5M/s row delivered about 1.003M/s and had 3,943.455 ms p99 and
+4,000,404 peak debt. Offered rate is not delivered capacity.
+
+The existing research gate's example admission profile remains 418,000 ns p99,
+128 peak debt and 3,000,000,000 ns whole-run time. This audit does not introduce
+a new runtime threshold or reinterpret that profile as a certificate for the
+10-second 6D replay. Each historical replay retains its original workload and
+deadline; the shorter whole-run gate is an admission profile, not a replay timeout.
+
+* Corrected model defects
+
+The previous gate allowed outcomes with no binding to the planned population,
+run, image, entry route or main phase. It could accept a negative peak sentinel,
+and it trusted a candidate-supplied failure set and limit argument. Those were
+actual defects in the acceptance model, not evidence that the runtime suffered
+every corresponding failure.
+
+=mailbox_measurement_contract.qnt= now owns the evidence types, count and
+quantile consistency, main-run binding, explicit histogram upper rounding,
+conservative peak uncertainty and the last-planned-arrival lower bound. Counts
+are mutually exclusive terminal outcomes; incomplete populations cannot be
+reported as full-population p99. These consistency checks do not independently
+recompute a real histogram or prove that a receipt is truthful.
+
+=mailbox_research_gate.qnt= consumes retained research state. A candidate cannot
+supply an empty known-failure list, ratchet either reference, expand admission
+limits or substitute a small component's valid outcome for the main workload.
+New failures feed the next decision. Rollback removes runtime candidates while
+preserving references and the union of learned factors. Qualified repair and
+evidence labels still require external source/VM/measurement receipts.
+
+=mailbox_resource_contract.qnt= separates zero roots, full cleanup, unload
+eligibility, classified image retention, long-term convergence and process-tree
+build monitoring. A sampled RSS peak is not an enforced maximum; a signal alone
+is not proof of OOM. Cleanup error -73 cannot be waived by an exited owner.
+
+=actor_service_calculus.qnt= separates logical transfers from actual green-thread
+dispatch changes. Existing two-transfer/two-dispatch algebra keeps its values,
+but it is now an explicit scenario. Packing, resume and observation costs must
+be included. Abstract ticks are not measured nanoseconds.
+
+* Executable coverage
+
+The table maps retained failure families to named executable checks. The entire
+existing 294-case aggregation is retained; the table gives representative
+entrypoints rather than replacing those refinements with another scheduler.
+Conditional reachability, static rejection and observed native failures remain
+distinct evidence classes.
+
+** Negative no-GC allocation and enclosing GC wall windows
+
+Evidence: retained unreliable observation / unknown runtime cause.
+Owner: =specs/mailbox_measurement_contract.qnt=.
+
+- =signedAllocationTest=
+- =gcWallIsNotCpuTest=
+
+** Frozen workload, unit, startup and timing provenance
+
+Evidence: retained historical records.
+Owner: =specs/mailbox_research_gate.qnt=.
+
+- =differentFrozenProfilesTest=
+- =workloadUnitsTest=
+- =rebuiltBytesTest=
+- =providerProvenanceTest=
+
+** Slow control, offered rate and partial admission
+
+Evidence: retained negative results.
+Owner: =specs/mailbox_research_gate.qnt=.
+
+- =anomalousControlTest=
+- =original351BacklogTest=
+- =offeredCapacityTest=
+- =partialReferencesTest=
+
+** Rollback preserves references and failed mechanisms
+
+Evidence: research protocol invariant.
+Owner: =specs/mailbox_research_gate.qnt=.
+
+- =preserveReferencesOnRollbackTest=
+- =learnedFailureFeedbackTest=
+- =cumulativeRollbackTest=
+- =trustedHistoryTest=
+- =unchangedRepeatTest=
+
+** Do not trade tails for correctness or relabel harness savings
+
+Evidence: retained negative results / claim boundary.
+Owner: =specs/mailbox_research_gate.qnt=.
+
+- =zeroRejectionIsInsufficientTest=
+- =harnessIsNotEngineTest=
+- =normalVariationTest=
+- =forbiddenChangesTest=
+
+** Population, run, image, route and main-phase binding
+
+Evidence: audited acceptance-model defect.
+Owner: =specs/mailbox_research_gate.qnt=.
+
+- =boundOutcomeIdentityTest=
+- =componentIsNotMainTest=
+- =immutableLimitsTest=
+- =validPeakEvidenceTest=
+- =nonVacuousAdmissionTest=
+
+** Missing / censored data, quantile order and histogram rounding
+
+Evidence: measurement evidence contract.
+Owner: =specs/mailbox_measurement_contract.qnt=.
+
+- =completePopulationTest=
+- =quantileWindowTest=
+- =histogramRoundingTest=
+- =quantileMethodTest=
+- =arrivalWindowTest=
+
+** Peak uncertainty, negative sentinel and contradictory counts
+
+Evidence: measurement evidence contract.
+Owner: =specs/mailbox_measurement_contract.qnt=.
+
+- =missingPeakTest=
+- =uncertainPeakTest=
+- =impossiblePeakTest=
+- =contradictoryCountsTest=
+
+** Zero roots do not waive -73, TLS or callback ownership
+
+Evidence: retained cleanup failure / claim boundary.
+Owner: =specs/mailbox_resource_contract.qnt=.
+
+- =cleanupErrorTest=
+- =callbackTlsProviderTest=
+- =continuationUnloadTest=
+
+** 32 images and RSS growth require classification and long reuse
+
+Evidence: retained observation / not a proven leak.
+Owner: =specs/mailbox_resource_contract.qnt=.
+
+- =retainedImagesTest=
+- =convergenceTest=
+
+** 8 GiB process-tree cap and termination attribution
+
+Evidence: retained build failures / monitoring boundary.
+Owner: =specs/mailbox_resource_contract.qnt=.
+
+- =originalBuildCapTest=
+- =wholeTreeMonitorTest=
+- =sampledMemoryTest=
+- =killAttributionTest=
+
+** Logical mailbox transfers are not green-thread switch counts
+
+Evidence: source refinement / conditional cost algebra.
+Owner: =specs/actor_service_calculus.qnt=.
+
+- =transfersDoNotFixDispatchesTest=
+- =historicalCostAssumptionIsExplicitTest=
+- =packingMustPayItsExtraWakeCostsTest=
+
+** Matched SDK / provider ABI and unsigned clock conversion
+
+Evidence: source / generated-code evidence.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62MatchingMailboxBodyDoesNotAuthenticateWorkloadSourceTest=
+- =op62ClockResultStillRequiresUnsignedBignumConversionTest=
+- =op62ClockPrototypeRequiresMatchedTrampolineLoweringTest=
+- =op62NewClockGlobalRequiresMatchingNativeLinkerMetadataTest=
+
+** scoped=false still enables native result construction
+
+Evidence: audited actual call path.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62UnobservedProfileSelectsNativeResultConstructionTest=
+- =op62ScopedFalseNativeAccessAssumptionIsCounterexampleTest=
+
+** Capture selection value is not a progress error
+
+Evidence: conditional C / VM fixture; not historical attribution.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62ProviderRestoration1Test=
+- =op62ProviderRestoration2Test=
+- =op62ProviderRestoration3Test=
+- =op62ProviderRestoration4Test=
+
+** Observe whole generated module, unhit stack and host setup
+
+Evidence: rejected generated-code candidates.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62WholeModuleCostIncludesPrivateProcedureStorageTest=
+- =op62OneShotRecordStillChangesUnmatchedReplyPathTest=
+- =op62SiblingSnapshotColdSourceChangesOrdinaryMachineCodeTest=
+- =op62OutlinedSiblingSnapshotAddsOrdinaryNativeStackTest=
+
+** Sparse / fixture / forced recovery cannot certify production cost
+
+Evidence: evidence-scope counterexamples.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62LowRateGapDoesNotQualifyProductionGuardTest=
+- =op62SparseNativeCpuEnvelopeDoesNotTransferToMainRateTest=
+- =op62MatchedRecoveryFixtureDoesNotQualifyLinkedBridgeCostTest=
+- =op62FullImageForcedTerminalRecoveryIsNotNaturalCostUpperTest=
+
+** Do not infer reply custody from thread state or public timeout object
+
+Evidence: public API epistemic boundary.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62PublicTimeoutObjectIdentityCannotCountReceivesTest=
+- =op62ProcessorWaitWithoutTimeoutCannotAttestEnqueueTest=
+- =op62PublicWaitObjectCannotProveTargetReplyWasNotDequeuedTest=
+- =op62SameArchivedSummaryAllowsEarlyLateOrNoLongGapTest=
+
+** No private inbox reads, cursor rewind or unrelated gap attribution
+
+Evidence: public API / observation safety.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62EvidenceRejectsPrivateInboxAndCursorRewindTest=
+- =op62PublicBoundariesAttestOnlyOutsideAmbiguousIntervalsTest=
+- =op62ObserverMaximaCannotSealGapTest=
+- =op62JointBoundsCannotMergeSeparateRoundsOrForceAThreadPhaseTest=
+
+** Reply-only wait can strand eligible unpublished work
+
+Evidence: conditional reachable waiting dependency.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62ReplyOnlyWaitCanStrandEligibleWorkWithFreeFramesTest=
+- =op62ArrivalAfterPostSendSampleCanLeaveCreditUnusedTest=
+- =op62ArrivalDeadlineCannotReplaceHeartbeatDeadlineTest=
+
+** No reset of original deadline; source debt spans publication
+
+Evidence: retained watchdog boundary.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62DeadlineSpansBothSidesOfPublicationTest=
+- =op62DeadlinePreservesSourceAndFrameDebtTest=
+- =op62ArrivalWakeCannotResetReplyDeadlineTest=
+- =op62SingleRetirementClockCanChangeOriginalDeadlineAndCreditTest=
+
+** Ready result is not validated consumption or returned capacity
+
+Evidence: canonical frame ownership invariant.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =nativeResultDoesNotReturnSourceCapacityTest=
+- =op62VerifiedProgressDoesNotAuthorizeFrameReuseTest=
+- =op62WorkerPostSendClearCanCorruptAnImmediatelyRefilledSlotTest=
+- =op62UncommittedSendCannotAuthorizeEarlyClearTest=
+
+** Stale reference, generation, exceptional drain and closure receipt
+
+Evidence: conditional lifecycle / continuation counterexamples.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62ReusableReplyEnvelopeCannotRejectStaleReferenceTest=
+- =op62StaleReplyGuardCannotUndoLateWorkerWriteTest=
+- =op62OldActivationCannotBorrowNewForeignCallTest=
+- =op62ReenteredTypedProjectionMustReleaseOnlyItsStaleRootTest=
+- =op62CloseTimeoutPreservesFramesUntilAllWorkersJoinTest=
+
+** One-shot record must bind selected request, recovery and generation
+
+Evidence: conditional diagnostic boundaries.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62OneShotRequiresActualRecoveryAndMatchingGenerationTest=
+- =op62OneShotSiblingProgressCannotSealCapturedFrameTest=
+- =op62FirstCutNestedEntryCannotResealOuterReceiptTest=
+- =op62DeferredReceiptNeedsOwnerAndBothLiveRootTokensTest=
+
+** Final drain or equal final throughput cannot erase an earlier peak
+
+Evidence: retained negative results / prefix accounting.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62FinalDrainCannotRemoveAnyBacklogBreachTest=
+- =op62FallbackBurstCanFailPeakWithEqualFinalThroughputTest=
+- =op62NaturalCompletionCannotWaiveLatencyOrBacklogAcceptanceTest=
+
+** Backlog needs spare service and bounded actual consumption opportunities
+
+Evidence: conditional service feasibility, not measured CPU bounds.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62RecoveryRequiresSpareCapacityAboveOfferedRateTest=
+- =op62ProgressGapCanForceBacklogDespiteNormalRetirementTest=
+- =op62ArchivedPostOfferDrainCouldNotMatchArrivalRateTest=
+- =op62FrozenSuffixRecoveryDiffersAtOneAndFiveMillionTest=
+
+** Three frames / modulo routing do not guarantee usable worker progress
+
+Evidence: conditional routing counterexamples.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62ModuloRouteCanQueueBehindOccupiedWorkerTest=
+- =op62StaticPartitionCanStrandFreeCreditBesideSuspendedActorTest=
+- =op62FixedSlotPairCannotSupportAdmissionTest=
+- =op62FrameOwnedRoutePreservesSparseRotationAndFreeSlotFallbackTest=
+
+** FIFO / wake token / sleep handoff and stale notification
+
+Evidence: conditional waiting and notification counterexamples.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62SplitDoorbellAckCanLoseLatestArrivalTest=
+- =op62StaleArrivalWakeCanOccupyOnlyNotificationSlotTest=
+- =op62PullBatonCanLoseOnlyWakeBeforeClaimTest=
+- =op62SingleEdgeSignalCanStrandWorkBehindBlockedClaimTest=
+
+** Oracle, bignums, initialized results and continuation allocation
+
+Evidence: semantic equivalence / lifetime boundaries.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =oracleGrossTransitionRetainsLineAndExactSumTest=
+- =validBignumsKeepOriginalConstructionRatherThanNarrowingTypesTest=
+- =initializedNativeResultIsCompleteBeforePublicationTest=
+- =rankContinuationReturnsAllocateIndependentResultsTest=
+- =preRankReusableAllocationIsARetainedCounterexampleTest=
+
+** Representation, wrappers and local operation savings are not admission
+
+Evidence: retained rejected candidates.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62OwnedSendWrapperRemovalDidNotAdmitCycleTest=
+- =op62PrivateInputReuseRecoveryDoesNotAdmitCycleTest=
+- =op62FixedQuantityStoresRemovalDidNotAdmitCycleTest=
+- =op62ClosedRingDidNotAdmitTheWholeCycleTest=
+
+** Failure phase, report identity and terminal statistics
+
+Evidence: retained failure / evidence boundary.
+Owner: =specs/mailbox_result_construction.qnt=.
+
+- =op62TypedReportRequiresMatchingVersionAndShapeTest=
+- =op62FailureTagRequiresReplyIdentityBeforeExceptionTest=
+- =op62InjectedJoinFailureCannotReturnASuccessfulReceiptTest=
+- =op62FullImageFirstRawAttemptWouldLoseSelectedReceiptTest=
+
+* Verification and limits
+
+Run =just mailbox-research-gate-check= from the repository root. It checks
+measurement (17), resource (9), cost-refinement (3), research-admission (28) and
+layout-entry trial (11) and existing aggregate (295) cases with the TypeScript backend and fixed seed.
+These suite counts overlap through aggregate imports and must not be added as
+a count of distinct modeled runtime failures.
+
+The audit also removes individual constraints in isolated copies and requires
+an actual assertion violation (QNT508), not a parse/type/backend failure. This
+checks that the new guards have executable witnesses, including a positive
+admission example; it does not prove arbitrary real executions satisfy them.
+
+Still unknown: the exclusive GC CPU cost in a natural gap, blocked versus
+runnable waiting in that same gap, long-term RSS convergence of the candidate,
+and whether a proposed whole-cycle change improves the frozen workload. Old
+summary maxima, a successful fixture or a missing reproduction cannot close
+those questions. No new runtime cause or performance gain is claimed here.
+
+* Follow-up trial
+
+The original 31-family audit above is retained. The concrete layout-entry trial,
+its failed complete outcomes and the missing current-control review boundary
+are recorded in [[file:10.44-mailbox-layout-entry-trial.org][Whole-cycle layout-entry trial and current-control review]].
+The runtime prototype is not integrated; historical references remain unchanged.

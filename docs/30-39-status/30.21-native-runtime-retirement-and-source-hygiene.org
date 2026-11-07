@@ -1,0 +1,57 @@
+#+TITLE: Retire VM-free execution paths and remove generated diagnostics
+#+STARTUP: overview
+
+* Runtime direction
+
+Complete Scheme execution stays on fixed owner OS threads. Rust admits and distributes work across native Scheme instances; Scheme retains macros, GC, closures, continuations, Actors and green-thread scheduling. The Gerbil -> Gambit C -> native O2 chain and the ledger's default four-owner configuration remain unchanged.
+
+The working performance baseline remains the latest adopted 10.10x owner-resident payload observation in 30.19. Cleanup is not a runtime optimization, and a different benchmark ratio is not evidence of a cleanup speedup.
+
+* Removed execution paths
+
+- The Scheme-to-Rust IR workspace crate, CLI and code-generation tests.
+- The ledger's unused typed-fold producer.
+- The VM-free ASCENT Python qualification example, including unpublished staged files.
+- The Python support crate's unused transport-only =rust-backend= feature.
+- Workspace membership, unused compiler dependencies and the source-inventory assumption that required the retired compiler.
+
+The ledger's own =rust-backend= feature continues to select =instance-backend= and complete Scheme runtimes. There is no compatibility alias or subset fallback for the retired execution paths.
+
+Owned host values and C ABI runtime declarations remain necessary transport/lifetime contracts. A copied host value is not a Scheme VM. The =NO_VM= flag describes that value or an independent C callback; it does not select a Scheme execution backend. Native Scheme calls retain their actual owner VM, roots and thread affinity.
+
+* Source-control cleanup
+
+Removed 944 tracked generated files from the documentation benchmark and diagnostic directories, including raw logs, captures, rejected patches, source snapshots and compressed experiment bundles. The receipt-only Git attributes rule is also removed. The generated directories and documentation log/patch extensions are ignored to prevent accidental re-addition.
+
+The material, including unpublished legacy changes, was copied to a repository-external local archive and independently checked before removal. It is not added to the PR. The current PR file tree contains maintained source, executable tests and English conclusions/reproduction commands. Earlier Git history remains historical; this cleanup does not rewrite it.
+
+Historical reports retain their measured positive/negative conclusions. Links promising generated files in the repository have been removed and their local-diagnostic status made explicit. The rejected scalar projection candidate remains rejected; it is not a public API or production default. No replacement archive or candidate patch is committed.
+
+* Local verification
+
+- Rebuilt the actual native O2 Python wheel through Cargo/maturin.
+- Confirmed retired IR/ASCENT/typed-fold source names are absent from the wheel.
+- Confirmed all 53 non-source native runtime/package resources are byte-identical to the earlier qualified O2 wheel.
+- Owner routing, native types, GC, continuations and affinity: 15 tests pass.
+- Existing native backend tests: 10 pass.
+- Full hygienic macro expansion, captured procedures, GC and exception recovery pass on all four owners.
+- Native payload reuse A/B completes with exact results, finite worker distribution, stable VM identities, post-GC reuse, zero shutdown roots and removed runtime files.
+- Resource-only Cargo check, locked offline workspace metadata and full formatting check pass. The updated source-inventory unit test and all 31 provider-selection/owned-state/package integration tests pass.
+
+The follow-up payload run observes 5264.69 versus 95059.22 Actor items/s (18.06x), with native scheduled short p99 164.144 ms and main response p99 284.119 ms. Short completions remain [128,128,128,128] per arm. These host-dependent observations do not reproduce the adopted baseline's tail and do not replace it or establish an optimization. Raw captures remain local.
+
+The complete Rust library test command fails the existing strict ASP source gate: native modules have deep relative imports and the runtime source has too many responsibilities. No suppression, allow-list or severity change was added. The successful inventory test and native wheel tests do not turn this gate into a pass. Remote CI and complete source-gate qualification remain separate pending requirements. Runtime-file removal does not prove full RSS recovery or indefinite leak freedom.
+
+* Reproduction
+
+#+begin_src sh
+cargo check --locked -p gerbil-scheme-python
+cargo test --locked -p gerbil-scheme-python --lib --test integration_test
+cargo fmt --all --check
+just bridge-python-owner-routing-tests /path/to/installed/venv/bin/python
+just bridge-python-owner-tests /path/to/installed/venv/bin/python
+just bridge-python-owner-full /path/to/installed/venv/bin/python
+just bridge-python-native-payload-ab /path/to/installed/venv/bin/python
+#+end_src
+
+The complete test command above currently reports the source-gate failure. Run native tests against a freshly built wheel, and keep outputs in a local directory outside the repository. No test log, raw performance dump, source snapshot or experimental patch belongs in the PR.

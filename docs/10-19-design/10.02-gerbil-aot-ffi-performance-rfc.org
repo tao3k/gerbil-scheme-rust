@@ -115,3 +115,262 @@ valid evidence.
 
 Until the control and raw-sys layers exist, current results are baseline evidence
 only and MUST NOT be described as proof that Gerbil AOT is fully optimized.
+
+* 10.02.100 Source Audit and Delivery Plan (2026-10-04)
+
+This audit uses the installed Gerbil =0.19.2591dcd.patchf5cedd8168cb=
+compiler and =std/ffi.ss= sources, Gambit =v4.9.8= =lib/setup.c=,
+and the bridge tree at =f47b6a6ee3d323558acc0171440c13db1d552ac3=.
+The installed Gerbil includes downstream patches; it is not evidence that
+an unpatched upstream tag has identical build behavior.
+
+Primary references:
+
+- [[https://gerbil.scheme.org/guide/ffi.html][Gerbil FFI guide]] (general interface guidance).
+- [[https://gerbil.scheme.org/guide/intro.html][Gerbil compilation guide]].
+- [[https://raw.githubusercontent.com/gambit/gambit/v4.9.8/lib/setup.c][Gambit 4.9.8 setup implementation]].
+- [[https://doc.rust-lang.org/nomicon/ffi.html][Rust FFI and unwinding contract]].
+- [[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC compiler diagnostic artifacts]].
+
+** Source findings
+
+| Source seam | Observed behavior | Engineering consequence |
+|-
+| Gerbil =src/gerbil/compiler/driver.ss=, =compile-stub= | Resolves static runtime/dependency modules, generates a stub, invokes GSC =-link= then =-obj=, and links Gambit | Preserve dependency closure, module initialization order and the SDK-owned compiler; a static archive is not a runtime-independent payload |
+| Gerbil =src/std/ffi.ss=, =def-C-type/pointer= | Foreign type tags and optional release function are explicit; default =release: #f= supplies no release function | Document borrowed versus owned pointers and the matching allocator/releaser for every export; no inference from pointer shape |
+| Gambit =lib/setup.c= | Setup owns process/runtime state, processor initialization and interrupt machinery; debug settings have an explicit mask update API | Use version-matched setup parameters; an embedding policy must distinguish diagnostics, interrupt handling and process termination |
+| =native/runtime.c= | Setup version =409008=, one processor, one-shot lifecycle | Keep initialization/calls/cleanup on the owning thread; processor count is not permission for arbitrary Rust threads to call Scheme |
+| Safe Rust =native/runtime.rs= and =types.rs= | Lifecycle serialization, runtime ABI check after setup, =!Send/!Sync= owner, root lifetime and drop release | Audit raw-sys callers separately; safe wrapper guarantees do not protect arbitrary extern calls |
+| Rust callback trampoline | =catch_unwind= converts an unwinding panic to status | This cannot contain =panic=abort=, foreign exceptions, or prove that Scheme nonlocal exits across Rust frames are safe |
+
+A bridge ABI version check after setup cannot validate the Gambit ABI before
+setup. Header version, target, compiler configuration, runtime library and
+linked program must therefore be matched at build time. Exported status values,
+integer widths, =repr(C)= records, pointer/null rules and buffer lengths require
+separate ABI conformance receipts. Rust must not decode Gambit object bits.
+
+AoT does not imply zero cold initialization. The downstream generated GQL and
+Cypher static grammar modules call the parser's embedded language artifact
+loader. =src/runtime/language-artifact.ss= performs base64 decode, zlib
+uncompress, SHA256 identity admission and Scheme datum reading. An owned-process
+sample showed corresponding CPU frames during initialization. This identifies
+a concrete startup seam; it does not yet quantify each stage's cost.
+Digest, schema and complete-datum checks must survive any optimization.
+Existing =GERBIL_PARSER_LR_TRACE= emits real decode/verified/admitted events,
+but a long operation between those boundaries can still fail idle supervision.
+
+** P0: qualify build and cold startup
+
+1. Complete the source closure with immutable SDK identity, target, generated
+   source/header identity and effective flags in the cache key. Preserve
+   =.ss/.ssi= generation parity and Cargo/Bazel artifact parity.
+2. Supervise compiler-owned output for every expensive object stage, including
+   individual module objects. The current GCC intermediate observer covers the
+   program linker only. A cold published-pin Data build still failed 30-second
+   idle supervision after several large module objects completed; the remaining
+   silent child must be identified before extending observation to that stage.
+3. Measure cold setup separately with parser artifact trace and owned-thread
+   samples. Separate decode, decompression, digest and read/admission costs.
+   Avoid eagerly restoring languages a profile does not use only if module
+   semantics and explicit admission remain equivalent. Any lazy restoration
+   needs a single-owner state machine and cached failure semantics.
+4. Admit only actual child success and admitted artifacts. Keep build idle30 /
+   wall1200 and runtime idle5 / wall120. File polling without growth is silent;
+   synthetic heartbeat output and increased limits do not qualify work.
+
+** P1: qualify ABI, GC and lifecycle
+
+- Inventory each extern signature and owned/borrowed buffer or handle. Verify
+  lengths, nulls, integer ranges, allocation failure and paired release.
+- Exercise rooted values through forced collections, callback reentry and
+  error paths; confirm roots drop before runtime cleanup and on the owner
+  thread. A lifetime marker alone is not a GC root.
+- Verify Scheme exceptions become typed statuses before returning through
+  Rust frames; verify callback panic conversion and late callback rejection.
+  Keep C ABI non-unwinding; do not substitute =C-unwind= for a Scheme exception
+  containment design.
+- Test duplicate initialization, failed initialization, cleanup with live
+  roots, post-cleanup calls, and cross-thread misuse. Process-global restart
+  remains unsupported unless independently designed and qualified.
+- Review host interruption and fatal-error behavior against the pinned SDK.
+  Compiler =q/Q= diagnostics policy must not be copied into an embedded host
+  where it may terminate the host process.
+
+** P2: optimize with paired evidence
+
+Compare cold/warm build, artifact restoration, first query, steady FFI calls,
+and peak memory separately. Use release C-control/raw-sys/safe-wrapper/AoT
+comparisons, median and p95, plus semantic equivalence and negative cases.
+Evaluate batching before claiming a scalar micro-optimization benefits query
+execution. Compiler flag, LTO or full-program changes require target-specific
+A/B evidence, artifact parity, and preserved exception/GC contracts.
+
+** Current evidence boundary
+
+PR #19 was merged into the existing PR #18 development branch, producing
+=f47b6a6=; #18 remains the sole open delivery PR. This is not a main release.
+At observation, exact-head Ubuntu CI was running and macOS queued.
+
+The linker fixture, helper library tests, and a local-patch downstream archive
+build passed. The published-pin cold Data build still failed idle30 in the
+module-object phase; runtime restoration separately failed idle5 after setup
+started. Full Cargo Clippy also failed its idle gate in a Rust harness
+dependency. Direct helper lint success does not qualify full Cargo Clippy.
+These are open P0 gates, not completed production or performance claims.
+
+** P0 follow-up: actual compiler and restoration evidence
+
+The remaining cold object was identified as =clan/poo/trie= (58/59 completed).
+An owned GCC sample localized load-motion expression table work. The narrow
+GCC generated-module policy and expanded object diagnostics are specified in
+[[file:../40-rfcs/40.022-linked-aot-programs.org::*GCC module load-motion and full object progress][40.022 module qualification]].
+
+The parser's existing =GERBIL_PARSER_LR_TRACE= enabled real decode, verified
+and admitted events during cold setup. Independently supervised local-patch
+DataFusion 2/2 and GraphAr 4/4 source-handoff suites then passed idle5, in
+7.55s and 9.93s respectively. Their admitted build record still uses the older
+MRR =023a6db= composition; these do not qualify the latest published pins or
+claim an initialization speedup. The earlier failed cold attempts remain
+retained. CI's original-query entrypoint must enable these actual events.
+
+** Apple tool redirection and process exit qualification (2026-10-05)
+
+Cleaning =SDKROOT= and PATH alone did not isolate the selected compiler:
+=DEVELOPER_DIR= still pointed at the Nix Apple SDK. An owned PackageSpec
+process-tree capture showed nested Nix =xcrun ld= invocations while GCC itself
+was the configured Homebrew tool. The shared =gerbil_command= now removes the
+ambient developer-directory override alongside unrelated C/SDK settings and
+is public so downstream PackageSpec preparation can use the same boundary.
+It preserves the configured GSC compiler and its ABI flags.
+
+The actual Cargo helper build succeeded in 44.82s; eight default regressions
+passed in 0.48s, with four native fixtures still explicitly ignored. The Darwin
+regression resolves the actual system linker under an inherited Nix developer
+directory. A fresh-prefix Scheme package build with that override removed
+completed under idle30/wall1200; another fresh-prefix attempt still failed
+idle30. This is not a universal cold-build guarantee or a performance result.
+
+The successful sampled attempt also exposed its remaining quiet phase:
+=___cleanup_dyn_module -> dlclose -> dyld unload notifications=. At that
+point only GXI remained in the owned tree. Compilation completion and process
+exit/cleanup must remain separate observations; neither a final GC report nor
+completed object files alone admit the package build. Strict idle supervision
+is retained, and full downstream construction remains a separate gate.
+
+The =9175ae2= Ubuntu job later rejected a newly written cache-test executable
+with =ETXTBSY= (=Text file busy=); its native Gerbil Bazel target passed, while
+the Cargo aggregate failed on that fixture. The fixture is now a checked-in
+immutable executable; output/log files remain per-run. This removes runtime
+executable writes without a production retry, a serialized test suite or a
+changed worker count. The revised Cargo test build succeeded in 1m11s;
+target-specific CI still needs qualification at the new commit.
+
+** Source audit: package return and dynamic unload
+
+Gerbil v0.19's installed =src/std/make.ss= executes pending compiler jobs
+before =make= returns. The public =defbuild-script= macro delegates to that
+implementation; a wrapper can expose the actual return boundary while keeping
+the first-party command parser, build specification and worker policy.
+The MRR package script now distinguishes entering and returning from that
+delegate. A returned event is not process exit or package admission.
+
+The reference [[https://github.com/gambit/gambit/blob/d4d124d0555d03d46171c42522e3907a256e37cc/lib/os_dyn.c][Gambit os_dyn.c]]
+implements dynamic cleanup by walking loaded modules and calling =dlclose=.
+Apple's reference [[https://github.com/apple-oss-distributions/dyld/blob/fd8d0c4d52320ebf64db34f3cb280310d905c5ae/dyld/ExternallyViewableState.cpp][dyld externally visible state]]
+updates the image list and may synchronously notify an active external monitor
+on removal. This agrees with the sampled cleanup stack, but these reference
+commits do not identify the installed Gerbil binary or macOS dyld build, nor
+identify the monitor or establish its contribution to a failed build.
+
+The next qualification must correlate a build-function return event, owned
+process descendants and a cleanup sample in the same refused run. Preserve
+normal Gambit cleanup and require successful child exit. Any static driver or
+module-lifetime change needs independent source/ABI qualification; object-file
+existence and a returned event cannot replace it.
+
+** Package compiler diagnostics and monitor failures (2026-10-05)
+
+The installed v0.19 compiler's =gsc-cc-options= discards user C options for
+macro (=phi?=) modules. PackageSpec options alone therefore do not cover the
+observed =native~1.c= quiet interval. The shared
+=prepare_gsc_progress_launcher= publishes a content-addressed, closed executable
+that execs the selected SDK GSC and forwards the original arguments. It adds
+=-Q -fopt-info-all= only for verbose builds whose SDK =gambuild-C= identifies
+GCC, preserving the SDK optimization level and ABI flags. Quiet and non-GCC
+calls retain the original compiler. These are actual function/optimization
+reports, as specified in [[https://gcc.gnu.org/onlinedocs/gcc/Developer-Options.html][GCC developer options]], with no timer output.
+
+The final helper Cargo test build passed (39.52s); thirteen default regressions
+passed (0.55s), four native fixtures remained explicitly ignored, and the
+current production source passed direct strict Clippy against qualified Cargo
+dependency inputs. Launcher regressions cover quoted compiler paths, exact
+argument forwarding, nonzero exit and concurrent executable publication.
+
+An actual new isolated MRR package prefix completed under idle30/wall1200 in
+80.51s using this helper's generated launcher. The macro object was present
+after successful process exit. This is one host qualification, not a speedup
+or full downstream semantic qualification. A prior resumed incomplete prefix
+exited zero without invoking GCC because std/make trusted its SSI intermediates;
+that attempt did not qualify the diagnostic change. MRR must invalidate such
+partial managed output before retrying.
+
+Data =0912e5bc= Ubuntu reported =compiler artifact monitor panicked= at an
+archive object, independently of idle supervision. The previous join mapping
+discarded its panic payload. It now retains the actual cause; diagnostic writes
+and flushes return typed errors rather than panicking. The original CI panic
+cause remains unproven until the revised job supplies it. Broken-pipe and
+actual-thread-panic regressions validate failure propagation without relaxing
+the build gate.
+
+** Immutable launcher publication after Linux regression (2026-10-05)
+
+Exact-head Ubuntu CI for =fc114cc= failed the parallel launcher regression
+with =ETXTBSY= (11 passed, one failed, four ignored). Closed staging files
+alone did not qualify rename-overwrite publication on Linux. Publication now
+uses a same-directory hard link with no replacement; concurrent losers verify
+the already published script bytes and remove their staging files. The
+content-addressed executable is reused rather than replaced during execution.
+An inherited staging descriptor is a possible mechanism, not a sampled cause.
+
+The revised local Cargo test build passed in 41.48s and thirteen default
+regressions passed in 0.77s, with four native fixtures explicitly ignored.
+Ubuntu qualification of this replacement remains required; the failed Linux
+receipt is retained and is not counted as a pass.
+
+** Native stdio ownership and nonblocking backpressure (2026-10-05)
+
+Data's actual MRR =dd46dc4= / GSC =2d20e48= archive build retained a typed
+=write compiler artifact progress: Resource temporarily unavailable (os error
+35)= failure at the Cypher object. No supervision budget triggered and no
+Source artifact was admitted. A separate SDK GXI pipe experiment observed a
+blocking parent write description become nonblocking after the child exited:
+Gambit changes the inherited stderr open-file-description flags. This explains
+why parent Rust diagnostic writes can encounter EAGAIN under compiler output.
+
+Live =run_native_process= now gives native children private stdout/stderr pipes
+and immediately forwards their actual bytes through owned readers. Parent
+console flags are isolated from child mutation. Forwarding locks stdout/stderr
+only during each write, allowing concurrent compiler-artifact observations.
+Event formatting occurs once and the writer preserves the remaining byte
+offset across partial writes. Interrupted operations retry; WouldBlock waits
+for the consumer without producing output. Flush uses the same error policy.
+WriteZero, BrokenPipe and other genuine I/O failures remain typed refusals.
+No timer event, worker cap, optimizer/heap change or supervision relaxation is
+introduced. A permanently blocked consumer is still bounded by the enclosing
+process supervisor.
+
+The final helper test build passed in 32.11s; sixteen default regressions passed
+(1.52s), with four native fixtures explicitly ignored. New tests cover a real
+nonblocking full pipe followed by byte-exact drainage, partial/interrupted
+writes and flush, and native-child flag isolation. Strict direct production
+Clippy passed. The six-second real compiler-artifact growth regression was
+explicitly run under idle5/wall120 and passed (6.06s), confirming live artifact
+reports are not blocked by a stream reader's console lock. Current upstream
+CI and downstream native admission remain separate gates.
+
+The library-native build entry point and MRR package/program-stage commands
+also use this isolated streaming executor. Duplication alone would not isolate
+file-status flags; private pipe descriptions are required. The local SDK GXI
+probe exited zero and observed =before_nonblocking=false= followed by
+=after_nonblocking=true=. An initial probe without the selected SDK runtime
+configuration exited 70 and was not counted as evidence.

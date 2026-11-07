@@ -1,0 +1,695 @@
+{
+  "schema": 1,
+  "recordId": "frozen-7f-four-round-replay-3927us",
+  "sourceRevision": "7f915dfdc70c4b346fac912a62f9551ac7ea3926",
+  "checkoutRevision": "d56f94ca943492b5f72bf8198a343475bbf43d19",
+  "classification": "original-byte replay and research reference",
+  "artifacts": [
+    {
+      "role": "reader",
+      "sha256": "f1e24bfcdb8a43cdd85a1fb1b366655c8047b041756e0a53f20325a1cc732d86",
+      "storage": "retained persistent local artifact; raw binary not tracked in Git"
+    },
+    {
+      "role": "image",
+      "sha256": "53ba9b24871cb1abd5b7e705bc04be83f1a1630bc7c22c7997db930aaed98e8d",
+      "storage": "retained persistent local artifact; raw binary not tracked in Git"
+    }
+  ],
+  "workload": {
+    "unit": "validated four-line service message",
+    "arrival": "open scheduled arrivals",
+    "offeredPerSecond": 1000000,
+    "offeredSeconds": 1,
+    "totalPlanned": 1000000,
+    "schemeVMs": 1,
+    "schemeWorkers": 4,
+    "transferFrames": 3,
+    "perMessageRustEntries": 0,
+    "warmup": {
+      "offeredPerSecond": 1000,
+      "offeredSeconds": 1,
+      "totalPlanned": 1000,
+      "excludedFromMain": true
+    }
+  },
+  "measurement": {
+    "latency": "original planned timestamp to real source consumption after worker execution and independent verification",
+    "throughputFormula": "completed * 1000000000 / elapsed_ns",
+    "histogramUpperBoundResolutionNs": 1000,
+    "backlog": "planned-due minus real consumed",
+    "sourceDebt": "planned-due minus published",
+    "sourceAndTotalPeaksIndependent": true,
+    "backlogPercentiles": "not collected",
+    "betweenSamplePeakUncertainty": "unknown",
+    "p50AndP95": "not collected"
+  },
+  "startup": {
+    "protocol": "Node spawnSync; regular stdout/stderr files",
+    "node": "v24.14.0",
+    "arch": "arm64",
+    "osRelease": "25.6.0",
+    "cpuCount": 12,
+    "totalMemoryBytes": 34359738368,
+    "argv": [
+      "--capacity-research",
+      "--backpressure-owned-schedule",
+      "--rate=1000000",
+      "--seconds=1",
+      "--require-native-acceptance"
+    ],
+    "stdin": "ignored",
+    "stdoutAndStderr": "regular files",
+    "environment": "inherited environment plus GERBIL_SERVICE_BENCH_IMAGE; complete environment identity not recorded",
+    "profiler": false,
+    "perMessageObservation": false
+  },
+  "samplingPlan": "One initial replay followed by three predeclared consecutive replay rounds. All four rounds are retained.",
+  "historicalReferenceP99Ns": 4513000,
+  "bestRound": 4,
+  "bestP99Ns": 3927000,
+  "fullyAdmitted": false,
+  "migratedPrImageMeasured": false,
+  "runs": [
+    {
+      "round": 1,
+      "started": "2026-11-06T00:18:52.777Z",
+      "ended": "2026-11-06T00:18:55.809Z",
+      "nativeExit": 101,
+      "signal": null,
+      "main": {
+        "accepted": 1000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 8665375,
+        "completed": 1000000,
+        "completed_per_second": 999999.8340000276,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 1000000166,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999999000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "historical_p99_exceeded_or_missing",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000000,
+        "rate": 1000000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 1166,
+          "last_publication_elapsed_ns": 999999250,
+          "maximum_due_unconsumed_messages": 8668,
+          "maximum_pending_source_messages": 8666,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 719503
+        },
+        "successful_planned_to_consumed_p999_ns": 8584000,
+        "successful_planned_to_consumed_p99_ns": 8331000,
+        "warmup": false,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1010586125,
+        "window": 128
+      },
+      "warmup": {
+        "accepted": 1000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 2482000,
+        "completed": 1000,
+        "completed_per_second": 1000.9997074167945,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 999001291,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999000000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "fixed_load_not_covered",
+            "all_planned_messages_not_completed"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000,
+        "rate": 1000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 1291,
+          "last_publication_elapsed_ns": 999000250,
+          "maximum_due_unconsumed_messages": 3,
+          "maximum_pending_source_messages": 3,
+          "original_window_guard_passed": true,
+          "samples_over_original_window": 0
+        },
+        "successful_planned_to_consumed_p999_ns": 1869000,
+        "successful_planned_to_consumed_p99_ns": 114000,
+        "warmup": true,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1013282958,
+        "window": 128
+      },
+      "cpuGcEnvelopes": [
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 2,
+            "gc_cpu_enclosing_ns": 961000,
+            "gc_wall_enclosing_ns": 957965.8508300781,
+            "owner_cpu_upper_ns": 987088292,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": true
+        },
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 39,
+            "gc_cpu_enclosing_ns": 15639999.999999255,
+            "gc_wall_enclosing_ns": 15621423.721313477,
+            "owner_cpu_upper_ns": 1001610249.9999998,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": false
+        }
+      ],
+      "cleanup": {
+        "clean": true,
+        "event": "gerbil_actor_cleanup"
+      },
+      "rawEvidence": {
+        "stdoutSha256": "916f2215e30681cd023777af1f95e5d63dc43d90ad3d5795cf8c5bb9e19fc427",
+        "stderrSha256": "dbf493e6e5f7e844ec95ad248d5b2a46eb239c5585faf3eb24fa155534cca07c"
+      }
+    },
+    {
+      "round": 2,
+      "started": "2026-11-06T00:19:24.147Z",
+      "ended": "2026-11-06T00:19:26.774Z",
+      "nativeExit": 101,
+      "signal": null,
+      "main": {
+        "accepted": 1000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 8055250,
+        "completed": 1000000,
+        "completed_per_second": 999794.9170676366,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 1000205125,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999999000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "historical_p99_exceeded_or_missing",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000000,
+        "rate": 1000000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 206125,
+          "last_publication_elapsed_ns": 1000203250,
+          "maximum_due_unconsumed_messages": 8058,
+          "maximum_pending_source_messages": 8056,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 890345
+        },
+        "successful_planned_to_consumed_p999_ns": 8004000,
+        "successful_planned_to_consumed_p99_ns": 7817000,
+        "warmup": false,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1013280333,
+        "window": 128
+      },
+      "warmup": {
+        "accepted": 1000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 21875,
+        "completed": 1000,
+        "completed_per_second": 1000.9938196969912,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 999007167,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999000000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "fixed_load_not_covered",
+            "all_planned_messages_not_completed"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000,
+        "rate": 1000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 7167,
+          "last_publication_elapsed_ns": 999000292,
+          "maximum_due_unconsumed_messages": 1,
+          "maximum_pending_source_messages": 1,
+          "original_window_guard_passed": true,
+          "samples_over_original_window": 0
+        },
+        "successful_planned_to_consumed_p999_ns": 37000,
+        "successful_planned_to_consumed_p99_ns": 18000,
+        "warmup": true,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1014528875,
+        "window": 128
+      },
+      "cpuGcEnvelopes": [
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 2,
+            "gc_cpu_enclosing_ns": 910999.9999999986,
+            "gc_wall_enclosing_ns": 905036.9262695312,
+            "owner_cpu_upper_ns": 1006080041.0000001,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": true
+        },
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 39,
+            "gc_cpu_enclosing_ns": 16482999.99999997,
+            "gc_wall_enclosing_ns": 16370296.478271484,
+            "owner_cpu_upper_ns": 1004307292.0000002,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": false
+        }
+      ],
+      "cleanup": {
+        "clean": true,
+        "event": "gerbil_actor_cleanup"
+      },
+      "rawEvidence": {
+        "stdoutSha256": "23bfe67433a2796632383a1b033d02f7166a763f1140448d3d72665d16a282b1",
+        "stderrSha256": "65d384a6ffe47f8cb059f280fba10ca1767edc60a401ddb7d3dbcd2743da06fb"
+      }
+    },
+    {
+      "round": 3,
+      "started": "2026-11-06T00:19:26.775Z",
+      "ended": "2026-11-06T00:19:29.410Z",
+      "nativeExit": 101,
+      "signal": null,
+      "main": {
+        "accepted": 1000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 6266500,
+        "completed": 1000000,
+        "completed_per_second": 999981.7503330563,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 1000018250,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999999000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "historical_p99_exceeded_or_missing",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000000,
+        "rate": 1000000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 19250,
+          "last_publication_elapsed_ns": 1000016916,
+          "maximum_due_unconsumed_messages": 6269,
+          "maximum_pending_source_messages": 6267,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 882014
+        },
+        "successful_planned_to_consumed_p999_ns": 6242000,
+        "successful_planned_to_consumed_p99_ns": 5951000,
+        "warmup": false,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1013788583,
+        "window": 128
+      },
+      "warmup": {
+        "accepted": 1000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 12833,
+        "completed": 1000,
+        "completed_per_second": 1000.9979950010161,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 999003000,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999000000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "fixed_load_not_covered",
+            "all_planned_messages_not_completed"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000,
+        "rate": 1000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 3000,
+          "last_publication_elapsed_ns": 999000292,
+          "maximum_due_unconsumed_messages": 1,
+          "maximum_pending_source_messages": 1,
+          "original_window_guard_passed": true,
+          "samples_over_original_window": 0
+        },
+        "successful_planned_to_consumed_p999_ns": 32000,
+        "successful_planned_to_consumed_p99_ns": 18000,
+        "warmup": true,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1018229292,
+        "window": 128
+      },
+      "cpuGcEnvelopes": [
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 2,
+            "gc_cpu_enclosing_ns": 859000.0000000003,
+            "gc_wall_enclosing_ns": 821113.5864257812,
+            "owner_cpu_upper_ns": 1003888166.0000001,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": true
+        },
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 39,
+            "gc_cpu_enclosing_ns": 16500000.000000626,
+            "gc_wall_enclosing_ns": 16450405.12084961,
+            "owner_cpu_upper_ns": 1005114666.0000001,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": false
+        }
+      ],
+      "cleanup": {
+        "clean": true,
+        "event": "gerbil_actor_cleanup"
+      },
+      "rawEvidence": {
+        "stdoutSha256": "2c48389a6249dac4e72533f228f9a76ec70efc3a1d6a88f21d1954288787d54a",
+        "stderrSha256": "6fdc2d5e6cbab91c85c290ac80f9a649d7873ed61add74a14b4809cec9921a5d"
+      }
+    },
+    {
+      "round": 4,
+      "started": "2026-11-06T00:19:29.410Z",
+      "ended": "2026-11-06T00:19:32.053Z",
+      "nativeExit": 101,
+      "signal": null,
+      "main": {
+        "accepted": 1000000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 4326875,
+        "completed": 1000000,
+        "completed_per_second": 999875.7234465814,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 1000124292,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999999000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "historical_p99_exceeded_or_missing",
+            "original_outstanding_window_exceeded_or_missing"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000000,
+        "rate": 1000000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 125292,
+          "last_publication_elapsed_ns": 1000122417,
+          "maximum_due_unconsumed_messages": 4329,
+          "maximum_pending_source_messages": 4327,
+          "original_window_guard_passed": false,
+          "samples_over_original_window": 589322
+        },
+        "successful_planned_to_consumed_p999_ns": 4265000,
+        "successful_planned_to_consumed_p99_ns": 3927000,
+        "warmup": false,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1010852000,
+        "window": 128
+      },
+      "warmup": {
+        "accepted": 1000,
+        "accepted_timeouts": 0,
+        "all_arrival_max_generator_lag_ns": 9750,
+        "completed": 1000,
+        "completed_per_second": 1000.995364765839,
+        "data_access_edge_contract": true,
+        "defaults_changed": false,
+        "diagnostic_native_observation": false,
+        "diagnostic_no_actor_handoff": false,
+        "diagnostic_owner_watch": false,
+        "elapsed_ns": 999005625,
+        "event": "gerbil_actor_arrival",
+        "failed": 0,
+        "latency_bucket_upper_bound_ns": 1000,
+        "mailbox": true,
+        "native_active": 3,
+        "native_coalesced_wake": false,
+        "native_data_access": true,
+        "native_source_park": false,
+        "offered_elapsed_ns": 999000000,
+        "owned_source_schedule": true,
+        "owners": 1,
+        "performance_admission": {
+          "failures": [
+            "fixed_load_not_covered",
+            "all_planned_messages_not_completed"
+          ],
+          "passed": false,
+          "scope": "capacity_1m_to_5m_three_second_goal"
+        },
+        "planned": 1000,
+        "rate": 1000,
+        "ready_drain_pipeline": false,
+        "rejected": 0,
+        "rejection_percent": 0,
+        "remaining_native": 0,
+        "remaining_staged": 0,
+        "rust_per_message_entries": 0,
+        "scheme_workers": 4,
+        "scoped_user_initiated_qos": false,
+        "seconds": 1,
+        "snapshot_gc_duplicate_and_unread_close_contract": false,
+        "source_backpressure": {
+          "drain_after_schedule_ns": 5625,
+          "last_publication_elapsed_ns": 999001625,
+          "maximum_due_unconsumed_messages": 1,
+          "maximum_pending_source_messages": 1,
+          "original_window_guard_passed": true,
+          "samples_over_original_window": 0
+        },
+        "successful_planned_to_consumed_p999_ns": 13000,
+        "successful_planned_to_consumed_p99_ns": 11000,
+        "warmup": true,
+        "watchdog_seconds": 10,
+        "whole_native_call_ns": 1012921334,
+        "window": 128
+      },
+      "cpuGcEnvelopes": [
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 2,
+            "gc_cpu_enclosing_ns": 938999.9999999988,
+            "gc_wall_enclosing_ns": 941038.1317138672,
+            "owner_cpu_upper_ns": 1004925042,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": true
+        },
+        {
+          "event": "native_call_cpu_gc_envelope",
+          "values": {
+            "gc_count_enclosing": 40,
+            "gc_cpu_enclosing_ns": 16206999.999999784,
+            "gc_wall_enclosing_ns": 16150474.548339844,
+            "owner_cpu_upper_ns": 1002827291.9999999,
+            "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+          },
+          "warmup": false
+        }
+      ],
+      "cleanup": {
+        "clean": true,
+        "event": "gerbil_actor_cleanup"
+      },
+      "rawEvidence": {
+        "stdoutSha256": "b1b3096f1d2eb737f7fe9544f647831b1b3cc688b2e2bc95f3d499d71c9f0088",
+        "stderrSha256": "cfc6297d17396b16daece13a53520ab1176573c413e0c063c6a817238e0b4f37"
+      }
+    }
+  ]
+}

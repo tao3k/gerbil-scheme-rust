@@ -1,0 +1,192 @@
+#+TITLE: Event-driven client progress at bulk service boundaries
+#+STARTUP: overview
+
+* Why ready-owner delivery is insufficient
+
+The ready-owner-only capture remains rejected. It removes the FIFO identity
+dependency and improves mixed pooled bulk p99 and maximum owner completion
+spread, but paired mixed client p99 still worsens. CPU client p99 reaches
+12.842 ms and its largest tails remain dominated by serial backlog. A completed
+native result, a ready Rust result queue and a runnable/polled client are three
+different facts. The data cannot establish an OS blocking or GC CPU cause.
+
+The next protocol supplies an explicit client progress opportunity at existing
+bulk registration and result-receive boundaries. It does not wait for a client
+acknowledgement before native retirement or owner refill, change Scheme
+execution budgets, add periodic yields or change a timeout. Rust continues
+cross-instance dispatch; Scheme retains full Actor/green-thread/continuation
+and exception execution on the fixed native owners.
+
+* Actual API and ownership
+
+=InstanceClientProgressDriver<P>= owns one pinned client progress future and its
+optional completed output. =wait(work)= checks signalled progress before every
+work poll, including immediately ready work. =finish= awaits outstanding
+progress or transfers its cached output once. A completed progress future is
+never repolled. Neither future's readiness completes the other, and the driver
+owns no native permit or Scheme root. Dropping it follows the owned future's
+normal cancellation contract: unclaimed input can cancel, accepted native work
+still drains on its owner. Cancelling one =wait= does not cancel the separately
+owned progress future; later =wait= or =finish= resumes it.
+
+One stable sub-waker publishes an atomic ready level for progress. A new parent
+poll registers its current waker before checking that level. The level is cleared
+before polling progress so a concurrent/self wake remains owed for the next
+boundary. Progress is not repeatedly polled merely because bulk work is ready.
+The parent waker is invoked outside the registration mutex; replacement and
+retirement do not call arbitrary wake implementations under that lock. On
+progress completion or driver drop, its parent registration retires. Late
+sub-wakers hold only Rust signal metadata, no future, native root or image.
+
+A signalled progress event arriving during a ready bulk poll can follow that
+one result; it must be checked before the next bulk wait. That is a logical
+opportunity bound, not a guarantee of an OS time slice or native completion.
+Tokio cooperative-budget refusal and an indivisible caller poll remain explicit
+limits. Callers must wrap registration and every result receive, and must not
+perform unbounded application work between those boundaries. No new task,
+executor or OS thread is created by this API.
+
+* Integration and matched comparison
+
+The actual bench creates one composite Tokio task in the candidate, keeping
+the same two-worker Tokio runtime. It does not poll the composite directly on
+the =block_on= caller thread. Within that task, the existing short probe future
+is driven before bulk source registration and every indexed ready-result
+receive. The control uses the existing independent bulk and short Tokio tasks.
+Both arms use the same ready-owner API, input-index restoration and oracle,
+unified short observer, retirement-before-send, NativeBudget, original timers,
+four live VMs, batch eight, work 32, window four, Actor quantum one, five ordered
+and reversed CPU/mixed blocks. The only comparison is client progress protocol.
+
+The candidate includes its signal, pin allocation, parent registration,
+conditional checks and cached-output costs in its measured interval. There is
+no general default-path speed claim. Unobserved application performance remains
+outside this explicitly observed workload qualification. Public defaults stay
+unchanged, and the rejected ready-owner-only capture is retained separately.
+Run the standard O2 Rust bench with
+=--progress-fair-ab --fixed-short-selective --client-turn-ab=.
+
+* Joint model and executable controls
+
+Reuse the existing =owner_lifecycle.qnt= delivery, Tokio polling slots, claim
+wake debt, native roots, grants and owner refill. A client turn records that
+signalled progress was offered before a bulk receive. Completion/early-claim
+observation reuses the existing joint receiver transitions, not a new lease or
+execution acknowledgement. Native refill remains possible before consumption.
+A signal between a check and a ready bulk result is handled at the next turn.
+An explicit skip mutation violates the progress-opportunity invariant.
+
+The model must respect an already occupied client polling slot: a second
+composite check is disabled until that poll settles. Random exploration exposed
+an initially missing guard, causing a model runtime error rather than a native
+failure. Preserve that receipt and the superseded regression processes. The
+repair uses the existing slot/phase ownership; no safety invariant is weakened.
+A new occupied-slot witness checks this boundary. A separate initial witness
+omitted the existing next-owner boundary before refeeding short work; that
+fixture is corrected without changing the underlying feed rules.
+
+Real controls verify no repeated progress poll without an event, progress before
+already-ready work, an event during a bulk poll, final-output caching, latest
+parent-waker replacement and parent retirement on drop. Actual native timeout
+coverage runs the claimed short ticket through this driver while a projector
+is held; client timeout must not return native credit. Existing full native
+GC, multi-shot continuation, typed-result, Scheme error and teardown controls
+remain enabled. Finite-model correctness is not performance acceptance.
+
+* Watchdog and publication boundary
+
+The original first-port watchdog remains UNATTRIBUTED and its original cleanup
+UNVERIFIED. The archived pre-main dyld stall is a distinct observation, not its
+explanation. Freeze current native host/image/source before execution; do not
+widen the five-second meaningful-progress or controller limits. Preserve all
+negative results. Commit/push is allowed only after performance acceptance;
+raw logs and host-local receipt paths remain private.
+
+
+* Executed gates before performance admission
+
+The final model passes typecheck, ten focused directed client-turn cases and
+400 random samples of up to 64 steps, seed 42. Model SHA256:
+=97f5a8f246f73c33f96fd838cba5a22bd83711fcbf07c3c5137965dd690e07b6=.
+The full inherited regression domains are checked separately against that same
+source. The initial failed feed witness, random poll-ownership runtime error,
+Quint branch-effect type error and two deliberately superseded regression
+processes remain recorded. Only those two owned model processes were terminated;
+no unrelated task was stopped and no native gate was relaxed.
+
+Twenty-two focused real controls pass: three client-driver cases, six indexed
+ready-owner transport cases and thirteen existing claim/notification/close
+cases. Strict bench/native and model-harness Clippy pass. Final O2 release
+builds through the standard Cargo/native graph. Three native lifecycle cases
+pass in 29.25 seconds, four owners joined, zero roots, files removed, FD returned
+and native close 2.62 ms. No general memory-growth or performance claim follows
+from those lifecycle receipts.
+
+PR18 remote head =c4b95dfaa116bd67b110d94826535fd27f227b85= has six effective
+successful checks. Remote CI is not attestation of this local unpushed code.
+The SDK-unavailable SMP check is outside the fixed-owner Scheme claim.
+
+The final full inherited regression also passes: 103 small-domain and 106
+wide-domain cases, 209 total, against the same final model hash. No model or
+compiler process from this task remains running when performance starts.
+
+
+* Executed A/B: client progress composition rejected
+
+One qualified capture completes all 40 windows in 7.297 seconds with zero exit,
+no stderr/timeout, empty compiler boundaries and unchanged frozen binary,
+source and release image. No earlier preflight with compiler activity starts a
+sample. Native workload/result identities, logical work, same four live VMs,
+client/native clock partitions and publication order all pass. Four owners join,
+roots are zero, files are removed and the service quiesces. The native release
+image remains =ba8125c6df45516c836e00eef990492df41ff64237222816184db0bf3edfa51e=.
+
+| Candidate relative to control | CPU | Mixed |
+|-------------------------------+-----+-------|
+| Total work / sum elapsed time | -0.96% | -1.29% |
+| Paired throughput median | +0.24% | -1.35% |
+| Emitted median-window throughput | -0.80% | -1.60% |
+| Pooled native short p99 | -0.13% | +2.60% |
+| Pooled client-total p99 | -6.57% | +4.05% |
+| Pooled client-delivery p99 | -65.18% | -1.62% |
+| Pooled bulk p99 | +2.49% | +3.69% |
+| Maximum owner completion spread | -15.48% | +10.05% |
+
+Mixed throughput improves in only three of ten pairs. Native short p99 improves
+in only two mixed pairs; paired median change is +2.47%. Paired mixed client
+p99 worsens by median 10.62%, with only two pairs improving. Maximum mixed owner
+spread grows from 1.737 to 1.912 ms. Mixed client-total p99 grows 2.184 to
+2.273 ms; native short p99 grows 0.464 to 0.476 ms. CPU client-total p99 falls
+2.306 to 2.155 ms, but this positive does not close mixed-load acceptance.
+Status is REJECTED_PERFORMANCE. No commit, push, default change or further
+unchanged-candidate capture. This result does not establish any accepted
+cumulative gain with the separate ready-owner experiment.
+
+* Same-request attribution and corrected next boundary
+
+CPU client-delivery p99 falls from 357.334 to 124.417 microseconds; its send-end
+to ready-poll-start lower bound falls from 355.958 to 121.958 microseconds.
+Mixed client delivery changes little, 66.875 to 65.792 microseconds. In the ten
+largest mixed candidate client-total requests, 63.54% of their summed time lies
+between eligibility and actual issue, 26.95% in serial predecessor backlog,
+9.05% in native actual service and only 0.43% in post-native delivery. These are
+partitions of those same requests, not sums of unrelated p99 statistics. This
+capture therefore does not support further optimizing result notification as
+the principal mixed client-tail fix.
+
+The locked Tokio 1.53.1 source documents =Sleep= as millisecond-granularity and
+unsuitable for high-resolution timers. The current preserved load plans short
+arrivals every 500 microseconds using that timer. =deadline_resume= includes
+both timer eligibility/resolution and scheduling before actual issue; it is
+not evidence of Scheme execution or GC CPU. The documented granularity is a
+concrete mismatch with the requested arrival cadence, but does not by itself
+attribute every observed delay to timer rounding or exclude OS runnable wait.
+
+Keep end-to-end planned-arrival latency as a failed requirement, alongside
+issued-to-native and native-to-consumed latency. The next boundary is the
+arrival clock, actual dispatch eligibility and bounded admission contract. A
+change there must preserve the requested workload and account for its producer
+cost; simply removing the timer, relabelling the metric, relaxing the gate or
+moving client work onto an extra thread would not close this experiment.
+No additional runtime notification/capacity ledger or Scheme execution
+restriction is justified by the present capture.

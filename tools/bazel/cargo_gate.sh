@@ -53,7 +53,7 @@ run_gate() {
 }
 
 run_benchmark_smoke_impl() {
-    local command=(cargo test -p gerbil-scheme --bench native_ffi --locked -- --test)
+    local command=(cargo test -p gerbil-scheme --bench ffi --locked -- --test)
     run_gate benchmark-smoke "${command[@]}"
 }
 

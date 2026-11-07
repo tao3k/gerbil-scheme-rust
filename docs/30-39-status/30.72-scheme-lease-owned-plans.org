@@ -1,0 +1,250 @@
+#+title: Scheme lease-owned execution plans and atomic invalidation
+#+startup: overview
+
+* Status
+
+Uncommitted ABI 16 candidate. Performance is NOT ADMITTED. Defaults remain
+off. The negative captures in [[file:30.71-scheme-work-execution-plan.org][30.71]] and [[file:30.70-executed-work-budget.org][30.70]] remain unchanged.
+The local base now includes the independently published heartbeat-ownership
+repair =9015091750e58f6f1f8eee7d45f44d59ee1fadf0=. Candidate sources are not
+committed or pushed. Preserve separate identities for every native image.
+
+* Ownership and algorithm
+
+Scheme owns a per-class permission cache in its existing work policy. It stores
+the contended or maximum span allowed for the next lease. It does not store Rust
+admission credits, Scheme roots, result IDs or already-selected continuations.
+
+| Event | Cache authority / boundary |
+|-------+----------------------------|
+| Policy configuration | Idle service and queues; new policy object, both class permissions initialized |
+| Short submitted / actually started | Pending obligation and cache updated together under the Scheme budget mutex |
+| Opposite-class queue push / pop | Existing budget mutex updates queue and class permissions |
+| Short result ready / harvested | Ready/offered generations and cache updated in the same critical section |
+| Work handoff | Offer generation and cache updated under budget mutex; release/yield/reacquire occurs outside it |
+| Direct uncontended lease grant | Copies a cached permission under the existing mutex; no repeated work-policy queue scan or cache refresh |
+| Policy replacement | New identity; old continuation cannot charge it |
+
+Service-control mutations take service lock then budget lock. Lease release
+never takes the service lock. No Scheme interrupt disabling or foreign thread
+mutation is introduced. Publishing an obligation before invalidating its cache
+would leave a preemption gap; the two updates are atomic. Grant copies permission
+before unlocking, rather than reading a cache that another green thread may be
+part-way through updating.
+
+A cold =make-gerbil-rs-service-work-layout= validates a positive logical cost.
+=call-with-gerbil-rs-service-work-layout= uses the copied permission when acquiring
+the existing lease. The real order handler uses preconstructed four/48-record
+layouts, with a general positive-cost fallback for other native inputs. It still
+validates native Scheme types and record shape. This is not an alternate Rust
+implementation or a synthetic payload shortcut.
+
+The whole-body path receives no checkpoint closure, performs no per-record
+work-policy check, and reports no terminal checkpoint. Normal whole-body cost
+and plan diagnostics are folded into the existing release critical section.
+The contended path retains explicit bounded Scheme checkpoints and the existing
+continuation-safe suspension/class arbitration. Necessary lease acquisition,
+release and exception ownership checks remain. No claim of zero handler overhead
+is made: mode dispatch, layout access and activation state still exist.
+
+* Bounds, accounting and continuations
+
+Contended permission is four records; maximum permission is 48. A bulk batch of
+eight orders is not a 384-record indivisible block. Actor quantum and per-order
+lease release remain. A short request arriving after a grant has copied 48 may
+wait for that one selected block, even if it arrives before arithmetic begins.
+Cache invalidation changes future grants; it never rewrites that active span.
+Whole four-record short work can fit a contended permission without checkpoints.
+Consequently observations explicitly distinguish =whole_plans= / =sliced_plans=,
+not uncontended/contended requests.
+
+The bound covers cooperative declared logical work, not GC, OS delay, type
+construction or arbitrary user code. I/O releases the lease using the existing
+suspension protocol. A resumed activation retains its selected bound; future
+activations use updated cache permissions. No frequent unconditional yielding is
+added to the CPU path.
+
+Continuation entry reacquires the Scheme lease; its captured span remains fixed.
+Each successful whole-body return charges its retained declaration. On partial
+continuation replay this is conservative declared work, not an exact count of
+instructions or reexecuted records. An exceptional/escaped unfinished body gets
+no whole-body credit; completed explicit sliced checkpoints retain their charges.
+The identity fence prevents old activations from charging a disabled/replacement
+policy, including replacement with a smaller maximum. Such old code retains its
+original declared bound; it does not inherit a new four-record preemption promise.
+The independent item ledger prevents duplicate item completion. None of these
+work counters release roots, result custody or Rust capacity early.
+
+The handler boundary returns one Scheme object, matching the existing service
+API. Computation inside retains Scheme values, exceptions, actors, green threads,
+GC and multishot continuations. Rust only distributes across fixed instances.
+
+* Actual API and verification
+
+ABI 16 operation 26 configures lease caching, with an exact mode receipt through
+=configure_scheme_service_lease_plan_on=. Existing operation 24 retains the older
+handler-selected experiment. =SchemeLeasePlanObservation= observes future short
+and bulk permissions through operation 27; =SchemeWorkPlanObservation= reports
+whole/sliced plan counts. Configuration and observation occur outside timed
+windows. The default work policy is off; completion-policy changes still reset it.
+
+Native controls exercise cold-layout rejection, unstarted dispatch, queue arrival,
+ready/harvest invalidation, frozen 48-record late-arrival bounds, actual short
+execution before the next bulk activation, whole/sliced release accounting,
+multishot reentry, exception unwind, disabled/smaller replacement-policy isolation,
+retained typed roots across callback/GC, and existing cancellation/expiry/close.
+Final native teardown requires independent root/capacity retirement and zero roots.
+
+The existing Runtime model is refined, not duplicated. Atomic cache updates,
+grant snapshots and selected computation are separate states. A witness inserts a
+short arrival between grant snapshot and handler selection, preserving the one
+already-granted whole span and requiring a short opportunity before extension.
+Another witness follows ready -> harvest -> independent result retirement and
+restored bulk permission. A required stale-cache mutation must violate safety.
+The model abstracts scheduling availability separately from GC and OS pauses;
+it cannot establish a wall-time SLO or native speed.
+
+Final model source SHA-256:
+=a20a5a88a715a56ee5432969b48867ba98c0ee19dbd608a035ca3bcb1a28b58e=.
+Both existing domains passed in 374.05 s, including all 18 required mutation
+counterexamples. The intermediate model also passed, but was then refined to
+represent copying permission at grant, not a later unlocked selection.
+
+* Directed acceptance
+
+From the repository root with the SDK and Cargo on PATH:
+
+#+begin_src text
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_completion_scenarios_and_control --locked -- --ignored --exact --nocapture
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --lease-plan-ab
+#+end_src
+
+Same four live VMs, O2 native image, native types/entry/projection, joint dispatch,
+Tokio two workers, request/work capacities, Actor quantum and CPU/mixed workloads
+in both arms. Only candidate enables lease-cached work plans. No profiler or
+matrix expansion. Audit every result, exact per-sample work/plan counts, paired
+throughput, short/bulk p99 and owner finish spread. Boundary process snapshots
+cannot prove an interference-free host throughout the run.
+
+Only an accepted incremental result can lead to =--lease-plan-protocol-ab=,
+comparing joint+cached plans against joint/work off in the same new image. It is
+not a replay of a historical binary. No commit or push before full acceptance.
+The five-second native meaningful-progress watchdog remains unchanged. The
+independent heartbeat fix and timer controls do not identify missing frames in
+historical watchdog failures; preserve their unverified cleanup records.
+
+* Final correctness gates before capture
+
+Final integrated source: strict Clippy, generated-artifact verification and
+formatting passed. All 45 dispatch library unit tests passed. Three native
+integration tests passed in 40.60 s with four joined owners, zero roots, removed
+files and returned descriptors. The independent private-image timer control
+passed, including host timer/masking and notifier retirement. The dedicated
+watchdog negative control passed in 6.231 s: phase chatter does not
+renew the unchanged five-second deadline, the stalled child exits 70 and its
+capture descriptors return. This neither attributes historical watchdog failures
+nor proves Scheme workload performance. O2 release bench built natively.
+
+Earlier gate failures are retained outside Git: an intermediate test was compiled
+against a just-changing observation interface, Clippy rejected an unnecessary
+unwrap, a new Scheme fixture had unmatched delimiters, and the new Quint mutation
+helper initially referenced a private module alias. These are compile/model
+wiring failures; the Scheme compiler's exit 70 is not a watchdog event. The final
+source was rebuilt and requalified. No tolerance, timeout or assertion suppression
+was used to turn a failure into a pass.
+
+* Targeted capture: not admitted
+
+=service-lease-plan-v16= completed 40 samples with clean teardown in 8.645 s.
+Both arms reused the same four live VMs and native image. Five AB/BA blocks
+provide ten paired windows per load. Observation is off; the short client remains
+serial, so scheduled latency includes accumulated issue lateness. Owner callback
+completion is not client-delivery wakeup. Root/capacity retirement remains separate.
+
+Compiler processes were present at both boundary snapshots: a C compiler and
+Gerbil compilers before capture, Gerbil compilers afterwards. No tasks were
+paused. These are coexisting-process observations, not same-spike CPU attribution.
+This capture cannot establish intrinsic regression magnitudes or clean-host
+performance. It is retained as non-admitting evidence, not removed as inconvenient
+noise. There is no combined publication comparison or favorable rerun selection.
+
+| Metric | CPU control -> candidate | Mixed control -> candidate |
+|--------+--------------------------+----------------------------|
+| Orders/s | 247029.107 -> 230289.443 (-6.776%) | 60520.709 -> 60985.486 (+0.768%) |
+| Pooled short owner-completion p99, us | 701.083 -> 613.541 (-12.487%) | 539.209 -> 930.375 (+72.544%) |
+| Pooled bulk service p99, us | 1674.834 -> 1581.041 (-5.600%) | 2642.125 -> 2780.500 (+5.237%) |
+| Maximum owner finish spread, us | 429.000 -> 676.584 (+57.712%) | 1543.417 -> 1819.583 (+17.893%) |
+
+Paired audit from those same samples:
+
+| Metric | CPU median change; improving pairs | Mixed median change; improving pairs |
+|--------+------------------------------------+--------------------------------------|
+| Throughput | -7.305%; 3/10 | +0.448%; 6/10 |
+| Per-sample short p99 | +26.035%; 4/10 | +22.641%; 4/10 |
+| Per-sample bulk p99 | +22.925%; 3/10 | -10.682%; 6/10 |
+| Owner finish spread | -0.110%; 5/10 | -2.152%; 5/10 |
+
+The CPU pooled short p99 improves while the median per-window short p99 worsens.
+These estimators must not be substituted: pooled p99 covers 640 probes, whereas
+the 64-probe per-window p99 is the sample maximum. Worst short-window changes are
++137.351% CPU / +313.040% mixed. Actor-peer minimum is 0 -> 0 for both loads,
+retained as an observation rather than standalone starvation proof. Aggregate
+orders/s uses median bulk elapsed time; paired rates use each actual window.
+
+Across 81920 bulk orders per load, whole/sliced plan totals are 81834/726 CPU
+and 81853/707 mixed, with 726 / 601 actual handoffs. Plan and handoff counts need
+not match: cached permission can change before a checkpoint, and a sliced handler
+can encounter zero or multiple actionable handoffs. Every candidate sample has
+8256 plans, 393216 declared bulk records, 256 short records, 64 short starts,
+zero pending dispatch, 1088 results, conserved offers and participation by all
+four owners. The non-replaying successful benchmark workload makes these declared
+record totals equal its completed arithmetic work; they are not a general CPU
+or continuation replay counter. Final cleanup joins four owners, reports roots
+=[0,0,0,0]=, removes files and quiesces service state. The internal heartbeat
+notifiers are joined by native teardown before owner exit; they are not extra
+Scheme executors and must not be omitted from total OS-thread resource accounting.
+
+** Identity and publication boundary
+
+- Local/PR base: =9015091750e58f6f1f8eee7d45f44d59ee1fadf0=.
+- Host binary SHA-256: =593989882507862304ba5122dbdfb42bef2e5c816c82bf611c62670f8291bd7f=.
+- Native image SHA-256: =79895a210e90cd8f43443913ece9f6ad0c52b70a22935fe1b388ebf0cf067262=.
+- Source archive SHA-256: =9def8abd4126fbdd7438fde2b69732d6d7ba7356eee7f5064471e4ef3d21a9ae=.
+
+The source archive contains the pre-result report; this section was added later.
+Raw sources, both binaries, failed gates and samples remain outside Git. Existing
+WIP was privately snapshotted and preserved while the already-published heartbeat
+commit was integrated. This does not constitute committing the candidate.
+
+At the last remote check, base 9015091 had completed Bazel Ubuntu and Quint checks;
+other native/bindings checks were running, and unsupported SDK SMP was skipped.
+These remote checks do not cover the uncommitted candidate. Do not claim CI green.
+No changes are staged, committed or pushed. Defaults remain unchanged.
+
+** Remaining architectural cost
+
+The work-policy queue scans and repeated layout/owner validation have moved out
+of the handler body. The whole path no longer creates a checkpoint procedure or
+writes then flushes per-span fuel. Event publication is atomic with invalidation,
+and grant permission has an explicit frozen-span boundary. These are implemented
+protocol changes, not a claim of admitted performance.
+
+The current wrapper still creates continuation-safe activation state: mutable
+span, normal-return, first-report and optional-checkpoint bindings captured by
+wind callbacks. Cold layout descriptors do not eliminate that activation state.
+Source shape identifies it as a remaining cost candidate; this capture does not
+quantify its allocation/CPU share or establish it as the dominant bottleneck.
+Future work should separate reusable immutable grant/compiled-executor metadata
+from activation-local unwind/completion obligations. Reusing one mutable actor
+frame across retained multishot continuations would be unsound. Any reduction
+must preserve policy identity, original selected bounds, exception cleanup and
+independent item completion/retirement. Merely moving bookkeeping to release or
+choosing a larger threshold is not sufficient proof of a faster library.
+
+Do not attribute the mixed tail to GC, OS scheduling, the new heartbeat repair or
+activation allocation without matching causal evidence. Stage wall intervals
+can overlap and their pooled quantiles are not additive. The current capture
+fails performance admission. Keep this implementation uncommitted; do not run
+the combined protocol publication gate on the strength of isolated tail wins.
+Historical watchdog failures remain open despite the dedicated control pass.

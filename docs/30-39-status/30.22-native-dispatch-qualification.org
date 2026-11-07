@@ -1,0 +1,175 @@
+#+TITLE: Native Tokio and Rayon dispatch qualification
+#+STARTUP: overview
+
+* Current status and historical receipt boundary
+
+The current lifecycle baseline is =8c23217= (six active CI jobs passed; SMP explicitly skipped). The dated artifacts, failures, ratios and model bounds below retain their original identities; they are not measurements of every later source revision. In particular, 10.10x / 21.18x data-placement ratios are not VM scaling factors, and the old eight-transition symbolic receipt does not qualify the extended lifecycle model.
+
+Use [[file:30.24-current-baseline-and-cost-attribution.org][the current baseline and attribution record]] for the rebuilt artifact, optional diagnostics and longer reuse observations. That record separates completed results from pending work. Raw historical temporary captures are currently unavailable on this host; their committed summaries are preserved without fabricating replacement logs.
+
+* Decision and scope
+
+The industrial acceptance work now includes executable native startup, contention, overload, in-flight close and deadline-recovery gates. These finite local passes do not establish complete industrial readiness. The default four VM owners, two Rust dispatch workers, stateless Tokio dispatcher, session direct dispatcher and window 128 remain unchanged. The adopted 10.10x owner-resident payload baseline remains historical working evidence; the new matrix changes workload/probe parameters and is not a replacement capture or a multiplicative speedup.
+
+Scheme keeps its native Gerbil/Gambit/C O2 compilation, macros, GC, closures, continuations and Actor/green-thread scheduling. Rust only admits, distributes and observes jobs on fixed owners. All 53 non-source native runtime/package resources are byte-identical to the previous qualified O2 wheel. The measured wheel SHA-256 is =6af7f691dbd3a09c89d24c7a40e65372b278f766747da3aba6d309320f9a8b15=.
+
+* Implementation and source-gate closure
+
+The Python runtime facade now separates library methods, value methods, input conversion and linked execution into responsibility-owned modules. Deep relative imports and the Rayon glob import are removed. A typed =DispatchRuntime= owns the Tokio runtime, returns supervised task handles, and remains under the existing host shutdown lifecycle. Pipeline admission, collection and ordered publication are distinct helpers; the JoinSet still observes every accepted future.
+
+Public maintainer startup/grouping functions use =PythonInstanceRequest= and =ModuleBundleRequest=. Resource namespace selection uses indexed path-ancestor membership instead of loop-local load-path scans. No source policy, allow-list, severity, deadline or compiler optimization was weakened. The strict ASP source gate now passes, as do both unit tests, all 31 integration tests, full formatting and strict release Clippy for instance-only and linked-only feature profiles. Linked-only lint is not an installed linked-wheel runtime acceptance result. Two older root-binding source contracts are updated to distinguish unconditional FFI from optional Tokio dispatch and the default SDK policy from explicit single-processor initialization. Negative controls reject an unconditional processor override or a changed default entry; runtime source is unchanged by this test repair.
+
+Shutdown now checks the closed flag while holding the Rayon pool creation lock and the registry insertion lock. This prevents late pool recreation or metadata publication after retirement. These were code-audit hazards: the finite pre-fix controls did not reproduce a failure. The rebuilt artifact passes the strengthened close test, which checks OS thread retirement before a second idempotent close can mask late recreation.
+
+Direct and Tokio batches now check the original group budget before admitting additional work, matching the existing Rayon/pipeline admission checks. Error cleanup and draining still occur after observation timeout; five seconds is not a hard bound on total API return or forced termination of Scheme.
+
+* Stateful native session API
+
+#+begin_src python
+session = library.session(owner)
+payload = session.value(read_only_data)
+roots = session.call_many(
+    [("actors", payload, 1)] * count,
+    dispatch="tokio", admission_window=16,
+)
+rows = library.project_many(roots, release=True)
+payload.close()
+#+end_src
+
+Supported pinned modes are =direct=, =tokio=, =rayon= and =rayon-blocking=. Native references stay on their actual owner, preserve identity, and execute within each batch in input order. Tokio admits ordered native asynchronous tickets before supervising replies. Rayon submits the ordered stream on its pool; the blocking reference occupies a pool worker while waiting. Concurrent batches may interleave and are not transactions. Defaults are unchanged.
+
+The experimental =tokio-pipeline= remains stateless-only and rejects pinned use before any Scheme state write. There is no fallback. The routing suite checks real ordered Scheme writes and rejection without side effects, in addition to type identity, GC, exceptions, foreign handles and continuations.
+
+* Executed safety matrix
+
+The updated routing suite passes 16 tests. The existing native backend passes 10. Full hygienic expansion, captured procedures, GC and exception recovery pass on all four owners. A fresh-process startup gate rejects four invalid owner/worker configurations without entering Scheme or leaving namespace files; a subsequent valid VM supports GC and multi-shot continuations and closes cleanly.
+
+Each dispatcher has four separate fresh-process contract runs: eight concurrent clients, four-client overload, close during observed native progress, and original-deadline recovery. The concurrent test completes 8 x 8 x 33 exact native Echo requests per mode. Live-VM root counts are checked after completed/failed overload and after deadline recovery. Close tests invalidate subsequent calls, join owners and remove runtime files. All 20 runs pass. All 15 stress processes return from one initial OS thread to one final OS thread after client joins and the first close; this check precedes a second close. This is finite thread retirement evidence, not proof against every shutdown race.
+
+| Dispatcher | Concurrent clients | Overload batch outcomes | In-flight close | Deadline completed native calls | Timeout API return seconds |
+|------------+--------------------+-------------------------+-----------------+---------------------------------+----------------------------|
+| direct | PASS | 1 complete / 3 rejected | PASS | 48 / 128 | 5.870 |
+| tokio | PASS | 1 complete / 3 rejected | PASS | 48 / 128 | 5.874 |
+| rayon | PASS | 1 complete / 3 rejected | PASS | 48 / 128 | 5.840 |
+| rayon-blocking | PASS | 4 complete / 0 rejected | PASS | 42 / 128 | 5.235 |
+| tokio-pipeline | PASS | 1 complete / 3 rejected | PASS | 59 / 128 | 6.355 |
+
+The deadline fixture requests 128 actual Scheme Actor jobs on one owner with an original five-second group budget and window 16. A strict subset completes, the error reports timeout, and later native calls/GC succeed with no orphan external roots. Return time includes observation, draining and partial-result retirement; accepted work is not cancelled. No runtime timeout was increased.
+
+Overload uses a finite owner queue. Direct/Tokio/Rayon/pipeline report explicit rejection for some batches. Rayon-blocking can occupy its limited Rust workers and wait instead of filling that queue. Accepted state changes are not rolled back and failed batches are not automatically retried. These are different backpressure behaviors, not equivalent throughput or fairness guarantees.
+
+* Matched resident-data performance protocol
+
+Each configuration uses the same live VMs, same read-only native input graph per owner, same 128 logical requests x 32 Actor items, same native results, and quantum one. Initial VM setup and graph preparation are reported outside warm timing. CPU cases use 512 pairs per item. Wait-mix cases use 48 pairs and one-millisecond cooperative Scheme waits; they are not production network-I/O tests.
+
+All four treatments are warmed before timing. Sixteen measured rounds use a four-treatment Williams rotation: each mode occupies every position and each directed adjacent pair occurs once per four-round cycle. The first matrix had equal counts but incomplete position balance; it was retained locally and superseded by this complete rerun. Added observations report per-owner client completion and Darwin thread rows. The final matrix uses the rebuilt shutdown-guard artifact. Earlier pre-guard captures remain separate local observations and are not pooled into its results.
+
+Main p99 is the nearest-rank p99 of 16 complete batch responses, including bulk projection/release; it is not 128 independent request-arrival samples per batch. Four short probes per owner are offered at fixed 20 ms intervals in each arm, including call, projection and release. The complete cohort drains before the next arm. Every owner finishes 64 probes per mode; Actor work finishes eight items per Scheme worker in every result. Equal finite counts do not prove starvation freedom, and faster arms can finish before later probes arrive.
+
+Comparisons are paired within one configuration. Owner/worker-count configurations use separate processes and are not paired proof of an optimal count or linear VM scaling. Host observations are retained locally; this is not dedicated-host performance certification. Primary tracing is off. No own build or lint ran during final captures.
+
+| VMs / Rust workers | Load | Mode | Actor items/s median | Batch p99 ms | Short p99 ms | Worst owner short p99 ms |
+|--------------------+------+-------+----------------------+--------------+--------------+--------------------------|
+| 1 / 1 | CPU, 512 pairs | direct | 16623 | 480.2 | 352.2 | 352.2 |
+| 1 / 1 | CPU, 512 pairs | tokio | 16779 | 620.3 | 626.6 | 626.6 |
+| 1 / 1 | CPU, 512 pairs | rayon | 22575 | 586.2 | 450.3 | 450.3 |
+| 1 / 1 | CPU, 512 pairs | rayon-blocking | 17648 | 596.1 | 381.5 | 381.5 |
+| 1 / 1 | Wait mix, 48 pairs | direct | 6621 | 803.2 | 275.1 | 275.1 |
+| 1 / 1 | Wait mix, 48 pairs | tokio | 6827 | 900.5 | 526.8 | 526.8 |
+| 1 / 1 | Wait mix, 48 pairs | rayon | 6192 | 894.6 | 368.4 | 368.4 |
+| 1 / 1 | Wait mix, 48 pairs | rayon-blocking | 6520 | 800.0 | 284.5 | 284.5 |
+| 4 / 1 | CPU, 512 pairs | direct | 64435 | 139.5 | 92.6 | 112.0 |
+| 4 / 1 | CPU, 512 pairs | tokio | 85805 | 146.9 | 90.0 | 130.0 |
+| 4 / 1 | CPU, 512 pairs | rayon | 71282 | 95.4 | 70.9 | 83.7 |
+| 4 / 1 | CPU, 512 pairs | rayon-blocking | 54131 | 108.7 | 81.2 | 108.5 |
+| 4 / 1 | Wait mix, 48 pairs | direct | 24296 | 241.3 | 182.5 | 202.4 |
+| 4 / 1 | Wait mix, 48 pairs | tokio | 26068 | 268.2 | 208.8 | 228.0 |
+| 4 / 1 | Wait mix, 48 pairs | rayon | 26659 | 232.3 | 214.9 | 215.6 |
+| 4 / 1 | Wait mix, 48 pairs | rayon-blocking | 8040 | 705.9 | 94.7 | 114.6 |
+| 4 / 2 | CPU, 512 pairs | direct | 72414 | 128.1 | 82.3 | 108.1 |
+| 4 / 2 | CPU, 512 pairs | tokio | 71985 | 119.9 | 96.4 | 99.9 |
+| 4 / 2 | CPU, 512 pairs | rayon | 62875 | 129.3 | 85.7 | 89.0 |
+| 4 / 2 | CPU, 512 pairs | rayon-blocking | 74530 | 101.9 | 66.3 | 76.9 |
+| 4 / 2 | Wait mix, 48 pairs | direct | 23092 | 246.4 | 207.3 | 211.5 |
+| 4 / 2 | Wait mix, 48 pairs | tokio | 23790 | 253.4 | 203.9 | 223.9 |
+| 4 / 2 | Wait mix, 48 pairs | rayon | 23486 | 239.5 | 193.2 | 208.9 |
+| 4 / 2 | Wait mix, 48 pairs | rayon-blocking | 15295 | 345.8 | 164.9 | 180.6 |
+| 4 / 4 | CPU, 512 pairs | direct | 61117 | 231.5 | 209.3 | 210.2 |
+| 4 / 4 | CPU, 512 pairs | tokio | 83469 | 188.7 | 130.2 | 170.1 |
+| 4 / 4 | CPU, 512 pairs | rayon | 70826 | 137.7 | 91.6 | 102.8 |
+| 4 / 4 | CPU, 512 pairs | rayon-blocking | 93744 | 109.2 | 77.7 | 87.5 |
+| 4 / 4 | Wait mix, 48 pairs | direct | 26303 | 221.1 | 190.1 | 191.8 |
+| 4 / 4 | Wait mix, 48 pairs | tokio | 27928 | 241.5 | 209.0 | 217.1 |
+| 4 / 4 | Wait mix, 48 pairs | rayon | 23431 | 271.1 | 213.9 | 253.9 |
+| 4 / 4 | Wait mix, 48 pairs | rayon-blocking | 26124 | 280.6 | 213.6 | 218.3 |
+
+Divide Actor items/s by 32 for requests/s. These values must not be multiplied into the earlier 10.10x or 21.18x data-placement ratios. Per-owner client completion tails are also observed, without claiming native-ready timestamps.
+
+| VMs / Rust workers | Load | Startup ms | Native graph preparation ms | Observed OS threads max |
+|--------------------+------+------------+-----------------------------+-------------------------|
+| 1 / 1 | CPU | 1625.9 | 251.8 | 9 |
+| 1 / 1 | Wait mix | 1259.5 | 4.0 | 9 |
+| 4 / 1 | CPU | 4368.4 | 349.4 | 27 |
+| 4 / 1 | Wait mix | 4045.4 | 20.5 | 27 |
+| 4 / 2 | CPU | 4111.7 | 326.8 | 29 |
+| 4 / 2 | Wait mix | 3672.2 | 20.2 | 29 |
+| 4 / 4 | CPU | 3936.4 | 530.1 | 33 |
+| 4 / 4 | Wait mix | 3633.9 | 141.7 | 33 |
+
+Startup/preparation are single observations per process, not latency distributions. OS thread rows include benchmark client/probe threads and both warmed Rust pools, not mandatory engine threads or additional Scheme processors. Host activity is observed, not suppressed; the captures do not establish quiet dedicated-host conditions.
+
+* Positive observations, negative results and admission
+
+- 4 VMs / 1 worker, wait mix, rayon-blocking: paired throughput ratio versus direct 0.306, descriptive bootstrap interval [0.279,0.426], faster in 0 / 16 pairs.
+- 4 VMs / 2 workers, wait mix, rayon-blocking: paired throughput ratio versus direct 0.568, descriptive bootstrap interval [0.531,0.772], faster in 1 / 16 pairs.
+
+The final four-VM/four-worker CPU run favors Tokio versus direct: median paired throughput ratio 1.222, descriptive interval [1.012,1.391], faster in 12 / 16 pairs. Its short p99 is 130.2 ms versus direct 209.3 ms. The blocking reference also favors throughput in this CPU capture (ratio 1.326, interval [1.041,1.812], 12 / 16 faster). These CPU wins did not recur consistently across the earlier pre-guard matrix. Host variation and changed shutdown guards prevent attributing their magnitude to the guards or promoting a default from this run.
+
+A separate pre-guard four-VM/four-worker wait-mix capture showed a Tokio regression: paired median throughput ratio 0.853, descriptive interval [0.716,0.971], and short p99 418.3 ms versus direct 199.9 ms. The final guarded capture has ratio 1.033 with interval [0.880,1.214]. Both observations are retained; neither proves that shutdown guards change scheduling performance.
+
+Blocking the finite Rust workers can limit simultaneous owner-stream progress. Other scheduler ratios remain workload- and configuration-dependent; no universal winner is admitted. Earlier pilot and pre-guard results are retained locally rather than merged into the final sample set.
+
+The bootstrap intervals describe these finite paired observations, not population guarantees; p99 differences do not inherit those throughput intervals. No scheduler, window or worker default is promoted. Rayon-blocking remains an explicit reference path, with its capacity cost stated. Treat compute-heavy, cooperative-wait and projection-heavy workloads separately before tuning.
+
+* Open gates recorded with the dispatch matrix
+
+These rows record the matrix artifact above. Later native startup/lifecycle controls and CI closures are tracked in 30.23 and 30.24; the historical rows do not undo those later passes. Arbitrary initialization hooks, longer endurance and deployment remain distinct from the exercised controls.
+
+| Area | Current boundary | Still required |
+|------+------------------+----------------|
+| Long reuse and memory | Finite stress, live external roots zero, files removed | Multi-hour same-process soak, per-VM post-GC live-heap trend, RSS/cache classification, repeated lifecycle pressure |
+| Fault injection | Invalid startup bounds, Scheme exceptions, overload, in-flight close and timeout recovery | Partial setup failures, allocation pressure/OOM, disk-full/permission faults, stuck native jobs and unresolved shutdown recovery |
+| Concurrency instrumentation | Runtime ownership and local native assertions | Separate ASan and TSan builds covering the native bridge and applicable SDK code; no sanitizer-clean claim yet |
+| Latency/fairness | Fixed finite probe cohorts and per-owner tails | Open-loop admission, variable task sizes, long-lived competing sessions, application SLOs and sustained no-progress detection |
+| I/O and language scope | Actual Scheme Actors, GC, continuations, hygienic macros and cooperative waits | Real concurrent port/network I/O and Rust completion integration, fuller application workloads; no universal Scheme conformance claim |
+| Deployment | Local Darwin wheel on installed dependencies | Self-contained dependency repair/audit, ABI/platform matrix and installed-wheel CI; current wheel reports external Homebrew libraries |
+| Failure containment | Independent VM heaps and owner queues | Native process crash containment is not supplied; timeout is observation, not a forced execution cutoff |
+| Release admission | Local source/native gates pass | Exact-head remote CI and separately qualified production packaging; linked-only compile/lint does not close linked-wheel runtime acceptance |
+
+Native deadline recovery under finite work does not prove bounded recovery from arbitrary stuck C/Scheme code. Root/file checks do not establish full RSS return or indefinite leak freedom. Keep full Scheme semantics; do not replace open gates with subset execution, cancelled continuations, relaxed thresholds or an unqualified no-VM route.
+
+* Build-control observations
+
+A fresh-target root-binding unit build exited 137 during Rust dependency compilation without reaching tests. Its log is retained locally; no test failure or exact termination cause is inferred. The two-job release-target retry completes with all 45 root-binding unit tests passing, including the repaired contracts and real Gerbil scalar/version checks. This is separate from native wheel acceptance.
+
+* Reproduction
+
+Build the actual O2 wheel through the existing Cargo/maturin chain and install it in a separate environment. Keep every generated output outside the repository.
+
+#+begin_src sh
+cargo test --locked -p gerbil-scheme-python --lib --test integration_test
+cargo test --release -j 2 --locked -p gerbil-scheme --test unit_test
+just bridge-python-dispatch-startup /path/to/venv/bin/python
+just bridge-python-owner-routing-tests /path/to/venv/bin/python
+just bridge-python-owner-tests /path/to/venv/bin/python
+just bridge-python-owner-full /path/to/venv/bin/python
+# Repeat these three cases and the deadline gate for all five stateless modes.
+just bridge-python-dispatch-stress /path/to/venv/bin/python --dispatch tokio --case concurrent
+just bridge-python-dispatch-stress /path/to/venv/bin/python --dispatch tokio --case overload
+just bridge-python-dispatch-stress /path/to/venv/bin/python --dispatch tokio --case close
+just bridge-python-owner-deadline /path/to/venv/bin/python --dispatch tokio
+# Repeat for 1/1, 4/1, 4/2 and 4/4; use --mixed --lines 48 for wait mix.
+just bridge-python-resident-dispatch-ab /path/to/venv/bin/python --owners 4 --workers 2 --rounds 16 --lines 512
+#+end_src
+
+Raw captures, failed build/lint attempts, superseded ordering results and source identities remain in the repository-external local diagnostic directory. Only maintained source, tests and this English summary are committed.

@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-29",
+  "scope": "Actual select wrapper association in a private native test image; not a Gerbil VM image or performance acceptance",
+  "baseline": {
+    "revision": "6d4ec27ccf166b89279999cce66e33ce1e34c643",
+    "historical_p99_ns": 317000,
+    "historical_outstanding_peak": 351,
+    "guard": 128,
+    "performance_admitted": false
+  },
+  "predecessor": {
+    "receipt": "owner_wait_scope.json",
+    "sha256": "c55580c135e03f16267d986416be8696bee300ffc25b106f4739f1b06e1a53a1",
+    "represents_historical_slice": true
+  },
+  "default_control": {
+    "diagnostic_macro": "GERBIL_OWNER_WAIT_SCOPE",
+    "macro_defined_by_normal_image_build": false,
+    "original_wrapper_sha256": "1791a51e62c3564be8d5a7e4e39f8c705d83c56079ff6851d02a2a44eeb008dd",
+    "preprocessed_comparison_passed": true,
+    "comparison_scope": "same current host compiler and native test translation unit; original versus current wrapper header, diagnostic macro absent",
+    "preprocessed_sha256": "3bda7976f0d05f702eb6e2d560ee2cb8e401d329ec1e67c5856d9c978965ae2d",
+    "frozen_binary_identity_claim": false,
+    "whole_sdk_image_equivalence_claim": false,
+    "selected_image_is_diagnostic_even_without_active_scope": true
+  },
+  "binding": {
+    "storage": "owner-local TLS plus one image-local checked activation counter",
+    "actual_wait_entry_exit_connected": true,
+    "actual_posix_deferred_cancellation_cleanup_connected": true,
+    "scheme_verified_progress_callback_connected": false,
+    "progress_requires_explicit_handle": true,
+    "progress_reads_clocks": false,
+    "progress_or_handler_clock_reads_added": 0,
+    "clock_acquisition_skew_included": true,
+    "exact_kernel_blocked_time_available": false,
+    "exact_os_scheduling_wait_available": false,
+    "activation_identity": "generation and owner; image-lifetime scoped",
+    "one_checked_lock_free_atomic_reservation_per_cold_open": true,
+    "shared_generation_updates_per_wait_or_progress": 0,
+    "tls_admission_allocation_free_claim": false,
+    "legacy_row_modes_excluded_in_both_orders_for_same_owner": true,
+    "legacy_remote_sampler_absence_proven": false,
+    "old_remote_sampler_reenabled": false,
+    "clock_reads_per_successfully_observed_wait": 4,
+    "inactive_scope_clock_reads": 0,
+    "clock_failure_may_stop_acquisition": true
+  },
+  "validation": {
+    "native": {
+      "cargo_target": "owner_wait_scope",
+      "rust_tests_passed": 2,
+      "core_c_contract_groups": 6,
+      "host_compiler": "Apple clang 21.0.0 (clang-2100.1.1.101)",
+      "optimization": "-O2",
+      "private_image_loaded_locally": true,
+      "select_hidden_from_image_export_list": true,
+      "rtld_next_resolved_distinct_actual_system_select": true,
+      "driver_variants": [
+        "optimized",
+        "ASan and UBSan"
+      ],
+      "both_variant_markers": "OWNER-WAIT-BINDING-CONTRACT-OK",
+      "both_variant_stderr_empty": true,
+      "child_execution_observed_before_deadline_seconds": 5,
+      "compiler_time_excluded_from_child_deadline": true,
+      "timeout_not_relaxed": true,
+      "workers_joined_before_dlclose": true,
+      "vm_initialized": false,
+      "paired_gambit_compiler_used": false
+    },
+    "real_native_outcomes": [
+      "readable pipe returned without consuming payload",
+      "zero-timeout completion",
+      "EBADF retained",
+      "EINTR retained",
+      "descriptor readiness and original syscall arguments forwarded",
+      "nested admission rejected",
+      "null finish output rejected without closing scope",
+      "cold finish idempotent",
+      "deferred pthread cancellation copied failed capture before TLS retirement",
+      "foreign-thread handle rejected",
+      "thread recreation cannot restart image activation generation",
+      "stale handle rejected after thread recreation",
+      "checked generation exhaustion preserves output handle",
+      "legacy row recording and new scope reject overlap"
+    ],
+    "qnt": {
+      "typecheck_passed": true,
+      "backend": "typescript",
+      "seed": 1,
+      "lifecycle_directed_passed": 20,
+      "binding_modes_directed_passed": 14,
+      "shared_cases_overlap": true,
+      "unique_directed_cases": 24,
+      "binding_modes_invariant": "safety",
+      "binding_modes_samples": 200,
+      "binding_modes_max_steps": 40,
+      "violation_found": false
+    },
+    "strict_clippy_passed": true,
+    "format_check_passed": true
+  },
+  "retained_findings": [
+    {
+      "kind": "review counterexample",
+      "issue": "TLS address and local sequence may recur after thread exit",
+      "native_identity_collision_observed": false,
+      "fix": "checked image-wide cold activation generation; no per-request shared counter",
+      "coverage": "actual thread recreation plus formal identity witness"
+    },
+    {
+      "kind": "tooling failure",
+      "issue": "strict Clippy rejected similar names",
+      "fix": "test flag variable renamed; no lint suppression"
+    },
+    {
+      "kind": "source custody",
+      "issue": "generated-C ignore rule hid the prior C fixture",
+      "fix": "three precise C-source exceptions; no logs or binaries admitted"
+    },
+    {
+      "kind": "watchdog conservatism",
+      "issue": "late parent observation must not accept an unproven deadline",
+      "fix": "deadline checked after child status observation, even if child has already exited"
+    }
+  ],
+  "pending": [
+    "actual Scheme typed API activation and report projection",
+    "explicit generation in Scheme verified-progress callback",
+    "actual VM owner/image lifetime binding",
+    "Gambit exception and multi-shot continuation integration",
+    "Gambit nonlocal exits or asynchronous pthread cancellation",
+    "same actual VM long-tail capture",
+    "historical 351 above 128 gate"
+  ],
+  "source_sha256": {
+    ".gitignore": "14ab7a79e1fd5299f118856120062d938155f4c5a3674fa4a9a8fc01f59b832b",
+    "crates/gerbil-scheme-qualification/ffi/owner_wait.h": "bb28cbce493b426702be48717021afe5fc0c7e967cf6011ba93589ed3bf2569b",
+    "crates/gerbil-scheme-qualification/ffi/owner_wait_scope.h": "90626095aabab705242379cf9ba18ee61f64b1c6bc118ab15f313f34d0408749",
+    "crates/gerbil-scheme-qualification/ffi/owner_wait_scope_binding.h": "2908a5f15c5479a487e9745b173c0e930a3b004cbcd237a4a3e6290019ae76ba",
+    "crates/gerbil-scheme-qualification/build/instances.rs": "bbf2cb381a7e4a1297fdb6bf85074e9a6d0c27c2dfd09b8f7e2eb9d76a483e3a",
+    "crates/gerbil-scheme-qualification/tests/owner_wait_scope.rs": "08191dc367960cf41f0ba7169c2b62aa71b0e0e80e1997b6935eba88c0ade1c9",
+    "crates/gerbil-scheme-qualification/tests/owner_wait_scope.c": "45d10b522a31eca8a89bae42e6240b43f1472179c4f786a4f2dcc34163c1d9c1",
+    "crates/gerbil-scheme-qualification/tests/owner_wait_binding.c": "a63b4c5c0fdd3b095270f7b31691d9af14c3121d368aefe12c9aac4a7676352f",
+    "crates/gerbil-scheme-qualification/tests/owner_wait_binding_image.c": "70041aa278ada8c1b68e78db5c1e779b0b47f193327a981f7b9909e8594c554f",
+    "specs/scheduling/native_owner_watch.qnt": "5a1a92b88c99ffe950aa023c8835cc70fa7cfd374e95137f0c4796f6116f70fc",
+    "specs/scheduling/owner_wait_coverage.md": "0f7c19b725e5398f9dd0e387a905a1b93c50d07a8eb4b2c44a7b9bcc1f84bf88"
+  },
+  "unchanged_runtime_source_sha256": {
+    "crates/gerbil-scheme-qualification/ffi/owner_instance.c": "eb87d8423698c2a0b45b1b07c9428de510adba64d2b49fce274e4a4e039d36fe",
+    "crates/gerbil-scheme-qualification/scheme/instance-owner-watch.ss": "254fd45205e8aa4ad6540a42d5baeeb5c5dd5afa725eec34a2f80a6cd047849c",
+    "crates/gerbil-scheme-qualification/scheme/instance-orders.ss": "db05bd5577c349746c3e07fa55038953d63b3e1c224520ee5cceeb22eea43546",
+    "crates/gerbil-scheme-qualification/scheme/instance-mailbox-backpressure.ss": "d02c136d74f02fa8cd3b30538ded6c33b38e744faea4291721bc2df4476da3fd",
+    "crates/gerbil-scheme-qualification/build.rs": "f0ede1d4e69faa4e7b5d822557ca7af9ef958d75916886463ff766be673ed3b3"
+  },
+  "boundaries": {
+    "private_native_test_image_built": true,
+    "gambit_runtime_image_built": false,
+    "new_load_runs": 0,
+    "p99_measured": false,
+    "runtime_wait_policy_changed": false,
+    "scheme_execution_changed": false,
+    "frame_return_order_changed": false,
+    "defaults_changed": false,
+    "gambit_or_sdk_changed": false,
+    "rust_scheduling_integration": false,
+    "instruments_used": false,
+    "performance_accepted": false,
+    "committed": false,
+    "pushed": false,
+    "pr_18_merged": false
+  }
+}

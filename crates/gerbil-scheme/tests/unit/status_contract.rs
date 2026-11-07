@@ -94,7 +94,7 @@ fn scheme_native_surface_projects_result_and_error_shapes() {
         .ancestors()
         .nth(2)
         .expect("workspace root from gerbil-scheme crate")
-        .join("scheme/asp/native-surface.ss");
+        .join("scheme/asp/abi-surface.ss");
     let source = std::fs::read_to_string(&native_surface)
         .unwrap_or_else(|err| panic!("read {}: {err}", native_surface.display()));
 

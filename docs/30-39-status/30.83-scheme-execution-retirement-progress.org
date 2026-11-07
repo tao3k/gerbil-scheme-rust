@@ -1,0 +1,195 @@
+#+TITLE: Scheme execution progress and completion retirement
+#+OPTIONS: toc:2
+
+* Existing evidence and causal limits
+
+The rejected ready-first comparison is preserved in
+[[file:30.82-scheme-ready-service-cycle.org]]. Its paired CPU throughput improved
+7.55%, while mixed throughput fell5.73%, actual short p99 rose7.68%, bulk p99
+rose25.71% and owner finish spread rose8.07%. This is not performance admission.
+
+Source inspection separates the mechanisms. CPU handlers perform arithmetic
+before publishing their graphs, so immediate retirement can promptly return
+capacity. Mixed handlers suspend through Scheme before arithmetic. After a
+harvest, the owner can prepare and construct more native inputs before returning
+to existing Scheme jobs. Ready custody and an execution opportunity therefore
+represent different obligations. The previous counters establish a small
+change in boundary decisions, not a unique quantitative OS/GC attribution.
+
+A completion can also be exceptional and carry no successful declared-work
+credit. The previous bounded-ready-backlog argument still bounds graph custody,
+but the arrival of a new ready graph does not prove useful logical execution.
+A finite backlog draining eventually is weaker than timely service under refill.
+
+The short probe issues requests sequentially against scheduled release times.
+Scheduled p99 includes accumulated client lateness. Actual latency still has the
+existing additive before-entry, native-construction, pending and projection
+components. Pending includes execution, suspension, GC and retirement; it is not
+Scheme CPU time. Neither differences of p99 values nor scheduler-pass counts
+separate those costs causally.
+
+The same-request additive audit of the already captured mixed ready-first
+arm puts72.42% of the ten largest actual latencies in pending,26.85% before
+entry,0.57% in construction and0.16% in projection. These shares describe those
+specific requests, not all requests or differences between quantiles. They
+exclude projection CPU cost as the dominant measured component of those ten
+short-request tails; they do not distinguish Scheme suspension from OS waiting.
+Across640 short requests the owner assignment counts were180/154/158/148;
+concentration alone does not explain the execution and completion delay.
+
+* Three independent progress contracts
+
+| Progress | Authority | What it cannot acknowledge |
+|----------+-----------+----------------------------|
+| Admission and construction | Existing bounded Rust offer, owner reservation and native input entry | A Scheme receiving grant or finished execution |
+| Successful logical execution | Scheme work accounting, including the live lease accumulator | Root retirement, capacity return, CPU time or partial exceptional work |
+| Completion retirement | Scheme ready token and each result's projection/clear | Another request's first grant or successful logical work |
+
+The new explicit =ProgressFair= service-cycle policy observes execution only at
+an existing native harvest boundary. Immutable handler plans, continuation
+activations, class arbitration, declared maximum spans and the existing work
+epoch remain authoritative. No new handler poll, timer, outer lease or Rust
+executor is introduced. The established shared wake policy remains unchanged.
+
+| Boundary state | Action |
+|----------------+--------|
+| No ready graph | Existing single Scheme pass, recheck, then ordinary native wait if still empty |
+| Ready graph and logical execution advanced | Direct bounded harvest |
+| Ready graph, unfinished accepted work, no execution advance | Existing single Scheme pass, then bounded harvest regardless of whether work advanced |
+| Only terminal graphs remain | Direct harvest, including exception-only results |
+
+The observation is updated after the pass and before harvest. A pass offers an
+opportunity; it never fabricates work credit or waits for an arbitrary handler.
+There is at most one explicit pass per harvest, never a new second yield. A
+native outstanding-job counter changes at accepted submission and terminal
+publication, not at every Actor handler. Both comparison arms maintain the
+same counter. There is no table scan or per-harvest queue allocation to count
+unfinished jobs.
+
+This policy does not promise preemption, a wall-clock service bound or per-class
+starvation freedom from aggregate execution credit. Existing Scheme class
+arbitration and first-grant obligations remain separate. In particular, bulk
+progress is not proof that a short request ran. Performance and per-owner
+receipts must establish whether this boundary rule is useful.
+
+The old continuation lease policy uses its own =cycle= internal tag. The new
+ready-first boundary policy now uses =ready-cycle=, avoiding a local name
+collision that previously redirected the old lease policy to registered layout
+execution. The ready-first A/B still selects the registered layout explicitly.
+This compatibility repair requires native replay and Actor qualification too.
+
+* Ownership and validation
+
+The actual API is =configure_scheme_service_boundary_plan_on= with explicit
+=SchemeServiceCyclePolicy::ProgressFair=; default selection is unchanged.
+=SchemeServiceCycleProgress= gains the policy flag and stalled-ready pass count.
+Counters are observations, not routing authority. Decoder checks retain signed
+range, flag, cardinality and active/total-pass conservation.
+
+No service mutex is held across scheduling. The existing service-to-budget
+lock order, receiving-thread first grant, stale-epoch continuation fences,
+multishot successful credit and exceptional unwind are retained. Each result
+keeps independent native root and capacity retirement. Cancellation and timeout
+after entry retain Scheme ownership until drain; closing does not depend on a
+future caller to acknowledge execution.
+
+The existing Runtime model is extended with monotonic ghost execution credit
+and last boundary observation. Only =compute= advances this ghost credit;
+readiness, grant, harvest and projection do not. Directed controls distinguish
+a stalled exceptional completion with another unfinished job, one bounded pass,
+terminal-only drain and a skipped-pass mutation. The ghost receipt represents
+logical progress, not a new runtime activation allocation or OS CPU clock.
+Existing cancellation, timeout, close, replay, registration and ready-token
+controls remain separate evidence.
+
+A native control holds a real Scheme continuation on a latch, publishes an
+exceptional result, verifies exactly one stalled-ready pass without invented
+work, resumes and drains the continuation, then verifies that a terminal-only
+exception drains without an idle scheduling pass.
+
+* Targeted acceptance
+
+Compare ABI27 ReadyFirst and ABI28 ProgressFair in the same four live VMs/image,
+O2, Tokio2, window4, work32, batch8, Actor quantum1, class/feed1, work quantum4
+and maximum48. Retain the existing five AB/BA blocks for CPU and mixed loads,
+ObservationOff, five-second native progress and120-second controller bounds.
+No broader matrix, default change or unchanged-source recapture is authorized
+by this experiment. Preserve throughput, actual/scheduled short p99, bulk p99,
+owner spread, exact execution/result conservation and full lifecycle receipts.
+A failed candidate stays unpublished. Historical watchdog attribution remains
+open; successful current runs cannot explain that older failure.
+
+* Final result: rejected
+
+The exact PR head =c4b95dfaa116bd67b110d94826535fd27f227b85= currently passes
+all supported CI checks, including both Bazel platforms, native lifecycle and
+Quint. The local candidate remains unpublished and defaults remain unchanged.
+
+The extended Runtime model passed108 directed witnesses and400 bounded random
+sequences at64 steps. Native qualification passed3 tests in31.85s, including
+the deterministic suspended-continuation/exception and terminal-only controls.
+Closing joined4 owners, left0 roots, removed files and returned FDs; native
+close took1.318875ms. Strict Clippy, final formatting, generated-source checking
+and O2 release construction passed. Failed model proofs were retained: the
+first used an inaccessible lifecycle action; the next skipped the existing
+worker assignment order. Corrections preserved ownership and FIFO guards.
+
+One capture after compilers ended naturally produced40 samples in9.231s,
+exit0, empty stderr and unchanged source/host/image identity. Compiler boundary
+checks were empty. Exact work, result, first-grant, ready-token and four-owner
+cleanup receipts passed. Boundary checks cannot exclude every mid-window host
+effect. No unchanged-source recapture was made.
+
+Paired medians over the ten matched AB/BA pairs per load are:
+
+| Load | Throughput | Actual short p99 | Scheduled short p99 | Bulk p99 | Owner finish spread |
+|------+------------+------------------+---------------------+----------+---------------------|
+| CPU | -8.05% | +9.83% | +56.93% | +30.39% | +61.80% |
+| Mixed | -20.54% | -19.99% | -25.24% | +51.65% | +18.89% |
+
+CPU throughput improved in only3/10 pairs; mixed throughput improved in2/10.
+The pooled CPU throughput change was-11.41%, actual short p99+85.39%, bulk
+p99+58.82% and maximum owner spread+375.56%. Pooled mixed throughput fell16.53%,
+actual short p99 improved23.95%, bulk p99 rose81.47% and maximum owner spread
+rose88.71%. Neither paired nor pooled results admit the candidate.
+
+Across ten windows per arm/load, each transferred640 short and10240 bulk
+results. Active boundary passes changed5160->5186 for CPU and7169->6879 for
+mixed. Direct collections changed3452->3435 and4389->4081. The new stalled-ready
+branch triggered only4 times for CPU and29 for mixed. These counts show that
+the branch is real, but do not justify attributing all throughput or tail
+changes to it. The deterministic contract is locally valid; it is not a
+sufficient performance protocol. Additional unconditional yields are rejected.
+
+In the new candidate's ten largest actual mixed tails, pending accounted for
+71.98% of total latency, before-entry16.22%, construction11.65% and projection
+0.15%. Short assignments across owners were193/145/162/140. These request-level
+components preserve the actual additive contract, without equating pending to
+CPU or subtracting quantiles. The existing aggregate progress floor did not
+prove timely completion fairness.
+
+* Direction after the negative result
+
+Do not promote aggregate logical execution credit as the scheduler's sole
+readiness predicate. Unfinished work can be suspended on external readiness;
+bulk execution can advance while a short job still waits. The next protocol
+must distinguish at least runnable Scheme work, lease registration/acquisition,
+external suspension/resumption and ready completion custody, using the existing
+Runtime model's blocked/runnable states and existing Scheme lifecycle events.
+A returned completion slot must not by itself authorize a claim that another
+class progressed. Native construction and retirement must consume the same
+owner service-cycle opportunity contract.
+
+Selection should move at those state transitions, retaining the uncontended
+specialized plan. No new per-handler polling, sleep threshold, outer lease or
+Rust green-thread scheduler is justified. Preserve the single native boundary,
+continuation reentry/exception fences, independent roots and admission credit.
+This direction is not implemented or performance-qualified by the failed
+aggregate-credit experiment. Further A/B requires an actual protocol change,
+not another capture of this image or another yield threshold.
+
+No commit or push was made. The older watchdog exit70 still lacks exact failing
+image/native-progress evidence, so attribution and that failed run's cleanup
+remain open. Current failures retain raw last-progress and phase context without
+renewing the five-second deadline on diagnostic phase chatter. Successful current
+native/capture runs do not retroactively explain the historical failure.

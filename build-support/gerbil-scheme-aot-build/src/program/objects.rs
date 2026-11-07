@@ -33,29 +33,31 @@ pub(super) fn compile_program_modules(
             operation: "compile program module objects",
             subject: Some(&batch),
         },
-        || compile_program_modules_inner(gsc, sources, cc_options, observer, worker_count),
+        || {
+            for_each_native_job(sources, worker_count, |item| {
+                let options = metadata_compile_options(cc_options, item.deferred);
+                compile_program_module(
+                    gsc,
+                    &item.source,
+                    &item.object,
+                    &item.module,
+                    &options,
+                    item.layout,
+                    observer,
+                )
+            })
+        },
     )
 }
 
-fn compile_program_modules_inner(
-    gsc: &Path,
-    sources: &[ProgramObject],
-    cc_options: &str,
-    observer: &dyn ProgramArchiveObserver,
+pub(super) fn for_each_native_job<T: Sync>(
+    jobs: &[T],
     worker_count: usize,
+    run: impl Fn(&T) -> Result<(), String> + Sync,
 ) -> Result<(), String> {
     if worker_count <= 1 {
-        for item in sources {
-            let options = metadata_compile_options(cc_options, item.deferred);
-            compile_program_module(
-                gsc,
-                &item.source,
-                &item.object,
-                &item.module,
-                &options,
-                item.layout,
-                observer,
-            )?;
+        for job in jobs {
+            run(job)?;
         }
         return Ok(());
     }
@@ -70,20 +72,14 @@ fn compile_program_modules_inner(
                         return;
                     }
                     let index = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(item) = sources.get(index) else {
+                    let Some(job) = jobs.get(index) else {
                         return;
                     };
-                    let options = metadata_compile_options(cc_options, item.deferred);
-                    if let Err(error) = compile_program_module(
-                        gsc,
-                        &item.source,
-                        &item.object,
-                        &item.module,
-                        &options,
-                        item.layout,
-                        observer,
-                    ) {
-                        *failure.lock().expect("native build failure lock") = Some(error);
+                    if let Err(error) = run(job) {
+                        failure
+                            .lock()
+                            .expect("native build failure lock")
+                            .get_or_insert(error);
                         return;
                     }
                 }

@@ -75,6 +75,66 @@ impl ProgramArchiveObserver for Observations {
 }
 
 #[test]
+fn c_staging_keeps_manifest_order_and_rejects_shared_output_names() {
+    let root = std::env::temp_dir().join(format!("gerbil-c-stage-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    let compiler = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/unit/scenarios/program-content-cache/inputs/fake-gsc.sh");
+    let stub = root.join("entry.scm");
+    fs::write(&stub, INPUT).unwrap();
+    let mut plan = super::ProgramManifest {
+        schema: String::new(),
+        modules: ["gamma", "beta", "delta", "alpha"]
+            .into_iter()
+            .map(|name| {
+                let scm = root.join(format!("{name}.scm"));
+                fs::write(&scm, INPUT).unwrap();
+                super::ProgramModule {
+                    module: name.into(),
+                    scm,
+                    system: false,
+                    deferred: false,
+                    host_layout: CFunctionLayout::CompilerDefault,
+                }
+            })
+            .collect(),
+        stub,
+        library_dir: root.clone(),
+        link_options: vec![],
+    };
+    let output = root.join("output");
+    let request = super::ProgramArchiveRequest {
+        manifest: &root.join("unused.json"),
+        gsc: &compiler,
+        archive_name: "test",
+        linker_name: "test",
+        out_dir: &output,
+    };
+    let observations = Observations(Mutex::new(Vec::new()));
+    let staged = super::stage_program(&plan, request, &observations).unwrap();
+    let ordered: Vec<_> = staged
+        .compile_sources
+        .iter()
+        .map(|job| {
+            assert!(job.source.is_file());
+            job.module.as_str()
+        })
+        .collect();
+    assert_eq!(ordered, ["gamma", "beta", "delta", "alpha"]);
+    assert_eq!(staged.objects[0], output.join("module_0.o"));
+
+    plan.modules[1].scm = plan.modules[0].scm.with_extension("ss");
+    fs::write(&plan.modules[1].scm, INPUT).unwrap();
+    let before = fs::read(output.join("compiler.log")).unwrap();
+    assert!(matches!(
+        super::stage_program(&plan, request, &observations),
+        Err(error) if error.contains("conflicting staged C output")
+    ));
+    assert_eq!(fs::read(output.join("compiler.log")).unwrap(), before);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn unchanged_native_input_reuses_content_addressed_output() {
     let root = std::env::temp_dir().join(format!(
         "gerbil-native-content-cache-{}",

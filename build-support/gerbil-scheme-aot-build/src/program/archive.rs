@@ -5,6 +5,7 @@
 #[cfg(test)]
 use super::compile_program_module;
 use super::compile_program_modules;
+use super::objects::for_each_native_job;
 use super::{
     GSC_PROGRESS_OPTIONS, configured_gambit_gcc, gambit_progress_command,
     gcc_allocation_diagnostics, native_progress_enabled, run_process, run_with_compiler_artifacts,
@@ -16,7 +17,7 @@ use crate::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -358,6 +359,8 @@ fn stage_program(
             subject: Some(&module_count),
         },
         || {
+            let mut c_jobs = Vec::new();
+            let mut staged_c = HashSet::from([linker_c.clone()]);
             for (index, module) in plan.modules.iter().enumerate() {
                 if !module.scm.is_file() {
                     return Err(format!("missing SCM for {}", module.module));
@@ -395,8 +398,12 @@ fn stage_program(
                     // Preserve the compiler's basename because it determines LNK names.
                     let file_name = module.scm.file_name().ok_or("SCM filename missing")?;
                     let staged = request.out_dir.join(file_name);
+                    let source = staged.with_extension("c");
+                    if source == staged || !staged_c.insert(source.clone()) {
+                        return Err(format!("conflicting staged C output: {}", source.display()));
+                    }
                     std::fs::copy(&module.scm, &staged).map_err(|e| e.to_string())?;
-                    let source = generate_module_c(request.gsc, &staged, &module.module, observer)?;
+                    c_jobs.push((staged, module.module.as_str()));
                     add_link_input(
                         &mut link,
                         &mut linked_modules,
@@ -416,7 +423,13 @@ fn stage_program(
                     objects.push(object);
                 }
             }
-            Ok(())
+            // Prepare unique jobs before spawning. Link arguments above retain
+            // manifest order regardless of native compiler completion order.
+            for_each_native_job(
+                &c_jobs,
+                native_build_parallelism(c_jobs.len()),
+                |(scm, module)| generate_module_c(request.gsc, scm, module, observer).map(|_| ()),
+            )
         },
     )?;
     let stub_source = generate_module_c(request.gsc, &plan.stub, "program-stub", observer)?;

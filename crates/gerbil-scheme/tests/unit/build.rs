@@ -111,17 +111,7 @@ fn build_test_and_failures_share_the_existing_owner() {
     let previous_cores = std::env::var_os("GERBIL_BUILD_CORES");
     let runtime = initialize();
     let directory = root.to_str().unwrap();
-    assert_eq!(runtime.clean_package(directory).unwrap(), 70);
-    assert_eq!(runtime.run_package_main(directory, &["clean"]).unwrap(), 70);
-    configure(&runtime, &root);
-    let cancelled = AtomicBool::new(true);
-    assert_eq!(
-        runtime
-            .build_package_cancellable(directory, &cancelled)
-            .unwrap(),
-        PackageCallOutcome::CancelledBeforeEntry
-    );
-    assert!(!root.join("build-owner.txt").exists());
+    configure_after_pre_entry_checks(&runtime, &root);
     let cwd = std::env::current_dir().unwrap();
     assert_eq!(runtime.build_package(directory).unwrap(), 0);
     report("initial build returned");
@@ -205,6 +195,21 @@ fn build_test_and_failures_share_the_existing_owner() {
     assert_eq!(std::env::var_os("GERBIL_PATH"), previous_prefix);
     assert_eq!(std::env::var_os("GERBIL_BUILD_CORES"), previous_cores);
     fs::remove_dir_all(root).unwrap();
+}
+
+fn configure_after_pre_entry_checks(runtime: &GerbilRuntime, root: &std::path::Path) {
+    let directory = root.to_str().unwrap();
+    assert_eq!(runtime.clean_package(directory).unwrap(), 70);
+    assert_eq!(runtime.run_package_main(directory, &["clean"]).unwrap(), 70);
+    configure(runtime, root);
+    let cancelled = AtomicBool::new(true);
+    assert_eq!(
+        runtime
+            .build_package_cancellable(directory, &cancelled)
+            .unwrap(),
+        PackageCallOutcome::CancelledBeforeEntry
+    );
+    assert!(!root.join("build-owner.txt").exists());
 }
 
 fn stage_and_clean(runtime: &GerbilRuntime, root: &std::path::Path) {

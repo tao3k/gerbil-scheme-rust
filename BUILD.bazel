@@ -41,6 +41,7 @@ filegroup(
         "crates/**/ffi/**/*.h",
         "crates/**/scheme/**/*.ss",
         "crates/**/Cargo.toml",
+        "crates/**/tests/fixtures/**",
         "crates/**/tests/unit/scenarios/**",
         "build-support/**/*.rs",
         "build-support/**/*.md",
@@ -50,6 +51,7 @@ filegroup(
         "Cargo.lock",
         "Cargo.toml",
         "rust-toolchain.toml",
+        "specs/scheduling/owner_peak_recovery.json",
     ],
 )
 

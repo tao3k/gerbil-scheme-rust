@@ -13,6 +13,40 @@ The original deadlines and 128-backlog gate still apply. The paths under
 =.ci= and =.data= identify local evidence or source copies. Those paths
 are not included in this publication.
 
+* Retained frozen replay at 12.869 ms p99
+
+The original 7f915df reader and image ran the same one-VM load:
+1000000 planned four-line typed orders at 1000000/s for one second,
+after the original 1000/s one-second warmup. Latency is measured
+from planned arrival to verified consumption. The frozen runtime,
+load, SDK, request deadline and admission limits are unchanged.
+
+| Main metric | Replay |
+|-------------+--------|
+| Verified consumed | 1000000 |
+| Successful throughput | 987434.24 messages/s |
+| p99 / p99.9 | 12.869 / 12.948 ms |
+| Rejected / errors / timeouts | 0 / 0 / 0 |
+| Sampled peak due-unconsumed | 12969 |
+| Peak unpublished | 12967 |
+| Inner elapsed / whole native call | 1012.725666 / 1023.012708 ms |
+| Clean shutdown | yes |
+
+The prior overlapping compiler process group was absent before and
+after launch. A separate compiler group appeared in the preflight
+snapshot. These snapshots leave the cause of the tail unresolved.
+The gate stopped at the first frozen control on latency and backlog.
+The matched control and candidate did not run. Retain this complete
+replay as evidence alongside the 4.513 ms reference and the 3.927 ms
+historical best. The original 128-backlog requirement still applies.
+
+| Evidence item | SHA-256 |
+|---------------+---------|
+| Frozen reader | f1e24bfcdb8a43cdd85a1fb1b366655c8047b041756e0a53f20325a1cc732d86 |
+| Frozen owner image | 53ba9b24871cb1abd5b7e705bc04be83f1a1630bc7c22c7997db930aaed98e8d |
+| Replay stdout | ab3943d7451f2d224cd9340923762f8738203cc95eafac03e22b09e0da45fe98 |
+| Replay stderr | 7a8d8da485c94baba9ec820316009d8970af2d0f100c510e8a52777018d753a6 |
+
 * Decision and scope
 
 Use the published d56f94c checkpoint as the constructive reference. Its

@@ -2,7 +2,7 @@
 ;; an unbounded list of payloads. The original timestamps and deadline include
 ;; that debt. Three existing execution credits own three transfer frames.
 (defrules define-mailbox-backpressure ()
- ((_ name observe? watch? park? coalesce? owned-plan? scoped?)
+ ((_ name observe? watch? owned-plan? scoped? construct execute)
  (def (name command)
   (mailbox-failure-reset!)
   (let* ((header (vector-ref command 0)) (rate (s64vector-ref header 1))
@@ -26,7 +26,6 @@
            (next 0) (completed 0) (active 0) (max-debt 0) (max-outstanding 0)
            (max-lag 0) (last-publish 0) (over-window 0) (start 0) (stopped? #f)
            (watch-before #f) (watch-after #f)
-           (edge (and coalesce? (make-mailbox-ready-edge frames receiver (vector #f) 0 0 0)))
            (plan (and owned-plan? (mailbox-source-plan-create rate)))
            (advance-plan (and owned-plan? (mailbox-source-plan-step plan))))
      (with-mailbox-observation observe? rate (if observe? (s64vector-ref header 4) 0)
@@ -73,7 +72,7 @@
                           (with-catch
                             (lambda (failure) (vector-set! frame 4 #t) (vector-set! frame 3 failure))
                             (lambda ()
-                              (let (value (orders-service-handler index (vector-ref frame 3)))
+                              (let (value (execute index (vector-ref frame 3)))
                                 (when observe? (mailbox-observe! worker-observer verification id))
                                 ;; Complete the SAME independent oracle inside
                                 ;; this existing Actor turn, not a new scheduler.
@@ -83,9 +82,7 @@
                           (vector-set! frame 2 'ready)
                           ;; Immutable id protects frame reuse against a stale
                           ;; response even after its mutable slot is recycled.
-                          (if coalesce?
-                            (mailbox-publish-ready! edge id)
-                            (thread-send receiver (cons id frame))))
+                          (thread-send receiver (cons id frame)))
                         (when observe? (mailbox-observe! worker-observer worker-idle 0))
                         (work))))))))
               )
@@ -118,7 +115,7 @@
                   (let (frame (vector-ref frames slot))
                     (when (eq? (vector-ref frame 2) 'free)
                       (when observe? (mailbox-observe! observer construction next))
-                      (let ((id next) (input (actor-arrival-input next))
+                      (let ((id next) (input (construct next))
                             (planned-time (and owned-plan? (mailbox-source-plan-time plan))))
                         (vector-set! frame 1 id) (vector-set! frame 2 'queued)
                         (vector-set! frame 3 input) (vector-set! frame 4 #f)
@@ -136,15 +133,12 @@
               ;; dependency; no yield/poll layer or timer is added.
               (let* ((message (begin
                        (when observe? (mailbox-observe! observer dispatch next))
-                       (if coalesce? (mailbox-take-ready edge) (thread-receive 10 #f)))))
-                (unless (or coalesce? message) (begin (mailbox-failure-seal! command 'completion-wait (owner-wait-trace 1 0) start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (error "native completion exceeded ten seconds")))
-                ;; A wake may describe results already taken by the fast path.
-                ;; It returns no credit, fabricates no progress, and never waits
-                ;; for a whole batch. Recheck the service cycle immediately.
+                       (thread-receive 10 #f))))
+                (unless message (begin (mailbox-failure-seal! command 'completion-wait (owner-wait-trace 1 0) start rate total next completed active histogram max-debt max-outstanding max-lag last-publish over-window) (error "native completion exceeded ten seconds")))
                 (when message
                 (when observe? (mailbox-observe! observer consumption (car message)))
-                (let* ((frame (if coalesce? message (cdr message)))
-                       (id (if coalesce? (vector-ref frame 1) (car message)))
+                (let* ((frame (cdr message))
+                       (id (car message))
                        (slot (vector-ref frame 0)))
                   (unless (and (<= 0 slot 2) (eq? frame (vector-ref frames slot))
                                (= id (vector-ref frame 1)) (eq? (vector-ref frame 2) 'ready))
@@ -163,15 +157,7 @@
                   (set! active (1- active)) (set! completed (1+ completed)))))
               (begin
                 (when observe? (mailbox-observe! observer idle next))
-                (if park?
-                  ;; No admitted work can be delayed: all active credits are
-                  ;; free. Park this green thread only until the ORIGINAL next
-                  ;; source timestamp; overdue work is supplied immediately.
-                  (when (< next total)
-                    (let (remaining (- (planned next) (owner-wait-trace 1 0)))
-                      (when (positive? remaining)
-                        (thread-sleep! (exact->inexact (/ remaining 1000000000))))))
-                  (thread-yield!))))
+                (thread-yield!)))
             (when (< completed total) (drive)))
           (let (elapsed (- (owner-wait-trace 1 0) start))
             (when watch?
@@ -183,10 +169,6 @@
             (when owned-plan?
               (unless (= (mailbox-source-plan-time plan) (planned total))
                 (error "native source plan final identity")))
-            (when coalesce?
-              ;; Join any worker between frame publication and signaling before
-              ;; projecting epoch counters. Cleanup drains the last optional wake.
-              (stop!))
             (let (receipt (s64vector total completed 0 elapsed (quotient (* (1- total) 1000000000) rate)
               (actor-arrival-percentile histogram completed 99 100)
               (actor-arrival-percentile histogram completed 999 1000) max-lag
@@ -204,19 +186,17 @@
                   (vector receipt (mailbox-report "owner" (mailbox-owner-watch-report)
                     "trial_begin" (mailbox-clock-report watch-before)
                     "trial_end" (mailbox-clock-report watch-after)))
-                  (if coalesce?
-                    (vector receipt (mailbox-ready-receipt edge))
-                    receipt)))))))
+                  receipt))))))
         (lambda ()
           (with-catch (lambda (failure) (set! orders-native-access? #f) (raise failure))
             (lambda ()
               (when watch?
                 (unless (zero? (mailbox-owner-watch-stop!)) (error "native owner observer unwind failed")))
               (stop!) (set! orders-native-access? #f)))))))))))))
-(define-mailbox-backpressure orders-mailbox-backpressure #f #f #f #f #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-observed #t #f #f #f #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-watched #f #t #f #f #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-parked #f #f #t #f #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-coalesced #f #f #f #t #f #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-scheduled #f #f #f #f #t #f)
-(define-mailbox-backpressure orders-mailbox-backpressure-scoped #f #f #f #f #t #t)
+(defrules execute-private-arrival-order ()
+ ((_ _index order) (orders-short-service order)))
+(define-mailbox-backpressure orders-mailbox-backpressure #f #f #f #f actor-arrival-input orders-service-handler)
+(define-mailbox-backpressure orders-mailbox-backpressure-observed #t #f #f #f actor-arrival-input orders-service-handler)
+(define-mailbox-backpressure orders-mailbox-backpressure-watched #f #t #f #f actor-arrival-input orders-service-handler)
+(define-mailbox-backpressure orders-mailbox-backpressure-scheduled #f #f #t #f actor-arrival-order-data execute-private-arrival-order)
+(define-mailbox-backpressure orders-mailbox-backpressure-scoped #f #f #t #t actor-arrival-input orders-service-handler)

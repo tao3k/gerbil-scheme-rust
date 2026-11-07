@@ -198,6 +198,8 @@ const OWNER_EXPORTS: &[&str] = &[
     "gerbil_owner_service_observe",
     "gerbil_owner_service_fail",
     "gerbil_owner_service_single",
+    "gerbil_owner_mailbox_terminal_take",
+    "gerbil_owner_mailbox_terminal_contract",
 ];
 
 #[derive(Clone, Copy)]

@@ -166,8 +166,6 @@ impl Drop for Watchdog {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum NativePath {
     BackpressureSchedule,
-    BackpressureCoalesced,
-    BackpressurePark,
     BackpressureUrgent,
     BackpressureOwnerUrgent,
     BackpressureOwnerWatch,
@@ -183,8 +181,6 @@ enum NativePath {
 impl NativePath {
     fn command(self) -> i64 {
         match self {
-            Self::BackpressurePark => 59,
-            Self::BackpressureCoalesced => 60,
             Self::BackpressureSchedule => {
                 if scope_diagnostic(self) {
                     64
@@ -215,8 +211,6 @@ impl NativePath {
                 | NativePath::BackpressureOwnerWatch
                 | NativePath::BackpressureOwnerUrgent
                 | NativePath::BackpressureUrgent
-                | NativePath::BackpressurePark
-                | NativePath::BackpressureCoalesced
                 | NativePath::BackpressureSchedule
         ) || backpressure_compare
         {
@@ -253,20 +247,8 @@ fn copy_arrival_receipt(
         println!(
             "{}",
             json!({"event":if scope_diagnostic(path) {"owner_wait_scope"}else if matches!(path,NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent) {"native_mailbox_owner_watch"}else{"native_mailbox_observation"},"diagnostic_only":true,
-                    "scoped_user_initiated_qos":matches!(path,NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent),"native_source_park":path==NativePath::BackpressurePark,
+                    "scoped_user_initiated_qos":matches!(path,NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent),"native_source_park":false,
                     "warmup":warmup,"stages":stages,"wait_evidence":wait_evidence})
-        );
-        session.copy_numeric::<i64>(&session.vector_element(result, 0)?)
-    } else if path == NativePath::BackpressureCoalesced {
-        let wake = session.copy_numeric::<i64>(&session.vector_element(result, 1)?)?;
-        let [issued, taken, unread] = wake.as_slice() else {
-            panic!("native coalesced wake receipt")
-        };
-        assert!(*issued >= *taken && issued - taken == *unread && (0..=1).contains(unread));
-        println!(
-            "{}",
-            json!({"event":"native_ready_wake_receipt","warmup":warmup,
-                    "issued":issued,"notifications_taken":taken,"retired_without_receiver_take":unread,"payload_frames":3,"wake_queue_bound":1})
         );
         session.copy_numeric::<i64>(&session.vector_element(result, 0)?)
     } else {
@@ -399,8 +381,6 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
             | NativePath::BackpressureOwnerWatch
             | NativePath::BackpressureOwnerUrgent
             | NativePath::BackpressureUrgent
-            | NativePath::BackpressurePark
-            | NativePath::BackpressureCoalesced
             | NativePath::BackpressureSchedule
     ) {
         let [source_debt, outstanding, last_publication, over_window] = debt else {
@@ -450,8 +430,8 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
         ].into_iter().filter_map(|(ok, reason)|(!ok).then_some(reason)).collect()
     } else { legacy_admission };
     let passed = admission.is_empty();
-    let mut value = json!({"event":"gerbil_actor_arrival","mailbox":path!=NativePath::Service,"ready_drain_pipeline":matches!(path,NativePath::Pipeline|NativePath::Direct),"diagnostic_no_actor_handoff":path==NativePath::Direct,"native_data_access":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"data_access_edge_contract":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressurePark|NativePath::BackpressureCoalesced|NativePath::BackpressureSchedule),"diagnostic_native_observation":path==NativePath::BackpressureObserved,"diagnostic_owner_watch":matches!(path,NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent),"scoped_user_initiated_qos":matches!(path,NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent),"native_source_park":path==NativePath::BackpressurePark,"warmup":warmup,"rate":rate,"seconds":seconds,
-        "owned_source_schedule":path==NativePath::BackpressureSchedule,"native_coalesced_wake":path==NativePath::BackpressureCoalesced,"performance_admission":{"passed":passed,"failures":admission,"scope":"native_500k_original_guard"},
+    let mut value = json!({"event":"gerbil_actor_arrival","mailbox":path!=NativePath::Service,"ready_drain_pipeline":matches!(path,NativePath::Pipeline|NativePath::Direct),"diagnostic_no_actor_handoff":path==NativePath::Direct,"native_data_access":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressureSchedule),"data_access_edge_contract":matches!(path,NativePath::Access|NativePath::BackpressureAccess|NativePath::BackpressureObserved|NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent|NativePath::BackpressureSchedule),"diagnostic_native_observation":path==NativePath::BackpressureObserved,"diagnostic_owner_watch":matches!(path,NativePath::BackpressureOwnerWatch|NativePath::BackpressureOwnerUrgent),"scoped_user_initiated_qos":matches!(path,NativePath::BackpressureOwnerUrgent|NativePath::BackpressureUrgent),"native_source_park":false,"warmup":warmup,"rate":rate,"seconds":seconds,
+        "owned_source_schedule":path==NativePath::BackpressureSchedule,"native_coalesced_wake":false,"performance_admission":{"passed":passed,"failures":admission,"scope":"native_500k_original_guard"},
         "planned":planned,"completed":completed,"accepted":completed,"rejected":rejected,"failed":0,"accepted_timeouts":0,"remaining_staged":0,"remaining_native":0,"source_backpressure":source,"snapshot_gc_duplicate_and_unread_close_contract":matches!(path,NativePath::Pipeline|NativePath::Direct),
         "completed_per_second":f64::from(u32::try_from(*completed).unwrap())/Duration::from_nanos(u64::try_from(*elapsed).unwrap()).as_secs_f64(),"rejection_percent":100.0*f64::from(u32::try_from(*rejected).unwrap())/f64::from(u32::try_from(*planned).unwrap()),
         "elapsed_ns":elapsed,"offered_elapsed_ns":offered_elapsed,"successful_planned_to_consumed_p99_ns":p99,
@@ -578,7 +558,6 @@ fn check_strict_scope(path: NativePath, rate: u64, seconds: u64) {
                 && matches!(
                     path,
                     NativePath::BackpressureAccess
-                        | NativePath::BackpressureCoalesced
                         | NativePath::BackpressureSchedule
                 )
                 && rate == 500_000
@@ -600,47 +579,6 @@ fn finish(pool: &mut InstancePool, admitted: bool) {
             "native 500k performance admission failed; cleanup success is independent"
         );
     }
-}
-
-fn coalesced_pair(pool: &mut InstancePool, rate: u64, seconds: u64) -> bool {
-    if !std::env::args().any(|arg| arg == "--backpressure-coalesced-compare") {
-        return false;
-    }
-    run(pool, 1000, 1, true, NativePath::BackpressureAccess);
-    run(pool, rate, seconds, false, NativePath::BackpressureAccess);
-    run(pool, 1000, 1, true, NativePath::BackpressureCoalesced);
-    let admitted = run(
-        pool,
-        rate,
-        seconds,
-        false,
-        NativePath::BackpressureCoalesced,
-    );
-    finish(pool, admitted);
-    true
-}
-
-fn ready_contract(pool: &InstancePool, path: NativePath) {
-    if path != NativePath::BackpressureCoalesced
-        && !std::env::args().any(|arg| arg == "--backpressure-coalesced-compare")
-    {
-        return;
-    }
-    pool.dispatcher()
-        .submit_native_on(0, |session| {
-            let header = session.numeric_vector::<i64>(&[61])?;
-            let command = session.vector(&[&header])?;
-            let result = session.call_export(c"gerbil_owner_service_reference", &command)?;
-            assert_eq!(session.copy_numeric::<i64>(&result)?, [0]);
-            Ok(())
-        })
-        .unwrap()
-        .wait(GATE)
-        .unwrap();
-    println!(
-        "{}",
-        json!({"event":"native_ready_contract","passed":true,"outside_measured_arms":true})
-    );
 }
 
 fn source_plan_contract(pool: &InstancePool, path: NativePath) {
@@ -681,7 +619,6 @@ fn source_plan_pair(pool: &mut InstancePool, rate: u64, seconds: u64) -> bool {
 fn select_path() -> NativePath {
     let has = |flag| std::env::args().any(|arg| arg == flag);
     let qos_native_compare = has("--backpressure-native-qos-compare");
-    let park_compare = has("--backpressure-park-compare");
     let qos_compare = qos_native_compare
         || has("--owner-qos-contract-only")
         || has("--backpressure-owner-qos-compare");
@@ -690,13 +627,7 @@ fn select_path() -> NativePath {
     let pipeline_compare = has("--pipeline-compare");
     if has("--owner-wait-scope") || has("--backpressure-owned-schedule") {
         NativePath::BackpressureSchedule
-    } else if std::env::args().any(|s| s == "--backpressure-coalesced") {
-        NativePath::BackpressureCoalesced
-    } else if qos_native_compare
-        || park_compare
-        || has("--backpressure-coalesced-compare")
-        || has("--backpressure-schedule-compare")
-    {
+    } else if qos_native_compare || has("--backpressure-schedule-compare") {
         NativePath::BackpressureAccess
     } else if qos_compare || std::env::args().any(|s| s == "--backpressure-owner-watch") {
         NativePath::BackpressureOwnerWatch
@@ -757,6 +688,11 @@ fn native_host_contract(pool: &mut InstancePool) {
 }
 
 fn main() {
+    assert!(
+        !std::env::args().any(|arg| matches!(arg.as_str(),
+            "--backpressure-park-compare" | "--backpressure-coalesced" | "--backpressure-coalesced-compare")),
+        "the experimental source park and ready-edge paths were retired"
+    );
     trace_gate();
     let rate = option("--rate=", if capacity_research() { 1_000_000 } else { 500_000 });
     let seconds = option("--seconds=", if capacity_research() { 1 } else { 10 });
@@ -765,7 +701,6 @@ fn main() {
     let backpressure_compare = std::env::args().any(|s| s == "--backpressure-compare");
     let qos_contract_only = std::env::args().any(|s| s == "--owner-qos-contract-only");
     let qos_native_compare = std::env::args().any(|s| s == "--backpressure-native-qos-compare");
-    let park_compare = std::env::args().any(|s| s == "--backpressure-park-compare");
     let qos_compare = qos_native_compare
         || qos_contract_only
         || std::env::args().any(|s| s == "--backpressure-owner-qos-compare");
@@ -789,12 +724,8 @@ fn main() {
         native_host_contract(&mut pool);
         return;
     }
-    ready_contract(&pool, path);
     source_plan_contract(&pool, path);
     if source_plan_pair(&mut pool, rate, seconds) {
-        return;
-    }
-    if coalesced_pair(&mut pool, rate, seconds) {
         return;
     }
     if qos_compare {
@@ -810,10 +741,6 @@ fn main() {
     }
     run(&pool, 1000, 1, true, path);
     let admitted = run(&pool, rate, seconds, false, path);
-    if park_compare {
-        run(&pool, 1000, 1, true, NativePath::BackpressurePark);
-        run(&pool, rate, seconds, false, NativePath::BackpressurePark);
-    }
     if qos_compare {
         qos_candidate(&pool, rate, seconds, qos_native_compare);
     }

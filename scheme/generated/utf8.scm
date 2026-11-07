@@ -1,128 +1,128 @@
 (declare (block) (standard-bindings) (extended-bindings))
 (begin
-  (define gerbil-scheme-rust/scheme/utf8::timestamp 1793963111)
+  (define gerbil-scheme-rust/scheme/utf8::timestamp 1794084866)
   (begin
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8
-      (lambda (_%str513%_)
-        (let* ((_%length515%_ (string-length _%str513%_))
-               (_%capacity517%_ (* '4 _%length515%_)))
-          (if (fixnum? _%capacity517%_)
+      (lambda (_%str515%_)
+        (let* ((_%length517%_ (string-length _%str515%_))
+               (_%capacity519%_ (* '4 _%length517%_)))
+          (if (fixnum? _%capacity519%_)
               '#!void
               (let ()
                 (declare (not safe))
-                (error '"UTF-8 capacity exceeds fixnum range" _%length515%_)))
-          (let ((_%bytes520%_ (make-u8vector _%capacity517%_)))
-            (let _%loop522%_ ((_%start524%_ '0) (_%j525%_ '0))
+                (error '"UTF-8 capacity exceeds fixnum range" _%length517%_)))
+          (let ((_%bytes522%_ (make-u8vector _%capacity519%_)))
+            (let _%loop524%_ ((_%start526%_ '0) (_%j527%_ '0))
               (if (let ()
                     (declare (not safe))
-                    (##fx< _%start524%_ _%length515%_))
-                  (let* ((_%end527%_
-                          (if (let ((__tmp9594
+                    (##fx< _%start526%_ _%length517%_))
+                  (let* ((_%end529%_
+                          (if (let ((__tmp9686
                                      (let ()
                                        (declare (not safe))
-                                       (##fx- _%length515%_ _%start524%_))))
+                                       (##fx- _%length517%_ _%start526%_))))
                                 (declare (not safe))
-                                (##fx< __tmp9594 '256))
-                              _%length515%_
+                                (##fx< __tmp9686 '256))
+                              _%length517%_
                               (let ()
                                 (declare (not safe))
-                                (##fx+ _%start524%_ '256))))
-                         (_%next529%_
+                                (##fx+ _%start526%_ '256))))
+                         (_%next531%_
                           (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk
-                           _%str513%_
-                           _%bytes520%_
-                           _%start524%_
-                           _%end527%_
-                           _%j525%_)))
-                    (_%loop522%_ _%end527%_ _%next529%_))
+                           _%str515%_
+                           _%bytes522%_
+                           _%start526%_
+                           _%end529%_
+                           _%j527%_)))
+                    (_%loop524%_ _%end529%_ _%next531%_))
                   (begin
                     (if (let ()
                           (declare (not safe))
-                          (##fx< _%j525%_ _%capacity517%_))
+                          (##fx< _%j527%_ _%capacity519%_))
                         (let ()
                           (declare (not safe))
-                          (##u8vector-shrink! _%bytes520%_ _%j525%_))
+                          (##u8vector-shrink! _%bytes522%_ _%j527%_))
                         '#!void)
-                    _%bytes520%_)))))))
+                    _%bytes522%_)))))))
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-into
-      (lambda (_%str497%_ _%pointer498%_ _%capacity499%_)
-        (let ((_%length501%_ (string-length _%str497%_)))
-          (if (and (fixnum? _%capacity499%_) (>= _%capacity499%_ '0))
+      (lambda (_%str499%_ _%pointer500%_ _%capacity501%_)
+        (let ((_%length503%_ (string-length _%str499%_)))
+          (if (and (fixnum? _%capacity501%_) (>= _%capacity501%_ '0))
               '#!void
               (let ()
                 (declare (not safe))
                 (error '"UTF-8 caller capacity cannot admit encoding")))
-          (let _%loop503%_ ((_%start505%_ '0) (_%written506%_ '0))
+          (let _%loop505%_ ((_%start507%_ '0) (_%written508%_ '0))
             (if (let ()
                   (declare (not safe))
-                  (##fx< _%start505%_ _%length501%_))
-                (let* ((_%end508%_
-                        (if (let ((__tmp9595
+                  (##fx< _%start507%_ _%length503%_))
+                (let* ((_%end510%_
+                        (if (let ((__tmp9687
                                    (let ()
                                      (declare (not safe))
-                                     (##fx- _%length501%_ _%start505%_))))
+                                     (##fx- _%length503%_ _%start507%_))))
                               (declare (not safe))
-                              (##fx< __tmp9595 '256))
-                            _%length501%_
+                              (##fx< __tmp9687 '256))
+                            _%length503%_
                             (let ()
                               (declare (not safe))
-                              (##fx+ _%start505%_ '256))))
-                       (_%next510%_
+                              (##fx+ _%start507%_ '256))))
+                       (_%next512%_
                         (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk
-                         _%str497%_
-                         _%pointer498%_
-                         _%capacity499%_
-                         _%start505%_
-                         _%end508%_
-                         _%written506%_)))
-                  (_%loop503%_ _%end508%_ _%next510%_))
-                _%written506%_)))))
+                         _%str499%_
+                         _%pointer500%_
+                         _%capacity501%_
+                         _%start507%_
+                         _%end510%_
+                         _%written508%_)))
+                  (_%loop505%_ _%end510%_ _%next512%_))
+                _%written508%_)))))
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-buffer-chunk
-      (lambda (_%str487%_
-               _%pointer488%_
-               _%capacity489%_
-               _%start490%_
-               _%end491%_
-               _%written492%_)
+      (lambda (_%str489%_
+               _%pointer490%_
+               _%capacity491%_
+               _%start492%_
+               _%end493%_
+               _%written494%_)
         (declare (not interrupts-enabled))
-        (let ((_%next495%_
+        (let ((_%next497%_
                (let ()
                  (declare (not safe))
                  (##c-code
                   '"void *destination = 0;\nif (___EXT(___SCMOBJ_to_POINTER) (___PSP ___ARG2, &destination, ___ARG7, 2) != ___FIX(___NO_ERR))\n  ___RESULT = ___FIX(-2);\nelse\n  ___RESULT = gerbil_utf8_encode_into(___ARG1, ___CAST(___U8*, destination),\n                                    ___ARG3, ___ARG4, ___ARG5, ___ARG6);"
-                  _%str487%_
-                  _%pointer488%_
-                  _%capacity489%_
-                  _%start490%_
-                  _%end491%_
-                  _%written492%_
+                  _%str489%_
+                  _%pointer490%_
+                  _%capacity491%_
+                  _%start492%_
+                  _%end493%_
+                  _%written494%_
                   '(void*)))))
-          (if (let () (declare (not safe)) (##fx< _%next495%_ '0))
+          (if (let () (declare (not safe)) (##fx< _%next497%_ '0))
               (let ()
                 (declare (not safe))
                 (error '"Illegal Unicode scalar or caller bounds"))
-              _%next495%_))))
+              _%next497%_))))
     (define gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk
-      (lambda (_%str478%_
-               _%bytes479%_
-               _%start480%_
-               _%end481%_
-               _%output-start482%_)
+      (lambda (_%str480%_
+               _%bytes481%_
+               _%start482%_
+               _%end483%_
+               _%output-start484%_)
         (declare (not interrupts-enabled))
-        (let ((_%next485%_
+        (let ((_%next487%_
                (gerbil-scheme-rust/scheme/utf8#gerbil-rs-encode-utf8-chunk-c
-                _%str478%_
-                _%bytes479%_
-                _%start480%_
-                _%end481%_
-                _%output-start482%_)))
-          (if (let () (declare (not safe)) (##fx< _%next485%_ '0))
+                _%str480%_
+                _%bytes481%_
+                _%start482%_
+                _%end483%_
+                _%output-start484%_)))
+          (if (let () (declare (not safe)) (##fx< _%next487%_ '0))
               (let ()
                 (declare (not safe))
                 (error '"Illegal Unicode scalar or UTF-8 chunk bounds"
-                       _%start480%_
-                       _%end481%_))
-              _%next485%_))))
+                       _%start482%_
+                       _%end483%_))
+              _%next487%_))))
     (namespace
      ("gerbil-scheme-rust/scheme/utf8#"
       gerbil-rs-encode-utf8-chunk-c

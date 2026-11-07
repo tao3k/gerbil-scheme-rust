@@ -17,14 +17,25 @@ pub struct GambitLinkSearchDiscovery {
 /// Finds the Gambit library associated with a selected `gsc` executable.
 #[must_use]
 pub fn discover_gambit_link_search_dir_from_gsc(gsc: &Path) -> Option<GambitLinkSearchDiscovery> {
-    gambit_link_search_dir_candidates(gsc)
-        .into_iter()
-        .find_map(|search_dir| {
-            find_gambit_library(&search_dir).map(|library_path| GambitLinkSearchDiscovery {
-                search_dir,
-                library_path,
-            })
+    let discover = |search_dir: PathBuf| {
+        find_gambit_library(&search_dir).map(|library_path| GambitLinkSearchDiscovery {
+            search_dir,
+            library_path,
         })
+    };
+    let mut candidates = Vec::new();
+    push_gsc_prefix_lib_candidate(&mut candidates, gsc);
+    if let Ok(canonical_gsc) = fs::canonicalize(gsc) {
+        push_gsc_prefix_lib_candidate(&mut candidates, &canonical_gsc);
+    }
+    candidates.into_iter().find_map(discover).or_else(|| {
+        // A direct SDK executable can be large. Read a wrapper only when
+        // neither the selected nor the resolved executable owns a library.
+        let wrapper = fs::read_to_string(gsc).ok()?;
+        gsc_wrapper_prefixes(&wrapper)
+            .map(|prefix| prefix.join("lib"))
+            .find_map(discover)
+    })
 }
 
 /// Inputs of the selected SDK, using the same library owner as link discovery.
@@ -49,20 +60,6 @@ pub(crate) fn gambit_sdk_inputs(gsc: &Path) -> Vec<PathBuf> {
         }
     }
     inputs
-}
-
-fn gambit_link_search_dir_candidates(gsc: &Path) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    push_gsc_prefix_lib_candidate(&mut candidates, gsc);
-    if let Ok(canonical_gsc) = fs::canonicalize(gsc) {
-        push_gsc_prefix_lib_candidate(&mut candidates, &canonical_gsc);
-    }
-    if let Ok(wrapper) = fs::read_to_string(gsc) {
-        for prefix in gsc_wrapper_prefixes(&wrapper) {
-            push_unique_candidate(&mut candidates, prefix.join("lib"));
-        }
-    }
-    candidates
 }
 
 fn push_gsc_prefix_lib_candidate(candidates: &mut Vec<PathBuf>, gsc: &Path) {

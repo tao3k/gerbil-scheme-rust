@@ -29,6 +29,14 @@ fn discovers_gambit_library_from_a_gerbil_wrapper() {
         .expect("discover Gambit from wrapper");
     assert_eq!(discovery.search_dir, lib);
     assert!(discovery.library_path.ends_with("libgambit.a"));
+
+    let sibling_lib = wrapper_root.join("lib");
+    fs::create_dir_all(&sibling_lib).expect("create sibling library directory");
+    fs::write(sibling_lib.join("libgambit.a"), "").expect("write sibling Gambit library");
+    let discovery = discover_gambit_link_search_dir_from_gsc(&wrapper_bin.join("gsc"))
+        .expect("discover sibling Gambit library");
+    assert_eq!(discovery.search_dir, sibling_lib);
+
     fs::remove_dir_all(prefix).expect("remove prefix");
     fs::remove_dir_all(wrapper_root).expect("remove wrapper root");
 }

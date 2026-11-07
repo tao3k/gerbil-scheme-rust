@@ -4,6 +4,7 @@ module actor_population {
   const JOBS:Set[int]
   const BUDGET:int
   import actor_batch_core(ACTORS=PEERS,PROCESSORS=Set(1)) as cpu from "./actor_batch_core"
+  // actorEpoch is the worker birth epoch. jobEpoch identifies the source invocation.
   type Population = {
     phase:str, epoch:int, resident:Set[int], cohort:Set[int], baselineSize:int, born:Set[int], stopping:Set[int],
     actorEpoch:int->int, queue:int->List[int], work:int->int, waiting:Set[int],
@@ -27,7 +28,7 @@ module actor_population {
   val drained = p.arrived==p.consumed and busy.size()==0 and queued.size()==0 and
     p.waiting.size()==0 and p.retained.size()==0 and cpu::running.size()==0
   def canResume(a:int, epoch:int, m:int):bool =
-    JOBS.contains(m) and p.resident.contains(a) and p.actorEpoch.get(a)==epoch and p.jobEpoch.get(m)==epoch and
+    JOBS.contains(m) and p.resident.contains(a) and p.epoch==epoch and p.jobEpoch.get(m)==epoch and
     p.owner.get(m)==a and p.work.get(a)==m and not(p.completed.contains(m)) and p.waiting.contains(a)
   action init = all {
     cpu::init,
@@ -60,7 +61,7 @@ module actor_population {
     p.phase=="run",p.available,p.arrived.contains(m),not(p.published.contains(m)),
     p.resident.contains(a),not(cpu::terminal.contains(a)),inflight.size()<p.tokens,memory+1<=BUDGET,
     cpu::stutter,p'={...p,published:p.published.union(Set(m)),owner:p.owner.set(m,a),
-      jobEpoch:p.jobEpoch.set(m,p.actorEpoch.get(a)),queue:p.queue.set(a,p.queue.get(a).append(m))}
+      jobEpoch:p.jobEpoch.set(m,p.epoch),queue:p.queue.set(a,p.queue.get(a).append(m))}
   }
   action start(a:int):bool = all {
     Set("run","draining").contains(p.phase),p.available,p.resident.contains(a),
@@ -116,7 +117,9 @@ module actor_population {
   action configure(profile:str):bool = all {
     p.phase=="quiescent",p.available,p.epoch<2,
     Set("cpu","green-wait","owner-stall").contains(profile),drained,
-    cpu::stutter,p'={...p,phase:"configure",epoch:p.epoch+1,profile:profile,baselineSize:p.resident.size()}
+    cpu::stutter,p'={...p,phase:"configure",epoch:p.epoch+1,profile:profile,baselineSize:p.resident.size(),
+      arrived:Set(),published:Set(),completed:Set(),consumed:Set(),failed:Set(),timedOut:Set(),
+      owner:JOBS.mapBy(_=>0),jobEpoch:JOBS.mapBy(_=>0),count:JOBS.mapBy(_=>0),remaining:JOBS.mapBy(_=>2)}
   }
   action closing = all { p.phase=="quiescent",p.available,drained,cpu::stutter,p'={...p,phase:"closing"} }
   action stop(a:int):bool = all {
@@ -140,11 +143,12 @@ module actor_population {
     p.consumed.subseteq(p.completed),p.timedOut.subseteq(p.published),p.completed.subseteq(p.published),p.published.subseteq(p.arrived),p.failed.subseteq(p.completed),
     queued.intersect(busyJobs).size()==0,queued.union(busyJobs)==executing,
     executing.intersect(ready).size()==0,executing.union(ready)==inflight,
+    p.published.forall(m=>p.jobEpoch.get(m)==p.epoch),
     JOBS.forall(m=>p.count.get(m)==(if(p.completed.contains(m)) 1 else 0)),
     JOBS.forall(m=>(p.remaining.get(m)==0)==p.completed.contains(m)),
     PEERS.forall(a=>p.queue.get(a).length()==p.queue.get(a).foldl(Set(),(s,m)=>s.union(Set(m))).size()),
-    PEERS.forall(a=>p.queue.get(a).foldl(true,(ok,m)=>ok and p.owner.get(m)==a and p.jobEpoch.get(m)==p.actorEpoch.get(a))),
-    busy.forall(a=>p.owner.get(p.work.get(a))==a and p.jobEpoch.get(p.work.get(a))==p.actorEpoch.get(a)),
+    PEERS.forall(a=>p.queue.get(a).foldl(true,(ok,m)=>ok and p.owner.get(m)==a and p.jobEpoch.get(m)==p.epoch)),
+    busy.forall(a=>p.owner.get(p.work.get(a))==a and p.jobEpoch.get(p.work.get(a))==p.epoch),
     busy.map(a=>p.work.get(a)).size()==busy.size(),
     inflight.size()<=p.tokens,memory<=BUDGET,
     implies(Set("run","draining").contains(p.phase),p.resident==p.cohort),
@@ -155,7 +159,7 @@ module actor_population {
     nondet a=PEERS.oneOf()
     nondet m=JOBS.oneOf()
     any { spawn(a),setTokens(1),setTokens(JOBS.size()),open,arrive(m),publish(m,a),start(a),continue(a),
-      unit(a),finish(a,false),finish(a,true),consume(m),suspend(a),resume(a,p.actorEpoch.get(a),p.work.get(a)),
+      unit(a),finish(a,false),finish(a,true),consume(m),suspend(a),resume(a,p.epoch,p.work.get(a)),
       capture(a),release(m),cancel(m),pauseOwner,restoreOwner,drain,quiesce,configure("cpu"),configure("green-wait"),
       configure("owner-stall"),closing,stop(a),stopped(a),join(a),close,stay }
   }

@@ -93,6 +93,63 @@ module owner_wait_coverage {
   pure def nonCpuLower(g:Span,b:CpuCut,a:CpuCut):int=
     if (not(enclosed(g,b,a))) -1
     else if (g.end-g.begin>a.cpu-b.cpu) g.end-g.begin-(a.cpu-b.cpu) else 0
+  // Owner CPU charged outside an inner span cannot exceed the outer slack.
+  pure def innerCpuFloor(outerScope:int,innerScope:int,outerWall:int,
+      innerWall:int,enclosingCpuFloor:int):int=
+    if(outerScope<=0 or outerScope!=innerScope or innerWall<0 or innerWall>outerWall or
+       enclosingCpuFloor<0 or enclosingCpuFloor>outerWall) -1
+    else {
+      val outside=outerWall-innerWall
+      if(enclosingCpuFloor>outside) enclosingCpuFloor-outside else 0
+    }
+  run AnchoredMillionReceiptRequiresOwnerCpuAfterTheOfferWindowTest={
+    val innerFloor=innerCpuFloor(1,1,1658919875,1638521208,1061999250)
+    val lastTick=999999000
+    assert(innerFloor==1041600583 and innerFloor-lastTick==41601583 and
+      innerFloor>1000000000)
+  }
+  run BracketedMillionPrefixNeedsBothCpuAndAvailabilityEvidenceTest={
+    val innerWall=481782417
+    val outerWall=512705875
+    val cpuFloor=innerCpuFloor(1,1,outerWall,innerWall,392436874)
+    val cpuCeil=392438875
+    val finished=310523
+    val period=1000
+    val limit=128
+    // Compressing only non-CPU time preserves this receipt's executed
+    // work and retirements. It makes no prediction for a changed run.
+    val dueWithOnlyCpu=1+cpuFloor/period
+    val latestWithAllowedDebt=(finished+limit)*period-1
+    assert(cpuFloor==361513416 and innerWall-cpuCeil==89343542 and
+      1+innerWall/period-finished==171260 and dueWithOnlyCpu-finished==50991 and
+      cpuFloor-latestWithAllowedDebt==50862417 and dueWithOnlyCpu-finished>limit)
+  }
+  run MissingOrForeignWallEnvelopeCannotGiveACompletionCpuFloorTest=assert(
+    innerCpuFloor(1,2,1658919875,1638521208,1061999250)== -1 and
+    innerCpuFloor(1,1,100,101,80)== -1 and
+    innerCpuFloor(1,1,100,99,101)== -1 and
+    innerCpuFloor(1,1,100,50,40)==0)
+  run FrozenControlHasTimeOutsideBothOwnerCpuAndCollectorEnvelopeTest={
+    // CPU and GC may overlap. Subtracting both upper bounds bounds their
+    // union conservatively; it does not decompose the gap by cause.
+    val inner={scope:7,begin:0,end:1121129458}
+    val before={scope:7,begin:0,end:0,cpu:0}
+    val after={scope:7,begin:1131643750,end:1131643750,cpu:1070708083}
+    val gcWallUpper=17758847
+    assert(enclosed(inner,before,after) and
+      nonCpuLower(inner,before,after)==50421375 and
+      nonCpuLower(inner,before,after)-gcWallUpper==32662528)
+  }
+  run SevereFrozenReplayCannotBeExplainedByCpuOrCollectorEnvelopeTest={
+    // Same-run bounds, rounded up with the receipt audit's 1 us margin.
+    val inner={scope:8,begin:0,end:6200527375}
+    val before={scope:8,begin:0,end:0,cpu:0}
+    val after={scope:8,begin:6200527375,end:6200527375,cpu:1379825084}
+    val gcWallUpper=96688794
+    val uncharged=nonCpuLower(inner,before,after)-gcWallUpper
+    assert(uncharged==4724013497 and uncharged>3000000000 and
+      nonCpuLower(inner,before,{...after,scope:7})== -1)
+  }
   pure def selectWrapperRecords(backend:str,recording:bool):bool=recording and backend=="select"
   // Even all select calls are a subset of possible native waits. Closed scope,
   // zero overflow and a verified call site are necessary, not all-wait coverage.
@@ -132,9 +189,127 @@ module owner_wait_coverage {
     // kernel blocking or runnable OS wait can dominate its non-CPU remainder.
     assert(2+0+98==2+98+0),assert(not(0==98)),
     assert(overlap(gap,{scope:1,begin:3,end:103})==100),assert(o::safety),o::idle})
+  run ShorterProcessResidualDoesNotMakeTheSameFrozenMainFasterTest={
+    // Retained frozen reader/image and identical arguments. Parent timestamps
+    // are millisecond wall times. The inner spans use the original VM clock.
+    val fast={child:3032000000,warm:1013282958,main:1010586125,inner:1000000166}
+    val slow={child:3300000000,warm:1013568458,main:1518095667,inner:1502227917}
+    assert(fast.child-fast.warm-fast.main==1008130917 and
+      slow.child-slow.warm-slow.main==768335875 and
+      slow.inner-fast.inner==502227751 and
+      slow.child-slow.warm-slow.main<fast.child-fast.warm-fast.main)
+  }
   run completeSelectCoverageStillDoesNotCoverOtherWaitsTest=o::init.then(all {
     assert(canExcludeSelect(gap,true,true,true,0,0)),
     assert(not(selectWrapperRecords("other-native-wait",true))),assert(o::safety),o::idle})
+  run frozenClockBoundsDistinguishOfferAndPostOfferWindowsTest = {
+    // Relative nanoseconds from the retained frozen 1M/s before anchor.
+    val offered = {scope:1, begin:20398667, end:999999000}
+    val afterOffer = {scope:1, begin:1020397667, end:1638521208}
+    val acrossEnd = {scope:1, begin:976119542, end:1010488583}
+    val insideAfterOffer = {scope:1, begin:1023010042, end:1048129875}
+    assert(and {
+      overlap(acrossEnd,offered)==23879458,
+      overlap(acrossEnd,offered)/1000==23879,
+      overlap(acrossEnd,afterOffer)==0,
+      overlap(insideAfterOffer,offered)==0,
+      overlap(insideAfterOffer,afterOffer)==25119833,
+      overlap(acrossEnd,offered.with("scope",2))== -1
+    })
+  }
+  run scopedGapDebtCanGrowBeforeLaterSampledPeakTest = {
+    // The prior verified frame can be returned after the first hook.
+    val newlyDue = 249506625 / 2000 - 244205209 / 2000
+    val previousFrameReturns = Set(0,1)
+    assert(newlyDue==2651 and
+      previousFrameReturns.forall(returned => newlyDue-returned>=2650))
+  }
+  // Each consecutive verified-progress hook still owns its current frame.
+  pure def maxPublicationsBetweenHooks(credits:int,returned:int):int=
+    returned+credits-1
+  run ScopedGapBoundsUnpublishedDebtWithoutReadingTheInboxTest={
+    val firstDue=249506625 / 2000 - 244205209 / 2000
+    val secondDue=247861375 / 2000 - 187861458 / 2000
+    val returned=Set(0,1)
+    assert(firstDue==2651 and secondDue==30000 and
+      returned.forall(n=>firstDue-maxPublicationsBetweenHooks(3,n)>=2648 and
+        secondDue-maxPublicationsBetweenHooks(3,n)>=29997))
+  }
+  // Second values are a structurally matched receipt example; the saved
+  // stdout bytes do not match the original digest in that receipt.
+  run ACollectorWallEnvelopeDoesNotPriceOwnerCpuInTheSameGapTest={
+    val interval={scope:2,begin:187861458,end:247861375}
+    val start={scope:2,begin:187628917,end:187629125,cpu:691662041}
+    val finish={scope:2,begin:247861792,end:247862250,cpu:692876916}
+    val gcWall=59944153
+    val recordedSelectWall=4250
+    assert(enclosed(interval,start,finish) and
+      nonCpuLower(interval,start,finish)-recordedSelectWall==58780792 and
+      gcWall>finish.cpu-start.cpu)
+  }
+  // An op62 observer cut is ordered in the progress word's modification
+  // order. A plain load pair does not supply that premise.
+  // A one-shot terminal write differs from a two-cut plateau read.
+  // Its replaced timestamp may come from a store inside the bracket.
+  type PrefixExchange={armed:int,target:int,begin:int,end:int,replaced:int,finished:int}
+  pure def prefixExchangeValid(c:PrefixExchange):bool=
+    c.armed<c.replaced and c.replaced<=c.end and c.armed<c.target and
+    c.target<=c.begin and c.begin<=c.end and c.end<=c.finished
+  run MidRunExchangeCanReplaceAHeartbeatWrittenInsideItsBracketTest={
+    val c={armed:37030731163875,target:37031231163875,begin:37031236183708,
+      end:37031236184041,replaced:37031236183791,finished:37031243797083}
+    assert(prefixExchangeValid(c) and c.replaced-c.begin==83 and
+      not(prefixExchangeValid({...c,replaced:c.end+1})) and
+      not(prefixExchangeValid({...c,replaced:c.armed})) and
+      not(prefixExchangeValid({...c,finished:c.end-1})))
+  }
+  run MillionPrefixSealDistinguishesSourceDebtAndUnfinishedWorkloadTest={
+    val elapsed=493396333
+    val planned=1000000
+    val due=493397
+    val published=461220
+    val verified=461217
+    val timed=461218
+    assert(due==1+elapsed/1000 and due-published==32177 and
+      published-verified==3 and due-verified==32180 and
+      planned-due==506603 and timed==verified+1 and due<planned)
+  }
+
+  type HeartbeatCut={owner:int,generation:int,begin:int,end:int,value:int,rmw:bool}
+  pure def progressPlateau(a:HeartbeatCut,b:HeartbeatCut,armedAfter:int):bool=
+    a.rmw and b.rmw and a.owner>0 and a.owner==b.owner and
+    a.generation>0 and a.generation==b.generation and
+    armedAfter<a.value and a.value<a.begin and a.begin<=a.end and
+    a.end<b.begin and b.begin<=b.end and a.value==b.value
+  pure val beatA={owner:1,generation:1,begin:3,end:4,value:2,rmw:true}
+  pure val beatB={...beatA,begin:9,end:10}
+  run HeartbeatPlateauRequiresLiveOwnerAndLinearizedCutsTest=assert(
+    progressPlateau(beatA,beatB,1) and
+    not(progressPlateau(beatA,beatB,2)) and
+    not(progressPlateau(beatA,{...beatB,generation:2},1)) and
+    not(progressPlateau(beatA,{...beatB,owner:2},1)) and
+    not(progressPlateau({...beatA,rmw:false},beatB,1)))
+  // At an arbitrary observer cut the current frame may already be free.
+  // One pre-cut or already-timestamped return is still possible.
+  run EqualHeartbeatDoesNotProveZeroReturnsBetweenObserverCutsTest={
+    val allowed=Set(0,1)
+    val maximumLiveGrowth=3
+    assert(progressPlateau(beatA,beatB,1) and allowed.contains(1) and
+      allowed.forall(n=>n+maximumLiveGrowth<=4))
+  }
+  run SteadyDeficitCanExceedDebtLimitWithoutAnObservablePlateauTest={
+    // A request becomes due every microsecond. A work-conserving FIFO server
+    // executes the oldest 970 requests during each millisecond, then cannot
+    // retire any in the next 30 microseconds.
+    val duePerWindow=1000
+    val retirementsPerWindow=970
+    val windows=1000
+    val longestCompletionGapNs=(duePerWindow-retirementsPerWindow+1)*1000
+    val triggerAgeNs=2000000
+    assert((duePerWindow-retirementsPerWindow)*windows==30000 and
+      (duePerWindow-retirementsPerWindow)*windows>128 and
+      longestCompletionGapNs<triggerAgeNs)
+  }
   run wakeAndOwnerExecutionRemainDifferentTransitionsTest=o::init.then(o::preempt)
     .then(o::arrival(2)).then(all {assert(not(o::canServe)),assert(not(o::nativeBlocked)),
       assert(o::safety),o::idle}).then(o::scheduled)

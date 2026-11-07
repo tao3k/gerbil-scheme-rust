@@ -62,6 +62,309 @@ module mailbox_result_construction {
     0.to(3).forall(line => Set(0,1,9999,99990).forall(gross =>
       Set(0,1,9999,39996).forall(amount =>
         boxedGrossStep(line,gross,amount) == parameterGrossStep(line,gross,amount)))))
+  // All fields come from an exact signed-64 typed row. The checked
+  // product can exceed fixnum or signed-64 range. Reuse the Scheme
+  // value only after the original validation and within this row.
+  run op62OneExactProductPreservesBothOrderTotalsTest={
+    val cases=Set({sku:0,quantity:1,cents:0},{sku:15,quantity:4,cents:9999},
+      {sku:3,quantity:9223372036854775807,cents:9223372036854775807},
+      {sku:16,quantity:2,cents:10},{sku:1,quantity:0,cents:10})
+    pure def valid(row:{sku:int,quantity:int,cents:int}):bool=
+      0<=row.sku and row.sku<=15 and row.quantity>0 and row.cents>=0
+    assert(cases.forall(row=>{
+      if(not(valid(row))) true
+      else {
+        val product=row.quantity*row.cents
+        List(100+product,4+row.quantity,200+product)==
+          List(100+row.quantity*row.cents,4+row.quantity,200+row.quantity*row.cents)
+      }
+    }) and
+    9223372036854775807*9223372036854775807>9223372036854775807)
+  }
+
+  // Recovered from the Mailbox stash. A checkpoint before later rows
+  // may retain their storage even if the ordinal was already copied.
+  pure def op62ReentryInputReads(checkpoint:bool,ordinalDetached:bool):Set[int] =
+    (if(checkpoint) 5.to(13) else Set()).union(
+      if(ordinalDetached) Set() else Set(0))
+  run Op62OrdinalSnapshotDoesNotProtectUnreadRowsAfterReentryTest = assert(
+    op62ReentryInputReads(false,false)==Set(0) and
+    op62ReentryInputReads(false,true)==Set() and
+    op62ReentryInputReads(true,true).size()==9 and
+    op62ReentryInputReads(true,true).intersect(2.to(13))==5.to(13))
+  // Installed Gerbil ran both exact 7F kernel variants. The mutation kept
+  // the ordinal and changed only row storage before checkpoint reentry.
+  run ReplayedKernelObservedReusedRowsWithTheSameOrdinalTest = {
+    val original={id:48,units:19,firstGross:8780,replayGross:16744}
+    val mutated={...original,replayGross:16897}
+    assert(original.id==mutated.id and original.units==mutated.units and
+      original.firstGross==mutated.firstGross and original.replayGross!=mutated.replayGross)
+  }
+
+  // The private qualification operation selects both endpoints before frames
+  // are published. A raw vector at the public endpoint means a native command.
+  type OrderRoute = {op:int, source:str, worker:str}
+  pure def mayOmitOrderEnvelope(route:OrderRoute):bool=
+    route.op==62 and route.source=="private-short-order" and route.worker=="private-short-order"
+  run EnvelopeRemovalRequiresBothPrivateEndpointsTest={
+    val route={op:62,source:"private-short-order",worker:"private-short-order"}
+    assert(mayOmitOrderEnvelope(route) and
+      not(mayOmitOrderEnvelope({...route,worker:"public"})) and
+      not(mayOmitOrderEnvelope({...route,source:"public"})) and
+      not(mayOmitOrderEnvelope({...route,op:66})))
+  }
+
+  // The source constructs a fresh, closed short order. Result construction
+  // may specialize only after the original service unit selects its layout.
+  pure def sparseOrderEligible(route:OrderRoute,native:bool,originalUnit:bool,
+      checkpoint:bool,span:int):bool =
+    mayOmitOrderEnvelope(route) and native and originalUnit and not(checkpoint) and span==4
+  run SparseOrderRequiresTheLiveNoCheckpointPrivateRouteTest={
+    val route={op:62,source:"private-short-order",worker:"private-short-order"}
+    assert(sparseOrderEligible(route,true,true,false,4) and
+      not(sparseOrderEligible(route,false,true,false,4)) and
+      not(sparseOrderEligible(route,true,false,false,4)) and
+      not(sparseOrderEligible(route,true,true,true,4)) and
+      not(sparseOrderEligible(route,true,true,false,1)) and
+      not(sparseOrderEligible({...route,source:"public"},true,true,false,4)))
+  }
+  pure def shortSku(base:int,line:int):int=(base+line)%16
+  run DistinctCyclicShortSkusAllowOneStorePerLineTest={
+    val lines=0.to(3)
+    val skus=0.to(15)
+    assert(skus.forall(base=>lines.map(line=>shortSku(base,line)).size()==4 and
+      skus.forall(sku=>{
+        val row=(sku+16-base)%16
+        val sparse=if(row<4) row+1 else 0
+        lines.fold(0,(sum,line)=>sum+(if(shortSku(base,line)==sku) line+1 else 0))==sparse
+      })) and
+      4*9999==39996 and (1+2+3+4)*9999==99990)
+  }
+  run DuplicateSkuNeedsTheGenericAccumulatorTest={
+    val old=7+11
+    val lastWrite=11
+    assert(old==18 and old!=lastWrite)
+  }
+
+  // A completion identity protects retirement only if checked before writes
+  // to reusable frame storage. Model a captured return from the old request.
+  type ReplyFrame = {id:int, state:str, payload:str}
+  pure def acceptsReply(frame:ReplyFrame, replyId:int, expectedState:str):bool=
+    frame.id==replyId and frame.state==expectedState
+  pure def writeReply(frame:ReplyFrame, payload:str):ReplyFrame=
+    {...frame, state:"ready", payload:payload}
+
+  run OldReplyRejectedAfterItOverwritesReusedFrameTest={
+    val reassigned={id:2,state:"queued",payload:"input-two"}
+    val overwritten=writeReply(reassigned,"stale-result")
+    assert(not(acceptsReply(overwritten,1,"ready")) and overwritten.id==2 and
+      overwritten.state=="ready" and overwritten.payload!=reassigned.payload)
+  }
+
+  run CheckBeforeFrameWritePreservesReassignedInputAndAllowsLiveReplyTest={
+    pure def commit(frame:ReplyFrame, replyId:int, payload:str):ReplyFrame=
+      if(acceptsReply(frame,replyId,"running")) writeReply(frame,payload) else frame
+    val reassigned={id:2,state:"queued",payload:"input-two"}
+    val running={...reassigned,state:"running"}
+    assert(commit(reassigned,1,"stale-result")==reassigned and
+      commit(running,1,"stale-result")==running and
+      commit(reassigned,2,"too-early")==reassigned and
+      commit(running,2,"second-result")=={id:2,state:"ready",payload:"second-result"})
+  }
+
+  // Archived single-product A/B on an earlier GCC image, distinct from frozen 7F.
+  run exactRowProductArchivedFailurePreventsAdmissionTest={
+    val candidate1M={completed:1000000,elapsedNs:1256709417,p99Ns:254110000,peak:205244}
+    val control1M={completed:1000000,elapsedNs:1275207417,p99Ns:272447000,peak:219241}
+    val failure={planned:5000000,published:2729260,completed:2729257,
+      active:3,elapsedNs:10546034041,cpuUpperNs:4422863042,phase:"request-deadline"}
+    val hardFailure={hardFailure:true,relativeEffect:"unconfirmed",absolutePassed:false}
+    assert(candidate1M.completed==control1M.completed and
+      candidate1M.elapsedNs<control1M.elapsedNs and candidate1M.p99Ns<control1M.p99Ns and
+      candidate1M.p99Ns>418000 and candidate1M.peak>128 and
+      failure.published-failure.completed==failure.active and
+      failure.planned-failure.published==2270740 and
+      failure.elapsedNs-failure.cpuUpperNs==6123170999 and
+      failure.phase=="request-deadline" and
+      gate::researchDisposition(hardFailure)=="withdraw" and
+      not(gate::maySeekAdmissionReview(hardFailure)))
+  }
+
+  // Recovered frame-time counting argument. A histogram bucket edge
+  // supplies a lower bound after subtracting one full bucket.
+  pure def shortHoldFloor(tailCount:int,holdNs:int,elapsedNs:int,frames:int):int =
+    if(holdNs<=0 or tailCount<=frames*elapsedNs/holdNs) 0 else tailCount-frames*elapsedNs/holdNs
+  pure def p99BeforePublishFloor(total:int,p99UpperNs:int,bucketNs:int,
+      elapsedNs:int,holdNs:int,frames:int):{count:int,waitNs:int}={
+    val tailCount=total-budget::rank(total,99,100)+1
+    val waitNs=p99UpperNs-bucketNs-holdNs
+    val count=if(waitNs<=0) 0 else shortHoldFloor(tailCount,holdNs,elapsedNs,frames)
+    if(count==0) {count:0,waitNs:0} else {count:count,waitNs:waitNs}
+  }
+  run FrozenMillionTailAlreadyWaitedBeforePublicationTest=assert(
+    p99BeforePublishFloor(1000000,6393000,1000,1004778708,1000000,3)==
+      {count:6987,waitNs:5392000} and
+    p99BeforePublishFloor(1000000,18922000,1000,1019933458,1000000,3)==
+      {count:6942,waitNs:17921000})
+  run FailedIntegratedControlStillBoundsItsOwnPostOfferRetirementTest={
+    val elapsed=1293533667
+    val lastOffer=999999000
+    val peak=110030
+    val ownerCpuUpper=1093768000
+    val gcWallUpper=18307925
+    assert((peak+1)*1000000000/(elapsed-lastOffer)==374848 and
+      elapsed-ownerCpuUpper-gcWallUpper==181457742 and
+      p99BeforePublishFloor(1000000,282234000,1000,elapsed,1000000,3)==
+        {count:6121,waitNs:281233000})
+  }
+  // Complete integral-rate receipts bound post-offer retirements by
+  // the sampled maximum plus one. The final publication timestamp
+  // is a source stamp after the send, not the mailbox enqueue instant.
+  run LatePublicationStampCannotBeExplainedByTheFinalRetirementSuffixTest={
+    val lastOffer=999999000
+    val stopped=Set(
+      {elapsed:1121129458,lastStamp:1121126916,peak:116723,upperRate:963623},
+      {elapsed:1181811875,lastStamp:1181809875,peak:154547,upperRate:850039},
+      {elapsed:1293533667,lastStamp:1293532292,peak:110030,upperRate:374849})
+    assert(stopped.forall(r=>
+      r.lastStamp-lastOffer>120000000 and
+      r.elapsed-r.lastStamp>0 and r.elapsed-r.lastStamp<3000 and
+      budget::ceilDiv((r.peak+1)*1000000000,r.elapsed-lastOffer)==r.upperRate and
+      r.upperRate<1000000))
+  }
+  run FiveMillionTailStillWaitsBeforePublicationDespiteShortFrameHoldsTest={
+    val count=5000000
+    val elapsed=4984038584
+    val upper=3943455000
+    val tailCount=count-budget::rank(count,99,100)+1
+    assert(p99BeforePublishFloor(count,upper,1000,elapsed,10000000,3)==
+      {count:48506,waitNs:3933454000} and
+      shortHoldFloor(tailCount,upper-1000-999999800,elapsed,3)==49996)
+  }
+  // After all arrivals are due, any tail request already published but
+  // unable to have consumed by the cut must still own a distinct frame.
+  pure def tailSourceFloor(tailCount:int,frames:int,lastOffer:int,cut:int,earliestConsume:int):int =
+    if(lastOffer<=cut and cut<earliestConsume and frames<tailCount) tailCount-frames else 0
+  run FiveMillionTailKeepsSourceDebtAcrossACommonPostOfferIntervalTest={
+    val count=5000000
+    val tailCount=count-budget::rank(count,99,100)+1
+    val lastOffer=999999800
+    val earliestConsume=3943455000-1000
+    val cut=earliestConsume-1
+    assert(cut-lastOffer==2943454199 and
+      tailSourceFloor(tailCount,3,lastOffer,lastOffer,earliestConsume)==49998 and
+      tailSourceFloor(tailCount,3,lastOffer,cut,earliestConsume)==49998 and
+      tailSourceFloor(tailCount,3,lastOffer,lastOffer-1,earliestConsume)==0 and
+      tailSourceFloor(tailCount,3,lastOffer,earliestConsume,earliestConsume)==0)
+  }
+  run ReplyOnlySpeedupWithFixedPublicationCannotClearRecordedP999TailTest={
+    val million=p99BeforePublishFloor(1000000,6393000,1000,1004778708,1000000,3)
+    val fiveMillion=p99BeforePublishFloor(5000000,3943455000,1000,4984038584,10000000,3)
+    assert(million.count>1000000-budget::rank(1000000,999,1000) and
+      million.waitNs==5392000 and
+      fiveMillion.count>5000000-budget::rank(5000000,999,1000) and
+      fiveMillion.waitNs==3933454000)
+  }
+  run FastHalfMillionCohortDoesNotInheritTheOtherTailAttributionTest=assert(
+    p99BeforePublishFloor(5000000,317000,1000,9999999542,200000,3)=={count:0,waitNs:0})
+
+  // Every verified retirement before the last scheduled tick spends
+  // publication-to-return frame time. Holds may overlap only across frames.
+  pure def frameTimeForRetired(retired:int,slow:int,fastHold:int,slowHold:int):int =
+    (retired-slow)*fastHold+slow*slowHold
+  run FixedThreeFramesImposeSeparateResidenceBudgetsTest=assert(
+    3*9999998000/(5000000-128)==6000 and
+    3*999999000/(1000000-128)==3000 and
+    3*999999800/(5000000-128)==600)
+  run MoreResidentActorsCannotPayForSuspendedFrameTimeTest={
+    val frameBudget=3*999999800
+    val required=5000000-128
+    assert(frameTimeForRetired(required,500,500,1000000)<=frameBudget and
+      frameTimeForRetired(required,501,500,1000000)>frameBudget)
+  }
+
+  // Recovered from the Mailbox stash. The numbers are hypothetical
+  // exclusive complete-cycle costs, not measured per-request CPU.
+  pure def mixedOwnerCost(retired:int,legacy:int,closedNs:int,legacyNs:int):int =
+    (retired-legacy)*closedNs+legacy*legacyNs
+  run FiveMillionFastPathMustCoverMostVerifiedReturnsTest={
+    val required=5000000-128
+    val offeredEndNs=999999800
+    val maxLegacy=295530
+    assert(mixedOwnerCost(required,maxLegacy,150,996)<=offeredEndNs and
+      mixedOwnerCost(required,maxLegacy+1,150,996)>offeredEndNs and
+      mixedOwnerCost(required,required/4,0,996)>offeredEndNs)
+  }
+  run OneMillionCanFitTheSameHypotheticalCostWithoutProvingRecoveryTest={
+    val required=1000000-128
+    val offeredEndNs=999999000
+    val base=mixedOwnerCost(required,required,150,996)
+    assert(base==995872512 and base<offeredEndNs and
+      base+4126489>offeredEndNs)
+  }
+  run ArchivedLayoutWrapperSavingsChangeSignAcrossMatchedPairsTest={
+    val completePerArm=100000
+    val firstSaved=118870125-120676375
+    val secondSaved=121144333-118812792
+    val targetNsPerRequest=41
+    assert(firstSaved<0 and secondSaved>0 and
+      firstSaved+secondSaved<2*completePerArm*targetNsPerRequest)
+  }
+  run PrivateOrderSaturatedSavingsDoNotQualifyOpenLoadTest={
+    val messages=100000
+    val firstSaved=154556542-123556500
+    val secondSaved=137693041-115399541
+    val nativeOpenLoad={hardFailure:false,relativeEffect:"unconfirmed",absolutePassed:false}
+    assert(firstSaved>0 and secondSaved>0 and
+      firstSaved+secondSaved>2*messages*266 and
+      not(gate::maySeekAdmissionReview(nativeOpenLoad)))
+  }
+  run LocalActorPairedCpuSavingDoesNotImplyWallOrRateAdmissionTest={
+    val splitFirst={cpu:101574125,wall:88966792}
+    val splitLast={cpu:104299541,wall:94850042}
+    val localFirst={cpu:95968875,wall:134703500}
+    val localLast={cpu:81857750,wall:70396250}
+    val evidence={hardFailure:false,relativeEffect:"unconfirmed",absolutePassed:false}
+    assert(localFirst.cpu<splitFirst.cpu and localLast.cpu<splitLast.cpu and
+      localFirst.wall>splitFirst.wall and localLast.wall<splitLast.wall and
+      localFirst.wall-localFirst.cpu==38734625 and
+      not(gate::maySeekAdmissionReview(evidence)))
+  }
+  run SparseAccumulatorRemovalAndFewerCollectionsDoNotQualifyComponentTest={
+    // Total enclosing owner CPU and synthetic-lead-adjusted inner wall.
+    val firstControl={cpu:104094292,wall:89599709,gc:4}
+    val firstSparse={cpu:100693041,wall:87710542,gc:3}
+    val lastSparse={cpu:124667917,wall:121231167,gc:3}
+    val lastControl={cpu:102808208,wall:89398917,gc:4}
+    val evidence={hardFailure:false,relativeEffect:"unconfirmed",absolutePassed:false}
+    assert(firstSparse.gc<firstControl.gc and lastSparse.gc<lastControl.gc and
+      firstSparse.cpu<firstControl.cpu and lastSparse.cpu>lastControl.cpu and
+      firstSparse.wall<firstControl.wall and lastSparse.wall>lastControl.wall and
+      not(gate::maySeekAdmissionReview(evidence)))
+  }
+  run LexicalCustodySmallerCodeStillRegressesBothMeasuredPairsTest={
+    val framedFirst={cpu:93239667,wall:77046208,codeInstructions:5400}
+    val framedLast={cpu:88372167,wall:73999583,codeInstructions:5400}
+    val lexicalFirst={cpu:94929333,wall:83061083,codeInstructions:4032}
+    val lexicalLast={cpu:91732041,wall:77768042,codeInstructions:4032}
+    val evidence={hardFailure:false,relativeEffect:"confirmed-regression",absolutePassed:false}
+    assert(lexicalFirst.codeInstructions<framedFirst.codeInstructions and
+      lexicalFirst.cpu>framedFirst.cpu and lexicalLast.cpu>framedLast.cpu and
+      lexicalFirst.wall>framedFirst.wall and lexicalLast.wall>framedLast.wall and
+      not(gate::maySeekAdmissionReview(evidence)))
+  }
+  run ArchivedShortAggregationComponentCannotCertifyOpenLoadTest={
+    val old={messages:200000,cpuNs:232460584,wallNs:208880041}
+    val changed={messages:200000,cpuNs:225118874,wallNs:201358667}
+    val openControl={completed:1000000,p99Ns:25212000,peak:25191}
+    val candidateMainRan=false
+    val evidence={hardFailure:false,relativeEffect:"unconfirmed",absolutePassed:false}
+    assert(old.messages==changed.messages and changed.cpuNs<old.cpuNs and
+      changed.wallNs<old.wallNs and openControl.p99Ns>418000 and
+      openControl.peak>128 and not(candidateMainRan) and
+      not(gate::maySeekAdmissionReview(evidence)))
+  }
+
   // Source ordinal debt is outside the bounded physical Actor custody. This
   // identity applies at each observation; maxima need not share a timestamp.
   val dueNotConsumed=j::c.offered.exclude(j::consumedRequests).size()
@@ -1456,9 +1759,6 @@ module mailbox_result_construction {
 
   // The rank callback follows the last row read. A work checkpoint can
   // precede later row reads, so detaching just the ordinal is insufficient.
-  pure def op62ReentryInputReads(checkpoint:bool,ordinalDetached:bool):Set[int] =
-    (if(checkpoint) 5.to(13) else Set()).union(
-      if(ordinalDetached) Set() else Set(0))
 
   run op62OrdinalSnapshotDoesNotCloseEarlierCheckpointInputTest={
     assert(op62ReentryInputReads(false,false)==Set(0) and

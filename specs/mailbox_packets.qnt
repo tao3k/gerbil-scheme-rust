@@ -88,6 +88,24 @@ module mailbox_packet_protocol {
   pure def packed(n:int,k:int,u:int,pack:int,decode:int,work:int,extraResume:int):int=
     (k+n)*u+k*pack+n*decode+n*work+extraResume
   pure def destinations(first:int,n:int):Set[int]=0.to(n-1).map(i=>(first+i)%4)
+
+  // Cost envelopes only: all weights are symbolic, not measured nanoseconds.
+  // Each result still uses the original individual reply and consumption.
+  pure def asymmetricOriginal(n:int,request:int,reply:int,core:int):int=
+    n*(request+reply+core)
+  pure def requestPacked(n:int,k:int,request:int,reply:int,core:int,extra:int):int=
+    k*request+n*(reply+core)+extra
+  pure def bothLegsPacked(n:int,k:int,request:int,reply:int,core:int,extra:int):int=
+    k*(request+reply)+n*core+extra
+  pure def validEnvelope(n:int,k:int,limit:int,request:int,reply:int,core:int,extra:int):bool=
+    n>0 and k>0 and limit>0 and k<=n and n<=limit*k and
+      request>=0 and reply>=0 and core>=0 and extra>=0
+  // limit*new-old has a nonnegative residual under validEnvelope.
+  // This algebraic certificate is independent of hypothetical cost examples.
+  pure def requestPackingResidual(n:int,k:int,limit:int,request:int,reply:int,core:int,extra:int):int=
+    (limit*k-n)*request+(limit-1)*n*(reply+core)+limit*extra
+  pure def bothPackingResidual(n:int,k:int,limit:int,request:int,reply:int,core:int,extra:int):int=
+    (limit*k-n)*(request+reply)+(limit-1)*n*core+limit*extra
 }
 module mailbox_packets {
   import mailbox_packet_protocol(ACTORS=Set(1,2),REQUESTS=Set(1,2,3),LIMIT=16).*
@@ -129,4 +147,37 @@ module mailbox_packets {
   run groupingWinIsConditionalOnAllNewCostsIncludingResumeTest=assert(
     packed(3,1,10,1,1,20,0)<original(3,10,20) and
     packed(3,1,10,1,1,20,30)>original(3,10,20))
+
+  run boundedPackingCeilingHasANonnegativeWholeCycleCertificateTest=assert(
+    1.to(4).forall(limit=>1.to(8).forall(n=>1.to(n).forall(k=>
+      0.to(3).forall(request=>0.to(3).forall(reply=>0.to(3).forall(core=>0.to(2).forall(extra=>
+        if(validEnvelope(n,k,limit,request,reply,core,extra)) {
+          val old=asymmetricOriginal(n,request,reply,core)
+          val one=requestPacked(n,k,request,reply,core,extra)
+          val both=bothLegsPacked(n,k,request,reply,core,extra)
+          limit*one-old==requestPackingResidual(n,k,limit,request,reply,core,extra) and
+            requestPackingResidual(n,k,limit,request,reply,core,extra)>=0 and
+            limit*both-old==bothPackingResidual(n,k,limit,request,reply,core,extra) and
+            bothPackingResidual(n,k,limit,request,reply,core,extra)>=0
+        } else true))))))))
+  run symmetricThreeFrameRequestPackingCannotExceedOnePointFiveTest=assert(
+    1.to(9).forall(n=>1.to(n).forall(k=>0.to(4).forall(u=>0.to(4).forall(core=>0.to(3).forall(extra=>
+      if(validEnvelope(n,k,3,u,u,core,extra))
+        3*requestPacked(n,k,u,u,core,extra)-2*asymmetricOriginal(n,u,u,core)==
+          (3*k-n)*u+n*core+3*extra and (3*k-n)*u+n*core+3*extra>=0
+      else true))))))
+  // Asymmetric legs can exceed 1.5x. Do not use the symmetric ceiling
+  // without qualifying request/reply costs.
+  run asymmetricMailboxLegsInvalidateTheSymmetricCeilingTest=assert(
+    asymmetricOriginal(3,100,1,0)>2*requestPacked(3,1,100,1,0,0) and
+      asymmetricOriginal(3,100,1,0)<=3*requestPacked(3,1,100,1,0,0))
+  run threeFramePackingAloneCannotFundAFivefoldTargetTest=assert(
+    1.to(9).forall(n=>1.to(n).forall(k=>0.to(4).forall(request=>0.to(4).forall(reply=>0.to(4).forall(core=>
+      if(validEnvelope(n,k,3,request,reply,core,0) and request+reply+core>0)
+        asymmetricOriginal(n,request,reply,core)<
+          5*bothLegsPacked(n,k,request,reply,core,0)
+      else true))))))
+  run savingAnUnexecutedEnvelopeCannotReduceTheCurrentRawRouteTest=assert(
+    1.to(3).forall(n=>0.to(4).forall(request=>0.to(4).forall(reply=>0.to(4).forall(core=>
+      requestPacked(n,n,request,reply,core,1)==asymmetricOriginal(n,request,reply,core)+1)))))
 }

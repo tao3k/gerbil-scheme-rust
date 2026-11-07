@@ -181,6 +181,16 @@ module mailbox_joint_cycle {
       gate::conditionsFit(goal,ref,good,fair) and not(gate::conditionsFit(goal,cand,bad,fair)) and
       not(gate::claimSupported(goal,cand,good,fair,incompleteEvidence)))
   }
+
+  run PublicMailboxEvidenceRejectsInboxInspectionAndCursorRewindTest={
+    val publicEvidence={cost:"qualified-upper",availability:"qualified-envelope",
+      fairness:"qualified-progress",retirementTail:"included",sourceMatched:true,
+      readPrivateInbox:false,rewoundCursor:false}
+    assert(gate::evidenceQualified(publicEvidence) and
+      not(gate::evidenceQualified({...publicEvidence,readPrivateInbox:true})) and
+      not(gate::evidenceQualified({...publicEvidence,rewoundCursor:true})))
+  }
+
   // One completed member releases exactly one credit and lets the source
   // supply a peer while the other members of the original packet remain.
   run partialPacketRetirementCanFeedIndependentPeerTest=cpu3
@@ -219,6 +229,71 @@ module mailbox_joint_cycle {
     eligibleReadyPrefix(Set(41,42),Set(41),2,2,true)==Set(42) and
     eligibleReadyPrefix(Set(41,42),Set(41),3,2,true)==Set() and
     eligibleReadyPrefix(Set(41,42),Set(41),2,2,false)==Set())
+  // This predicate gates a physical transfer elision. Existing logical
+  // custody, verified retirement, and generic Scheme fallback still apply.
+  type ClosedTurn={privateOrder:bool,actorOwnsSource:bool,localRetirement:bool,
+    zeroWaitMode:bool,checkpointAbsent:bool,externalHandler:bool,perRequestReply:bool,
+    boundedTurn:bool}
+  pure def canElideWorkerTransfer(t:ClosedTurn):bool=
+    t.privateOrder and t.actorOwnsSource and t.localRetirement and t.zeroWaitMode and
+    t.checkpointAbsent and not(t.externalHandler) and not(t.perRequestReply) and t.boundedTurn
+
+  pure def privateOrderTransfers(t:ClosedTurn,entered:int):int=
+    if(canElideWorkerTransfer(t)) 0 else 2*entered
+
+  run LocalActorTurnRequiresClosedWorkAndExclusiveRetirementTest={
+    val eligible={privateOrder:true,actorOwnsSource:true,localRetirement:true,
+      zeroWaitMode:true,checkpointAbsent:true,externalHandler:false,perRequestReply:false,
+      boundedTurn:true}
+    assert(canElideWorkerTransfer(eligible) and privateOrderTransfers(eligible,69)==0 and
+      privateOrderTransfers({...eligible,perRequestReply:true},69)==138 and
+      not(canElideWorkerTransfer({...eligible,zeroWaitMode:false})) and
+      not(canElideWorkerTransfer({...eligible,checkpointAbsent:false})) and
+      not(canElideWorkerTransfer({...eligible,localRetirement:false})) and
+      not(canElideWorkerTransfer({...eligible,externalHandler:true})) and
+      not(canElideWorkerTransfer({...eligible,perRequestReply:true})) and
+      not(canElideWorkerTransfer({...eligible,boundedTurn:false})))
+  }
+
+  run LocalActorCustodyStillReturnsOnlyAfterVerificationOrTerminalAbortTest={
+    // Native fixture request counts across three invocations of each Actor.
+    val rows=Set({entered:31,verified:31,aborted:0},
+      {entered:6,verified:5,aborted:1},{entered:32,verified:32,aborted:0})
+    assert(rows.forall(row=>row.entered==row.verified+row.aborted) and
+      rows.fold(0,(count,row)=>count+row.entered)==69 and
+      rows.exists(row=>row.aborted==1 and row.entered!=row.verified))
+  }
+
+  // The local route still takes its timed sample before verified progress.
+  type LocalRetirement={published:int,verified:int,timed:int,charged:int}
+  pure def localRetirementStep(r:LocalRetirement,progressAccepted:bool):LocalRetirement=
+    {...r,timed:r.timed+1,
+      verified:r.verified+(if(progressAccepted) 1 else 0),
+      charged:r.charged-(if(progressAccepted) 1 else 0)}
+
+  pure def lexicalLocalOrder(r:LocalRetirement,constructed:bool,
+      oraclePassed:bool,progressAccepted:bool):LocalRetirement=
+    if(not(constructed)) r
+    else {
+      val entered={...r,published:r.published+1,charged:r.charged+1}
+      if(oraclePassed) localRetirementStep(entered,progressAccepted) else entered
+    }
+  run RemovingPhysicalFrameDoesNotMoveTheLogicalReturnCutTest={
+    val idle={published:0,verified:0,timed:0,charged:0}
+    assert(lexicalLocalOrder(idle,false,false,false)==idle and
+      lexicalLocalOrder(idle,true,false,false)=={published:1,verified:0,timed:0,charged:1} and
+      lexicalLocalOrder(idle,true,true,false)=={published:1,verified:0,timed:1,charged:1} and
+      lexicalLocalOrder(idle,true,true,true)=={published:1,verified:1,timed:1,charged:0})
+  }
+
+  run LinkedLocalActorTimedFailureRetainsUnreturnedFrameAtSealedCutTest={
+    val entered={published:1,verified:0,timed:0,charged:1}
+    val failure=localRetirementStep(entered,false)
+    val success=localRetirementStep(entered,true)
+    assert(failure=={published:1,verified:0,timed:1,charged:1} and
+      success=={published:1,verified:1,timed:1,charged:0} and
+      Set(failure,success).forall(r=>r.published-r.verified==r.charged))
+  }
 
   // Separate above-limit runs by distinct returns on intervening turns.
   // Every breach after the first in its run immediately refills one frame.
@@ -233,6 +308,7 @@ module mailbox_joint_cycle {
   run FrozenEagerRefillLeavesTooFewSameTurnRequestBatchesTest=assert(
     oneReplacementFloor(1000000,998385)==996769 and
     sameTurnSendSavingCeiling(1000000,998385)==2154 and
+    sameTurnSendSavingCeiling(1000000,998045)==2607 and
     oneReplacementFloor(5000000,4999857)==4999713 and
     sameTurnSendSavingCeiling(5000000,4999857)==191)
 
@@ -393,4 +469,14 @@ module mailbox_joint_cycle {
     assert(actualLive.size()==2 and localRingSlots(1,3)==Set(1,2) and
       actualLive!=localRingSlots(1,3))
   }
+  run NativeReplayHasLongAboveLimitRunsWithAlmostNoBatchingOpportunityTest={
+    val retirements=1000000
+    val aboveLimit=999828
+    val atMostRuns=retirements-aboveLimit+1
+    assert((aboveLimit+atMostRuns-1)/atMostRuns==5780 and
+      oneReplacementFloor(retirements,aboveLimit)==999655 and
+      sameTurnSendSavingCeiling(retirements,aboveLimit)==230)
+  }
+
+
 }

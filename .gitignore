@@ -8,6 +8,8 @@
 *.c
 !ffi/runtime.c
 !ffi/instance.c
+!ffi/host_signal_process_scope_test.c
+!ffi/host_signal_action_test.c
 !crates/gerbil-scheme-python/tests/fixtures/owned_exports.c
 !crates/gerbil-scheme-qualification/ffi/instance_probe.c
 !crates/gerbil-scheme-qualification/ffi/owner_instance.c

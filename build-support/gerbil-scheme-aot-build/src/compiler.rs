@@ -62,7 +62,8 @@ fn run_native_build() {
         fs::write(out_dir.join("build-home.h"), toolchain_home_header(&gsc))
             .expect("write paired external program installation mapping");
         let lifecycle_options = format!(
-            "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM -DGERBIL_SCHEME_RUST_TOOLCHAIN_HOME -I{}",
+            "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM -DGERBIL_SCHEME_RUST_TOOLCHAIN_HOME {} -I{}",
+            signal_scope_option(),
             out_dir.display()
         );
         let runtime_object = out_dir.join("runtime.o");
@@ -73,12 +74,7 @@ fn run_native_build() {
                 .arg(workspace.join("ffi/runtime.c")),
             "compile external program lifecycle owner",
         );
-        cc::Build::new()
-            .cargo_metadata(false)
-            .out_dir(&out_dir)
-            .object(&runtime_object)
-            .try_compile("gerbil_scheme_rust_native")
-            .expect("archive external program lifecycle owner");
+        archive_lifecycle(&runtime_object, &gsc, &out_dir);
         println!("cargo:rustc-link-search=native={}", out_dir.display());
         println!(
             "cargo:rustc-link-search=native={}",
@@ -298,7 +294,11 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
         bytes.join(",")
     ));
     fs::write(out.join("build-home.h"), header).expect("write paired Gerbil installation mapping");
-    let lifecycle_options = format!("-O2 -DGERBIL_SCHEME_RUST_BUILD -I{}", out.display());
+    let lifecycle_options = format!(
+        "-O2 -DGERBIL_SCHEME_RUST_BUILD {} -I{}",
+        signal_scope_option(),
+        out.display()
+    );
     let lifecycle = out.join("lifecycle.o");
     run(
         gerbil_command(gsc)
@@ -307,7 +307,7 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
             .arg(workspace.join("ffi/runtime.c")),
         "Gerbil build lifecycle",
     );
-    publish_default_image(&receipt, &lifecycle, out);
+    publish_default_image(&receipt, &lifecycle, out, gsc);
 }
 
 fn toolchain_home_header(gsc: &OsStr) -> String {
@@ -336,7 +336,12 @@ fn toolchain_home_header(gsc: &OsStr) -> String {
     header
 }
 
-fn publish_default_image(receipt: &crate::NativeArchiveLinkReceipt, lifecycle: &Path, out: &Path) {
+fn publish_default_image(
+    receipt: &crate::NativeArchiveLinkReceipt,
+    lifecycle: &Path,
+    out: &Path,
+    gsc: &OsStr,
+) {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         // Keep the complete tooling graph in its package-owned native image.
         // Rust's executable dead-strip traversal recursively walks large Scheme
@@ -349,15 +354,64 @@ fn publish_default_image(receipt: &crate::NativeArchiveLinkReceipt, lifecycle: &
         println!("cargo:rustc-link-lib=dylib=gerbil_scheme_build");
         return;
     }
-    cc::Build::new()
-        .cargo_metadata(false)
-        .out_dir(out)
-        .object(lifecycle)
-        .try_compile("gerbil_scheme_rust_native")
-        .expect("archive native lifecycle");
+    archive_lifecycle(lifecycle, gsc, out);
     println!("cargo:rustc-link-search=native={}", out.display());
     println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
     for directive in &receipt.cargo_directives {
         println!("{}", directive.line());
     }
 }
+
+fn signal_scope_option() -> &'static str {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+        "-DGERBIL_SCHEME_RUST_SCOPED_SIGNALS"
+    } else {
+        ""
+    }
+}
+
+fn configure_scoped_lifecycle_link(
+    command: &mut Command,
+    lifecycle: &Path,
+    gambit: &Path,
+    output: &Path,
+) {
+    // Resolve Gambit's internal calls here, not in the final host link. Cargo
+    // dependency link-args do not propagate to a consumer executable, and a
+    // global libc interposer would also redirect unrelated host operations.
+    command
+        .args([
+            "-nostdlib",
+            "-no-pie",
+            "-r",
+            "-Wl,--wrap=___set_signal_handler",
+        ])
+        .arg(lifecycle)
+        .arg(gambit)
+        .arg("-o")
+        .arg(output);
+}
+
+fn archive_lifecycle(lifecycle: &Path, gsc: &OsStr, out: &Path) {
+    let object = if signal_scope_option().is_empty() {
+        lifecycle.to_path_buf()
+    } else {
+        let library = crate::discover_gambit_link_search_dir_from_gsc(Path::new(gsc))
+            .expect("paired Gambit library for scoped lifecycle");
+        let scoped = out.join("runtime-scoped.o");
+        let mut command = cc::Build::new().get_compiler().to_command();
+        configure_scoped_lifecycle_link(&mut command, lifecycle, &library.library_path, &scoped);
+        run(&mut command, "link owner-scoped Gambit signal actions");
+        scoped
+    };
+    cc::Build::new()
+        .cargo_metadata(false)
+        .out_dir(out)
+        .object(object)
+        .try_compile("gerbil_scheme_rust_native")
+        .expect("archive native lifecycle");
+}
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "../tests/unit/native_signal_scope.rs"]
+mod native_signal_scope;

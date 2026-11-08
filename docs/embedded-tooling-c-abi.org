@@ -823,3 +823,36 @@ be published. The native batch observation includes these two existing objects.
 The complete AOT crate controls pass with the shared-batch and four-worker
 failure/join controls: 56 passed and seven pre-existing ignored. Exact-head CI
 and the downstream cold build and linked-program replay remain separate gates.
+
+* Host signal ownership during Linux cleanup
+
+SIGPIPE disposition belongs to the process, while =pthread_sigmask= protects
+only its calling thread. The Weaver native owner qualification exposed this
+distinction: GDB stopped a Tokio TLS worker inside =writev= while the Scheme
+owner was inside =___cleanup_mem_vmstate=. Gambit's earlier interrupt cleanup
+had already selected =SIG_DFL= for SIGPIPE. An owner-local mask cannot protect
+that concurrent writer. Final handler restoration does not close this window.
+
+The Linux lifecycle archive now uses the native linker's relocatable link to
+route the paired Gambit's =___set_signal_handler= calls through the SDK cleanup
+scope. Inside that scope, Gambit cannot change SIGPIPE disposition. Other
+signals, ordinary Gambit operations outside cleanup, and host libc signal
+operations retain their normal behavior. The existing owner mask still drains
+new internal SIGPIPE events and preserves the caller's mask and pending events.
+Since Gambit leaves SIGPIPE unchanged in this scope, restoration also preserves
+a legitimate concurrent host update to that action.
+
+This binding is completed inside the SDK archive. It requires no linker flag
+in consumer executables, does not interpose libc, and changes no Gambit source
+or installed library. Both the default tooling image and external-program
+lifecycle use the same archive preparation. Existing module object compilation
+options, ordering and concurrency limits are independent of this binding.
+
+The Linux AOT control =native_bundle_preserves_other_threads_and_host_signal_updates=
+partially links the same private scope and a separate native signal-helper
+fixture. A barrier places an unmasked host worker's real =writev= to a closed
+socket inside the cleanup window. The guarded image must return =EPIPE= and
+preserve host updates and the owner mask. The same objects without the scoped
+binding must terminate with SIGPIPE despite retaining the owner mask. The final
+host link has no wrapping flags. These controls and the unchanged native Weaver
+owner qualification are required before the repair is accepted.

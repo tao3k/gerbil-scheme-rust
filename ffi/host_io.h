@@ -14,6 +14,17 @@
 #include <sched.h>
 #include <pthread.h>
 #include <time.h>
+#if defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+/* Only the SDK/Gambit relocatable image redirects this Gambit helper. Host
+ * libc calls are never interposed. Masking the owner alone cannot protect a
+ * concurrent host thread's writev while Gambit resets SIGPIPE process-wide. */
+static _Thread_local unsigned gerbil_host_signal_scope_depth;
+extern void __real____set_signal_handler(int, void (*)(int));
+void __wrap____set_signal_handler(int signal_number, void (*handler)(int)) {
+  if (signal_number == SIGPIPE && gerbil_host_signal_scope_depth != 0) return;
+  __real____set_signal_handler(signal_number, handler);
+}
+#endif
 /* Gambit resets SIGPIPE before retiring its I/O devices. Defer signals from
  * that owner-local cleanup until the caller's disposition has been restored. */
 typedef struct { sigset_t mask; int pending; } gerbil_host_sigpipe;
@@ -30,6 +41,9 @@ static int gerbil_host_sigpipe_begin(gerbil_host_sigpipe *scope) {
     return -1;
   }
   scope->pending = sigismember(&pending, SIGPIPE);
+#if defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+  gerbil_host_signal_scope_depth++;
+#endif
   return 0;
 }
 static int gerbil_host_sigpipe_end(const gerbil_host_sigpipe *scope) {
@@ -43,6 +57,9 @@ static int gerbil_host_sigpipe_end(const gerbil_host_sigpipe *scope) {
     do { status = sigtimedwait(&pipe, NULL, &now); } while (status < 0 && errno == EINTR);
     if (status < 0 && errno != EAGAIN) result = -1;
   }
+#if defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+  gerbil_host_signal_scope_depth--;
+#endif
   int status = pthread_sigmask(SIG_SETMASK, &scope->mask, NULL);
   if (status != 0) { errno = status; result = -1; }
   return result;
@@ -81,6 +98,12 @@ static int gerbil_host_signals_capture(gerbil_host_signals *signals) {
 static int gerbil_host_signals_restore(const gerbil_host_signals *signals) {
   int result = 0;
   for (unsigned i = 0; i < signals->saved; ++i) {
+#if defined(__linux__) && defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+    /* Gambit did not change this action in the cleanup scope. Preserve any
+     * legitimate concurrent host update instead of restoring a stale action. */
+    if (gerbil_host_signal_numbers[i] == SIGPIPE && gerbil_host_signal_scope_depth != 0)
+      continue;
+#endif
     if (sigaction(gerbil_host_signal_numbers[i], &signals->actions[i], NULL) < 0)
       result = -1;
   }

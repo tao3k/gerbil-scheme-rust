@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-use super::configure_scoped_lifecycle_link;
+use super::{configure_scoped_lifecycle_link, extract_signal_callers};
 use std::{ffi::OsStr, os::unix::process::ExitStatusExt, path::Path, process::Output};
 use tokio::process::Command;
 
@@ -24,14 +24,18 @@ async fn native_bundle_preserves_other_threads_and_host_signal_updates() {
             .as_nanos()
     ));
     std::fs::create_dir(&root).unwrap();
-    for (source, object) in [
-        ("host_signal_process_scope_test.c", "runtime.o"),
-        ("host_signal_action_test.c", "gambit.o"),
+    for (source, object, binding) in [
+        ("host_signal_process_scope_test.c", "runtime.o", "41"),
+        ("host_signal_action_test.c", "gambit.o", "41"),
+        ("host_signal_cleanup_test.c", "cleanup.o", "41"),
+        ("host_signal_binding_test.c", "host-binding.o", "41"),
+        ("host_signal_binding_test.c", "fallback-binding.o", "99"),
     ] {
         let output = bounded(
             Command::new("cc")
                 .args(["-std=c11", "-pthread", "-Wall", "-Wextra", "-Werror", "-I"])
                 .arg(workspace.join("ffi"))
+                .arg(format!("-DGERBIL_TEST_PROGRAM_BINDING={binding}"))
                 .arg("-c")
                 .arg(workspace.join("ffi").join(source))
                 .arg("-o")
@@ -48,14 +52,22 @@ async fn native_bundle_preserves_other_threads_and_host_signal_updates() {
         Command::new("ar")
             .arg("rcs")
             .arg(&library)
-            .arg(root.join("gambit.o")),
+            .arg(root.join("gambit.o"))
+            .arg(root.join("cleanup.o"))
+            .arg(root.join("fallback-binding.o")),
     )
     .await;
     assert!(output.status.success(), "fixture archive: {output:?}");
+    let signal_objects = extract_signal_callers(&library, &root).expect("read native callers");
     for guarded in [true, false] {
         let image = root.join(if guarded { "guarded.o" } else { "owner-only.o" });
         let mut link = std::process::Command::new("cc");
-        configure_scoped_lifecycle_link(&mut link, &root.join("runtime.o"), &library, &image);
+        configure_scoped_lifecycle_link(
+            &mut link,
+            &root.join("runtime.o"),
+            &signal_objects,
+            &image,
+        );
         if !guarded {
             let args = link
                 .get_args()
@@ -73,6 +85,8 @@ async fn native_bundle_preserves_other_threads_and_host_signal_updates() {
             Command::new("cc")
                 .arg("-pthread")
                 .arg(&image)
+                .arg(root.join("host-binding.o"))
+                .arg(&library)
                 .arg("-o")
                 .arg(&binary),
         )

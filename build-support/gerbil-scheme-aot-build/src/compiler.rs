@@ -373,7 +373,7 @@ fn signal_scope_option() -> &'static str {
 fn configure_scoped_lifecycle_link(
     command: &mut Command,
     lifecycle: &Path,
-    gambit: &Path,
+    signal_objects: &[PathBuf],
     output: &Path,
 ) {
     // Resolve Gambit's internal calls here, not in the final host link. Cargo
@@ -387,9 +387,50 @@ fn configure_scoped_lifecycle_link(
             "-Wl,--wrap=___set_signal_handler",
         ])
         .arg(lifecycle)
-        .arg(gambit)
+        .args(signal_objects)
         .arg("-o")
         .arg(output);
+}
+
+fn write_signal_caller(bytes: &[u8], out: &Path, index: usize) -> Result<Option<PathBuf>, String> {
+    use object::{Object, ObjectSymbol};
+    let object = object::File::parse(bytes).map_err(|error| error.to_string())?;
+    if !object.symbols().any(|symbol| {
+        symbol.is_undefined()
+            && symbol
+                .name_bytes()
+                .is_ok_and(|name| name == b"___set_signal_handler")
+    }) {
+        return Ok(None);
+    }
+    let path = out.join(format!("gambit-signal-{index}.o"));
+    fs::write(&path, bytes).map_err(|error| error.to_string())?;
+    Ok(Some(path))
+}
+
+fn extract_signal_callers(library: &Path, out: &Path) -> Result<Vec<PathBuf>, String> {
+    let data = fs::read(library).map_err(|error| error.to_string())?;
+    let archive = object::read::archive::ArchiveFile::parse(data.as_slice())
+        .map_err(|error| error.to_string())?;
+    let objects = archive
+        .members()
+        .enumerate()
+        .filter_map(|(index, member)| {
+            member
+                .map_err(|error| error.to_string())
+                .and_then(|member| {
+                    member
+                        .data(data.as_slice())
+                        .map_err(|error| error.to_string())
+                })
+                .and_then(|bytes| write_signal_caller(bytes, out, index))
+                .transpose()
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    if objects.is_empty() {
+        return Err("paired Gambit archive has no external signal-helper callers".into());
+    }
+    Ok(objects)
 }
 
 fn archive_lifecycle(lifecycle: &Path, gsc: &OsStr, out: &Path) {
@@ -398,9 +439,13 @@ fn archive_lifecycle(lifecycle: &Path, gsc: &OsStr, out: &Path) {
     } else {
         let library = crate::discover_gambit_link_search_dir_from_gsc(Path::new(gsc))
             .expect("paired Gambit library for scoped lifecycle");
+        // Only copy the native callers. Resolving the entire library here would
+        // pull its Scheme globals before the downstream program defines them.
+        let signal_objects = extract_signal_callers(&library.library_path, out)
+            .expect("read paired Gambit signal-helper callers");
         let scoped = out.join("runtime-scoped.o");
         let mut command = cc::Build::new().get_compiler().to_command();
-        configure_scoped_lifecycle_link(&mut command, lifecycle, &library.library_path, &scoped);
+        configure_scoped_lifecycle_link(&mut command, lifecycle, &signal_objects, &scoped);
         run(&mut command, "link owner-scoped Gambit signal actions");
         scoped
     };

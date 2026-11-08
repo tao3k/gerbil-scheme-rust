@@ -9,6 +9,7 @@
 #include "host_io.h"
 
 extern void ___set_signal_handler(int, void (*)(int));
+extern void gerbil_test_native_signal_cleanup(void);
 static pthread_barrier_t resetting;
 static int writer;
 static volatile sig_atomic_t delivered;
@@ -58,7 +59,7 @@ int main(void) {
   assert(gerbil_host_signals_capture(&signals) == 0);
   gerbil_host_sigpipe scope;
   assert(gerbil_host_sigpipe_begin(&scope) == 0);
-  ___set_signal_handler(SIGPIPE, SIG_DFL);
+  gerbil_test_native_signal_cleanup();
   int status = pthread_barrier_wait(&resetting);
   assert(status == 0 || status == PTHREAD_BARRIER_SERIAL_THREAD);
   assert(pthread_join(worker, NULL) == 0);

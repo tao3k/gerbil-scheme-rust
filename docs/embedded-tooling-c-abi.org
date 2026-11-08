@@ -833,8 +833,10 @@ owner was inside =___cleanup_mem_vmstate=. Gambit's earlier interrupt cleanup
 had already selected =SIG_DFL= for SIGPIPE. An owner-local mask cannot protect
 that concurrent writer. Final handler restoration does not close this window.
 
-The Linux lifecycle archive now uses the native linker's relocatable link to
-route the paired Gambit's =___set_signal_handler= calls through the SDK cleanup
+The Linux lifecycle archive reads the paired archive's ELF symbols with Rust's
+=object= reader and copies only objects with undefined references to Gambit's
+=___set_signal_handler=. It then uses the native linker's relocatable link to
+route those calls through the SDK cleanup
 scope. Inside that scope, Gambit cannot change SIGPIPE disposition. Other
 signals, ordinary Gambit operations outside cleanup, and host libc signal
 operations retain their normal behavior. The existing owner mask still drains
@@ -856,3 +858,9 @@ preserve host updates and the owner mask. The same objects without the scoped
 binding must terminate with SIGPIPE despite retaining the owner mask. The final
 host link has no wrapping flags. These controls and the unchanged native Weaver
 owner qualification are required before the repair is accepted.
+
+Whole-library prelinking is refused by the test's additional program-binding
+control: a library fallback symbol must remain unselected until the final host
+supplies its own binding. Premature extraction would duplicate downstream
+Scheme globals, as exposed by the real external Arrow program. Member selection
+uses binary symbol records, not member-name lists or parsed tool diagnostics.

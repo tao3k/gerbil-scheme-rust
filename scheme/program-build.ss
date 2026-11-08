@@ -194,6 +194,12 @@
                      (copy-file source scm))
                    (hash-put! seen id #t)
                    (hash-put! seen (string-append id "~0") #t)
-                   (hash ("module" id) ("scm" scm) ("system" (and system? #t)) ("deferred" #t))))))
+                   (let (module (hash ("module" id) ("scm" scm)
+                                       ("system" (and system? #t)) ("deferred" #t)))
+                     ;; Lazy compiler metadata uses the archive's existing
+                     ;; procedure layout. Installed objects keep their ABI.
+                     (unless system?
+                       (hash-put! module "host_layout" "separate-procedures"))
+                     module)))))
             (else (error "invalid compiler metadata observation" row))))
         rows))))

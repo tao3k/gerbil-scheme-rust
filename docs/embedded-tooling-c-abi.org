@@ -775,3 +775,30 @@ boundary. Full consumer delivery and the 180-second cold
 package installation remain independent obligations. The installed Gerbil test
 launcher can return zero despite =ERROR HARNESS=; such a result is refused even
 when the command status is zero.
+
+* Linked program installation context
+
+A linked program can load Gerbil language metadata during initialization. Its
+lifecycle owner must therefore bind the installation paired with the compiler,
+not rely on a consumer exporting =GERBIL_HOME= or on the compiler's original
+build-machine default prefix.
+
+The external-program and default build images share the generated installation
+mapping. The external lifecycle supplies that mapping through Gambit's setup
+parameters. It does not mutate process environment, add a consumer loader,
+change the ABI, or alter processor selection and cleanup. Package child-process
+handling remains exclusive to the default build image.
+
+The AITIA linked-program Case exposed this boundary: the original setup reports
+=RuntimeUnavailable= with diagnostic =[2, 1, 0, 0]=. An independent verbose
+initialization identifies =cannot find library module :gerbil/core=. Ordinary
+Scheme execution and Rust workspace tests do not qualify this startup path.
+Producer unit/lint and external-program compilation, followed by the unchanged
+AITIA linked-program Case, are distinct evidence obligations. Diagnostic
+verbosity is not an acceptance-policy change or an accepted replay result.
+
+For the shared mapping repair, the AOT library controls pass (35 passed,
+seven pre-existing ignored), and the complete AOT integration target passes
+(19 passed). Strict Clippy, formatting and the real external-program lifecycle
+object build pass under the existing 120-second boundaries. These producer
+results do not by themselves qualify the downstream linked-program replay.

@@ -59,15 +59,16 @@ fn run_native_build() {
     }
 
     if env::var_os("CARGO_FEATURE_EXTERNAL_PROGRAM").is_some() {
+        fs::write(out_dir.join("build-home.h"), toolchain_home_header(&gsc))
+            .expect("write paired external program installation mapping");
+        let lifecycle_options = format!(
+            "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM -I{}",
+            out_dir.display()
+        );
         let runtime_object = out_dir.join("runtime.o");
         run(
             gerbil_command(&gsc)
-                .args([
-                    "-obj",
-                    "-cc-options",
-                    "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM",
-                    "-o",
-                ])
+                .args(["-obj", "-cc-options", &lifecycle_options, "-o"])
                 .arg(&runtime_object)
                 .arg(workspace.join("ffi/runtime.c")),
             "compile external program lifecycle owner",
@@ -282,28 +283,7 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
         out_dir: &out.join("build-archive"),
     })
     .expect("Gerbil build archive");
-    let home = gerbil_prefix(gsc);
-    let mappings = [
-        home.to_str()
-            .expect("Gerbil installation UTF-8 path")
-            .to_owned(),
-        format!("bin={}", home.join("bin").display()),
-        format!("lib={}", home.join("lib").display()),
-        format!("include={}", home.join("include").display()),
-    ];
-    let mut header = String::new();
-    for (index, value) in mappings.iter().enumerate() {
-        let mut units = value
-            .encode_utf16()
-            .map(|unit| unit.to_string())
-            .collect::<Vec<_>>();
-        units.push("0".to_owned());
-        header.push_str(&format!(
-            "static ___UCS_2 package_toolchain_path_{index}[] = {{{}}};\n",
-            units.join(",")
-        ));
-    }
-    header.push_str("static ___UCS_2STRING package_toolchain_map[] = {package_toolchain_path_1, package_toolchain_path_2, package_toolchain_path_3, 0};\n");
+    let mut header = toolchain_home_header(gsc);
     let library = prefix.join("lib");
     let mut bytes = library
         .to_str()
@@ -328,6 +308,32 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
         "Gerbil build lifecycle",
     );
     publish_default_image(&receipt, &lifecycle, out);
+}
+
+fn toolchain_home_header(gsc: &OsStr) -> String {
+    let home = gerbil_prefix(gsc);
+    let mappings = [
+        home.to_str()
+            .expect("Gerbil installation UTF-8 path")
+            .to_owned(),
+        format!("bin={}", home.join("bin").display()),
+        format!("lib={}", home.join("lib").display()),
+        format!("include={}", home.join("include").display()),
+    ];
+    let mut header = String::new();
+    for (index, value) in mappings.iter().enumerate() {
+        let mut units = value
+            .encode_utf16()
+            .map(|unit| unit.to_string())
+            .collect::<Vec<_>>();
+        units.push("0".to_owned());
+        header.push_str(&format!(
+            "static ___UCS_2 package_toolchain_path_{index}[] = {{{}}};\n",
+            units.join(",")
+        ));
+    }
+    header.push_str("static ___UCS_2STRING package_toolchain_map[] = {package_toolchain_path_1, package_toolchain_path_2, package_toolchain_path_3, 0};\n");
+    header
 }
 
 fn publish_default_image(receipt: &crate::NativeArchiveLinkReceipt, lifecycle: &Path, out: &Path) {

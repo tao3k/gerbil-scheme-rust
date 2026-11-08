@@ -4,7 +4,7 @@
 #endif
 #define ___VERSION 409008
 #include "gambit.h"
-#ifdef GERBIL_SCHEME_RUST_BUILD
+#if defined(GERBIL_SCHEME_RUST_BUILD) || defined(GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM)
 #include "build-home.h"
 #endif
 
@@ -157,7 +157,7 @@ static int32_t runtime_init_program(
   ___setup_params_reset(&params);
   params.version = ___VERSION;
   params.linker = linker;
-#ifdef GERBIL_SCHEME_RUST_BUILD
+#if defined(GERBIL_SCHEME_RUST_BUILD) || defined(GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM)
   params.gambitdir = package_toolchain_path_0;
   params.gambitdir_map = package_toolchain_map;
 #endif

@@ -34,6 +34,14 @@ module-specific compiler option. It does not replace source-owned build.ss or
 authorize changing an unrelated runtime ABI. Runtime compatibility still needs
 the complete linked consumer entry and its real tests.
 
+On Linux, Gambit can bind the embedding owner thread to one CPU. The SDK's
+existing host-state boundary captures and restores the caller's exact CPU
+affinity around initialization, package operations and cleanup. Native worker
+discovery and compiler children therefore retain the host's admitted CPUs,
+including container restrictions. Cargo's =NUM_JOBS= still bounds the native
+batch; this does not introduce a worker override or modify Gambit sources.
+The runtime and package tests check the calling thread's allowed CPU list.
+
 * Retained-source evidence
 
 The exact failed generated C source compiles with the remedy and the same

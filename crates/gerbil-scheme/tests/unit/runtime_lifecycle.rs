@@ -79,7 +79,15 @@ unsafe extern "C" fn linked_hex_bytes_fixture(input: *const u8, len: usize) -> i
 
 #[test]
 fn calls_scalar_export_in_process() {
+    #[cfg(target_os = "linux")]
+    let host_cpus = host_allowed_cpus();
     let runtime = GerbilRuntime::initialize().expect("initialize in-process Gerbil runtime");
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        host_allowed_cpus(),
+        host_cpus,
+        "setup changed host CPU affinity"
+    );
     assert!(matches!(
         GerbilRuntime::initialize(),
         Err(NativeError::AlreadyInitialized)
@@ -102,6 +110,22 @@ fn calls_scalar_export_in_process() {
     exercises_binary_input_and_reused_output(&runtime);
     exercises_utf8_bulk_conversion(&runtime);
     reports_overflow_and_finalized_runtime_boundaries(runtime);
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        host_allowed_cpus(),
+        host_cpus,
+        "cleanup changed host CPU affinity"
+    );
+}
+
+#[cfg(target_os = "linux")]
+fn host_allowed_cpus() -> String {
+    std::fs::read_to_string("/proc/thread-self/status")
+        .expect("read calling thread CPU affinity")
+        .lines()
+        .find_map(|line| line.strip_prefix("Cpus_allowed_list:").map(str::trim))
+        .expect("calling thread has an allowed CPU list")
+        .to_owned()
 }
 
 fn exercises_binary_input_and_reused_output(runtime: &GerbilRuntime) {

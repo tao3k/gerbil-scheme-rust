@@ -7,6 +7,23 @@
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+/* Gambit binds its owner thread to one CPU. Native compiler children must
+ * inherit the embedding host's original allowed CPUs, including restrictions
+ * set by its container or caller. Never reset to an invented all-CPU mask. */
+#if defined(__linux__)
+#include <sched.h>
+typedef cpu_set_t gerbil_host_affinity;
+static int gerbil_host_affinity_capture(gerbil_host_affinity *affinity) {
+  return sched_getaffinity(0, sizeof(*affinity), affinity);
+}
+static int gerbil_host_affinity_restore(const gerbil_host_affinity *affinity) {
+  return sched_setaffinity(0, sizeof(*affinity), affinity);
+}
+#else
+typedef struct { int unused; } gerbil_host_affinity;
+static int gerbil_host_affinity_capture(gerbil_host_affinity *affinity) { (void)affinity; return 0; }
+static int gerbil_host_affinity_restore(const gerbil_host_affinity *affinity) { (void)affinity; return 0; }
+#endif
 /* Process control belongs to the embedding host. Leave the SDK's internal
  * timer signals alone so Scheme green-thread scheduling remains native. */
 typedef struct {
@@ -38,6 +55,7 @@ typedef struct {
   off_t forwarded[3];
   int forward_error;
   gerbil_host_signals signals;
+  gerbil_host_affinity affinity;
 } gerbil_host_io;
 
 /* Read without moving the open-file-description offset shared by Scheme and
@@ -98,6 +116,7 @@ static int gerbil_host_io_restore(gerbil_host_io *host) {
     }
   }
   if (gerbil_host_signals_restore(&host->signals) != 0) result = -1;
+  if (gerbil_host_affinity_restore(&host->affinity) != 0) result = -1;
   for (int fd = 0; fd < 3; ++fd) {
     FILE *stream = host->private_stream[fd];
     if (stream == NULL) continue;
@@ -113,7 +132,8 @@ static int gerbil_host_io_capture(gerbil_host_io *host) {
     host->saved[fd] = -1;
     host->descriptor_flags[fd] = -2; /* not yet inspected */
   }
-  if (gerbil_host_signals_capture(&host->signals) != 0) return -1;
+  if (gerbil_host_affinity_capture(&host->affinity) != 0 ||
+      gerbil_host_signals_capture(&host->signals) != 0) return -1;
   for (int fd = 0; fd < 3; ++fd) {
     int flags = fcntl(fd, F_GETFD);
     if (flags < 0 && errno == EBADF) { host->descriptor_flags[fd] = -1; continue; }
@@ -136,6 +156,9 @@ failed:
   return -1;
 }
 #else
+typedef struct { int unused; } gerbil_host_affinity;
+static int gerbil_host_affinity_capture(gerbil_host_affinity *affinity) { (void)affinity; return 0; }
+static int gerbil_host_affinity_restore(const gerbil_host_affinity *affinity) { (void)affinity; return 0; }
 typedef struct { int unused; } gerbil_host_signals;
 static int gerbil_host_signals_capture(gerbil_host_signals *signals) { (void)signals; return 0; }
 static int gerbil_host_signals_restore(const gerbil_host_signals *signals) { (void)signals; return 0; }

@@ -1,4 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later */
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
 #define ___VERSION 409008
 #include "gambit.h"
 #ifdef GERBIL_SCHEME_RUST_BUILD
@@ -190,6 +193,7 @@ static int32_t runtime_init_program(
     if (initialized == ___FIX(___NO_ERR)) {
       ___cleanup();
       gerbil_host_signals_restore(&host.signals);
+      gerbil_host_affinity_restore(&host.affinity);
     }
     gerbil_scheme_rust_state = 2;
     return 4;
@@ -230,6 +234,8 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
     return 8;
   }
 
+  gerbil_host_affinity affinity;
+  if (gerbil_host_affinity_capture(&affinity) != 0) return 4;
   gerbil_host_environment environment;
   if (gerbil_host_environment_capture(&environment) != 0) return 4;
   gerbil_host_signals signals;
@@ -238,7 +244,8 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
   gerbil_host_environment_restore(&environment);
   gerbil_scheme_rust_state = 2;
   int restored = gerbil_host_signals_restore(&signals);
-  return captured == 0 && restored == 0 ? 0 : 4;
+  int affinity_restored = gerbil_host_affinity_restore(&affinity);
+  return captured == 0 && restored == 0 && affinity_restored == 0 ? 0 : 4;
 }
 
 #ifdef GERBIL_SCHEME_RUST_BUILD

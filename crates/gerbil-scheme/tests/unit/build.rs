@@ -22,6 +22,8 @@ fn local_package_environment_is_selected_before_loading_build_script() {
     }
     let root = fixture();
     let environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
+    #[cfg(target_os = "linux")]
+    let host_cpus = host_allowed_cpus();
     assert!(std::env::var_os("GERBIL_PATH").is_none());
     let runtime = initialize();
     // The existing runtime compiler projection lasts until VM teardown. Calls
@@ -40,6 +42,12 @@ fn local_package_environment_is_selected_before_loading_build_script() {
         "cancelled call must not select/create package environment"
     );
     assert_eq!(runtime.build_package(directory).unwrap(), 0);
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        host_allowed_cpus(),
+        host_cpus,
+        "package build changed host CPU affinity"
+    );
     assert!(prefix.join("lib/package-fixture/answer.o1").is_file());
     assert_eq!(
         fs::read_to_string(root.join("build-owner.txt")).unwrap(),
@@ -92,10 +100,26 @@ fn local_package_environment_is_selected_before_loading_build_script() {
     drop(runtime);
     println!("PACKAGE-STEP runtime cleanup returned");
     assert_environment_after_close(&environment);
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        host_allowed_cpus(),
+        host_cpus,
+        "cleanup changed host CPU affinity"
+    );
     fs::remove_dir_all(root).unwrap();
     println!(
         "PACKAGE-NATIVE-ENV-OK discovery immutable-prefix failure-restoration cancellation cleanup"
     );
+}
+
+#[cfg(target_os = "linux")]
+fn host_allowed_cpus() -> String {
+    fs::read_to_string("/proc/thread-self/status")
+        .expect("read calling thread CPU affinity")
+        .lines()
+        .find_map(|line| line.strip_prefix("Cpus_allowed_list:").map(str::trim))
+        .expect("calling thread has an allowed CPU list")
+        .to_owned()
 }
 
 #[test]

@@ -8,13 +8,13 @@ release_root="${1:?usage: install-gerbil-release.sh RELEASE_ROOT}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
-    # Latest published Linux archive; no matching 1cfb032 release exists yet.
+    # Native four-worker indexing and streaming compilation; Gambit is unchanged.
     revision=2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb
     release_os=linux
     release_arch=x86_64
-    tag=gerbil-v0.19-2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb-linux-x86_64-portable-full-single-host-unlimited-patchf5cedd8168cb
-    sha256=9844ba362fdf6f1c5e8a4411e462a466d52dee0d541f8e84f61091cec0e5e740
-    asset_id=581656092
+    tag=gerbil-v0.19-2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb-linux-x86_64-portable-full-single-host-unlimited-patcha379bb244bfa
+    sha256=3b345b1af68dfbbc0e73bae64941e4c8910d0ca192d81432ce699c5af385b565
+    asset_id=690615494
     ;;
   Darwin-arm64)
     revision=1cfb032c7a1612637da6205f5f8a15683eba3ba0

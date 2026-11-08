@@ -1,7 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 (import :std/test :std/io/tempfile :std/encoding/json
         (only-in :std/error Error?)
-        (only-in :std/make pkg-config)
+        (only-in :std/make pkg-config pkg-config-libs)
         (only-in :std/source this-source-file)
         (only-in :gerbil/runtime/loader add-load-path!)
         :gerbil/compiler
@@ -25,9 +25,11 @@
     (test-case "ordinary staging carries current target package flags first"
       (call-with-temporary-directory "program-link-options"
         (lambda (directory)
-          (let ((expected (filter (lambda (flag) (not (string-empty? flag)))
-                            (string-split (pkg-config "openssl" "--libs" "--keep-system-libs" "zlib" "sqlite3") #\space)))
+          (let ((caller-policy (getenv "PKG_CONFIG_ALLOW_SYSTEM_LIBS" #f))
+                (expected (filter (lambda (flag) (not (string-empty? flag)))
+                            (string-split (pkg-config-libs "openssl" "zlib" "sqlite3") #\space)))
                 (actual (stage-link-options directory [])))
+            (check-equal? (getenv "PKG_CONFIG_ALLOW_SYSTEM_LIBS" #f) caller-policy)
             (check-equal? (take actual (length expected)) expected)
             (for-each (lambda (flag) (check (member flag actual) ? pair?))
                       '("-lcrypto" "-lssl" "-lz" "-lsqlite3"))))))
@@ -36,10 +38,10 @@
         (lambda (directory)
           (let* ((explicit '("-L/consumer-target" "-lconsumer" "-lconsumer"))
                  (expected (filter (lambda (flag) (not (string-empty? flag)))
-                             (string-split (pkg-config "openssl" "--libs" "--keep-system-libs" "zlib" "sqlite3") #\space)))
+                             (string-split (pkg-config-libs "openssl" "zlib" "sqlite3") #\space)))
                  (actual (stage-link-options directory explicit)))
             (check-equal? (take (drop actual (length expected)) (length explicit)) explicit)))))
-    (test-case "system-directory suppression cannot drop declared target paths"
+    (test-case "system-directory classification follows standard Make flags"
       (call-with-temporary-directory "program-link-system-paths"
         (lambda (directory)
           (let ((previous (getenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" #f))
@@ -48,8 +50,12 @@
             (dynamic-wind
               (lambda () (setenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" target))
               (lambda ()
-                (check (member (string-append "-L" target)
-                               (stage-link-options directory [])) ? pair?))
+                (let ((expected (filter (lambda (flag) (not (string-empty? flag)))
+                                  (string-split (pkg-config-libs "openssl" "zlib" "sqlite3") #\space)))
+                      (actual (stage-link-options directory [])))
+                  (check-equal? (take actual (length expected)) expected)
+                  (for-each (lambda (flag) (check (member flag actual) ? pair?))
+                            '("-lcrypto" "-lssl" "-lz" "-lsqlite3"))))
               (lambda ()
                 (if previous (setenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH" previous)
                     (setenv "PKG_CONFIG_SYSTEM_LIBRARY_PATH"))))))))

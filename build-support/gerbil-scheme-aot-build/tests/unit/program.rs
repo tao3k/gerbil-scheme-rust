@@ -184,9 +184,9 @@ fn observed_build_identifies_the_last_owned_phase_without_a_heartbeat() {
     );
     assert_eq!(
         rows[1],
-        "phase=native-link-inputs state=start operation=admit native library dependencies"
+        "phase=native-link-inputs state=start operation=project compiler-owned native link options"
     );
-    assert!(rows[2].starts_with("phase=native-link-inputs state=complete operation=admit native library dependencies elapsedMs="));
+    assert!(rows[2].starts_with("phase=native-link-inputs state=complete operation=project compiler-owned native link options elapsedMs="));
     assert_eq!(
         rows[3],
         "phase=module-c-batch state=start operation=stage program module C sources subject=1"
@@ -298,10 +298,10 @@ fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats
     );
     assert_eq!(
         receiver.recv_timeout(Duration::from_millis(250)).unwrap(),
-        "phase=native-link-inputs state=start operation=admit native library dependencies"
+        "phase=native-link-inputs state=start operation=project compiler-owned native link options"
     );
     assert!(receiver.recv_timeout(Duration::from_millis(250)).unwrap().starts_with(
-        "phase=native-link-inputs state=complete operation=admit native library dependencies elapsedMs="
+        "phase=native-link-inputs state=complete operation=project compiler-owned native link options elapsedMs="
     ));
     assert_eq!(
         receiver.recv_timeout(Duration::from_millis(250)).unwrap(),

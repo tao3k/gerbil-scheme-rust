@@ -64,22 +64,26 @@ from direct public build/test invocation.
 
 Native dependency discovery belongs to this package's build declaration.
 =build.ss= and low-level program staging include the same =scheme/link-options.ss=
-declaration, using the native =std/make pkg-config= procedure for OpenSSL,
-zlib and SQLite with =--libs --keep-system-libs=. This retains explicit search
-paths even when ordinary =--libs= would filter system directories. Staging records
+declaration, using =std/make pkg-config-libs= for OpenSSL, zlib and SQLite.
+Package metadata and flag construction remain with the standard library.
+No private shell command replaces the standard interface. Staging records
 these target flags before caller additions and the installed Gerbil link flags.
 An old installation path is not a reason to probe alternate host libraries in a
 downstream consumer. Missing target package metadata fails staging naturally.
-The Rust archive consumer retains its availability and static/dynamic checks;
-it does not reinterpret a dynamic library as a static archive.
+The archive consumer preserves the ordered Cargo search paths and typed link
+modes. Cargo's target linker validates availability, target compatibility and
+static/dynamic mode; producing an archive alone does not qualify an executable.
+A system directory omitted by pkg-config is not a missing dependency. Rust must
+not reinterpret a dynamic library as a static archive or reconstruct the
+linker's implicit search from filename suffixes.
 
 Discovery runs during builds, never during Policy evaluation or provider sends.
 The host supplies its target pkg-config environment, including keg-only package
 metadata when needed. Compiler/linker selection and package metadata search are
 separate inputs: configuring pkg-config does not select the C compiler.
 =gerbil test -g -v 5 t/link-options-test.ss= checks ordinary staging, preservation
-of explicit flag ordering, retained system directories and refusal when target
-metadata is unavailable. Cargo's pkg-config environment invalidation applies to
+of explicit flag ordering, standard system-directory classification and refusal
+when target metadata is unavailable. Cargo's pkg-config environment invalidation applies to
 the default image that consumes these inputs; the external lifecycle-only
 archive does not depend on another consumer's pkg-config search path.
 
@@ -485,9 +489,9 @@ Retained local source-export checks are serial, not selected retries:
   with ordinary=21, expanded=86, duplicate-identities=0 and missing-inputs=0;
   standard native options retain their order.
 
-Evidence is retained under =/private/tmp/gerbil-scheme-rust-ci-20261102/=,
-including rejected prototypes, prior CI failures, timeout samples and the first
-workspace failure on stale diagnostic expectations. The later expectations fix
+The 2026-11-02 local qualification recorded rejected prototypes, prior CI
+failures, timeout samples and the first workspace failure on stale diagnostic
+expectations. Those unpublished logs are not portable evidence references. The later expectations fix
 preserves phase/order/no-heartbeat assertions. These local results exclude
 unpublished concurrent service work and are not a fresh Git-clone receipt.
 Ignored and cancelled tests are not passes. Latest-head remote CI, Linux and
@@ -528,8 +532,9 @@ There is no compatibility keyword.
 
 Ordinary =pkg-config-libs= suppresses target system-library search directories.
 On this host, =--libs= omits =-L/usr/lib= while =--keep-system-libs= retains it.
-The shared declaration therefore uses the existing =std/make pkg-config=
-procedure with its standard retention option. It does not infer host search
+That earlier declaration used =std/make pkg-config= with a pkgconf-specific
+retention option. It is not supported by pkg-config 0.29.2; the correction below
+uses the standard =pkg-config-libs= interface. It does not infer host search
 paths or weaken archive availability/static-mode admission. The native tests
 also suppress a known target directory through pkg-config's own system-path
 classification and require that declared directory to survive staging.
@@ -713,3 +718,60 @@ sample placed execution in Gambit's dynamic-module cleanup and dyld unloading;
 terminal test output alone did not establish process completion.
 
 Platform reference: [[https://github.com/apple-oss-distributions/dyld/blob/main/dyld/DyldAPIs.cpp][Apple dyld API implementation]].
+
+* Standard Make package-query correction (2026-11-08)
+
+The shared declaration calls =std/make pkg-config-libs= directly. The previous
+=--keep-system-libs= argument was a pkgconf extension rejected by pkg-config
+0.29.2. The intermediate private =shell-config= query was withdrawn. Package
+querying stays with the standard library; no environment variable is globally
+changed to force its output.
+
+System-directory qualification checks real target linking rather than requiring
+a literal =-L= directory in the query output. The =native-link-inputs= observation now
+projects compiler-owned options; it does not claim that producing the AOT
+archive establishes an executable link. Ordered paths, duplicates and typed
+Cargo library modes are retained. Cargo's final target linker owns resolution
+and target-architecture refusal, including valid implicit system directories. No additional
+pre-linker or host package fallback is introduced.
+
+The existing source tests retain package metadata refusal and explicit flag
+ordering. System-directory classification must match =pkg-config-libs= rather
+than a private retention rule. Rust tests use real target archives/shared
+libraries and Rust consumers instead of text files named like libraries. They
+cover missing libraries, an unrelated library failing to satisfy the request,
+dynamic-only input refusing static mode, implicit system lookup, and a library
+whose target header is changed to a different architecture. Accepted consumers
+use the actual rlib bundling, final executable link and execution chain to check
+the exported function. A direct-binary-only fixture does not represent Cargo's
+static-library bundling contract. Unit projection checks separately
+retain exact search-path and library ordering.
+
+The complete AOT crate unit gate passes 35 tests, with the same seven existing
+explicitly ignored diagnostic/performance controls unqualified. Its integration
+gate passes all 19 tests. Strict Clippy and formatting pass. The existing
+=just bridge-regenerate= entry updates both compiler-produced SCM files and
+their whole-file/source receipts; hashes are not rewritten independently.
+Both pkgconf and pkg-config 0.29.2 pass all four Scheme link-option Cases,
+including missing target metadata. The existing program metadata and real
+metadata-link controls pass: ordinary=21, expanded=86, duplicate-identities=0,
+missing-inputs=0; option order and lazy initialization markers remain intact.
+These are local existing-toolchain results, not new-head remote CI.
+The existing =just bridge-test= consumer also passes naturally: the real
+Gerbil scalar export and abandoned-receiver/root-release controls succeed.
+The first 120-second attempt stops during compilation before assertions;
+the incremental invocation completes compilation and the real consumer within
+the same 120-second fence. Its 0.10-second test execution is not a cold-build
+latency claim. The installed Gerbil/Gambit tools are used throughout.
+
+An initial cold Cargo preparation reaches the local 120-second fence before
+assertions. A direct-binary fixture and a verbatim-filename experiment are
+rejected because they do not model Cargo's rlib bundling; ordinary Cargo
+serialization is preserved. An unrelated developer-environment preparation is
+cancelled before test launch and is not counted as verification. The passing
+functional runs use Cargo's existing incremental products and do not establish
+a cold-build timing claim. Earlier query experiments are not a verdict for this
+boundary. Full consumer delivery and the 180-second cold
+package installation remain independent obligations. The installed Gerbil test
+launcher can return zero despite =ERROR HARNESS=; such a result is refused even
+when the command status is zero.

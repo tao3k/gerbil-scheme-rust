@@ -242,12 +242,13 @@ pub fn build_program_archive_with_contract(
         observer.observe_source_input(&input);
     }
     let cc_options = native_compile_options(contract.native_headers, observer)?;
-    // Admit host libraries before any generated C or object compilation.
+    // Preserve compiler-owned options. Cargo's target linker owns library
+    // resolution and ABI checks, including its implicit system search paths.
     let link_inputs = observe_program_archive_operation(
         observer,
         ProgramArchiveOperation {
             phase: "native-link-inputs",
-            operation: "admit native library dependencies",
+            operation: "project compiler-owned native link options",
             subject: None,
         },
         || native_link_options(&plan),
@@ -863,43 +864,7 @@ fn native_link_options(
             return Err(format!("unsupported compiler-owned link option {option:?}"));
         }
     }
-    validate_native_dependency_search(&search, &libraries)?;
     Ok((search, libraries))
-}
-
-fn validate_native_dependency_search(
-    search: &[PathBuf],
-    libraries: &[NativeLinkLibrary],
-) -> Result<(), String> {
-    for library in libraries {
-        let static_name = library.as_str().strip_prefix("static=");
-        let name = static_name.unwrap_or(library.as_str());
-        if !matches!(name, "crypto" | "ssl" | "z" | "sqlite3") {
-            continue;
-        }
-        if !locate_native_library(search, name, static_name.is_some()) {
-            return Err(format!(
-                "native link dependency unavailable: lib{name}; static={}",
-                static_name.is_some()
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn locate_native_library(search: &[PathBuf], name: &str, static_only: bool) -> bool {
-    // Ordered linker precedence is semantic. Probe one basename rather than
-    // enumerating every archive in each toolchain/system library directory.
-    let extensions: &[&str] = if static_only {
-        &["a"]
-    } else {
-        &["a", "so", "dylib"]
-    };
-    search.iter().any(|path| {
-        extensions.iter().any(|extension| {
-            path.is_absolute() && path.join(format!("lib{name}.{extension}")).is_file()
-        })
-    })
 }
 
 fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {

@@ -1,7 +1,7 @@
 #!/usr/bin/env gxi
 ;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-(import :std/build-script (only-in :std/make pkg-config)
+(import :std/build-script (only-in :std/make pkg-config-libs)
         (only-in "scheme/package-clean" clean-package-modules!))
 (export gerbil-scheme-rust-link-options gerbil-scheme-rust-program-build-spec)
 (include "scheme/link-options.ss")

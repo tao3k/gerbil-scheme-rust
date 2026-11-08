@@ -1,7 +1,7 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 (import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build
         :std/encoding/json (only-in :std/list/list delete-duplicates/hash)
-        (only-in :std/make pkg-config)
+        (only-in :std/make pkg-config-libs)
         (only-in :gerbil/runtime/loader add-load-path!))
 
 (def (main output)
@@ -33,7 +33,7 @@
       (unless (equal? (options native-options)
                      (append
                        (filter (lambda (flag) (not (string-empty? flag)))
-                         (string-split (pkg-config "openssl" "--libs" "--keep-system-libs" "zlib" "sqlite3") #\space))
+                         (string-split (pkg-config-libs "openssl" "zlib" "sqlite3") #\space))
                        ["-Lcontract-first" "-lcrypto" "-Lcontract-last" "-lssl"]
                        (call-with-input-file (path-expand "lib/libgerbil.ldd" (gerbil-home)) read)))
         (error "native compiler options changed order, included CC flags, or were dropped"))

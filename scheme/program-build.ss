@@ -3,7 +3,7 @@
 (import :gerbil/compiler
         :gerbil/expander
         (only-in :std/list/list delete-duplicates/hash)
-        (only-in :std/make pkg-config)
+        (only-in :std/make pkg-config-libs)
         (only-in :std/encoding/json write-json))
 (export gerbil-rs-stage-program)
 

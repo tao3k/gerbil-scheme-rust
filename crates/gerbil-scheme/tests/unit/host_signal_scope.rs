@@ -30,8 +30,8 @@ async fn check_cleanup() {
         if !guarded {
             compiler.arg("-DGERBIL_TEST_UNGUARDED_SIGPIPE");
         }
-        let compiled = bounded_output(&mut compiler).await;
-        assert!(compiled.status.success(), "C fixture: {compiled:?}");
+        let build_result = bounded_output(&mut compiler).await;
+        assert!(build_result.status.success(), "C fixture: {build_result:?}");
         let output = bounded_output(&mut Command::new(&binary)).await;
         if guarded {
             assert!(output.status.success(), "guarded cleanup: {output:?}");

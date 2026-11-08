@@ -62,7 +62,7 @@ fn run_native_build() {
         fs::write(out_dir.join("build-home.h"), toolchain_home_header(&gsc))
             .expect("write paired external program installation mapping");
         let lifecycle_options = format!(
-            "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM -I{}",
+            "-O2 -DGERBIL_SCHEME_RUST_EXTERNAL_PROGRAM -DGERBIL_SCHEME_RUST_TOOLCHAIN_HOME -I{}",
             out_dir.display()
         );
         let runtime_object = out_dir.join("runtime.o");

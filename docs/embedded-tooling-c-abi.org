@@ -802,3 +802,14 @@ seven pre-existing ignored), and the complete AOT integration target passes
 (19 passed). Strict Clippy, formatting and the real external-program lifecycle
 object build pass under the existing 120-second boundaries. These producer
 results do not by themselves qualify the downstream linked-program replay.
+
+The first CI run of that repair exposed an independent-instance regression:
+four Darwin qualification jobs failed compiling =ffi/runtime.c= because
+=GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM= also denotes an instance-owned linker.
+That flag alone does not establish ownership of a generated installation map.
+The package build now explicitly selects =GERBIL_SCHEME_RUST_TOOLCHAIN_HOME=
+when it emits the mapping; isolated instance adapters retain their existing
+setup behavior. Both existing =instance_probe.c= and =owner_instance.c= compile
+successfully without =build-home.h= under the original 120-second limit.
+The complete AOT library and integration controls pass: 54 passed and seven
+pre-existing ignored. These focused controls do not replace exact-head CI.

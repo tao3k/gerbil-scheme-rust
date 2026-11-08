@@ -813,3 +813,13 @@ setup behavior. Both existing =instance_probe.c= and =owner_instance.c= compile
 successfully without =build-home.h= under the original 120-second limit.
 The complete AOT library and integration controls pass: 54 passed and seven
 pre-existing ignored. These focused controls do not replace exact-head CI.
+
+Startup and linker object compilation now share the module object's existing
+host/Cargo-bounded native work queue. Their generated C is available before this
+queue starts, so the linker can begin first without waiting for every module
+object. Compiler options, input fingerprints and final archive member order are
+preserved. Every running task joins before an error returns or an archive can
+be published. The native batch observation includes these two existing objects.
+The complete AOT crate controls pass with the shared-batch and four-worker
+failure/join controls: 56 passed and seven pre-existing ignored. Exact-head CI
+and the downstream cold build and linked-program replay remain separate gates.

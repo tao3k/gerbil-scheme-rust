@@ -62,6 +62,7 @@ pub(crate) enum CFunctionLayout {
     SeparateProcedures,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct ObjectCompilation<'a> {
     pub identity: &'a str,
     pub options: &'a str,
@@ -550,43 +551,51 @@ fn compile_program(
         linker_c,
         linker_object,
     } = staged;
-    compile_program_modules(request.gsc, &compile_sources, cc_options, observer)?;
     let optimization = native_optimization_options()?;
     let stub_object = request.out_dir.join("program_stub.o");
-    compile_native_object(
+    let stub_c = plan.stub.with_extension("c");
+    let linker_options = format!("{optimization} -Dmain={linker_main_symbol}");
+    // These sources already exist after staging. Share the module queue rather
+    // than leaving startup/linker compilation on the critical path after it.
+    // Start the linker first; publication still waits for every bounded job.
+    let additional_jobs = [
+        super::objects::NativeObjectJob {
+            source: &linker_c,
+            object: &linker_object,
+            compilation: ObjectCompilation {
+                identity: "program-linker-object-v1",
+                options: &linker_options,
+                layout: CFunctionLayout::CompilerDefault,
+            },
+            operation: ProgramArchiveOperation {
+                phase: "native-object",
+                operation: "compile program linker",
+                subject: Some("program-linker"),
+            },
+        },
+        super::objects::NativeObjectJob {
+            source: &stub_c,
+            object: &stub_object,
+            compilation: ObjectCompilation {
+                identity: "program-startup-object-v1",
+                options: &optimization,
+                layout: CFunctionLayout::CompilerDefault,
+            },
+            operation: ProgramArchiveOperation {
+                phase: "native-object",
+                operation: "compile program startup",
+                subject: Some("program-stub"),
+            },
+        },
+    ];
+    compile_program_modules(
         request.gsc,
-        &plan.stub.with_extension("c"),
-        &stub_object,
-        ObjectCompilation {
-            identity: "program-startup-object-v1",
-            options: &optimization,
-            layout: CFunctionLayout::CompilerDefault,
-        },
-        ProgramArchiveOperation {
-            phase: "native-object",
-            operation: "compile program startup",
-            subject: Some("program-stub"),
-        },
+        &compile_sources,
+        cc_options,
+        &additional_jobs,
         observer,
     )?;
     objects.push(stub_object);
-    let linker_options = format!("{optimization} -Dmain={linker_main_symbol}");
-    compile_native_object(
-        request.gsc,
-        &linker_c,
-        &linker_object,
-        ObjectCompilation {
-            identity: "program-linker-object-v1",
-            options: &linker_options,
-            layout: CFunctionLayout::CompilerDefault,
-        },
-        ProgramArchiveOperation {
-            phase: "native-object",
-            operation: "compile program linker",
-            subject: Some("program-linker"),
-        },
-        observer,
-    )?;
     Ok(NativeStaticLinkPlan {
         module_objects: objects,
         link_object: linker_object,

@@ -18,31 +18,61 @@ pub(super) struct ProgramObject {
     pub layout: CFunctionLayout,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct NativeObjectJob<'a> {
+    pub source: &'a Path,
+    pub object: &'a Path,
+    pub compilation: ObjectCompilation<'a>,
+    pub operation: ProgramArchiveOperation<'a>,
+}
+
 pub(super) fn compile_program_modules(
     gsc: &Path,
     sources: &[ProgramObject],
     cc_options: &str,
+    additional_jobs: &[NativeObjectJob<'_>],
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<(), String> {
-    let worker_count = native_build_parallelism(sources.len());
-    let batch = format!("jobs={} workers={worker_count}", sources.len());
+    let metadata_options = metadata_compile_options(cc_options, true);
+    let jobs: Vec<_> = additional_jobs
+        .iter()
+        .copied()
+        .chain(sources.iter().map(|item| NativeObjectJob {
+            source: &item.source,
+            object: &item.object,
+            compilation: ObjectCompilation {
+                identity: "program-module-object-v1",
+                options: if item.deferred {
+                    &metadata_options
+                } else {
+                    cc_options
+                },
+                layout: item.layout,
+            },
+            operation: ProgramArchiveOperation {
+                phase: "native-object",
+                operation: "compile program module",
+                subject: Some(&item.module),
+            },
+        }))
+        .collect();
+    let worker_count = native_build_parallelism(jobs.len());
+    let batch = format!("jobs={} workers={worker_count}", jobs.len());
     observe_program_archive_operation(
         observer,
         ProgramArchiveOperation {
             phase: "native-object-batch",
-            operation: "compile program module objects",
+            operation: "compile program native objects",
             subject: Some(&batch),
         },
         || {
-            for_each_native_job(sources, worker_count, |item| {
-                let options = metadata_compile_options(cc_options, item.deferred);
-                compile_program_module(
+            for_each_native_job(&jobs, worker_count, |item| {
+                compile_native_object(
                     gsc,
-                    &item.source,
-                    &item.object,
-                    &item.module,
-                    &options,
-                    item.layout,
+                    item.source,
+                    item.object,
+                    item.compilation,
+                    item.operation,
                     observer,
                 )
             })
@@ -103,6 +133,7 @@ fn metadata_compile_options(options: &str, deferred: bool) -> String {
     }
 }
 
+#[cfg(test)]
 pub(super) fn compile_program_module(
     gsc: &Path,
     source: &Path,
@@ -133,3 +164,7 @@ pub(super) fn compile_program_module(
 #[cfg(test)]
 #[path = "../../tests/unit/program_metadata_profile.rs"]
 mod metadata_profile_tests;
+
+#[cfg(test)]
+#[path = "../../tests/unit/program_object_pool.rs"]
+mod object_pool_tests;

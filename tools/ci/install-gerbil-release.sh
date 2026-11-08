@@ -14,6 +14,7 @@ case "$(uname -s)-$(uname -m)" in
     release_arch=x86_64
     tag=gerbil-v0.19-2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb-linux-x86_64-portable-full-single-host-unlimited-patchf5cedd8168cb
     sha256=9844ba362fdf6f1c5e8a4411e462a466d52dee0d541f8e84f61091cec0e5e740
+    asset_id=581656092
     ;;
   Darwin-arm64)
     revision=1cfb032c7a1612637da6205f5f8a15683eba3ba0
@@ -21,6 +22,7 @@ case "$(uname -s)-$(uname -m)" in
     release_arch=aarch64
     tag=gerbil-v0.19-1cfb032c7a1612637da6205f5f8a15683eba3ba0-darwin-aarch64-gcc16-arm64-aot-tools-single-host-unlimited-multiple-vms-patch618d76f9eb72
     sha256=0e18d063f888a73d9f9692d441fb3776898114e8440eada6876937d289578183
+    asset_id=624730911
     ;;
   *)
     printf 'unsupported Gerbil release host: %s-%s\n' "$(uname -s)" "$(uname -m)" >&2
@@ -31,8 +33,9 @@ esac
 archive="$tag.tar.gz"
 download="${RUNNER_TEMP:?}/$archive"
 mkdir -p "$release_root"
-curl --fail --location --retry 3 --output "$download" \
-  "https://github.com/tao3k/gerbil-bazel/releases/download/$tag/$archive"
+curl --fail --location --retry 3 --header 'Accept: application/octet-stream' \
+  --output "$download" \
+  "https://api.github.com/repos/tao3k/gerbil-bazel/releases/assets/$asset_id"
 echo "$sha256  $download" | shasum -a 256 --check
 tar -xzf "$download" -C "$release_root" --strip-components=1
 

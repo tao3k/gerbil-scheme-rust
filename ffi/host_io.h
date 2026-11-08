@@ -27,13 +27,13 @@ static int gerbil_host_affinity_restore(const gerbil_host_affinity *affinity) { 
 /* Process control belongs to the embedding host. Leave the SDK's internal
  * timer signals alone so Scheme green-thread scheduling remains native. */
 typedef struct {
-  struct sigaction actions[3];
+  struct sigaction actions[4];
   unsigned saved;
 } gerbil_host_signals;
-static const int gerbil_host_signal_numbers[3] = { SIGCHLD, SIGINT, SIGTERM };
+static const int gerbil_host_signal_numbers[4] = { SIGCHLD, SIGINT, SIGTERM, SIGPIPE };
 static int gerbil_host_signals_capture(gerbil_host_signals *signals) {
   memset(signals, 0, sizeof(*signals));
-  for (unsigned i = 0; i < 3; ++i) {
+  for (unsigned i = 0; i < 4; ++i) {
     if (sigaction(gerbil_host_signal_numbers[i], NULL, &signals->actions[i]) < 0)
       return -1;
     signals->saved++;

@@ -41,6 +41,9 @@ discovery and compiler children therefore retain the host's admitted CPUs,
 including container restrictions. Cargo's =NUM_JOBS= still bounds the native
 batch; this does not introduce a worker override or modify Gambit sources.
 The runtime and package tests check the calling thread's allowed CPU list.
+The same host-state boundary retains the caller's SIGPIPE disposition; Rust
+pipe writes must still return BrokenPipe after native setup and cleanup.
+A real pipe with an exited reader exercises that contract in the runtime test.
 
 * Retained-source evidence
 

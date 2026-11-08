@@ -79,9 +79,13 @@ unsafe extern "C" fn linked_hex_bytes_fixture(input: *const u8, len: usize) -> i
 
 #[test]
 fn calls_scalar_export_in_process() {
+    #[cfg(unix)]
+    assert_host_broken_pipe();
     #[cfg(target_os = "linux")]
     let host_cpus = host_allowed_cpus();
     let runtime = GerbilRuntime::initialize().expect("initialize in-process Gerbil runtime");
+    #[cfg(unix)]
+    assert_host_broken_pipe();
     #[cfg(target_os = "linux")]
     assert_eq!(
         host_allowed_cpus(),
@@ -110,11 +114,33 @@ fn calls_scalar_export_in_process() {
     exercises_binary_input_and_reused_output(&runtime);
     exercises_utf8_bulk_conversion(&runtime);
     reports_overflow_and_finalized_runtime_boundaries(runtime);
+    #[cfg(unix)]
+    assert_host_broken_pipe();
     #[cfg(target_os = "linux")]
     assert_eq!(
         host_allowed_cpus(),
         host_cpus,
         "cleanup changed host CPU affinity"
+    );
+}
+
+#[cfg(unix)]
+fn assert_host_broken_pipe() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let mut child = Command::new("true")
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("create a real host pipe");
+    let mut input = child.stdin.take().expect("parent pipe writer");
+    assert!(child.wait().expect("close the reader").success());
+    assert_eq!(
+        input
+            .write_all(b"closed")
+            .expect_err("reader already exited")
+            .kind(),
+        std::io::ErrorKind::BrokenPipe,
     );
 }
 

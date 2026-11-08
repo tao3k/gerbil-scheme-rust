@@ -21,9 +21,12 @@ success therefore does not qualify the archive's single-host compilation.
 For generated module objects built by the configured GCC lane, the program
 archive sets =___SINGLE_HOST_LIMIT= to Gambit's own
 =___OPTIMIZED_MODULE_LIMIT=. The paired header supplies the numeric threshold
-and selects multiple host functions when necessary. The existing O2 setting,
-module closure, runtime headers, concurrency, linker entry and existing GCSE
-load-motion exclusion remain. Code-generation options are part of the existing
+and selects multiple host functions when necessary. Cargo's =OPT_LEVEL= selects
+runtime, startup and linker-object optimization. Standalone archive calls use
+=-O2=, and lazy metadata follows the paired compiler's default.
+Cargo level =0= uses =-O1= to retain optimized C tail calls. Module closure,
+runtime headers, concurrency, linker entry and the existing GCSE load-motion
+exclusion remain part of the archive contract. Code-generation options are part of the existing
 object fingerprint; the old single-host object cannot satisfy the new recipe.
 
 This is a generic archive safety default, not reproduction of every producer's

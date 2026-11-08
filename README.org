@@ -247,6 +247,11 @@ provenance and complete link receipts. Bazel owns the cross-language CI graph.
 Downstream consumers validate and consume the receipt, without repeating
 Gerbil installation, compiler or system-library discovery.
 
+Cargo's =OPT_LEVEL= selects native runtime, startup and linker-object
+optimization. Standalone archive callers default to =-O2=. Lazy compiler
+metadata retains the paired Gambit compiler's default optimization.
+Cargo level =0= uses the native =-O1= baseline for trusted C tail calls.
+
 Compiler selection follows the configured Gerbil executable and its paired Gambit compiler.
 Ghostscript's unrelated =gsc= is rejected. Explicit =GERBIL_GSC= overrides
 remain validated. OpenSSL, zlib and SQLite link receipts are admitted before

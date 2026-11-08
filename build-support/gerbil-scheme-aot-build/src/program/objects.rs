@@ -96,7 +96,8 @@ fn metadata_compile_options(options: &str, deferred: bool) -> String {
     // Gerbil gsc-cc-options(phi? = #t) omits runtime optimization flags.
     // Retain declared package headers and let the frozen SDK choose its default.
     if deferred {
-        options.replacen("-O2", "", 1)
+        let prefix_end = options.find(' ').unwrap_or(options.len());
+        options[prefix_end..].to_owned()
     } else {
         options.to_owned()
     }
@@ -128,3 +129,7 @@ pub(super) fn compile_program_module(
         observer,
     )
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/program_metadata_profile.rs"]
+mod metadata_profile_tests;

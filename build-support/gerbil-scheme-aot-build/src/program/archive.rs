@@ -105,7 +105,7 @@ pub struct NativeHeaderInput<'a> {
     pub header_files: &'a [PathBuf],
 }
 
-use super::native_compile_options;
+use super::{native_compile_options, native_optimization_options};
 
 const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/runtime"];
 
@@ -550,6 +550,7 @@ fn compile_program(
         linker_object,
     } = staged;
     compile_program_modules(request.gsc, &compile_sources, cc_options, observer)?;
+    let optimization = native_optimization_options()?;
     let stub_object = request.out_dir.join("program_stub.o");
     compile_native_object(
         request.gsc,
@@ -557,7 +558,7 @@ fn compile_program(
         &stub_object,
         ObjectCompilation {
             identity: "program-startup-object-v1",
-            options: "-O2",
+            options: &optimization,
             layout: CFunctionLayout::CompilerDefault,
         },
         ProgramArchiveOperation {
@@ -568,7 +569,7 @@ fn compile_program(
         observer,
     )?;
     objects.push(stub_object);
-    let linker_options = format!("-O2 -Dmain={linker_main_symbol}");
+    let linker_options = format!("{optimization} -Dmain={linker_main_symbol}");
     compile_native_object(
         request.gsc,
         &linker_c,

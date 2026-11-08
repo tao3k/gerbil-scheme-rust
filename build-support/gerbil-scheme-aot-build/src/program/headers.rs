@@ -5,14 +5,35 @@ use super::{NativeHeaderInput, ProgramArchiveObserver};
 use sha2::{Digest, Sha256};
 use std::fs;
 
+pub(super) fn native_optimization_options() -> Result<String, String> {
+    println!("cargo:rerun-if-env-changed=OPT_LEVEL");
+    let configured = std::env::var_os("OPT_LEVEL");
+    let level = configured
+        .as_deref()
+        .map(|value| value.to_str().ok_or("Cargo OPT_LEVEL must be UTF-8"))
+        .transpose()?;
+    optimization_option(level)
+}
+
+fn optimization_option(level: Option<&str>) -> Result<String, String> {
+    let level = level.unwrap_or("2");
+    if !["0", "1", "2", "3", "s", "z"].contains(&level) {
+        return Err(format!("unsupported Cargo OPT_LEVEL {level:?}"));
+    }
+    // The paired toolchain trusts optimized C tail calls. Keep its -O1
+    // baseline when Cargo disables Rust optimization for a dependency.
+    let level = if level == "0" { "1" } else { level };
+    Ok(format!("-O{level}"))
+}
+
 pub(super) fn native_compile_options(
     inputs: &[NativeHeaderInput<'_>],
     observer: &dyn ProgramArchiveObserver,
 ) -> Result<String, String> {
+    let mut options = native_optimization_options()?;
     if inputs.is_empty() {
-        return Ok("-O2".into());
+        return Ok(options);
     }
-    let mut options = String::from("-O2");
     let mut digest = Sha256::new();
     digest.update(b"gerbil-native-package-headers.v1\0");
     for input in inputs {
@@ -51,3 +72,7 @@ pub(super) fn native_compile_options(
     ));
     Ok(options)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/program_profile.rs"]
+mod profile_tests;

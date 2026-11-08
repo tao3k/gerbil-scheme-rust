@@ -8,7 +8,7 @@ use metadata::{add_link_input, scheme_string};
 use objects::compile_program_module;
 use objects::compile_program_modules;
 mod headers;
-use headers::native_compile_options;
+use headers::{native_compile_options, native_optimization_options};
 mod process;
 pub(crate) use process::configured_gambit_gcc;
 use process::{

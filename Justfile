@@ -332,6 +332,11 @@ native-mailbox-model-check:
 native-mailbox-backpressure:
     {{build_env}} cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench gerbil_actor_arrival --locked -- --rate=500000 --seconds=10 --backpressure-compare
 
+# Pinned op62 replay. Qualify frozen controls before comparing matched builds.
+[positional-arguments]
+mailbox-replay-1m reader frozen_image matched_image matched_sha256 candidate_image candidate_sha256 receipt_dir:
+    node tools/ci/mailbox-replay.mjs "$@"
+
 native-mailbox-backpressure-model-check:
     quint test specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --seed 1 --backend typescript
     quint run specs/scheduling/native_mailbox_backpressure.qnt --main native_mailbox_backpressure --invariant safety --seed 1 --max-samples 1000 --max-steps 50 --backend typescript --verbosity 1
@@ -340,6 +345,9 @@ native-mailbox-backpressure-model-check:
 # Model labels remain external proof obligations; this never runs a benchmark.
 mailbox-research-gate-check:
     quint typecheck specs/mailbox_research_gate.qnt
+    quint test specs/actor_mailbox_work.qnt --main mailbox_send_scope --seed 1 --max-samples 1 --backend typescript
+    quint test specs/scheduling/native_owner_watch.qnt --main owner_wait_coverage --seed 1 --max-samples 1 --backend typescript
+    quint test specs/scheduling/native_source_plan.qnt --main native_source_plan --seed 1 --max-samples 1 --backend typescript
     quint test specs/mailbox_measurement_contract.qnt --main mailbox_measurement_tests --seed 1 --max-samples 1 --backend typescript
     quint test specs/mailbox_resource_contract.qnt --main mailbox_resource_tests --seed 1 --max-samples 1 --backend typescript
     quint test specs/actor_service_calculus.qnt --main actor_service_cost_tests --seed 1 --max-samples 1 --backend typescript

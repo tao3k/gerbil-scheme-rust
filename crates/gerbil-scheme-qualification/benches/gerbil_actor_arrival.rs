@@ -256,14 +256,14 @@ fn copy_arrival_receipt(
     }
 }
 #[expect(clippy::too_many_lines, reason = "Frozen benchmark")]
-fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativePath) -> bool {
+fn run(pool: &mut InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativePath) -> bool {
     let watchdog = Watchdog::start();
     let anchored = std::env::args().any(|arg| arg == "--native-clock-anchor");
     let progress = Arc::clone(&watchdog.last);
     // AtomicU64 has the aligned C atomic-word representation used by this
     // Darwin qualification bridge. The owner closure keeps the allocation live
     // until the synchronous Scheme call has returned or unwound.
-    let (receipt, whole_call_ns) = pool
+    let outcome = pool
         .dispatcher()
         .submit_native_on(0, move |session| {
             with_owner_qos(
@@ -353,10 +353,17 @@ fn run(pool: &InstancePool, rate: u64, seconds: u64, warmup: bool, path: NativeP
                 },
             )
         })
-        .unwrap()
-        .wait(Duration::from_secs(seconds) + REQUEST_DEADLINE + GATE)
-        .unwrap();
+        .and_then(|ticket| ticket.wait(Duration::from_secs(seconds) + REQUEST_DEADLINE + GATE));
     drop(watchdog);
+    let (receipt, whole_call_ns) = outcome
+        .inspect_err(|_| {
+            let report = pool.shutdown(GATE);
+            println!("{}", json!({
+                "event":"gerbil_actor_failure_cleanup", "warmup":warmup, "clean":report.is_clean(),
+                "joined":report.joined, "pending":report.pending, "panicked":report.panicked,
+            }));
+        })
+        .unwrap();
     let (core, debt) = receipt.split_at(8);
     let [
         planned,
@@ -536,7 +543,7 @@ fn qos_scope_contract(pool: &InstancePool) {
     );
 }
 
-fn qos_candidate(pool: &InstancePool, rate: u64, seconds: u64, native: bool) {
+fn qos_candidate(pool: &mut InstancePool, rate: u64, seconds: u64, native: bool) {
     let candidate = if native {
         NativePath::BackpressureUrgent
     } else {
@@ -739,42 +746,42 @@ fn main() {
         );
         return;
     }
-    run(&pool, 1000, 1, true, path);
-    let admitted = run(&pool, rate, seconds, false, path);
+    run(&mut pool, 1000, 1, true, path);
+    let admitted = run(&mut pool, rate, seconds, false, path);
     if qos_compare {
-        qos_candidate(&pool, rate, seconds, qos_native_compare);
+        qos_candidate(&mut pool, rate, seconds, qos_native_compare);
     }
     if service_compare {
         assert!(
             path == NativePath::Service,
             "comparison starts with service control"
         );
-        run(&pool, 1000, 1, true, NativePath::Mailbox);
-        run(&pool, rate, seconds, false, NativePath::Mailbox);
+        run(&mut pool, 1000, 1, true, NativePath::Mailbox);
+        run(&mut pool, rate, seconds, false, NativePath::Mailbox);
     }
     if pipeline_compare {
         assert!(
             path == NativePath::Mailbox,
             "pipeline comparison starts with original mailbox"
         );
-        run(&pool, 1000, 1, true, NativePath::Pipeline);
-        run(&pool, rate, seconds, false, NativePath::Pipeline);
+        run(&mut pool, 1000, 1, true, NativePath::Pipeline);
+        run(&mut pool, rate, seconds, false, NativePath::Pipeline);
     }
     if access_compare {
         assert!(
             path == NativePath::Mailbox,
             "data access comparison starts with original mailbox"
         );
-        run(&pool, 1000, 1, true, NativePath::Access);
-        run(&pool, rate, seconds, false, NativePath::Access);
+        run(&mut pool, 1000, 1, true, NativePath::Access);
+        run(&mut pool, rate, seconds, false, NativePath::Access);
     }
     if backpressure_compare {
         assert!(
             path == NativePath::Mailbox,
             "backpressure comparison starts with original mailbox"
         );
-        run(&pool, 1000, 1, true, NativePath::Backpressure);
-        run(&pool, rate, seconds, false, NativePath::Backpressure);
+        run(&mut pool, 1000, 1, true, NativePath::Backpressure);
+        run(&mut pool, rate, seconds, false, NativePath::Backpressure);
     }
     finish(&mut pool, admitted);
 }

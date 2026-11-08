@@ -305,36 +305,57 @@ module mailbox_send_scope {
       current.p99Ns<=reference.p99Ns and current.p999Ns<=reference.p999Ns and current.peak<=reference.peak
   pure val recordedReference={planned:1000000,completed:1000000,rejected:0,errors:0,timeouts:0,
     clean:true,p99Ns:6393000,p999Ns:6740000,peak:6746}
+  pure val workingControlEnvelope={...recordedReference,p99Ns:15000000,p999Ns:15000000,peak:12969}
+  // For complete equal-size runs, the rate floor is exactly an
+  // upper bound on the native inner elapsed time.
+  pure val workingControlElapsedNs=1012725666
+  pure def workingControlFits(current:RelativeControl,elapsedNs:int):bool=
+    historicalControlFits(workingControlEnvelope,current,true) and
+      0<elapsedNs and elapsedNs<=workingControlElapsedNs
+  run WorkingLineRetains3477a02AndStopsAboveFifteenMsTest={
+    val replay={...workingControlEnvelope,p99Ns:12869000,p999Ns:12948000}
+    val local={...replay,p99Ns:19561000,p999Ns:19698000,peak:19717}
+    assert(workingControlFits(replay,workingControlElapsedNs) and
+      workingControlFits({...replay,p99Ns:15000000,p999Ns:15000000},workingControlElapsedNs) and
+      not(workingControlFits({...replay,p99Ns:15001000,p999Ns:15001000},workingControlElapsedNs)) and
+      not(workingControlFits(local,1019221625)) and
+      not(workingControlFits(replay,workingControlElapsedNs+1)))
+  }
   pure val recordedCurrentControl={...recordedReference,p99Ns:51139000,p999Ns:51291000,peak:51316}
   run sameFrozenInputsAndZeroRejectsDoNotQualifySlowControlTest=assert(
     not(historicalControlFits(recordedReference,recordedCurrentControl,true)) and
       historicalControlFits(recordedReference,recordedReference,true) and
       not(historicalControlFits(recordedReference,recordedReference,false)))
-  // Hundredths of messages per second preserve the recorded decimal floor.
-  pure def candidateReplayFits(current:RelativeControl,throughputHundredths:int):bool=
-    historicalControlFits(recordedReference,current,true) and
-    current.p99Ns<=418000 and current.peak<=128 and throughputHundredths>=99524402
+  pure val publishedCandidateReference={...recordedReference,p99Ns:4513000,p999Ns:4819000,peak:4853}
+  pure val publishedCandidateElapsedNs=1000055125
+  // Receipt authenticity, full call elapsed and the ordered control
+  // sequence are checked separately by the launcher.
+  pure def candidateReplayFits(current:RelativeControl,elapsedNs:int):bool=
+    historicalControlFits(publishedCandidateReference,current,true) and
+    0<elapsedNs and elapsedNs<=publishedCandidateElapsedNs and current.p99Ns<=418000 and
+    current.p99Ns<publishedCandidateReference.p99Ns and
+    current.peak+1<=128 and current.peak+1<publishedCandidateReference.peak
   run AbsoluteLatencyAndBacklogDoNotWaiveRelativeTailOrThroughputTest={
-    val candidate={...recordedReference,p99Ns:400000,p999Ns:6000000,peak:100}
-    val tailRegressed={...candidate,p999Ns:9000000}
-    assert(candidateReplayFits(candidate,99900000) and
-      not(candidateReplayFits(tailRegressed,99900000)) and
-      not(candidateReplayFits(candidate,99100000)))
+    val candidate={...recordedReference,p99Ns:400000,p999Ns:4819000,peak:127}
+    assert(candidateReplayFits(candidate,publishedCandidateElapsedNs) and
+      not(candidateReplayFits({...candidate,p999Ns:4820000},publishedCandidateElapsedNs)) and
+      not(candidateReplayFits({...candidate,peak:128},publishedCandidateElapsedNs)) and
+      not(candidateReplayFits(candidate,publishedCandidateElapsedNs+1)))
   }
   pure def improvesMatchedControl(control:RelativeControl,candidate:RelativeControl,
       controlRate:int,candidateRate:int):bool=
     historicalControlFits(control,candidate,true) and candidateRate>=controlRate and
-    (candidate.p99Ns<control.p99Ns or candidate.p999Ns<control.p999Ns or
-      candidate.peak<control.peak or candidateRate>controlRate)
+    candidate.p99Ns<control.p99Ns and candidate.peak+1<control.peak
   run HistoricGainCannotCoverRegressionAgainstTheMatchedBuildTest={
-    val rebuilt={...recordedReference,p99Ns:380000,p999Ns:460000,peak:90}
-    val candidate={...rebuilt,p99Ns:390000}
-    val improved={...rebuilt,peak:80}
-    assert(candidateReplayFits(candidate,99900000) and
-      not(improvesMatchedControl(rebuilt,candidate,99900000,99900000)) and
-      not(improvesMatchedControl(rebuilt,rebuilt,99900000,99900000)) and
-      not(improvesMatchedControl(rebuilt,improved,99900000,99800000)) and
-      improvesMatchedControl(rebuilt,improved,99900000,99900000))
+    val rebuilt={...recordedReference,p99Ns:200000,p999Ns:410000,peak:100}
+    val improved={...rebuilt,p99Ns:199000,p999Ns:405000,peak:80}
+    val regression=Set(200000,201000,300000,400000,401000)
+    assert(candidateReplayFits({...improved,p99Ns:401000},publishedCandidateElapsedNs) and
+      regression.forall(p99=>not(improvesMatchedControl(
+        rebuilt,{...improved,p99Ns:p99},100000000,110000000))) and
+      not(improvesMatchedControl(rebuilt,{...improved,peak:99},100000000,110000000)) and
+      not(improvesMatchedControl(rebuilt,improved,100000000,99999999)) and
+      improvesMatchedControl(rebuilt,improved,100000000,100000000))
   }
   run PrivateOrderImageLifecyclePassCannotAdmitFailedFrozenControlTest={
     val frozen={...recordedReference,p99Ns:120686000,p999Ns:120844000,peak:116723}
@@ -347,7 +368,15 @@ module mailbox_send_scope {
   run NativeMatchedReplayStillStopsAtTheFirstFrozenControlTest={
     val frozen={...recordedReference,p99Ns:118138000,p999Ns:118718000,peak:115280}
     assert(not(historicalControlFits(recordedReference,frozen,true)) and
-      not(candidateReplayFits(frozen,89356415)))
+      not(candidateReplayFits(frozen,publishedCandidateElapsedNs)))
+  }
+  run BothOracleTimeoutPrefixesFailAdmissionIndependentlyTest={
+    val apparentFast={...recordedReference,p99Ns:400000,p999Ns:410000,peak:100}
+    val original={...apparentFast,completed:936340,timeouts:1,clean:false}
+    val changed={...apparentFast,completed:791216,timeouts:1,clean:false}
+    // Even optimistic prefix quantiles and peak cannot qualify either arm.
+    assert(not(workingControlFits(original,workingControlElapsedNs)) and
+      not(candidateReplayFits(changed,publishedCandidateElapsedNs)))
   }
   run CleanShutdownDoesNotAdmitSlowFullMainOrTruncatedPrefixTest={
     val slowMain={...recordedReference,p99Ns:181533000,p999Ns:181639000,peak:154547}

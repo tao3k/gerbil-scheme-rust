@@ -124,6 +124,15 @@ module owner_wait_coverage {
       1+innerWall/period-finished==171260 and dueWithOnlyCpu-finished==50991 and
       cpuFloor-latestWithAllowedDebt==50862417 and dueWithOnlyCpu-finished>limit)
   }
+  run FirstBreachWindowWasMostlyOwnerCpuTest={
+    val elapsed=173625
+    val ownerFloor=innerCpuFloor(1,1,177583,elapsed,176417-2000)
+    val retired=42
+    val period=1000
+    assert(ownerFloor==170459 and elapsed-ownerFloor==3166 and
+      2*ownerFloor>elapsed and 1+elapsed/period-retired==132 and
+      1+ownerFloor/period-retired==129)
+  }
   run MissingOrForeignWallEnvelopeCannotGiveACompletionCpuFloorTest=assert(
     innerCpuFloor(1,2,1658919875,1638521208,1061999250)== -1 and
     innerCpuFloor(1,1,100,101,80)== -1 and
@@ -149,6 +158,13 @@ module owner_wait_coverage {
     val uncharged=nonCpuLower(inner,before,after)-gcWallUpper
     assert(uncharged==4724013497 and uncharged>3000000000 and
       nonCpuLower(inner,before,{...after,scope:7})== -1)
+  }
+  run OraclePrefixTimeoutsCannotPriceOwnerWorkTest={
+    // Archive CPU and GC are upper bounds with 1 us of margin each.
+    val controlOutside=10938620250-1262637418-234370994
+    val changedOutside=10799639875-1137100125-204175996
+    assert(controlOutside==9441611838 and changedOutside==9458363754 and
+      2*controlOutside>10938620250 and 2*changedOutside>10799639875)
   }
   pure def selectWrapperRecords(backend:str,recording:bool):bool=recording and backend=="select"
   // Even all select calls are a subset of possible native waits. Closed scope,

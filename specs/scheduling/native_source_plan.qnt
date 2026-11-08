@@ -124,6 +124,33 @@ module native_source_plan {
       oldestPublicationStampDelayCeiling(false,351,3,2000,697625)== -1 and
       oldestPublicationStampDelayCeiling(true,351,3,2000,693999)== -1)
   }
+  run FrozenMillionPeakAlreadyHasDebtBeforePromptRefillTest={
+    // The raw drive samples before supply. With three frames, each
+    // preceding nonidle turn retires one, leaving at most two charged.
+    val activeAtSample=0.to(3).map(afterSupply =>
+      if(afterSupply==0) 0 else afterSupply-1)
+    assert(activeAtSample==Set(0,1,2) and
+      12969-12967==2 and 19717-19715==2 and
+      oldestPublicationStampDelayCeiling(true,12969,2,1000,12966875)==875 and
+      oldestPublicationStampDelayCeiling(true,19717,2,1000,19714625)==625)
+  }
+  run LastTurnCanExceedWindowBeforeItsProgressStampTest={
+    val period=1000
+    val lastPublication=1458458
+    val progress=1462416
+    val sample=1462458
+    val published=1336
+    val beforeReturn=1333
+    val afterReturn=beforeReturn+1
+    val exactCrossing=(beforeReturn+128)*period
+    val dueAtPublication=1+lastPublication/period
+    assert(dueAtPublication>published and published-afterReturn==2 and
+      dueAtPublication-beforeReturn==126 and lastPublication<exactCrossing and
+      1+(exactCrossing-1)/period-beforeReturn==128 and
+      1+exactCrossing/period-beforeReturn==129 and exactCrossing<progress and
+      1+sample/period-afterReturn==129 and progress-lastPublication==3958 and
+      sample-progress==42)
+  }
   // On the original complete three-frame loop, each sampled breach
   // forces a retirement. Before the first sampled breach at most
   // completed - aboveLimit requests can have returned.

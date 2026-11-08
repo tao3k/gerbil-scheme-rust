@@ -12,6 +12,41 @@
  * set by its container or caller. Never reset to an invented all-CPU mask. */
 #if defined(__linux__)
 #include <sched.h>
+#include <pthread.h>
+#include <time.h>
+/* Gambit resets SIGPIPE before retiring its I/O devices. Defer signals from
+ * that owner-local cleanup until the caller's disposition has been restored. */
+typedef struct { sigset_t mask; int pending; } gerbil_host_sigpipe;
+static int gerbil_host_sigpipe_begin(gerbil_host_sigpipe *scope) {
+  sigset_t pipe, pending;
+  sigemptyset(&pipe);
+  sigaddset(&pipe, SIGPIPE);
+  int status = pthread_sigmask(SIG_BLOCK, &pipe, &scope->mask);
+  if (status != 0) { errno = status; return -1; }
+  if (sigpending(&pending) != 0) {
+    int saved = errno;
+    pthread_sigmask(SIG_SETMASK, &scope->mask, NULL);
+    errno = saved;
+    return -1;
+  }
+  scope->pending = sigismember(&pending, SIGPIPE);
+  return 0;
+}
+static int gerbil_host_sigpipe_end(const gerbil_host_sigpipe *scope) {
+  int result = 0;
+  if (!scope->pending) {
+    sigset_t pipe;
+    sigemptyset(&pipe);
+    sigaddset(&pipe, SIGPIPE);
+    const struct timespec now = {0, 0};
+    int status;
+    do { status = sigtimedwait(&pipe, NULL, &now); } while (status < 0 && errno == EINTR);
+    if (status < 0 && errno != EAGAIN) result = -1;
+  }
+  int status = pthread_sigmask(SIG_SETMASK, &scope->mask, NULL);
+  if (status != 0) { errno = status; result = -1; }
+  return result;
+}
 typedef cpu_set_t gerbil_host_affinity;
 static int gerbil_host_affinity_capture(gerbil_host_affinity *affinity) {
   return sched_getaffinity(0, sizeof(*affinity), affinity);
@@ -20,6 +55,9 @@ static int gerbil_host_affinity_restore(const gerbil_host_affinity *affinity) {
   return sched_setaffinity(0, sizeof(*affinity), affinity);
 }
 #else
+typedef struct { int unused; } gerbil_host_sigpipe;
+static int gerbil_host_sigpipe_begin(gerbil_host_sigpipe *scope) { (void)scope; return 0; }
+static int gerbil_host_sigpipe_end(const gerbil_host_sigpipe *scope) { (void)scope; return 0; }
 typedef struct { int unused; } gerbil_host_affinity;
 static int gerbil_host_affinity_capture(gerbil_host_affinity *affinity) { (void)affinity; return 0; }
 static int gerbil_host_affinity_restore(const gerbil_host_affinity *affinity) { (void)affinity; return 0; }
@@ -156,6 +194,9 @@ failed:
   return -1;
 }
 #else
+typedef struct { int unused; } gerbil_host_sigpipe;
+static int gerbil_host_sigpipe_begin(gerbil_host_sigpipe *scope) { (void)scope; return 0; }
+static int gerbil_host_sigpipe_end(const gerbil_host_sigpipe *scope) { (void)scope; return 0; }
 typedef struct { int unused; } gerbil_host_affinity;
 static int gerbil_host_affinity_capture(gerbil_host_affinity *affinity) { (void)affinity; return 0; }
 static int gerbil_host_affinity_restore(const gerbil_host_affinity *affinity) { (void)affinity; return 0; }

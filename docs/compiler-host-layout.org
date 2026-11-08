@@ -44,6 +44,12 @@ The runtime and package tests check the calling thread's allowed CPU list.
 The same host-state boundary retains the caller's SIGPIPE disposition; Rust
 pipe writes must still return BrokenPipe after native setup and cleanup.
 A real pipe with an exited reader exercises that contract in the runtime test.
+Linux cleanup also blocks owner-thread SIGPIPE until the host disposition is
+restored: Gambit resets it before retiring I/O devices. The boundary restores
+the original thread mask and retains an already pending host SIGPIPE, while
+consuming a newly generated cleanup signal without waiting. The Linux C ABI
+gate checks real closed-pipe writes and an unguarded signal-13 control. This
+adds no mask operation to scalar access or application message dispatch.
 
 * Retained-source evidence
 

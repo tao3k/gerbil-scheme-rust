@@ -49,6 +49,7 @@ static void gerbil_host_environment_restore(gerbil_host_environment *snapshot) {
 }
 #else
 typedef struct { int unused; } gerbil_host_environment;
+static void gerbil_host_environment_discard(gerbil_host_environment *snapshot) { (void)snapshot; }
 static int gerbil_host_environment_capture(gerbil_host_environment *snapshot) { (void)snapshot; return 0; }
 static void gerbil_host_environment_restore(gerbil_host_environment *snapshot) { (void)snapshot; }
 #endif

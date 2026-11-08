@@ -191,8 +191,12 @@ static int32_t runtime_init_program(
   if (initialized != ___FIX(___NO_ERR) || host_restored != 0 ||
       (single_processor && ___VMSTATE->processor_count != 1)) {
     if (initialized == ___FIX(___NO_ERR)) {
-      ___cleanup();
-      gerbil_host_signals_restore(&host.signals);
+      gerbil_host_sigpipe pipe;
+      if (gerbil_host_sigpipe_begin(&pipe) == 0) {
+        ___cleanup();
+        gerbil_host_signals_restore(&host.signals);
+        gerbil_host_sigpipe_end(&pipe);
+      }
       gerbil_host_affinity_restore(&host.affinity);
     }
     gerbil_scheme_rust_state = 2;
@@ -238,14 +242,25 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
   if (gerbil_host_affinity_capture(&affinity) != 0) return 4;
   gerbil_host_environment environment;
   if (gerbil_host_environment_capture(&environment) != 0) return 4;
+  gerbil_host_sigpipe pipe;
+  if (gerbil_host_sigpipe_begin(&pipe) != 0) {
+    gerbil_host_environment_discard(&environment);
+    return 4;
+  }
   gerbil_host_signals signals;
   int captured = gerbil_host_signals_capture(&signals);
+  if (captured != 0) {
+    gerbil_host_sigpipe_end(&pipe);
+    gerbil_host_environment_discard(&environment);
+    return 4;
+  }
   ___cleanup();
   gerbil_host_environment_restore(&environment);
   gerbil_scheme_rust_state = 2;
   int restored = gerbil_host_signals_restore(&signals);
+  int pipe_restored = gerbil_host_sigpipe_end(&pipe);
   int affinity_restored = gerbil_host_affinity_restore(&affinity);
-  return captured == 0 && restored == 0 && affinity_restored == 0 ? 0 : 4;
+  return restored == 0 && pipe_restored == 0 && affinity_restored == 0 ? 0 : 4;
 }
 
 #ifdef GERBIL_SCHEME_RUST_BUILD

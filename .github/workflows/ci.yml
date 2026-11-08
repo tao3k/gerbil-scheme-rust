@@ -367,6 +367,7 @@ jobs:
         shard: [0, 1]
     env:
       GERBIL_OWNER_MODEL_SHARD: ${{ matrix.shard }}
+      QUINT_HOME: ${{ github.workspace }}/.ci/quint
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
@@ -375,6 +376,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
       - name: Install pinned Quint CLI
         run: npm install --global @informalsystems/quint@0.33.0
+      - name: Prepare pinned Quint Rust evaluator
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download evaluator/v0.7.0 --repo quint-co/quint --pattern quint_evaluator-x86_64-unknown-linux-gnu.tar.gz --dir "$RUNNER_TEMP"
+          printf '%s  %s\n' '869adb8762a518483eb39f67fde622253a58527494e15afe77d610a0b6dab7d2' "$RUNNER_TEMP/quint_evaluator-x86_64-unknown-linux-gnu.tar.gz" | sha256sum --check
+          mkdir -p "$QUINT_HOME/rust-evaluator-v0.7.0"
+          tar -xzf "$RUNNER_TEMP/quint_evaluator-x86_64-unknown-linux-gnu.tar.gz" -C "$QUINT_HOME/rust-evaluator-v0.7.0"
       - name: Check lifecycle scenarios, sampled traces and negative controls
         run: |
           quint typecheck specs/mailbox_result_construction.qnt

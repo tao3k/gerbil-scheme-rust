@@ -19,10 +19,10 @@
  * libc calls are never interposed. Masking the owner alone cannot protect a
  * concurrent host thread's writev while Gambit resets SIGPIPE process-wide. */
 static _Thread_local unsigned gerbil_host_signal_scope_depth;
-extern void __real____set_signal_handler(int, void (*)(int));
+extern void ___set_signal_handler(int, void (*)(int));
 void __wrap____set_signal_handler(int signal_number, void (*handler)(int)) {
   if (signal_number == SIGPIPE && gerbil_host_signal_scope_depth != 0) return;
-  __real____set_signal_handler(signal_number, handler);
+  ___set_signal_handler(signal_number, handler);
 }
 #endif
 /* Gambit resets SIGPIPE before retiring its I/O devices. Defer signals from

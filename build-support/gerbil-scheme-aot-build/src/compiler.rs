@@ -74,14 +74,16 @@ fn run_native_build() {
                 .arg(workspace.join("ffi/runtime.c")),
             "compile external program lifecycle owner",
         );
-        archive_lifecycle(&runtime_object, &gsc, &out_dir);
+        archive_lifecycle(&runtime_object, &out_dir);
+        prepare_paired_signal_archive(Path::new(&gsc), &out_dir)
+            .expect("prepare paired Gambit signal scope");
         println!("cargo:rustc-link-search=native={}", out_dir.display());
         println!(
             "cargo:rustc-link-search=native={}",
             gerbil_prefix(&gsc).join("lib").display()
         );
         println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
-        println!("cargo:rustc-link-lib=static=gambit");
+        println!("cargo:rustc-link-lib=static={}", paired_gambit_link_name());
         return;
     }
 
@@ -307,7 +309,7 @@ fn build_default_program(workspace: &Path, out: &Path, prefix: &Path, gsc: &OsSt
             .arg(workspace.join("ffi/runtime.c")),
         "Gerbil build lifecycle",
     );
-    publish_default_image(&receipt, &lifecycle, out, gsc);
+    publish_default_image(&receipt, &lifecycle, out);
 }
 
 fn toolchain_home_header(gsc: &OsStr) -> String {
@@ -336,12 +338,7 @@ fn toolchain_home_header(gsc: &OsStr) -> String {
     header
 }
 
-fn publish_default_image(
-    receipt: &crate::NativeArchiveLinkReceipt,
-    lifecycle: &Path,
-    out: &Path,
-    gsc: &OsStr,
-) {
+fn publish_default_image(receipt: &crate::NativeArchiveLinkReceipt, lifecycle: &Path, out: &Path) {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         // Keep the complete tooling graph in its package-owned native image.
         // Rust's executable dead-strip traversal recursively walks large Scheme
@@ -354,7 +351,7 @@ fn publish_default_image(
         println!("cargo:rustc-link-lib=dylib=gerbil_scheme_build");
         return;
     }
-    archive_lifecycle(lifecycle, gsc, out);
+    archive_lifecycle(lifecycle, out);
     println!("cargo:rustc-link-search=native={}", out.display());
     println!("cargo:rustc-link-lib=static=gerbil_scheme_rust_native");
     for directive in &receipt.cargo_directives {
@@ -370,12 +367,7 @@ fn signal_scope_option() -> &'static str {
     }
 }
 
-fn configure_scoped_lifecycle_link(
-    command: &mut Command,
-    lifecycle: &Path,
-    signal_objects: &[PathBuf],
-    output: &Path,
-) {
+fn configure_scoped_signal_link(command: &mut Command, caller: &Path, output: &Path) {
     // Resolve Gambit's internal calls here, not in the final host link. Cargo
     // dependency link-args do not propagate to a consumer executable, and a
     // global libc interposer would also redirect unrelated host operations.
@@ -386,73 +378,103 @@ fn configure_scoped_lifecycle_link(
             "-r",
             "-Wl,--wrap=___set_signal_handler",
         ])
-        .arg(lifecycle)
-        .args(signal_objects)
+        .arg(caller)
         .arg("-o")
         .arg(output);
 }
 
-fn write_signal_caller(bytes: &[u8], out: &Path, index: usize) -> Result<Option<PathBuf>, String> {
+fn is_signal_caller(bytes: &[u8]) -> Result<bool, String> {
     use object::{Object, ObjectSymbol};
     let object = object::File::parse(bytes).map_err(|error| error.to_string())?;
-    if !object.symbols().any(|symbol| {
+    Ok(object.symbols().any(|symbol| {
         symbol.is_undefined()
             && symbol
                 .name_bytes()
                 .is_ok_and(|name| name == b"___set_signal_handler")
-    }) {
-        return Ok(None);
-    }
-    let path = out.join(format!("gambit-signal-{index}.o"));
-    fs::write(&path, bytes).map_err(|error| error.to_string())?;
-    Ok(Some(path))
+    }))
 }
 
-fn extract_signal_callers(library: &Path, out: &Path) -> Result<Vec<PathBuf>, String> {
+fn build_signal_archive(library: &Path, out: &Path, mut build: cc::Build) -> Result<(), String> {
+    fs::create_dir_all(out).map_err(|error| error.to_string())?;
     let data = fs::read(library).map_err(|error| error.to_string())?;
     let archive = object::read::archive::ArchiveFile::parse(data.as_slice())
         .map_err(|error| error.to_string())?;
     let objects = archive
         .members()
         .enumerate()
-        .filter_map(|(index, member)| {
-            member
-                .map_err(|error| error.to_string())
-                .and_then(|member| {
-                    member
-                        .data(data.as_slice())
-                        .map_err(|error| error.to_string())
-                })
-                .and_then(|bytes| write_signal_caller(bytes, out, index))
-                .transpose()
+        .map(|(index, member)| {
+            let member = member.map_err(|error| error.to_string())?;
+            let bytes = member
+                .data(data.as_slice())
+                .map_err(|error| error.to_string())?;
+            let object = out.join(format!("gambit-{index}.o"));
+            fs::write(&object, bytes).map_err(|error| error.to_string())?;
+            if is_signal_caller(bytes)? {
+                let scoped = out.join(format!("gambit-{index}-scoped.o"));
+                let mut command = build.get_compiler().to_command();
+                configure_scoped_signal_link(&mut command, &object, &scoped);
+                let status = command.status().map_err(|error| error.to_string())?;
+                if !status.success() {
+                    return Err(format!("paired Gambit signal binding failed: {status}"));
+                }
+                Ok((scoped, true))
+            } else {
+                Ok((object, false))
+            }
         })
         .collect::<Result<Vec<_>, String>>()?;
-    if objects.is_empty() {
+    if !objects.iter().any(|(_, scoped)| *scoped) {
         return Err("paired Gambit archive has no external signal-helper callers".into());
     }
-    Ok(objects)
+    build
+        .cargo_metadata(false)
+        .out_dir(out)
+        .objects(objects.iter().map(|(path, _)| path))
+        .try_compile("gerbil_scheme_rust_gambit")
+        .map_err(|error| error.to_string())
 }
 
-fn archive_lifecycle(lifecycle: &Path, gsc: &OsStr, out: &Path) {
-    let object = if signal_scope_option().is_empty() {
-        lifecycle.to_path_buf()
+fn paired_gambit_link_name() -> &'static str {
+    if signal_scope_option().is_empty() {
+        "gambit"
     } else {
-        let library = crate::discover_gambit_link_search_dir_from_gsc(Path::new(gsc))
-            .expect("paired Gambit library for scoped lifecycle");
-        // Only copy the native callers. Resolving the entire library here would
-        // pull its Scheme globals before the downstream program defines them.
-        let signal_objects = extract_signal_callers(&library.library_path, out)
-            .expect("read paired Gambit signal-helper callers");
-        let scoped = out.join("runtime-scoped.o");
-        let mut command = cc::Build::new().get_compiler().to_command();
-        configure_scoped_lifecycle_link(&mut command, lifecycle, &signal_objects, &scoped);
-        run(&mut command, "link owner-scoped Gambit signal actions");
-        scoped
-    };
+        "gerbil_scheme_rust_gambit"
+    }
+}
+
+fn prepare_paired_signal_archive(gsc: &Path, out: &Path) -> Result<(), String> {
+    if signal_scope_option().is_empty() {
+        return Ok(());
+    }
+    let library = crate::discover_gambit_link_search_dir_from_gsc(gsc)
+        .ok_or("paired Gambit library for scoped lifecycle")?;
+    build_signal_archive(&library.library_path, out, cc::Build::new())
+}
+
+pub(crate) fn scope_program_signals(
+    mut receipt: crate::NativeArchiveLinkReceipt,
+    gsc: &Path,
+    out: &Path,
+) -> Result<crate::NativeArchiveLinkReceipt, String> {
+    if signal_scope_option().is_empty() {
+        return Ok(receipt);
+    }
+    prepare_paired_signal_archive(gsc, out)?;
+    for directive in &mut receipt.cargo_directives {
+        if directive.kind == crate::CargoDirectiveKind::RustcLinkLib
+            && directive.value == "static=gambit"
+        {
+            directive.value = format!("static={}", paired_gambit_link_name());
+        }
+    }
+    Ok(receipt)
+}
+
+fn archive_lifecycle(lifecycle: &Path, out: &Path) {
     cc::Build::new()
         .cargo_metadata(false)
         .out_dir(out)
-        .object(object)
+        .object(lifecycle)
         .try_compile("gerbil_scheme_rust_native")
         .expect("archive native lifecycle");
 }

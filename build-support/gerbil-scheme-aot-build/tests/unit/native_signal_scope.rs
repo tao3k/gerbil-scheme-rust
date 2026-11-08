@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 
-use super::{configure_scoped_lifecycle_link, extract_signal_callers};
-use std::{ffi::OsStr, os::unix::process::ExitStatusExt, path::Path, process::Output};
+use super::build_signal_archive;
+use std::{os::unix::process::ExitStatusExt, path::Path, process::Output};
 use tokio::process::Command;
 
 async fn bounded(command: &mut Command) -> Output {
@@ -58,35 +58,33 @@ async fn native_bundle_preserves_other_threads_and_host_signal_updates() {
     )
     .await;
     assert!(output.status.success(), "fixture archive: {output:?}");
-    let signal_objects = extract_signal_callers(&library, &root).expect("read native callers");
+    let scoped = root.join("scoped");
+    let target = format!("{}-unknown-linux-gnu", std::env::consts::ARCH);
+    let mut build = cc::Build::new();
+    build.target(&target).host(&target).opt_level(0);
+    build_signal_archive(&library, &scoped, build).expect("prepare paired native archive");
     for guarded in [true, false] {
-        let image = root.join(if guarded { "guarded.o" } else { "owner-only.o" });
-        let mut link = std::process::Command::new("cc");
-        configure_scoped_lifecycle_link(
-            &mut link,
-            &root.join("runtime.o"),
-            &signal_objects,
-            &image,
-        );
-        if !guarded {
-            let args = link
-                .get_args()
-                .filter(|arg| *arg != OsStr::new("-Wl,--wrap=___set_signal_handler"))
-                .map(OsStr::to_owned)
-                .collect::<Vec<_>>();
-            link = std::process::Command::new("cc");
-            link.args(args);
-        }
-        let output = bounded(&mut Command::from(link)).await;
-        assert!(output.status.success(), "native partial link: {output:?}");
-        let binary = image.with_extension("test");
+        let archive = if guarded {
+            scoped.join("libgerbil_scheme_rust_gambit.a")
+        } else {
+            library.clone()
+        };
+        let binary = root.join(if guarded {
+            "guarded.test"
+        } else {
+            "owner-only.test"
+        });
         // No wrapping flag in the final host link: the archive owns its scope.
+        // Pull the caller before the owner, as a program rlib does in Cargo.
+        // The owner must not carry another strong copy of the caller's functions.
         let output = bounded(
             Command::new("cc")
                 .arg("-pthread")
-                .arg(&image)
+                .arg("-Wl,--undefined=gerbil_test_native_signal_cleanup")
                 .arg(root.join("host-binding.o"))
-                .arg(&library)
+                .arg(&archive)
+                .arg(root.join("runtime.o"))
+                .arg(&archive)
                 .arg("-o")
                 .arg(&binary),
         )

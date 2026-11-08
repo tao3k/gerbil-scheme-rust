@@ -274,7 +274,14 @@ pub fn build_program_archive_with_contract(
             operation: "package linked AOT archive",
             subject: None,
         },
-        || build_static_archive_from_link_plan(request.archive_name, &link_plan, request.out_dir),
+        || {
+            let receipt = build_static_archive_from_link_plan(
+                request.archive_name,
+                &link_plan,
+                request.out_dir,
+            )?;
+            crate::compiler::scope_program_signals(receipt, request.gsc, request.out_dir)
+        },
     )
 }
 

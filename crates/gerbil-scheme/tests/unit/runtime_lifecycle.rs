@@ -4,6 +4,10 @@
 mod conversion_contracts;
 use conversion_contracts::{checks_borrowed_bytevector_bulk_copy, exercises_utf8_bulk_conversion};
 
+#[cfg(target_os = "linux")]
+#[path = "host_signal_scope.rs"]
+mod host_signal_scope;
+
 use gerbil_scheme::{
     ByteOrder, BytestringDelimiter, GERBIL_SCHEME_RUST_ABI_ID, GERBIL_SCHEME_RUST_ABI_VERSION,
     GerbilRuntime, GerbilRuntimeReceipt, GerbilStatus, GerbilValueProvenance, IntegerDecoding,
@@ -79,6 +83,8 @@ unsafe extern "C" fn linked_hex_bytes_fixture(input: *const u8, len: usize) -> i
 
 #[test]
 fn calls_scalar_export_in_process() {
+    #[cfg(target_os = "linux")]
+    host_signal_scope::check();
     #[cfg(unix)]
     assert_host_broken_pipe();
     #[cfg(target_os = "linux")]

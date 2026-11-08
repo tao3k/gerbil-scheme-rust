@@ -130,19 +130,6 @@ jobs:
         uses: ./.github/actions/setup-gerbil
         with:
           release-root: ${{ env.GERBIL_RELEASE_ROOT }}
-      - name: Preserve Linux host SIGPIPE through native cleanup
-        if: runner.os == 'Linux'
-        run: |
-          cc -std=c11 -pthread -Wall -Wextra -Werror -I ffi ffi/host_signal_scope_test.c -o "$RUNNER_TEMP/host-signal-scope"
-          "$RUNNER_TEMP/host-signal-scope"
-          cc -std=c11 -pthread -Wall -Wextra -Werror -DGERBIL_TEST_UNGUARDED_SIGPIPE -I ffi ffi/host_signal_scope_test.c -o "$RUNNER_TEMP/host-signal-control"
-          if "$RUNNER_TEMP/host-signal-control"; then
-            echo 'unguarded cleanup unexpectedly survived a closed pipe' >&2
-            exit 1
-          else
-            control_status=$?
-            test "$control_status" -eq 141
-          fi
       - name: Direct build, clean, GxTest, cancellation and natural exit
         run: |
           cargo test -p gerbil-scheme-sys --lib --locked -- --nocapture

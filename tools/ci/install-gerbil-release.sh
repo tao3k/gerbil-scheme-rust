@@ -33,9 +33,14 @@ esac
 archive="$tag.tar.gz"
 download="${RUNNER_TEMP:?}/$archive"
 mkdir -p "$release_root"
-curl --fail --location --retry 3 --header 'Accept: application/octet-stream' \
+if ! curl --fail --location --retry 3 --header 'Accept: application/octet-stream' \
   --output "$download" \
-  "https://api.github.com/repos/tao3k/gerbil-bazel/releases/assets/$asset_id"
+  "https://api.github.com/repos/tao3k/gerbil-bazel/releases/assets/$asset_id"; then
+  # Both official endpoints select the same immutable asset. Verify its fixed
+  # digest below before extracting, including after a transport failure.
+  curl --fail --location --retry 3 --output "$download" \
+    "https://github.com/tao3k/gerbil-bazel/releases/download/$tag/$archive"
+fi
 echo "$sha256  $download" | shasum -a 256 --check
 tar -xzf "$download" -C "$release_root" --strip-components=1
 

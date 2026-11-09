@@ -321,6 +321,14 @@ module mailbox_send_scope {
       not(workingControlFits(local,1019221625)) and
       not(workingControlFits(replay,workingControlElapsedNs+1)))
   }
+  run AuthorizedOriginalReplayStopsOnFailedMainTest={
+    val main={...workingControlEnvelope,p99Ns:69350000,p999Ns:69505000,peak:69369}
+    assert(main.completed==1000000 and main.rejected==0 and main.timeouts==0 and main.clean and
+      not(workingControlFits(main,1070022416)) and
+      main.p99Ns>workingControlEnvelope.p99Ns and
+      main.p999Ns>workingControlEnvelope.p999Ns and
+      main.peak>workingControlEnvelope.peak and 1070022416>workingControlElapsedNs)
+  }
   pure val recordedCurrentControl={...recordedReference,p99Ns:51139000,p999Ns:51291000,peak:51316}
   run sameFrozenInputsAndZeroRejectsDoNotQualifySlowControlTest=assert(
     not(historicalControlFits(recordedReference,recordedCurrentControl,true)) and

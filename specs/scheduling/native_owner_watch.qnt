@@ -133,6 +133,163 @@ module owner_wait_coverage {
       2*ownerFloor>elapsed and 1+elapsed/period-retired==132 and
       1+ownerFloor/period-retired==129)
   }
+  run CompleteMainNeedsBothCpuAndExecutionOpportunityTest={
+    val inner=1185837583
+    val floor=innerCpuFloor(1,1,1185843166,inner,1055562459)
+    val outside=inner-1055564459
+    assert(floor==1055556876 and outside==130273124 and
+      floor-(20577999-3083000+1000)==1038060877 and
+      outside-(23062944-3072261+1000)==110281441)
+  }
+  run GcJobCallbackCannotLocateTheCollectorPauseTest={
+    // Notification follows collection/finalization, not an entry/exit probe.
+    // Both histories expose the same cumulative GC wall and callback stamp.
+    val early={gcBegin:10,gcEnd:20,callback:40,gcWall:10}
+    val late={gcBegin:30,gcEnd:40,callback:40,gcWall:10}
+    assert(early.gcEnd<=early.callback and late.gcEnd<=late.callback and
+      early.callback==late.callback and early.gcWall==late.gcWall and
+      early.gcBegin!=late.gcBegin and early.gcEnd!=late.gcEnd)
+  }
+  run HistoricalGcJobsCanCoalesceCollectionsTest={
+    // Hash-verified historical SDK fixture, not a current business trace.
+    val records=List({collections:1,before:0,after:1,again:1},
+      {collections:2,before:0,after:1,again:1},
+      {collections:4,before:0,after:1,again:1})
+    assert(records.foldl(true,(ok,r)=>ok and r.before==0 and r.after==1 and
+      r.again==1) and records.nth(2).collections>records.nth(2).after)
+  }
+  run FinalizerWaitingNeedNotIncreaseCollectorWallCountersTest={
+    // Installed SDK probe: a deliberate finalizer sleep, not frozen workload.
+    val measured={wallNs:3010988,gcCountDelta:0,gcWallDeltaNs:0,
+      jobAfterFinalizer:true}
+    assert(measured.wallNs>0 and measured.gcCountDelta==0 and
+      measured.gcWallDeltaNs==0 and measured.jobAfterFinalizer)
+  }
+  run ProcessCpuDuringGcCannotIdentifyExclusiveCollectorCpuTest={
+    // Frozen process_times calls getrusage(RUSAGE_SELF), not per-owner CPU.
+    // Abstract decompositions of one interval; not measured phase prices.
+    val first={collector:5,otherThreads:3}
+    val second={collector:7,otherThreads:1}
+    val observed=8
+    assert(first.collector+first.otherThreads==observed and
+      second.collector+second.otherThreads==observed and
+      first.collector!=second.collector and observed>first.collector)
+  }
+  run StableProcessGcTotalsDoNotSignTheOwnerNonGcDeltaTest={
+    // Rounded recorded original totals. Even ideal counters do not fix
+    // the owner share of process CPU sampled over GC intervals.
+    val ownerA=1013156667
+    val ownerB=1019203000
+    val processGcA=17427000
+    val processGcB=17441000
+    val first={ownerGcA:1000000,ownerGcB:16000000}
+    val second={ownerGcA:16000000,ownerGcB:1000000}
+    val firstNonGcDelta=(ownerB-first.ownerGcB)-(ownerA-first.ownerGcA)
+    val secondNonGcDelta=(ownerB-second.ownerGcB)-(ownerA-second.ownerGcA)
+    assert(Set(first,second).forall(p=>p.ownerGcA<=processGcA and p.ownerGcB<=processGcB) and
+      processGcB-processGcA==14000 and firstNonGcDelta<0 and secondNonGcDelta>0)
+  }
+  run AggregateFixtureNonCpuDoesNotLocateOneLongPauseTest={
+    // One C counter-correctness fixture, not a Gerbil business receipt.
+    val coreWall=67786375
+    val enclosingSelfCpu=57113917
+    val aggregate=coreWall-enclosingSelfCpu
+    val oneEpisode=aggregate
+    val smallEpisode=aggregate/1000
+    val remainder=aggregate%1000
+    assert(aggregate==10672458 and oneEpisode>128000 and
+      smallEpisode<128000 and 1000*smallEpisode+remainder==aggregate)
+  }
+  run NominalObserverDeadlineDoesNotCertifyActualCoverageTest={
+    // First query is no earlier than the scheduling anchor. Its offset
+    // makes these lower bounds on lateness, not exact wake latencies.
+    val first=128719865196666
+    val fourth=128719902124875
+    val fifth=128719932985791
+    assert(fourth-first-32000000==4928209 and
+      fifth-first-64000000==3789125 and fourth-first>32000000)
+  }
+  run GcJobLogicalCloseDoesNotRemoveTheRegisteredCallbackTest={
+    // The installed-SDK fixture observed eight active calls and one more
+    // after logical close. It proves neither arbitrary interrupt coverage
+    // nor callback/thread equivalence in a populated business VM.
+    val before={registered:true,active:true,kept:8,ignored:0}
+    val closed={...before,active:false}
+    val after={...closed,ignored:closed.ignored+1}
+    assert(after.registered and not(after.active) and after.kept==8 and
+      after.ignored==1 and after.registered==before.registered)
+  }
+  // Conditional single-processor collector budget. Never manufacture a
+  // historical clock-error bound or count notification jobs as collections.
+  pure def collectorPauseDebtFloor(whole:int,offer:int,gc:int,count:int,
+      period:int,error:int,returned:int,withinCall:bool,clockBounded:bool,
+      stoppedOwner:bool):int=
+    if(not(withinCall and clockBounded and stoppedOwner) or whole<offer or
+       offer<=0 or gc<0 or count<=0 or period<=0 or error<0 or returned<0) -1
+    else {
+      val outside=whole-offer
+      val inside=if(gc-error>outside) gc-error-outside else 0
+      val pause=(inside+count-1)/count
+      // Open interval endpoints may coincide with an arrival. Allow one
+      // already-in-flight return at the boundary when requested by the caller.
+      val ticks=if(pause>0) (pause+period-1)/period-1 else 0
+      if(ticks>returned) ticks-returned else 0
+    }
+  run CollectorOfferOverlapCanConstrainDebtWithoutPerGcTimestampsTest={
+    // Published 4.513 ms cohort, with a HYPOTHETICAL proven 1 ms total
+    // clock-overstatement allowance. No such historical proof is asserted.
+    val debt=collectorPauseDebtFloor(1009152667,999999000,17893791,39,
+      1000,1000000,1,true,true,true)
+    assert(debt==197 and debt>128)
+  }
+  run CollectorDebtBoundRequiresEnvelopeAndClockEvidenceTest=assert(
+    collectorPauseDebtFloor(1009152667,999999000,17893791,39,1000,1000000,1,false,true,true)== -1 and
+    collectorPauseDebtFloor(1009152667,999999000,17893791,39,1000,1000000,1,true,false,true)== -1 and
+    collectorPauseDebtFloor(1009152667,999999000,17893791,39,1000,1000000,1,true,true,false)== -1)
+  run SplitSnapshotTimeCannotAssumeWithinCallCoverageTest={
+    // A hypothetical before-snapshot collection affects time but precedes
+    // the count baseline. The archival totals do not prove this contribution.
+    val rawGc=17893791
+    val beforeGc=4000000
+    val unverified=collectorPauseDebtFloor(1009152667,999999000,rawGc,39,
+      1000,0,1,false,true,true)
+    val assumed=collectorPauseDebtFloor(1009152667,999999000,rawGc,39,
+      1000,0,1,true,true,true)
+    val bounded=collectorPauseDebtFloor(1009152667,999999000,rawGc-beforeGc,39,
+      1000,0,1,true,true,true)
+    assert(unverified== -1 and assumed==223 and bounded==120)
+  }
+  run CollectorDebtInferenceIsSensitiveToClockErrorTest={
+    // Hash-verified 3.927 ms raw record. This is sensitivity arithmetic,
+    // not an actual timebase-error measurement or attribution of its peak.
+    val atBoundary=collectorPauseDebtFloor(1010852000,999999000,16150474,40,
+      1000,97474,1,true,true,true)
+    val justInside=collectorPauseDebtFloor(1010852000,999999000,16150474,40,
+      1000,97473,1,true,true,true)
+    assert(atBoundary==128 and justInside==129)
+  }
+  run EqualCollectorTotalsDoNotFixPublicationTimelineTest={
+    // Inference counterexample only. Ten ordered releases, eight units of
+    // work each, and one ten-unit pause. This is not an op62 simulator.
+    val releases=List(0,10,20,30,40,50,60,70,80,90)
+    val initial={now:0,ordinal:0,lastPublication:0,work:0,pause:0}
+    val early=releases.foldl(initial,(state,release)=>{
+      val begin=if(state.now>release) state.now else release
+      val gc=if(state.ordinal==0) 10 else 0
+      {now:begin+gc+8,ordinal:state.ordinal+1,lastPublication:begin+gc,
+        work:state.work+8,pause:state.pause+gc}
+    })
+    val late=releases.foldl(initial,(state,release)=>{
+      val begin=if(state.now>release) state.now else release
+      val gc=if(state.ordinal==9) 10 else 0
+      {now:begin+gc+8,ordinal:state.ordinal+1,lastPublication:begin+gc,
+        work:state.work+8,pause:state.pause+gc}
+    })
+    assert(early.work==80 and late.work==80 and early.pause==10 and late.pause==10 and
+      early.lastPublication==90 and late.lastPublication==100 and
+      early.now==98 and late.now==108 and
+      early.now-early.lastPublication==late.now-late.lastPublication)
+  }
   run MissingOrForeignWallEnvelopeCannotGiveACompletionCpuFloorTest=assert(
     innerCpuFloor(1,2,1658919875,1638521208,1061999250)== -1 and
     innerCpuFloor(1,1,100,101,80)== -1 and
@@ -312,6 +469,17 @@ module owner_wait_coverage {
     val maximumLiveGrowth=3
     assert(progressPlateau(beatA,beatB,1) and allowed.contains(1) and
       allowed.forall(n=>n+maximumLiveGrowth<=4))
+  }
+  run FrozenWatchdogCadenceCanMissTheLatestScaleOfGapTest={
+    // Coverage counterexample, not a reconstruction of the 69.350 ms p99.
+    val checks=Set(0,100000000)
+    val gap={begin:1000000,end:70350000}
+    val resumedStamp=99000000
+    val watchdogNs=10000000000
+    assert(checks.forall(t=>t<gap.begin or t>gap.end) and
+      gap.end-gap.begin==69350000 and resumedStamp>gap.end and
+      100000000-resumedStamp<watchdogNs and
+      not(progressPlateau({...beatA,rmw:false},beatB,1)))
   }
   run SteadyDeficitCanExceedDebtLimitWithoutAnObservablePlateauTest={
     // A request becomes due every microsecond. A work-conserving FIFO server

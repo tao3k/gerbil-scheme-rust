@@ -56,6 +56,8 @@ module mailbox_measurement_contract {
   pure val unknownOrCrossingPeakUncertaintyCannotPass=
     not(absolutePassed({...sampleOutcome,peakUncertainty:-1},sampleLimits)) and
     not(absolutePassed({...sampleOutcome,peak:127,peakUncertainty:2},sampleLimits)) and
+    // Frozen reader accepts sampled 128; research still needs true upper <=128.
+    not(absolutePassed({...sampleOutcome,peak:128,peakUncertainty:1},sampleLimits)) and
     absolutePassed({...sampleOutcome,peak:127,peakUncertainty:1},sampleLimits)
   pure val peakCannotExceedThePlannedPopulation=
     not(validCounts({...sampleOutcome,peak:1000001}))
@@ -106,7 +108,32 @@ module mailbox_measurement_contract {
     not(exclusiveGcCpuClaimAllowed(708625,100000,false,true)) and
     not(exclusiveGcCpuClaimAllowed(708625,900000,true,true)) and
     exclusiveGcCpuClaimAllowed(708625,100000,true,true)
-  pure val measurementChecks=and {negativeAllocationWithNoGcCannotBeClampedIntoEvidence,
+  // Frozen diagnostics reads GC time, calls a Scheme root-count export, then
+  // reads GC count. Contributions are abstract nonnegative units, not timings.
+  type GcContribution={time:int,count:int}
+  pure def splitSnapshotDelta(beforeReentry:GcContribution,body:GcContribution,
+      afterReentry:GcContribution):GcContribution={
+    time:beforeReentry.time+body.time,count:body.count+afterReentry.count}
+  pure val splitSnapshotZeroCountDoesNotExcludeTimeEnvelopeGc={
+    val none={time:0,count:0}
+    val read=splitSnapshotDelta({time:7,count:1},none,none)
+    read=={time:7,count:0}
+  }
+  pure val splitSnapshotCountMayIncludeGcAbsentFromItsTime={
+    val none={time:0,count:0}
+    splitSnapshotDelta(none,none,{time:7,count:1})=={time:0,count:1}
+  }
+  pure val equalSplitSnapshotsDoNotIdentifyTheNativeGcCohort={
+    val none={time:0,count:0}
+    val firstBody={time:17,count:39}
+    val secondBody={time:12,count:38}
+    splitSnapshotDelta(none,firstBody,none)==
+      splitSnapshotDelta({time:5,count:1},secondBody,{time:2,count:1}) and
+      firstBody!=secondBody
+  }
+  pure val measurementChecks=and {splitSnapshotZeroCountDoesNotExcludeTimeEnvelopeGc,
+    splitSnapshotCountMayIncludeGcAbsentFromItsTime,equalSplitSnapshotsDoNotIdentifyTheNativeGcCohort,
+    negativeAllocationWithNoGcCannotBeClampedIntoEvidence,
     gcWallEnvelopeIsNotExclusiveCpuOrAStallCause,countCannotBeSubstitutedByAComponent,
     aDifferentInvocationImageOrRouteIsNotTheSameOutcome,warmupAndCleanupCannotStandInForMain,
     negativePeakIsMissingEvidenceNotZeroBacklog,unknownOrCrossingPeakUncertaintyCannotPass,
@@ -118,9 +145,24 @@ module mailbox_measurement_contract {
 }
 module mailbox_measurement_tests {
   import mailbox_measurement_contract.*
+  run splitSnapshotBeforeReentryTest=assert(splitSnapshotZeroCountDoesNotExcludeTimeEnvelopeGc)
+  run splitSnapshotAfterReentryTest=assert(splitSnapshotCountMayIncludeGcAbsentFromItsTime)
+  run splitSnapshotCohortAmbiguityTest=assert(equalSplitSnapshotsDoNotIdentifyTheNativeGcCohort)
   run signedAllocationTest=assert(negativeAllocationWithNoGcCannotBeClampedIntoEvidence)
   run gcWallIsNotCpuTest=assert(gcWallEnvelopeIsNotExclusiveCpuOrAStallCause)
   run componentCountTest=assert(countCannotBeSubstitutedByAComponent)
+  run PreSourceAdmissionDelayDoesNotDirectlyChangeFixedInnerTraceTest={
+    // Conditional unchanged post-anchor execution, not a performance model:
+    // shifting cold admission shifts both planned and consumed timestamps.
+    val ordinary={submitted:0,sourceAnchor:1000,consumed:12700,nativeEntry:900,nativeReturn:13000}
+    val shift=6497000
+    val delayed={...ordinary,sourceAnchor:ordinary.sourceAnchor+shift,
+      consumed:ordinary.consumed+shift,nativeEntry:ordinary.nativeEntry+shift,
+      nativeReturn:ordinary.nativeReturn+shift}
+    assert(delayed.consumed-delayed.sourceAnchor==ordinary.consumed-ordinary.sourceAnchor and
+      delayed.nativeReturn-delayed.nativeEntry==ordinary.nativeReturn-ordinary.nativeEntry and
+      delayed.nativeReturn-delayed.submitted>ordinary.nativeReturn-ordinary.submitted)
+  }
   run outcomeIdentityTest=assert(aDifferentInvocationImageOrRouteIsNotTheSameOutcome)
   run mainPhaseTest=assert(warmupAndCleanupCannotStandInForMain)
   run missingPeakTest=assert(negativePeakIsMissingEvidenceNotZeroBacklog)

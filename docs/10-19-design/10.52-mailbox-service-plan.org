@@ -3,15 +3,1261 @@
 
 * Research branch publication
 
-This record preserves the source audit and failed cases as reviewable
-knowledge. The companion Scheme change is limited to op62's private
-qualification route and the removal of retired qualification modes. The
-published 4.513 ms observation remains the reference. The candidate passed
-native correctness checks, including the host boundary and the independent
-order contract. Its million-message p99 and true backlog remain unmeasured.
-The original deadlines and 128-backlog gate still apply. The paths under
-=.ci= and =.data= identify local evidence or source copies. Those paths
-are not included in this publication.
+This publication preserves the QNT models and this Org evidence ledger.
+The Scheme, FFI and benchmark source are restored to checkpoint 3477a02
+with the byte-pinned 12.869 ms replay as the working reference. Keep the
+published 4.513 ms comparison reference and the separate 3.927 ms best.
+The df1491e image has verified native functional receipts and a separate
+14.164 ms one-arm diagnostic that failed the backlog gate. A formal paired
+performance outcome remains unavailable. The original deadlines and true
+backlog limit of 128 still apply.
+
+Later launcher experiments described in this ledger refer to local research
+evidence. This publication retains the already published launcher and
+excludes pending local launcher changes. The paths under =.ci= and =.data=
+identify local evidence or source copies outside the published tree.
+
+* Optimization loop remains open after an execution gate fails
+
+A missing timeline is a limitation on attribution, not by itself a research
+blocker. Failed frozen qualification stops subsequent native arms and gain
+claims. Source inspection, component-boundary mapping, full-cost analysis,
+and review of new falsifiable hypotheses remain available without a
+qualified control. They must not be relabeled as native evidence.
+
+The existing research gate now separates source-cost-review permission from
+replay, diagnostic and performance execution admission. A regression keeps
+review available with missing evidence and a known failed observation factor,
+while rejecting every execution and engine-gain claim on that same plan.
+This corrects the decision to treat unresolved attribution as a reason to
+stop the optimization loop. It grants no new VM run or runtime change.
+
+* GC-only observation mechanism: installed SDK contract, not qualification
+
+A new source review considered the existing SDK's GC interrupt jobs rather
+than adding a condition to each message. The installed generated runtime
+exports =##add-gc-interrupt-job!= and =##clear-gc-interrupt-jobs!=. A single
+isolated probe used the existing =bridge-sdk-contract= Justfile entry, without
+compilation or any business messages. Eight forced collections each produced
+an active callback; a ninth after logical close still invoked the registered
+job, taking its inactive branch. The probe exited zero in 0.196 s, with a
+sampled process-group RSS peak of 68,583,424 bytes, below the 8 GiB termination
+threshold. It made no clear-all call. Process exit ended this isolated job.
+This does not validate original-image cleanup or observer overhead.
+
+The cached Gambit source describes GC interrupt dispatch followed by
+finalization and job execution. Its checked-out Git object is not the SDK's
+recorded ea114fc revision, although installed/cache thread and kernel macro
+files match. The cached generated =_gambit.c= differs from the installed one.
+Therefore that cache is a mechanism reference, not an authenticated body of
+the installed SDK. Installed behavior above is established by the actual
+probe, not by claiming source-version equality.
+
+Two important limits apply before implementing this route:
+
+1. A post-GC callback timestamp is an observation after finalization. Even
+   with a collection counter and cumulative wall total, it is not a collector
+   entry/exit timestamp. The new QNT witness preserves this ambiguity.
+2. Setting an observer inactive does not unregister its SDK job. A future
+   design must retain the callback's sink/provider until its lifetime ends,
+   or establish safe removal of only its own job. Clearing every SDK job
+   would interfere with existing finalization/cleanup and is not permitted.
+
+This mechanism is not connected to the frozen image or current runtime.
+Before any native diagnostic, price registration, added roots, dispatch,
+callback body, report extraction and shutdown across the complete lifecycle;
+verify generation/exception/multi-shot continuation handling and event
+coverage. Do not describe eight observed callbacks as proof of one event per
+arbitrary collection or use this contract as a performance improvement.
+The business baseline and latest failed 69.350 ms receipt remain unchanged.
+
+Evidence: =.ci/mailbox-send-target-20261107/gc-job-contract-20261108/= contains
+the probe, question, raw output and monitored receipt. No full load ran.
+
+* Recovered GC notification counterexample and finalizer boundary
+
+Before integration, an older retained fixture was recovered at
+=.ci/pr18-op62-gc-notification-x8ZbmZ/=. Its source, generated C, executable
+and stdout all match the SHA-256 pins in =fixture-receipt.json=. It had
+already demonstrated coalescing: one/two/four forced collections without
+interrupt polls each produced zero jobs before service, one job after
+service, and still one after a second service. This historical SDK cohort
+does not independently pin the current installed SDK archive. It does refute
+using the mechanism's name or the latest eight-at-eight-cuts probe as a
+proof of one notification per arbitrary collection. No old binary was rerun.
+The coalescing result was absent from this checkout's QNT/Org index; it is
+now an explicit retained mechanism factor. It is not a new observer design.
+
+A distinct installed-SDK contract then tested finalization itself, using
+=bridge-sdk-contract= with a bounded artificial will. Its deliberate 2 ms
+sleep occupied 3.010988 ms of measured wall time. The collector count and
+collector wall counters both stayed unchanged across that finalizer interval,
+and the GC job ran after the finalizer. The process exited zero in 0.252 s;
+sampled process-group RSS peaked at 58,540,032 bytes. No compilation or
+business messages occurred. The fixture makes no statement about the
+presence or duration of finalizers in the frozen workload. The focused
+project source review found no explicit will/GC-job registration in the
+qualification Scheme files or shared FFI, but SDK-owned resources and weak
+objects remain a separate question.
+
+For component accounting, retain distinct buckets for collector work,
+post-collection finalization, ordinary business work, and execution/waiting.
+Equal GC totals cannot bound finalizer delay. A late GC job cannot distinguish
+all these buckets or recover the start/end of each collection. Consequently,
+GC jobs are not admitted as a complete per-collection timeline and are not
+connected to the native path. Their restricted use as post-GC observations
+would still need a separate association, cost and lifecycle proof.
+
+The new regression witnesses cover coalescing, logical-close persistence,
+callback ambiguity and finalization outside measured collector time. They
+do not certify performance. The new installed-SDK raw evidence is under
+=.ci/mailbox-send-target-20261107/gc-finalizer-contract-20261108/=. The two
+frozen references, original source and failed controls remain unchanged.
+
+* Original op62 driver: clock and transport operation accounting
+
+A static audit now binds the driver counts to the original frozen image
+SHA-256 =53ba9b24871cb1abd5b7e705bc04be83f1a1630bc7c22c7997db930aaed98e8d=.
+The extracted CFUN host =actors_23_0= retains conversion of the integer
+operation and u64 argument, one indirect callback, and u64 result conversion.
+Its whole body has 119 ARM64 instructions, 11 native stack references and an
+80-byte entry frame. These are all-path code-shape facts, not the number of
+instructions dynamically executed on a successful read or measured CPU cost.
+The provider dispatcher has 236 all-path instructions and a 64-byte entry
+frame. Its other operations include TLS and QoS; those sites must not all be
+charged to operation 1. No runtime was executed for this audit.
+
+For a successful unobserved op62 main, let N be verified messages and Z be
+source-drive iterations with no active message. Each positive-active drive
+receives and retires exactly one message, so there are N+Z drive iterations.
+
+| Driver operation | Successful-main count | Meaning |
+|------------------+-----------------------+---------|
+| Source eligibility clock | N+Z | Includes empty pacing rounds |
+| Publication clock | N | Separate publication/lag sample |
+| Verified latency clock | N | Original latency endpoint |
+| Fresh progress clock and atomic publication | N | Separate watchdog freshness endpoint |
+| Inner start/end clocks | 2 | Original inner wall interval |
+| Total driver clock/bridge calls | 4N+Z+2 | Excludes SDK/helper/cold clocks |
+| Request plus reply sends | 2N | Worker-stop traffic excluded |
+| Worker plus source receives | 2N | Stop/drain receives excluded |
+| Progress-word load / store | N / N | Not extra observer writes |
+
+At one million verified messages, the driver contributes at least 4,000,002
+clock/bridge calls. No message counter establishes Z. A low-rate warmup may
+perform substantial empty pacing work, so enclosing owner CPU cannot be
+assigned to the handler by dividing it by warmup message count. Existing
+stage costs, GC timing, scheduler dispatches and waits still need separate
+prices; the call counts alone cannot rank them by CPU.
+
+Do not merge the latency read with the fresh progress read or replace either
+with the earlier eligibility timestamp. The retained earlier-sample regression
+already demonstrates the resulting deadline/return error. A faster clock
+bridge would be harness/observation work and would need its own full cost,
+ABI and lifecycle screen; it is not the admitted df1491e engine candidate.
+No such runtime or benchmark change is made here.
+
+The exact source graph remains important: the 3477a02 research source inherits
+the private construction candidate, whereas these image bytes are the original
+7F runtime. The driver protocol/count argument is shared; allocation and
+business-handler counts must retain their individual source identities.
+The missing original generated C file is not replaced by a rebuilt C file as
+proof of the frozen host. Direct original-image disassembly is retained in
+=.ci/mailbox-send-target-20261107/frozen-clock-cost-20261108/=, including its
+image hash, complete selected-symbol bodies and audit receipt.
+
+* One authorized clock-route component calibration
+
+The user explicitly authorized one isolated dynamic calibration after the
+original-image static audit. It completed once in A/B/B/A order. Here a unit
+is a fresh CLOCK_UPTIME_RAW read, never a service message. The two paths share
+one C callback provider; A loops through the signature-matched Scheme/C
+bridge, B loops through that callback in C. Warmup verified exactly 4096 calls
+and nondecreasing clocks in each path. A bad operation type was rejected.
+The executable asserted one VM processor and ran with =-:p1=.
+
+| Component arm | Clock calls | Process CPU ms | Wall ms | GC CPU / wall / count |
+|---------------+-------------+----------------+---------+-----------------------|
+| A, Scheme/C route | 1000000 | 23.434 | 23.474 | 0 / 0 / 0 |
+| B, C-loop reference | 1000000 | 15.791 | 15.808 | 0 / 0 / 0 |
+| B, C-loop reference | 1000000 | 15.898 | 15.916 | 0 / 0 / 0 |
+| A, Scheme/C route | 1000000 | 24.075 | 24.156 | 0 / 0 / 0 |
+
+The two paired gross differences are 7.643 and 8.177 ns/read. They include
+Scheme-versus-C loop/dispatch differences as well as bridge conversion and
+entry costs. They do not isolate FFI CPU, establish the full original provider
+cost, or price progress operation 11. The private callback implements only
+operation 1. No Actor, business oracle or original arrival schedule runs here.
+Do not invert ns/read into service-message throughput or multiply these values
+into a claimed native p99 gain. The existing pure cost model now preserves a
+counterexample to exclusive-bridge attribution from this gross difference.
+
+Preflight retained three mismatches before any timing: missing foreign-name
+bindings; PATH's =gsc= naming Ghostscript rather than the installed Gambit
+compiler; and dynamic/single-host call layouts unlike the original image.
+The expansion error occurred before the wrong compiler could be invoked.
+The admitted artifact uses the installed SDK native static entry and GCC 16,
+with explicit =-O2= after default optimization flags, and the existing
+multiple-host/no-inline-jump flags. Its CFUN retains direct int/u64 conversion
+calls, indirect callback and the original 80-byte entry frame. Its whole host
+has 115 instructions versus the original 119, so identical full cost is not
+claimed. The original SDK, image and reader were not rebuilt or modified.
+
+Combined monitored build wall time was about 5.684 s; the
+largest sampled build-group RSS was 364,036,096 bytes. The one measurement
+process exited zero with a sampled group RSS peak of 6,340,608 bytes and
+empty stderr. The 120 s build, 10 s calibration and 8 GiB RSS termination
+thresholds remained unchanged. No native business or candidate arm ran.
+The latest actual business main remains the failed 69.350 ms control; the
+12.869 ms original reference remains unchanged and is not requalified here.
+
+Raw source, generated code, failed preflights, ABI checks, single-run
+reservation and four output rows are retained under
+=.ci/mailbox-send-target-20261107/frozen-clock-cost-20261108/calibration/=.
+The executable hash is
+=e428c1048aac4c572ec8a0dc922100a2f9d0077a7c69a47b91f9e1d13e8294c2=.
+No publication or PR #18 change was made.
+
+* Collector pauses and the unchanged 128-debt budget
+
+Total CPU cost and peak debt impose different requirements. A brief pause can
+violate the debt limit even when collector CPU is a small part of the whole
+run. More ready green threads on the same stopped processor cannot consume
+messages during that interval. Faster recovery afterwards cannot erase the
+peak that already occurred. This is a necessary-budget question, not a claim
+that GC caused the original 6.497 ms difference or every observed peak.
+
+The retained published reader source matches the d56f94c Git blob.
+Later disassembly of the pinned original image shows that diagnostics
+reads counters around a root-count callback into Scheme, which can collect.
+The earlier counter-only assumption is withdrawn. Before-snapshot collector
+time can enter the wall delta from outside the timed call. Under monotone
+counters and complete coverage the count can upper-bound the relevant
+collection count even when it includes after-snapshot events. Establish
+those premises separately. Collector wall time and the arrival clock also
+need a bound on their historical accumulated mismatch. The model rejects
+a certified debt floor without verified coverage and bounds.
+
+Conditional arithmetic: if G is collector wall time, W whole-call duration,
+O the complete offering span and E a PROVEN aggregate overstatement allowance,
+collector overlap inside offering is at least max(0,G-E-(W-O)). With K
+nonoverlapping collector pauses, at least one overlap is ceil(that/K). Convert
+that interval into a conservative due-arrival count, excluding both endpoints
+and allowing one boundary retirement. This does not reconstruct a GC timeline.
+
+| Historical record | GC wall / count | Whole call outside offering | Inside-offer lower, assuming E=0 | Strict E ceiling forcing >128, with one boundary return |
+|-------------------+-----------------+-----------------------------+---------------------------------+-------------------------------------------------------|
+| Published 4.513 ms | 17.893791 ms / 39 | 9.153667 ms | 8.740124 ms | E < 3.670124 ms |
+| Raw 3.927 ms | 16.150475 ms / 40 | 10.853000 ms | 5.297474 ms | E < 0.097474 ms |
+
+These are conditional requirements, not certified GC-attributed failures:
+no historical E bound has been established. At a hypothetical verified E of
+1 ms, the first record would force at least 197 due-unconsumed during one
+collector overlap even allowing the boundary return. The second record would
+not force a breach at that E. This sensitivity must remain visible; assume
+neither perfect clock alignment nor causality from the counts alone.
+
+The published 4.513 ms metrics are the Git-retained structured record; its raw
+stdout hash is retained but those bytes were not revalidated in this audit.
+The 3.927 ms and other four-round stdout bytes were rehashed against the
+existing inventory. All rows are retained in
+=.ci/mailbox-send-target-20261107/gc-offer-budget-20261108/receipt.json=.
+
+This adds a separate design obligation for the native service cycle: bound
+unavailable-to-consume intervals as well as reduce steady CPU and preserve
+recovery headroom. Keep df1491e as the first candidate, with its actual
+construction/allocation difference; do not promote clock-loop calibration,
+extra Actors, bigger queues or late catch-up as proof of meeting the 128
+limit. No SDK, heap default, workload or runtime code changed; no native run
+was launched for this derivation.
+
+** Split snapshots and the working control pair
+
+If the measured GC time includes an independently bounded amount B from
+before the whole-call interval, subtract its upper bound as well as the
+clock-error allowance E before applying the overlap formula. Otherwise
+the recorded time is not certified as within-call coverage. The existing
+QNT witness now checks this distinction: with the published numbers, a
+hypothetical 4 ms before-snapshot contribution and zero clock error lowers
+the calculated debt floor from 223 to 120. No historical 4 ms event is
+claimed. Knowing count coverage alone cannot justify subtracting zero.
+
+Rehashed the three original main stdout receipts and applied the interval
+bound to their recorded values. The offering span is 999.999 ms.
+
+| Frozen main p99 | Recorded GC wall ms | Main whole minus offering ms | Guaranteed collector overlap under ideal alignment |
+|-----------------+---------------------+------------------------------+----------------------------------------------------|
+| 12.869 | 17.383575 | 23.013708 | 0 ms |
+| 19.561 | 17.391682 | 30.387000 | 0 ms |
+| 69.350 | 17.761707 | 80.017334 | 0 ms |
+
+Even a hypothetical fully covered, perfectly aligned time/count sample
+would give a zero lower bound for these three runs. Zero is a statement
+about the bound. The receipts cannot locate actual pauses, rule them out
+or classify the historical 6.497 ms gap. Even if all the recorded 12.869 ms run's GC time were inside its
+inner interval with perfect clock alignment, the inner interval minus
+the offering is 12.726666 ms. The overlap formula then guarantees only
+4.656909 ms of total overlap. With 39 as a count upper bound, the
+open-endpoint and one-boundary-return convention gives a debt floor of
+118. Tighter measurement of aggregate GC time alone would therefore
+not prove a 128 breach for those same totals. An observation would
+need information about individual pause overlap or a tighter
+independent bound on work outside the offering. Existing positive and
+negative native receipts are preserved. No native arm ran.
+
+* Frozen-byte GC clock-domain audit
+
+The original image hash =53ba9b24871cb1abd5b7e705bc04be83f1a1630bc7c22c7997db930aaed98e8d=
+was revalidated before disassembly. Its =garbage_collect_pstate= body calls
+=process_times= at =0x62a654= and =0x62c02c=. The latter helper passes clock ID
+0 to stub =0x92ec30=; the image indirect-symbol table resolves that stub to
+=clock_gettime=. Current Darwin headers identify ID 0 as CLOCK_REALTIME and
+ID 8 as CLOCK_UPTIME_RAW. The stored reader source (a3c9c169...) selects
+CLOCK_UPTIME_RAW; its complete binding to reader f1e24 is unproven (see the
+reader-source audit below). These are different clock domains even though both use the
+same system function. This replaces a cached-source-only premise with direct
+frozen-byte evidence; it does not authenticate every cached SDK source file.
+
+The same frozen =process_times= routine passes selector 0 to =getrusage=
+through stub =0x92eeac=. That is RUSAGE_SELF: the recorded GC user/system CPU
+accumulates process CPU over collector intervals, not exclusively collector
+instructions or the owner thread. Other process threads can contribute during
+those intervals. Keep the recorded values, but do not subtract them from
+owner-thread CPU as an exact phase partition or rank them as exclusive GC
+work. A regression test retains two distinct collector/other-thread CPU
+partitions with the same observed process interval total. This does not show
+that other threads materially contributed in either historical run.
+
+No historical relative clock-error bound follows from those instructions.
+Consequently the collector-overlap debt arithmetic above remains conditional:
+keep its unknown-error guard, and do not certify GC as the cause of the
+6.497 ms publication difference or the 128 breach. The old receipts contain
+neither a per-collection UPTIME_RAW timeline nor a historical clock-error bound.
+The code also retains clock-error fallback branches; their presence is not
+proof that either historical run took them.
+
+Selected disassemblies, stub resolution and the static receipt are retained in
+=.ci/mailbox-send-target-20261107/frozen-gc-clock-domain-20261108/=.
+No VM or benchmark executed; no observation, runtime, SDK or default changed.
+
+* Authorized cold-preparation diagnostic: completed and retired
+
+The user separately authorized one isolated pair comparing ordinary preparation
+with one existing =NativeSession.collect()= call after joined warmup and before
+main header allocation. This intentionally changes startup. It is not an
+original-artifact qualification sequence or an engine candidate. Both arms used
+one new reader and the same hash-pinned original =53ba9b24...= image, inherited
+environment, Node spawnSync, original root cwd, regular output files and the
+original one-VM/1M planned per second/one-second main. A separate 1000/s,
+one-second warmup ran first. No Scheme, archive or SDK was rebuilt.
+
+The reader built once in 2.223 s, with sampled build-group RSS 355385344 bytes.
+Its cold helper remained non-inline; the message driver and callbacks were not
+changed. Counter/usage reads and JSON preparation metadata occur only before
+main header construction. Both arms share that helper. An external process-group
+RSS check sampled every 100 ms; this additional supervisor and the new reader
+make the pair diagnostic-only. The 8 GiB cap and original deadlines remain.
+
+| Main metric | Ordinary preparation | One cold collection |
+|-------------+----------------------+---------------------|
+| Planned / verified | 1000000 / 1000000 | 1000000 / 1000000 |
+| Successful messages/s | 976295.385 | 959085.800 |
+| Planned-to-verified p99 ms | 27.439 | 47.731 |
+| Planned-to-verified p99.9 ms | 27.680 | 47.930 |
+| Rejected / errors / timeouts | 0 / 0 / 0 | 0 / 0 / 0 |
+| Inner / whole native-call ms | 1024.280167 / 1033.689000 | 1042.659583 / 1051.963042 |
+| Last publication elapsed ms | 1024.278334 | 1042.657166 |
+| Sampled debt peak / conservative true upper | 27705 / 27706 | 47962 / 47963 |
+| Source unpublished peak | 27703 | 47960 |
+| Enclosing owner CPU ms | 1010.430083 | 1034.849166 |
+| Recorded GC process CPU / wall ms | 16.655 / 16.642094 | 16.743 / 17.013073 |
+| Main enclosing collections | 39 | 39 |
+| Sampled process-group peak bytes | 234520576 | 234536960 |
+| Shutdown | clean | clean |
+
+Both readers naturally exited 101 with the original performance assertion
+identity after clean shutdown. No request timeout or terminal Scheme exception
+occurred. Both rows fail the original relative and absolute performance gates;
+neither is a new baseline, nor a qualification of the frozen 12.869 ms record.
+The true-peak upper adds one for the unchanged one-retirement source sampling
+boundary; it does not apply to an arbitrary instrumented driver.
+
+The intervention was real: the cold collection increased the cumulative count
+from 6 to 7, took 671791 ns, and left external strong roots at zero. The SDK
+last-GC-live metric fell from 81298440 to 1297736 while heap capacity increased
+from 177579176 to 188805240 bytes. The ordinary arm retained count 6 and the
+same pre-main metrics. These are recorded metric changes, not proof of a
+particular root chain, a leak, RSS reclamation or latency improvement.
+Original warmup stop/join plus zero external roots is the idle precondition;
+zero external roots alone is not a close proof.
+
+The main still collected 39 times in each arm. One sequential pair cannot
+isolate a causal performance effect or explain the original 6.497 ms difference.
+It gives no support for precollection as a recovery recipe. In particular,
+a lower post-GC metric cannot substitute for p99, throughput or peak admission.
+The existing QNT regression gate retains =lower-live-metric-as-tail-proof=.
+The diagnostic reader execute bits were removed after the pair; its bytes,
+sources, disassembly and all output remain under
+=.ci/mailbox-send-target-20261107/gc-preparation-proposal-20261108/=.
+This authorization is exhausted. Runtime/bench source stays at 3477a02, both
+historical references and all original artifact bytes remain, and PR #18 was
+not touched. No publication was made.
+
+* Original supply branch: what existing counters can classify
+
+The two original stdout files were rehashed against their retained runs.json
+pins and their parsed main rows compared exactly. Under the successful original
+op62 transaction, =next-completed=active= and exhaustive free-frame supply gives
+=post-supply-active=min(3,due-completed)=. Source eligibility is monotonic and
+supply either succeeds or terminates with an exception. Therefore every source
+sample above 128 fills all three frames, then receives and retires one result;
+it cannot itself execute the zero-active yield branch. This is a source-backed
+protocol/count projection, not a measured scheduler timing model.
+
+| Original main | Verified retirements | Source samples >128 / receives on those turns | Receives on <=128 turns |
+|---------------+----------------------+----------------------------------------------+------------------------|
+| 12.869 ms | 1000000 | 998145 | 1855 |
+| 19.561 ms | 1000000 | 998960 | 1040 |
+
+The remaining receive count is not an idle-drive count: zero-active loops can
+run repeatedly without retiring a request. Nor can these counters price yield,
+construction, Actor work, receive blocking or retirement CPU. An early idle
+pause could seed debt that persists through many later busy turns; this audit
+does not exclude it or explain the 6.497 ms difference. In particular, do not
+infer that an idle-only change repairs sustained recovery, and do not infer
+that idle cannot have caused the initial deficit. Any such proposal still needs
+same-interval evidence and complete-cycle cost admission.
+
+The existing service calculus now checks the supply identity over all valid
+small count states and retains the two exact historical count decompositions.
+No Actor scheduler, observation path or runtime code was added. The offline
+receipt is retained in
+=.ci/mailbox-send-target-20261107/frozen-supply-branch-audit-20261108/=.
+
+* CPU-scope correction for original differences and component evidence
+
+A later audit also resolves =process_times= in both archived synthetic-lead
+component images: its getrusage selector is process-wide, matching the original
+frozen image's scope. Both component image hashes and all four component stdout
+hashes were revalidated. The measured enclosing owner CPU savings of 310.000
+and 222.935 ns/order remain directional evidence from that separate cohort.
+They are not exclusive constructor, allocation, bridge or non-GC phase prices.
+The old residual column is retained as arithmetic and its interpretation is
+corrected in place rather than deleting the negative or positive records.
+
+For idealized exact counters, let O be enclosing owner CPU and P process CPU
+recorded during GC intervals. If actual owner GC CPU is somewhere in [0,P],
+the non-GC owner difference for the two original runs lies in
+[-11.394667, +23.473333] ms, despite the recorded process GC difference being
+only +0.014 ms. Thus even its sign is unidentified. The existing owner model
+now retains two positive owner-GC partitions with the same observed totals,
+one giving an increase and the other a decrease outside GC. This is an
+inference counterexample, not a claim about which partition actually occurred.
+
+Applying the same idealized bounding arithmetic to the separate component
+pairs gives non-GC saving intervals of [277.990,337.910] and [197.665,250.925]
+ns/order. Those intervals additionally require counter coverage and a proven
+precision/error allowance before becoming native phase bounds; that proof is
+not supplied by the ideal arithmetic. They do not transfer to the open-arrival
+cohort, qualify its baseline or explain the historical 6.497 ms difference.
+Use enclosing owner savings to prioritize the already retained df1491e candidate
+only after the original control gate qualifies, not to bypass that gate.
+
+The static helper disassemblies, hashes and conditional arithmetic are retained
+in =.ci/mailbox-send-target-20261107/gc-cpu-attribution-audit-20261108/=.
+No VM, new benchmark, runtime change, SDK change or publication occurred.
+
+* Startup fingerprints: allocator coverage was incomplete
+
+A targeted entry audit found no additional environment lookup in the selected
+reader beyond the image path and command-line switches; the library lifecycle
+trace is explicitly recorded. However, the historical launch fingerprints
+covered only a selected runtime/dyld allowlist. Neither original two-run plan
+recorded allocator environment settings. Their recorded fingerprints match;
+the complete inherited environments have not thereby been proven equal.
+
+The current parent environment contains =MallocNanoZone= (value fingerprint
+only in the retained receipt). Other selected allocator debug inputs are absent
+in this inspection. The installed SDK =usr/share/man/man3/malloc.3= documents
+heap guards, stack logging, scribble and heap-check controls; it does not describe
+MallocNanoZone here. Neither actual target allocator selection nor a historical
+change of this setting is established. Do not name it as the 6.497 ms cause,
+clear it, or repeat a failed control based on this omission alone.
+
+The existing launcher now records a separate allocatorEnvironment allowlist
+and labels the fingerprint scope as v2. Values are hashed; unset is null and
+set-to-empty or set-to-zero remain distinct. Existing startup fields, child
+arguments, inherited environment, working directory, stdio, timeout and all
+native clocks are unchanged. This is parent-only metadata before spawnSync,
+not new request observation. Hashing still costs parent work and may shift
+absolute startup; it carries no performance claim and no automatic replay.
+Historical receipt files remain untouched: missing allocator fields mean
+unknown historical settings, not absent settings or silently normalized values.
+
+The existing QNT gate retains =partial-startup-fingerprint-as-equivalence=:
+equal captured subsets cannot certify equality of omitted execution inputs.
+Offline launcher checks cover value changes, absent/empty/zero distinctions,
+nonmutation and exclusion of unrelated environment secrets. Receipt and local
+SDK manual identity are retained in
+=.ci/mailbox-send-target-20261107/startup-coverage-audit-20261108/=.
+No runtime, SDK, default, deadline, native benchmark or PR #18 change occurred.
+
+* External CPU-counter contract: one non-Scheme correctness fixture
+
+The archived live-cut reader uses proc_pidinfo(PROC_PIDTHREADID64INFO=15),
+not THREAD_BASIC_INFO directly, for pth_user_time + pth_system_time and
+pth_run_state. Installed SDK headers confirm flavor 15 and state 1 as running
+normally, but give no bounded freshness/coverage promise. A single standalone
+GCC/O2 C fixture tested whether independently published work can advance between
+query brackets while the external CPU count stays unchanged. No Scheme VM,
+Actor workload, message benchmark, SDK or frozen image ran or changed.
+
+| Running cut | Work before / after query | External CPU ms | State | Query wall us |
+|-------------+---------------------------+-----------------+-------+---------------|
+| 0 | 16384 / 16384 | 0.049 | 1 | 2.750 |
+| 1 | 815104 / 815104 | 1.968 | 1 | 4.500 |
+| 2 | 3309568 / 3309568 | 7.951 | 1 | 1.916 |
+| 3 | 16519168 / 16539648 | 32.487 | 1 | 35.000 |
+| 4 | 28422144 / 28426240 | 56.894 | 1 | 4.625 |
+
+All four adjacent running-query pairs showed both work and CPU increases.
+Counter staleness was not reproduced; this is not proof of universal counter
+freshness and does not explain the old unobserved business gap. After work,
+the worker parked, external state became 3, then it was released and joined.
+Its enclosing self thread CPU was 57.113917 ms. The inner query-free wall was
+67.786375 ms, leaving at least 10.672458 ms of aggregate non-CPU time on the
+reported counters. The running body contains no application mutex, sleep or
+explicit syscall. This does not identify OS runqueue time, faults or a single
+pause; the aggregate may be dispersed. It must not be transferred to the
+original two Gerbil receipts or treated as a machine-cause conclusion.
+
+Nominal snapshot offsets were 0, 2, 8, 32 and 64 ms, not a fixed-period sampling
+coverage claim. Relative to the first snapshot (itself after the anchor), the
+32 ms and 64 ms cuts were at least 4.928209 and 3.789125 ms late. Query wall
+spans are not exclusive query CPU costs. Actual timestamp coverage is required;
+smaller requested polling intervals alone do not guarantee catching a gap.
+The existing owner model retains both the aggregate-versus-single-pause and
+nominal-versus-actual-deadline counterexamples. No observer is connected to the
+business path as a result of this test.
+
+The first build failed before any execution: GCC found Nix as/ld through the
+inherited PATH. The concrete repair for this fixture was -B/usr/bin/, which
+resolves both tools to system paths while retaining GCC 16, -O2 and the same
+SDK. No PATH/default/SDK was changed. This repair is build-entry evidence,
+not evidence that Nix altered either frozen run. Failed build RSS peaked at
+43745280 bytes; repaired build at 41795584 bytes. The one executed fixture
+exited zero, joined the worker, and had sampled process-group RSS 704512 bytes.
+Build 120 s, fixture 5 s and 8 GiB thresholds remained. Its execute bits were
+removed after the one run; source and bytes are retained. Artifacts:
+=.ci/mailbox-send-target-20261107/thread-counter-contract-20261108/=.
+
+* Native entry, budget domains and the actual short business branch
+
+Source audit traces submit_native_on through Work::Native, run_native,
+NativeSession.call_export, gerbil-rs-rooted-call and opcode 62. The Rust methods
+and rooted-call/budget-context sources are byte-identical at d56f94c and
+3477a02. configure_owner_budgets replaces Rust semaphore capacities; it does
+not enter Scheme or set gerbil-rs-service-context. The direct native-job path
+also does not install a Scheme service-budget context. This excludes an
+automatic Rust-quota-to-Scheme-lease translation; it does not prove the actual
+historic dynamic parameter was false or certify absence of a prior leak.
+Do not remove the existing context re-read, lease or continuation fallback.
+The native data-access switch is a different global: mailbox-scoped-access
+with macro argument #f still tests membership including opcode 62, so the
+main selects native access and restores false on exit. That macro argument is
+not proof of a false budget context or a disabled native kernel.
+
+The main is one Rust owner job, declaring one Rust work unit, containing one
+service-reference export invocation that drives one million Scheme messages.
+The original Rust slot/work bounds (4 and 32) are not the three Scheme frame
+credits or four Scheme workers. Each frame is still returned only after the
+source validates and consumes its result. Header/result construction and
+projection, cold contracts and all Scheme/C clock/progress callbacks are
+separate crossings; one service invocation does not mean one total FFI call.
+
+The per-message plan is anchored at the Scheme source clock, after setup.
+The successful whole-native timer starts before call_export but ends after
+post-call diagnostics, envelope output and receipt copying; the separately
+computed raw-export duration is not retained on success. This corrects the
+earlier "immediately around the export" scope description. Rust admission
+waiting before that export and client observation afterwards are outside
+both message p99 and the successful whole-native timer. Merely shifting an
+otherwise identical post-anchor trace preserves its internal message latency.
+This excludes adding outer queue delay directly to the 6.497 ms source-span
+difference, not indirect startup/cache/scheduler effects. The measurement
+contract now keeps that conditional clock-translation test. The existing
+launcher plan records these scopes explicitly without changing the reader,
+child environment, timestamps or acceptance decisions.
+
+The selected public short route unwraps application tag [77,1], then invokes
+orders-handler/rank with a constant-rank lambda. It does not call the global
+orders-next-rank! mutex path or the bulk Actor coordinator. The fresh payload
+has 14 zero-initialized s64 elements; construction writes id at 0 and records
+at 2..13, leaving wait field 1 zero. Hence the explicit 1 ms sleep and latch
+branches selected by wait values 1 and 2 are not the intended measured business
+path. This does not exclude context-dependent lease waits, native Mailbox/SDK
+synchronization or OS execution delays. The independent oracle remains; no
+business, exception or continuation behavior was narrowed to obtain this audit.
+The private df1491e candidate removes packaging/dispatch; it does not obtain
+its component savings by deleting the general rank mutex from this short path.
+
+Source identities and domain conclusions are retained in
+=.ci/mailbox-send-target-20261107/native-entry-domain-audit-20261108/=.
+No VM or benchmark executed; the original gap is still unattributed. This
+scope correction neither qualifies a frozen control nor authorizes a retry.
+
+* Recovery budget: packet completion correction
+
+The existing pure service calculus called ceil(D*p*c/(p-c)) a conservative
+integer recovery bound. That rounds fluid work, not completed messages.
+With one initial deficit, period 7 and cycle 5, it returns 18 ticks. At that
+cut the service lower bound is 3 completions and the new-arrival upper bound
+is 3, so the initial deficit can still be 1. These are abstract ticks, not
+measurements of a Gerbil component.
+
+The corrected conditional bound is c*ceil(D*p/(p-c)), rounded to a service
+completion opportunity. For the example it gives 20. At k=ceil(D*p/(p-c)),
+k*(p-c)>=D*p, hence k-ceil(k*c/p)>=D. If the queue reaches the target earlier,
+recovery already occurred; otherwise it remained backlogged and the assumed
+service bound applies through this cut. Invalid/nonpositive spare headroom
+returns unknown (-1), not a zero/negative successful time.
+
+This bound requires an independently valid service curve and periodic
+single-message arrival envelope. It does not follow from saturated mean CPU,
+arrival-limited throughput, Actor count or a small final suffix. It certifies
+neither remaining below a target at every later instant nor an earlier peak
+<=128. No native consumer calls this helper; no historical observation was
+changed or admitted using it. The current gate still requires the actual peak.
+QNT checks all small valid period/cycle/deficit combinations and the concrete
+old-formula counterexample; independent integer enumeration covers 7395 states.
+Receipt: =.ci/mailbox-send-target-20261107/recovery-packet-bound-20261108/=.
+No runtime, SDK, workload, default or threshold changed, and no benchmark ran.
+
+* One authorized df1491e single arm: recovery observed, not admitted
+
+The user explicitly permitted one candidate-only diagnostic exception to the
+usual baseline-first research order. This did not waive performance admission,
+change defaults or authorize publication. Before execution, the original reader
+pin, formal candidate =2f0b96f9...= pin and full native receipt hash were checked.
+That same image's retained host, result-construction and op62 checks had passed,
+covering GC/types, original exceptions, multi-shot reentry, Actor drain/reuse
+and clean shutdown. Component and formal image identities remain separate.
+No Scheme, SDK, native image or reader was rebuilt for this run.
+
+The existing Justfile/Node launcher now has a separate one-shot diagnostic role.
+An exact authorization file is consumed before spawn, using an exclusive-create
+reservation. Diagnostic results always have baseline/gain eligibility false,
+even if numerical conditions pass. The ordinary three-frozen/one-matched
+comparator and its first-failure stopping order were verified offline unchanged.
+The single-arm role never enters that comparator. No native observation was
+enabled. External process-group RSS guarding is separate and sampled every
+100 ms; it is not a hard instantaneous memory-bound proof.
+
+| Actual main metric | Single df1491e diagnostic |
+|--------------------+--------------------------|
+| Configuration | one VM, four Scheme workers, three frames |
+| Planned rate / offering | 1000000 per second / one second |
+| Planned / verified | 1000000 / 1000000 |
+| Successful throughput, inner source elapsed | 999518.774 messages/s |
+| Planned-to-verified p99 / p99.9 | 14.164 / 14.729 ms |
+| Rejected / errors / timeouts | 0 / 0 / 0 |
+| Inner elapsed / whole native call | 1000.481458 / 1015.021458 ms |
+| Last publication elapsed | 1000.479416 ms |
+| Drain after last planned tick | 0.482458 ms |
+| Sampled peak / conservative true upper | 14821 / 14822 |
+| Maximum unpublished source debt | 14819 |
+| Source samples above 128 | 521984 |
+| Enclosing owner CPU | 966.346125 ms |
+| Recorded GC process CPU / wall / count | 17.900 / 19.718647 ms / 37 |
+| Sampled process-group RSS peak | 273285120 bytes |
+| Shutdown / native reader exit | clean / 101 |
+
+The 1000-message, 1000/s one-second warmup is separate: p99 34.124 ms,
+p99.9 38.752 ms and sampled peak 39. Do not hide this negative warmup tail
+or substitute it for main metrics. The child naturally returned the original
+performance-assertion panic after successful cleanup; request errors and
+accepted timeouts stayed zero. The main met the numerical 15 ms quantile,
+throughput and whole-native duration conditions, but sampled peak 14821 exceeded
+the relative limit 12969. The absolute 418 us/true-peak 128 admission also
+failed. The supervisor ended normally without a cap/timeout stop.
+
+Within this run, debt had largely recovered by the end of offering; the final
+2.042 us suffix concerns only the last in-flight frames, not all consumption.
+Recovery cannot erase a past 14821 peak. Without a qualified paired control,
+this is neither an engine gain nor confirmed regression, and 14.164 ms is not
+a replacement baseline. Keep df1491e isolated, retain its separate component
+evidence, and preserve 12.869/4.513/3.927 ms references. The historical 6.497 ms
+cause is still unidentified. No native candidate code was edited or installed.
+The existing QNT gate retains the actual peak failure and rejects admission
+even in a hypothetical row with improved quantiles but the same observed peak.
+
+Complete raw outputs, plan, consumed authorization and Benchmark are retained
+in =.ci/mailbox-send-target-20261107/candidate-single-arm-proposal-20261108/=.
+This permission is exhausted; no retry follows from a completed diagnostic.
+No SDK/default/deadline/128 change, publication or PR #18 change occurred.
+
+* User stop line: over-20 ms measurements are counterexamples, not a research runtime
+
+The user explicitly rejected continuation from the 33.520 ms cold diagnostic
+and set a 20 ms stop line. This is an additional research triage rule, NOT a
+relaxation of the existing p99/p99.9 <=15 ms frozen-control qualification,
+throughput floor, original acceptance or true-peak <=128 requirement.
+At or below 20 ms means "needs existing admission", never "passed". Missing
+or invalid quantiles remain unknown. Either tail over the ceiling is archived.
+
+The actual mailbox-snapshot-cut-diagnostic Just recipe and launcher execution
+function were removed. Its CLI spelling now fails closed before opening any
+reader or image. The reader was already made nonexecutable; its byte hash,
+source patch, original raw stdout/stderr and the once-consumed authorization
+remain unchanged. Removed launcher/recipe text is preserved as non-entrypoint
+knowledge alongside the negative receipt. No production runtime change from
+that diagnostic existed to roll back: runtime and benchmark source still
+match 3477a02. Do not blacklist or delete the frozen original bytes because a
+different diagnostic reader produced this failed cohort.
+
+The existing launcher's actual run receipt now records the numeric research
+disposition. Its formal comparator still stops at the first failed <=15 ms
+control. QNT retains continue-measured-tail-over-20ms as a prohibited measured
+route continuation; renaming the route or self-declaring a repair cannot
+admit the old failed route. The pure counter parser remains for offline
+knowledge, not as an executable benchmark path.
+
+Retained useful facts are distinct from a runtime proposal: snapshots can
+reenter Scheme and allocate; they collected zero in this actual cohort;
+collector reads have split cuts in general; success-span timing includes cold
+projection. These do not establish the historical 6.497 ms cause. They must
+screen future proposals before implementation, not become reasons to extend
+the >20 ms implementation or replace a positive baseline with its numbers.
+
+No business load, SDK/default/deadline/128 change, publication or PR #18
+change occurred during this retirement. The 12.869 ms frozen reference and
+4.513/3.927 ms historical references are preserved; baseline qualification
+has not been recovered. Evidence stays under
+=.ci/mailbox-send-target-20261107/snapshot-cut-proposal-20261108/=.
+
+* Authorized cold snapshot diagnostic: allocation path present, snapshot GC absent
+
+The user authorized one cold-cut diagnostic after review of the built Rust
+reader. Relative to stored source a3c9c169 it adds four existing C GC-count
+getter calls per arm. The complete source-to-frozen-reader binding is not
+proven; four calls must not be described as the entire delta against f1e24.
+The diagnostic source adds no per-message
+clock/FFI/recording, and no new native output lines. Its owner callback frame
+is 1072 bytes versus 1024 in the pinned original reader: +48 bytes, with the
+same saved register pairs. Existing envelope JSON is extended after the raw
+call, which adds cold formatting/allocation and can affect warmup-to-main
+preparation. No zero-overhead claim is made. The reader build completed at
+339951616 bytes sampled process-group RSS under the unchanged 8 GiB cap.
+No Scheme, SDK or image was rebuilt. The original image and original reader
+remain untouched; the diagnostic is explicitly ineligible for baseline/gain.
+
+| Actual metric | Warmup | Main diagnostic |
+|---------------+--------+-----------------|
+| Rate / offering | 1000/s / 1 s | 1000000/s / 1 s |
+| Planned / completed | 1000 / 1000 | 1000000 / 1000000 |
+| Successful throughput, inner elapsed | 1000.964/s | 969198.038/s |
+| Planned-to-verified p99 / p99.9 | 0.050 / 0.082 ms | 33.520 / 33.609 ms |
+| Reject / request error / timeout | 0 / 0 / 0 | 0 / 0 / 0 |
+| Inner elapsed | 999.036583 ms | 1031.780875 ms |
+| Whole success span, including cold projection | 1016.718917 ms | 1046.108041 ms |
+| Sampled peak / conservative true upper | 1 / 2 | 33670 / 33671 |
+| Maximum unpublished source debt | 1 | 33668 |
+| Samples above 128 | 0 | 999154 |
+| Enclosing owner CPU | 1002.222791 ms | 1032.606542 ms |
+| Recorded GC process CPU / real duration | 1.184 / 1.199961 ms | 19.738 / 19.688368 ms |
+| Cold GC count cuts | [4,4,6,6] | [6,6,45,45] |
+| Before-snapshot / raw-export / after-snapshot collections | 0 / 2 / 0 | 0 / 39 / 0 |
+
+The main recovered its last request 31.781875 ms after the last scheduled
+arrival; the final post-publication suffix is 1.666 us. These endpoints do
+not price earlier receives. All messages completed and cleanup was clean.
+The native reader naturally exited 101 for its original performance assertion,
+not a request error or watchdog. The outer diagnostic completed normally in
+3.976656 s with sampled process-group RSS 274530304 bytes and no guard stop.
+Its extra scope marker is rejected by the formal admission parser.
+
+The inner elapsed/completed ratio is 1031.780875 ns/message in this run,
+versus 1012.725666 ns/message in the historical 12.869 ms receipt. The difference
+is only 19.055209 ns per completion when amortized across one million messages.
+This includes pacing, GC and waits: it is NOT measured CPU service time or an
+attribution of per-message instrumentation overhead (the new reads are cold).
+The existing calculus now gives a separate hypothetical FIFO illustration:
+at a 1000-tick arrival period, constant service cycles 1013 and 1032 yield p99
+12871000 and 31681000 ticks over one million arrivals. Neither service curve
+is claimed for a native arm. The point is near-capacity tail amplification,
+not a fit or a cause: native progress/pause bounds and full-cycle headroom
+still need evidence, and good average throughput cannot certify peak <=128.
+
+This run falsifies snapshot-triggered GC as the explanation of THIS 33.520 ms
+tail: neither snapshot collected. The 39 collections belong to the raw export
+span; they cannot all be labeled inner-loop GC because setup/report/stop/join
+also occur there. Time/count collector cohorts coincide in this particular
+run because both cold contributions are zero, despite the general split-cut
+risk proved above. Allocation/preparation effects, collection placement and
+the historical 6.497 ms cause remain unresolved. Do not use conditional native
+reachability to override the same-run zero counts.
+
+No baseline recovered and no runtime gain was established. The 12.869 ms and
+4.513/3.927 ms references remain. The one-shot permission is exhausted and the
+diagnostic reader execute bits were removed, preserving its bytes. No retry,
+runtime default/SDK/deadline/128 change, publication or PR #18 change follows.
+Complete plan, source patch, assembly, raw outputs and Benchmark:
+=.ci/mailbox-send-target-20261107/snapshot-cut-proposal-20261108/=.
+
+* Frozen diagnostics reenters Scheme and splits collector snapshot cuts
+
+This corrects the assumption that reading the six diagnostic doubles cannot
+enter Scheme. The comment in the 3477a02 C source says so, but its root-count
+helper is a =c-define= callback, not a direct C counter. Preserve the frozen
+source and bytes; do not silently repair them while calling a run original.
+
+The original image =53ba9b24...= was rehashed, and bounded-address disassembly
+establishes the following call/order facts without executing a VM:
+
+| Frozen operation | Actual byte-level boundary |
+|------------------+----------------------------|
+| diagnostics at 0x61cfe0 | reads owner CPU; reads GC user/system/real counters; then calls root_count_raw; then reads GC count |
+| root_count_raw at 0x489080 | creates an sfun stack marker, invokes Gambit ___call, converts the Scheme result and kills the marker |
+| make_sfun_stack_marker at 0x636b24 | calls make_vector for the marker |
+| make_vector at 0x628c80 | allocates a heap vector; its pressure branch at 0x628e2c calls garbage_collect |
+
+Thus the existing cold diagnostic can allocate and conditionally collect.
+This is a proven reachable native call path, NOT proof that either historical
+snapshot actually collected. The Rust wrapper only invokes this C export;
+its small source shape does not remove that transitive cost. The companion
+=usage= export also calls root_count_raw, so it is not a nonreentrant substitute.
+
+Let B be work caused by the before-snapshot root-count call, W the timed raw
+native call, and A work caused by the after-snapshot root-count call. Under
+unchanged monotone counters and no unrelated updates, the recorded GC-time
+delta covers B+W, whereas the recorded GC-count delta covers W+A. Owner CPU
+is also read before each root-count call. Both collector summaries enclose
+the native call, but they do not share a single sampling cut. The model uses
+abstract contributions, not inferred historical durations.
+
+Consequences for retained evidence:
+
+- Reported equal GC counts (39/39) cannot identify the same inner or native
+  collector cohort, even before considering unknown placement and clock domains.
+- Zero count delta can coexist with positive GC-time delta from B. This does
+  not imply a hidden GC inside W; preserve the distinction.
+- The before-snapshot reentry is outside the source arrival anchor. Its time
+  must not be subtracted from source p99. It can nevertheless change heap,
+  stack or pending-work preparation; the earlier time-shift invariance proof
+  explicitly assumes unchanged post-anchor execution and cannot waive this.
+- Keep the observed GC values and owner-CPU envelope, but do not rank exclusive
+  components or divide recorded GC time by recorded count as an exact per-GC cost.
+
+The root-count marker is not synchronously freed by its normal teardown:
+kill_sfun_stack_marker clears its captured value and delegates to
+still_obj_refcount_dec, whose frozen body only decrements the reference count.
+This is collector-managed still-object lifetime, not evidence of a leak.
+It reinforces that the snapshot can change allocation/collector preparation
+rather than merely add a fixed time offset.
+
+A second source-boundary correction follows from the stored
+reader source (SHA-256 =a3c9c169...=, full frozen-reader binding unproven):
+its success-path =whole_native_call_ns=
+ends only after the after-snapshot, envelope println and copy_arrival_receipt.
+The raw export-only clock is computed earlier but not emitted on success.
+On failure that earlier clock is emitted under the same field name. Retain
+both field values but distinguish their paths; do not subtract an enclosing
+CPU/GC delta from the entire success span as an exclusive phase partition.
+The envelope does not cover the later receipt projection. These are report
+scope corrections, not changed clocks, recalculated p99 or engine gains.
+
+Existing public =NativeSession::gc_collections()= already reads the image's
+C collection-count export without invoking the root-count callback. A future
+bounded cold-only diagnostic can bracket each existing diagnostics() with
+that getter and distinguish B/W/A counts, with no per-handler clock or FFI.
+It would add four C reads per arm and require a different diagnostic reader,
+full cold-path/stack review and explicit non-baseline labeling; its startup
+and preparation could still differ. At that initial static-audit cut no such reader had been built or executed;
+the separately authorized run and its retirement are recorded above.
+
+The concrete falsifiable hypothesis is observation-induced preparation or
+counter-cut mixing, not generic machine contention. Historical snapshot-local
+counter deltas were not recorded, so occurrence and the original 6.497 ms cause
+remain unknown. This discovery alone does not authorize another frozen retry.
+
+A future diagnostic must distinguish B, W and A at existing cold boundaries
+before making a causal claim. Do not move a new clock or recorder into each
+handler, relabel a snapshot as pure C, or copy the earlier rejected probes.
+A future nonreentrant counter API would have to separate resource-root queries
+from execution counters and preserve the existing ABI and fallback; it is not
+implemented, installed or substituted for the original qualification here.
+The first formal runtime candidate remains df1491e after control recovery.
+
+The existing measurement model now checks before/after reentry counterexamples
+and identical reported totals with distinct W cohorts. The research gate
+retains =split-counter-cuts-as-one-cohort=. Cold launch metadata records the
+actual transitive behavior. No runtime, reader, SDK, image, default, deadline
+or PR #18 change and no native benchmark occurred.
+Evidence: =.ci/mailbox-send-target-20261107/frozen-diagnostics-reentry-20261108/=.
+
+* Worker exception boundary: a real repeated cost, not yet an admitted optimization
+
+Static audit of the retained df1491e scheduled worker found a normal-path
+=__with-catch= call for each executed-and-verified message. The archived generated
+Actor C hash =15fe28f6...=, object hash =b3a6197a...= and image hash
+=2f0b96f9...= all match the existing paired provenance receipt. This is the
+actual single-arm candidate graph; it is not a newly generated substitute for
+the frozen original image. The 3477a02 worker source retains the same lexical
+catch boundary, but a statement about its source is not a frozen-image
+machine-code or timing claim.
+
+| Existing normal-path layer | Preserved static evidence |
+|----------------------------+---------------------------|
+| Worker before execute/oracle | two closure allocations, capturing frame and frame/immutable ID; heap check and call to __with-catch |
+| Installed SDK __with-catch | two further closure allocation sites and continuation capture before installing the handler |
+| Installed SDK __with-exception-handler | one wrapper closure and delegation to Gambit's exception-handler mechanism |
+| Worker after catcher returns | marks ready and sends immutable ID/frame reply; source validates identity before failure propagation or retirement |
+
+Five generated closure-allocation sites are therefore present along the
+successful source/SDK chain, in addition to continuation preservation and the
+dynamic handler machinery. Exact machine allocation bytes, lifetime/stack
+cost and CPU price have not been established. Do not multiply the site count
+by an assumed object size or call it the largest measured component. It does
+not explain the original 6.497 ms difference.
+
+Hoisting a catcher to a resident loop is not a safe mechanical rewrite.
+Under the conditional retained-continuation scenario, relabeling an old
+failure with a mutable current frame/ID can make the source accept it as a
+new request's failure. The original immutable reply ordinal instead fails
+identity validation. The existing result-construction QNT model now retains
+this precise conditional counterexample alongside its older late-write
+counterexample; neither is claimed to be a naturally reproduced native fault.
+Any future boundary reduction must preserve the failure origin and its
+unwind/continuation target without introducing a replacement per-message
+activation layer or extending roots. That full net cost remains unclosed.
+
+No exception boundary, Mailbox operation, wait, SDK or runtime source was
+changed. Baseline qualification still precedes component implementation;
+df1491e remains the first formal candidate. Static evidence is under
+=.ci/mailbox-send-target-20261107/worker-exception-boundary-audit-20261108/=.
+
+The independent offline Just/Node failure fixture also confirmed that
+=just --quiet= preserves exit status 1 while suppressing child stderr. The
+absence of an EEXIST message in the earlier quiet denial check is therefore
+not proof of authorization reuse or a native launch. The direct denial
+receipt already proves rejection before spawn. This wrapper behavior does
+not establish any benchmark timing cause and warrants no native retry.
+
+* Same-cohort tail localization without another observation mechanism
+
+Reuse =p99BeforePublishFloor= from the existing result-construction model,
+not a new monitor. One million successful samples imply at least 10001
+samples at or above the p99 bucket's lower edge. With three live frames,
+inner elapsed E, and a 1 ms analysis cutoff, at most floor(3E/1ms) such
+requests can have held a frame for 1 ms or more after the publication stamp.
+Subtracting those requests gives the following conservative lower bounds.
+The cutoff is offline algebra, not a runtime threshold or a changed deadline.
+
+| Exact completed cohort | At least this many requests | Wait before post-send publication stamp |
+|------------------------+-----------------------------+-----------------------------------------|
+| Original 12.869 ms | 6963 | at least 11.868 ms each |
+| Original 19.561 ms | 6944 | at least 18.560 ms each |
+| Authorized df1491e 14.164 ms | 7000 | at least 13.163 ms each |
+
+These are separate same-cohort bounds, not a paired treatment effect. They
+exclude explaining the entire p99 solely by long post-stamp residence for
+all tail requests. They do NOT exclude blocked sends, worker execution or
+receive waits delaying supply: thread-send precedes the source's publication
+stamp and can transfer execution. Nor do they prove which of construction,
+Actor execution, oracle, source eligibility, CPU service or off-CPU wait is
+largest. Source debt is a location/accounting state, not a CPU-cost attribution.
+
+The next admissible component proposal must shorten the full supply/execute/
+verified-retire/refill cycle before that stamp; merely speeding the final
+publication-to-last-consumption suffix cannot explain these bounds. Existing
+failed independent FIFO, deferred refill and extra per-message diagnostics
+remain excluded. No fresh business run is justified by this arithmetic alone.
+The existing QNT regression now checks all three numeric applications.
+
+* Cold admission parity: sampled 128 is not certified true peak 128
+
+The complete native source graph still matches 3477a02. No native execution
+followed the one authorized candidate arm. An offline audit found that the
+launcher judge called the frozen reader's sampled-peak predicate
+=absolutePassed=, although its reported conservative upper was =sampled+1=.
+The final comparator already rejected a true upper above 128; this was an
+intermediate report inconsistency, not evidence of a previously admitted
+unqualified candidate and not a cause of the historical 6.497 ms difference.
+
+The launcher now keeps =readerAdmissionPassed= for validating the original
+reader's exit 0/101 and performance assertion, and uses =absolutePassed= only
+when the conservative true upper meets 128. The population caps that upper.
+No native assertion, runtime, SDK, deadline, window or workload changed.
+Synthetic Node fixtures cover sampled 127/128/129, clean assertion failure,
+diagnostic ineligibility, the original five-arm order and stopping at each
+failed control. The existing QNT uncertainty regression explicitly retains
+sampled 128 plus one failing the same fixed 128 limit. These are offline
+contract tests, not new throughput or baseline-recovery evidence.
+
+* One authorized original-artifact qualification attempt
+
+After withdrawal the user explicitly authorized one frozen qualification
+sequence, stopping on the first failed control. The original reader and
+all three image pins matched their archived SHA-256 values. The launcher
+ran from the original canonical working directory. Its recorded launch
+protocol exactly matches the 12.869 ms receipt, including Node, platform,
+kernel, working directory digest, startup-variable digests, lifecycle
+trace state and regular-file output. Original arguments also match.
+
+The source guard now resolves the research checkpoint relative to the
+launcher file, allowing the native child to retain the historical cwd.
+The Justfile resolves that same launcher from its own directory.
+These parent-side changes do not change the native workload.
+
+| Original frozen first control | Result |
+|-------------------------------+--------|
+| Offered / planned | 1000000/s for one second / 1000000 |
+| Verified / successful throughput | 1000000 / 934559.86 per second |
+| p99 / p99.9 | 69.350 / 69.505 ms |
+| Rejected / errors / timeouts | 0 / 0 / 0 |
+| Sampled total / source debt peaks | 69369 / 69367 |
+| Conservative true peak upper bound | 69370 |
+| Source inner / whole call | 1070.022416 / 1080.016334 ms |
+| Last publication to inner end | 1.458 us |
+| Enclosing owner CPU | 1045.100167 ms |
+| Enclosing GC CPU / wall / count | 17.646000 / 17.761707 ms / 39 |
+| Clean shutdown | yes |
+
+The original 1000/s warmup completed all 1000, with p99/p99.9 of
+0.098/0.547 ms and sampled peak one. It did not qualify the main.
+The first native main failed the declared p99, p99.9, sampled-peak
+and throughput gates. Exactly one reader process was launched.
+No second frozen control, rebuilt match or candidate ran.
+The unchanged frozen files are retained as the baseline artifacts.
+This failure is not a new runtime implementation to revert.
+
+On this run alone, inner elapsed minus rounded-up enclosing owner
+CPU and a 1 us margin leaves at least 24.921248 ms outside owner
+CPU. Subtracting the collector wall upper with a further 1 us
+margin leaves at least 7.158540 ms outside their union. This
+does not classify runnable delay versus native block or locate
+the historical 6.497 ms difference. CPU and GC envelopes can
+overlap. A repeated failed arm is not authorized by this receipt.
+
+The full stream hashes match runs.json. Raw logs, original artifact
+pins, user authorization and launch decision are retained under
+=.ci/mailbox-send-target-20261107/authorized-frozen-return.CtOxlW=.
+No business source, SDK, deadline, absolute gate or PR #18 changed.
+
+** Existing watchdog cannot supply same-gap attribution
+
+After the authorized original-artifact replay, the exact reader
+source was checked for an existing observation opportunity.
+Its watchdog uses a 100 ms sleep between checks and guards the
+ten-second deadline. A 69.350 ms example gap can lie wholly
+between consecutive checks. Progress can resume before the next
+sample, leaving a recent timestamp and no record of the gap.
+This is a coverage counterexample, not a reconstruction of the
+69.350 ms percentile request or its cause.
+
+The existing progressPlateau contract also requires same-owner,
+same-generation linearized cuts. Two ordinary loads are not a
+qualified plateau witness under that contract. Read-modify-write
+sampling would touch the progress word's cache line, and reducing
+the polling interval would add external execution, wall reads and
+coherence traffic. The retained remote CPU fixture only measures
+two bracketed query costs. It does not qualify a recurrent poller,
+association to a natural native gap or the interference on owner
+progress. These facts reject implementing the proposed observer
+as an already-priced reuse of the existing watchdog.
+
+No polling interval, watchdog, owner callback or source line was
+changed. The newest actual full-workload observation remains the
+single failed frozen replay at 69.350 ms, not a newly admitted
+baseline. This audit launches no additional workload.
+
+* Current rollback and evidence gate
+
+The user withdrew the complete-main boundary diagnostic after its
+185.461 ms p99. The selected runtime and benchmark source now match
+3477a02 under every tracked crates path. Research HEAD remains
+5ca8d7e for the accumulated knowledge. The reverted benchmark
+cleanup differs from HEAD, and its repair remains recoverable in Git.
+Frozen reader and image bytes remain the reproduction authority.
+
+The failed diagnostic directory is sealed as
+=.ci/mailbox-send-target-20261107/withdrawn-op62-complete-cpu.9AOXGD=.
+Its reader and both diagnostic images retain their bytes with
+execution permissions removed. No source from that directory is
+eligible as a basis for another candidate or renamed diagnostic.
+The 185.461 ms execution remains a failed observation. Its cause
+relative to the separate 12.869 ms record is unresolved.
+
+Full observation cost includes ten new native TLS integer fields
+(80 bytes per native thread), source-entry and exit FFI calls,
+CPU/wall and collector snapshots, ten cold field reads, one fresh
+report vector through the rooted-call ABI, a new exported symbol,
+new module/linker metadata, reader parsing and formatting, and the
+resulting native code layout. The scheduled arm64 symbol changes
+from 5696 to 5700 decoded instructions, with zero native stack
+references and direct call instructions in both. Generated Scheme
+stack accesses change from 898 to 887. None of those counts prices
+runtime register pressure, safepoint behavior, cache effects, TLS
+initialization or callback scheduling. The retained same-loop and
+same-poll counts were an insufficient observation cost screen.
+No direct causal speed ratio is established by the two different
+execution histories.
+
+Resume with original frozen evidence. Re-establish the approximately
+12 ms baseline before component optimization. Analyze the 6.497 ms
+last-publication difference on the original two receipts. Collector
+CPU differs by 14 us, final consumption suffix by minus 1.041 us,
+and enclosing owner CPU by 6.046333 ms. The original CPU samples
+lack the wall anchors needed to place that difference inside the
+source span. Preserve that unknown. A valid reproduction premise
+must change evidence about a concrete execution condition. New
+observation layers are subject to the retained
+unpriced-boundary-observation veto before any native execution.
+
+** Frozen source enforcement before native startup
+
+The actual replay launcher now compares tracked runtime inputs against
+3477a02 before resolving or launching the reader. It covers crates,
+FFI, Scheme, build support and Cargo manifests/lockfile. It rejects
+unstaged changes, staged changes and untracked nonignored files in
+those paths. Knowledge files remain independently maintainable.
+The actual research tree and an isolated original-revision copy pass.
+One unstaged Scheme probe, the same staged probe and an untracked
+runtime probe each fail. A knowledge-only addition passes. These
+six checks launch no VM. The retired complete-cycle image remains
+quarantined and is also outside the admitted image hashes.
+
+The source audit confirmed the diagnostics export reads owner thread
+CPU via CLOCK_THREAD_CPUTIME_ID and collector counters directly from
+the VM. The two ordinary 3477a02 main intervals still lack anchors
+around those CPU reads. The warmup CPU envelopes are about one second
+at only 1000 requests/s, and the raw source can repeatedly yield while
+waiting for eligibility. Such an envelope includes pacing and scheduler
+execution and cannot price business work per request. These facts
+prevent assigning the 6.046333 ms enclosing CPU increment to handlers.
+The original 6.497 ms pre-publication difference remains unresolved.
+
+** Equal collector totals leave collection placement unresolved
+
+The 12.869 and 19.561 ms receipts each report 39 collections.
+Their collector CPU differs by only 14 us. This does not exclude
+a different placement of collections within the offered interval.
+An early pause may be absorbed by later service headroom, while
+an equal pause near the last arrivals shifts final publication.
+The owner CPU envelope can also include pacing work, so its
+6.046333 ms increment is not a measured increase in business work.
+
+The existing owner_wait_coverage regression constructs ten fixed
+release times, identical total service work and one identical
+pause placed early or late. The last publication and final
+completion differ while the final suffix remains equal.
+It is an inference counterexample, not an op62 scheduler or proof
+of the observed cause. All 36 tests in that module pass.
+
+The original two receipts preserve total counters but no individual
+collection timestamps, and their startup fingerprints agree.
+They therefore cannot choose between collector placement,
+variable non-collector work and lost owner opportunity.
+A new reproduction still requires a separately qualified premise.
+Do not restart the withdrawn observation to obtain that premise.
+Runtime files continue to match 3477a02 and no workload was rerun.
+
+** Research checkpoint and measured runtime have different identities
+
+3477a02 records the 12.869 ms frozen-image replay. Its Git parent is
+df1491e and its scheduled Scheme source already uses the private
+payload candidate. The measured 12.869 ms runtime uses the original
+7f915df frozen image and reader digests. Returning tracked files to
+3477a02 restores the research checkpoint but cannot authenticate a
+rebuild as the original frozen runtime.
+
+The launcher source guard is now named verifyResearchCheckpointSource.
+Its plan explicitly records the research checkpoint, frozen 7F
+runtime, cleaned d56f94c matched source and df1491e candidate source.
+Native selection continues to require each independently verified
+image digest. A research HEAD or identical reader alone cannot
+transfer a performance observation to a new image. The archived
+matched control differs from d56f94c only by its documented
+retired-mode cleanup. Its image remains a distinct comparison arm.
+
+This mismatch of identities does not explain the original 6.497 ms
+difference: both ordinary runs used the same pinned original image.
+It closes an incorrect source-attribution path for future rebuilds.
+The two original stdout/stderr streams contain no per-collection
+event records and no additional timeline file is in either receipt
+directory. Collector placement therefore remains unknown.
+
+** Foreign host cost omitted by the earlier scheduled-symbol audit
+
+The retired object's foreign hosts contain work absent from the
+named scheduled op62 function. ARM64 relocation inspection finds
+seven emutls_get_address call sites in the opening host, five in
+the closing host and ten selectable sites in the field reader.
+Each opening/closing host has an 80-byte native stack frame.
+The field reader has a 64-byte frame plus argument/result conversion
+and its selected TLS resolver call. Each boundary host also has
+two clock_gettime call sites. Each of ten cold field invocations
+selects one resolver branch. Call-site counts are not elapsed costs.
+
+The previous scheduled-symbol inspection reported no native stack
+references or call instructions. It excluded these Scheme-jump
+foreign hosts, so it could not establish complete observation cost.
+The first access to an emulated TLS variable can differ from later
+accesses. Warmup uses the same owner and also executes the two
+boundaries, so this audit does not assert fresh TLS allocation in
+the main. These findings support the existing withdrawal and do
+not establish that the resolver caused the 185.461 ms trace.
+No new run or replacement boundary implementation is authorized
+by the object counts.
+
+The static object digest, host symbols and counts are retained in
+the sealed directory's foreign-host-audit.json. The existing
+unpriced-boundary-observation gate rejects plans that inspect
+only the scheduled host and omit its foreign-call closure.
+
+* Complete-main boundary diagnostic after publication (withdrawn)
+
+One isolated matched-control image adds CPU and collector snapshots
+before the source clock and after its elapsed clock. Removing the
+two boundary calls restores the original driver source byte for byte.
+Generated scheduled C retains 28 polls, eight heap checks, three
+send sites, three receive sites and maximum frame adjustment 24.
+The new cold export was explicitly added to a separate link response
+file. The SDK, original images and formal launcher remain intact.
+
+The real-VM host preflight passed. One main followed the original
+1000/s warmup and offered 1000000/s for one second. It completed
+all 1000000, with zero rejection, error or timeout and clean close.
+Diagnostic p99/p99.9 were 185.461/185.585 ms, throughput
+843285.80/s, sampled debt 114235 and conservative true upper 114236.
+This is a failed diagnostic cohort and supplies no performance gain.
+
+The outer wall span was 1185.843166 ms, enclosing owner CPU
+1055.563459 ms and inner span 1185.837583 ms. With 1 us margins
+the inner CPU interval is 1055.556876 to 1055.564459 ms.
+Outside owner CPU is at least 130.273124 ms. Collector CPU
+was 17.494999 ms and collector wall 19.990683 ms over 38
+collections. Subtracting its enclosing wall upper leaves at
+least 110.281441 ms outside both envelopes. Non-GC owner CPU
+is at least 1038.060877 ms. Thus eliminating collector work
+or lost execution opportunity alone cannot make this fixed
+execution history fit in one second. Repeated green-thread
+scheduling and full-cycle work remain included in the CPU bound.
+
+These are same-arm bounds. They neither transfer into 3477a02
+nor attribute its 6.497 ms publication difference. The diagnostic
+adds no per-message acquisition but still changes generated code
+layout and startup state. Its instrumentation overhead inside
+the wall brackets has not been independently priced. Preserve
+this limitation and the failed receipt. No native retry or
+candidate A/B followed.
+
+Maximum sampled build-group RSS was 842612736 bytes. Raw inputs,
+generated code, link and host preflight receipts, and single
+main output are retained under
+=.ci/mailbox-send-target-20261107/withdrawn-op62-complete-cpu.9AOXGD=.
+The formal df1491e candidate remains gated on fresh qualified
+frozen controls. The selected runtime source is unchanged.
 
 * Consolidated next-work decision
 
@@ -48,7 +1294,7 @@ remain excluded by their counterexamples.
 Use =just mailbox-research-gate-check= for the retained QNT gates
 and =just mailbox-replay-1m= for the prebuilt native sequence.
 The launcher binds exact reader and image digests and records
-each admission dimension. Its failure-reporting companion reader
+each admission dimension. The archived failure-reporting companion reader
 closes the owner before propagating an original failed call.
 That rebuilt reader is a new artifact and cannot inherit frozen
 timings. No raw logs, SDK files, binaries or isolated diagnostic
@@ -110,6 +1356,49 @@ inside the source cycle. These data place the delay before the
 last publication and do not identify a single runtime or host
 cause. Do not repeat the same run or restart the failed role and
 idle-policy experiments on this evidence alone.
+
+The QNT replay rule requires an independently verified
+=changed-execution-premise= after a prior attempt. A renamed plan, a new
+question or explicit replay intent alone cannot satisfy it. Record the
+observed change, its source, the expected distinguishing result and the
+stopping rule before invoking the existing launcher. The model checks the
+decision contract. The launcher checks artifact identity and measured
+results. The evidence for the change must come from outside both checks.
+
+** Reconcile parent wall time with the two measured calls
+
+Rechecked the stdout digests and parsed the two arrival records in each
+archived process. Parent time is measured across spawnSync. Subtract the
+warmup and main whole-call durations to get the residual outside both
+recorded call intervals. All values below are milliseconds.
+
+| Frozen main p99 | Parent elapsed | Warmup whole | Main whole | Parent residual | Main inner |
+|-----------------+----------------+--------------+------------+-----------------+------------|
+| 12.869 | 3014.166834 | 1012.942083 | 1023.012708 | 978.212043 | 1012.725666 |
+| 19.561 | 3389.653750 | 1012.970166 | 1030.386000 | 1346.297584 | 1019.221625 |
+| 69.350 | 3116.203000 | 1012.432125 | 1080.016334 | 1023.754541 | 1070.022416 |
+
+Relative to 12.869, the 19.561 process adds 375.486916 ms, including
+368.085541 ms outside the two recorded calls. The main whole call adds
+7.373292 ms, of which 6.495959 ms is inside the main inner interval.
+The 69.350 process adds only 102.036166 ms in parent time while its
+main inner interval adds 57.296750 ms. Ranking these receipts by
+parent elapsed would reverse the two failed mains.
+
+The residual mixes startup, setup and contract work, time between the
+calls, shutdown, and parent observation overhead. The receipts lack
+timestamps that separate those pieces. They cannot establish that the
+extra residual was a pre-main pause, or that it caused the 6.497 ms
+publication delta. A proposed startup explanation must identify an
+independently observed startup condition and predict a change in the
+inner publication/retirement metrics. Parent elapsed alone cannot
+qualify that proposal. This offline partition supplies no changed
+execution premise or authority to retry.
+
+Sources: =.ci/mailbox-send-target-20261107/= receipt sets
+=frozen-group-terminal.kreNhR=, =frozen-after-compile-stage.0WMHws=,
+and =authorized-frozen-return.CtOxlW=. Each uses its own
+=frozen-1.stdout= and =runs.json=. No native arm was executed.
 
 ** Stage gates for the 3477a02 optimization line
 
@@ -358,6 +1647,26 @@ available for the existing stop-on-failure launcher.
 The next readiness check again observed 12 active logical CPUs, 0 percent
 idle across both samples, 57 and 52 runnable processes, and a short
 load average of 86.27. No million-message arm was launched.
+
+The directory label =post-compiler-frozen.OkFX66= does not establish
+that compilation had ended. Its launch snapshots list gsc and cc1
+in process group 41715 both before and after the run. The rehashed
+stdout/stderr receipt binds the frozen 53ba image to a complete but
+failed main: 1000000 verified, 249080.76/s, p99/p99.9
+2873.933/2990.662 ms, sampled peak 796141, and zero request
+rejections, failures and timeouts. The snapshots do not measure overlap
+with individual pauses or establish that the group caused this tail.
+
+In the 12.869 ms archive a separate build group appears before launch.
+Before the 19.561 ms archive the short load average is lower (9.15
+versus 16.35), but the main is slower. A named group disappearing,
+lower aggregate load or a later date does not identify a controlled
+change in owner execution. The latest 69.350 ms record does not have
+bracketing host snapshots. The current launcher preflight matches
+every captured launch field in that receipt. Its missing allocator
+fields and missing execution-state observations remain unknown.
+Neither current AC power nor the current memory snapshot can be
+paired with those missing observations to justify another run.
 
 *** Frozen replay stopped at the request deadline
 
@@ -2946,6 +4255,42 @@ op6 fixture. The exact reader, image and stream hashes are in
 =.ci/mailbox-send-target-20261107/op62-public-batch.qg6UkA=.
 The formal frozen performance sequence did not run.
 
+*** Exact image functional preflight for the first formal comparison
+
+Rehashed the two images selected by mailbox-replay.mjs against the paired
+provenance record: matched 595f19cb... and df1491e candidate 2f0b96f9....
+Both native-receipt.json files matched the lifecycle pins. All six
+host/result/op62 reader-and-image pairs matched their hashes and passed
+with exit zero. Each raw stdout JSON sequence matched its retained events
+and each stderr was empty. Rehashed both public fixtures and all eight
+public stdout/stderr files against their receipts.
+
+| Evidence on both formal images | Verified scope |
+|--------------------------------+----------------|
+| Native host contract | GC and native types, exception unwind, multi-shot continuation across FFI, Actor failure drain and reuse, clean shutdown |
+| Native result contract | 21 differential cases, bignum fallback, original exception identity, two rank and two checkpoint replays, GC, two green wait cases and clean shutdown |
+| Frozen reader op62 smoke | 1000 warmup completions and one main completion, zero failed/rejected/timed-out requests and clean shutdown |
+| Public op6 fixture | Tagged/raw fallback, guard, GC, original unwind, reuse, zero roots and clean close |
+| Public untagged batch fixture | 16 verified results over four actors, intervening malformed request, recovered credits, reuse, zero roots and clean close |
+
+The retained staged source diff changes the private scheduled constructor
+and handler dispatch through three Scheme files. It keeps the independent
+oracle, catcher, ready/reply and retirement/refill bodies. The public handler
+uses the shared short-order helper and retains its guards. The host and
+result fixtures exercise those contracts on the same image through separate
+exports. Their fault and continuation evidence is not a claim that the
+one-request op62 smoke injects those cases into the timed source. Fault
+relinks have their own image hashes and cannot fill an exact-image evidence
+gap. Use the verified functional preflight as eligibility evidence only
+after the three frozen controls and one matched control qualify.
+
+Sources under =.ci/mailbox-send-target-20261107/=:
+=paired-git-provenance.gzsN6M/receipt.json=,
+=retire-park-edge.sMscX6/native-receipt.json=,
+=private-layout-cleaned.Uf1IUk/native-receipt.json=,
+=op62-public-fallback.c1COjn/receipt.json= and
+=op62-public-batch.qg6UkA/receipt.json=. No native process ran in this audit.
+
 *** Paired saturated service-cycle cost
 
 The linked ordinary op62 body contains 5695 arm64 instructions in
@@ -2997,12 +4342,14 @@ Actor C and object bytes against its Git provenance receipt.
 | First control to first candidate | 310.000 | 4.100 | 305.900 |
 | Second control to second candidate | 222.935 | -2.720 | 225.655 |
 
-The reported GC CPU difference cannot account for either reduction.
-This residual still includes setup, terminal capture, scheduling,
-bridges, allocation outside the collector and the entire service
-cycle. It cannot price a Mailbox transfer or bound exclusive work
-under the original open arrivals. The formal image pair did not
-run. No runtime, build or admission input changed.
+Correction from the later frozen-byte CPU-scope audit: the last column is
+an arithmetic residual across different counter scopes, not an exclusive
+non-GC CPU measurement. The GC counter records process CPU during collector
+intervals, whereas the enclosing CPU is owner-thread CPU. Keep the raw numbers
+and observed enclosing savings; do not subtract these scopes as an exact
+partition or price a Mailbox transfer. The separate component results do not
+bound exclusive work under original open arrivals. The formal image pair did
+not run. No runtime, build or admission input changed.
 
 Keep the ordinary candidate isolated with positive component
 evidence. Its open-arrival throughput, p99 and peak backlog
@@ -5374,3 +6721,174 @@ There is no accepted new throughput candidate in this review. The next code chan
 must address the actual sum of complete-cycle costs with the general Scheme
 path intact. Further observation layers, frame scans, independent FIFOs,
 ready-first refill barriers and unqualified permit schemes are not the next step.
+
+
+* Frozen reader source binding: preserve byte evidence, reject complete-source claims
+
+The retained reader source a3c9c169... matches the real 7f915df Git blob,
+but this does not prove that it built frozen reader f1e24bfc.... It contains
+an early-return --host-boundary-contract-only branch. The existing
+loader-relocation.wYE96K receipt pins f1e24/53ba and passes that argument,
+yet records the 1000-message warmup and one-message main smoke. This is an
+actual retained CLI behavior mismatch, not an inference from missing strings.
+No new native invocation was needed to establish the mismatch.
+
+Consequences for complete-cost review:
+- The four added getter calls are a source delta against a3c9, not a proven
+  exhaustive delta against f1e24. Full reader build-input correspondence stays
+  unknown; matching the Git source hash cannot supply the missing binding.
+- The measured callback frames (1024 versus 1072 bytes) remain byte-level
+  facts, but the +48 bytes cannot be attributed exclusively to those calls.
+- The frozen reader itself confirms calls at 0x10000b0a8 diagnostics,
+  0x10000b0ac clock, 0x10000b0cc call_export, 0x10000b0d8 clock,
+  0x10000b0f0 diagnostics, 0x10000bf40 copy_arrival_receipt and
+  0x10000bf74 clock. This preserves the enclosing success-span boundary;
+  it does not authenticate all surrounding source or price exclusive phases.
+- The raw original benchmark values and artifact hashes remain valid records.
+  The mismatch is not evidence that it caused the historical 6.497 ms
+  difference, nor permission to rebuild a guessed reader or rerun controls.
+
+Reuse the existing partial-source-or-provider-cohort QNT factor: a plan
+cannot claim complete cost or provenance merely from the stored source when
+its CLI behavior contradicts the pinned executable. Keep source-only review
+available, but require independent qualified binding before runtime admission.
+The >20 ms diagnostic stays retired. Runtime and benchmark still match
+3477a02; no SDK, default, deadline, 128 gate, PR #18 or publication changed.
+Evidence: =.ci/mailbox-send-target-20261107/reader-source-binding-audit-20261108/receipt.json=.
+
+
+* Original frozen heartbeat-mask body already uses the cached provider
+
+A static audit of original image 53ba9b... confirms pthread_sigmask occupies
+0x61a2d0..0x61a3e8. It loads the cached provider pointer at 0x11f43e0 and
+calls it at 0x61a2ec. There is no direct dlsym call in that body. The
+owner-specific branch calls pthread_self/pthread_equal, locks the timer mutex
+at 0x61a328, updates masked/pending state, may invoke the pending heartbeat
+callback, then unlocks at 0x61a358. Import-table addresses authenticate those
+libc call names. The wrapper uses a 32-byte stack frame on its calling path.
+
+Thus the existing positive frozen image already has the cached mask provider;
+proposing to remove per-mask dlsym again would target work absent from this
+body. This is not a claim about every transitive libc instruction or every
+symbol lookup elsewhere. Cached dispatch does NOT eliminate the real timer
+mutex or the pending callback. The old receipts contain no same-gap lock
+interval or runnable-wait timeline, so neither can be priced or blamed for
+the original 6.497 ms from this static evidence. No fresh replay premise is
+established. Do not reopen the retired lock-splitting/atomic candidates under
+a cache-repair label.
+
+Retained source-copy checks found the stored a3c9 reader or later sources in
+the bounded original-input/full-source/pool-retirement/private-cargo copies;
+none restored the contradictory frozen reader's complete source binding.
+The fc82d5a parent predates this reader file, so it is not its original source.
+No runtime, SDK/default/128/deadline change, rebuild, native run or PR #18
+mutation occurred. Evidence:
+=.ci/mailbox-send-target-20261107/frozen-mask-byte-audit-20261108/=.
+
+* 3477a02 cost review and single-loop oracle follow-up
+
+Runtime and benchmark paths match 3477a02. Its runtime source also matches
+df1491e on those paths. The frozen reader and image for the 12.869 ms
+reference are the original 7F pair. Preserve this distinction when pricing
+a source change or selecting the candidate artifact.
+
+| Complete-cycle stage | Work on the scheduled path | Decision from retained evidence |
+|----------------------+----------------------------+---------------------------------|
+| Supply | Compute due, acquire a free frame, construct s64[14], populate it, send to a selected worker, advance the plan and stamp publication | Private typed construction and dispatch in df1491e remove the original wrapper, tag allocations and general tag comparison. The two saturated pairs saved 222.935 and 310.000 ns/order in enclosing owner CPU. This is the largest verified saving among retained candidate changes. |
+| Actor turn | Receive, install per-request exception scope, execute the order, allocate the result, independently verify it, mark ready and send immutable ID/frame | The independent verifier costs 268.65 and 270.02 ns/order over the identity reference in the separate verifier fixture. This is the largest separately priced business subcomponent in the retained evidence. Exclusive handler, exception-scope and transport CPU are still unknown. |
+| Consumption and return | Receive, validate immutable identity and ready state, preserve any worker exception, record latency and progress, clear roots, return one frame and refill | This stage preserves immediate refill. The timed driver has four clock crossings per success plus empty pacing rounds and two boundary calls. The clock component compares loops with different boundaries and cannot price this stage exclusively. |
+
+At the sampled 12.869 ms replay peak, 12,967 of 12,969 due-unconsumed
+orders were still unpublished. The post-send stamp of the oldest due
+order followed that sample within 875 ns. This bounds one refill at the
+peak. The 128 requirement would have needed at least 12,841 additional
+verified returns by that same cut under the same arrival schedule. Earlier
+retirements matter even if the final drain or whole-run throughput improves.
+The two separate component prices must not be added or translated into
+open-arrival p99 or a debt reduction.
+
+Keep the pinned df1491e image as the first formal candidate. The work is
+already represented in the 3477a02 source. A fresh source patch applying
+it again would be redundant. The existing one-arm 14.164 ms observation
+had sampled peak 14,821 and supplies no paired acceptance. Use the existing
+qualified frozen/matched sequence for any future formal decision.
+
+For a follow-up after the first formal decision, target only the independent
+verifier's empty-SKU traversal. The stock verifier checks shape/identity,
+four occupied amounts, and gross before visiting all 16 SKU indices and
+selecting the 12 empty ones. The earlier two-loop rewrite preserved checks
+but expanded the generated body from 1,209 to 1,775 instructions. Keep its
+counterexample. The alternative proposed here uses one loop with one typed
+read/check site. Compute first = id modulo 16 and low = max(0, first - 12)
+once at this stage. For ordinal 0 through 11, compute position = low +
+ordinal. Check SKU position when position < first and position + 4
+otherwise. For a wrapped occupied interval the skip never fires. For an
+unwrapped interval the map skips the four occupied slots. All 12 empty
+checks remain in ascending order, including the first failing check. The
+existing QNT module compares the mapped domain and ordering for every
+possible first SKU. The earlier checks and their error ordering stay intact.
+
+This proposal removes four loop visits and the dynamic modulo membership
+test in the empty-bin phase. It adds a bounded index selection and two
+invariants at loop entry. It retains checked access, independent expected
+values, the original catch/exception identity, and one verified retirement.
+Use the existing general verifier for general callers and keep the optimized
+domain private to the bounded scheduled-order route. A future full-module
+GCC review must include the selection, any guards or duplicated code, the
+loop's full stack/branch footprint and the caller. Cancel if it grows
+another loop body, adds per-message allocation/FFI, or has no credible net
+cost advantage. QNT proves the index property only. It cannot admit a CPU
+or latency gain. Current work changes only the knowledge and model.
+
+The existing vetoes still apply to packing across the three-frame/four-worker
+schedule, moving the per-request catch to mutable resident state, fusing the
+latency and progress timestamps, and delaying refill. Preserve any new
+over-20 ms execution as a counterexample and withdraw its runtime change.
+The frozen 12.869 ms reference and native acceptance gates remain in force.
+
+** Single-loop verifier canceled after full-module GCC audit
+
+Compiled the complete Actor module twice using the pinned SDK and GCC 16.2.0
+with effective -O2, MULTIPLE_HOSTS and DONT_INLINE_JUMPS. Every staged
+control Scheme input matched 3477a02. Only instance-actor-arrival.ss and
+instance-mailbox-backpressure.ss differed in the isolated arm. The general
+oracle stayed available. A macro parameter selected the new oracle only
+for scheduled op62, inside the original per-request catch and before ready
+publication. The shape, occupied totals, gross, and ascending empty checks
+retain their order. The catch, original exception value, immutable reply
+identity, and per-result frame return are unchanged in the source diff.
+The comparison compiled object files without linking or running an image.
+
+| Static cost | Stock | Private single loop |
+|-------------+-------+---------------------|
+| Verifier machine instructions / bytes | 1216 / 4864 | 1323 / 5292 |
+| Conditional branch / select sites | 113 / 5 | 121 / 4 |
+| Unconditional branch sites | 104 | 112 |
+| ARM64 stack references | 0 | 0 |
+| Scheme stack adjustment sites / range in words | 60 / -9 to +11 | 75 / -11 to +11 |
+| Scheme stack write / read sites | 95 / 144 | 126 / 196 |
+| Checked typed-read / gross-box sites | 7 / 1 | 7 / 1 |
+| Scheduled caller machine instructions | 5766 | 5766 |
+| Whole Actor object text bytes | 648736 | 654188 |
+| Whole Actor object file bytes | 1475616 | 1487016 |
+
+The generated C moves the first-SKU modulo out of the empty-SKU traversal
+and removes the second modulo site. It adds the low-bound decision, checked
+position arithmetic and conditional index skip, including the exact-integer
+fallback paths. The general verifier still occupies its original 4864 bytes.
+The caller retains the same-sized body and Scheme stack site counts. These
+are complete static spans and sites. They neither price the successful
+branch trace nor measure the maximum live stack or CPU time. The scheduled
+call is a Gambit Scheme jump. Zero native call instructions in these hosts
+does not omit the checked typed reads from the cost analysis.
+
+Decision: cancel this implementation. The reduced iteration count and
+ordered-domain proof leave the full-cycle net benefit unestablished with
+the added branching, Scheme stack traffic sites and module footprint.
+Retain the existing two-loop witness and the new single-loop GCC witness
+in QNT. This is a static rejection, with no measured latency regression.
+df1491e remains the first formal candidate. The runtime and benchmark
+source stay at 3477a02. No business load ran. The peak sampled build-group
+RSS was 852770816 bytes under the 8 GiB guard. The raw compiler commands,
+generated C and bounded disassemblies are retained with the receipt at
+=.ci/mailbox-send-target-20261107/op62-single-sku-codegen.32kc7he5/=.

@@ -206,6 +206,16 @@ module mailbox_result_construction {
       {count:6987,waitNs:5392000} and
     p99BeforePublishFloor(1000000,18922000,1000,1019933458,1000000,3)==
       {count:6942,waitNs:17921000})
+  // Apply the existing frame-time bound to exact completed receipt cohorts.
+  // "Publication" here is the source's post-send clock stamp. A blocked send
+  // may already have enqueued work: this is NOT a source-only CPU attribution.
+  run OriginalPairAndSingleCandidateTailStampBoundsTest=assert(
+    p99BeforePublishFloor(1000000,12869000,1000,1012725666,1000000,3)==
+      {count:6963,waitNs:11868000} and
+    p99BeforePublishFloor(1000000,19561000,1000,1019221625,1000000,3)==
+      {count:6944,waitNs:18560000} and
+    p99BeforePublishFloor(1000000,14164000,1000,1000481458,1000000,3)==
+      {count:7000,waitNs:13163000})
   run FailedIntegratedControlStillBoundsItsOwnPostOfferRetirementTest={
     val elapsed=1293533667
     val lastOffer=999999000
@@ -981,6 +991,19 @@ module mailbox_result_construction {
       afterReplay.payload!=recycled.payload)
   }
 
+  // Conditional design counterexample, not a reproduced native failure.
+  // A resident catcher that labels a resumed old exception with mutable current
+  // custody can defeat the existing immutable reply identity check.
+  run op62ResidentCatcherCannotRelabelOldFailureAsCurrentTurnTest = {
+    val failureOrigin=0
+    val currentFrameOrdinal=3
+    val originalReplyOrdinal=failureOrigin
+    val mutableCurrentReplyOrdinal=currentFrameOrdinal
+    assert(failureOrigin!=currentFrameOrdinal and
+      op62ReplyDisposition(originalReplyOrdinal==currentFrameOrdinal,"failed-ready")=="frame-identity" and
+      op62ReplyDisposition(mutableCurrentReplyOrdinal==currentFrameOrdinal,"failed-ready")=="worker-exception")
+  }
+
   run op62ReadyStateEnvelopeCannotExplainFullOwnerGapTest = {
     val frozenInnerWall=9761178791
     val candidateInnerWall=10792667209
@@ -1471,6 +1494,25 @@ module mailbox_result_construction {
     }))
   }
 
+  // Map one 12-iteration loop to the original ascending empty-SKU checks.
+  // The map has one body even when the occupied interval crosses SKU 15.
+  pure def op62EmptySkuAt(first:int, ordinal:int):int = {
+    val low=if(first>12) first-12 else 0
+    val position=low+ordinal
+    if(position<first) position else position+4
+  }
+
+  run op62SingleEmptySkuLoopPreservesChecksAndFirstFailureTest={
+    val bins=0.to(15)
+    val ordinals=0.to(11)
+    assert(bins.forall(first => {
+      val stock=bins.filter(sku => (sku-first+16)%16>=4)
+      val mapped=ordinals.map(ordinal => op62EmptySkuAt(first,ordinal))
+      mapped==stock and ordinals.forall(i => ordinals.forall(j =>
+        i>=j or op62EmptySkuAt(first,i)<op62EmptySkuAt(first,j)))
+    }))
+  }
+
   // The isolated full-module GCC lowering replaces the loop with two
   // loop bodies. An exact oracle with fewer iterations can still grow
   // materially, and does not remove a Mailbox handoff or credit transition.
@@ -1479,6 +1521,19 @@ module mailbox_result_construction {
     val split={visits:12,checks:12,instructions:1775,handoffs:2}
     assert(split.visits<stock.visits and split.checks==stock.checks and
       split.instructions>stock.instructions and split.handoffs==stock.handoffs)
+  }
+
+  // Actual full-module GCC -O2 object pair, relative to 3477a02.
+  // Source iteration savings do not pay for the added selection and spill sites
+  // by themselves. All-path static counts provide no native throughput evidence.
+  run op62SingleEmptySkuCodegenCostsCancelAdmissionTest={
+    val stock={visits:16,checks:12,instructions:1216,branches:113,stackAdjusts:60,textBytes:648736}
+    val single={visits:12,checks:12,instructions:1323,branches:121,stackAdjusts:75,textBytes:654188}
+    assert(single.visits<stock.visits and single.checks==stock.checks and
+      single.instructions>stock.instructions and single.branches>stock.branches and
+      single.stackAdjusts>stock.stackAdjusts and single.textBytes-stock.textBytes==5452 and
+      not(researchGate::pairedRunAllowed(researchGate::authority,{...researchGate::goodPlan,
+        introduced:Set("local-cost-only")})))
   }
 
   type Op62HistogramAlias={enqueue:int,dequeue:int,ageSample:int,

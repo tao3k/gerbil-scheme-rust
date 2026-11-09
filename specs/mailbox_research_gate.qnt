@@ -22,14 +22,22 @@ module mailbox_research_gate {
   // of downstream projects. A repair requires new externally qualified proof.
   pure val retainedFactors=Set("delayed-refill", "new-queue-and-sleep-registration",
     "unhit-probe-stack-or-branch", "partial-source-or-provider-cohort",
-    "capture-value-used-as-progress-error", "local-cost-only")
+    "capture-value-used-as-progress-error", "local-cost-only",
+    "unpriced-boundary-observation", "gc-notification-as-collection-timeline",
+    "lower-live-metric-as-tail-proof", "partial-startup-fingerprint-as-equivalence",
+    "split-counter-cuts-as-one-cohort", "continue-measured-tail-over-20ms")
+  pure def measuredRouteDisposition(p99Ns:int,p999Ns:int):str=
+    if(p99Ns<=0 or p999Ns<p99Ns) "hold-insufficient-evidence"
+    else if(p99Ns>20000000 or p999Ns>20000000) "archive-counterexample"
+    else "needs-existing-admission"
   pure val requiredFacts=Set("same-workload", "complete-link-inputs", "same-startup",
     "same-timing", "real-vm-correctness", "complete-cost-screen", "qualified-control")
   pure val replayFacts=Set("complete-link-inputs", "same-startup", "same-timing")
   pure val diagnosticFacts=replayFacts.union(Set("authorized-single-capture",
     "qualified-unhit-path", "same-request-association", "real-vm-correctness"))
   pure val forbiddenFactors=Set("private-inbox-read", "premature-capacity-return",
-    "narrowed-scheme-semantics", "changed-defaults", "relaxed-gates", "sdk-modified")
+    "narrowed-scheme-semantics", "changed-defaults", "relaxed-gates", "sdk-modified",
+    "continue-measured-tail-over-20ms")
   type Plan={control:Workload,candidate:Workload,key:RunKey,verified:Set[str],introduced:Set[str],
     repaired:Set[str],repairsQualified:bool,alreadyAttempted:bool,newMechanism:bool,
     newQuestion:bool,explicitReplay:bool,purpose:str,origin:str,originalBytesVerified:bool,scope:str}
@@ -47,9 +55,15 @@ module mailbox_research_gate {
   // Reproduction and a single new diagnostic question remain possible. They
   // are not eligible to publish an engine gain, even if the command exits 0.
   pure def replayAllowed(s:Research,p:Plan):bool=validAuthority(s) and validWorkload(p.control) and validKey(p.key) and p.purpose=="baseline-replay" and p.explicitReplay and
-    p.control==p.candidate and replayFacts.subseteq(p.verified) and unresolved(s,p)==Set()
+    p.control==p.candidate and replayFacts.subseteq(p.verified) and unresolved(s,p)==Set() and
+    (not(p.alreadyAttempted) or p.verified.contains("changed-execution-premise"))
   pure def diagnosticAllowed(s:Research,p:Plan):bool=validAuthority(s) and validWorkload(p.control) and validKey(p.key) and p.purpose=="single-diagnostic" and p.newQuestion and
     p.control==p.candidate and diagnosticFacts.subseteq(p.verified) and unresolved(s,p)==Set()
+  // Failed execution admission does not stop non-executing research.
+  // This permission covers source/cost review only, never a VM launch.
+  pure def sourceReviewAllowed(s:Research,p:Plan):bool=
+    validAuthority(s) and validWorkload(p.control) and validKey(p.key) and
+    p.purpose=="source-cost-review" and p.scope=="research"
   pure def sameHistoricalWorkload(r:Reference,p:Plan):bool=r.work==p.control and r.work==p.candidate
   pure def identicalHistoricalBytesClaimAllowed(p:Plan):bool=
     p.origin=="original-bytes" and p.originalBytesVerified and replayFacts.subseteq(p.verified)
@@ -73,7 +87,20 @@ module mailbox_research_gate {
     introduced:Set(),repaired:Set(),repairsQualified:false,alreadyAttempted:false,newMechanism:true,
     newQuestion:false,explicitReplay:false,purpose:"performance-ab",origin:"paired-rebuild",
     originalBytesVerified:false,scope:"engine"}
+  pure val splitCounterCohortClaimRejected=
+    not(pairedRunAllowed(authority,{...goodPlan,introduced:Set("split-counter-cuts-as-one-cohort")})) and
+    equalSplitSnapshotsDoNotIdentifyTheNativeGcCohort
   pure val goodOutcome=sampleOutcome
+  // Actual authorized one-arm observation, kept separate from the references.
+  pure val singleCandidateObservation={...sampleOutcome,
+    p99Ns:14164000,p999Ns:14729000,peak:14821,peakUncertainty:1,wholeNs:1015021458,
+    key:{runId:"authorized-candidate-single-20261108",artifact:"df1491e-2f0b96f9",route:"op62"}}
+  pure val candidateRecoveryDoesNotEraseObservedPeak=
+    singleCandidateObservation.completed==1000000 and singleCandidateObservation.clean and
+    peakUpper(singleCandidateObservation)==14822 and not(absolutePassed(singleCandidateObservation,limits)) and
+    // Hypothetical improved quantiles, NOT a measured row: keeping the actual
+    // peak must still fail. Catch-up or lower p99 cannot erase the peak.
+    not(absolutePassed({...singleCandidateObservation,p99Ns:300000,p999Ns:400000},limits))
 
   pure val differentFrozenProfilesCannotBeComparedAsOneRun=
     reference6D.work!=reference7F.work and
@@ -97,6 +124,17 @@ module mailbox_research_gate {
   pure val aRebuildCannotClaimOriginalBytes=
     not(identicalHistoricalBytesClaimAllowed(goodPlan)) and
     identicalHistoricalBytesClaimAllowed({...goodPlan,origin:"original-bytes",originalBytesVerified:true})
+  pure val failedControlStopsExecutionButNotSourceResearch={
+    val review={...goodPlan,purpose:"source-cost-review",scope:"research",
+      verified:Set(),alreadyAttempted:true,newMechanism:false,
+      introduced:Set("unpriced-boundary-observation")}
+    sourceReviewAllowed(authority,review) and
+      not(pairedRunAllowed(authority,review)) and
+      not(replayAllowed(authority,review)) and
+      not(diagnosticAllowed(authority,review)) and
+      not(engineGainClaimAllowed(authority,review,goodOutcome,limits,"qualified-gain")) and
+      not(sourceReviewAllowed(authority,{...review,purpose:"performance-ab"}))
+  }
   pure val badControlCannotProveAnEngineGain=
     not(engineGainClaimAllowed(authority,{...goodPlan,verified:requiredFacts.exclude(Set("qualified-control"))},
       goodOutcome,limits,"qualified-gain"))
@@ -117,6 +155,35 @@ module mailbox_research_gate {
     not(pairedRunAllowed(authority,{...goodPlan,alreadyAttempted:true,newMechanism:false,newQuestion:true})) and
     diagnosticAllowed(authority,{...goodPlan,alreadyAttempted:true,newMechanism:false,newQuestion:true,
       purpose:"single-diagnostic",verified:diagnosticFacts})
+  pure val unchangedBoundaryObservationCannotBeRenamedIntoARepair={
+    val failed={...goodPlan,purpose:"single-diagnostic",
+      introduced:Set("unpriced-boundary-observation"),verified:diagnosticFacts,
+      alreadyAttempted:true,newMechanism:false,newQuestion:true}
+    not(diagnosticAllowed(authority,failed)) and
+      not(diagnosticAllowed(authority,{...failed,newMechanism:true,origin:"renamed-image"})) and
+      not(pairedRunAllowed(authority,{...failed,purpose:"performance-ab",verified:requiredFacts}))
+  }
+  pure val gcNotificationsCannotSelfCertifyACollectionTimeline={
+    val p={...goodPlan,purpose:"single-diagnostic",newQuestion:true,
+      verified:diagnosticFacts,introduced:Set("gc-notification-as-collection-timeline")}
+    not(diagnosticAllowed(authority,p)) and
+      not(pairedRunAllowed(authority,{...p,purpose:"performance-ab",verified:requiredFacts})) and
+      sourceReviewAllowed(authority,{...p,purpose:"source-cost-review",scope:"research"})
+  }
+  pure val scheduledHostOnlyCannotQualifyBoundaryObservation={
+    val scheduled={nativeCallSites:0,stackBytes:0}
+    val opening={tlsCallSites:7,clockCallSites:2,stackBytes:80}
+    val closing={tlsCallSites:5,clockCallSites:2,stackBytes:80}
+    val fieldReader={selectableTlsSites:10,stackBytes:64}
+    val omitted={...goodPlan,verified:requiredFacts.exclude(Set("complete-cost-screen")),
+      introduced:Set("unpriced-boundary-observation")}
+    scheduled.nativeCallSites==0 and scheduled.stackBytes==0 and
+      opening.tlsCallSites+closing.tlsCallSites==12 and
+      fieldReader.selectableTlsSites==10 and
+      not(pairedRunAllowed(authority,omitted)) and
+      not(diagnosticAllowed(authority,{...omitted,purpose:"single-diagnostic",
+        newQuestion:true,verified:diagnosticFacts}))
+  }
   pure val explicitReplayIsNotAnEngineGain=
     replayAllowed(authority,{...goodPlan,purpose:"baseline-replay",explicitReplay:true,verified:replayFacts}) and
     not(engineGainClaimAllowed(authority,{...goodPlan,purpose:"baseline-replay",explicitReplay:true},
@@ -211,7 +278,7 @@ module mailbox_research_gate {
       not(pairedRunAllowed(third,{...goodPlan,introduced:Set("new-failure-b")})) and
       third.six==authority.six and third.seven==authority.seven and not(third.runtimeCandidate)
   }
-  pure val allCounterexamples=and {successiveRollbacksCannotLoseEarlierNewFailures,
+  pure val allCounterexamples=and {gcNotificationsCannotSelfCertifyACollectionTimeline,failedControlStopsExecutionButNotSourceResearch,successiveRollbacksCannotLoseEarlierNewFailures,
     measurementChecks,resource::resourceChecks,candidateCannotSupplyItsOwnEvidenceIdentity,
     aSmallValidComponentCannotAuthenticateTheMainPopulation,callerCannotRelaxApprovedAdmission,
     forgettingHistoryOrRatchetingReferencesInvalidatesAuthority,negativeOrUncertainPeakCannotPassEngineAdmission,
@@ -230,18 +297,89 @@ module mailbox_research_gate {
 }
 module mailbox_research_gate_tests {
   import mailbox_research_gate.*
+  run MeasuredTailOver20MsIsAStopNotANewBaselineTest=assert(
+    measuredRouteDisposition(33520000,33609000)=="archive-counterexample" and
+    measuredRouteDisposition(20000001,20000001)=="archive-counterexample" and
+    measuredRouteDisposition(20000000,20000000)=="needs-existing-admission" and
+    measuredRouteDisposition(16000000,16000000)=="needs-existing-admission" and
+    measuredRouteDisposition(0,0)=="hold-insufficient-evidence")
+  run RenamingTheOver20MsRouteCannotAvoidLearnedFailureTest=assert(
+    not(pairedRunAllowed(authority,{...goodPlan,introduced:Set("continue-measured-tail-over-20ms")})) and
+    not(pairedRunAllowed(authority,{...goodPlan,origin:"renamed-cold-observer",
+      introduced:Set("continue-measured-tail-over-20ms"),
+      repaired:Set("continue-measured-tail-over-20ms"),repairsQualified:true})))
+  // Retained f1e24 CLI executes warmup/main under a flag that a3c9 source
+  // treats as an early contract return. A matching Git hash is not full binding.
+  run StoredReaderSourceCannotCertifyContradictoryFrozenBehaviorTest=assert(
+    not(pairedRunAllowed(authority,{...goodPlan,
+      origin:"stored-reader-source-with-cli-mismatch",
+      introduced:Set("partial-source-or-provider-cohort")})) and
+    sourceReviewAllowed(authority,{...goodPlan,purpose:"source-cost-review",scope:"research",
+      introduced:Set("partial-source-or-provider-cohort")}))
+  run unpricedBoundaryObservationCannotRestartTest=assert(unchangedBoundaryObservationCannotBeRenamedIntoARepair)
+  run gcNotificationIsNotACollectionTimelineTest=assert(gcNotificationsCannotSelfCertifyACollectionTimeline)
+  run foreignHostClosureCostRequiredTest=assert(scheduledHostOnlyCannotQualifyBoundaryObservation)
   run differentFrozenProfilesTest=assert(differentFrozenProfilesCannotBeComparedAsOneRun)
   run partialReferencesTest=assert(historicalReferencesRemainPartial)
   run workloadUnitsTest=assert(unitsAndArrivalModesMustMatch)
   run everyProofRequiredTest=assert(verifiedLabelsCannotCoverAnOmittedProof)
   run providerProvenanceTest=assert(matchingActorCannotAuthenticateTheProvider)
   run rebuiltBytesTest=assert(aRebuildCannotClaimOriginalBytes)
+  run LowerLiveMetricCannotAdmitTheColdCollectionPairTest={
+    // Authorized one-shot pair: same image/new reader; both fail original
+    // relative admission. These are observations, not a causal effect estimate.
+    val ordinary={p99:27439000,p999:27680000,peak:27705,mainCollections:39,liveMetric:81298440}
+    val collected={p99:47731000,p999:47930000,peak:47962,mainCollections:39,liveMetric:1297736}
+    assert(collected.liveMetric<ordinary.liveMetric and
+      collected.mainCollections==ordinary.mainCollections and
+      collected.p99>ordinary.p99 and collected.p999>ordinary.p999 and
+      collected.peak>ordinary.peak and
+      not(pairedRunAllowed(authority,{...goodPlan,introduced:Set("lower-live-metric-as-tail-proof")})))
+  }
+  run EqualPartialStartupFingerprintsDoNotProveAllocatorEquivalenceTest={
+    val first={recordedRuntimeEnvironment:1,allocatorSetting:0}
+    val second={recordedRuntimeEnvironment:1,allocatorSetting:1}
+    // Alternative possible histories, not claimed historical values.
+    assert(first.recordedRuntimeEnvironment==second.recordedRuntimeEnvironment and
+      first.allocatorSetting!=second.allocatorSetting and
+      not(pairedRunAllowed(authority,{...goodPlan,
+        introduced:Set("partial-startup-fingerprint-as-equivalence")})))
+  }
+  run SplitCounterCutsCannotBeCertifiedByTheDiagnosticsNameTest=assert(splitCounterCohortClaimRejected)
+  run CompleteSingleCandidateRecoveryDoesNotEraseObservedPeakTest=assert(candidateRecoveryDoesNotEraseObservedPeak)
+  run ExplicitSingleCandidateDiagnosticCannotBypassQualifiedControlTest={
+    val p={...goodPlan,purpose:"single-candidate-diagnostic",scope:"unqualified-diagnostic",
+      verified:requiredFacts.exclude(Set("qualified-control")).union(Set("explicit-single-candidate-authorization"))}
+    assert(engineGainClaimAllowed(authority,goodPlan,goodOutcome,limits,"qualified-gain") and
+      not(pairedRunAllowed(authority,p)) and not(diagnosticAllowed(authority,p)) and
+      not(engineGainClaimAllowed(authority,p,goodOutcome,limits,"qualified-gain")))
+  }
+  run AuthorizedColdCollectionCannotRequalifyOriginalStartupTest={
+    // Explicit permission for a separate intervention does not authenticate
+    // the original startup or lift the failed-control candidate gate.
+    val altered={...goodPlan,purpose:"single-diagnostic",newQuestion:true,
+      verified:diagnosticFacts.exclude(Set("same-startup")).union(Set("authorized-cold-preparation-pair")),
+      scope:"preparation-diagnostic"}
+    assert(not(diagnosticAllowed(authority,altered)) and
+      not(replayAllowed(authority,{...altered,purpose:"baseline-replay",explicitReplay:true})) and
+      not(pairedRunAllowed(authority,{...altered,purpose:"performance-ab"})) and
+      not(engineGainClaimAllowed(authority,altered,goodOutcome,limits,"qualified-gain")))
+  }
+  run failedControlDoesNotBlockSourceResearchTest=assert(failedControlStopsExecutionButNotSourceResearch)
   run anomalousControlTest=assert(badControlCannotProveAnEngineGain)
   run zeroRejectionIsInsufficientTest=assert(correctnessAndZeroRejectionDoNotWaiveTails)
   run harnessIsNotEngineTest=assert(localAndHarnessSavingsAreNotEngineAdmission)
   run knownFailedMechanismsTest=assert(knownMechanismsRequireAnActualQualifiedRepair)
   run unchangedRepeatTest=assert(unchangedFailedAttemptCannotBeRepeatedByRenaming)
   run explicitReplayTest=assert(explicitReplayIsNotAnEngineGain)
+  run FailedFrozenReplayNeedsVerifiedChangedPremiseTest={
+    val failed={...goodPlan,purpose:"baseline-replay",explicitReplay:true,
+      alreadyAttempted:true,newMechanism:false,verified:replayFacts}
+    assert(not(replayAllowed(authority,failed)) and
+      not(replayAllowed(authority,{...failed,newMechanism:true,newQuestion:true})) and
+      replayAllowed(authority,{...failed,
+        verified:replayFacts.union(Set("changed-execution-premise"))}))
+  }
   run preserveReferencesOnRollbackTest=assert(rollbackPreservesBothReferencesAndCounterexamples)
   run normalVariationTest=assert(smallUnconfirmedVariationIsNotAutomaticWithdrawal)
   run censoredSamplesTest=assert(missingOrCensoredSamplesCannotBecomeAFullP99)
@@ -249,6 +387,14 @@ module mailbox_research_gate_tests {
   run diagnosticProofTest=assert(aNewQuestionStillRequiresSameRequestAndUnhitProof)
   run learnedFailureFeedbackTest=assert(learnedNewFailuresFeedTheNextAdmission)
   run original351BacklogTest=assert(aGoodP99CannotHideTheOriginal351Backlog)
+  run ColdSnapshotReachabilityCannotOverrideZeroObservedCollectionsTest={
+    // Actual authorized cold diagnostic: warmup [4,4,6,6], main [6,6,45,45].
+    // Counts cover the raw export, not only the Scheme source's inner interval.
+    val mainCuts=List(6,6,45,45)
+    assert(mainCuts.nth(1)-mainCuts.nth(0)==0 and
+      mainCuts.nth(2)-mainCuts.nth(1)==39 and mainCuts.nth(3)-mainCuts.nth(2)==0 and
+      not(causeClaimAllowed(Set("same-gap","conditional-path-present"))))
+  }
   run causalAttributionTest=assert(correlationAndConditionalReachabilityCannotEstablishTheCause)
   run offeredCapacityTest=assert(offeredRateCannotBeReportedAsDeliveredCapacity)
   run boundOutcomeIdentityTest=assert(candidateCannotSupplyItsOwnEvidenceIdentity)

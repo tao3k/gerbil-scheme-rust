@@ -1,5 +1,9 @@
 # Native Gerbil ready-edge handoff
 
+This is a historical experiment. The 3477a02 Mailbox implementation retires
+qualification operations 59–61 and their benchmark flags. The protocol and
+commands below describe the earlier implementation.
+
 This experiment changes the native Gerbil Actor API path, not Rust dispatch or
 the message workload. It targets recovery headroom after an owner loses CPU:
 the existing path allocates and sends a result notification for every message,

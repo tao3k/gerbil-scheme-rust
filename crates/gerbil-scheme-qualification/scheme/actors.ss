@@ -29,7 +29,6 @@ package: gerbil-scheme-rust/qualification
 (include "result-construction-contract.ss")
 (include "instance-mailbox-observation.ss")
 (include "instance-owner-watch.ss")
-(include "instance-ready-edge.ss")
 (include "instance-source-plan.ss")
 (include "instance-owner-scope.ss")
 (include "instance-mailbox-backpressure.ss")

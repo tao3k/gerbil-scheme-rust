@@ -96,7 +96,9 @@
 ;; Qualification-only: the existing Gerbil service, with no per-message Rust entry.
 ;; Header [50, rate, seconds, progress-address]. The caller owns the aligned
 ;; atomic progress word throughout this synchronous call, including unwinding.
-(def (actor-arrival-input id)
+(defrules define-actor-arrival-input ()
+ ((_ name package-order)
+  (def (name id)
   (let (data (make-s64vector 14 0))
     (s64vector-set! data 0 id)
     (let loop ((line 0))
@@ -111,7 +113,13 @@
           (let ((position (+ offset 2)) (cents (modulo (+ (* id 17) (* line 31)) 10000)))
             (let () (declare (not safe)) (s64vector-set! data position cents))))
         (loop (1+ line))))
-    (vector (s64vector 77 1) data)))
+    (package-order data)))))
+(defrules wrap-actor-arrival-order ()
+ ((_ data) (vector (s64vector 77 1) data)))
+(defrules keep-actor-arrival-order ()
+ ((_ data) data))
+(define-actor-arrival-input actor-arrival-input wrap-actor-arrival-order)
+(define-actor-arrival-input actor-arrival-order-data keep-actor-arrival-order)
 (def (actor-arrival-verify! id value)
   ;; Independent result oracle; do not call the implementation under test again.
   (unless (and (s64vector? value) (= (s64vector-length value) 21)

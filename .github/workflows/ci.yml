@@ -106,12 +106,14 @@ jobs:
           gxi -e '(import (only-in :gerbil/tools/gxtest main)) (exit (main "-g" "-v" "5" "t/link-options-test.ss"))'
           gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
           gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"
-      - name: Arrow C Data native round trip
+      - name: Arrow C Data ownership and round trip
         run: |
           cargo test -p gerbil-scheme --features arrow --lib --locked runtime::arrow::
-          cargo clippy -p gerbil-scheme --features arrow --lib --locked -- -D warnings
+          # Keep the test dependency features active across test and lint.
+          # Default-runtime and external-program checks remain separate.
+          cargo clippy -p gerbil-scheme --features arrow --lib --tests --locked -- -D warnings
           cargo test -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked
-          cargo clippy -p gerbil-scheme-qualification --features arrow-aot --test linked_arrow --locked -- -D warnings
+          cargo clippy -p gerbil-scheme-qualification --features arrow-aot --lib --tests --locked -- -D warnings
 
   # Cargo and Bazel own independent build graphs. Keep both complete gates,
   # without spending Bazel's watchdog budget on Cargo compilation first.

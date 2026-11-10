@@ -93,3 +93,28 @@ observes return to the exact baseline within the existing five-second operation
 gate. A persistent extra task still fails; actual host worker count, repeated
 owner creation and the final exact-count assertion remain. No runtime shutdown
 deadline or CI watchdog is extended. The original Ubuntu failure is retained.
+
+* Arrow check preparation
+
+The Darwin compiler-control job at =45b74a5= exceeded its unchanged 30-minute
+limit. Arrow's three library tests passed, library Clippy passed, and the
+linked-program ownership test passed. The final Clippy compilation was
+interrupted. The job annotation confirms a time-budget failure, not a failed
+Arrow ownership assertion. The full failed transcript remains local evidence.
+
+The Arrow lint commands now include library and test targets. This retains
+test dependency features across test and lint while checking additional test
+code. Default-runtime and external-program builds stay separate: combining
+them into one feature-unified Cargo invocation would lose the original
+default ABI configuration. Both original test commands and all original lint
+surfaces remain; no extra shards, profile changes or timeout increases are
+used.
+
+The expanded four-command sequence passed locally, including the three
+library tests and one linked ownership test. Cargo-native timings recorded
+5m45s for the default test build, 38.58s for expanded default Clippy, 3m23s for
+the linked test build and 1m57s for expanded linked Clippy. The target directory
+was partially warm and fingerprint logs include an isolated =GERBIL_PATH=
+change. These are preparation observations, not a matched cold comparison
+with CI and not proof that its 30-minute gate is repaired. Inspect the next
+exact-head CI result before claiming acceptance.

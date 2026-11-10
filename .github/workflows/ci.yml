@@ -106,6 +106,29 @@ jobs:
           gxi -e '(import (only-in :gerbil/tools/gxtest main)) (exit (main "-g" "-v" "5" "t/link-options-test.ss"))'
           gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
           gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"
+
+  # Arrow has its own Cargo feature and link graph. Give those checks a
+  # separate job from the compiler and Scheme metadata controls.
+  arrow-c-data:
+    name: Arrow C Data ownership and round trip (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      GERBIL_RELEASE_ROOT: ${{ github.workspace }}/.ci/gerbil-v0.19
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Set up immutable Gerbil release
+        uses: ./.github/actions/setup-gerbil
+        with:
+          release-root: ${{ env.GERBIL_RELEASE_ROOT }}
       - name: Arrow C Data ownership and round trip
         run: |
           cargo test -p gerbil-scheme --features arrow --lib --locked runtime::arrow::

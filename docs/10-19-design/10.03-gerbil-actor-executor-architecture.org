@@ -33,6 +33,13 @@ the caller-error assertion. The corrected source completes naturally without
 an unhandled exception report. This changes failure ownership only; it does
 not replace the resident-service or performance acceptance obligations above.
 
+The Darwin compiler job at =9debb38= passed the compiler unit tests, the
+Scheme metadata controls and both Arrow execution tests. It reached its
+30-minute limit during the external-program Arrow Clippy check. Arrow
+now owns its test and lint job on Ubuntu and Darwin. The compiler and
+metadata job retains its existing entry points. Both jobs have a
+30-minute limit and install the same pinned toolchains.
+
 * Source facts and three alternatives
 
 | Alternative | Execution authority | Publication boundary | Principal risk |

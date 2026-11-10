@@ -97,6 +97,12 @@ jobs:
           export GERBIL_LOADPATH="$GERBIL_PATH/lib"
           gxi build.ss compile
           gxi scheme/runtime-test.ss
+          gxi :gerbil-scheme-rust/scheme/build test "$PWD" t/actor-batch-test.ss 2>&1 | tee "$RUNNER_TEMP/actor-batch-test.log"
+          rg --quiet '^CASE-OK ' "$RUNNER_TEMP/actor-batch-test.log"
+          if rg --quiet 'ERROR|FAILED|FAILURE|FAIL:|Unhandled' "$RUNNER_TEMP/actor-batch-test.log"; then
+            echo 'Actor coordinator failure escaped its caller' >&2
+            exit 1
+          fi
           gxi -e '(import (only-in :gerbil/tools/gxtest main)) (exit (main "-g" "-v" "5" "t/link-options-test.ss"))'
           gxi -:debug=q t/program-metadata-test.ss "$RUNNER_TEMP/metadata-qualification"
           gxi -:debug=q t/program-metadata-link-test.ss "$RUNNER_TEMP/metadata-link-qualification"

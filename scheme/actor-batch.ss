@@ -121,7 +121,17 @@
       ;; entry thread may already have unrelated mailbox traffic.
       (lambda ()
         (call-with-gerbil-rs-service-suspension
-          (lambda () (thread-join! (spawn (lambda () (actor-batch-execute! service input quantum)))))
+          (lambda ()
+            ;; Join a completed outcome, then raise on the caller. An exception
+            ;; escaping the coordinator also reaches Gambit's orphan reporter,
+            ;; even when the caller handles the thread-join! exception.
+            (let (outcome
+                   (thread-join!
+                    (spawn
+                     (lambda ()
+                       (with-catch (lambda (failure) (cons #f failure))
+                         (lambda () (cons #t (actor-batch-execute! service input quantum))))))))
+              (if (car outcome) (cdr outcome) (raise (cdr outcome)))))
           'barrier))
       (lambda () (set! (actor-batch-busy service) #f)))))
 (def (gerbil-rs-actor-batch-close! service)

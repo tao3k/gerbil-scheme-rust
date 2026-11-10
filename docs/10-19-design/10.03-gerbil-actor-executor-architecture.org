@@ -17,6 +17,22 @@ their progress and resource contracts. Defaults are unchanged. No new A/B is
 required for this review. The existing native watchdog failure remains open;
 no rejected runtime candidate is approved for PR #18.
 
+* Synchronous coordinator failure ownership
+
+A finite Actor batch drains every assigned item and joins its coordinator
+before returning. The coordinator returns a tagged success or failure;
+the calling Scheme thread raises a failed outcome after the join. Letting
+the coordinator terminate with an exception also reaches Gambit's orphan
+exception reporter even when the caller catches the thread-join exception.
+That reports a handled batch failure again during process shutdown.
+
+=t/actor-batch-test.ss= checks the caller-visible Error, complete item drain,
+ordered reuse after each failed turn, preservation of the caller's mailbox,
+and explicit close at quanta 0, 1 and 256. The unmodified coordinator fails
+the caller-error assertion. The corrected source completes naturally without
+an unhandled exception report. This changes failure ownership only; it does
+not replace the resident-service or performance acceptance obligations above.
+
 * Source facts and three alternatives
 
 | Alternative | Execution authority | Publication boundary | Principal risk |

@@ -98,8 +98,8 @@ jobs:
           gxi build.ss compile
           gxi scheme/runtime-test.ss
           gxi :gerbil-scheme-rust/scheme/build test "$PWD" t/actor-batch-test.ss 2>&1 | tee "$RUNNER_TEMP/actor-batch-test.log"
-          rg --quiet '^CASE-OK ' "$RUNNER_TEMP/actor-batch-test.log"
-          if rg --quiet 'ERROR|FAILED|FAILURE|FAIL:|Unhandled' "$RUNNER_TEMP/actor-batch-test.log"; then
+          grep -q '^CASE-OK ' "$RUNNER_TEMP/actor-batch-test.log"
+          if grep -Eq 'ERROR|FAILED|FAILURE|FAIL:|Unhandled' "$RUNNER_TEMP/actor-batch-test.log"; then
             echo 'Actor coordinator failure escaped its caller' >&2
             exit 1
           fi

@@ -1,0 +1,112 @@
+#+title: bfe803f complete consumer caller screen
+#+date: 2026-11-11
+
+* Scope and custody
+Runtime remains bfe803f597a15a3654b70a64c3a039980c31da8a. This is isolated
+static research, not a source integration, candidate VM or performance trial.
+The actual Cargo-produced actors AOT was read using Scheme's native reader.
+Baseline write/read datums compare equal. GSC output equals the actual baseline
+C at every line except its output-filename comment. No generated C was patched.
+The transformation replaces exactly one adjacent histogram/progress sequence
+in orders-mailbox-backpressure-scheduled; all other service paths remain intact.
+The full AOT, generated C, object and assembly are retained under the relative
+CI evidence directory and hash-bound in the JSON companion.
+
+* A real retained cost, not only a removed source wrapper
+The successful ordinary original path contains two C foreign entries and two
+Scheme primitive transfers: u64vector-ref and u64vector-set!. The matched C
+shows JUMPPRM at return labels 154 and 156, and the two original foreign
+transfers around labels 149 and 157. The private histogram is not inline here.
+The isolated replacement at label 146 calls the new foreign entry once and
+returns its success marker directly to Scheme frame clearing at label 406.
+Both fresh clock reads and both provider loads remain. The original Scheme
+identity/failure checks, clear, active/completed updates and immediate refill
+are outside the C transaction and unchanged.
+
+Installed lib/_std#.scm 554-583 is byte-identical to its pinned Gambit counterpart
+(blob cf8cbfb5709fd2b9afbc86b8e70f75eb7a9b14aa). It defines checked vector
+access/mutation, including index, mutable-vector and element constraints.
+The pinned lib/gambit/vector/vector.scm 111-123 instantiates it with exact
+unsigned-64 values. This proves the actual primitive family, not its dynamic
+CPU time or every SDK-built interrupt opportunity. The latter instantiation
+source is absent from this installed SDK subset; its pinned counterpart was read.
+The initially guessed _numvec.scm path does not exist and supplies no evidence.
+
+* Complete-module costs observed with the same GCC policy
+| Static property | Baseline | Isolated replacement |
+| Successful consumer transfers | 4 | 1 |
+| C foreign entries | 2 | 1 |
+| Histogram Scheme primitive transfers | 2 | 0 |
+| Foreign entry C stack | 80 bytes each, sequential | 96 bytes |
+| Scheduled host maximum absolute VM stack read offset | 23 words | 23 words |
+| Scheduled host closure allocation sites | 7 | 7 |
+| Scheduled host poll sites | 29 | 29 |
+| Scheduled host SP-relative assembly instructions | 0 | 0 |
+| Scheduled host instructions, all branches | 5673 | 6127 |
+| Scheduled host VM stack write sites, all branches | 327 | 375 |
+| Entire object text bytes | 661422 | 664258 |
+| Entire object data bytes | 402984 | 404816 |
+
+All-branch counts are static inventories, not executed per-request counts.
+Zero C-SP references does not erase the Scheme VM stack. The inline foreign
+procedure introduces no closure allocation on its successful local call site;
+this does not remove the seven existing closure sites elsewhere in the host.
+Two sequential 80-byte C frames never establish a 160-byte peak. The candidate
+has a higher 96-byte single-entry peak. Added fallback branches grow text by
+2836 bytes and data by 1832 bytes. No numeric CPU/p99 saving follows from these
+counts. Normal existing U64 clock results can already be fixnums: fewer return
+conversion calls do not imply fewer normal-path heap allocations.
+
+The compiler also adds global actors#47 in its own generated namespace.
+An old linker inventory cannot certify this object. Any later isolated complete
+image needs regeneration of all corresponding compiler/linker metadata; no
+manual hash or manifest patch is an acceptable substitute.
+
+* Necessary caller and lifecycle conditions
+The frame must already have passed identity and worker-exception propagation.
+Its planned field is stable under source custody. The histogram is the private
+mutable make-u64vector allocation. Progress is a positive S64 value validated
+at original entry. Existing native providers must not reenter Scheme while C
+borrows a histogram pointer. All raw pointer accesses end before the second
+provider call, return conversion or allocation. C retains no Scheme pointer.
+Moving a field read and progress conversion before the first clock is not
+unconditionally equivalent for arbitrary malformed arguments; these original
+caller facts are required. They must not be replaced by new per-message guards.
+The entire generic suffix remains available with the original sampled clock;
+VOID decline is allowed only before effects. Foreign-result roots/pins and
+original exception identity must survive any fallback. C never returns credit.
+
+* Open boundary: what the model and generated code do not prove
+The local host retains 29 poll sites, but its removed primitive calls may carry
+additional callee stack, allocation or interrupt opportunities. Equal caller
+poll counts do not prove identical full-call-chain safepoints or fairness.
+The new larger native span must have a justified bounded cost before it can
+be admitted. Existing five-second deadlines and the 128 debt constraint remain.
+Neither C compiler instruction counts nor passing protocol tests settle those
+bounds. Fallback frequency and code/cache cost also remain unknown. This is
+not yet a complete-cycle net CPU proof and is not an admitted runtime patch.
+
+* Validation, retained setup errors and resource receipt
+Existing Justfile model entry passed suites 321 / 11 / 25 / 10 / 39. Imports
+overlap; do not sum as unique tests. Four new checks require original caller
+facts, updated link inventory, costs beyond the fast branch, and accounting
+for removed callee opportunities. A concrete abstract counterexample lowers
+CPU from 13 to 11 ticks while increasing the longest unschedulable span from
+5 to 11 ticks. These ticks are not SDK measurements. No performance
+or unbounded fairness proof is implied.
+The isolated source-transform setup initially selected nonexistent bin/gsi,
+then the internal ##load with wrong arity, then exposed an unmatched script
+parenthesis using public load and original exception reporting. Raw receipts
+are retained. These were pre-compiler script failures, not Actor watchdogs.
+The final transform verified datum fidelity and one changed consumer sequence.
+
+GSC emission and GCC object compilation completed with original optimization
+and SeparateProcedures macros. Tree-sampled peaks were 475136000 / 491503616
+bytes for C emission and 893681664 / 918732800 bytes for the two object builds.
+The approved 8 GiB limit and 7 GiB cancellation margin were unchanged; samples
+are not a kernel-enforced hard maximum. All tracked processes exited naturally.
+No image was linked or launched and no runtime source was modified. The latest
+business receipt is still the previous rebuilt baseline, not a new result:
+985354.11 successful messages/s, p99 11.437 ms, p99.9 14.873 ms, zero rejection,
+errors and accepted timeouts, sampled debt peak 12924. The 128 guard failed;
+no candidate business run follows that failed control in this revision.

@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "source_reference": "bfe803f597a15a3654b70a64c3a039980c31da8a",
+  "classification": "single rebuilt-baseline qualification; not an A/B or optimization result",
+  "reader": {
+    "path": ".ci/bfe803f-lowering-20261111/cargo-target/debug/deps/gerbil_actor_arrival-d12b870b550be537",
+    "bytes": 1868184,
+    "sha256": "1196a4bfcb7e3d80d6ce01834535abd837ed0511d1bf356879546ba8c462ca7c"
+  },
+  "image": {
+    "path": ".ci/bfe803f-lowering-20261111/cargo-target/debug/build/gerbil-scheme-qualification-b11cda4ca8933978/out/owner_instance.dylib",
+    "bytes": 21774248,
+    "sha256": "252c6d67430ab2d9d43fba216f508e30324881ae7af4d1125eb4aaf9f51bbf73"
+  },
+  "argv": [
+    "--capacity-research",
+    "--backpressure-owned-schedule",
+    "--rate=1000000",
+    "--seconds=1",
+    "--require-native-acceptance"
+  ],
+  "warmup": {
+    "accepted": 1000,
+    "accepted_timeouts": 0,
+    "all_arrival_max_generator_lag_ns": 329667,
+    "completed": 1000,
+    "completed_per_second": 1000.9982034164325,
+    "data_access_edge_contract": true,
+    "defaults_changed": false,
+    "diagnostic_native_observation": false,
+    "diagnostic_no_actor_handoff": false,
+    "diagnostic_owner_watch": false,
+    "elapsed_ns": 999002792,
+    "event": "gerbil_actor_arrival",
+    "failed": 0,
+    "latency_bucket_upper_bound_ns": 1000,
+    "mailbox": true,
+    "native_active": 3,
+    "native_coalesced_wake": false,
+    "native_data_access": true,
+    "native_source_park": false,
+    "offered_elapsed_ns": 999000000,
+    "owned_source_schedule": true,
+    "owners": 1,
+    "performance_admission": {
+      "failures": [
+        "fixed_load_not_covered",
+        "all_planned_messages_not_completed"
+      ],
+      "passed": false,
+      "scope": "capacity_1m_three_second_goal"
+    },
+    "planned": 1000,
+    "rate": 1000,
+    "ready_drain_pipeline": false,
+    "rejected": 0,
+    "rejection_percent": 0.0,
+    "remaining_native": 0,
+    "remaining_staged": 0,
+    "rust_per_message_entries": 0,
+    "scheme_workers": 4,
+    "scoped_user_initiated_qos": false,
+    "seconds": 1,
+    "snapshot_gc_duplicate_and_unread_close_contract": false,
+    "source_backpressure": {
+      "drain_after_schedule_ns": 2792,
+      "last_publication_elapsed_ns": 999000334,
+      "maximum_due_unconsumed_messages": 1,
+      "maximum_pending_source_messages": 1,
+      "original_window_guard_passed": true,
+      "samples_over_original_window": 0
+    },
+    "successful_planned_to_consumed_p999_ns": 309000,
+    "successful_planned_to_consumed_p99_ns": 20000,
+    "warmup": true,
+    "watchdog_seconds": 5,
+    "whole_native_call_ns": 1014911292,
+    "window": 128
+  },
+  "main": {
+    "accepted": 1000000,
+    "accepted_timeouts": 0,
+    "all_arrival_max_generator_lag_ns": 15053541,
+    "completed": 1000000,
+    "completed_per_second": 985354.1074396796,
+    "data_access_edge_contract": true,
+    "defaults_changed": false,
+    "diagnostic_native_observation": false,
+    "diagnostic_no_actor_handoff": false,
+    "diagnostic_owner_watch": false,
+    "elapsed_ns": 1014863583,
+    "event": "gerbil_actor_arrival",
+    "failed": 0,
+    "latency_bucket_upper_bound_ns": 1000,
+    "mailbox": true,
+    "native_active": 3,
+    "native_coalesced_wake": false,
+    "native_data_access": true,
+    "native_source_park": false,
+    "offered_elapsed_ns": 999999000,
+    "owned_source_schedule": true,
+    "owners": 1,
+    "performance_admission": {
+      "failures": [
+        "historical_p99_exceeded_or_missing",
+        "original_outstanding_window_exceeded_or_missing"
+      ],
+      "passed": false,
+      "scope": "capacity_1m_three_second_goal"
+    },
+    "planned": 1000000,
+    "rate": 1000000,
+    "ready_drain_pipeline": false,
+    "rejected": 0,
+    "rejection_percent": 0.0,
+    "remaining_native": 0,
+    "remaining_staged": 0,
+    "rust_per_message_entries": 0,
+    "scheme_workers": 4,
+    "scoped_user_initiated_qos": false,
+    "seconds": 1,
+    "snapshot_gc_duplicate_and_unread_close_contract": false,
+    "source_backpressure": {
+      "drain_after_schedule_ns": 14864583,
+      "last_publication_elapsed_ns": 1014862000,
+      "maximum_due_unconsumed_messages": 12924,
+      "maximum_pending_source_messages": 12922,
+      "original_window_guard_passed": false,
+      "samples_over_original_window": 149937
+    },
+    "successful_planned_to_consumed_p999_ns": 14873000,
+    "successful_planned_to_consumed_p99_ns": 11437000,
+    "warmup": false,
+    "watchdog_seconds": 5,
+    "whole_native_call_ns": 1027911834,
+    "window": 128
+  },
+  "cpu_gc_envelope": {
+    "gc_count_enclosing": 39.0,
+    "gc_cpu_enclosing_ns": 17382000.00000057,
+    "gc_wall_enclosing_ns": 17496109.008789062,
+    "owner_cpu_upper_ns": 997164250.0,
+    "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+  },
+  "process": {
+    "exit": 101,
+    "wall_seconds": 5.872359915985726,
+    "rss_sample_peak_bytes": 201998336,
+    "termination": "post-cleanup performance assertion; not native watchdog"
+  },
+  "raw_stdout_sha256": "fa3644664aaca5ded4b5d9cc9c50caa41ad91a26866dbea1e0fd80149c5f3d6f",
+  "raw_stderr_sha256": "80502ce8306e65d62980ec28f91fde6d8fdca1aab39fe77efbf267114d04bbcf",
+  "candidate_run": false,
+  "runtime_changed": false,
+  "historical_reference": {
+    "p99_ns": 10083000,
+    "p999_ns": 11019000,
+    "successful_per_second": 995241.2945549785,
+    "sampled_peak_due_unconsumed": 11110
+  },
+  "backlog_quantiles": "not collected by original path",
+  "next_performance_action": "none; current strict qualification failed"
+}

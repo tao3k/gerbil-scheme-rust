@@ -1,0 +1,150 @@
+#+title: bfe803f rebuilt baseline single qualification
+#+date: 2026-11-11
+
+* Identity and decision
+Source is bfe803f597a15a3654b70a64c3a039980c31da8a, with no runtime/build source
+changes. Reader 1196a4bfcb7e3d80d6ce01834535abd837ed0511d1bf356879546ba8c462ca7c
+and image 252c6d67430ab2d9d43fba216f508e30324881ae7af4d1125eb4aaf9f51bbf73
+were verified before and after the one qualification. They are newly built
+baseline artifacts, not historical original bytes. The original Cargo paths
+were used; custody copies were not launched. Exact arguments and raw output
+hashes are retained in mailbox-bfe803f-qualification.json.
+
+One fresh process ran the original 1000/s, one-second warmup, followed by one
+million/s for one second. No extra observation, clock anchor, forced collection,
+QoS change or alternative message path was enabled. Three frames and four
+workers remain unchanged in one owner/VM. No candidate was run.
+
+* Complete successful main and separate warmup
+| Metric | Historical bfe803f port observation | This rebuilt baseline |
+| Planned / completed | 1000000 / 1000000 | 1000000 / 1000000 |
+| Successful messages per second | 995241.29 | 985354.11 |
+| Planned-to-verified-consumed p99 ms | 10.083 | 11.437 |
+| Planned-to-verified-consumed p99.9 ms | 11.019 | 14.873 |
+| Rejected / errors / accepted timeouts | 0 / 0 / 0 | 0 / 0 / 0 |
+| Sampled peak due-unconsumed | 11110 | 12924 |
+| Sampled peak due-unpublished | 11108 | 12922 |
+| Source interval seconds | Not repeated here | 1.014863583 |
+| Last publication elapsed seconds | Not repeated here | 1.014862000 |
+| Whole native call plus report seconds | Not repeated here | 1.027911834 |
+| Maximum publication lag ms | Not repeated here | 15.053541 |
+| Samples exceeding 128 | Not repeated here | 149937 |
+| Backlog p99 / p99.9 | Not collected | Not collected |
+| Clean shutdown | Retained historical record | True |
+
+Successful throughput is completed divided by source elapsed time, including
+drain. It is not first-second completions or independent saturation capacity.
+Latency uses the unchanged 1-microsecond upper histogram buckets and original
+planned-to-consumed interval. Peak fields are sampled; unknown inter-sample
+uncertainty cannot turn them into an exact maximum or a qualified upper bound.
+
+Warmup separately completed 1000 messages at 1000.9982/s, p99 0.020 ms,
+p99.9 0.309 ms and sampled peak 1. It is not a million-profile result.
+
+* CPU / GC envelope and limits of inference
+| Main call enclosing observation | Value |
+| Owner CPU upper envelope ms | 997.164250 |
+| GC wall envelope ms | 17.496109 |
+| GC CPU envelope ms | 17.382000 |
+| GC count | 39 |
+
+These existing snapshots enclose startup and terminal capture as well as the
+native call. They are not phase-exclusive construction, execution or consumption
+costs. The whole CPU value divided by one million is not a measured handler
+cost. No individual GC pause duration or placement in the arrival window is
+available; the GC sum alone does not explain the peak causally. Reported GC CPU
+and wall values are retained, without inventing per-request GC or OS wait time.
+
+The source/credit invariant gives more precise structural information: published
+but unconsumed work is bounded by three frames. At the sampled total-debt peak,
+at least 12921 messages were therefore still unpublished. Combining that bound
+with the separately observed source maximum 12922 gives 12921..12922 for the
+source debt at that peak; it does NOT imply the two maxima occurred together
+or that exactly two frames were occupied at the same instant.
+
+For a conditional continuous-arrival recovery window beginning with debt 12924,
+returning to 128 in ten milliseconds would require average completion rate at
+least 2279600/s over that window; in one millisecond, 13796000/s. These are budget
+requirements, not observed capacity or promises that a small static saving
+solves the peak. Recovering later also cannot undo an earlier peak breach.
+
+* Preserved failure and next action
+The process exited 101 after all messages and clean shutdown because both the
+original p99 418000 ns guard and the original 128 guard failed. It did not hit
+the five-second request watchdog, and its 5.872-second whole process lifetime
+is not a request latency. Five-second native deadlines remain unchanged.
+No claim is made that this historical-reference difference is caused by code,
+a machine condition, GC or a specific owner wait. It is one rebuilt baseline
+observation, not an A/B or measured optimization/regression of a source change.
+
+Strict admission is false and no candidate performance test follows. Runtime
+source is already at bfe803f, so no runtime patch exists to roll back. The
+qualification, noncoincident-peak bound and conditional recovery budget are wired
+into the existing QNT regression. An initial QNT404 imported-name error was
+corrected with a direct measurement-contract import, not weakened assertions.
+No SDK/default/gate changes, commits or PR merges were made.
+
+* Source-level screen that remains open
+The installed SDK uses not-interrupts-enabled scopes in bounded native Mailbox
+operations, but this is not permission to apply them to a whole business batch.
+Gambit include/gambit.h 8514-8559 shows that POLL tests stack-trip as well as,
+under its configured mode, heartbeat expiry; heap-limit checking is a separate
+operation. Any proposal to consolidate checks must preserve stack safety, heap
+checks, callbacks, continuation reentry and the existing cooperative boundary.
+This source fact is not evidence that polling caused this measured latency.
+No check-removal candidate is selected or executed in this revision.
+
+* Narrow next cost question, not an admitted candidate
+The existing consumption sequence has two Scheme/C entries: obtain a fresh
+latency clock; later publish verified progress using a second fresh clock.
+A source-level question is whether those EXISTING entries can be replaced by
+one bounded native transaction preserving both sample points, histogram update
+before progress publication, failure ordering and Scheme-owned frame release.
+This would be consumer/measurement-path work, not an established improvement to
+the native Mailbox engine. No extra queue, lease or wake layer is justified.
+
+A valid screen must include argument conversion, native pointer/root lifetime,
+all full-width clock fallbacks, request-versus-progress error precedence, module
+linker regeneration and the complete caller/callee machine-code cost. It must
+not move progress before real validation, remove a clock sample, weaken the
+independent oracle, shift timestamps or transfer frame ownership to C. Earlier
+broad consumption-fusion and private-frame replay investigations must be checked
+before any implementation; a new name or smaller source diff is not a repair.
+There is no authorization implied by a passing model and no performance trial
+of this question following the failed control in this revision.
+
+* Model result
+The existing Justfile entry passed typecheck, 321 result-construction checks,
+11 packet checks, 25 joint-cycle checks and 5 cost checks after the receipt
+refinement. Imports overlap; counts are not unique scenario totals. Runtime
+source remains exactly bfe803f. This step supplies new current evidence and
+keeps the full optimization GOAL incomplete.
+
+* Authorized research checkpoint publication
+The user explicitly requested preserving and publishing this 11.437 ms receipt.
+It is retained as a rebuilt baseline observation, not claimed as an improvement
+against the historical 10.083 ms observation, a repeated stability result or a
+pass of the existing performance guards. This publication does not change the
+original guards or authorize merging PR #18. The active optimization GOAL stays
+incomplete. The working runtime source remains exactly the source reference.
+
+The checkpoint commit contains the complete runtime source through its bfe803f
+parent and the curated benchmark, build and mechanism evidence plus QNT/Org
+regressions. No unaccepted Scheme/C bridge prototype is part of runtime source.
+Raw logs, scratch patches, generated compiler files, archives and executable
+bytes are not Git source files. Their retained local identities are recorded;
+this branch does not claim to host a binary artifact download.
+
+* Original native entrypoint and measurement
+The recorded build used the repository Cargo bench entry, the installed SDK and
+GCC optimization with the existing native compilation policy:
+#+begin_src sh
+cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench gerbil_actor_arrival --profile dev --locked --offline --no-run --jobs 1
+#+end_src
+The one build job is custody of this bounded build, not a change to library
+or runtime concurrency defaults. Select the emitted gerbil_actor_arrival reader
+and corresponding owner_instance image from the same Cargo build; compare their
+hashes with the JSON before interpreting this recorded run. The exact run argv
+is in that JSON. Rebuilding does not reproduce the historical bytes by assertion.
+A fresh run must be reported as a fresh observation. No new run is made to
+publish this checkpoint. Backlog p99/p99.9 remain uncollected by this path.

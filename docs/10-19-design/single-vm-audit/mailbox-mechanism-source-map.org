@@ -1,0 +1,214 @@
+#+title: Mailbox mechanism source bindings and optimization obligations
+#+date: 2026-11-11
+
+* Scope and preserved reference
+Runtime reference: bfe803f597a15a3654b70a64c3a039980c31da8a.
+Historical p99 10.083 ms, p99.9 11.019 ms and sampled outstanding peak 11110
+are retained observations, not a current measurement or a pass of the 128 gate.
+This change modifies models and their checks; it does not modify Scheme, Rust,
+C, SDK, compiler options, defaults, deadlines or the application transport.
+The scientific GOAL remains active. No performance candidate is certified.
+
+* Primary sources and custody
+Gerbil source reference is 1cfb032. Its Gambit submodule reference is
+ ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f.
+Local installed Gerbil source digests and upstream Gambit Git blob identities
+are retained in mailbox-mechanism-source-map.json. These bind source counterparts;
+they do not authenticate the bytes linked into an old frozen executable.
+The installed source subset does not include the complete Gambit thread/ring
+implementation; that evidence was read at the pinned upstream commit.
+
+- [[https://github.com/mighty-gerbils/gerbil/tree/1cfb032/src/std/actor][Gerbil standard Actor implementation]].
+- [[https://github.com/mighty-gerbils/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/lib/_thread.scm][Gambit non-SMP thread implementation]].
+- [[https://github.com/mighty-gerbils/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/lib/_thread%23.scm][Gambit thread macros]].
+- [[https://github.com/mighty-gerbils/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/lib/_fifo%23.scm][Gambit FIFO macros]].
+- [[https://github.com/mighty-gerbils/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/examples/ring/ring.scm][Official ring.scm example]].
+- [[https://www-labs.iro.umontreal.ca/~feeley/papers/GermainFeeleyMonnierSW06.pdf][Germain, Feeley and Monnier, Concurrency oriented programming in Termite Scheme (2006)]], sections 6 and 7.
+
+The paper explains Gambit/Termite continuation-based lightweight threads,
+shared-heap execution and scheduler data structures. It is not the Gerbil Actor
+API specification. Its historical object sizes and benchmark timings are not
+current SDK budgets. Termite restrictions must not be imposed on full Gerbil.
+The separate first-class-continuations/C-interoperability paper was not obtained;
+no claim here is attributed to unread text.
+
+* Source to executable-model mapping
+| Source location | Mechanism | Model and check |
+| gerbil/runtime/thread.ss 29-58 | Actor wrapper constructs and starts a Gambit thread; exceptions unwind through thread-main | Existing actor_population lifecycle; cohort configuration is a library policy, not a general spawn restriction |
+| std/actor/interaction.ss 17-29 | LocalActor, Handle and ActorGroup take different send routes | gerbil_actor_transport.localHandleAndBroadcastDoNotShareTheSameTransportTest |
+| std/actor/interaction.ss 169-237 | Selective receive walks the cursor; matching extracts and rewinds; unmatched messages remain | mailbox_selective_tests, payloadEqualityCannotRemoveStandardEnvelopeSemanticsTest |
+| std/actor/message.ss 58-63 | Envelope expiry uses wall seconds and is checked before matching | gerbil_actor_transport expiration tests; not a monotonic bench arrival clock |
+| _thread.scm 7106-7123 | Heap preparation precedes protected enqueue; FIFO link and signal are distinct; payload reference is shared | prepareSend/insert/signal/returnSend; preparation failure and enqueue-before-return tests |
+| _thread.scm 7000-7068 | Already-ready path avoids timeout preparation; empty path converts deadline once, rechecks, then registers | readyReceiveSkipsTimeoutConversionAndPreservesReferenceTest, arrivalBeforeWaitRegistrationUsesProtectedRecheckTest |
+| _thread.scm 7236-7269 | Blocking saves continuation and registers wait; retry retains the converted timeout | interruptedWaitRetainsConvertedDeadlineTest and untimed wait test |
+| _thread.scm 7317-7337; _thread#.scm 3553-3567 | Signal removes wait/timeout and restores eligibility; selection is a separate scheduler obligation | wake edge in canonical Actor model; notificationDoesNotSelectSourceAheadOfCurrentActorTest |
+| _thread.scm 6287-6306, 6355-6397 | Single-runnable yield shortcut; runnable selection precedes device wait | Existing CPU lease model; no fixed two-dispatch-per-request inference |
+| _thread#.scm 2448-2478 | Preallocated scheduler nodes; insertion/deletion do not allocate heap | Do not substitute an additional runtime ready queue for the existing one |
+| _thread#.scm 3689-3693; _fifo#.scm | Mailbox owns mutex/condition/FIFO/cursor; FIFO enqueue allocates a pair | Queue occurrence and payload alias are separate; no zero-allocation claim |
+| Application packet consume | Completion/dequeue does not itself return frame ownership | mailbox_reply_refinement composes canonical packet state; cancellation and dequeue leave credit held until real consume |
+
+All paths above preserve the original Scheme predicates, exceptions and
+multi-shot continuation semantics. Abstract protocol/payload match booleans
+represent normally returned predicate results; they do not replace a matcher.
+Mutex/condition procedure names alone do not prove an OS-level blocking wait.
+
+* Ring and business workloads must remain separate
+The current example accepts a thread population parameter. With its default
+round calculation m=floor(1000000/n), one go token makes n*m hops. This is not
+necessarily one million when n does not divide one million. The timed transfer
+region also includes neighbor delivery, thread starts and final join; it is not
+an isolated steady-state service loop. Thread creation and the outer total time
+have different scopes. The 2006 paper describes another ring measurement.
+
+actor_service_calculus now makes population-dependent setup an explicit abstract
+cost input. Its illustrative equation is not an exhaustive native cost model:
+GC, scheduling and shutdown costs must still be accounted for where applicable.
+Ring hop CPU averages cannot establish offered business capacity, end-to-end
+p99, rejection rate, memory residency or a per-request fairness guarantee.
+
+* Full-cycle optimization decision
+The existing ownership chain remains:
+planned arrival -> construction -> request enqueue -> Actor execution -> reply
+enqueue -> source dequeue -> independent validation -> real frame return ->
+immediate refill. Each intermediate position may carry live work; shifting its
+name or releasing a credit early cannot reduce that work.
+
+Resident Actors, runnable Actors, selected execution, charged frames and
+completed-but-unconsumed results are distinct quantities. More resident Actors
+can expose independent state and suspension opportunities, but do not increase
+the CPU service budget of one owner. A valid scaling proposal must name the
+suspension it overlaps and pay for construction, stack/continuation retention,
+Mailbox traffic, validation, consumption and final lifecycle cleanup.
+
+No extra completion FIFO, sleep registration layer or per-message probe is
+introduced. The next candidate must eliminate an operation actually retained
+in this application cycle and its matched generated code; it must not merely
+move bookkeeping across a yield. No such runtime saving is certified here.
+
+At one million planned messages/s, 128 messages represent 128 microseconds of
+unserved arrivals when there is no compensating service. This is a necessary
+budget sanity check, not a universal pause bound: already outstanding work,
+bursts, service completions and spare recovery throughput must enter the bound.
+A p99 observation alone cannot imply a maximum-backlog guarantee. The existing
+service calculus requires an independently justified service curve and request
+fairness before a delay bound is applicable. Those native timing assumptions
+remain unknown; finite protocol checks cannot manufacture them.
+
+* Model limits, counterexamples and regression wiring
+mailbox_primitive refines one existing single-consumer Mailbox. Message IDs are
+logical occurrence labels; OBJECTS permits aliases to the same payload. The
+model is not a restriction on Scheme payload types or a second scheduler.
+A caller supplies processor selection; mailbox_reply_refinement couples that
+selection to the canonical Actor lease and request-credit state.
+
+Protected queue mutations are atomic model steps. Other interleavings are
+conservative source-level possibilities, not claims that every race is reachable
+in the current single-owner SDK build. Closing the primitive means the library
+has stopped admission after draining; it does not assert that Gambit thread-send
+rejects every dead thread. Actual service termination/join remains a separate
+canonical obligation. Memory units in actor_population are abstract ownership
+budgets, not bytes or RSS. No unbounded liveness or scheduling-time proof is claimed.
+
+Two explicit unsafe mutants retain the protected-recheck and mandatory-signal
+counterexamples. Additional research-gate factors forbid treating wake as CPU,
+dequeue as credit return, raw FIFO as a selective protocol, or ring averages as
+business p99 without repairing their proof obligations. These are mechanism
+counterexamples, not newly observed runtime failures.
+
+An initial integration test incorrectly wrapped a multi-step action together
+with a single other-module stay. Intermediate states then left that module
+undefined. The test was repaired with explicit preservation at every microstep;
+no native protocol or safety invariant was weakened. Earlier pinned-route test
+errors and the Quint trace-recorder failure remain in the prior refinement note.
+
+* Validation receipt
+Existing Justfile mailbox-result-construction-model-check passed typecheck and
+318 result-construction, 11 packet, 25 joint-cycle and 5 cost tests. Imported
+checks overlap: these are suite results, not a sum of unique checks.
+The research-gate suite separately passed 29 checks.
+Both FIFO and selective primitive safety simulations passed 1000 traces of at
+most 50 steps with seed 1 using Quint 0.33.0 TypeScript backend. These are finite
+checks, not unbounded proofs or VM/performance acceptance. Raw FIFO output and
+aggregate suite output are retained in ignored local CI evidence; selective
+simulation result was returned by the tool, not retroactively fabricated as a log.
+No native runtime build or business benchmark was run for this model revision.
+
+* Executable CPU / pause obligations (subsequent refinement)
+The existing actor_service_calculus now includes cpuWorkFits, debtCuts and
+pauseFits. These are projections and necessary budget checks, not another
+Actor lifecycle and not measured native costs. Lifecycle, wake eligibility,
+selection and real per-result credit return remain in the canonical models.
+
+- cpuWorkFits charges source, construction, sends, execution, independent
+  validation, consumption, observation, actual dispatches and extra setup to
+  ONE non-SMP processor. Actor population does not divide those CPU costs.
+  The paper's lightweight threads can expose independent state and overlap
+  suspension; this does not certify zero creation/stack/GC cost or parallel CPU.
+- debtCuts checks same-run prefix conservation and records peak outstanding
+  arrivals minus REAL consumption. An eventually drained run and identical
+  final message counts can have peaks 65 and 129. End-of-run throughput cannot
+  certify the 128 constraint. The projection cannot authenticate counter labels:
+  its consumed input must come from canonical real consumption, never wake,
+  publication, receive or progress-heartbeat counters.
+- pauseFits includes initial debt AND arrival phase. At a one-microsecond
+  period, an empty-debt 128-microsecond no-consumption interval just fits at
+  phase zero; 129 microseconds fails. Starting at debt 127 or another phase
+  leaves less room. These are conditional arithmetic witnesses, not measured
+  pauses, scheduler deadlines or permission to alter the waiting protocol.
+- Lower steady CPU work does not establish a bounded next consumption
+  opportunity. A 129-message peak cannot be undone by a later recovery window.
+  The existing service-curve and per-request fairness obligations still apply.
+
+The cost suite adds five executable checks for these distinctions. Its abstract
+numbers are illustrative witnesses, not fitted phase costs or a proof that a
+specific native wait caused the observed peak. Bounded tests do not prove
+unbounded scheduler fairness, GC pause duration or current performance.
+
+* Concrete optimization boundary and retained ABI counterexample
+The currently examined two-entry consume/progress bridge is still an isolated
+static question, not a Mailbox implementation change. Its isolated same-SDK
+GCC -O2 gateway has an 80-byte generic C entry frame versus a 96-byte fused
+entry frame. The sequential original entries do NOT imply a 160-byte peak.
+The ordinary bound-provider call structure can fall from ten native calls
+across two entries to three in one entry; full op62 caller costs, Scheme frame
+saves, code size, fallback cost and actual VM evidence are not yet established.
+No complete-cycle gain or runtime integration follows from these counts.
+
+The isolated prototype exposed a real C-interop construction error before any
+VM execution: ___return jumps out of generated C glue. An unconditional VOID
+return after side effects would replay the old transaction; returning inside
+the SDK result-conversion bracket would skip release of its foreign pin.
+The prototype now assigns the result, completes the SDK conversion/root/release
+protocol, and returns once. mailbox_consume_abi retains both counterexamples,
+two original clock samples, histogram-before-progress ordering, original errors,
+Scheme-owned frame return, pointer lifetime and the failed-control gate.
+Unsupported inputs decline before effects or carry the already sampled clock
+into the unchanged arithmetic suffix; they must not resample or replay effects.
+Input progress conversion also moves before the first clock in this prototype:
+positive S64 progress must be proved by the caller, or invalid-input exception
+ordering would differ. This remains an explicit integration precondition.
+
+The model is wired into the existing Justfile regression entry. Its passing
+checks only screen semantic mistakes; they do not qualify this prototype for
+runtime testing. Runtime files still equal bfe803f and the last original-load
+receipt remains 985354.11 successful messages/s, p99 11.437 ms, p99.9 14.873 ms,
+zero rejected/errors/timeouts and sampled peak 12924. The 128 gate failed.
+No new business run, SDK/default change, commit or PR merge accompanies this
+refinement. The existing scientific GOAL remains active.
+
+* Latest focused regression receipt
+The existing Justfile entry completed with suite pass counts 321 / 11 / 25 /
+10 / 35, including the consume-ABI screen. Counts overlap through imports and
+must not be summed as unique scenarios. Typechecking and git diff --check
+passed. The JSON companion binds model/entrypoint hashes and the local raw
+receipt. Runtime source equality was checked against bfe803f across crates,
+Scheme, FFI, build-support, headers and Cargo manifests/lockfile.
+
+* Complete consumer caller follow-up
+The full matched caller screen is recorded in
+[[file:mailbox-bfe803f-consume-caller.org][Complete consumer caller evidence]]. Its latest existing-entry regression
+passes 321 / 11 / 25 / 10 / 39 (overlapping imports). The isolated AOT prototype
+reduces four successful consume transfers to one, but increases C peak stack
+and object text/data. Removed callee opportunities remain an open obligation,
+not resolved by equal caller poll counts. No runtime integration or business
+run was performed. The companion JSON now binds this latest model receipt.

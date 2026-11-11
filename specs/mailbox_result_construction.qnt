@@ -3,9 +3,15 @@ module mailbox_result_construction {
   import mailbox_research_gate as researchGate from "./mailbox_research_gate"
   import mailbox_layout_entry as layoutEntry from "./mailbox_layout_entry"
   import mailbox_joint_cycle as j from "./mailbox_joint_cycle"
+  import mailbox_primitive_tests as primitive from "./mailbox_primitive"
+  import mailbox_selective_tests as selective from "./mailbox_primitive"
+  import mailbox_reply_refinement as replyPrimitive from "./mailbox_primitive"
+  import mailbox_untimed_tests as untimedPrimitive from "./mailbox_primitive"
+  import gerbil_actor_transport as standardActor from "./gerbil_actor_transport"
   import actor_service_contract as gate from "./actor_service_contract"
   import actor_service_calculus as budget from "./actor_service_calculus"
   import mailbox_clock_abi as clockAbi from "./mailbox_clock_abi"
+  import mailbox_measurement_contract as measurement from "./mailbox_measurement_contract"
   pure val resultFields=0.to(20)
   pure def fastEligible(fixnumFields:Set[int]):bool=resultFields.subseteq(fixnumFields)
   // Actual native constructor allocates after rank returns and initializes all
@@ -3585,4 +3591,23 @@ module mailbox_result_construction {
     assert(not(gate::migrationSupported(unqualified)) and
       not(gate::migrationSupported({...unqualified,controlQualified:true,actualRunPassed:false})))
   }
+
+  // One rebuilt bfe803f baseline qualification, not a candidate or a cause.
+  // Hash-bound raw receipts are mailbox-bfe803f-qualification.json.
+  pure val bfeMain={...measurement::sampleOutcome,
+    key:{runId:"bfe803f-rebuilt-qualification-20261111",artifact:"252c6d67430ab2d9d43fba216f508e30324881ae7af4d1125eb4aaf9f51bbf73",route:"op62"},
+    work:{...measurement::sampleWork,deadlineSeconds:5},p99Ns:11437000,p999Ns:14873000,
+    peak:12924,peakUncertainty:-1,wholeNs:1027911834}
+  run bfeRebuiltCompletionAndCleanupDoNotCertifyStrictAdmissionTest=assert(
+    bfeMain.completed==1000000 and bfeMain.rejected==0 and bfeMain.errors==0 and bfeMain.clean and
+    bfeMain.p99Ns>measurement::sampleLimits.p99Ns and bfeMain.peak>measurement::sampleLimits.peak and
+    not(measurement::absolutePassed(bfeMain,measurement::sampleLimits)))
+  run bfePeakSourceDebtBoundsDoNotAssumeCoincidentMaximaTest={
+    val sourceAtPeak=0.to(3).map(active=>bfeMain.peak-active).filter(debt=>debt<=12922)
+    assert(sourceAtPeak==Set(12921,12922))
+  }
+  run bfeRecoveryRatesAreConditionalNotMeasuredCapacityTest=assert(
+    budget::recoveryRatePerSecond(1000000,bfeMain.peak,128,1)==13796000 and
+    budget::recoveryRatePerSecond(1000000,bfeMain.peak,128,10)==2279600 and
+    bfeMain.peak>128)
 }

@@ -20,9 +20,13 @@ module mailbox_research_gate {
 
   // These are source/operation facts, not filenames, changed hashes, or a list
   // of downstream projects. A repair requires new externally qualified proof.
+  // Source-bound formal counterexamples, not claims of observed SDK bugs.
+  pure val mechanismFactors=Set("removed-mailbox-recheck", "wake-counted-as-cpu-grant",
+    "dequeue-counted-as-credit-return", "raw-fifo-replaces-selective-protocol",
+    "ring-cpu-average-used-as-business-p99")
   pure val retainedFactors=Set("delayed-refill", "new-queue-and-sleep-registration",
     "unhit-probe-stack-or-branch", "partial-source-or-provider-cohort",
-    "capture-value-used-as-progress-error", "local-cost-only")
+    "capture-value-used-as-progress-error", "local-cost-only").union(mechanismFactors)
   pure val requiredFacts=Set("same-workload", "complete-link-inputs", "same-startup",
     "same-timing", "real-vm-correctness", "complete-cost-screen", "qualified-control")
   pure val replayFacts=Set("complete-link-inputs", "same-startup", "same-timing")
@@ -211,7 +215,9 @@ module mailbox_research_gate {
       not(pairedRunAllowed(third,{...goodPlan,introduced:Set("new-failure-b")})) and
       third.six==authority.six and third.seven==authority.seven and not(third.runtimeCandidate)
   }
-  pure val allCounterexamples=and {successiveRollbacksCannotLoseEarlierNewFailures,
+  pure val sourceMechanismFailuresMustBeRepairedBeforeAnotherCandidate=
+    mechanismFactors.forall(f=>not(pairedRunAllowed(authority,{...goodPlan,introduced:Set(f)})))
+  pure val allCounterexamples=and {sourceMechanismFailuresMustBeRepairedBeforeAnotherCandidate,successiveRollbacksCannotLoseEarlierNewFailures,
     measurementChecks,resource::resourceChecks,candidateCannotSupplyItsOwnEvidenceIdentity,
     aSmallValidComponentCannotAuthenticateTheMainPopulation,callerCannotRelaxApprovedAdmission,
     forgettingHistoryOrRatchetingReferencesInvalidatesAuthority,negativeOrUncertainPeakCannotPassEngineAdmission,
@@ -239,6 +245,7 @@ module mailbox_research_gate_tests {
   run anomalousControlTest=assert(badControlCannotProveAnEngineGain)
   run zeroRejectionIsInsufficientTest=assert(correctnessAndZeroRejectionDoNotWaiveTails)
   run harnessIsNotEngineTest=assert(localAndHarnessSavingsAreNotEngineAdmission)
+  run sourceMechanismFailuresGateTest=assert(sourceMechanismFailuresMustBeRepairedBeforeAnotherCandidate)
   run knownFailedMechanismsTest=assert(knownMechanismsRequireAnActualQualifiedRepair)
   run unchangedRepeatTest=assert(unchangedFailedAttemptCannotBeRepeatedByRenaming)
   run explicitReplayTest=assert(explicitReplayIsNotAnEngineGain)

@@ -34,11 +34,51 @@ module actor_service_calculus {
   pure def backlogBound(period:int,burst:int,cycle:int,latency:int):int = burst+ceilDiv(latency+cycle,period)
   // A per-request interpretation additionally requires FIFO or per-request fairness.
   pure def delayBound(burst:int,cycle:int,latency:int):int = latency+cycle+burst*cycle
+  // Official ring source: one circulating token, n parameterized threads.
+  // Timed region also includes neighbor setup, starts and join. Abstract
+  // costs are external inputs, never fitted historical native nanoseconds.
+  pure def ringHops(n:int,m:int):int=n*m
+  pure def ringTimedCost(n:int,m:int,start:int,neighbor:int,hop:int,join:int):int=
+    n*start+n*neighbor+ringHops(n,m)*hop+join
+  // Necessary CPU feasibility only. More resident Actors do not divide the
+  // CPU work of one non-SMP owner; suspension overlap can reduce idle time,
+  // but must not erase construction, validation, sends or retirement CPU.
+  pure def cpuWorkFits(c:Cost,messages:int,sends:int,dispatches:int,extra:int,available:int):bool=
+    validCost(c) and messages>=0 and sends>=0 and dispatches>=0 and extra>=0 and available>=0 and
+      wholeCycleCost(c,messages,sends,dispatches,extra)<=available
+  // A coarse conservation projection of the canonical protocol, NOT a new
+  // queue or lifecycle. Inputs are increments at cuts of the SAME run. Only
+  // real consumption may enter consumed; publication/wake/dequeue may not.
+  type Cut={arrived:int,consumed:int}
+  pure def debtCuts(cuts:List[Cut]):{arrived:int,consumed:int,peak:int,valid:bool}=
+    cuts.foldl({arrived:0,consumed:0,peak:0,valid:true},(s,x)=>{
+      val a=s.arrived+x.arrived
+      val d=s.consumed+x.consumed
+      val debt=a-d
+      {arrived:a,consumed:d,peak:if(debt>s.peak) debt else s.peak,
+        valid:s.valid and x.arrived>=0 and x.consumed>=0 and d<=a}
+    })
+  // Necessary no-consumption-gap budget at a known cut. Period, phase and
+  // initial debt are external evidence; no p99 or mean rate supplies them.
+  pure def pauseDebt(debt:int,phase:int,gap:int,period:int):int=debt+(phase+gap)/period
+  pure def pauseFits(debt:int,phase:int,gap:int,period:int,limit:int):bool=
+    debt>=0 and phase>=0 and period>0 and phase<period and gap>=0 and limit>=0 and
+      pauseDebt(debt,phase,gap,period)<=limit
   pure def rank(n:int,num:int,den:int):int = ceilDiv(n*num,den)
 }
 
 module actor_service_cost_tests {
   import actor_service_calculus.*
+  run officialRingSetupCannotBeChargedAsPureSteadyHopCostTest={
+    val small=ringTimedCost(10,100,3,2,1,7)
+    val large=ringTimedCost(1000,1,3,2,1,7)
+    assert(ringHops(10,100)==ringHops(1000,1) and small==1057 and large==6007 and
+      small>ringHops(10,100) and large>small)
+  }
+  run ringDefaultRoundsDoNotPromiseAMillionHopsForEveryPopulationTest=assert(
+    ringHops(1000000,1000000/1000000)==1000000 and
+    ringHops(600000,1000000/600000)==600000 and
+    ringHops(1000,1000000/1000)==1000000)
   run transfersDoNotFixDispatchesTest={
     val c={source:1,construct:1,send:2,execute:3,verify:2,consume:1,schedule:5,observe:0}
     val grouped=List(0,0,0,1,1,2,2,3,3,0,0,0)
@@ -57,4 +97,36 @@ module actor_service_cost_tests {
     assert(wholeCycleCost(c,3,6,4,6)>baseline and wholeCycleCost(c,3,4,4,6)<baseline and
       wholeCycleCost(c,3,4,8,6)>baseline)
   }
+  run residentPopulationCannotMultiplyOneOwnerCpuBudgetTest={
+    val c={source:1,construct:2,send:1,execute:3,verify:2,consume:1,schedule:1,observe:0}
+    // Grouped dispatch reduces actual switches; it does not parallelize CPU.
+    val work=wholeCycleCost(c,100,200,20,0)
+    assert(work==1120 and cpuWorkFits(c,100,200,20,0,1120) and
+      not(cpuWorkFits(c,100,200,20,0,1119)) and
+      Set(1,4,1000000).forall(population=>population>0 and work==1120))
+  }
+  run eventualDrainAndSameMeanDoNotCertifyPeakDebtTest={
+    val smooth=debtCuts(List({arrived:64,consumed:0},{arrived:0,consumed:64},
+      {arrived:65,consumed:0},{arrived:0,consumed:65}))
+    val stalled=debtCuts(List({arrived:129,consumed:0},{arrived:0,consumed:129}))
+    assert(smooth.valid and stalled.valid and smooth.arrived==stalled.arrived and
+      smooth.consumed==stalled.consumed and smooth.peak==65 and stalled.peak==129 and
+      smooth.peak<=128 and not(stalled.peak<=128))
+  }
+  run invalidConsumptionCountersCannotCertifyDebtTest=assert(
+    not(debtCuts(List({arrived:1,consumed:2})).valid) and
+    not(debtCuts(List({arrived:-1,consumed:0})).valid) and
+    debtCuts(List({arrived:129,consumed:0})).peak==129)
+  run pauseBudgetIncludesInitialDebtAndArrivalPhaseTest=assert(
+    pauseFits(0,0,128000,1000,128) and not(pauseFits(0,0,129000,1000,128)) and
+    pauseFits(127,0,1999,1000,128) and not(pauseFits(127,999,1001,1000,128)) and
+    not(pauseFits(129,0,0,1000,128)))
+  run lowerSteadyCpuCannotPayForAnUnboundedPauseTest={
+    val original={source:1,construct:2,send:1,execute:3,verify:2,consume:1,schedule:1,observe:0}
+    val saving={...original,construct:1}
+    assert(wholeCycleCost(saving,100,200,20,0)<wholeCycleCost(original,100,200,20,0) and
+      not(pauseFits(0,0,129000,1000,128)) and
+      recoveryRatePerSecond(1000000,129,128,1)==1001000)
+  }
+
 }

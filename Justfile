@@ -359,6 +359,10 @@ bridge-build:
 mailbox-result-construction-model-check:
     quint typecheck specs/mailbox_result_construction.qnt
     quint test specs/mailbox_result_construction.qnt --main mailbox_result_construction --seed 1 --max-samples 1 --backend typescript
+    quint test specs/mailbox_packets.qnt --main mailbox_packets --seed 1 --max-samples 1 --backend typescript
+    quint test specs/mailbox_joint_cycle.qnt --main mailbox_joint_cycle --seed 1 --max-samples 1 --backend typescript
+    quint test specs/actor_service_calculus.qnt --main actor_service_cost_tests --seed 1 --max-samples 1 --backend typescript
+    quint test specs/mailbox_consume_abi.qnt --main mailbox_consume_abi --seed 1 --max-samples 1 --backend typescript
 
 owner-timer-cache-contract:
     {{build_env}} cargo test -p gerbil-scheme-qualification --test owner_timer_cache --locked -- --nocapture

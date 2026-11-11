@@ -21,6 +21,9 @@ module actor_population {
   val busyJobs = busy.map(a=>p.work.get(a))
   val runnable = p.resident.filter(a=>not(p.waiting.contains(a)) and
     (p.work.get(a)!=0 or p.queue.get(a).length()>0) and not(cpu::terminal.contains(a)))
+  // Eligibility is separate from holding the single processor lease.
+  val readyToRun = runnable.exclude(cpu::running)
+  // Abstract ownership-budget units, NOT bytes, RSS or SDK object sizes.
   val memory = p.resident.size()*2+inflight.size()+p.retained.size()
   val canGrow = p.phase=="configure" and p.available and
     p.profile=="green-wait" and memory+2<=BUDGET
@@ -38,6 +41,8 @@ module actor_population {
       remaining:JOBS.mapBy(_=>2),timedOut:Set(),available:true,profile:"cpu",tokens:1}
   }
   action stay = all { cpu::stutter, p'=p }
+  // This qualified service cohort configures at quiescence. It is NOT a
+  // restriction on Gambit/Gerbil spawn, which applications can call while live.
   action spawn(a:int):bool = all {
     p.phase=="configure",p.available,not(p.resident.contains(a)),p.actorEpoch.get(a)<p.epoch,
     memory+2<=BUDGET,p.epoch==1 or p.resident.size()<p.baselineSize or canGrow,
@@ -92,6 +97,14 @@ module actor_population {
     p.available,cpu::running.contains(a),p.work.get(a)!=0,cpu::yieldActor(a),
     p'={...p,waiting:p.waiting.union(Set(a))}
   }
+  // Gambit condition signaling restores eligibility; another Actor may still
+  // own the processor. No frame credit or result is returned by this event.
+  action wake(a:int, epoch:int, m:int):bool = all {
+    p.available,canResume(a,epoch,m),cpu::stutter,
+    p'={...p,waiting:p.waiting.exclude(Set(a))}
+  }
+  // Retain the existing immediate-selection scenario shortcut. wake followed
+  // by continue exposes the interleavings that this atomic shortcut omits.
   action resume(a:int, epoch:int, m:int):bool = all {
     p.available,canResume(a,epoch,m),cpu::start(a,1),p'={...p,waiting:p.waiting.exclude(Set(a))}
   }
@@ -155,7 +168,7 @@ module actor_population {
     nondet a=PEERS.oneOf()
     nondet m=JOBS.oneOf()
     any { spawn(a),setTokens(1),setTokens(JOBS.size()),open,arrive(m),publish(m,a),start(a),continue(a),
-      unit(a),finish(a,false),finish(a,true),consume(m),suspend(a),resume(a,p.actorEpoch.get(a),p.work.get(a)),
+      unit(a),finish(a,false),finish(a,true),consume(m),suspend(a),wake(a,p.actorEpoch.get(a),p.work.get(a)),resume(a,p.actorEpoch.get(a),p.work.get(a)),
       capture(a),release(m),cancel(m),pauseOwner,restoreOwner,drain,quiesce,configure("cpu"),configure("green-wait"),
       configure("owner-stall"),closing,stop(a),stopped(a),join(a),close,stay }
   }

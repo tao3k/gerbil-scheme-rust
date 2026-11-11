@@ -12,6 +12,8 @@ module actor_mailbox_work {
   val nativeOutstanding = life::inflight
   val lifecycleDrained = life::drained
   val runningActors = life::runningActors
+  val runnableActors = life::runnable
+  val readyToRunActors = life::readyToRun
   val liveMemory = life::memory
   var work:Work
   val sourceDebt = life::p.arrived.exclude(life::p.published)
@@ -44,6 +46,8 @@ module actor_mailbox_work {
       verified:if(failed) work.verified else work.verified.set(life::p.work.get(a),work.verified.get(life::p.work.get(a))+1)} }
   action takeVerified(m:int):bool = all { life::consume(m),work'=work }
   action waitGreen(a:int):bool = all { life::suspend(a),work'=work }
+  def canWakeGreen(a:int,epoch:int,m:int):bool = life::canResume(a,epoch,m)
+  action wakeGreen(a:int,epoch:int,m:int):bool = all { life::wake(a,epoch,m),work'=work }
   action resumeGreen(a:int,epoch:int,m:int):bool = all { life::resume(a,epoch,m),work'=work }
   action cancelCaller(m:int):bool = all { life::cancel(m),work'=work }
   action beginDrain = all { life::drain,work'=work }
@@ -59,7 +63,7 @@ module actor_mailbox_work {
     nondet m = REQUESTS.oneOf()
     any { createResident(a),openCycle,offer(m),supply(m,a),enter(a),executeUnit(a),
       continueUnit(a),returnResult(a,false),returnResult(a,true),takeVerified(m),
-      waitGreen(a),resumeGreen(a,life::p.actorEpoch.get(a),m),cancelCaller(m),
+      waitGreen(a),wakeGreen(a,life::p.actorEpoch.get(a),m),resumeGreen(a,life::p.actorEpoch.get(a),m),cancelCaller(m),
       beginDrain,endDrain,beginClose,requestStop(a),confirmStop(a),joinResident(a),finishClose,unchanged }
   }
   // Retained rejected mechanisms change only the event ledger, not lifecycle.

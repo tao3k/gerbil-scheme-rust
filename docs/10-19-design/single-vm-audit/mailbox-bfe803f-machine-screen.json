@@ -1,0 +1,42 @@
+{
+  "classification": "baseline static GCC -O2 object and assembly; not runtime performance",
+  "reference": "bfe803f597a15a3654b70a64c3a039980c31da8a",
+  "layout_options": "-U___SINGLE_HOST -U___INLINE_JUMPS -D___MULTIPLE_HOSTS -D___DONT_INLINE_JUMPS",
+  "existing_policy": "build-support/gerbil-scheme-aot-build/src/program/archive.rs:636",
+  "elapsed_seconds": 19.801641000027303,
+  "rss_sample_peak_bytes": 876249088,
+  "actor_c_sha256": "f68cb446e12174ce13df4dc0f9496aa1d3c30afec2c4fa379a55a421f8931f6f",
+  "object_sha256": "b241340fb6df230435388feddec2261e2fa91e13bfddd6a90f7fd7422b061ed4",
+  "assembly_sha256": "37f13f1982f19b4a272d92ab0954f1ee32147a679b5b310ae390552f2f783d4b",
+  "functions": [
+    {
+      "symbol": "____H_gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_orders_2d_handler_2f_rank",
+      "assembly_line": 73623,
+      "instruction_lines_all_branches": 1197,
+      "sp_relative_instruction_lines": 0,
+      "arm_bl_blr_instruction_lines": 0
+    },
+    {
+      "symbol": "____H_gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_orders_2d_unit_2f_native",
+      "assembly_line": 71028,
+      "instruction_lines_all_branches": 2170,
+      "sp_relative_instruction_lines": 0,
+      "arm_bl_blr_instruction_lines": 0
+    },
+    {
+      "symbol": "____H_gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_actor_2d_arrival_2d_verify_21_",
+      "assembly_line": 48293,
+      "instruction_lines_all_branches": 1208,
+      "sp_relative_instruction_lines": 0,
+      "arm_bl_blr_instruction_lines": 0
+    },
+    {
+      "symbol": "____H_gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_orders_2d_mailbox_2d_backpressure_2d_scheduled",
+      "assembly_line": 129007,
+      "instruction_lines_all_branches": 5752,
+      "sp_relative_instruction_lines": 0,
+      "arm_bl_blr_instruction_lines": 0
+    }
+  ],
+  "caveat": "All alternatives included. SP counts exclude Scheme stack through VM registers; no hot frequency, native VM semantics or latency claim. Indirect/tail jumps implement Scheme calls; zero BL/BLR is not zero Scheme calls."
+}

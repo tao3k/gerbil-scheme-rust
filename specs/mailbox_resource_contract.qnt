@@ -54,7 +54,28 @@ module mailbox_resource_contract {
     terminationClass(9,false,false,true)=="user-stop" and
     terminationClass(9,false,true,false)=="memory-cap-stop" and
     terminationClass(70,true,false,false)=="watchdog"
-  pure val resourceChecks=and {zeroRootsAndExitedOwnerDoNotWaiveCleanupError,
+  // Installed std/make gerbil-build-cores retains an explicit integer.
+  // Only the #t policy reads GERBIL_BUILD_CORES. Effective serial means one.
+  // These are construction-policy facts, not Scheme runtime Actor counts.
+  pure def producerBuildWorkers(explicit:bool,declared:int,environment:int):int={
+    val n=if(explicit) declared else environment
+    if(n>1) n else 1
+  }
+  pure val cargoAndArchiveCapsDoNotOverrideExplicitProducer=
+    producerBuildWorkers(true,12,1)==12 and
+    producerBuildWorkers(false,12,1)==1 and
+    producerBuildWorkers(true,0,12)==1
+  // A controlled counterexample, not an attribution of any old observed OOM.
+  // An owned child can have another process group; grouping is not ancestry.
+  pure val oneProcessGroupPeakCannotAuthenticateTheWholeBuildTree={
+    val groupA=6*1073741824
+    val groupB=3*1073741824
+    val cap=8*1073741824
+    groupA<cap and groupB<cap and groupA+groupB>cap and
+      not(monitoredBuildCompleted({...buildExample,peak:groupA,treeComplete:false}))
+  }
+  pure val resourceChecks=and {cargoAndArchiveCapsDoNotOverrideExplicitProducer,
+    oneProcessGroupPeakCannotAuthenticateTheWholeBuildTree,zeroRootsAndExitedOwnerDoNotWaiveCleanupError,
     callbacksTlsAndProviderRefsIndependentlyBlockReclamation,retainedContinuationBlocksUnload,
     retainedImagesRequireClassificationNotAutomaticLeakOrPass,aShortReuseCheckDoesNotProveLongTermConvergence,
     capCannotBeIncreasedToPassTheBuild,parentOnlyOrFailedMonitorIsNotTreeEvidence,
@@ -62,6 +83,8 @@ module mailbox_resource_contract {
 }
 module mailbox_resource_tests {
   import mailbox_resource_contract.*
+  run explicitProducerConcurrencyTest=assert(cargoAndArchiveCapsDoNotOverrideExplicitProducer)
+  run processGroupIsNotBuildTreeTest=assert(oneProcessGroupPeakCannotAuthenticateTheWholeBuildTree)
   run cleanupErrorTest=assert(zeroRootsAndExitedOwnerDoNotWaiveCleanupError)
   run callbackTlsProviderTest=assert(callbacksTlsAndProviderRefsIndependentlyBlockReclamation)
   run continuationUnloadTest=assert(retainedContinuationBlocksUnload)

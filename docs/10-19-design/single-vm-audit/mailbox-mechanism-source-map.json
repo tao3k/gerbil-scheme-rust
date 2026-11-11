@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "runtime_reference": "bfe803f597a15a3654b70a64c3a039980c31da8a",
+  "gerbil_reference": "1cfb032",
+  "gambit_reference": "ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f",
+  "scope": "source counterparts; not frozen executable authentication",
+  "installed_source_sha256": {
+    "gerbil/runtime/thread.ss": "5096aaece94ee3aab6eaeee65d1a9333593fa6c3257c4f870c7634faeb560f6c",
+    "std/actor/interaction.ss": "733c9d73fbe2648ff2492429a5266748f7c5203bdbdb718a5af64c4a55a8f868",
+    "std/actor/message.ss": "a56d1dd44fc78b7373ec57634ec032be1a1d36477c7574ff379b68f5ce4bf486"
+  },
+  "gambit_git_blobs": {
+    "lib/_thread.scm": "0b85ce8dda1852cbc951737b286172ae87d07365",
+    "lib/_thread#.scm": "47d19b1130321932e340799def4daf0bef98d49b",
+    "lib/_fifo#.scm": "5c16a04a445a6499b77999b10dba7e22556dbe30",
+    "examples/ring/ring.scm": "ded9959a1b674f9d2ff7e45014032251972e49c8"
+  },
+  "paper": {
+    "title": "Concurrency oriented programming in Termite Scheme",
+    "authors": [
+      "Germain",
+      "Feeley",
+      "Monnier"
+    ],
+    "year": 2006,
+    "sections": [
+      6,
+      7
+    ],
+    "url": "https://www-labs.iro.umontreal.ca/~feeley/papers/GermainFeeleyMonnierSW06.pdf",
+    "scope": "Gambit/Termite mechanism evidence; not current Gerbil timing or ABI"
+  },
+  "mechanism_regression": {
+    "entrypoint": "just mailbox-result-construction-model-check",
+    "quint": "0.33.0",
+    "backend": "typescript",
+    "seed": 1,
+    "max_samples": 1,
+    "suite_pass_counts": [
+      321,
+      11,
+      25,
+      10,
+      39
+    ],
+    "counts_overlap": true,
+    "finite_checks_not_unbounded_proof": true,
+    "runtime_source_unchanged": true,
+    "business_run_in_this_refinement": false,
+    "source_sha256": {
+      "specs/actor_service_calculus.qnt": "b6988514d9006d82c6a7654939e4d6e79bf91a9e71c6a286c7996c8cf84387fd",
+      "specs/mailbox_consume_abi.qnt": "ade68fc28476b5cdbe4d195713644d7fc4231beb381b5d52c052e9cb3e7a0f68",
+      "specs/mailbox_primitive.qnt": "c47c3dd69343f98f97bf6b5d14ff8a33f5dcaeaf9d5adc8fe997ae54eec0215e",
+      "specs/gerbil_actor_transport.qnt": "97467fb447aeab3e03d52a8d7085aefe1c5e00b5e5676aba797ffc4ebbfee304",
+      "Justfile": "ad7bc322e9209b6e0b724571ea7b7f2cdfb4ce913b7e7aaae7d6014b8c2dcf02"
+    },
+    "receipt": {
+      "stdout": ".ci/bfe803f-lowering-20261111/consume-caller-screen/final-model-regression.stdout",
+      "sha256": "01ea7c97187f010ef843cd39e5d0966fa3c6b48db2df9479ab3f51cc06c42d9b"
+    }
+  }
+}

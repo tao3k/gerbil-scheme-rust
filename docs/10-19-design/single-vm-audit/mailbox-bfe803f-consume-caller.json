@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "runtime_reference": "bfe803f597a15a3654b70a64c3a039980c31da8a",
+  "scope": "Isolated complete-module AOT transformation and static code screen only; no candidate image linked or run",
+  "actual_baseline_c_sha256": "882eddb922459decee1ee774bd9050c24a63609bc855988e022c132dc59774de",
+  "normalized_baseline_only_file_comment_differs": true,
+  "isolated_scheme_ast_replacements": 1,
+  "source_runtime_edited": false,
+  "optimization": "One bounded consume transaction replacing two existing C entries and two histogram primitive transfers; original two clock samples retained",
+  "compiler_policy": "Installed SDK GSC, GCC -O2 and existing SeparateProcedures macros",
+  "metrics": {
+    "baseline": {
+      "scheduled_all_path_instructions": 5673,
+      "scheduled_sp_references": 0,
+      "scheduled_bl_blr": 0,
+      "scheduled_closure_allocation_sites": 7,
+      "scheduled_stack_write_sites": 327,
+      "scheduled_largest_abs_vm_stack_read_offset_words": 23,
+      "scheduled_poll_sites": 29,
+      "c_bytes": 8536977,
+      "object_text_bytes": 661422,
+      "object_data_bytes": 402984,
+      "generic_bridge_c_frame_bytes": 80,
+      "fused_bridge_c_frame_bytes": null,
+      "ordinary_consumer_transfers": 4,
+      "foreign_entries": 2,
+      "histogram_primitive_jumps": 2
+    },
+    "candidate": {
+      "scheduled_all_path_instructions": 6127,
+      "scheduled_sp_references": 0,
+      "scheduled_bl_blr": 0,
+      "scheduled_closure_allocation_sites": 7,
+      "scheduled_stack_write_sites": 375,
+      "scheduled_largest_abs_vm_stack_read_offset_words": 23,
+      "scheduled_poll_sites": 29,
+      "c_bytes": 8572089,
+      "object_text_bytes": 664258,
+      "object_data_bytes": 404816,
+      "generic_bridge_c_frame_bytes": 80,
+      "fused_bridge_c_frame_bytes": 96,
+      "ordinary_consumer_transfers": 1,
+      "foreign_entries": 1,
+      "histogram_primitive_jumps": 0
+    }
+  },
+  "added_compiler_global": "gerbil-scheme-rust__qualification__actors#47",
+  "old_link_inventory_may_not_be_reused": true,
+  "source": {
+    "std_macro_same_as_installed_sdk": true,
+    "gambit_reference": "ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f",
+    "primitives": [
+      {
+        "path": "lib/_std#.scm",
+        "url": "https://github.com/mighty-gerbils/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/lib/_std%23.scm",
+        "excerpts": [
+          {
+            "start": 551,
+            "end": 588,
+            "text": "             `((define-procedure (,vect-length (,name ,name))\n                 (,prim-vect-length ,name))))\n\n       (define-primitive (,vect-ref ,name k))\n\n\n       ,@(if (memq name '(values))\n             `()\n             `((define-procedure (,vect-ref\n                                  (,name ,name)\n                                  (k (index-range\n                                      0\n                                      (,prim-vect-length ,name))))\n                 (,prim-vect-ref ,name k))))\n\n       ,@(if (memq name '(u32vector s32vector u64vector s64vector))\n             `((define-primitive (,vect-ref-fixnum ,name k)\n                 (,prim-vect-ref ,name k)))\n             `())\n\n       (define-primitive (,vect-set! ,name k ,elem-name))\n\n\n       ,@(if (memq name '(values))\n             `()\n             `((define-procedure (,vect-set!\n                                  (,name (and ,name mutable))\n                                  (k (index-range\n                                      0\n                                      (,prim-vect-length ,name)))\n                                  (,elem-name ,elem-type))\n                 (,prim-vect-set! ,name k ,elem-name)\n                 (void))))\n\n       ,@(if (memq name '(u32vector s32vector u64vector s64vector))\n             `((define-primitive (,vect-set!-fixnum ,name k ,elem-name)\n                 (,prim-vect-set! ,name k ,elem-name)))\n             `())"
+          }
+        ],
+        "git_blob_sha1": "cf8cbfb5709fd2b9afbc86b8e70f75eb7a9b14aa",
+        "sha256": "dd0df858d37fce82fb82abb23c249967cd073e203e2f457557d6655f8a7f523e"
+      },
+      {
+        "path": "lib/gambit/vector/vector.scm",
+        "url": "https://github.com/mighty-gerbils/gambit/blob/ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f/lib/gambit/vector/vector.scm",
+        "excerpts": [
+          {
+            "start": 111,
+            "end": 123,
+            "text": "(macro-if-u64vector\n (define-prim-vector-procedures\n   u64vector\n   u64value\n   exact-unsigned-int64\n   0\n   macro-force-vars\n   macro-check-exact-unsigned-int64\n   macro-check-exact-unsigned-int64-list-exact-unsigned-int64\n   macro-test-exact-unsigned-int64\n   ##fail-check-exact-unsigned-int64\n   #f\n   ##eqv?))"
+          }
+        ],
+        "git_blob_sha1": "695c104cd3c6200d394d251197b178da8abefb23",
+        "sha256": "28579072b9d3ecf080fe9db60f73c49ee4b42cff058a917f1cd6233609247901"
+      }
+    ]
+  },
+  "receipts": {
+    "transform-checked": {
+      "command": [
+        "${GERBIL_HOME}/bin/gxi",
+        "-e",
+        "(with-exception-catcher (lambda (e) (display-exception e (current-error-port)) (exit 1)) (lambda () (load \".ci/bfe803f-lowering-20261111/consume-caller-screen/transform.scm\")))"
+      ],
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 3.307200416980777,
+      "tree_rss_sample_peak_bytes": 94437376,
+      "sample_count": 24,
+      "approved_limit_bytes": 8589934592,
+      "stop_margin_bytes": 7516192768,
+      "sample_period_seconds": 0.05,
+      "all_tracked_processes_gone": true,
+      "observed_processes": 1,
+      "scope": "sampled transitive descendants from launch; not a kernel hard limit"
+    },
+    "baseline-emission": {
+      "command": [
+        "${GERBIL_HOME}/bin/gsc",
+        "-c",
+        "-o",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.c",
+        "-module-ref",
+        "gerbil-scheme-rust__qualification__actors",
+        "-linker-name",
+        "gerbil-scheme-rust__qualification__actors",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.scm"
+      ],
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 14.616240959032439,
+      "tree_rss_sample_peak_bytes": 475136000,
+      "sample_count": 128,
+      "approved_limit_bytes": 8589934592,
+      "stop_margin_bytes": 7516192768,
+      "sample_period_seconds": 0.05,
+      "all_tracked_processes_gone": true,
+      "observed_processes": 1,
+      "scope": "sampled transitive descendants from launch; not a kernel hard limit"
+    },
+    "candidate-emission": {
+      "command": [
+        "${GERBIL_HOME}/bin/gsc",
+        "-c",
+        "-o",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.c",
+        "-module-ref",
+        "gerbil-scheme-rust__qualification__actors",
+        "-linker-name",
+        "gerbil-scheme-rust__qualification__actors",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.scm"
+      ],
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 7.741163750004489,
+      "tree_rss_sample_peak_bytes": 491503616,
+      "sample_count": 74,
+      "approved_limit_bytes": 8589934592,
+      "stop_margin_bytes": 7516192768,
+      "sample_period_seconds": 0.05,
+      "all_tracked_processes_gone": true,
+      "observed_processes": 1,
+      "scope": "sampled transitive descendants from launch; not a kernel hard limit"
+    },
+    "baseline-o2": {
+      "command": [
+        "${GERBIL_HOME}/bin/gsc",
+        "-obj",
+        "-cc-options",
+        "-O2 -U___SINGLE_HOST -U___INLINE_JUMPS -D___MULTIPLE_HOSTS -D___DONT_INLINE_JUMPS -save-temps=obj",
+        "-o",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.o",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.c"
+      ],
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 31.882983917021193,
+      "tree_rss_sample_peak_bytes": 893681664,
+      "sample_count": 340,
+      "approved_limit_bytes": 8589934592,
+      "stop_margin_bytes": 7516192768,
+      "sample_period_seconds": 0.05,
+      "all_tracked_processes_gone": true,
+      "observed_processes": 24,
+      "scope": "sampled transitive descendants from launch; not a kernel hard limit"
+    },
+    "candidate-o2": {
+      "command": [
+        "${GERBIL_HOME}/bin/gsc",
+        "-obj",
+        "-cc-options",
+        "-O2 -U___SINGLE_HOST -U___INLINE_JUMPS -D___MULTIPLE_HOSTS -D___DONT_INLINE_JUMPS -save-temps=obj",
+        "-o",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.o",
+        ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.c"
+      ],
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 20.074940084014088,
+      "tree_rss_sample_peak_bytes": 918732800,
+      "sample_count": 235,
+      "approved_limit_bytes": 8589934592,
+      "stop_margin_bytes": 7516192768,
+      "sample_period_seconds": 0.05,
+      "all_tracked_processes_gone": true,
+      "observed_processes": 16,
+      "scope": "sampled transitive descendants from launch; not a kernel hard limit"
+    }
+  },
+  "artifact_sha256": {
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/transform.scm": "6f1915aa7a994d5a709d7e31d132e8899aa3219a7b0b0d88b121c5faa8139d42",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/bridge.scm": "96e0f768c21e4eb398301657b07befb4cfb262ef970f1ecd567c14b1dd388a8d",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/core.c.txt": "584b12dc4ba352e519e5c101cca00d2a46d6ecb79e38b71648524a1231e71e26",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.scm": "8476ea867dce80d798bb83c02cd3e9167b0427ef1076ab3b2352789722a0718a",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.scm": "29f0bd2ba0edee5fd33313797524c0494b800a0216f28e6c691891049b4d3b97",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.c": "72002bafefcdde13cdd6c8d64d32161d2f48a0f6dbf9ef2bcb0c0d6430b37dfd",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.c": "b96ff7dba1c56565383a8781444d695beadf403e14e7865ef84c2973e21d8192",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.o": "5fe26091a1ef2a1b9a9b2b791fac5223494cedebab8dcc40dc797aaf5c850b6f",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.o": "8d375dab7ff9f140c7578963b51d03d91a32e67bf0bf87f035e9f32fff125048",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/baseline.s": "400eccee8a38995501a568c4921bc5583e0c2905cb2474a0ef47c0d1abfbda84",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/candidate.s": "e0391ca821e531c8aac0ee4d815656d9e804ee8a1209cbc27f16c7fbc44b484f",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/primitive-source.json": "12ce474ab139f5d6358b88b10c4cbd89567e426d63b59f31bb1535c0228203d3",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/model-regression.stdout": "aa426266e85da67a4720112a2d9bcbabc6abfab0037ac2cd123f3af453bf8705",
+    ".ci/bfe803f-lowering-20261111/consume-caller-screen/final-model-regression.stdout": "01ea7c97187f010ef843cd39e5d0966fa3c6b48db2df9479ab3f51cc06c42d9b"
+  },
+  "model_suite_pass_counts": [
+    321,
+    11,
+    25,
+    10,
+    39
+  ],
+  "counts_overlap": true,
+  "decision": {
+    "complete_net_cpu_gain_proven": false,
+    "fallback_mix_known": false,
+    "per_request_allocation_reduction_claimed": false,
+    "intermediate_primitive_safepoint_effect_closed": false,
+    "candidate_vm_acceptance": false,
+    "candidate_business_run": false,
+    "current_control_strict_passed": false,
+    "next": "Resolve changed intermediate primitive/FFI opportunities and complete cost evidence before any runtime integration; control must qualify before candidate performance."
+  },
+  "model_sha256": "ade68fc28476b5cdbe4d195713644d7fc4231beb381b5d52c052e9cb3e7a0f68",
+  "scope_note": "The equal caller poll count does not include removed primitive callees; the new nativeSpan counterexample keeps this obligation open.",
+  "published_command_path_policy": "SDK executable paths use ${GERBIL_HOME}; original unnormalized commands remain in the hash-bound local receipts. No SDK installation prefix is required by the repository."
+}

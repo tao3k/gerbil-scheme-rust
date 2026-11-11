@@ -31,6 +31,9 @@ module mailbox_packet_protocol {
   val canonicalSafe=w::cycleSafe
   val workLedger=w::work
   val lifecycleMemory=w::liveMemory
+  val runningActors=w::runningActors
+  val runnableActors=w::runnableActors
+  val readyToRunActors=w::readyToRunActors
   action stay=all {w::unchanged,p'=p}
   action offer(m:int):bool=all {not(p.parked),w::offer(m),p'=p}
   action stage(m:int,a:int):bool=all {not(p.parked),w::supply(m,a),p'={...p,staged:p.staged.append(m)}}
@@ -55,6 +58,10 @@ module mailbox_packet_protocol {
   action waitFor(a:int,m:int):bool=all {w::waitGreen(a),p'={...p,waits:p.waits+1,awaiting:p.awaiting.set(a,m)}}
   def canResume(a:int):bool=w::state.waiting.contains(a) and
     (p.awaiting.get(a)==0 or w::state.completed.contains(p.awaiting.get(a)))
+  def canWakeActor(a:int,m:int,epoch:int):bool=canResume(a) and w::canWakeGreen(a,epoch,m)
+  // resumes counts leaving registered wait, not acquiring a processor.
+  action wakeActor(a:int,m:int,epoch:int):bool=all {canWakeActor(a,m,epoch),w::wakeGreen(a,epoch,m),
+    p'={...p,resumes:p.resumes+1,awaiting:p.awaiting.set(a,0)}}
   action resume(a:int,m:int,epoch:int):bool=all {canResume(a),w::resumeGreen(a,epoch,m),
     p'={...p,resumes:p.resumes+1,awaiting:p.awaiting.set(a,0)}}
   action cancel(m:int):bool=all {w::cancelCaller(m),p'=p}
@@ -78,7 +85,7 @@ module mailbox_packet_protocol {
     nondet m=REQUESTS.oneOf()
     any {offer(m),stage(m,a),send(List(m),1),send(List(1,2),1),send(List(2,3),1),send(List(1,2,3),1),
       decode(a),unit(a),proceed(a),finish(a,m,1,false),finish(a,m,1,true),consume(m),
-      waitFor(a,0),waitFor(a,m),resume(a,m,1),cancel(m),park,wake,
+      waitFor(a,0),waitFor(a,m),wakeActor(a,m,1),resume(a,m,1),cancel(m),park,wake,
       startDrain,finishDrain,startClose,stop(a),stopped(a),join(a),finishClose,stay}
   }
 
@@ -122,6 +129,28 @@ module mailbox_packets {
     .then(all {assert(not(canSend(List(1,2),1))),assert(not(canSend(List(1,2),0))),
       assert(not(canFinish(1,1,1))),stay})
     .then(success(1,2)).then(consume(2)).then(close).then(all {assert(safe),assert(not(canSend(List(1),1))),stay})
+  // Resident count, processor ownership and unread-result capacity are
+  // independent. This is a finite protocol witness, not a thread-count tuning.
+  action twoBusy=boot.then(offer(1)).then(stage(1,1)).then(send(List(1),1))
+    .then(decode(1)).then(waitFor(1,0)).then(offer(2)).then(stage(2,2))
+    .then(send(List(2),1)).then(decode(2))
+  run wakeDoesNotPreemptPeerOrReturnUnreadCapacityTest=twoBusy
+    .then(wakeActor(1,1,1)).then(all {
+      assert(safe),assert(actorState.resident==Set(1,2)),assert(actorState.tokens==3),
+      assert(runningActors==Set(2)),assert(readyToRunActors==Set(1)),
+      assert(outstanding==Set(1,2)),assert(actorState.consumed==Set()),stay})
+    .then(unit(2)).then(proceed(2)).then(finish(2,2,1,false)).then(all {
+      assert(outstanding==Set(1,2)),assert(ready==Set(2)),assert(readyToRunActors==Set(1)),stay})
+    .then(consume(2)).then(all {assert(outstanding==Set(1)),assert(safe),stay})
+    .then(proceed(1)).then(unit(1)).then(proceed(1)).then(finish(1,1,1,false))
+    .then(consume(1)).then(close).then(all {assert(safe),assert(lifecycleMemory==0),
+      assert(not(canWakeActor(1,1,1))),stay})
+  run wakeRetainsEpochRequestAndSingleDeliveryGuardsTest=twoBusy.then(cancel(1)).then(all {
+      assert(not(canWakeActor(1,1,0))),assert(not(canWakeActor(1,2,1))),stay})
+    .then(wakeActor(1,1,1)).then(all {
+      assert(not(canWakeActor(1,1,1))),assert(p.waits==p.resumes),
+      assert(runningActors==Set(2)),assert(outstanding==Set(1,2)),
+      assert(actorState.timedOut==Set(1)),assert(safe),stay})
   run originalThreeSlotFourDestinationSupplyCannotCombineRequestsTest=assert(
     0.to(3).forall(first=>1.to(3).forall(n=>destinations(first,n).size()==n)))
   run unchangedDestinationsMakePacketOverheadStrictlyAdditionalTest=assert(

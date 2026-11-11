@@ -1,0 +1,129 @@
+#+title: bfe803f complete-cycle lowering and candidate screen
+#+date: 2026-11-11
+
+* Actual progress and custody
+The reference remains bfe803f597a15a3654b70a64c3a039980c31da8a.
+No runtime/build source was changed. Optimized static Gerbil Scheme and Gambit C
+were reconstructed from this source in a persistent isolated research directory.
+The exact source and generated-file digests, compiler stages and selected function
+inventory are in mailbox-bfe803f-cycle-lowering.json. Local ignored evidence and
+an archive remain under .ci/bfe803f-lowering-20261111, not a temporary directory.
+This reconstructs compiler inputs, not original frozen bytes. No new performance
+numbers, real-VM correctness, full runtime object or linked image are claimed.
+
+The emission uses the same compile-module optimize/static options as the existing
+qualification build. Compiling phase-1 macro dependencies is necessary to load
+exported Gerbil syntax; it does not build a business runtime. SDK GSC and its
+configured gcc-16 were retained. Only those metadata bundles used GCC -O2.
+The final actors C was emitted by GSC -c, without a GCC actors-object compile.
+
+* Retained infrastructure failures
+Initial emission stopped when the dependent expander tried to read an uncompiled
+service-budget phase-1 file as syntax. Completing its macro bundle required the
+SDK directory mappings already used by Justfile: the first GSC invocation failed
+because its inherited ~~bin resolved to a nonexistent location. With explicit
+installed SDK mappings, the necessary phase-1 modules and actors emission passed.
+Completed modules were not blindly regenerated between dependency fixes.
+These are build-input failures, not Actor timeouts or throughput regressions.
+The compile warnings about disabled GCC optimization passes are retained.
+
+Owned process groups were sampled at 50 ms. The approved limit remained 8 GiB;
+a 7 GiB stop margin was used to allow cancellation before that limit. The largest
+observed stage was service-budget macro compilation at 2279342080 bytes, about
+2.12 GiB. Actors Scheme emission observed 594083840 bytes; actors C emission
+observed 481050624 bytes. Sampling is not an enforced kernel maximum. These
+results do not assert that a future full GCC actors-object build fits the cap.
+
+* Cycle cost ledger: what the evidence actually establishes
+| Phase | Source and generated evidence | Current decision |
+| Source input | Fresh s64[14], id store and twelve line stores; source schedule owns the planned timestamp | Preserve workload and source custody; do not move debt behind an early publication marker |
+| Request transfer | Existing thread-send transfers the frame reference; standard Mailbox adds a FIFO node | Keep transport; no replacement FIFO or extra wake registration |
+| Handler layout | Actual orders-handler/rank still routes through service-unit/work-layout boundaries | The withdrawn lexical-layout trial already tested closure reduction; do not restart it |
+| Arithmetic | orders-unit/native retains a generic totals[16], two box allocation sites and checked arithmetic | Boxes support mutable state across checkpoints/continuations; deleting or pooling them needs full semantic and net-cost proof |
+| Result | Generated native branch has one BEGIN_ALLOC_S64VECTOR and 21 ADD_S64VECTOR_ELEM sites | Atomic result construction is already present; a new C wrapper is not an established saving |
+| Independent oracle | Its generated function retains one box and the original value/error checks | The withdrawn oracle accumulator trial is retained; do not turn another oracle rewrite into an engine claim |
+| Reply transfer | Immutable (id . frame) plus native Mailbox transfer | Identity is necessary across frame reuse; dequeue alone does not release credit |
+| Real consumption | Request identity/failure validation, original planned-to-consumed latency and verified progress, then frame clear and refill | Keep per-result return and immediate refill; do not exchange low p99 for premature release |
+
+The C inventory deliberately distinguishes ALLOC_CLO allocation sites from CLO
+field reads. Function byte size, total static poll sites and cold fallback code
+are not dynamic hot-path costs. The inventory does not rank these phases by CPU
+time and does not establish GCC register spills or stack preservation cost.
+It is not a justification to compile and benchmark another speculative candidate.
+
+* Next admissible implementation condition
+A runtime change must remove an operation on this actual cycle, preserve the
+current service-unit and independent oracle, and pay for any new branch,
+captured state, roots, synchronization and code growth. Existing QNT regression
+rules and source mechanism bindings remain in force. No candidate passed that
+complete screen in this step, so no runtime edit or business run was performed.
+The next analysis can now use the reconstructed C tied to bfe803f instead of
+borrowing later generated code or guessing that a removed wrapper still exists.
+Historical p99 10.083 ms and sampled peak 11110 remain historical, not current
+measurements or a pass of the unchanged 128 limit. The active GOAL is incomplete.
+
+* Machine-code screen (subsequent step)
+The exact actors C was subsequently compiled once using the existing
+SeparateProcedures policy in program/archive.rs and GCC -O2. This changes no
+runtime source, SDK policy or project default. The object and saved assembly
+are hash-bound in mailbox-bfe803f-machine-screen.json. Compilation exited zero
+in 19.801641 seconds; owned process-group RSS samples peaked at 876249088 bytes.
+This is one object, not a completed library/VM build or performance acceptance.
+
+The selected generated functions have no SP-relative instruction lines, but
+Scheme frames are held through VM registers. That observation does not prove
+absence of Scheme stack saves. Likewise, zero BL/BLR lines do not mean zero
+Scheme calls: indirect and tail transfers implement those calls. The complete
+alternative-branch instruction counts must not be billed to every hot request.
+
+* Baseline native build preparation
+One original Cargo reader/image build, profile dev (-O2), was started without
+running a benchmark. Its native archive/Cargo concurrency is set to one only
+for this bounded local build; benchmark settings and project defaults are unchanged.
+The producer build.ss passes an integer CPU count to std/make. Inspection of the
+installed std/make gerbil-build-cores confirms that GERBIL_BUILD_CORES does not
+override this explicit integer. Calling the entire producer build serial on
+that basis would be incorrect. A separate process-tree watcher was therefore
+attached before the native producer stage, supplementing the initial owned
+process-group monitor. Its coverage starts at attachment, not at build launch;
+it must not be mislabeled a complete lifetime kernel memory bound.
+The final build and watcher receipts, including any cap stop, remain pending.
+No runtime candidate has been selected and no business result is reported.
+
+* Completed native baseline preparation
+The original Cargo dev build finished naturally in 562.632613 seconds. The reader
+and owner_instance image are frozen by hash in mailbox-bfe803f-native-preparation.json,
+with the compiler-owned module graph and archive member verification. The actual
+linked Actor member is module 141. Its real object disassembly is retained; the
+earlier isolated assembly screen is not substituted for this linked object.
+
+The process-group sampled peak was 6062637056 bytes. The supplemental transitive
+process-tree watcher observed 6077333504 bytes, about 5.66 GiB, during its coverage
+window, stopped no process and found all tracked descendants gone. Neither this
+mid-build watcher nor the first group-only sampler establishes an enforced
+whole-lifetime memory maximum. The distinction is retained explicitly.
+
+Two existing native entrypoints then passed against that same rebuilt baseline:
+- Original reader host-boundary-contract-only: terminal receipt, GC/native types,
+  exception unwinding, multishot FFI continuation, Actor failure drain/reuse and
+  clean shutdown.
+- Existing result_construction_contracts bench using arrival-prebuilt only:
+  21 differential cases, three fresh rank results and three checkpoint results
+  (two replays each), GC, bignum fallback, exception identity, two green-wait cases
+  and clean shutdown. No Scheme/image recompilation was needed for this reader.
+  Its Cargo feature subset did recompile Rust dependencies; that preparation time
+  is not a Scheme execution or message-latency result.
+
+The resource QNT adds the explicit-producer-concurrency rule and a controlled
+cross-process-group counterexample. It does not attribute a historical kill to
+OOM or change the 8 GiB cap. No candidate, business run, performance improvement,
+commit or PR merge is claimed. The next phase still needs a justified runtime
+saving before candidate correctness and the original controlled million trial.
+
+The completed model regression passed 318 result-construction, 11 packet,
+25 joint-cycle and 5 cost checks. The resource suite passed 11 checks. Counts
+can overlap through imports. Original execution/link artifacts also have
+hash-checked custody copies; no copied reader or image was launched. Their
+original execution paths remain recorded separately. Runtime/build source
+diff against bfe803f is still empty. No frozen historical p99 was reproduced
+or replaced by these correctness-only results.

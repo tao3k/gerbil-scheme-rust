@@ -87,6 +87,7 @@ module mailbox_joint_cycle {
   action finish(a:int,m:int,failed:bool):bool=all {mp::finish(a,m,1,failed),c'={...c,opportunity:if(c.opportunity=="waiting") "runnable" else c.opportunity}}
   action success(a:int,m:int):bool=decode(a).then(unit(a)).then(proceed(a)).then(finish(a,m,false))
   action waitFor(a:int,m:int):bool=all {not(c.certified.contains(mp::actorState.work.get(a))),mp::waitFor(a,m),c'=c}
+  action wakeActor(a:int,m:int,epoch:int):bool=all {mp::wakeActor(a,m,epoch),c'=c}
   action resume(a:int,m:int,epoch:int):bool=all {mp::resume(a,m,epoch),c'=c}
   action cancel(m:int):bool=all {mp::cancel(m),c'=c}
   action close=all {c.opportunity=="selected",c.phase=="collect",c.reserved==List(),c.offered==mp::actorState.consumed,mp::startDrain,c'=c}
@@ -106,6 +107,17 @@ module mailbox_joint_cycle {
   action admit3=arrive(1).then(arrive(2)).then(arrive(3)).then(reserve(1)).then(reserve(2)).then(reserve(3)).then(seal)
   action cpu3=bootCpu.then(admit3).then(chooseOwner(1)).then(publish(1,1)).then(publish(2,1)).then(publish(3,1)).then(flush(1))
   action cpuReady3=cpu3.then(success(1,1)).then(success(1,2)).then(success(1,3)).then(harvestDirect)
+  run actorWakeAndSourceConsumptionHaveSeparateAuthorityTest=bootUnknown.then(admit3)
+    .then(publish(1,1)).then(publish(2,3)).then(publish(3,2))
+    .then(flush(1)).then(flush(3)).then(flush(2)).then(await)
+    .then(decode(1)).then(waitFor(1,0)).then(decode(3)).then(wakeActor(1,1,1))
+    .then(all {assert(safe),assert(mp::actorState.resident==Set(1,2,3,4)),
+      assert(mp::runningActors==Set(3)),assert(mp::readyToRunActors==Set(1,2)),
+      assert(c.opportunity=="waiting"),assert(charged==3),assert(consumedRequests==Set()),stay})
+    .then(unit(3)).then(proceed(3)).then(finish(3,2,false))
+    .then(all {assert(safe),assert(charged==3),assert(pendingResults==Set(2)),stay})
+    .then(harvestWoken).then(consume(2)).then(endHarvestEager).then(arrive(4))
+    .then(all {assert(safe),assert(charged==2),assert(canReserveEager(4)),stay})
   run lateBindingAndNaturalHarvestExposeTwoBoundedPacketsTest=cpuReady3
     .then(consume(1)).then(all {assert(safe),assert(charged==2),assert(not(canEndHarvest)),assert(not(canReserve(4))),stay})
     .then(consume(2)).then(consume(3)).then(endHarvest)

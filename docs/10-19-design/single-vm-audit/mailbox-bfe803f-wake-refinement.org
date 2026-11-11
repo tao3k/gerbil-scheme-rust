@@ -1,0 +1,73 @@
+#+title: bfe803f Actor eligibility and consumption refinement
+#+date: 2026-11-11
+
+* Reference and current source custody
+Reference is bfe803f597a15a3654b70a64c3a039980c31da8a, with the retained
+10.083 ms p99 observation in mailbox-pr18-3477-port.json. That observation
+also has sampled outstanding peak 11110 and is not a pass of the 128 guard.
+A shared-object independent clone was checked out at this exact commit in a
+persistent .data directory. The unrelated dirty parent checkout was not reset,
+stashed or changed. No historical executable bytes were reconstructed or relabeled.
+No Scheme, Rust, FFI, SDK, defaults or deadline changes are made by this review.
+
+* Model code actually changed
+Reuse actor_population, actor_mailbox_work, mailbox_packets and mailbox_joint_cycle.
+Previously resume both left a registered wait and acquired the only processor
+in one action. A wake is now also possible while a peer holds the processor:
+- Resident population stays unchanged.
+- The waiting member becomes eligible (readyToRun), not selected/running.
+- Native inflight credit remains held; neither wake nor completed-ready frees it.
+- Actual source consumption returns one credit, permitting immediate eager refill.
+- Invalid epoch/request and duplicate wake remain disabled; cancellation does
+  not prematurely return credit, and closed service cannot wake the old request.
+The old immediate-selection action remains a valid convenience case. The separate
+wake edge is propagated through the existing packet/work ledger, not a second
+scheduler, timer or queue. Tests are wired into the existing Justfile model entry.
+This refines possible interleavings; it does not assert fairness or CPU timing.
+
+* Actual encapsulation and complete-cycle cost screen
+| Item in scheduled op62 | Actual role | Decision |
+| Input [77,1] wrapper and generic tag lookup | Already absent at this reference | Do not optimize a retired cost |
+| Request Mailbox entry | Transfers a charged frame to another Actor | Preserve native transport |
+| Immutable (id . frame) reply | Protects reused mutable frame against stale reply | Not removable without equivalent identity proof |
+| Separate completion FIFO or ready edge | Adds registration/notification to an existing Mailbox protocol | No new layer |
+| Same-turn packet wrapping | Three consecutive mod-4 destinations are distinct | Cannot save request sends in this cohort |
+| Moving supply to worker while source consumes | Needs credit-return wake when worker waits | Two legs may remain; not a proved saving |
+| totals[16] followed by fresh result[21] | Rank continuation may reenter; result must be allocated after rank returns | Do not merge by reusing a captured result |
+
+The source allocation forms contain input 14*8 bytes, totals 16*8 bytes and result 21*8
+bytes of payload bodies. The standard FIFO allocates one pair node per send;
+a request/reply cycle has two such nodes and the immutable reply pair. On a
+64-bit host, if retained by native lowering, these bodies total at least 456 bytes per request, before headers,
+other closures, big-number fallbacks and scheduler continuation storage. These
+are source-bound allocation obligations, not a measured allocation rate, GC time,
+or proof that this is the largest CPU component. Required independent oracle and
+original planned-to-consumed timing are not removed to make the bench faster.
+
+The screen found no removable transport encapsulation with demonstrated complete
+net benefit. No runtime candidate is selected or reintroduced. In particular,
+this review does not revive the withdrawn frame-store, input-reuse, FIFO or
+layout-entry candidates by renaming them. Subsequent implementation still needs
+an actual removable cost, full native correctness and a qualified same-load control.
+
+* Validation and retained failures
+Existing native model entry is mailbox-result-construction-model-check. Full
+result construction, packet and joint suites are exercised; the population safety
+explorer uses seed 1, 1000 samples and 50 steps, TypeScript backend. This is finite
+simulation and deterministic protocol testing, not unbounded proof or VM acceptance.
+An early new joint test used the wrong destination for a pinned request and then
+placed a stateless request on an Actor reserved for that pinned request. The
+existing affinity guards correctly disabled both scenarios. Only the test routes
+were corrected to the existing unknown-handler scenario; guards were not weakened.
+Quint 0.33.0 verbosity 3 additionally threw TypeError in TraceRecorderImpl.onRunReturn
+on the disabled scenario. This tooling failure is retained separately and is not
+a native runtime failure. No Quint installation changes were made.
+No business run, build, native performance gain, publication or PR merge is claimed.
+
+* Final check result
+The Justfile entry passed typecheck and 299 result-construction tests, 11 packet
+tests and 25 joint tests. Imported tests overlap; these are suite evaluations,
+not a sum of unique scenarios. Population safety simulation also passed 1000
+traces of at most 50 steps with seed 1, TypeScript backend. Runtime/build source
+diff against bfe803f is empty; only model code, model suite wiring and this note
+changed. Business throughput/p99/backlog remain unmeasured in this revision.

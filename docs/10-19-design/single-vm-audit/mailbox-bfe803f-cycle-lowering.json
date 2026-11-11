@@ -1,0 +1,604 @@
+{
+  "schema": 1,
+  "runtime_reference": "bfe803f597a15a3654b70a64c3a039980c31da8a",
+  "classification": "fresh reconstruction of static compiler inputs; not original frozen artifact or performance receipt",
+  "sdk_gerbil": "1cfb032",
+  "sdk_gambit": "ea114fc",
+  "runtime_sources_modified": false,
+  "phase1_metadata_compiler": "SDK GSC and configured gcc-16 with -O2",
+  "actor_c_compiler": "not invoked; only GSC -c emission performed",
+  "process_tree_limit_bytes": 8589934592,
+  "monitor_stop_margin_bytes": 7516192768,
+  "peak_sampling_period_seconds": 0.05,
+  "sampling_is_not_kernel_hard_limit": true,
+  "source_inputs": [
+    {
+      "path": "build.ss",
+      "sha256": "89a0f9046c45ca1ed8735c4ba96e1fdac7b971722762d3926d072c127214bbf5"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/actors.ss",
+      "sha256": "7461cef0d874aad1e4dcabff7ec7061c96ac97402012243689672a34216d2018"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/arrow-qualification.ss",
+      "sha256": "942c1053979a4f14be8e63a52c1cb265e8fe21303461d207b8fcf51f8d0ac7f6"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-actor-arrival.ss",
+      "sha256": "7e2a91a2a1e8af7e56f3ec266811ef8c1696ed9c9a95a0a9921e00fc0add73e8"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-actor-control.ss",
+      "sha256": "c0f9c70678dd94a9fd6084c6e1d6a9539ac867105cb1aa7b1b7a42c2295f4599"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-green.ss",
+      "sha256": "6d5ba2fe4680ffe637431b614151cc2232c7f6237c062350bb45b529936c4fbf"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-json.ss",
+      "sha256": "d91330a18d03966da4efe0fc4b3b98af59c779809ce9282168c61b2417e779c6"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-lifecycle.ss",
+      "sha256": "a894d2531d98c0f72bd6ee869e77930d1ca33cdd74fa9e6cf9d3569124548de7"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-mailbox-backpressure.ss",
+      "sha256": "d80a37b8d34b9c98107190d078b8b0f1f995bd382b192406592186c09c203448"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-mailbox-observation.ss",
+      "sha256": "ebce70bcb306f5201556986772865d5dd688486b1957632db4fc5d8d7cda5f84"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-native.ss",
+      "sha256": "9ce07eb3c67459c5f5036d87e101678332acaff678018a0b852b0c3265b2e7fe"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-orders.ss",
+      "sha256": "252b8d4c313233bc251d5f761941d1093a3fc3c6c7e5953ffefd4113631c8023"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-owner-scope.ss",
+      "sha256": "b9ffe5448ff374aa39e2797f0ff772e9157206c28c1bf9ed7467e56bd7430c5e"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-owner-watch.ss",
+      "sha256": "401720115efcccf8f998d7c7d6159636384d91fb65dedc0c10e8371cf0f384a9"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-service-activation.ss",
+      "sha256": "64ecf9abb0e8e0a0c26795a38dc6172951f3ed72735527bfed8c4de520819f18"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-service-lease.ss",
+      "sha256": "5d221396ff1b29faa382d7da21e0679ca6aeaa62f662241a97bfefd657712820"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-service-turn.ss",
+      "sha256": "9f8f9f2b3cb224dccdcaae78ad0da1b3b4530124ce9b6652a7c4f6394e00ec22"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-service.ss",
+      "sha256": "f2dadc52268009f89ed38b46ab736686cdaaf2b8cd84d3d9aeb9eddfe55f45de"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/instance-source-plan.ss",
+      "sha256": "87296ee41895882db0e5137b60041e3ae8392d1c322c6726dcb783f3a61b7ef4"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/mailbox-failure.ss",
+      "sha256": "3e1f6bd125713bde4944673e852ff8d5c5058572faf5994fe305315ee12ffd35"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/result-construction-contract.ss",
+      "sha256": "8c135aaa549aa60a91f300f3a4c6a31430fc25ccd9fc008fea333d3c68571259"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/utf8-baseline-control.ss",
+      "sha256": "8c14603953aec207e41866ac22699a694bcdb5e9f2671174add7b730b337c74f"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/utf8-buffer-control.ss",
+      "sha256": "133e0e56540122b4dc7b3feb64eb9b7c05886eedbc84f9b74c997bd9e3de9ec8"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/utf8-controls.ss",
+      "sha256": "4677d7b4eb0e21d0acfe6f6c6451d48d45fca7c24c52f433f49af1321e497728"
+    },
+    {
+      "path": "crates/gerbil-scheme-qualification/scheme/utf8-inline-control.ss",
+      "sha256": "b5f409fe5492943ee463d50356abbf3f891c4787c6c4838ac86eb59b3cfb30b1"
+    },
+    {
+      "path": "gerbil.pkg",
+      "sha256": "aa47d89043cb3bd415c8e3e4cb9785f1b6c948a0fa04e660f494288e6e112b55"
+    },
+    {
+      "path": "scheme/actor-batch.ss",
+      "sha256": "68ac097c46ed748a8e4a35d743f3834bbf08bb93920c2811e0a2c02ca6c66e51"
+    },
+    {
+      "path": "scheme/arrow.ss",
+      "sha256": "e1495789d2af20fee398d4063f19eeb423a721bfeb6801d0638a87b3e51d134f"
+    },
+    {
+      "path": "scheme/async-service.ss",
+      "sha256": "5d8df36dcb10c7fcc8b37ae36837d7557fd6abd36d589cc2f90b69ab6a1e2089"
+    },
+    {
+      "path": "scheme/build.ss",
+      "sha256": "bac5ce653e274b8837125bb07c8455fbc0c27682057a45b3f2c1632388da7cd3"
+    },
+    {
+      "path": "scheme/link-options.ss",
+      "sha256": "9a4329fb64b9e126f7872044f9b73f0ffc002fbcfd083f7b78c5231e7f6b3dcd"
+    },
+    {
+      "path": "scheme/package-clean.ss",
+      "sha256": "4e55f1379b1574b5c2d6e851887592fff92348090bb932c28797b703ba81a187"
+    },
+    {
+      "path": "scheme/program-build.ss",
+      "sha256": "55ec20d441655bc9cdbc560cfd51ac18290dae853a40e4954ff216d74ff29a5d"
+    },
+    {
+      "path": "scheme/program-metadata.ss",
+      "sha256": "89046ee6acda8903a0833b0d996f9a9ca393224a91ba2c31a548aef0f008377e"
+    },
+    {
+      "path": "scheme/python-package.ss",
+      "sha256": "597ca95cd6f04e51e43f38f4758e3ba531085a1d307febe0aa6f1d28f06c5be1"
+    },
+    {
+      "path": "scheme/python-runtime.ss",
+      "sha256": "dece0dd57a91f90feb23b1cdc9b591aa0d8a857e62ff4e5f9b3c7020cfb33b14"
+    },
+    {
+      "path": "scheme/runtime-collections.ss",
+      "sha256": "c2bcbcbc972acdbee6bfd0e02363f62310ef0100736bf5b7ad018cc9a0e3d1b6"
+    },
+    {
+      "path": "scheme/runtime-composites.ss",
+      "sha256": "760b1a6c23873328c37ca29eb20c5d8461607ba98fe8ada761ddd16f15579850"
+    },
+    {
+      "path": "scheme/runtime-exchange.ss",
+      "sha256": "bca78746fa93671c470409c554493e53d285c5670fa47f2bb6b235607f3aa415"
+    },
+    {
+      "path": "scheme/runtime-host.ss",
+      "sha256": "7a98e19188830662b0a89b2aa9a77b32eda46930babc1d3dffc33cf6063dbc8f"
+    },
+    {
+      "path": "scheme/runtime-object-kinds.ss",
+      "sha256": "c6cd7ca8a9211af2967b6cbc48aa1d8ef6ef58f699ec7dbb1652b6ec53e2a629"
+    },
+    {
+      "path": "scheme/runtime-smp-test.ss",
+      "sha256": "62897f5e2456267e4152e06223e783aa7e73d31d85f9749cad9a50d838119788"
+    },
+    {
+      "path": "scheme/runtime-test.ss",
+      "sha256": "4653ea0ded79d2883ac00ba703e4cca93f8d3920035dbe046ef233f9e56b31d0"
+    },
+    {
+      "path": "scheme/runtime-vm-test.ss",
+      "sha256": "f1f8727f9ba4e5127c08ba7b88bef4bc386270eb54172a1044e64f7e3bfc00c3"
+    },
+    {
+      "path": "scheme/runtime.ss",
+      "sha256": "812593c4311faae83b88e7c734abb079c0d12e056ea3a36069ad6e4460c25992"
+    },
+    {
+      "path": "scheme/service-budget.ss",
+      "sha256": "6439848592ad6db1e06ebeb29ac774887dda6719428ef90926b1b2263847ff28"
+    },
+    {
+      "path": "scheme/service-native.ss",
+      "sha256": "7cb2430b548c1cf8a7151ea0a1caf019a34877b29cd7e5b2f32308e28cdfe3fc"
+    },
+    {
+      "path": "scheme/service-port-wake.ss",
+      "sha256": "fba78c0b4c9d70f83c9320e9cc245527a792ca0db369a79056d60f9f310ec86a"
+    },
+    {
+      "path": "scheme/service-progress.ss",
+      "sha256": "6d78a27e287e70c06c04e26c1840962e09279893a4d971ff12a9950f1a4ee4dd"
+    },
+    {
+      "path": "scheme/service-runtime.ss",
+      "sha256": "bfc0f787a551767c04a7974aa222af33f7c5f95e416f6c2fe54bcebb560c9e95"
+    },
+    {
+      "path": "scheme/service-work-activation.ss",
+      "sha256": "54c9c31d96b172e5e02c15b69bf3f397f041d4663be6997e95790dedfb86f740"
+    },
+    {
+      "path": "scheme/service-work-turn.ss",
+      "sha256": "897297d101350aec375ed10bb2582bc7cfcce0592abd74ab7f1b4501658a96a0"
+    },
+    {
+      "path": "scheme/service-work.ss",
+      "sha256": "66a5283595a65ed480177fc6a30b7febbe4906c42cc188e8a70afc7d7962b480"
+    },
+    {
+      "path": "scheme/utf8.ss",
+      "sha256": "3e50a90bcb64088dcde1baa850e780568355a203ddd7ad068d7d2d76ffbfd0d0"
+    }
+  ],
+  "generated_artifacts": [
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/actors.scm",
+      "bytes": 543,
+      "sha256": "3e03bd3f33bb0094c7d0b643979c615036f1731d92c3fc9c5115f553ffef6e31"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/actors.ssi",
+      "bytes": 60374,
+      "sha256": "c48aa12754400754b68e93cb5daa31b7238b4455bf76a3759c9f0f40ab8cdfc1"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/actors~0.scm",
+      "bytes": 745819,
+      "sha256": "9fd4d0633736b24fdd7f0e5e6ee3267265fcec56339e4f57a84d56bfdd83b497"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/actors~1.scm",
+      "bytes": 690388,
+      "sha256": "166f62f0f16c9a30ca04e7dfc1bdd9dc3ca9c5e1fa6505f0aaeabfb6934873e1"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/mailbox-failure.scm",
+      "bytes": 145,
+      "sha256": "7e151833f17a5c0734fd0e9d4f51d336df99ba2569a4123dd76d07de0f0c5632"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/mailbox-failure.ssi",
+      "bytes": 1739,
+      "sha256": "b9a90dec1567552f8bb6a9645daeb42616446ddd13239853b51f0b4879f81187"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/mailbox-failure~0.scm",
+      "bytes": 14463,
+      "sha256": "d8d20ae57f94d74ea91e233b8cfed6e71af8890cfada7ad51670387986d67945"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-baseline-control.scm",
+      "bytes": 151,
+      "sha256": "0864e2e1686095963a13c7d347325ef57bcd779225b66bc62e298e0c22839ccb"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-baseline-control.ssi",
+      "bytes": 728,
+      "sha256": "99b7b44733207291e580f0965df46c29e2f400b269c3a205a74826b50dc816bf"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-baseline-control~0.scm",
+      "bytes": 5301,
+      "sha256": "6311051e26e135c8f29deaf92a990dce5569e671309b38f1e11240593f762828"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-buffer-control.scm",
+      "bytes": 191,
+      "sha256": "5921aa69c58cec2e5b08db06d66b29324b3d76ac4b1c6372a061eb4dd8e75cf3"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-buffer-control.ssi",
+      "bytes": 585,
+      "sha256": "1d292bc862550d809dc6ab06a7115515ba245e58add5d3fba15550b7e2fe5b3c"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-buffer-control~0.scm",
+      "bytes": 6088,
+      "sha256": "c410460f7b310721641d491a7c588ed11e3f79ccd36bb1867dfa522ee0cec171"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-controls.scm",
+      "bytes": 469,
+      "sha256": "828668d0a2a2d55358411cccfaf88680b09e04e2d987f631db60f2d570aa069a"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-controls.ssi",
+      "bytes": 2517,
+      "sha256": "ee762e47404963c444d92fffbecad13780c15ae2ffff304f2741be6424964729"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-controls~0.scm",
+      "bytes": 26416,
+      "sha256": "870e92d382bea2578d2eef6da07a1780405d18924a1784a830ec0d298a943733"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-inline-control.scm",
+      "bytes": 149,
+      "sha256": "91047bd82009ac15bb819b338eac6bd15d6435f5f7acdc9a027233eddfe9c3b2"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-inline-control.ssi",
+      "bytes": 771,
+      "sha256": "ac43c8c971ca8b7f60917dc054c612c8370e32be692aa884cdea0fee0897620e"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/qualification/utf8-inline-control~0.scm",
+      "bytes": 5641,
+      "sha256": "479fdaf3cfc04224f439d8379d3ca8751398ef3a097f5a903a22c1c9d6205417"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/actor-batch.scm",
+      "bytes": 183,
+      "sha256": "79a5e2aedc97f2e7e730daedbae3ee8a341fab530944697fe63f5706d3cacda6"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/actor-batch.ssi",
+      "bytes": 11094,
+      "sha256": "37f79b16b9d53840905e5ff12ce1e452f6133d56da97a35eeb354cf91d4e7c91"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/actor-batch~0.scm",
+      "bytes": 39988,
+      "sha256": "cf0173a2449d645321aa6b9911a3409a60ce51415576283071f1fbe26fe0a6d0"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/actor-batch~1.o1",
+      "bytes": 66912,
+      "sha256": "f9c7bcfad2f10539957b7928369b2260c317a193c6ab46cf3440116698b2cfd0"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/actor-batch~1.scm",
+      "bytes": 29007,
+      "sha256": "ec9d4dd73012053b03a3b97a67de5170846ad09e56f5be30776a12e33b6320eb"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/async-service.scm",
+      "bytes": 251,
+      "sha256": "d72451db05a2a4d16dea920e1b9dd18d98515967c2bf48e26e9f606027ba3470"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/async-service.ssi",
+      "bytes": 40255,
+      "sha256": "454c3b977988a7eac330ceec6069e8e785d295c08432c766892fc12d3f3c832d"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/async-service~0.scm",
+      "bytes": 254566,
+      "sha256": "b0b15c7a6832dae7c3405ec7f98758aa341c6cfa2a73ca84ba982d2b0401bde8"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/async-service~1.o1",
+      "bytes": 166048,
+      "sha256": "178dfc8f06e485b6727292a45b19d2c6027bb96180ec7fcd73cc2da440977cfb"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/async-service~1.scm",
+      "bytes": 94063,
+      "sha256": "301481b5ad4a07fceab5dd8d7984b7a0842d7aa0a85b384d53710fa8fe85f8e1"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/runtime.scm",
+      "bytes": 263,
+      "sha256": "42129365665fa5d402452b172cbfd48ff510c58ed777472ba0cc6183cf6363eb"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/runtime.ssi",
+      "bytes": 9181,
+      "sha256": "f4fb812dd7d56fcdecf115b10577391b3e869f08bdd5bc331b9084d1226470d2"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/runtime~0.scm",
+      "bytes": 115478,
+      "sha256": "d32a367da20009e4bbd37967eb8d3b32477c5c6340d1ae49328bd7623cb4c2aa"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/service-budget.scm",
+      "bytes": 133,
+      "sha256": "4a7a3ac7cbd2d23471f2dd8d0e0654637cc023c722438766debcf03b3c9780d8"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/service-budget.ssi",
+      "bytes": 83017,
+      "sha256": "da0dcb5fc8dd10099405e1d1d6808d42ea984c9f47cad904dc64bdc5d1d7a8ce"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/service-budget~0.scm",
+      "bytes": 369242,
+      "sha256": "db892b97b0f6e5ec4a4bc742214e7946892e23c885c1dcccdab5f15bc9089e10"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/service-budget~1.o1",
+      "bytes": 414096,
+      "sha256": "c85beea6fdc4e9b03ea7c0c0ac5821ae82c6232e1d924ec9d86cc656bf6fbb0f"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/service-budget~1.scm",
+      "bytes": 318656,
+      "sha256": "7cc1934299beea09e083a124614f33ae21ecd4331bee2869712eacffa66037de"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/utf8.scm",
+      "bytes": 123,
+      "sha256": "66576292b9325083f5a6113f0e89be90b94bbb46c3e06016937a680dd32ec858"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/utf8.ssi",
+      "bytes": 1135,
+      "sha256": "1f84b6da5d0f543bfc6420e7414328d8463b3ac03819c432dec8b4ca7773475a"
+    },
+    {
+      "path": "gerbil-path/lib/gerbil-scheme-rust/scheme/utf8~0.scm",
+      "bytes": 9589,
+      "sha256": "f2b20bc6cdf56908ccdbd877d71b6967cb09ac4e078fce9753e800d29078f216"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__qualification__actors.scm",
+      "bytes": 745819,
+      "sha256": "9fd4d0633736b24fdd7f0e5e6ee3267265fcec56339e4f57a84d56bfdd83b497"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__qualification__mailbox-failure.scm",
+      "bytes": 14463,
+      "sha256": "d8d20ae57f94d74ea91e233b8cfed6e71af8890cfada7ad51670387986d67945"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__qualification__utf8-baseline-control.scm",
+      "bytes": 5301,
+      "sha256": "6311051e26e135c8f29deaf92a990dce5569e671309b38f1e11240593f762828"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__qualification__utf8-buffer-control.scm",
+      "bytes": 6088,
+      "sha256": "c410460f7b310721641d491a7c588ed11e3f79ccd36bb1867dfa522ee0cec171"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__qualification__utf8-controls.scm",
+      "bytes": 26416,
+      "sha256": "870e92d382bea2578d2eef6da07a1780405d18924a1784a830ec0d298a943733"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__qualification__utf8-inline-control.scm",
+      "bytes": 5641,
+      "sha256": "479fdaf3cfc04224f439d8379d3ca8751398ef3a097f5a903a22c1c9d6205417"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__scheme__actor-batch.scm",
+      "bytes": 39988,
+      "sha256": "cf0173a2449d645321aa6b9911a3409a60ce51415576283071f1fbe26fe0a6d0"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__scheme__async-service.scm",
+      "bytes": 254566,
+      "sha256": "b0b15c7a6832dae7c3405ec7f98758aa341c6cfa2a73ca84ba982d2b0401bde8"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__scheme__runtime.scm",
+      "bytes": 115478,
+      "sha256": "d32a367da20009e4bbd37967eb8d3b32477c5c6340d1ae49328bd7623cb4c2aa"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__scheme__service-budget.scm",
+      "bytes": 369242,
+      "sha256": "db892b97b0f6e5ec4a4bc742214e7946892e23c885c1dcccdab5f15bc9089e10"
+    },
+    {
+      "path": "gerbil-path/lib/static/gerbil-scheme-rust__scheme__utf8.scm",
+      "bytes": 9589,
+      "sha256": "f2b20bc6cdf56908ccdbd877d71b6967cb09ac4e078fce9753e800d29078f216"
+    },
+    {
+      "path": "actors.c",
+      "bytes": 8554648,
+      "sha256": "f68cb446e12174ce13df4dc0f9496aa1d3c30afec2c4fa379a55a421f8931f6f"
+    }
+  ],
+  "compiler_stage_results": {
+    "receipt": {
+      "exit": 70,
+      "reason": null,
+      "elapsed_seconds": 1.3603378750267439,
+      "process_group_rss_sample_peak_bytes": 274350080
+    },
+    "phase1": {
+      "exit": 70,
+      "reason": null,
+      "elapsed_seconds": 1.387079290987458,
+      "process_group_rss_sample_peak_bytes": 109789184
+    },
+    "phase1-sdk-map": {
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 32.797248833987396,
+      "process_group_rss_sample_peak_bytes": 2279342080
+    },
+    "remaining": {
+      "exit": 70,
+      "reason": null,
+      "elapsed_seconds": 1.7241726669599302,
+      "process_group_rss_sample_peak_bytes": 258097152
+    },
+    "phase1-actor-batch": {
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 0.7931445409776643,
+      "process_group_rss_sample_peak_bytes": 208846848
+    },
+    "phase1-async-service": {
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 3.525303249945864,
+      "process_group_rss_sample_peak_bytes": 641482752
+    },
+    "actors-emission": {
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 6.301567874965258,
+      "process_group_rss_sample_peak_bytes": 594083840
+    },
+    "actors-c-emission": {
+      "exit": 0,
+      "reason": null,
+      "elapsed_seconds": 2.0889705829904415,
+      "process_group_rss_sample_peak_bytes": 481050624
+    }
+  },
+  "kernel_static_inventory": [
+    {
+      "name": "gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_orders_2d_handler_2f_rank",
+      "c_line": 30336,
+      "c_bytes": 42170,
+      "box_allocation_sites": 0,
+      "closure_allocation_sites": 2,
+      "closure_field_read_sites": 26,
+      "poll_sites": 10,
+      "s64vector_allocation_sites": 0,
+      "s64vector_inline_element_sites": 0
+    },
+    {
+      "name": "gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_orders_2d_unit_2f_native",
+      "c_line": 32376,
+      "c_bytes": 84475,
+      "box_allocation_sites": 2,
+      "closure_allocation_sites": 0,
+      "closure_field_read_sites": 0,
+      "poll_sites": 13,
+      "s64vector_allocation_sites": 1,
+      "s64vector_inline_element_sites": 21
+    },
+    {
+      "name": "gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_actor_2d_arrival_2d_order_2d_data",
+      "c_line": 60216,
+      "c_bytes": 22989,
+      "box_allocation_sites": 0,
+      "closure_allocation_sites": 0,
+      "closure_field_read_sites": 0,
+      "poll_sites": 2,
+      "s64vector_allocation_sites": 0,
+      "s64vector_inline_element_sites": 0
+    },
+    {
+      "name": "gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_actor_2d_arrival_2d_verify_21_",
+      "c_line": 60707,
+      "c_bytes": 51073,
+      "box_allocation_sites": 1,
+      "closure_allocation_sites": 0,
+      "closure_field_read_sites": 0,
+      "poll_sites": 7,
+      "s64vector_allocation_sites": 0,
+      "s64vector_inline_element_sites": 0
+    },
+    {
+      "name": "gerbil_2d_scheme_2d_rust_2f_qualification_2f_actors_23_orders_2d_mailbox_2d_backpressure_2d_scheduled",
+      "c_line": 88416,
+      "c_bytes": 233960,
+      "box_allocation_sites": 10,
+      "closure_allocation_sites": 7,
+      "closure_field_read_sites": 100,
+      "poll_sites": 29,
+      "s64vector_allocation_sites": 0,
+      "s64vector_inline_element_sites": 0
+    }
+  ],
+  "inventory_scope": "static C source sites, including cold paths; not dynamic frequencies, machine register spills or CPU costs",
+  "business_benchmark_run": false,
+  "native_vm_acceptance_run": false
+}

@@ -103,6 +103,14 @@
         (if (eq? value gerbil-rs-root-missing) 0
           (gerbil-rs-root-object (procedure value)))))))
 
+;; Call only a rooted procedure on this VM owner. Both roots remain borrowed.
+(def (gerbil-rs-rooted-apply procedure-root input-root)
+  (gerbil-rs-rooted-call input-root
+    (lambda (input)
+      (let (procedure (gerbil-rs-rooted-value-ref procedure-root))
+        (unless (procedure? procedure) (error "expected a live rooted procedure"))
+        (procedure input)))))
+
 (def (gerbil-rs-rooted-value-store! value)
   (let (root-id gerbil-rs-next-root-id)
     (set! gerbil-rs-next-root-id (1+ root-id))
@@ -1029,6 +1037,9 @@ END-C
 
 ;; Stable C projections stay in the core; native build procedures load on demand.
 (begin-foreign
+  (c-define (gerbil-rs-apply-rooted procedure-root input-root) (int64 int64) int64
+    "gerbil_scheme_rust_apply_rooted" "extern"
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-apply procedure-root input-root))
   (c-define (package-main-entry directory arguments count) (UTF-8-string (pointer void) unsigned-int) int32
     "gerbil_scheme_rust_package_main_scheme" ""
     (gerbil-scheme-rust/scheme/build#package-main-arguments directory arguments count))
@@ -1057,4 +1068,9 @@ END-C
     "gerbil_scheme_rust_package_load_closure_scheme" ""
     (gerbil-scheme-rust/scheme/build#package-load-closure
       (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref imports) output))
+  (c-define (package-resolve-export-entry directory module-name export-name)
+    (UTF-8-string int64 int64) int64 "gerbil_scheme_rust_package_resolve_export_scheme" ""
+    (gerbil-scheme-rust/scheme/build#package-resolve-export directory
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref module-name)
+      (gerbil-scheme-rust/scheme/runtime#gerbil-rs-rooted-value-ref export-name)))
 )

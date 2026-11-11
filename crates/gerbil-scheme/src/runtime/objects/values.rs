@@ -1,7 +1,7 @@
 //! Strong Scheme roots: no GC-managed words escape collection ownership.
 use crate::runtime::RootedSchemeOwner;
 use crate::runtime::{
-    GerbilRuntime, GerbilValue, GerbilValueProvenance, NativeError, SchemeScalar,
+    GerbilRuntime, GerbilValue, GerbilValueProvenance, NativeError, RootedCallError, SchemeScalar,
 };
 use gerbil_scheme_sys::{self as sys, GerbilRootId, GerbilStatus};
 use std::marker::PhantomData;
@@ -330,6 +330,40 @@ impl<'r> RootedObjectBatch<'r> {
 }
 
 impl GerbilRuntime {
+    /// Invoke a rooted Scheme procedure with one rooted argument on this owner.
+    /// Both inputs remain borrowed; a successful result owns a fresh root.
+    /// # Errors
+    /// Rejects wrong owner, non-procedure values, and caught Scheme exceptions.
+    pub fn call_rooted(
+        &self,
+        procedure: &RootedSchemeObject<'_>,
+        argument: &RootedSchemeObject<'_>,
+    ) -> Result<RootedSchemeObject<'_>, RootedCallError> {
+        self.check_thread()?;
+        if procedure.as_ref().kind()? != ObjectKind::Procedure {
+            return Err(invalid("rooted procedure").into());
+        }
+        // SAFETY: the checked owner retains both input roots for the call.
+        let root = unsafe {
+            sys::gerbil_scheme_rust_apply_rooted(procedure.root_id().0, argument.root_id().0)
+        };
+        match own(root) {
+            Ok(owner) => Ok(RootedSchemeObject { owner }),
+            Err(source) => {
+                // SAFETY: this consumes only the immediately preceding call's
+                // owner-local diagnostic and transfers its bytevector root.
+                let diagnostic_root = unsafe { sys::gerbil_scheme_rust_take_call_error_raw() };
+                let diagnostic = own(diagnostic_root)
+                    .ok()
+                    .and_then(|owner| {
+                        let bytes = crate::RootedSchemeBytevector { owner };
+                        bytes.to_vec().into_result().ok()
+                    })
+                    .map(|bytes| String::from_utf8_lossy(&bytes).into_owned());
+                Err(RootedCallError { source, diagnostic })
+            }
+        }
+    }
     /// Allocate a strongly rooted scalar through the official Scheme constructors.
     /// # Errors
     /// Rejects a wrong owner, out-of-range fixnum or native allocation failure.

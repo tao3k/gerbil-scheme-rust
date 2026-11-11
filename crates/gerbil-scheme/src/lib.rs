@@ -41,7 +41,7 @@ pub use runtime::{
 pub use runtime::{
     GerbilI64Callback, GerbilI64CallbackAbi, GerbilRuntime, GerbilRuntimeReceipt, GerbilUtf8,
     GerbilValue, GerbilValueProvenance, LinkedBytesExport, LinkedGerbilProgram, LinkedObjectExport,
-    LinkedStringExport, NativeError, NativeResult, VmCapabilities,
+    LinkedStringExport, NativeError, NativeResult, RootedCallError, VmCapabilities,
 };
 
 pub mod tool_environment;

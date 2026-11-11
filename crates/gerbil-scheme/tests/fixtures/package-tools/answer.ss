@@ -1,4 +1,5 @@
-(export answer answer-literal main)
+(export answer answer-literal echo main)
 (def (answer) 42)
 (defrule (answer-literal) 42)
+(def (echo value) value)
 (def (main . _) (void))

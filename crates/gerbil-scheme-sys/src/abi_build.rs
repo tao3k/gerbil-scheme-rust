@@ -16,6 +16,37 @@ unsafe extern "C" {
         tests: *const c_char,
         result: *mut i32,
     ) -> GerbilStatus;
+    fn gerbil_scheme_rust_package_resolve_export_cstr(
+        directory: *const c_char,
+        module: GerbilRootId,
+        name: GerbilRootId,
+        result: *mut GerbilRootId,
+    ) -> GerbilStatus;
+}
+
+/// Resolve one module export on the live package owner, transferring a fresh root.
+/// # Safety
+/// Owner-local live symbol roots, readable directory and writable disjoint result.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gerbil_scheme_rust_package_resolve_export(
+    directory: GerbilBorrowedUtf8,
+    module: GerbilRootId,
+    name: GerbilRootId,
+    result: *mut GerbilRootId,
+) -> GerbilStatus {
+    if result.is_null() {
+        return GerbilStatus::NullPointer;
+    }
+    if !module.is_valid() || !name.is_valid() {
+        return GerbilStatus::InvalidValue;
+    }
+    let directory = match unsafe { directory_string(directory) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    unsafe {
+        gerbil_scheme_rust_package_resolve_export_cstr(directory.as_ptr(), module, name, result)
+    }
 }
 
 unsafe fn directory_string(value: GerbilBorrowedUtf8) -> Result<CString, GerbilStatus> {

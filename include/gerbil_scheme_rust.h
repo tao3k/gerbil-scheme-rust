@@ -65,6 +65,9 @@ typedef int64_t GerbilRootId;
  * Creation transfers a strong root. Collection copy publishes newly owned
  * roots only on success. Release spans contain ascending unique live IDs. */
 GerbilRootId gerbil_scheme_rust_object_root_raw(GerbilValueHandle value);
+/* Owner-local rooted procedure and argument are borrowed; success transfers a
+ * fresh root. Zero indicates failure, with optional owner-local diagnostic. */
+GerbilRootId gerbil_scheme_rust_apply_rooted(GerbilRootId procedure, GerbilRootId argument);
 int64_t gerbil_scheme_rust_root_count_raw(void);
 /* Optional, owner-local, consumed UTF-8 diagnostic root; release normally. */
 int64_t gerbil_scheme_rust_take_call_error_raw(void);
@@ -105,6 +108,8 @@ typedef struct GerbilBorrowedVector {
 GerbilStatus gerbil_scheme_rust_package_build(GerbilBorrowedUtf8 directory, int32_t *result);
 GerbilStatus gerbil_scheme_rust_package_clean(GerbilBorrowedUtf8 directory, int32_t *result);
 GerbilStatus gerbil_scheme_rust_package_test(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 tests, int32_t *result);
+/* Startup-only trusted package resolution, using rooted Scheme symbols. */
+GerbilStatus gerbil_scheme_rust_package_resolve_export(GerbilBorrowedUtf8 directory, GerbilRootId module, GerbilRootId name, GerbilRootId *result);
 
 GerbilStatus gerbil_scheme_rust_package_paths(GerbilBorrowedUtf8 prefix, GerbilBorrowedUtf8 libraries, int32_t *result);
 GerbilStatus gerbil_scheme_rust_package_main(GerbilBorrowedUtf8 directory, const GerbilBorrowedUtf8 *arguments, size_t count, int32_t *result);

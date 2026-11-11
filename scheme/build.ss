@@ -3,7 +3,7 @@
 (import :gerbil/expander :std/ffi
         (only-in :gerbil/runtime/init gerbil-load-expander!)
         (rename-in (only-in :gerbil/tools/gxtest main) (main package-test-main))
-        (only-in "runtime.ss" gerbil-rs-exception-message)
+        (only-in "runtime.ss" gerbil-rs-exception-message gerbil-rs-root-object)
         (only-in "program-build.ss" gerbil-rs-stage-program)
         (only-in :std/source this-source-file)
         (only-in :gerbil/tools/env setup-local-pkg-env!))
@@ -216,6 +216,31 @@
                                gerbil-rs-stage-load-closure)))
         ((eval 'gerbil-rs-stage-load-closure) imports (path-expand output))
         (void)))))
+
+;; Resolve a declared module export with Gerbil's own expander and loader.
+;; This uses the same immutable package path owner as other package operations.
+(def (package-resolve-export directory module-name export-name)
+  (with-catch
+    (lambda (failure)
+      (display (gerbil-rs-exception-message failure) (current-error-port))
+      (newline (current-error-port))
+      (force-output (current-error-port))
+      0)
+    (lambda ()
+      (unless (and (string? directory) (not (string-empty? directory))
+                   (symbol? module-name) (symbol? export-name))
+        (error "invalid package module export request"))
+      (let (value
+             (parameterize ((current-directory (path-expand directory))
+                            (current-expander-context (make-top-context)))
+               (eval-syntax '(import :gerbil/core))
+               (with-package-paths
+                 (lambda ()
+                   (setup-package-env! #f)
+                   (eval-syntax `(import (only-in ,module-name ,export-name)))
+                   (eval export-name)))))
+        ;; Root only after dynamic cleanup succeeds, so failure cannot leak it.
+        (gerbil-rs-root-object value)))))
 
 (begin-foreign
   (namespace ("gerbil-scheme-rust/scheme/build#" package-argument))

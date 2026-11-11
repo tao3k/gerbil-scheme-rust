@@ -18,6 +18,31 @@ pub enum PackageCallOutcome {
 }
 
 impl GerbilRuntime {
+    /// Resolve an exported value through Gerbil's package module loader.
+    /// The package prefix is fixed to the existing tooling owner. This is a
+    /// startup operation: do not overlap unrelated environment or subprocess work.
+    /// # Errors
+    /// Rejects wrong owner, invalid symbols, resolution failures and native errors.
+    pub fn resolve_package_export(
+        &self,
+        directory: &str,
+        module: &RootedSchemeObject<'_>,
+        name: &RootedSchemeObject<'_>,
+    ) -> Result<RootedSchemeObject<'_>, NativeError> {
+        self.check_thread()?;
+        let mut root = gerbil_scheme_sys::GerbilRootId(0);
+        // SAFETY: live owner and input roots remain borrowed throughout the call.
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_package_resolve_export(
+                directory.into(),
+                module.root_id(),
+                name.root_id(),
+                &raw mut root,
+            )
+        };
+        super::types::RootedSchemeOwner::new(status, root, "package module export")
+            .map(RootedSchemeObject::from_owner)
+    }
     /// Invoke the package's official `build.ss clean` action on this VM owner.
     /// Package code owns generated-output cleanup; this does not unload modules
     /// or classify artifacts in Rust. A new source cut requires a new host.

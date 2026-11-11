@@ -121,6 +121,14 @@ unsafe extern "C" {
     /// The word must be a live object on the active Scheme owner.
     pub fn gerbil_scheme_rust_object_root_raw(word: usize) -> i64;
     /// # Safety
+    /// Owner-local live roots; procedure and argument are borrowed for the call.
+    /// A positive result transfers a fresh strong root; zero signals failure.
+    pub fn gerbil_scheme_rust_apply_rooted(procedure: i64, argument: i64) -> i64;
+    /// # Safety
+    /// Call only on the active VM owner after a failed rooted call. A positive
+    /// result transfers an owned UTF-8 bytevector root; zero means unavailable.
+    pub fn gerbil_scheme_rust_take_call_error_raw() -> i64;
+    /// # Safety
     /// The root must remain live on its owner; the borrowed word must not escape.
     pub fn gerbil_scheme_rust_object_word_raw(root: i64) -> usize;
     /// # Safety

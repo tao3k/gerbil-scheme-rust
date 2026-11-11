@@ -123,6 +123,80 @@ fn host_allowed_cpus() -> String {
 }
 
 #[test]
+fn rooted_package_exports_preserve_diagnostics_and_owner() {
+    if supervisor::run() {
+        return;
+    }
+    let root = fixture();
+    let environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
+    let runtime = initialize();
+    let directory = root.to_str().unwrap();
+    {
+        use gerbil_scheme::{IdentifierKind, ObjectKind, SchemeScalar};
+        let module = runtime
+            .intern_identifier(IdentifierKind::Symbol, ":gerbil/core")
+            .unwrap();
+        let name = runtime
+            .intern_identifier(IdentifierKind::Symbol, "not")
+            .unwrap();
+        let procedure = runtime
+            .resolve_package_export(directory, &module, &name)
+            .unwrap();
+        assert_eq!(procedure.as_ref().kind().unwrap(), ObjectKind::Procedure);
+        let input = runtime.scalar_object(SchemeScalar::Boolean(false)).unwrap();
+        let output = runtime.call_rooted(&procedure, &input).unwrap();
+        assert_eq!(
+            output.as_ref().scalar().unwrap(),
+            SchemeScalar::Boolean(true)
+        );
+        assert!(runtime.call_rooted(&input, &input).is_err());
+        println!("PACKAGE-ROOTED-EXPORT-STEP normal and non-procedure returned");
+        let failing = runtime
+            .intern_identifier(IdentifierKind::Symbol, "error")
+            .unwrap();
+        let failing = runtime
+            .resolve_package_export(directory, &module, &failing)
+            .unwrap();
+        let message = runtime
+            .string_from_utf8("rooted test exception")
+            .unwrap()
+            .into_object();
+        let failure = runtime.call_rooted(&failing, &message).unwrap_err();
+        assert!(
+            failure
+                .diagnostic
+                .as_deref()
+                .is_some_and(|message| message.contains("rooted test exception"))
+        );
+        println!("PACKAGE-ROOTED-EXPORT-STEP diagnostic returned");
+        let missing = runtime
+            .intern_identifier(IdentifierKind::Symbol, "no-such-export")
+            .unwrap();
+        assert!(
+            runtime
+                .resolve_package_export(directory, &module, &missing)
+                .is_err()
+        );
+        println!("PACKAGE-ROOTED-EXPORT-STEP missing export returned");
+        assert_eq!(
+            runtime
+                .call_rooted(&procedure, &input)
+                .unwrap()
+                .as_ref()
+                .scalar()
+                .unwrap(),
+            SchemeScalar::Boolean(true)
+        );
+    }
+    println!("PACKAGE-ROOTED-EXPORT-STEP cleanup entered");
+    drop(runtime);
+    println!("PACKAGE-ROOTED-EXPORT-STEP cleanup returned");
+    assert_environment_after_close(&environment);
+    fs::remove_dir_all(root).unwrap();
+    println!("PACKAGE-ROOTED-EXPORT-OK");
+}
+
+#[test]
 fn build_test_and_failures_share_the_existing_owner() {
     if supervisor::run() {
         return;

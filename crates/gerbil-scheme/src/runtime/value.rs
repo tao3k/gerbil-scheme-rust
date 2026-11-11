@@ -6,6 +6,36 @@ use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::thread::ThreadId;
 
+/// A rooted Scheme call failure with an optional bounded VM diagnostic.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RootedCallError {
+    /// Stable boundary status or owner validation failure.
+    pub source: NativeError,
+    /// Scheme's diagnostic, when a caught exception provided one.
+    pub diagnostic: Option<String>,
+}
+
+impl From<NativeError> for RootedCallError {
+    fn from(source: NativeError) -> Self {
+        Self {
+            source,
+            diagnostic: None,
+        }
+    }
+}
+
+impl fmt::Display for RootedCallError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.source)?;
+        if let Some(diagnostic) = &self.diagnostic {
+            write!(f, ": {diagnostic}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for RootedCallError {}
+
 /// Failure at the safe in-process Gerbil boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NativeError {

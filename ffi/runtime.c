@@ -279,6 +279,8 @@ static int (*package_forward_callback)(void) = package_forward_output;
 extern int32_t gerbil_scheme_rust_package_build_scheme(const char *directory);
 extern int32_t gerbil_scheme_rust_package_clean_scheme(const char *directory);
 extern int32_t gerbil_scheme_rust_package_test_scheme(const char *directory, const char *tests);
+extern int64_t gerbil_scheme_rust_package_resolve_export_scheme(const char *, int64_t, int64_t);
+extern int32_t gerbil_scheme_rust_root_release_raw(int64_t);
 extern int32_t gerbil_scheme_rust_package_stage_scheme(const char *, const char *, int64_t);
 extern int32_t gerbil_scheme_rust_package_build_spec_scheme(const char *, const char *);
 extern int32_t gerbil_scheme_rust_package_load_closure_scheme(int64_t, const char *);
@@ -330,6 +332,23 @@ GerbilStatus gerbil_scheme_rust_package_test_cstr(const char *directory, const c
   GerbilStatus status = package_enter(&host);
   if (status != GERBIL_STATUS_OK) return status;
   return package_leave(&host, gerbil_scheme_rust_package_test_scheme(directory, tests), result);
+}
+GerbilStatus gerbil_scheme_rust_package_resolve_export_cstr(const char *directory, GerbilRootId module, GerbilRootId name, GerbilRootId *result) {
+  if (directory == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;
+  if (module <= 0 || name <= 0) return GERBIL_STATUS_INVALID_VALUE;
+  gerbil_host_io host;
+  GerbilStatus status = package_enter(&host);
+  if (status != GERBIL_STATUS_OK) return status;
+  int64_t root = gerbil_scheme_rust_package_resolve_export_scheme(directory, module, name);
+  int32_t ignored = 0;
+  status = package_leave(&host, 0, &ignored);
+  if (status != GERBIL_STATUS_OK) {
+    if (root > 0) (void)gerbil_scheme_rust_root_release_raw(root);
+    return status;
+  }
+  if (root <= 0) return GERBIL_STATUS_INVALID_VALUE;
+  *result = root;
+  return GERBIL_STATUS_OK;
 }
 GerbilStatus gerbil_scheme_rust_package_stage_cstr(const char *source, const char *output, GerbilRootId imports, int32_t *result) {
   if (source == NULL || output == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;

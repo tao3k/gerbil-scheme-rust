@@ -33,6 +33,7 @@ mod types;
 use types::RootedSchemeOwner;
 mod utf8;
 mod value;
+pub use value::RootedCallError;
 mod value_buffers;
 pub use capabilities::VmCapabilities;
 pub use lifecycle::{GerbilI64Callback, GerbilI64CallbackAbi};

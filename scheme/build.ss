@@ -79,7 +79,8 @@
         (options (getenv "GAMBOPT" #f)))
     (dynamic-wind
       (lambda ()
-        (setenv "GERBIL_BUILD_CORES" (number->string (##cpu-count)))
+        (unless previous
+          (setenv "GERBIL_BUILD_CORES" (number->string (##cpu-count))))
         ;; Child gsc has its own setup parameters. Preserve the paired
         ;; installation through Gambit's official relocation options too.
         (setenv "GAMBOPT" (string-append

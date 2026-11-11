@@ -29,6 +29,7 @@ fn local_package_environment_is_selected_before_loading_build_script() {
     // The existing runtime compiler projection lasts until VM teardown. Calls
     // must restore this active-owner state; Drop restores the full caller state.
     let active_environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
+    let selected_cores = std::env::var("GERBIL_BUILD_CORES").ok();
     let directory = root.to_str().unwrap();
     let prefix = root.join(".gerbil");
     assert_eq!(
@@ -42,6 +43,30 @@ fn local_package_environment_is_selected_before_loading_build_script() {
         "cancelled call must not select/create package environment"
     );
     assert_eq!(runtime.build_package(directory).unwrap(), 0);
+    let observed_cores = fs::read_to_string(root.join("build-cores.txt")).unwrap();
+    if let Some(expected) = &selected_cores {
+        assert_eq!(
+            &observed_cores, expected,
+            "explicit build budget was replaced"
+        );
+    } else {
+        assert_eq!(
+            observed_cores,
+            fs::read_to_string(root.join("cpu-count.txt")).unwrap(),
+            "default build budget must equal the Gambit CPU count"
+        );
+    }
+    assert_eq!(
+        runtime
+            .run_package_main(directory, &["test-fail-cores"])
+            .unwrap(),
+        70
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("build-cores.txt")).unwrap(),
+        observed_cores
+    );
+    assert_eq!(std::env::var("GERBIL_BUILD_CORES").ok(), selected_cores);
     #[cfg(target_os = "linux")]
     assert_eq!(
         host_allowed_cpus(),

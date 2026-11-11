@@ -125,7 +125,66 @@ module mailbox_measurement_contract {
     not(absolutePassed(control.outcome,sampleLimits)) and
     not(absolutePassed(candidate.outcome,sampleLimits))
   }
-  pure val measurementChecks=and {negativeAllocationWithNoGcCannotBeClampedIntoEvidence,
+  // Total owner CPU includes the zero-inflight source yield loop. Without
+  // component-exclusive accounting, payload cost is not identifiable.
+  pure def cpuDecompositionValid(total:int,payload:int,idle:int,other:int):bool=
+    total>=0 and payload>=0 and idle>=0 and other>=0 and total==payload+idle+other
+  pure val identicalOwnerCpuCannotIdentifyPayloadCpu=
+    cpuDecompositionValid(1000000000,1000000,998000000,1000000) and
+    cpuDecompositionValid(1000000000,900000000,99000000,1000000)
+  // Only a thread-CPU window that ENCLOSES the wall interval supplies an
+  // upper bound for its CPU. The successful reader's larger returned whole
+  // field also contains report copying after the second CPU snapshot.
+  pure def enclosedNonCpuLowerNs(wall:int,cpuUpper:int,error:int,sameOwner:bool,enclosed:bool):int=
+    if(wall>=0 and cpuUpper>=0 and error>=0 and sameOwner and enclosed)
+      if(wall>cpuUpper+error) wall-cpuUpper-error else 0
+    else -1
+  pure val sourceCpuEnclosureProvidesOnlyAnAggregateLowerBound=
+    enclosedNonCpuLowerNs(1239239875,953310960,1000,true,true)==285927915 and
+    Set(0,1,100).forall(cpu=>Set(0,1,100).forall(blocked=>
+      Set(0,1,100).forall(overhead=>
+        enclosedNonCpuLowerNs(cpu+blocked,cpu+overhead,1,true,true)<=blocked)))
+  pure val reportOutsideCpuSnapshotCannotBorrowTheEnclosure=
+    enclosedNonCpuLowerNs(1333752083,953310960,1000,true,false)==-1 and
+    enclosedNonCpuLowerNs(1239239875,953310960,1000,false,true)==-1 and
+    enclosedNonCpuLowerNs(1000,2000,1,true,true)==0 and
+    enclosedNonCpuLowerNs(1000,-1,1,true,true)==-1
+  // Equal aggregate counters permit all-blocked, all-runnable-wait, and many
+  // disjoint-pause explanations. They cannot identify a cause or a max gap.
+  pure def sourceTimeBudget(wall:int,cpu:int,blocked:int,runnableWait:int):bool=
+    cpu>=0 and blocked>=0 and runnableWait>=0 and wall==cpu+blocked+runnableWait
+  pure val aggregateNonCpuCannotIdentifyBlockedOrRunnableWait=
+    sourceTimeBudget(1239239875,953310959,285928916,0) and
+    sourceTimeBudget(1239239875,953310959,0,285928916) and
+    285928916==142964458+142964458
+  // Conditional source-loop proof, not a generic sampler guarantee. The
+  // reviewed standard owned-source loop samples before supply/receive, and
+  // increments completed at most once before the next sample. Due is monotone.
+  pure def oneCompletionInterval(laterDue:int,priorCompleted:int,step:int):bool=
+    priorCompleted>=0 and 0<=step and step<=1 and priorCompleted+step<=laterDue
+  pure def sampledAfterCompletion(laterDue:int,priorCompleted:int,step:int):int=
+    laterDue-priorCompleted-step
+  pure def closedOwnedSourcePeakUpper(sampled:int,total:int,complete:bool,protocolKnown:bool):int=
+    if(complete and protocolKnown and total>0 and 0<=sampled and sampled<=total)
+      if(sampled+1<total) sampled+1 else total
+    else -1
+  pure val oneCompletionSamplingGapHasOneMessageUncertainty=
+    Set(0,1000,999999).forall(c=>Set(0,1,127,128,129,1000000).forall(debt=>
+      Set(0,1).forall(step=>not(oneCompletionInterval(c+debt,c,step)) or
+        c+debt-c<=sampledAfterCompletion(c+debt,c,step)+1)))
+  pure val raw128SampleCannotCertifyTheTrue128Peak=
+    sampledAfterCompletion(129,0,1)==128 and
+    closedOwnedSourcePeakUpper(128,1000000,true,true)==129 and
+    closedOwnedSourcePeakUpper(127,1000000,true,true)==128 and
+    not(oneCompletionInterval(129,0,2)) and
+    129>sampledAfterCompletion(129,0,2)+1
+  pure val incompleteOrUnqualifiedSourceCannotBorrowThisBound=
+    closedOwnedSourcePeakUpper(3460,1000000,true,true)==3461 and
+    closedOwnedSourcePeakUpper(1,1,true,true)==1 and
+    closedOwnedSourcePeakUpper(128,1000000,false,true)==-1 and
+    closedOwnedSourcePeakUpper(128,1000000,true,false)==-1 and
+    closedOwnedSourcePeakUpper(-1,1000000,true,true)==-1
+  pure val measurementChecks=and {sourceCpuEnclosureProvidesOnlyAnAggregateLowerBound,reportOutsideCpuSnapshotCannotBorrowTheEnclosure,aggregateNonCpuCannotIdentifyBlockedOrRunnableWait,oneCompletionSamplingGapHasOneMessageUncertainty,raw128SampleCannotCertifyTheTrue128Peak,incompleteOrUnqualifiedSourceCannotBorrowThisBound,identicalOwnerCpuCannotIdentifyPayloadCpu,negativeAllocationWithNoGcCannotBeClampedIntoEvidence,
     lowerCollectionCostDoesNotAdmitTheHistogramCandidate,
     gcWallEnvelopeIsNotExclusiveCpuOrAStallCause,countCannotBeSubstitutedByAComponent,
     aDifferentInvocationImageOrRouteIsNotTheSameOutcome,warmupAndCleanupCannotStandInForMain,
@@ -138,7 +197,14 @@ module mailbox_measurement_contract {
 }
 module mailbox_measurement_tests {
   import mailbox_measurement_contract.*
+  run sourceCpuEnclosureTest=assert(sourceCpuEnclosureProvidesOnlyAnAggregateLowerBound)
+  run reportOutsideCpuSnapshotTest=assert(reportOutsideCpuSnapshotCannotBorrowTheEnclosure)
+  run aggregateWaitAmbiguityTest=assert(aggregateNonCpuCannotIdentifyBlockedOrRunnableWait)
   run signedAllocationTest=assert(negativeAllocationWithNoGcCannotBeClampedIntoEvidence)
+  run ownerCpuIsNotPayloadCpuTest=assert(identicalOwnerCpuCannotIdentifyPayloadCpu)
+  run ownedSourceOneCompletionGapTest=assert(oneCompletionSamplingGapHasOneMessageUncertainty)
+  run sampled128IsNotTrue128Test=assert(raw128SampleCannotCertifyTheTrue128Peak)
+  run conditionalPeakBoundTest=assert(incompleteOrUnqualifiedSourceCannotBorrowThisBound)
   run gcWallIsNotCpuTest=assert(gcWallEnvelopeIsNotExclusiveCpuOrAStallCause)
   run gcReductionDoesNotAdmitHistogramTest=assert(lowerCollectionCostDoesNotAdmitTheHistogramCandidate)
   run componentCountTest=assert(countCannotBeSubstitutedByAComponent)

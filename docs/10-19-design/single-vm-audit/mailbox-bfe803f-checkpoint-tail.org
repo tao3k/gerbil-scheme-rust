@@ -1,0 +1,161 @@
+#+title: Checkpoint-preserving consume tail: initial qualification and subsequent rejection
+#+date: 2026-11-11
+
+* Decision and custody
+The active runtime is restored to published bfacd40, whose runtime is bfe803f.
+Only five hash-verified candidate runtime/contract files were restored; parent
+checkout and QNT changes were not touched. The candidate is not a measured
+regression: its performance run was stopped because the original control failed.
+Its complete source and patch remain in the persistent ignored evidence tree at
+.ci/bfe803f-lowering-20261111/consume-caller-screen/checkpoint-tail/qualified-source.
+The manifest binds all five files, complete runtime patch, final cold reader and
+candidate image. The original reader/image hashes remain unchanged. No candidate
+has been committed, pushed, merged, or substituted for the published checkpoint.
+
+* One coherent consume transaction
+Retain the original consumption clock, request deadline, checked histogram read,
+read allocation checkpoint, increment and pre-store poll. Only the histogram
+store and existing progress transaction share one foreign leaf. Scheme retains
+exception propagation, frame clearing, capacity return and immediate refill.
+No new mailbox, wake, lease, scheduler or raw Scheme pointer crosses a callback
+or GC. Cold unsupported counts decline to the original store/progress path.
+
+The broader four-to-one bridge was not integrated: pinned Gambit checked read
+contains CHECK_HEAP, and checked store reaches a poll through generic comparison.
+Counting caller polls alone had missed these callee checkpoints. The narrower
+wrapper retains them. QNT keeps this rejected inference as a regression gate.
+
+* Complete compiler context matters
+Compiling actors alone did not reproduce Cargo's optimizer context. The native
+entrypoint first compiles six modules in the same Gerbil process and then stages
+the executable. Reusing this exact sequence removed unrelated safety/lowering
+differences. Comparison of the actual linked archive AOT finds 127 original
+function bodies equal under compiler-local alpha renaming. Only the scheduled
+consumer and cold opcode-66 contract routing changed. This is not binary identity.
+QNT rejects treating standalone module emission as equivalent program lowering.
+
+The isolated machine screen retained the Scheme wrapper poll and histogram-read
+checkpoint. Its foreign leaf uses an 80-byte C frame, equal to the original
+progress bridge; conversion/provider call sites fall from five to two. Aggregate
+scheduled-driver instruction counts increase, not decrease. These are static
+cost facts, not measured throughput or a proof of positive whole-cycle CPU gain.
+
+* Complete build and actual VM acceptance
+The complete image built naturally in 626.449 s with a sampled transitive process
+tree peak of 4,873,486,336 bytes (about 4.54 GiB), below the unchanged 8 GiB limit.
+Sampling is not a kernel hard memory cap. Cargo used one job; Gerbil's own module
+parallelism was not claimed to be serialized. SDK, GCC optimization and defaults
+were unchanged. Strict Clippy passed.
+
+Actual final reader and matching image passed all 21 existing construction cases
+plus 8 consume cases and three caller continuation replays. Validation covers GC,
+full-width cold fallback, original exception identity, progress failure before
+retirement, reuse of that same VM after failure, and clean shutdown. Separately,
+the original frozen reader passed the new image's host-boundary contracts,
+including multi-shot continuation across FFI and Actor failure drain/reuse.
+These are correctness results, not performance acceptance.
+
+* Fresh original control: candidate not run
+Same one-owner workload: 1,000,000 scheduled requests/s for one second, original
+1000/s one-second warmup first, original reader and original image. No candidate
+was executed after the following control failed.
+
+| Metric | Published rebuilt baseline | Fresh original control |
+| Completed | 1000000 | 1000000 |
+| Successful messages/s, including source drain | 985354.11 | 812896.91 |
+| Planned-to-consumed p99 ms | 11.437 | 316.817 |
+| Planned-to-consumed p99.9 ms | 14.873 | 318.079 |
+| Rejected / errors / accepted timeouts | 0 / 0 / 0 | 0 / 0 / 0 |
+| Sampled due-unconsumed peak | 12924 | 318238 |
+| Sampled due-unpublished peak | 12922 | 318236 |
+| Samples over 128 | 149937 | 785951 |
+| Source interval seconds | 1.014863583 | 1.230168292 |
+| Native call plus report seconds | 1.027911834 | 1.247405208 |
+| GC count, enclosing | 39 | 35 |
+| GC wall envelope ms | 17.496109 | 17.978907 |
+| GC CPU envelope ms | 17.382000 | 17.641000 |
+| Owner CPU upper envelope ms | 997.164250 | 898.616875 |
+| Clean shutdown | true | true |
+| Backlog p99 / p99.9 | not collected | not collected |
+
+Exit 101 was a post-cleanup performance assertion, not a native five-second
+watchdog. Zero rejections and complete consumption do not satisfy tail/backlog
+acceptance. The original historical guard and 128 limit remain unchanged.
+316.817 ms is neither a new baseline nor a candidate result. No repeat was run.
+
+* Startup comparison and causal limits
+The fresh control explicitly supplied relative image and GERBIL_PATH values;
+the earlier launcher supplied an absolute GERBIL_PATH and explicitly supplied an
+absolute image path. This was recovered from the actual session call, not
+inferred from the benchmark command receipt, which omitted inherited environment.
+NativeIsolatedProgram::from_image canonicalizes the image before use. Gerbil's
+runtime/system gerbil-path returns its environment value unchanged. The directory
+resolves to the same original directory, but string identity differs. This is a
+recorded startup difference, not evidence that relative paths caused the stall.
+
+Aggregate CPU/GC envelopes and publication lag do not associate a particular
+Mailbox receive, reply, return or OS runnable interval. They cannot distinguish
+native blocking from runnable waiting in the same gap. No whole-process CPU
+subtraction or unrelated maximum interval is presented as a causal explanation.
+
+* Implication for the 128 objective
+At one million planned messages/s, 128 due messages represent only 128 us of
+arrival time. Even an otherwise empty system cannot preserve this bound through
+a longer consumption outage; existing work and finite recovery headroom tighten
+it further. More Actors or queue capacity alone do not establish a shorter
+owner outage or adequate service headroom. A mailbox/credit change must remove
+actual cycle work or an evidenced wait without moving return before consumption.
+The next performance comparison still requires a qualified original control;
+this failed control cannot establish the candidate's gain or regression.
+
+QNT checks passed 321/11/25/10/44 via the existing model entry and 31 research-gate
+checks. Imported checks overlap. Models retain callee-checkpoint and complete
+compiler-session counterexamples. They do not certify CPU cost or a future run.
+The full optimization GOAL remains incomplete.
+
+* Subsequent approved comparison policy and final rejection
+The earlier sections describe the initial stopped attempt. The user subsequently
+approved separating frozen-control comparability from final candidate admission.
+The existing Rust bench now has an explicit post-run --control-comparability
+mode; it preserves the original final admission fields. Control qualification
+requires the original million profile, complete consumption, no observation,
+valid recorded debt, p99 <=15 ms, native return and clean shutdown. Exact cohort
+identity remains an independent external requirement. Candidate/default p99
+0.418 ms, debt 128, native five seconds and whole-stage three seconds are intact.
+Seven Rust admission tests and 33 QNT gate tests pass. Full bench metadata was
+typechecked against the exact frozen Cargo dependency fingerprints; this is not
+a linked native build. Neither Scheme nor SDK was rebuilt for this step.
+
+One original control used the recovered historical explicit absolute image
+variable and the same absolute GERBIL_PATH supplied by the original launcher.
+It qualified for comparison at 2.564 ms. This observation is not a new baseline
+and does not prove path text caused previous variability. One candidate then ran
+with the identical frozen reader and original startup/warmup protocol. Both
+completed all one million requests with zero rejections, errors and timeouts.
+
+| Metric | Original control | Checked-tail candidate |
+| Successful messages/s, source interval including drain | 999218.49 | 538618.17 |
+| Planned-to-consumed p99 ms | 2.564 | 845.283 |
+| Planned-to-consumed p99.9 ms | 3.287 | 856.933 |
+| Sampled due-unconsumed peak | 3460 | 430698 |
+| Sampled due-unpublished peak | 3458 | 430696 |
+| Samples above 128 | 156456 | 998134 |
+| Native call plus report ms | 1011.785875 | 1905.738625 |
+| GC count, enclosing | 39 | 34 |
+| GC wall envelope ms | 16.974926 | 22.220612 |
+| GC CPU envelope ms | 16.988000 | 19.749000 |
+| Owner CPU upper envelope ms | 998.963458 | 1094.365833 |
+| Backlog p99 / p99.9 | not collected | not collected |
+| Clean shutdown | true | true |
+| Final absolute admission | false | false |
+
+The candidate is rejected: throughput fell about 46.1%, while both tail and debt
+failed severely. Fewer conversions and fewer GCs do not establish a whole-cycle
+gain. This paired observation rejects deployment, but does not uniquely identify
+the scheduler/native-wait cause; no unrelated interval is used for attribution.
+No retry followed. Scheme runtime remains bfe803f, original artifacts are intact,
+and the rejected source/image remain isolated for evidence, not active execution.
+QNT blocks replay of this checked-tail mechanism without qualified new repair
+facts. No runtime code from this candidate was committed, pushed, or merged;
+its QNT/Org knowledge is retained separately.
+Complete raw identities and pair measurements are in mailbox-bfe803f-control-policy-pair.json.

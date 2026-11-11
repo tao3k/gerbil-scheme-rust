@@ -163,4 +163,42 @@ module mailbox_consume_abi {
       original.largest<=10 and not(fused.largest<=10))
   }
 
+  // Installed vector-ref returns through a heap check. The checked set also
+  // reaches ##<'s POLL. These are actual callee boundaries, not guessed from
+  // the caller's static POLL count. Whole fusion has NOT refined this trace.
+  pure def checkedConsumePrefix(gc:bool):List[str]=List("validate-frame","propagate-worker-failure",
+    "sample-consume","original-request-check","original-histogram-read","original-heap-check")
+      .concat(if(gc) List("gc-may-run") else List()).concat(List("original-count-increment","poll-before-write"))
+  pure def commitSuffix(ok:bool):List[str]=List("histogram-write","sample-progress","check-progress")
+    .concat(if(ok) List("publish-progress","existing-progress-hook","scheme-return-frame","immediate-refill")
+      else List("sample-original-failure-clock","progress-deadline-original"))
+  pure def checkedOriginal(gc:bool,ok:bool):List[str]=checkedConsumePrefix(gc).concat(commitSuffix(ok))
+  pure def checkedTail(gc:bool,ok:bool):List[str]=checkedConsumePrefix(gc)
+    .concat(List("tail-bridge-enter")).concat(commitSuffix(ok))
+  pure def checkedProjection(xs:List[str]):List[str]=xs.foldl(List(),(kept,e)=>
+    if(e=="tail-bridge-enter") kept else kept.append(e))
+  run readHeapCheckAndPreWritePollAreRetainedInTheTailTransactionTest=assert(
+    Set(true,false).forall(gc=>Set(true,false).forall(ok=>
+      checkedProjection(checkedTail(gc,ok))==checkedOriginal(gc,ok))))
+  run oldFourToOneProjectionDoesNotProveCalleeCheckpointPreservationTest=assert(
+    not(hasEvent(original(valid),"original-heap-check")) and
+    not(hasEvent(original(valid),"poll-before-write")) and
+    checkedOriginal(true,true)!=original(valid) and
+    hasEvent(checkedOriginal(true,true),"gc-may-run"))
+  run failedProgressAfterThePreservedCheckStillHoldsCanonicalCreditTest=j::cpuReady3.then(all {
+    assert(j::safe),assert(j::charged==3),
+    assert(not(hasEvent(checkedTail(true,false),"scheme-return-frame"))),j::stay})
+  run rawHistogramAccessBeginsOnlyAfterRetainedGcAndPollTest=assert(
+    lifetimeSafe(List("gc","scheme-callback","borrow-histogram","histogram-write",
+      "last-histogram-access","sample-progress","return")) and
+    not(lifetimeSafe(List("borrow-histogram","gc","last-histogram-access","return"))))
+  // A cold non-fixnum value must delegate to original checked mutation and
+  // progress without re-reading the histogram, clock or releasing a frame.
+  pure def tailDeclinePrefix:List[str]=List("tail-bridge-decline","original-checked-set","original-progress")
+  run coldTailDeclineCannotReplayTheReadOrPrematurelyReturnCreditTest=assert(
+    not(hasEvent(tailDeclinePrefix,"sample-consume")) and
+    not(hasEvent(tailDeclinePrefix,"original-histogram-read")) and
+    not(hasEvent(tailDeclinePrefix,"histogram-write")) and
+    not(hasEvent(tailDeclinePrefix,"scheme-return-frame")))
+
 }

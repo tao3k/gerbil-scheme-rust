@@ -23,7 +23,9 @@ module mailbox_research_gate {
   // Source-bound formal counterexamples, not claims of observed SDK bugs.
   pure val mechanismFactors=Set("removed-mailbox-recheck", "wake-counted-as-cpu-grant",
     "dequeue-counted-as-credit-return", "raw-fifo-replaces-selective-protocol",
-    "ring-cpu-average-used-as-business-p99")
+    "ring-cpu-average-used-as-business-p99", "caller-polls-used-as-full-checkpoint-proof",
+    "single-module-emit-used-as-program-lowering",
+    "consume-tail-store-progress-with-preserved-read-and-wrapper-poll")
   pure val retainedFactors=Set("delayed-refill", "new-queue-and-sleep-registration",
     "unhit-probe-stack-or-branch", "partial-source-or-provider-cohort",
     "capture-value-used-as-progress-error", "local-cost-only").union(mechanismFactors)
@@ -62,6 +64,33 @@ module mailbox_research_gate {
   // proposed candidate. Fixed references cannot be ratcheted by a slow control.
   type Research={six:Reference,seven:Reference,runtimeCandidate:bool,learned:Set[str],approvedLimits:Limits}
   pure val limits={p99Ns:418000,peak:128,wholeNs:3000000000}
+  // User-approved control reproduction gate. It does not replace limits,
+  // authorize a different cohort, or establish a candidate engine gain.
+  pure def comparableFrozenControl(o:Outcome,w:Workload,k:RunKey,cohortVerified:bool):bool=
+    cohortVerified and outcomeMatches(o,w,k) and validCounts(o) and validQuantiles(o) and
+    w.rate==1000000 and w.seconds==1 and w.owners==1 and w.workers==4 and w.frames==3 and
+    w.deadlineSeconds==5 and o.completed==o.planned and o.samples==o.completed and
+    o.rejected==0 and o.errors==0 and o.clean and allArrivalsCanHaveCompleted(o) and
+    o.p99Ns<=15000000 and o.wholeNs<=limits.wholeNs
+  pure val controlQualificationDoesNotRelaxFinalAdmission={
+    val w={...sampleWork,deadlineSeconds:5}
+    val old={...sampleOutcome,work:w,p99Ns:11437000,p999Ns:14873000,peak:12924,wholeNs:1027911834}
+    comparableFrozenControl(old,w,old.key,true) and not(absolutePassed(old,limits)) and
+      not(comparableFrozenControl(old,w,old.key,false)) and
+      not(comparableFrozenControl({...old,p99Ns:316817000,p999Ns:318079000,peak:318238,wholeNs:1247405208},w,old.key,true)) and
+      not(comparableFrozenControl({...old,completed:999999,samples:999999},w,old.key,true)) and
+      comparableFrozenControl({...old,p99Ns:15000000,p999Ns:15000000},w,old.key,true) and
+      not(comparableFrozenControl({...old,p99Ns:15000001,p999Ns:15000001},w,old.key,true))
+  }
+  // Actual frozen-control failure after cold candidate validation. Cold success
+  // cannot manufacture comparative eligibility or authorize the second arm.
+  pure val coldCorrectnessDoesNotQualifySlowFrozenControl={
+    val w={...sampleWork,deadlineSeconds:5}
+    val o={...sampleOutcome,work:w,p99Ns:256748000,p999Ns:258303000,
+      peak:152834,wholeNs:1333752083}
+    validCounts(o) and not(comparableFrozenControl(o,w,o.key,true)) and
+      not(absolutePassed(o,limits))
+  }
   pure val authority={six:reference6D,seven:reference7F,runtimeCandidate:false,
     learned:retainedFactors,approvedLimits:limits}
   pure def validAuthority(s:Research):bool=s.six==reference6D and s.seven==reference7F and
@@ -77,6 +106,10 @@ module mailbox_research_gate {
     introduced:Set(),repaired:Set(),repairsQualified:false,alreadyAttempted:false,newMechanism:true,
     newQuestion:false,explicitReplay:false,purpose:"performance-ab",origin:"paired-rebuild",
     originalBytesVerified:false,scope:"engine"}
+  pure val callerCountsCannotAuthenticateRemovedCallees=
+    not(pairedRunAllowed(authority,{...goodPlan,introduced:Set("caller-polls-used-as-full-checkpoint-proof")}))
+  pure val sourceIdentityCannotReplaceTheOriginalCompilerSession=
+    not(pairedRunAllowed(authority,{...goodPlan,introduced:Set("single-module-emit-used-as-program-lowering")}))
   pure val goodOutcome=sampleOutcome
 
   pure val differentFrozenProfilesCannotBeComparedAsOneRun=
@@ -217,7 +250,19 @@ module mailbox_research_gate {
   }
   pure val sourceMechanismFailuresMustBeRepairedBeforeAnotherCandidate=
     mechanismFactors.forall(f=>not(pairedRunAllowed(authority,{...goodPlan,introduced:Set(f)})))
-  pure val allCounterexamples=and {sourceMechanismFailuresMustBeRepairedBeforeAnotherCandidate,successiveRollbacksCannotLoseEarlierNewFailures,
+  // Actual paired million-message receipts; rejection evidence, not proof
+  // that a particular scheduler/GC mechanism caused the loss.
+  pure val rejectedCheckedTailCannotBeSavedByFewerConversions={
+    val w={...sampleWork,deadlineSeconds:5}
+    val p={...goodPlan,control:w,candidate:w,
+      introduced:Set("consume-tail-store-progress-with-preserved-read-and-wrapper-poll")}
+    val o={...sampleOutcome,work:w,p99Ns:845283000,p999Ns:856933000,
+      peak:430698,wholeNs:1905738625}
+    not(absolutePassed(o,limits)) and
+      not(engineGainClaimAllowed(authority,p,o,limits,"qualified-gain")) and
+      not(pairedRunAllowed(authority,p))
+  }
+  pure val allCounterexamples=and {coldCorrectnessDoesNotQualifySlowFrozenControl,rejectedCheckedTailCannotBeSavedByFewerConversions,controlQualificationDoesNotRelaxFinalAdmission,sourceMechanismFailuresMustBeRepairedBeforeAnotherCandidate,successiveRollbacksCannotLoseEarlierNewFailures,
     measurementChecks,resource::resourceChecks,candidateCannotSupplyItsOwnEvidenceIdentity,
     aSmallValidComponentCannotAuthenticateTheMainPopulation,callerCannotRelaxApprovedAdmission,
     forgettingHistoryOrRatchetingReferencesInvalidatesAuthority,negativeOrUncertainPeakCannotPassEngineAdmission,
@@ -236,6 +281,10 @@ module mailbox_research_gate {
 }
 module mailbox_research_gate_tests {
   import mailbox_research_gate.*
+  run allGateCounterexamplesTest=assert(allCounterexamples)
+  run slowControlAfterColdValidationTest=assert(coldCorrectnessDoesNotQualifySlowFrozenControl)
+  run rejectedCheckedTailTest=assert(rejectedCheckedTailCannotBeSavedByFewerConversions)
+  run controlQualificationTest=assert(controlQualificationDoesNotRelaxFinalAdmission)
   run differentFrozenProfilesTest=assert(differentFrozenProfilesCannotBeComparedAsOneRun)
   run partialReferencesTest=assert(historicalReferencesRemainPartial)
   run workloadUnitsTest=assert(unitsAndArrivalModesMustMatch)
@@ -265,4 +314,7 @@ module mailbox_research_gate_tests {
   run validPeakEvidenceTest=assert(negativeOrUncertainPeakCannotPassEngineAdmission)
   run cumulativeRollbackTest=assert(successiveRollbacksCannotLoseEarlierNewFailures)
   run nonVacuousAdmissionTest=assert(validEvidenceCanStillEnterResearchAndSeekReview)
+  run calleeCheckpointEvidenceTest=assert(callerCountsCannotAuthenticateRemovedCallees)
+  run fullCompilerSessionEvidenceTest=assert(sourceIdentityCannotReplaceTheOriginalCompilerSession)
+
 }

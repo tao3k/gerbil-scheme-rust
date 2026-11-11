@@ -148,3 +148,17 @@ hashes with the JSON before interpreting this recorded run. The exact run argv
 is in that JSON. Rebuilding does not reproduce the historical bytes by assertion.
 A fresh run must be reported as a fresh observation. No new run is made to
 publish this checkpoint. Backlog p99/p99.9 remain uncollected by this path.
+
+* Return to this baseline after the unaccepted research routes
+On user request, all local crates/ and ffi/ changes were restored to bfe803f.
+The untracked cold constructor test was archived before removal. Research code
+is retained only in the persistent ignored backup; QNT and curated Org/JSON
+knowledge remain on the research branch. Both frozen reader/image hashes above
+were reverified unchanged. This source restoration is not a fresh latency run.
+
+The 11.437 ms observation remains the fixed rebuilt reference alongside the
+historical 10.083 ms result. The later 256.748 ms frozen-control failure is
+retained in mailbox-bfe803f-bounded-input.org; its candidate never started.
+It does not replace this reference or certify that current execution will
+automatically reproduce 11.437 ms. SDK, defaults, native five-second and debt
+128 limits are unchanged. No PR branch or main merge is part of this return.

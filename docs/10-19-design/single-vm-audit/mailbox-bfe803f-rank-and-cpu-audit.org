@@ -1,0 +1,81 @@
+#+title: Whole-cycle CPU attribution and literal-rank static screen
+#+date: 2026-11-11
+
+* Current runtime and scope
+At the time of this static screen, Scheme, C adapter and engine runtime equaled bfe803f. No new business run,
+SDK change, default change, native image or GCC object was produced in this step.
+The rejected consume-tail candidate remains isolated. Its negative paired receipt
+is mailbox-bfe803f-control-policy-pair.json, not a new baseline.
+
+* Owner CPU is not payload cost
+The existing 1000-message warmup uses the same one-second arrival schedule as
+the million-message main. Recovered original control warmup consumed 1000
+messages with owner CPU envelope 1001.417 ms; its million-message main envelope
+was 998.963 ms. Published 11.437 ms checkpoint warmup was 1000.034 ms and main
+997.164 ms. These are enclosing CPU observations, not per-handler measurements.
+
+The actual source's zero-active branch performs thread-yield! and re-enters the
+source clock/arrival loop. It retains a runnable source while waiting for later
+arrivals. Whole owner CPU therefore includes source waiting/polling, scheduler,
+construction, handler, independent oracle, consumption and native setup/report.
+It excludes later Rust report copying and output after the second CPU snapshot;
+see mailbox-bfe803f-bounded-input.org for the subsequent timing-boundary audit.
+The evidence does not quantify each share. Dividing about one second by one
+million messages cannot establish handler service capacity or recovery headroom.
+Subtracting this low-load CPU from main CPU is equally invalid: polling share,
+object lifetimes and allocation/GC pressure differ. QNT now carries the explicit
+non-identifiability counterexample.
+
+The rejected consume-tail candidate also had a degraded warmup (20.768 ms p99,
+669.575 ms owner CPU) before its million-message main. Its negative performance
+still rejects deployment, but the main aggregate alone cannot uniquely establish
+where the loss occurred. No machine/scheduler cause is inferred from this fact.
+
+* One actual remaining indirect boundary
+The frozen scheduled-worker AOT passes literal (lambda () 1) to orders-handler/rank.
+The frozen orders-unit/native C still contains a nullary JUMPGENSAFE through
+STK(-11), followed by result construction. This is a real remaining call boundary;
+it is not evidence of a per-message rank-closure allocation. The generic rank API
+must retain arbitrary effects, exceptions and continuation replay.
+
+An isolated parser projection preserves every original top-level form, appends
+one four-argument unit clone and replaces its one rank application with literal
+1. It rejects any escaping or differently used rank parameter. No caller points
+to this prototype and no production source is changed. GSC emission completed
+in 4.945 seconds with a sampled process-tree peak of 491372544 bytes.
+
+The unit removes one indirect nullary call, but keeps two accumulator-box sites
+and one native result-constructor site. Both units contain 13 caller poll sites;
+this does not authenticate the removed callee's checkpoint behavior. Whole C
+text size also depends on generated label spelling and cannot establish machine
+code size or spill behavior. Full caller closure/frame costs, code growth and
+checkpoint fairness remain unqualified. The prototype is not integrated, and no
+GCC build or performance run is justified by this unit-only screen.
+
+QNT restricts constant rank to the parsed owned nullary literal form, rejects
+callbacks merely observed to return 1, and rejects unit-only cost as a whole-cycle
+review. Result-construction checks passed 323; measurement checks passed 19.
+These are model tests, not native VM or performance acceptance.
+
+* Existing GC event interface: feasibility only
+Installed gxi confirms the public gc-report-set! procedure. Enabling it for one
+forced GC produced one standard report; disabling it suppressed the next report.
+This independent SDK process is not the private workload VM, and its reported GC
+time is not a workload pause bound. No business diagnostic was enabled.
+
+The local Homebrew source cache is at another Gambit revision and is not treated
+as matched source for the installed SDK. Installed gambit.h declares the public
+get/set debug-settings C ABI and latest-GC counters. The frozen embedding enters
+___setup directly; parsing GAMBOPT in the command-line main cannot simply be
+assumed to configure that embedding. The private image does not export a GC
+report-control entry. Enabling one would require a separately reviewed cold
+adapter scope with exact restoration, exceptional exit and cleanup boundaries.
+No such adapter has been connected here, and no SDK source was modified.
+
+* Next selection requirement
+Do not reopen consume fusion or eliminate arbitrary rank callbacks. A proposed
+runtime change must reduce complete-cycle work with caller, callee, GC/root and
+execution-opportunity boundaries closed. CPU envelopes and unit instruction
+counts cannot supply that evidence. The original 128 debt limit and final
+performance guards remain unchanged; the 15 ms control-comparability rule is
+separate from final candidate acceptance.

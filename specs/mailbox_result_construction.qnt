@@ -3610,4 +3610,53 @@ module mailbox_result_construction {
     budget::recoveryRatePerSecond(1000000,bfeMain.peak,128,1)==13796000 and
     budget::recoveryRatePerSecond(1000000,bfeMain.peak,128,10)==2279600 and
     bfeMain.peak>128)
+
+  // Parsed source shape, not a runtime callback's observed result or name.
+  pure def closedLiteralRank(parameters:List[str],body:List[str],genericApi:bool):bool=
+    parameters==List() and body==List("quote","1") and not(genericApi)
+  run constantRankCannotBeInferredFromOneObservedReturnTest=assert(
+    closedLiteralRank(List(),List("quote","1"),false) and
+    not(closedLiteralRank(List(),List("quote","1"),true)) and
+    not(closedLiteralRank(List(),List("begin","effect","quote","1"),false)) and
+    not(closedLiteralRank(List(),List("call/cc","quote","1"),false)))
+  // A disconnected unit can remove an indirect call without changing any
+  // per-message allocations or proving caller/register/root/callee costs.
+  pure def constantRankReviewAllowed(literal:bool,wholeCallerCost:bool,
+      checkpointBoundary:bool,vm:bool):bool=
+    literal and wholeCallerCost and checkpointBoundary and vm
+  run constantRankUnitProjectionIsNotWholeCycleAdmissionTest=assert(
+    not(constantRankReviewAllowed(true,false,false,false)) and
+    not(constantRankReviewAllowed(true,true,false,true)) and
+    constantRankReviewAllowed(true,true,true,true))
+
+  // Actual owned-source admission: rate<=1M, seconds<=10, and the ordinal
+  // increments only after construction/publication. Affine extrema occur at
+  // the corners because both coefficients below are nonnegative.
+  pure val inputOrdinalMax=1000000*10-1
+  pure val portablePositiveFixnumMax=536870911
+  pure def provenInputDomain(id:int,rate:int,seconds:int):bool=
+    1<=rate and rate<=1000000 and 1<=seconds and seconds<=10 and
+    0<=id and id<rate*seconds
+  run ownedInputArithmeticHasNoFixnumOverflowTest=assert(
+    inputOrdinalMax==9999999 and 17*inputOrdinalMax+31*3==170000076 and
+    Set(0,inputOrdinalMax).forall(id=>Set(0,3).forall(line=>
+      0<=id and id<=portablePositiveFixnumMax and
+      0<=id+line and id+line<=portablePositiveFixnumMax and
+      0<=id*17+line*31 and id*17+line*31<=portablePositiveFixnumMax and
+      2<=2+3*line and 2+3*line+2<14)))
+  run boundedInputSpecializationCannotNarrowGenericEntryTest=assert(
+    provenInputDomain(0,1,1) and provenInputDomain(inputOrdinalMax,1000000,10) and
+    not(provenInputDomain(-1,1000000,10)) and
+    not(provenInputDomain(10000000,1000000,10)) and
+    not(provenInputDomain(0,1000001,1)) and
+    not(provenInputDomain(0,1000000,11)))
+  run boundedInputKeepsFieldOrderAndUnpublishedPartialStateTest={
+    val writes=List(0).concat(List(0,1,2,3).foldl(List(),(out,line)=>
+      out.concat(List(2+line*3,3+line*3,4+line*3))))
+    assert(writes==List(0,2,3,4,5,6,7,8,9,10,11,12,13) and
+      writes.foldl(true,(ok,index)=>ok and index!=1) and
+      not(researchGate::engineGainClaimAllowed(researchGate::authority,
+        {...researchGate::goodPlan,verified:researchGate::requiredFacts.exclude(Set("complete-cost-screen"))},
+        researchGate::goodOutcome,researchGate::limits,"qualified-gain")))
+  }
 }

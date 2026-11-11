@@ -1,0 +1,126 @@
+{
+  "baseline": "bfe803f597a15a3654b70a64c3a039980c31da8a",
+  "scope": "disconnected parser-owned literal-rank unit prototype only; no runtime caller changed; not an engine improvement",
+  "decision": "do not integrate or run business; full caller, callee checkpoint and generated object net costs remain unqualified",
+  "original_generated_c_sha256": "882eddb922459decee1ee774bd9050c24a63609bc855988e022c132dc59774de",
+  "prototype_aot_sha256": "29044d73c213d23c68d153af8955519945642bbaa0d3464eb897caa5155b2627",
+  "prototype_c_sha256": "da44bf6e85f7379b0c129b7ba945407e69518692e3b1258ea1f1e8b4b86494e9",
+  "original_kernel": {
+    "c_text_bytes": 84986,
+    "normalized_target_name_c_text_bytes": 48924,
+    "poll_sites": 13,
+    "indirect_nullary_call_sites": 1,
+    "mutable_accumulator_box_sites": 2,
+    "native_result_constructor_sites": 1,
+    "vm_stack_read_sites": 378
+  },
+  "prototype_kernel": {
+    "c_text_bytes": 88469,
+    "normalized_target_name_c_text_bytes": 48214,
+    "poll_sites": 13,
+    "indirect_nullary_call_sites": 0,
+    "mutable_accumulator_box_sites": 2,
+    "native_result_constructor_sites": 1,
+    "vm_stack_read_sites": 369
+  },
+  "existing_cpu_receipts": [
+    {
+      "receipt": "baseline-qualification",
+      "warmup": true,
+      "completed": 1000,
+      "source_ns": 999002792,
+      "call_ns": 1014911292,
+      "p99_ns": 20000,
+      "owner_cpu_envelope_ns": 1000033832.9999998,
+      "gc_count_enclosing": 2.0
+    },
+    {
+      "receipt": "baseline-qualification",
+      "warmup": false,
+      "completed": 1000000,
+      "source_ns": 1014863583,
+      "call_ns": 1027911834,
+      "p99_ns": 11437000,
+      "owner_cpu_envelope_ns": 997164250.0,
+      "gc_count_enclosing": 39.0
+    },
+    {
+      "receipt": "recovered-protocol-control",
+      "warmup": true,
+      "completed": 1000,
+      "source_ns": 999001333,
+      "call_ns": 1013051583,
+      "p99_ns": 29000,
+      "owner_cpu_envelope_ns": 1001416917.0,
+      "gc_count_enclosing": 2.0
+    },
+    {
+      "receipt": "recovered-protocol-control",
+      "warmup": false,
+      "completed": 1000000,
+      "source_ns": 1000782125,
+      "call_ns": 1011785875,
+      "p99_ns": 2564000,
+      "owner_cpu_envelope_ns": 998963458.0,
+      "gc_count_enclosing": 39.0
+    },
+    {
+      "receipt": "checkpoint-tail-candidate",
+      "warmup": true,
+      "completed": 1000,
+      "source_ns": 999003375,
+      "call_ns": 1036901750,
+      "p99_ns": 20768000,
+      "owner_cpu_envelope_ns": 669575250.0000001,
+      "gc_count_enclosing": 2.0
+    },
+    {
+      "receipt": "checkpoint-tail-candidate",
+      "warmup": false,
+      "completed": 1000000,
+      "source_ns": 1856602792,
+      "call_ns": 1905738625,
+      "p99_ns": 845283000,
+      "owner_cpu_envelope_ns": 1094365833.0,
+      "gc_count_enclosing": 34.0
+    }
+  ],
+  "emission": {
+    "command": [
+      "${GERBIL_HOME}/bin/gsc",
+      "-c",
+      "-o",
+      ".ci/bfe803f-lowering-20261111/constant-rank-screen/constant-rank.c",
+      "-module-ref",
+      "gerbil-scheme-rust__qualification__actors",
+      "-linker-name",
+      "gerbil-scheme-rust__qualification__actors",
+      ".ci/bfe803f-lowering-20261111/constant-rank-screen/constant-rank.scm"
+    ],
+    "exit": 0,
+    "reason": null,
+    "elapsed_seconds": 4.944685458031017,
+    "tree_rss_sample_peak_bytes": 491372544,
+    "sample_count": 44,
+    "approved_limit_bytes": 8589934592,
+    "stop_margin_bytes": 7516192768,
+    "sample_period_seconds": 0.05,
+    "all_tracked_processes_gone": true,
+    "observed_processes": 1,
+    "scope": "sampled transitive descendants from launch; not a kernel hard limit"
+  },
+  "sdk_api_probe": {
+    "stdout_sha256": "35bd1e20db46ef312b23389b4d2265c23226968e00bb72ff30e695299f580f5b",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "public_gc_report_procedure_exists": true,
+    "disabled_after_one_forced_collection": true,
+    "scope": "independent installed gxi; not private benchmark VM or business performance; no SDK changes"
+  },
+  "model_results": {
+    "result_construction_checks": 323,
+    "measurement_checks": 19
+  },
+  "scheme_runtime_changed": false,
+  "gcc_object_built": false,
+  "new_business_run": false
+}

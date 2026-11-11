@@ -1,0 +1,205 @@
+#+title: Bounded owned-source constructor: matched source and machine screen
+#+date: 2026-11-11
+
+* Decision and current state
+This is an unaccepted isolated source candidate based on bfe803f. The complete
+image and actual VM cold validation are now available; performance remains
+unknown. The frozen reader/control bytes are intact. No candidate code has been
+committed, pushed or applied to the parent checkout or PR #18.
+
+* Source-derived private domain, not a narrowed generic API
+Original owned-source admission bounds rate to 1000000 and seconds to 10. The
+source ordinal starts at zero, is below rate*seconds, and advances only after
+construction/publication. Therefore its maximum is 9999999. With four rows,
+the largest intermediate is 17*9999999+31*3=170000076, below even the portable
+30-bit fixnum maximum 536870911. All stores are into fresh s64[14], in original
+order 0,2,3,...,13; index 1 retains zero. Moduli 16,5,10000 are positive.
+
+A defrules declaration parameter keeps the original generic input factories
+unchanged. The existing scheduled path alone selects a new private constructor
+with fixnum/not-safe declarations under the above contract. It adds no runtime
+predicate, input sharing, FFI hop, queue, actor, lease or source-clock operation.
+The generic bignum/type/range behavior, independent oracle, business handler,
+per-result capacity return and immediate refill are not replaced. If profile
+admission is extended, the arithmetic contract and native edge cases must be
+requalified before this private helper can cover the extension.
+
+* Matched complete source, not an unattached unit
+The original six producer modules are compiled in the original single Gerbil
+process before compiler-owned program staging. All 128 other original Gambit
+function bodies remain equal under lexical compiler-name normalization; quoted
+data is retained verbatim. The scheduled caller changes only its constructor
+reference. The new helper retains the original one-argument/fresh-s64 result ABI.
+
+A raw AOT prototype differs from actual Gerbil lowering in redundant annotation
+lets. That exact comparison failed and was not waived: actual source C and its
+GCC object were emitted and checked independently. The prototype object was not
+used as proof for the final source.
+
+Placing the helper before existing definitions initially shifted continuation
+label offsets, producing 5681 caller instructions instead of 5680. The source
+now appends the private definition after all original module declarations,
+preserving their definition/init order. No padding or alignment parameter was
+introduced. Final actual-source machine results are:
+
+| Static inventory, all paths | Frozen original | Source candidate |
+| Input-constructor instructions | 680 | 176 |
+| Scheduled-caller instructions | 5680 | 5680 |
+| Constructor C primitive-call sites | 17 | 1 |
+| Constructor Scheme-stack write sites | 72 | 12 |
+| Constructor Scheme-stack read sites | 76 | 13 |
+| Constructor caller poll sites | 2 | 2 |
+| Native stack-pointer accesses in either function | 0 | 0 |
+
+These are static sites, not executed counts, phase CPU times or throughput gains.
+The retained primitive is the same ##make-s64vector allocation. The new helper
+continues to allocate a fresh input, with original field ordering. Removed checked
+arithmetic/store callees cannot be justified from caller poll counts alone;
+private bounds and the retained allocation/row-loop safe points are part of the
+native correctness obligation. There is no new handwritten C allocator or raw
+Scheme pointer lifetime.
+
+* Resources, models and remaining acceptance
+The final real-source GCC -O2 object completed in 36.632 seconds. The sampled
+transitive process-tree peak was 895254528 bytes (about 0.834 GiB), below the
+unchanged 8 GiB limit and 7 GiB sampled stop margin. This is not a kernel-enforced
+memory maximum. SDK/compiler/jump layout are unchanged. QNT result-construction
+checks passed 326, including affine bound corners, generic-domain exclusion,
+field order and unqualified-full-cost rejection. These model checks do not
+replace actual VM validation or claim every application interleaving is proved.
+
+Next acceptance must exercise the exact private constructor at boundary ordinals,
+compare all 14 fields with the preserved generic factory, force GC while values
+are live, verify fresh objects across continuation returns, preserve generic
+wide-integer/error paths, and check complete shutdown. Cold test entrypoints must
+be appended without changing existing dispatch or procedure order. Only after
+native correctness passes may the original reader run a qualified control and
+one candidate at one million/s for one second. Control comparability <=15 ms is
+separate from original final p99/debt/watchdog/whole-stage guards. Debt limit 128
+is unchanged. Candidate performance remains unknown.
+
+* Complete image and actual VM acceptance
+The full canonical build completed naturally in 842.293 seconds, with sampled
+transitive-tree RSS peak 5071077376 bytes (4.72 GiB), all tracked processes gone.
+The 8 GiB limit/7 GiB stop margin, SDK and optimization were unchanged.
+
+The six-file source manifest includes cold-only tests and the export/reader
+binding. Original reader host contracts passed against the new image: GC/native
+types, exact exception identity, multi-shot continuation across FFI, Actor
+failure drain/reuse and clean shutdown. New constructor contracts passed ten
+boundary ids, three continuation returns, two wide generic values and two range
+exceptions. Natural GC occurred after 4000 constructor calls (one GC). Existing
+21 differential cases and original cold contracts also passed. These are not
+performance acceptance.
+
+Final linked archive comparison keeps 128 original bodies alpha-equivalent and
+changes only the scheduled constructor reference. The actual linked object has
+175 constructor instructions (the earlier standalone object had 176) and 5680
+scheduled-caller instructions; both retain zero native-SP accesses and zero bl
+sites. Static counts are all-path inventories, not measured service time.
+
+Next is one original-reader paired run, control first. Control <=15 ms is only
+comparability; candidate final 0.418 ms, debt 128, native five seconds and whole
+stage three seconds remain unchanged. Sampled debt and conditional +1 upper
+bound will be reported separately; backlog quantiles remain uncollected.
+
+* Original-reader control: gate stopped before candidate
+The strict cold-reader Clippy check passed with -D warnings. The only attempted
+performance pair used one parent shell, original wrapper, original reader,
+absolute original image, original warmup and arguments. Frozen hashes and the
+six-file candidate source/image manifest were checked before launch.
+
+| Control main result | Value |
+| Planned / completed | 1000000 / 1000000 |
+| Completed throughput | 806946.274 messages/s |
+| Planned-to-consumed p99 / p99.9 | 256.748 / 258.303 ms |
+| Rejected / errors / timeouts | 0 / 0 / 0 |
+| Sampled due-unconsumed peak | 152834 |
+| Conditional conservative true-peak upper | 152835 |
+| Source unpublished peak | 152832 |
+| Backlog p99 / p99.9 | not collected |
+| Source elapsed / whole native call | 1239.240 / 1333.752 ms |
+| GC count / wall / CPU envelope | 37 / 44.195 / 18.046 ms |
+| Owner CPU upper envelope | 953.311 ms |
+| Warmup p99 | 6.302 ms |
+| Native cleanup | clean |
+| Process exit | 101, post-cleanup absolute performance assertion |
+
+Control comparability failed only its p99 criterion; zero rejection and clean
+shutdown did not override this. Candidate did not start. This is not evidence
+that the unrun constructor regressed, nor does it establish an OS/GC/lock cause.
+The CPU and GC envelopes are not exclusive component costs. No business repeat,
+no SDK/default/gate change, and no commit/push followed the failure. The frozen
+control image/reader bytes remain unchanged. The already-qualified cold source
+candidate stays isolated and unaccepted; no optimization benefit is claimed.
+
+* Offline timing-boundary audit: no new business run
+The frozen diagnostics machine code calls clock_gettime with thread-CPU clock
+and the C root counter; it does not enter Scheme. The source's elapsed interval
+ends after the drive loop, before percentile scans and stop/join. That interval
+is enclosed by the owner CPU snapshots. Rounding CPU upward and adding a
+conservative 1000 ns arithmetic margin gives an aggregate owner non-CPU lower
+bound of 285927915 ns within the 1239239875 ns source interval. This is a
+conditional cumulative bound, not the duration or cause of any single pause.
+Both native blocking and runnable waiting remain compatible with these data.
+
+A separate reader boundary matters: on success, whole_native_call_ns is read
+after diagnostics output and copy_arrival_receipt, while CPU capture ended before
+those operations. Therefore subtracting the CPU envelope from that larger field
+cannot establish its waiting time. The call_export-only duration was measured
+locally but not retained in the original success receipt; it remains unknown.
+Keep the original field and three-second gate unchanged; clarify its scope.
+
+The two final percentile scans visit 515051 bins in this failed control. They
+follow every consumption timestamp, so cannot cause this run's already-recorded
+request p99. They do contribute to post-consumption reporting work. The 94.512 ms
+whole-field/source-elapsed difference mixes setup, scans, stop/join and Rust
+reporting; it is not an exclusive component measurement. No CPU-only constructor
+claim can explain away the independently established non-CPU lower bound.
+
+No additional sampler, business replay, SDK, default, or gate change was made.
+The native-correct candidate remains isolated without a performance claim.
+
+Measurement-contract regression checks passed 25. The 1000 ns margin is an
+arithmetic allowance, not an independently calibrated OS clock error. The
+physical non-CPU bound remains conditional on the same-owner counter semantics;
+it does not certify a bounded pause or authorize a candidate performance claim.
+
+The research gate now explicitly asserts allCounterexamples, including imported
+measurement/resource predicates; previous individual-only runs did not establish
+that aggregate coverage. The 35-test suite passed, including this aggregate.
+No runtime source or frozen artifact was changed in the timing-boundary audit.
+
+* Completion/blocking audit after three consecutive goal turns
+The unchanged frozen control pthread_sigmask disassembly directly calls the
+original native mutex lock/unlock. No diagnostic wrapper is visible in that
+function. This is static reachability only, with no executed frequency, wait
+duration or same-gap attribution. It does not justify reviving rejected lock
+separation or claiming the timer explains the non-CPU envelope.
+
+Stages 1-3 have source/build, machine and actual cold native evidence. Stage 4
+is incomplete: the single current paired attempt stopped at the 256.748 ms
+control. The constructor arm was never run and final performance is unproved.
+The same qualification blocker persisted through three goal turns; those are
+not three control retries. There was only one current control attempt.
+
+No retained receipt distinguishes native blocking from runnable waiting inside
+that same cumulative non-CPU window. Repeating an unchanged pair or reviving a
+rejected diagnostic would violate the stop/knowledge rules. The goal therefore
+requires a new qualified evidence basis before another business attempt; no
+relaxed control/final threshold, rollback of unrelated code, or success claim
+can substitute for this missing evidence. Runtime candidate and frozen bytes
+remain isolated and intact; no source was committed or pushed.
+
+* User-requested restoration and knowledge-only publication
+The eight local runtime/build/bench/test files were archived in the persistent
+ignored evidence directory before restoration. Tracked crates/ and ffi/ now
+exactly match bfe803f; the untracked cold constructor test was removed only
+after its bytes/hash were backed up. Candidate native correctness remains
+evidence, but candidate business performance was never run. This restoration
+is user-directed; it is not a claim of a measured constructor regression.
+
+Only QNT and curated Org/JSON knowledge are selected for publication. No raw
+logs, binaries or unaccepted runtime source are included. The 11.437 ms result
+remains a historical rebuilt baseline observation, not a fresh reproduction.
+The latest failed control remains retained and must not be promoted as baseline.

@@ -264,8 +264,19 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
 }
 
 #ifdef GERBIL_SCHEME_RUST_BUILD
-extern int32_t gerbil_scheme_rust_load_build_scheme(const char *library, void *forward);
+extern int32_t gerbil_scheme_rust_load_build_scheme(const char *library, void *forward, int32_t report_progress);
 static gerbil_host_io *package_io_active;
+/* Configuration belongs to the unique live runtime owner and affects only
+ * package export resolution, never package build/test progress. */
+static int32_t package_resolution_progress = 1;
+GerbilStatus gerbil_scheme_rust_package_set_resolution_progress(int32_t report_progress) {
+  if (gerbil_scheme_rust_state != 1)
+    return gerbil_scheme_rust_state == 2 ? GERBIL_STATUS_RUNTIME_FINALIZED : GERBIL_STATUS_NOT_INITIALIZED;
+  if (!package_image_live || package_io_active != NULL) return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
+  if (report_progress != 0 && report_progress != 1) return GERBIL_STATUS_INVALID_VALUE;
+  package_resolution_progress = report_progress;
+  return GERBIL_STATUS_OK;
+}
 static int package_forward_output(void) {
 #if defined(__unix__) || defined(__APPLE__)
   return package_io_active == NULL ? 0 : gerbil_host_io_forward(package_io_active);
@@ -286,7 +297,7 @@ extern int32_t gerbil_scheme_rust_package_build_spec_scheme(const char *, const 
 extern int32_t gerbil_scheme_rust_package_load_closure_scheme(int64_t, const char *);
 extern int32_t gerbil_scheme_rust_package_paths_scheme(const char *prefix, const char *libraries);
 extern int32_t gerbil_scheme_rust_package_main_scheme(const char *directory, const void *arguments, unsigned int count);
-static GerbilStatus package_enter(gerbil_host_io *host) {
+static GerbilStatus package_enter_with_progress(gerbil_host_io *host, int32_t report_progress) {
   if (package_io_active != NULL) return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
   if (gerbil_scheme_rust_state != 1)
     return gerbil_scheme_rust_state == 2 ? GERBIL_STATUS_RUNTIME_FINALIZED : GERBIL_STATUS_NOT_INITIALIZED;
@@ -299,12 +310,15 @@ static GerbilStatus package_enter(gerbil_host_io *host) {
   }
 #endif
   package_io_active = host;
-  if (gerbil_scheme_rust_load_build_scheme(package_library_path, &package_forward_callback) != 0) {
+  if (gerbil_scheme_rust_load_build_scheme(package_library_path, &package_forward_callback, report_progress) != 0) {
     package_io_active = NULL;
     gerbil_host_io_restore(host);
     return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
   }
   return GERBIL_STATUS_OK;
+}
+static GerbilStatus package_enter(gerbil_host_io *host) {
+  return package_enter_with_progress(host, 1);
 }
 static GerbilStatus package_leave(gerbil_host_io *host, int32_t code, int32_t *result) {
   package_io_active = NULL;
@@ -337,7 +351,7 @@ GerbilStatus gerbil_scheme_rust_package_resolve_export_cstr(const char *director
   if (directory == NULL || result == NULL) return GERBIL_STATUS_NULL_POINTER;
   if (module <= 0 || name <= 0) return GERBIL_STATUS_INVALID_VALUE;
   gerbil_host_io host;
-  GerbilStatus status = package_enter(&host);
+  GerbilStatus status = package_enter_with_progress(&host, package_resolution_progress);
   if (status != GERBIL_STATUS_OK) return status;
   int64_t root = gerbil_scheme_rust_package_resolve_export_scheme(directory, module, name);
   int32_t ignored = 0;

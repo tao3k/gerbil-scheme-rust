@@ -52,4 +52,4 @@ mod instance_backend;
 pub mod instances;
 
 #[cfg(not(feature = "external-program"))]
-pub use runtime::PackageCallOutcome;
+pub use runtime::{PackageCallOutcome, PackageResolutionProgress};

@@ -454,6 +454,15 @@ return and exceptions. No timer emits progress and no deadline is enlarged.
 The existing Scheme test now checks delegation, exception identity, nested
 observation and restoration after both success and failure.
 
+Export resolution has an explicit owner-local progress policy, initially
+=Observed=. =Quiet= omits SDK internal module progress while forwarding module
+output and errors; this choice persists for later export resolutions on that
+runtime owner. Package build, test, clean and staging continue to report real
+progress regardless of the resolution policy. The C boundary accepts only
+zero or one and refuses configuration without the live package-capable owner
+or during an active package call. Quiet resolution may be silent for a long
+load; it must not be used to claim a progress-watchdog pass.
+
 Package =build.ss= remains the authority for foreign-library flags. All three
 existing program producers consume the same staging entry. It includes the
 package declaration once and combines it with caller =gsc-options:=.

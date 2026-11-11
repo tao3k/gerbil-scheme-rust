@@ -109,6 +109,8 @@ GerbilStatus gerbil_scheme_rust_package_build(GerbilBorrowedUtf8 directory, int3
 GerbilStatus gerbil_scheme_rust_package_clean(GerbilBorrowedUtf8 directory, int32_t *result);
 GerbilStatus gerbil_scheme_rust_package_test(GerbilBorrowedUtf8 directory, GerbilBorrowedUtf8 tests, int32_t *result);
 /* Startup-only trusted package resolution, using rooted Scheme symbols. */
+/* Owner-local resolution progress: 0 quiet, 1 observed. Diagnostics remain visible. */
+GerbilStatus gerbil_scheme_rust_package_set_resolution_progress(int32_t report_progress);
 GerbilStatus gerbil_scheme_rust_package_resolve_export(GerbilBorrowedUtf8 directory, GerbilRootId module, GerbilRootId name, GerbilRootId *result);
 
 GerbilStatus gerbil_scheme_rust_package_paths(GerbilBorrowedUtf8 prefix, GerbilBorrowedUtf8 libraries, int32_t *result);

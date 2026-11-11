@@ -3,6 +3,9 @@ use crate::{GerbilBorrowedUtf8, GerbilRootId, GerbilStatus};
 use std::{ffi::CString, os::raw::c_char};
 
 unsafe extern "C" {
+    /// Set owner-local export-resolution progress: zero quiet, one observed.
+    pub fn gerbil_scheme_rust_package_set_resolution_progress(report_progress: i32)
+    -> GerbilStatus;
     fn gerbil_scheme_rust_package_build_cstr(
         directory: *const c_char,
         result: *mut i32,

@@ -33,7 +33,7 @@
       action
       (lambda () (##get-module-set! resolver)))))
 
-(def (gerbil-rs-load-build library)
+(def (gerbil-rs-load-build library report-progress?)
   (with-catch
     (lambda (failure)
       (display-exception failure (current-error-port))
@@ -44,15 +44,18 @@
         (dynamic-wind
           (lambda () (set-load-path! (cons library previous)))
           (lambda ()
-            (gerbil-rs-observe-module-work
-              (lambda ()
-                (displayln "GERBIL-BUILD native-library entered")
-                (gerbil-rs-flush-build-output!)
-                (load-module "gerbil-scheme-rust/scheme/build")
-                (gerbil-load-expander!)
-                (displayln "GERBIL-BUILD native-library returned")
-                (gerbil-rs-flush-build-output!)
-                0)))
+            (if report-progress?
+              (gerbil-rs-observe-module-work
+                (lambda ()
+                  (displayln "GERBIL-BUILD native-library entered")
+                  (gerbil-rs-flush-build-output!)
+                  (load-module "gerbil-scheme-rust/scheme/build")
+                  (gerbil-load-expander!)
+                  (displayln "GERBIL-BUILD native-library returned")
+                  (gerbil-rs-flush-build-output!)
+                  0))
+              (begin (load-module "gerbil-scheme-rust/scheme/build")
+                     (gerbil-load-expander!) 0)))
           (lambda () (set-load-path! previous)))))))
 
 (def (gerbil-rs-abi-version) 1)
@@ -463,10 +466,10 @@ END-C
         0)))
   (define gerbil-rs-forward-output-c
     (c-lambda ((pointer void)) int "___return((*(int (**)(void))___arg1)());"))
-  (c-define (gerbil-rs-load-build-native library forward)
-    (UTF-8-string (pointer void)) int32 "gerbil_scheme_rust_load_build_scheme" ""
+  (c-define (gerbil-rs-load-build-native library forward report-progress)
+    (UTF-8-string (pointer void) int32) int32 "gerbil_scheme_rust_load_build_scheme" ""
     (gerbil-scheme-rust/scheme/runtime#gerbil-rs-build-output-observer forward)
-    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-load-build library))
+    (gerbil-scheme-rust/scheme/runtime#gerbil-rs-load-build library (not (zero? report-progress))))
 
   (c-define (gerbil-rs-abi-version-native)
     () unsigned-int32

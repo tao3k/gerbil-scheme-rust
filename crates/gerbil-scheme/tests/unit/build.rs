@@ -26,6 +26,9 @@ fn local_package_environment_is_selected_before_loading_build_script() {
     let host_cpus = host_allowed_cpus();
     assert!(std::env::var_os("GERBIL_PATH").is_none());
     let runtime = initialize();
+    runtime
+        .set_package_resolution_progress(gerbil_scheme::PackageResolutionProgress::Quiet)
+        .unwrap();
     // The existing runtime compiler projection lasts until VM teardown. Calls
     // must restore this active-owner state; Drop restores the full caller state.
     let active_environment: std::collections::BTreeMap<_, _> = std::env::vars_os().collect();
@@ -157,12 +160,40 @@ fn rooted_package_exports_preserve_diagnostics_and_owner() {
     let runtime = initialize();
     let directory = root.to_str().unwrap();
     {
-        use gerbil_scheme::{IdentifierKind, ObjectKind, SchemeScalar};
+        use gerbil_scheme::{IdentifierKind, ObjectKind, PackageResolutionProgress, SchemeScalar};
         let module = runtime
             .intern_identifier(IdentifierKind::Symbol, ":gerbil/core")
             .unwrap();
         let name = runtime
             .intern_identifier(IdentifierKind::Symbol, "not")
+            .unwrap();
+        // SAFETY: this test owns the live runtime and exercises scalar rejection.
+        assert_eq!(
+            unsafe { gerbil_scheme_sys::gerbil_scheme_rust_package_set_resolution_progress(2) },
+            GerbilStatus::InvalidValue
+        );
+        runtime
+            .set_package_resolution_progress(PackageResolutionProgress::Quiet)
+            .unwrap();
+        println!("PACKAGE-QUIET-BEGIN");
+        use std::io::Write as _;
+        std::io::stdout().flush().unwrap();
+        let quiet = runtime
+            .resolve_package_export(directory, &module, &name)
+            .unwrap();
+        assert_eq!(quiet.as_ref().kind().unwrap(), ObjectKind::Procedure);
+        let quiet_missing = runtime
+            .intern_identifier(IdentifierKind::Symbol, "no-such-quiet-export")
+            .unwrap();
+        assert!(
+            runtime
+                .resolve_package_export(directory, &module, &quiet_missing)
+                .is_err()
+        );
+        println!("PACKAGE-QUIET-END");
+        std::io::stdout().flush().unwrap();
+        runtime
+            .set_package_resolution_progress(PackageResolutionProgress::Observed)
             .unwrap();
         let procedure = runtime
             .resolve_package_export(directory, &module, &name)

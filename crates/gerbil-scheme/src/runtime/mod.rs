@@ -17,7 +17,7 @@ mod integer;
 mod lifecycle;
 mod objects;
 #[cfg(not(feature = "external-program"))]
-pub use build::PackageCallOutcome;
+pub use build::{PackageCallOutcome, PackageResolutionProgress};
 mod program;
 mod rooted;
 mod scalar_batch;

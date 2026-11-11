@@ -17,7 +17,38 @@ pub enum PackageCallOutcome {
     },
 }
 
+/// Progress policy for package export resolution on this runtime owner.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum PackageResolutionProgress {
+    /// Emit module-loading progress.
+    Observed,
+    /// Suppress internal progress while retaining output and diagnostics.
+    Quiet,
+}
+
 impl GerbilRuntime {
+    /// Configure later export resolutions on the live owner; build/test progress is unaffected.
+    /// # Errors
+    /// Rejects a non-owner or a runtime which cannot perform package operations.
+    pub fn set_package_resolution_progress(
+        &self,
+        progress: PackageResolutionProgress,
+    ) -> Result<(), NativeError> {
+        self.check_thread()?;
+        // SAFETY: the checked owner is live and the scalar policy is valid.
+        let status = unsafe {
+            gerbil_scheme_sys::gerbil_scheme_rust_package_set_resolution_progress(i32::from(
+                progress == PackageResolutionProgress::Observed,
+            ))
+        };
+        if status != GerbilStatus::Ok {
+            return Err(NativeError::Status {
+                operation: "package resolution progress",
+                code: status as i32,
+            });
+        }
+        Ok(())
+    }
     /// Resolve an exported value through Gerbil's package module loader.
     /// The package prefix is fixed to the existing tooling owner. This is a
     /// startup operation: do not overlap unrelated environment or subprocess work.

@@ -53,16 +53,21 @@ pub(super) fn run() -> bool {
         let (mut out_open, mut err_open) = (true, true);
         let mut status = None;
         let mut progress = Vec::new();
+        let verify_quiet = test_name.ends_with("rooted_package_exports_preserve_diagnostics_and_owner");
+        let verify_build = test_name.ends_with("local_package_environment_is_selected_before_loading_build_script");
+        let capture_output = verify_quiet || verify_build;
+        let mut quiet_stdout = Vec::new();
+        let mut quiet_stderr = Vec::new();
         while status.is_none() || out_open || err_open {
             tokio::select! {
                 result = child.wait(), if status.is_none() => { status = Some(result.unwrap()); }
                 read = stdout.read(&mut out), if out_open => {
                     let count = read.unwrap(); out_open = count != 0;
-                    if count != 0 { std::io::stdout().write_all(&out[..count]).unwrap(); acknowledge_progress(&mut progress, &out[..count], pid); idle = tokio::time::Instant::now() + Duration::from_secs(5); }
+                    if count != 0 { if capture_output { quiet_stdout.extend_from_slice(&out[..count]); assert!(quiet_stdout.len() <= 2 * 1024 * 1024); } std::io::stdout().write_all(&out[..count]).unwrap(); acknowledge_progress(&mut progress, &out[..count], pid); idle = tokio::time::Instant::now() + Duration::from_secs(5); }
                 }
                 read = stderr.read(&mut err), if err_open => {
                     let count = read.unwrap(); err_open = count != 0;
-                    if count != 0 { std::io::stderr().write_all(&err[..count]).unwrap(); idle = tokio::time::Instant::now() + Duration::from_secs(5); }
+                    if count != 0 { if verify_quiet { quiet_stderr.extend_from_slice(&err[..count]); assert!(quiet_stderr.len() <= 2 * 1024 * 1024); } std::io::stderr().write_all(&err[..count]).unwrap(); idle = tokio::time::Instant::now() + Duration::from_secs(5); }
                 }
                 () = tokio::time::sleep_until(wall.min(idle)) => {
                     #[cfg(unix)]
@@ -76,6 +81,18 @@ pub(super) fn run() -> bool {
         }
         let status = status.unwrap();
         assert!(status.success(), "C ABI owner failed: {status}; output retained above");
+        if verify_quiet {
+            let output = String::from_utf8_lossy(&quiet_stdout);
+            let (_, after_start) = output.split_once("PACKAGE-QUIET-BEGIN\n").expect("quiet start marker");
+            let (quiet, _) = after_start.split_once("PACKAGE-QUIET-END\n").expect("quiet end marker");
+            assert!(!quiet.contains("GERBIL-BUILD"), "quiet resolution emitted internal progress");
+            assert!(output.contains("GERBIL-BUILD"), "observed resolution did not emit progress");
+            assert!(String::from_utf8_lossy(&quiet_stderr).contains("Unexpected import"), "missing export diagnostic was lost");
+        }
+        if verify_build {
+            assert!(String::from_utf8_lossy(&quiet_stdout).contains("GERBIL-BUILD"),
+                "quiet export resolution must not suppress package build progress");
+        }
         #[cfg(unix)]
         {
             // SAFETY: signal zero observes only this newly owned group; no signal is delivered.

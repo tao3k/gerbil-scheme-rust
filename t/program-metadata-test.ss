@@ -1,6 +1,6 @@
 ;;; SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 (import :gerbil/compiler :gerbil-scheme-rust/scheme/program-build
-        :std/encoding/json (only-in :std/list/list delete-duplicates/hash)
+        :std/encoding/json (only-in :std/list/list delete-duplicates/hash find)
         (only-in :std/make pkg-config-libs)
         (only-in :gerbil/runtime/loader add-load-path!))
 
@@ -16,6 +16,25 @@
     (compile-module source [output-dir: library invoke-gsc: #f optimize: #t static: #t])
     (gerbil-rs-stage-program source ordinary)
     (gerbil-rs-stage-program source explicit-empty [])
+    ;; A template value needs its native code even when no macro carrier was
+    ;; observed. This remains deferred, rather than joining eager bootstrap.
+    (let* ((entry (path-expand "t/metadata-template-entry.ss" (current-directory)))
+           (target (path-expand "template" output)))
+      (create-directory* target)
+      (compile-module (path-expand "t/metadata-template-prelude.ss" (current-directory))
+        [output-dir: library invoke-gsc: #f optimize: #t static: #t])
+      (compile-module entry [output-dir: library invoke-gsc: #f optimize: #t static: #t])
+      (gerbil-rs-stage-program entry target)
+      (def plan
+        (parameterize ((current-json-read-options (make-JSONReadOptions object-as-hash: #t)))
+          (call-with-input-file (path-expand "program.json" target) read-json)))
+      (def rows (hash-ref plan "modules"))
+      (def modules (if (vector? rows) (vector->list rows) rows))
+      (def role (find (lambda (row) (equal? (hash-ref row "module") "std/func")) modules))
+      (def runtime-role (find (lambda (row) (equal? (hash-ref row "module") "std/iter")) modules))
+      (unless (and role (hash-ref role "deferred" #f) runtime-role)
+        (error "template or explicit runtime code is absent, or template eagerly initialized"))
+      (displayln "PROGRAM-TEMPLATE-RUNTIME-OK deferred=true"))
     (gerbil-rs-stage-program source expanded '(:gerbil/compiler/base))
     ;; Standard compiler options must reach both compile-exe and its link plan.
     ;; This extends the same source case; no package or source fixture is added.

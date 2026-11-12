@@ -41,6 +41,7 @@ fn run_native_build() {
     println!("cargo:rerun-if-changed=../../scheme/generated/utf8.scm.sha256");
     println!("cargo:rerun-if-changed=../../ffi/runtime.c");
     println!("cargo:rerun-if-changed=../../ffi/host_io.h");
+    println!("cargo:rerun-if-changed=../../ffi/signal_binding.c");
     println!("cargo:rerun-if-changed=../../ffi/host_environment.h");
 
     let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
@@ -360,7 +361,10 @@ fn publish_default_image(receipt: &crate::NativeArchiveLinkReceipt, lifecycle: &
 }
 
 fn signal_scope_option() -> &'static str {
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+    if matches!(
+        env::var("CARGO_CFG_TARGET_OS").as_deref(),
+        Ok("linux" | "macos")
+    ) {
         "-DGERBIL_SCHEME_RUST_SCOPED_SIGNALS"
     } else {
         ""
@@ -388,9 +392,9 @@ fn is_signal_caller(bytes: &[u8]) -> Result<bool, String> {
     let object = object::File::parse(bytes).map_err(|error| error.to_string())?;
     Ok(object.symbols().any(|symbol| {
         symbol.is_undefined()
-            && symbol
-                .name_bytes()
-                .is_ok_and(|name| name == b"___set_signal_handler")
+            && symbol.name_bytes().is_ok_and(|name| {
+                matches!(name, b"___set_signal_handler" | b"____set_signal_handler")
+            })
     }))
 }
 
@@ -399,6 +403,7 @@ fn build_signal_archive(library: &Path, out: &Path, mut build: cc::Build) -> Res
     let data = fs::read(library).map_err(|error| error.to_string())?;
     let archive = object::read::archive::ArchiveFile::parse(data.as_slice())
         .map_err(|error| error.to_string())?;
+    let mut darwin_binding = None;
     let objects = archive
         .members()
         .enumerate()
@@ -412,7 +417,52 @@ fn build_signal_archive(library: &Path, out: &Path, mut build: cc::Build) -> Res
             if is_signal_caller(bytes)? {
                 let scoped = out.join(format!("gambit-{index}-scoped.o"));
                 let mut command = build.get_compiler().to_command();
-                configure_scoped_signal_link(&mut command, &object, &scoped);
+                if object::File::parse(bytes)
+                    .map_err(|error| error.to_string())?
+                    .format()
+                    == object::BinaryFormat::MachO
+                {
+                    // A private alias resolves only this caller. The original
+                    // helper remains available to the runtime and host.
+                    let binding = if let Some(binding) = &darwin_binding {
+                        PathBuf::clone(binding)
+                    } else {
+                        let binding_source = out.join("signal-binding.c");
+                        let binding = out.join("signal-binding.o");
+                        fs::write(
+                            &binding_source,
+                            include_str!("../../../ffi/signal_binding.c"),
+                        )
+                        .map_err(|error| error.to_string())?;
+                        let status = build
+                            .get_compiler()
+                            .to_command()
+                            .arg("-c")
+                            .arg(&binding_source)
+                            .arg("-o")
+                            .arg(&binding)
+                            .status()
+                            .map_err(|error| error.to_string())?;
+                        if !status.success() {
+                            return Err(format!("compile paired signal binding failed: {status}"));
+                        }
+                        darwin_binding = Some(binding.clone());
+                        binding
+                    };
+                    command
+                        .args(["-nostdlib", "-r"])
+                        .arg(&object)
+                        .arg(&binding)
+                        .args([
+                            "-Wl,-alias,_gerbil_scoped_signal_binding,____set_signal_handler",
+                            "-Wl,-unexported_symbol,____set_signal_handler",
+                            "-Wl,-unexported_symbol,_gerbil_scoped_signal_binding",
+                        ])
+                        .arg("-o")
+                        .arg(&scoped);
+                } else {
+                    configure_scoped_signal_link(&mut command, &object, &scoped);
+                }
                 let status = command.status().map_err(|error| error.to_string())?;
                 if !status.success() {
                     return Err(format!("paired Gambit signal binding failed: {status}"));
@@ -482,3 +532,7 @@ fn archive_lifecycle(lifecycle: &Path, out: &Path) {
 #[cfg(all(test, target_os = "linux"))]
 #[path = "../tests/unit/native_signal_scope.rs"]
 mod native_signal_scope;
+
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+#[path = "../tests/unit/child_scope.rs"]
+mod child_scope;

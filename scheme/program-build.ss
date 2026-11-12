@@ -27,6 +27,39 @@
        (file-exists? (string-append (path-strip-extension scm) ".c"))
        (file-exists? (string-append (path-strip-extension scm) ".o"))))
 
+;; Template imports carry runtime values without eager initialization. Follow
+;; their native Contexts, including their runtime dependency closure, instead
+;; of relying on which macro carriers happened to initialize in the observer.
+(def (program-template-contexts roots)
+  (def seen (make-hash-table-eq))
+  (def result '())
+  (def (template-source entry)
+    (cond
+     ;; A native runtime: import carries a direct Context, rather than a
+     ;; binding-bearing import set. Preserve that native representation.
+     ((module-context? entry) entry)
+     ((and (import-set? entry) (negative? (import-set-phi entry)))
+      (import-set-source entry))
+     ((and (module-import? entry) (negative? (module-import-phi entry)))
+      (module-export-context (module-import-source entry)))
+     (else #f)))
+  (def (walk context deferred?)
+    (def id (expander-context-id context))
+    (unless (hash-key? seen id)
+      (hash-put! seen id #t)
+      ;; The native closure also contains Prelude Contexts. Its public driver
+      ;; accepts a Module Context, not a Prelude in the same unchecked slots.
+      (when (module-context? context)
+        (for-each (lambda (dependency) (walk dependency deferred?))
+                  (find-runtime-module-deps context))
+        (for-each (lambda (entry)
+                    (let (source (template-source entry))
+                      (when (module-context? source) (walk source #t))))
+                  (module-context-import context)))
+      (when deferred? (set! result (cons context result)))))
+  (for-each (lambda (context) (walk context #f)) roots)
+  (reverse result))
+
 (def (gerbil-rs-stage-program source output-dir (runtime-imports []) (separate-procedures []) gsc-options: (gsc-options []))
   (let* ((native-gsc-options
            (append ["-ld-options" (string-join (gerbil-scheme-rust-link-options) " ")]
@@ -66,11 +99,13 @@
                          (hash-put! module "host_layout" "separate-procedures"))
                        module)))
                  ids)))
-      (when (pair? runtime-imports)
+      (def templates
+        (program-template-contexts (append contexts (map import-module runtime-imports))))
+      (when (or (pair? runtime-imports) (pair? templates))
         (let* ((stub (string-append output "__exe.scm"))
                (builtin (program-builtins stub))
                (base (delete-duplicates/hash (append builtin ids)))
-               (metadata (program-metadata-modules runtime-imports output-dir base)))
+               (metadata (program-metadata-modules runtime-imports output-dir base templates)))
           (set! modules (append modules metadata))
           (program-register-builtins! stub base metadata)))
       (call-with-output-file (path-expand "program.json" output-dir)
@@ -139,33 +174,39 @@
         (newline port)
         (for-each (lambda (form) (write form port) (newline port)) forms)))))
 
-(def (program-metadata-modules imports output-dir builtin)
-  (let* ((observation (path-expand "metadata-modules.dat" output-dir))
-         (expression
-           (call-with-output-string
-             (lambda (port)
-               (write '(import :gerbil-scheme-rust/scheme/program-metadata) port)
-               (newline port)
-               (write `(gerbil-rs-observe-program-metadata ,observation ',imports) port))))
-         (child (open-process
-                  [path: (path-expand "bin/gxi" (gerbil-home))
-                   arguments: ["-:debug=q" "-e" expression]
-                   stdin-redirection: #f stdout-redirection: #f stderr-redirection: #f]))
-         (status (process-status child)))
-    (close-port child)
-    (unless (= status 0) (error "compiler metadata observation failed" status))
+(def (program-observe-metadata imports output-dir)
+  (if (null? imports) '()
+    (let* ((observation (path-expand "metadata-modules.dat" output-dir))
+           (expression
+             (call-with-output-string
+               (lambda (port)
+                 (write '(import :gerbil-scheme-rust/scheme/program-metadata) port)
+                 (newline port)
+                 (write `(gerbil-rs-observe-program-metadata ,observation ',imports) port))))
+           (child (open-process
+                    [path: (path-expand "bin/gxi" (gerbil-home))
+                     arguments: ["-:debug=q" "-e" expression]
+                     stdin-redirection: #f stdout-redirection: #f stderr-redirection: #f]))
+           (status (process-status child)))
+      (close-port child)
+      (unless (= status 0) (error "compiler metadata observation failed" status))
+      (call-with-input-file observation read))))
+
+(def (program-metadata-modules imports output-dir builtin templates)
     ;; Additional library runtime dependencies are lazy too. In particular,
     ;; compiler/base constructs classes and cannot precede runtime/MOP setup.
     ;; Never merge these contexts into compile-exe's eager bootstrap order.
-    (let ((rows (append (call-with-input-file observation read)
+    (let ((rows (append (program-observe-metadata imports output-dir)
                   (filter-map
                     (lambda (ctx)
                       (let (id (symbol->string (expander-context-id ctx)))
                         (and (not (string-prefix? "gerbil/core" id))
                              (list id (find-static-module-file id)))))
-                    (apply append (map (lambda (ctx)
-                                         (append (find-runtime-module-deps ctx) [ctx]))
-                                       (map import-module imports))))))
+                    (append
+                      (apply append (map (lambda (ctx)
+                                           (append (find-runtime-module-deps ctx) [ctx]))
+                                         (map import-module imports)))
+                      templates))))
           (seen (list->hash-table (map (lambda (id) (cons id #t))
                     (append builtin (map (cut string-append <> "~0") builtin)))))
           (directory (path-expand "metadata" output-dir)))
@@ -202,4 +243,4 @@
                        (hash-put! module "host_layout" "separate-procedures"))
                      module)))))
             (else (error "invalid compiler metadata observation" row))))
-        rows))))
+        rows)))

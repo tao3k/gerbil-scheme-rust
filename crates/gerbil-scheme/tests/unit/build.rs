@@ -46,30 +46,7 @@ fn local_package_environment_is_selected_before_loading_build_script() {
         "cancelled call must not select/create package environment"
     );
     assert_eq!(runtime.build_package(directory).unwrap(), 0);
-    let observed_cores = fs::read_to_string(root.join("build-cores.txt")).unwrap();
-    if let Some(expected) = &selected_cores {
-        assert_eq!(
-            &observed_cores, expected,
-            "explicit build budget was replaced"
-        );
-    } else {
-        assert_eq!(
-            observed_cores,
-            fs::read_to_string(root.join("cpu-count.txt")).unwrap(),
-            "default build budget must equal the Gambit CPU count"
-        );
-    }
-    assert_eq!(
-        runtime
-            .run_package_main(directory, &["test-fail-cores"])
-            .unwrap(),
-        70
-    );
-    assert_eq!(
-        fs::read_to_string(root.join("build-cores.txt")).unwrap(),
-        observed_cores
-    );
-    assert_eq!(std::env::var("GERBIL_BUILD_CORES").ok(), selected_cores);
+    assert_build_core_selection(&runtime, &root, selected_cores.as_deref());
     #[cfg(target_os = "linux")]
     assert_eq!(
         host_allowed_cpus(),
@@ -140,6 +117,41 @@ fn local_package_environment_is_selected_before_loading_build_script() {
     );
 }
 
+fn assert_build_core_selection(
+    runtime: &GerbilRuntime,
+    root: &std::path::Path,
+    selected_cores: Option<&str>,
+) {
+    let directory = root.to_str().unwrap();
+    let observed_cores = fs::read_to_string(root.join("build-cores.txt")).unwrap();
+    if let Some(expected) = selected_cores {
+        assert_eq!(
+            observed_cores, expected,
+            "explicit build budget was replaced"
+        );
+    } else {
+        assert_eq!(
+            observed_cores,
+            fs::read_to_string(root.join("cpu-count.txt")).unwrap(),
+            "default build budget must equal the Gambit CPU count"
+        );
+    }
+    assert_eq!(
+        runtime
+            .run_package_main(directory, &["test-fail-cores"])
+            .unwrap(),
+        70
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("build-cores.txt")).unwrap(),
+        observed_cores
+    );
+    assert_eq!(
+        std::env::var("GERBIL_BUILD_CORES").ok().as_deref(),
+        selected_cores
+    );
+}
+
 #[cfg(target_os = "linux")]
 fn host_allowed_cpus() -> String {
     fs::read_to_string("/proc/thread-self/status")
@@ -161,6 +173,7 @@ fn rooted_package_exports_preserve_diagnostics_and_owner() {
     let directory = root.to_str().unwrap();
     {
         use gerbil_scheme::{IdentifierKind, ObjectKind, PackageResolutionProgress, SchemeScalar};
+        use std::io::Write as _;
         let module = runtime
             .intern_identifier(IdentifierKind::Symbol, ":gerbil/core")
             .unwrap();
@@ -176,7 +189,6 @@ fn rooted_package_exports_preserve_diagnostics_and_owner() {
             .set_package_resolution_progress(PackageResolutionProgress::Quiet)
             .unwrap();
         println!("PACKAGE-QUIET-BEGIN");
-        use std::io::Write as _;
         std::io::stdout().flush().unwrap();
         let quiet = runtime
             .resolve_package_export(directory, &module, &name)

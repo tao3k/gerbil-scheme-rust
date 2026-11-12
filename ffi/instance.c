@@ -1,5 +1,8 @@
 /* Fixed-owner Gerbil native runtime lifecycle; shared by library consumers. */
 #define GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM
+#ifndef GERBIL_SCHEME_RUST_SCOPED_SIGNALS
+#define GERBIL_SCHEME_RUST_SCOPED_SIGNALS
+#endif
 #include "runtime.c"
 #include "instance.h"
 #include "instance_loader.h"
@@ -33,6 +36,8 @@ static uint32_t setup_phase = 0;
 uint32_t gerbil_scheme_instance_abi(void) { return 4; }
 uint32_t gerbil_scheme_instance_setup_phase(void) { return setup_phase; }
 int32_t gerbil_scheme_instance_setup(uint32_t owner) {
+  int32_t entry_status = runtime_entry_status();
+  if (entry_status != 0) return entry_status;
   /* Qualification faults are compiled into separate images. No environment,
    * source-name policy or shared SDK configuration controls production setup. */
   if (GERBIL_OWNER_FAILURE_STAGE == 1 && owner == 1) return 61;

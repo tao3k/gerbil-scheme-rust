@@ -26,11 +26,20 @@ ___END_C_LINKAGE
 
 /* 0 = never initialized, 1 = running, 2 = finalized and not restartable. */
 static int gerbil_scheme_rust_state = 0;
+static int32_t runtime_entry_status(void) {
+  if (gerbil_scheme_rust_state == 1) return 6;
+  if (gerbil_scheme_rust_state == 2) return 8;
+  return 0;
+}
 #if defined(GERBIL_SCHEME_RUST_BUILD) && (defined(__unix__) || defined(__APPLE__))
 /* Native build/test owns Gerbil child processes for the duration of the call.
- * Save the handler installed by the actual runtime, not a private SDK symbol.
+ * Save the handler requested by the actual runtime, not a private SDK symbol.
  * Ordinary Rust ownership and its original handler resume after the operation. */
+#if defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+static void (*package_child_handler)(int);
+#else
 static struct sigaction package_child_action;
+#endif
 static int package_child_action_ready = 0;
 static int package_image_live = 0;
 #endif
@@ -144,12 +153,8 @@ static int32_t runtime_init_program(
   ___setup_params_struct params;
   gerbil_host_io host;
 
-  if (gerbil_scheme_rust_state == 1) {
-    return 6;
-  }
-  if (gerbil_scheme_rust_state == 2) {
-    return 8;
-  }
+  int32_t entry_status = runtime_entry_status();
+  if (entry_status != 0) return entry_status;
   if (linker == 0) {
     return 1;
   }
@@ -175,15 +180,22 @@ static int32_t runtime_init_program(
     gerbil_scheme_rust_state = 2;
     return 4;
   }
+  gerbil_host_child_scope_begin();
   ___SCMOBJ initialized = ___setup(&params);
   setup_diagnostic[1] = ___FIXNUMP(initialized) ? ___INT(initialized) : (int64_t)initialized;
 #if defined(GERBIL_SCHEME_RUST_BUILD) && (defined(__unix__) || defined(__APPLE__))
   if (initialized == ___FIX(___NO_ERR)) {
+#if defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+    package_child_handler = gerbil_host_child_handler;
+    package_child_action_ready = gerbil_host_child_handler_seen;
+#else
     package_child_action_ready = sigaction(SIGCHLD, NULL, &package_child_action) == 0;
+#endif
     package_image_live = linker == ___LNK_gerbil__scheme__rust__linker;
   }
 #endif
   int host_restored = gerbil_host_io_restore(&host);
+  gerbil_host_child_scope_end();
   if (host_restored != 0) setup_diagnostic[2] = errno;
   if (initialized == ___FIX(___NO_ERR)) setup_diagnostic[3] = ___VMSTATE->processor_count;
   setup_diagnostic[0] = initialized != ___FIX(___NO_ERR) ? 2 :
@@ -193,8 +205,10 @@ static int32_t runtime_init_program(
     if (initialized == ___FIX(___NO_ERR)) {
       gerbil_host_sigpipe pipe;
       if (gerbil_host_sigpipe_begin(&pipe) == 0) {
+        gerbil_host_child_scope_begin();
         ___cleanup();
         gerbil_host_signals_restore(&host.signals);
+        gerbil_host_child_scope_end();
         gerbil_host_sigpipe_end(&pipe);
       }
       gerbil_host_affinity_restore(&host.affinity);
@@ -254,10 +268,12 @@ int32_t gerbil_scheme_rust_runtime_cleanup(void) {
     gerbil_host_environment_discard(&environment);
     return 4;
   }
+  gerbil_host_child_scope_begin();
   ___cleanup();
   gerbil_host_environment_restore(&environment);
   gerbil_scheme_rust_state = 2;
   int restored = gerbil_host_signals_restore(&signals);
+  gerbil_host_child_scope_end();
   int pipe_restored = gerbil_host_sigpipe_end(&pipe);
   int affinity_restored = gerbil_host_affinity_restore(&affinity);
   return restored == 0 && pipe_restored == 0 && affinity_restored == 0 ? 0 : 4;
@@ -304,10 +320,20 @@ static GerbilStatus package_enter_with_progress(gerbil_host_io *host, int32_t re
   if (!package_image_live) return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
   if (gerbil_host_io_capture(host) != 0) return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
 #if defined(__unix__) || defined(__APPLE__)
+#if defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+  if (!package_child_action_ready) {
+    gerbil_host_io_restore(host);
+    return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
+  }
+  /* Only explicit package execution lends child-process ownership to Scheme.
+   * Use the paired SDK helper so its flags and mask retain their native form. */
+  ___set_signal_handler(SIGCHLD, package_child_handler);
+#else
   if (!package_child_action_ready || sigaction(SIGCHLD, &package_child_action, NULL) != 0) {
     gerbil_host_io_restore(host);
     return GERBIL_STATUS_RUNTIME_UNAVAILABLE;
   }
+#endif
 #endif
   package_io_active = host;
   if (gerbil_scheme_rust_load_build_scheme(package_library_path, &package_forward_callback, report_progress) != 0) {

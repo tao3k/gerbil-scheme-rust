@@ -9,6 +9,13 @@ extern uint32_t gerbil_instance_qualification_marker(void);
 extern int64_t gerbil_instance_qualification_lifecycle(uint32_t, uint32_t);
 static int initialized = 0;
 
+/* This diagnostic deliberately retains direct SDK signal ownership.
+ * It is an explicit unprotected reference, not the bridge lifecycle owner. */
+extern void ___set_signal_handler(int, void (*)(int));
+void __wrap____set_signal_handler(int signal_number, void (*handler)(int)) {
+  ___set_signal_handler(signal_number, handler);
+}
+
 int32_t gerbil_instance_probe_init(void) {
   ___setup_params_struct params;
   if (initialized != 0) return -1;

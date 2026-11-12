@@ -35,6 +35,11 @@ gerbil-scheme-aot-build.workspace = true
 libc = "=0.2.186"
 serde_json.workspace = true
 
+[[test]]
+name = "instance_image"
+path = "tests/instance_image.rs"
+required-features = ["instance-probe"]
+
 [[bench]]
 name = "actors"
 harness = false

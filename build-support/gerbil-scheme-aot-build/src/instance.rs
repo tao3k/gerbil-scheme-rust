@@ -52,6 +52,7 @@ pub fn build_native_instance_image(
         "ffi/instance_timer.h",
         "ffi/runtime.c",
         "ffi/host_io.h",
+        "ffi/signal_binding.c",
     ] {
         println!(
             "cargo:rerun-if-changed={}",

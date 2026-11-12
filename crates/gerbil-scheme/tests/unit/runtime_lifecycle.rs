@@ -2,6 +2,13 @@
 
 #[path = "conversion_contracts.rs"]
 mod conversion_contracts;
+#[cfg(unix)]
+#[path = "host_child_wait.rs"]
+mod host_child_wait;
+#[cfg(unix)]
+use host_child_wait::assert_host_broken_pipe;
+#[cfg(target_os = "linux")]
+use host_child_wait::host_allowed_cpus;
 use conversion_contracts::{checks_borrowed_bytevector_bulk_copy, exercises_utf8_bulk_conversion};
 
 #[cfg(target_os = "linux")]
@@ -89,7 +96,11 @@ fn calls_scalar_export_in_process() {
     assert_host_broken_pipe();
     #[cfg(target_os = "linux")]
     let host_cpus = host_allowed_cpus();
-    let runtime = GerbilRuntime::initialize().expect("initialize in-process Gerbil runtime");
+    #[cfg(unix)]
+    let initialized = host_child_wait::during(GerbilRuntime::initialize);
+    #[cfg(not(unix))]
+    let initialized = GerbilRuntime::initialize();
+    let runtime = initialized.expect("initialize in-process Gerbil runtime");
     #[cfg(unix)]
     assert_host_broken_pipe();
     #[cfg(target_os = "linux")]
@@ -128,36 +139,6 @@ fn calls_scalar_export_in_process() {
         host_cpus,
         "cleanup changed host CPU affinity"
     );
-}
-
-#[cfg(unix)]
-fn assert_host_broken_pipe() {
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-
-    let mut child = Command::new("true")
-        .stdin(Stdio::piped())
-        .spawn()
-        .expect("create a real host pipe");
-    let mut input = child.stdin.take().expect("parent pipe writer");
-    assert!(child.wait().expect("close the reader").success());
-    assert_eq!(
-        input
-            .write_all(b"closed")
-            .expect_err("reader already exited")
-            .kind(),
-        std::io::ErrorKind::BrokenPipe,
-    );
-}
-
-#[cfg(target_os = "linux")]
-fn host_allowed_cpus() -> String {
-    std::fs::read_to_string("/proc/thread-self/status")
-        .expect("read calling thread CPU affinity")
-        .lines()
-        .find_map(|line| line.strip_prefix("Cpus_allowed_list:").map(str::trim))
-        .expect("calling thread has an allowed CPU list")
-        .to_owned()
 }
 
 fn exercises_binary_input_and_reused_output(runtime: &GerbilRuntime) {
@@ -914,6 +895,9 @@ fn reports_overflow_and_finalized_runtime_boundaries(runtime: GerbilRuntime) {
             right: 1,
         })
     );
+    #[cfg(unix)]
+    host_child_wait::during(|| drop(runtime));
+    #[cfg(not(unix))]
     drop(runtime);
 
     assert!(matches!(

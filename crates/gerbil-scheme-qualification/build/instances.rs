@@ -3,8 +3,8 @@
 use std::{path::Path, process::Command};
 
 use gerbil_scheme_aot_build::{
-    CargoDirectiveKind, NativeArchiveLinkReceipt, discover_native_c_compiler, gerbil_command,
-    run_native_process,
+    CargoDirectiveKind, NativeArchiveLinkReceipt, NativeInstanceImageRequest,
+    build_native_instance_image, discover_native_c_compiler, gerbil_command, run_native_process,
 };
 
 pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArchiveLinkReceipt) {
@@ -13,6 +13,7 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
         Ok("macos"),
         "private runtime image diagnostics are currently Darwin-only; do not infer portability"
     );
+    build_canonical_owner_image(out, gsc, receipt);
     build_image(
         package,
         out,
@@ -99,6 +100,22 @@ pub(super) fn build(package: &Path, out: &Path, gsc: &Path, receipt: &NativeArch
         }
         build_wait_diagnostic(package, out, gsc, receipt);
     }
+}
+
+fn build_canonical_owner_image(out: &Path, gsc: &Path, receipt: &NativeArchiveLinkReceipt) {
+    let canonical = out.join("canonical-owner.dylib");
+    build_native_instance_image(NativeInstanceImageRequest {
+        gsc,
+        archive: receipt,
+        linker_symbol: "___LNK_gerbil__actor__qualification",
+        output: &canonical,
+        exports: &[],
+    })
+    .expect("canonical owner image compilation");
+    println!(
+        "cargo:rustc-env=GERBIL_CANONICAL_OWNER_IMAGE={}",
+        canonical.display()
+    );
 }
 
 fn build_wait_diagnostic(

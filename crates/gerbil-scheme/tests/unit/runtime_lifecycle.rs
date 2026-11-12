@@ -5,11 +5,11 @@ mod conversion_contracts;
 #[cfg(unix)]
 #[path = "host_child_wait.rs"]
 mod host_child_wait;
+use conversion_contracts::{checks_borrowed_bytevector_bulk_copy, exercises_utf8_bulk_conversion};
 #[cfg(unix)]
 use host_child_wait::assert_host_broken_pipe;
 #[cfg(target_os = "linux")]
 use host_child_wait::host_allowed_cpus;
-use conversion_contracts::{checks_borrowed_bytevector_bulk_copy, exercises_utf8_bulk_conversion};
 
 #[cfg(target_os = "linux")]
 #[path = "host_signal_scope.rs"]

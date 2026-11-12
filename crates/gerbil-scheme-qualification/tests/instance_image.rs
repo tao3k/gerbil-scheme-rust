@@ -4,6 +4,30 @@
 #![cfg(target_os = "macos")]
 use std::ffi::{CStr, CString};
 
+fn available_tls_keys() -> usize {
+    // SAFETY: POSIX exposes this process's finite thread-key capacity.
+    let limit = unsafe { libc::sysconf(libc::_SC_THREAD_KEYS_MAX) };
+    let limit = usize::try_from(limit).expect("finite Darwin TLS key capacity");
+    let mut keys = Vec::new();
+    let mut exhausted = false;
+    for _ in 0..limit {
+        let mut key = 0;
+        // SAFETY: fresh output and no destructor; every successful key is retired below.
+        let status = unsafe { libc::pthread_key_create(&raw mut key, None) };
+        if status != 0 {
+            exhausted = status == libc::EAGAIN;
+            break;
+        }
+        keys.push(key);
+    }
+    for key in &keys {
+        // SAFETY: this probe owns these keys and has installed no values.
+        assert_eq!(unsafe { libc::pthread_key_delete(*key) }, 0);
+    }
+    assert!(exhausted, "TLS probe did not reach the platform capacity");
+    keys.len()
+}
+
 struct Image {
     handle: *mut libc::c_void,
     live: bool,
@@ -32,6 +56,7 @@ fn canonical_image_sets_up_one_owner_and_cleans_up_before_unload() {
     type Setup = unsafe extern "C" fn(u32) -> i32;
     type Cleanup = unsafe extern "C" fn() -> i32;
     type Processors = unsafe extern "C" fn() -> u32;
+    std::thread::spawn(|| ()).join().unwrap();
     let path = CString::new(env!("GERBIL_CANONICAL_OWNER_IMAGE")).unwrap();
     // SAFETY: the normal build entry produced this image and ABI.
     let handle = unsafe { libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
@@ -40,6 +65,7 @@ fn canonical_image_sets_up_one_owner_and_cleans_up_before_unload() {
         handle,
         live: false,
     };
+    let tls_before = available_tls_keys();
     // SAFETY: the canonical image owns these exact public C signatures.
     let (setup, cleanup, processors) = unsafe {
         (
@@ -79,10 +105,15 @@ fn canonical_image_sets_up_one_owner_and_cleans_up_before_unload() {
     if retired == 0 && terminal == 8 {
         image.live = false;
     }
+    let tls_retired = available_tls_keys();
     drop(image);
     assert_eq!(started, 0);
     assert_eq!(retired, 0, "owner cleanup failed; code retained");
     assert_eq!(population, 1);
     assert_eq!(duplicate, 6);
     assert_eq!(terminal, 8);
+    assert_eq!(
+        tls_retired, tls_before,
+        "retained code must not retain TLS keys after owner join"
+    );
 }

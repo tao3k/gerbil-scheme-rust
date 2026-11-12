@@ -8,12 +8,20 @@
 #include <stdio.h>
 #include <unistd.h>
 #if defined(GERBIL_SCHEME_RUST_SCOPED_SIGNALS)
+#include <stdatomic.h>
 /* Bound only inside the paired Gambit archive. These scopes never replace
  * host libc calls or mask signals on unrelated Rust threads. */
+#if defined(__linux__)
 static _Thread_local unsigned gerbil_host_signal_scope_depth;
-static _Thread_local unsigned gerbil_host_child_scope_depth;
-static _Thread_local void (*gerbil_host_child_handler)(int);
-static _Thread_local int gerbil_host_child_handler_seen;
+#endif
+/* The unique VM owner serializes scope entry and exit. This state belongs to
+ * its image, not caller TLS: Darwin retains a TLS key for C thread-local data
+ * while image code remains leased after owner join. SDK helper reads may come
+ * from other threads, so the image-owned state uses atomic access. */
+typedef void (*gerbil_host_signal_handler)(int);
+static _Atomic unsigned gerbil_host_child_scope_depth;
+static _Atomic(gerbil_host_signal_handler) gerbil_host_child_handler;
+static _Atomic int gerbil_host_child_handler_seen;
 extern void ___set_signal_handler(int, void (*)(int));
 void __wrap____set_signal_handler(int signal_number, void (*handler)(int)) {
   if (signal_number == SIGCHLD && gerbil_host_child_scope_depth != 0) {
@@ -21,11 +29,14 @@ void __wrap____set_signal_handler(int signal_number, void (*handler)(int)) {
     gerbil_host_child_handler_seen = 1;
     return;
   }
+#if defined(__linux__)
   if (signal_number == SIGPIPE && gerbil_host_signal_scope_depth != 0) return;
+#endif
   ___set_signal_handler(signal_number, handler);
 }
 static inline void gerbil_host_child_scope_begin(void) {
-  if (gerbil_host_child_scope_depth++ == 0) gerbil_host_child_handler_seen = 0;
+  if (gerbil_host_child_scope_depth == 0) gerbil_host_child_handler_seen = 0;
+  gerbil_host_child_scope_depth++;
 }
 static inline void gerbil_host_child_scope_end(void) { gerbil_host_child_scope_depth--; }
 #else

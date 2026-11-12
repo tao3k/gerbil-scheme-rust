@@ -1,0 +1,969 @@
+// SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+
+//! Compile a compiler-owned AOT program manifest without inspecting Scheme text.
+
+#[cfg(test)]
+use super::compile_program_module;
+use super::compile_program_modules;
+use super::objects::for_each_native_job;
+use super::{
+    GSC_PROGRESS_OPTIONS, configured_gambit_gcc, gambit_progress_command,
+    gcc_allocation_diagnostics, native_progress_enabled, run_process, run_with_compiler_artifacts,
+};
+use super::{add_link_input, scheme_string};
+use crate::{
+    NativeArchiveLinkReceipt, NativeLinkLibrary, NativeStaticLinkPlan,
+    build_static_archive_from_link_plan,
+};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::{Duration, Instant};
+
+/// Cargo-resolved source root containing `build.ss` and the Scheme modules.
+///
+/// Downstream build scripts use this instead of guessing a sibling checkout.
+#[must_use]
+pub fn source_workspace() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProgramManifest {
+    schema: String,
+    modules: Vec<ProgramModule>,
+    stub: PathBuf,
+    library_dir: PathBuf,
+    link_options: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProgramModule {
+    module: String,
+    scm: PathBuf,
+    system: bool,
+    #[serde(default)]
+    deferred: bool,
+    #[serde(default)]
+    host_layout: CFunctionLayout,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum CFunctionLayout {
+    #[default]
+    CompilerDefault,
+    SeparateProcedures,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ObjectCompilation<'a> {
+    pub identity: &'a str,
+    pub options: &'a str,
+    pub layout: CFunctionLayout,
+}
+
+/// Named inputs for a compiler-owned linked program archive.
+#[derive(Clone, Copy, Debug)]
+pub struct ProgramArchiveRequest<'a> {
+    /// Manifest emitted by the canonical Gerbil package build.
+    pub manifest: &'a Path,
+    /// Installed Gambit compiler selected by the consuming build.
+    pub gsc: &'a Path,
+    /// Cargo static archive name, without the platform prefix or suffix.
+    pub archive_name: &'a str,
+    /// Compiler linker identity, before Gambit's C name encoding.
+    pub linker_name: &'a str,
+    /// Cargo-owned directory for generated C, objects and the archive.
+    pub out_dir: &'a Path,
+}
+
+/// Extension points for a downstream compiler-owned AOT program.
+#[derive(Clone, Copy, Debug)]
+pub struct ProgramArchiveContract<'a> {
+    /// Modules that must each occur exactly once in the compiler manifest.
+    pub required_modules: &'a [&'a str],
+    /// Modules that must not enter this downstream program's runtime closure.
+    pub forbidden_modules: &'a [&'a str],
+    /// C symbol used in place of Gambit's generated `main`.
+    pub linker_main_symbol: &'a str,
+    /// Caller-owned native objects included in the same static archive.
+    pub additional_objects: &'a [PathBuf],
+    /// Explicit package header roots and files used by module compilation.
+    pub native_headers: &'a [NativeHeaderInput<'a>],
+}
+
+/// One declared package include root, with its complete header inputs.
+#[derive(Clone, Copy, Debug)]
+pub struct NativeHeaderInput<'a> {
+    pub include_directory: &'a Path,
+    pub header_files: &'a [PathBuf],
+}
+
+use super::{native_compile_options, native_optimization_options};
+
+const DEFAULT_REQUIRED_MODULES: &[&str] = &["gerbil-scheme-rust/scheme/runtime"];
+
+/// One compiler-owned transition in the linked AOT program build.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramArchiveObservation<'a> {
+    /// Stable native phase name.
+    pub phase: &'static str,
+    /// `start`, `complete`, `cached`, or `failed`.
+    pub state: &'static str,
+    /// Human-readable operation owned by this crate.
+    pub operation: &'a str,
+    /// Optional module or artifact currently owned by the phase.
+    pub subject: Option<&'a str>,
+    /// Wall time is present for terminal transitions only.
+    pub elapsed: Option<Duration>,
+}
+
+impl fmt::Display for ProgramArchiveObservation<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "phase={} state={} operation={}",
+            self.phase, self.state, self.operation
+        )?;
+        if let Some(subject) = self.subject {
+            write!(formatter, " subject={subject}")?;
+        }
+        if let Some(elapsed) = self.elapsed {
+            write!(formatter, " elapsedMs={}", elapsed.as_millis())?;
+        }
+        Ok(())
+    }
+}
+
+/// Receives phase changes from the canonical AOT builder.
+///
+/// Implementations decide how observations are presented. The builder never
+/// invents a timer heartbeat: the last emitted `start` is the exact native
+/// operation that still owns execution.
+pub trait ProgramArchiveObserver: Sync {
+    /// Records one build transition.
+    fn observe(&self, observation: ProgramArchiveObservation<'_>);
+
+    /// Records a Scheme, toolchain or header input consumed by the AOT graph.
+    fn observe_source_input(&self, _source: &Path) {}
+}
+
+/// Named description for one observed native operation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProgramArchiveOperation<'a> {
+    /// Stable native phase name.
+    pub phase: &'static str,
+    /// Human-readable operation owned by the caller.
+    pub operation: &'a str,
+    /// Optional module or artifact owned by the operation.
+    pub subject: Option<&'a str>,
+}
+
+struct NoProgramArchiveObserver;
+
+impl ProgramArchiveObserver for NoProgramArchiveObserver {
+    fn observe(&self, _observation: ProgramArchiveObservation<'_>) {}
+}
+
+/// Compile a plan emitted by `gerbil-rs-stage-program` in the package build.
+/// The consumer must enable `gerbil-scheme/external-program` so the AOT graph
+/// owns the bridge module while the sys crate retains lifecycle ownership.
+///
+/// # Errors
+/// Returns an error for invalid metadata, missing artifacts, or any failed
+/// compiler/archiver command. It never falls back to process-backed evaluation.
+pub fn build_program_archive(
+    request: ProgramArchiveRequest<'_>,
+) -> Result<NativeArchiveLinkReceipt, String> {
+    build_program_archive_observed(request, &NoProgramArchiveObserver)
+}
+
+/// Builds a linked AOT program while publishing exact native phase changes.
+///
+/// # Errors
+/// Returns the same typed build errors as [`build_program_archive`].
+pub fn build_program_archive_observed(
+    request: ProgramArchiveRequest<'_>,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<NativeArchiveLinkReceipt, String> {
+    build_program_archive_with_contract(
+        request,
+        ProgramArchiveContract {
+            required_modules: DEFAULT_REQUIRED_MODULES,
+            forbidden_modules: &[],
+            linker_main_symbol: "gerbil_scheme_rust_program_main",
+            additional_objects: &[],
+            native_headers: &[],
+        },
+        observer,
+    )
+}
+
+/// Builds a downstream AOT program through the canonical implementation.
+///
+/// # Errors
+/// Returns an error when the requested contract, compiler manifest, native
+/// command, or archive is invalid.
+pub fn build_program_archive_with_contract(
+    request: ProgramArchiveRequest<'_>,
+    contract: ProgramArchiveContract<'_>,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<NativeArchiveLinkReceipt, String> {
+    validate_linker_name(request.linker_name)?;
+    validate_linker_name(contract.linker_main_symbol)?;
+    let plan = read_manifest(
+        request.manifest,
+        contract.required_modules,
+        contract.forbidden_modules,
+    )?;
+    observer.observe(ProgramArchiveObservation {
+        phase: "program-plan",
+        state: "complete",
+        operation: "validate compiler-owned AOT manifest",
+        subject: None,
+        elapsed: None,
+    });
+    for module in &plan.modules {
+        observer.observe_source_input(&module.scm);
+    }
+    for input in [
+        source_workspace().join("scheme/link-options.ss"),
+        plan.library_dir.join("libgerbil.ldd"),
+    ] {
+        observer.observe_source_input(&input);
+    }
+    for input in crate::discovery::gambit_sdk_inputs(request.gsc) {
+        observer.observe_source_input(&input);
+    }
+    let cc_options = native_compile_options(contract.native_headers, observer)?;
+    // Preserve compiler-owned options. Cargo's target linker owns library
+    // resolution and ABI checks, including its implicit system search paths.
+    let link_inputs = observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase: "native-link-inputs",
+            operation: "project compiler-owned native link options",
+            subject: None,
+        },
+        || native_link_options(&plan),
+    )?;
+    let staged = stage_program(&plan, request, observer)?;
+    let mut link_plan = compile_program(
+        &plan,
+        staged,
+        request,
+        contract.linker_main_symbol,
+        &cc_options,
+        link_inputs,
+        observer,
+    )?;
+    link_plan
+        .module_objects
+        .extend_from_slice(contract.additional_objects);
+    observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase: "static-archive",
+            operation: "package linked AOT archive",
+            subject: None,
+        },
+        || {
+            let receipt = build_static_archive_from_link_plan(
+                request.archive_name,
+                &link_plan,
+                request.out_dir,
+            )?;
+            crate::compiler::scope_program_signals(receipt, request.gsc, request.out_dir)
+        },
+    )
+}
+
+fn validate_linker_name(linker_name: &str) -> Result<(), String> {
+    if linker_name.is_empty()
+        || !linker_name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    {
+        return Err("invalid native linker name".into());
+    }
+    Ok(())
+}
+
+fn read_manifest(
+    manifest: &Path,
+    required_modules: &[&str],
+    forbidden_modules: &[&str],
+) -> Result<ProgramManifest, String> {
+    let plan: ProgramManifest =
+        serde_json::from_slice(&std::fs::read(manifest).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    if plan.schema != "gerbil-scheme-rust.aot-program.v1"
+        || plan.modules.is_empty()
+        || plan.modules.len() > 1024
+    {
+        return Err("invalid AOT program manifest".into());
+    }
+    let module_counts = plan
+        .modules
+        .iter()
+        .fold(HashMap::new(), |mut counts, module| {
+            *counts.entry(module.module.as_str()).or_insert(0_usize) += 1;
+            counts
+        });
+    for required in required_modules {
+        if module_counts.get(required).copied() != Some(1) {
+            return Err(format!(
+                "AOT program must contain required module {required} exactly once"
+            ));
+        }
+    }
+    for forbidden in forbidden_modules {
+        if module_counts.contains_key(forbidden) {
+            return Err(format!(
+                "AOT program must not contain forbidden module {forbidden}"
+            ));
+        }
+    }
+    Ok(plan)
+}
+
+struct StagedProgram {
+    objects: Vec<PathBuf>,
+    compile_sources: Vec<super::objects::ProgramObject>,
+    linker_c: PathBuf,
+    linker_object: PathBuf,
+}
+
+fn stage_program(
+    plan: &ProgramManifest,
+    request: ProgramArchiveRequest<'_>,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<StagedProgram, String> {
+    std::fs::create_dir_all(request.out_dir).map_err(|e| e.to_string())?;
+    let linker_c = request.out_dir.join("program_link.c");
+    let linker_object = request.out_dir.join("program_link.o");
+    let mut link = gambit_progress_command(request.gsc);
+    let deferred = plan.modules.iter().any(|module| module.deferred);
+    let mut linked_modules = Vec::new();
+    if !deferred {
+        link.args(["-link", "-linker-name", request.linker_name, "-o"])
+            .arg(&linker_c);
+    }
+    let mut objects = Vec::new();
+    let mut compile_sources = Vec::new();
+    let mut linker_inputs = Vec::new();
+    let module_count = plan.modules.len().to_string();
+    observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase: "module-c-batch",
+            operation: "stage program module C sources",
+            subject: Some(&module_count),
+        },
+        || {
+            let mut c_jobs = Vec::new();
+            let mut staged_c = HashSet::from([linker_c.clone()]);
+            for (index, module) in plan.modules.iter().enumerate() {
+                if !module.scm.is_file() {
+                    return Err(format!("missing SCM for {}", module.module));
+                }
+                // Gerbil compile-exe filters empty user SCM, but keeps every installed
+                // system object, including its interface/link metadata.
+                if !module.system
+                    && std::fs::metadata(&module.scm)
+                        .map_err(|e| e.to_string())?
+                        .len()
+                        == 0
+                {
+                    continue;
+                }
+                if module.system {
+                    let c = module.scm.with_extension("c");
+                    let object = module.scm.with_extension("o");
+                    if !c.is_file() || !object.is_file() {
+                        return Err(format!(
+                            "missing installed AOT object for {}",
+                            module.module
+                        ));
+                    }
+                    add_link_input(
+                        &mut link,
+                        &mut linked_modules,
+                        &c,
+                        deferred,
+                        module.deferred,
+                    );
+                    linker_inputs.push(c);
+                    objects.push(object);
+                } else {
+                    // Stage outside the source tree: gsc -link creates C next to SCM.
+                    // Preserve the compiler's basename because it determines LNK names.
+                    let file_name = module.scm.file_name().ok_or("SCM filename missing")?;
+                    let staged = request.out_dir.join(file_name);
+                    let source = staged.with_extension("c");
+                    if source == staged || !staged_c.insert(source.clone()) {
+                        return Err(format!("conflicting staged C output: {}", source.display()));
+                    }
+                    std::fs::copy(&module.scm, &staged).map_err(|e| e.to_string())?;
+                    c_jobs.push((staged, module.module.as_str()));
+                    add_link_input(
+                        &mut link,
+                        &mut linked_modules,
+                        &source,
+                        deferred,
+                        module.deferred,
+                    );
+                    linker_inputs.push(source.clone());
+                    let object = request.out_dir.join(format!("module_{index}.o"));
+                    compile_sources.push(super::objects::ProgramObject {
+                        source,
+                        object: object.clone(),
+                        module: module.module.clone(),
+                        deferred: module.deferred,
+                        layout: module.host_layout,
+                    });
+                    objects.push(object);
+                }
+            }
+            // Prepare unique jobs before spawning. Link arguments above retain
+            // manifest order regardless of native compiler completion order.
+            for_each_native_job(
+                &c_jobs,
+                native_build_parallelism(c_jobs.len()),
+                |(scm, module)| generate_module_c(request.gsc, scm, module, observer).map(|_| ()),
+            )
+        },
+    )?;
+    let stub_source = generate_module_c(request.gsc, &plan.stub, "program-stub", observer)?;
+    add_link_input(
+        &mut link,
+        &mut linked_modules,
+        &stub_source,
+        deferred,
+        false,
+    );
+    if deferred {
+        // Use Gambit's public linker API: CLI -link has no per-module flags.
+        link.arg("-e").arg(format!(
+            "(link-incremental (quote ({})) output: {} linker-name: {})",
+            linked_modules.join(" "),
+            scheme_string(&linker_c),
+            scheme_string(Path::new(request.linker_name))
+        ));
+    }
+    linker_inputs.push(stub_source);
+    let linker_fingerprint = native_inputs_fingerprint(
+        request.gsc,
+        "program-linker-source-v2",
+        &format!("{} {:?}", request.linker_name, linked_modules),
+        &linker_inputs,
+    )?;
+    let linker_cached = match linker_fingerprint.as_deref() {
+        Some(fingerprint) => cached_native_output(&linker_c, fingerprint)?,
+        None => false,
+    };
+    if linker_cached {
+        observe_cached(observer, "gsc-link", "generate program linker", None);
+    } else {
+        run(
+            &mut link,
+            "gsc-link",
+            "generate program linker",
+            None,
+            observer,
+        )?;
+        if let Some(fingerprint) = linker_fingerprint {
+            publish_native_output_fingerprint(&linker_c, &fingerprint)?;
+        }
+    }
+    Ok(StagedProgram {
+        objects,
+        compile_sources,
+        linker_c,
+        linker_object,
+    })
+}
+
+fn generate_module_c(
+    gsc: &Path,
+    scm: &Path,
+    module: &str,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<PathBuf, String> {
+    let source = scm.with_extension("c");
+    let fingerprint = native_input_fingerprint(gsc, "module-c-v1", "-c -o", scm)?;
+    if let Some(fingerprint) = fingerprint.as_deref() {
+        if cached_native_output(&source, fingerprint)? {
+            observe_cached(
+                observer,
+                "module-c",
+                "generate program module C",
+                Some(module),
+            );
+            return Ok(source);
+        }
+    }
+    // A linker-name passed while compiling SCM also names every module's
+    // entry point. Compile separately so each module keeps its own identity;
+    // only the final C-only link step receives the program linker name.
+    run(
+        gambit_progress_command(gsc)
+            .args(["-c", "-o"])
+            .arg(&source)
+            .arg(scm),
+        "module-c",
+        "generate program module C",
+        Some(module),
+        observer,
+    )?;
+    if let Some(fingerprint) = fingerprint {
+        publish_native_output_fingerprint(&source, &fingerprint)?;
+    }
+    Ok(source)
+}
+
+fn compile_program(
+    plan: &ProgramManifest,
+    staged: StagedProgram,
+    request: ProgramArchiveRequest<'_>,
+    linker_main_symbol: &str,
+    cc_options: &str,
+    (mut search, mut libraries): (Vec<PathBuf>, Vec<NativeLinkLibrary>),
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<NativeStaticLinkPlan, String> {
+    // Compiler runtime discovery belongs to the admitted compiler lane, not
+    // manifest/toolchain admission. Rejection fixtures need not create a Cargo CC
+    // environment before their missing/failed Scheme compiler is observed.
+    if cfg!(target_os = "macos") {
+        let runtime = discover_darwin_compiler_runtime()?;
+        let directory = runtime.parent().ok_or_else(|| {
+            format!(
+                "Darwin compiler runtime has no parent: {}",
+                runtime.display()
+            )
+        })?;
+        search.push(directory.to_path_buf());
+        libraries.push(NativeLinkLibrary::new("static=clang_rt.osx"));
+    }
+    let StagedProgram {
+        mut objects,
+        compile_sources,
+        linker_c,
+        linker_object,
+    } = staged;
+    let optimization = native_optimization_options()?;
+    let stub_object = request.out_dir.join("program_stub.o");
+    let stub_c = plan.stub.with_extension("c");
+    let linker_options = format!("{optimization} -Dmain={linker_main_symbol}");
+    // These sources already exist after staging. Share the module queue rather
+    // than leaving startup/linker compilation on the critical path after it.
+    // Start the linker first; publication still waits for every bounded job.
+    let additional_jobs = [
+        super::objects::NativeObjectJob {
+            source: &linker_c,
+            object: &linker_object,
+            compilation: ObjectCompilation {
+                identity: "program-linker-object-v1",
+                options: &linker_options,
+                layout: CFunctionLayout::CompilerDefault,
+            },
+            operation: ProgramArchiveOperation {
+                phase: "native-object",
+                operation: "compile program linker",
+                subject: Some("program-linker"),
+            },
+        },
+        super::objects::NativeObjectJob {
+            source: &stub_c,
+            object: &stub_object,
+            compilation: ObjectCompilation {
+                identity: "program-startup-object-v1",
+                options: &optimization,
+                layout: CFunctionLayout::CompilerDefault,
+            },
+            operation: ProgramArchiveOperation {
+                phase: "native-object",
+                operation: "compile program startup",
+                subject: Some("program-stub"),
+            },
+        },
+    ];
+    compile_program_modules(
+        request.gsc,
+        &compile_sources,
+        cc_options,
+        &additional_jobs,
+        observer,
+    )?;
+    objects.push(stub_object);
+    Ok(NativeStaticLinkPlan {
+        module_objects: objects,
+        link_object: linker_object,
+        link_search_dirs: search,
+        link_libraries: libraries,
+    })
+}
+
+pub(crate) fn compile_native_object(
+    gsc: &Path,
+    source: &Path,
+    object: &Path,
+    compilation: ObjectCompilation<'_>,
+    operation: ProgramArchiveOperation<'_>,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<(), String> {
+    let ObjectCompilation {
+        identity: domain,
+        options: cc_options,
+        layout,
+    } = compilation;
+    // Gambit's configured compiler owns its ABI flags. Only its declared GCC
+    // backend supports these diagnostic options; never substitute ambient CC.
+    let gcc = configured_gambit_gcc(gsc);
+    // Gambit's large single-host module functions can spend minutes building
+    // GCC's load-motion expression table with no observable compiler output.
+    // Keep O2 and the paired runtime ABI. Gambit's own label threshold selects
+    // multiple host functions for large modules, avoiding one enormous GCC CFG.
+    // Reuse the header's optimization threshold rather than inventing a second
+    // numeric resource limit. This policy is independent of verbosity.
+    let cc_options = if layout == CFunctionLayout::SeparateProcedures {
+        // Preserve the qualified separate-procedure lowering, including jump
+        // layout. SINGLE_HOST_LIMIT alone leaves inline jumps enabled and does
+        // not reproduce the frozen Actor object's compilation contract.
+        format!(
+            "{cc_options} -U___SINGLE_HOST -U___INLINE_JUMPS -D___MULTIPLE_HOSTS -D___DONT_INLINE_JUMPS"
+        )
+    } else if gcc && operation.phase == "native-object" {
+        format!("{cc_options} -fno-gcse-lm -D___SINGLE_HOST_LIMIT=___OPTIMIZED_MODULE_LIMIT")
+    } else {
+        cc_options.to_owned()
+    };
+    // Allocation-only diagnostics must not invalidate code-generation caches.
+    // They expose real compiler progress when a large optimized function takes
+    // longer than the initial observation window, without changing GSC options.
+    println!("cargo:rerun-if-env-changed=GERBIL_BUILD_OBJECT_PROGRESS");
+    println!("cargo:rerun-if-env-changed=GERBIL_BUILD_COMPILER_DIAGNOSTICS");
+    let gcc_progress = native_progress_enabled() && gcc;
+    let detailed_diagnostics =
+        gcc && std::env::var("GERBIL_BUILD_COMPILER_DIAGNOSTICS").as_deref() == Ok("1");
+    let allocation_progress = detailed_diagnostics
+        || (gcc && std::env::var("GERBIL_BUILD_OBJECT_PROGRESS").as_deref() == Ok("1"));
+    let cc_options = compiler_diagnostic_options(&cc_options, gcc_progress, detailed_diagnostics);
+    let fingerprint = native_input_fingerprint(gsc, domain, &cc_options, source)?;
+    if let Some(fingerprint) = fingerprint.as_deref() {
+        if cached_native_output(object, fingerprint)? {
+            observe_cached(
+                observer,
+                operation.phase,
+                operation.operation,
+                operation.subject,
+            );
+            return Ok(());
+        }
+    }
+    // Diagnostic dumps do not change optimizer or ABI inputs. Keep existing
+    // verified object identities, and observe real file growth during register
+    // allocation without forwarding the full IRA/LRA trace through Cargo.
+    let cc_options = if allocation_progress {
+        format!(
+            "{cc_options} -save-temps=obj {}",
+            gcc_allocation_diagnostics(object)?
+        )
+    } else {
+        cc_options
+    };
+    let mut command = gambit_progress_command(gsc);
+    command
+        .args(["-obj", "-cc-options", &cc_options, "-o"])
+        .arg(object)
+        .arg(source);
+    if allocation_progress {
+        observe_program_archive_operation(observer, operation, || {
+            run_with_compiler_artifacts(&mut command, operation.operation, object)
+        })?;
+    } else {
+        run(
+            &mut command,
+            operation.phase,
+            operation.operation,
+            operation.subject,
+            observer,
+        )?;
+    }
+    match fingerprint {
+        Some(fingerprint) => publish_native_output_fingerprint(object, &fingerprint),
+        None => Ok(()),
+    }
+}
+
+// Diagnostic work is independent of genuine progress and code-generation policy.
+pub(super) fn compiler_diagnostic_options(options: &str, progress: bool, detailed: bool) -> String {
+    let mut options = options.to_owned();
+    if progress {
+        options.push_str(" -save-temps=obj -Q");
+    }
+    if detailed {
+        options.push_str(" -fopt-info-all");
+    }
+    options
+}
+
+#[cfg(test)]
+#[path = "../../tests/unit/program_diagnostics.rs"]
+mod diagnostic_tests;
+
+pub(crate) fn native_input_fingerprint(
+    compiler: &Path,
+    domain: &str,
+    options: &str,
+    input: &Path,
+) -> Result<Option<String>, String> {
+    native_inputs_fingerprint(compiler, domain, options, &[input.to_path_buf()])
+}
+
+fn native_inputs_fingerprint(
+    compiler: &Path,
+    domain: &str,
+    options: &str,
+    inputs: &[PathBuf],
+) -> Result<Option<String>, String> {
+    let compiler = match fs::canonicalize(compiler) {
+        Ok(compiler) => compiler,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(format!(
+                "resolve native compiler {}: {error}",
+                compiler.display()
+            ));
+        }
+    };
+    let compiler_metadata = fs::metadata(&compiler)
+        .map_err(|error| format!("inspect native compiler {}: {error}", compiler.display()))?;
+    let compiler_modified = compiler_metadata
+        .modified()
+        .map_err(|error| {
+            format!(
+                "inspect native compiler mtime {}: {error}",
+                compiler.display()
+            )
+        })?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| {
+            format!(
+                "invalid native compiler mtime {}: {error}",
+                compiler.display()
+            )
+        })?;
+    let mut hasher = Sha256::new();
+    if native_progress_enabled() {
+        for option in GSC_PROGRESS_OPTIONS {
+            hasher.update((option.len() as u64).to_le_bytes());
+            hasher.update(option.as_bytes());
+        }
+    }
+    for value in [
+        domain.as_bytes(),
+        options.as_bytes(),
+        compiler.as_os_str().as_encoded_bytes(),
+        &compiler_metadata.len().to_le_bytes(),
+        &compiler_modified.as_nanos().to_le_bytes(),
+    ] {
+        hasher.update((value.len() as u64).to_le_bytes());
+        hasher.update(value);
+    }
+    for input in inputs {
+        let input_bytes = fs::read(input)
+            .map_err(|error| format!("read native input {}: {error}", input.display()))?;
+        let path = input.as_os_str().as_encoded_bytes();
+        hasher.update((path.len() as u64).to_le_bytes());
+        hasher.update(path);
+        hasher.update((input_bytes.len() as u64).to_le_bytes());
+        hasher.update(input_bytes);
+    }
+    // Compiler metadata alone cannot detect an in-place toolchain header/driver
+    // change. Hash the ABI and configured compile policy, not the large runtime
+    // archive: Cargo tracks that archive for relinking above.
+    for input in crate::discovery::gambit_sdk_inputs(&compiler) {
+        if input.ends_with("gambit.h") || input.ends_with("gambuild-C") {
+            let bytes = fs::read(&input)
+                .map_err(|error| format!("read toolchain input {}: {error}", input.display()))?;
+            hasher.update((bytes.len() as u64).to_le_bytes());
+            hasher.update(bytes);
+        }
+    }
+    Ok(Some(format!("{:x}", hasher.finalize())))
+}
+
+fn native_output_fingerprint_path(output: &Path) -> PathBuf {
+    let mut path = output.as_os_str().to_owned();
+    path.push(".sha256");
+    PathBuf::from(path)
+}
+
+pub(crate) fn cached_native_output(output: &Path, fingerprint: &str) -> Result<bool, String> {
+    if !output.is_file() {
+        return Ok(false);
+    }
+    let stamp = native_output_fingerprint_path(output);
+    match fs::read_to_string(&stamp) {
+        Ok(actual) => Ok(actual == fingerprint),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!(
+            "read native output fingerprint {}: {error}",
+            stamp.display()
+        )),
+    }
+}
+
+pub(crate) fn publish_native_output_fingerprint(
+    output: &Path,
+    fingerprint: &str,
+) -> Result<(), String> {
+    let stamp = native_output_fingerprint_path(output);
+    fs::write(&stamp, fingerprint).map_err(|error| {
+        format!(
+            "write native output fingerprint {}: {error}",
+            stamp.display()
+        )
+    })
+}
+
+fn observe_cached(
+    observer: &dyn ProgramArchiveObserver,
+    phase: &'static str,
+    operation: &str,
+    subject: Option<&str>,
+) {
+    observer.observe(ProgramArchiveObservation {
+        phase,
+        state: "cached",
+        operation,
+        subject,
+        elapsed: None,
+    });
+}
+
+pub(crate) fn native_build_parallelism(job_count: usize) -> usize {
+    let configured = crate::parallelism::host_build_parallelism();
+    // Cargo's own build-script budget bounds nested native compiler processes.
+    // Host discovery and Scheme child capacity remain host-owned; a stale
+    // GERBIL_BUILD_CORES value still cannot override them. No new knob/default.
+    let cargo_budget = std::env::var_os("NUM_JOBS").map_or(configured, |value| {
+        value
+            .to_str()
+            .expect("Cargo NUM_JOBS must be UTF-8")
+            .parse::<std::num::NonZeroUsize>()
+            .expect("Cargo NUM_JOBS must be a positive integer")
+            .get()
+    });
+    configured.min(cargo_budget).min(job_count.max(1))
+}
+
+fn native_link_options(
+    plan: &ProgramManifest,
+) -> Result<(Vec<PathBuf>, Vec<NativeLinkLibrary>), String> {
+    let mut search = vec![plan.library_dir.clone()];
+    let mut libraries = vec![NativeLinkLibrary::new("static=gambit")];
+    for option in &plan.link_options {
+        if let Some(path) = option.strip_prefix("-L") {
+            search.push(PathBuf::from(path));
+        } else if let Some(name) = option.strip_prefix("-l") {
+            libraries.push(NativeLinkLibrary::new(name));
+        } else {
+            return Err(format!("unsupported compiler-owned link option {option:?}"));
+        }
+    }
+    Ok((search, libraries))
+}
+
+fn discover_darwin_compiler_runtime() -> Result<PathBuf, String> {
+    let compiler = cc::Build::new()
+        .cargo_metadata(false)
+        .try_get_compiler()
+        .map_err(|error| format!("resolve Darwin compiler runtime tool: {error}"))?;
+    let output = compiler
+        .to_command()
+        .arg("-print-file-name=libclang_rt.osx.a")
+        .output()
+        .map_err(|error| format!("query Darwin compiler runtime: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "query Darwin compiler runtime: {}; {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let runtime = PathBuf::from(
+        std::str::from_utf8(&output.stdout)
+            .map_err(|error| format!("decode Darwin compiler runtime path: {error}"))?
+            .trim(),
+    );
+    if !runtime.is_file() {
+        return Err(format!(
+            "Darwin compiler runtime is missing: {}",
+            runtime.display()
+        ));
+    }
+    Ok(runtime)
+}
+
+fn run(
+    command: &mut Command,
+    phase: &'static str,
+    operation: &str,
+    subject: Option<&str>,
+    observer: &dyn ProgramArchiveObserver,
+) -> Result<(), String> {
+    observe_program_archive_operation(
+        observer,
+        ProgramArchiveOperation {
+            phase,
+            operation,
+            subject,
+        },
+        || run_process(command, operation, native_progress_enabled()),
+    )
+}
+
+/// Runs one extension operation under the same phase observation contract.
+///
+/// # Errors
+/// Returns the action error after publishing a terminal `failed` transition.
+pub fn observe_program_archive_operation<T>(
+    observer: &dyn ProgramArchiveObserver,
+    operation: ProgramArchiveOperation<'_>,
+    action: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
+    observer.observe(ProgramArchiveObservation {
+        phase: operation.phase,
+        state: "start",
+        operation: operation.operation,
+        subject: operation.subject,
+        elapsed: None,
+    });
+    let started = Instant::now();
+    let result = action();
+    observer.observe(ProgramArchiveObservation {
+        phase: operation.phase,
+        state: if result.is_ok() { "complete" } else { "failed" },
+        operation: operation.operation,
+        subject: operation.subject,
+        elapsed: Some(started.elapsed()),
+    });
+    result
+}
+
+#[cfg(all(test, unix))]
+#[path = "../../tests/unit/program_cache_scenario.rs"]
+mod cache_scenario;
+
+#[cfg(test)]
+#[path = "../../tests/unit/program_link_search.rs"]
+mod link_search_tests;

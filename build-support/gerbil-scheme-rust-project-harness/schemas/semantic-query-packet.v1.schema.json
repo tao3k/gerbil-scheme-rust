@@ -131,7 +131,7 @@
       "type": "array",
       "description": "Parser-owned language syntax facts used for code-shaped query repair and routing.",
       "items": {
-        "$ref": "semantic-native-syntax-fact-index.v1.schema.json#/$defs/nativeSyntaxFact"
+        "$ref": "semantic-syntax-fact-index.v1.schema.json#/$defs/nativeSyntaxFact"
       }
     },
     "patchSafety": {

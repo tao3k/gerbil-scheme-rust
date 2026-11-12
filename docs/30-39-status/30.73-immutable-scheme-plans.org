@@ -1,0 +1,254 @@
+#+title: Immutable Scheme plan metadata and invocation-owned activation state
+#+startup: overview
+
+* Status and metric direction
+
+Uncommitted ABI 17 candidate; directed storage A/B not accepted. Defaults remain
+unchanged. PR #18 base =9015091750e58f6f1f8eee7d45f44d59ee1fadf0= has six completed
+successful checks and unsupported SDK SMP skipped. These checks cover the
+published base, not this candidate. All earlier negative captures are retained.
+
+In [[file:30.72-scheme-lease-owned-plans.org][30.72]], mixed short-request p99 +72.544% means higher latency, a negative.
+CPU-load short p99 -12.487% means lower short latency, not lower CPU utilization;
+CPU throughput simultaneously falls 6.776%. Compiler coexistence prevents a clean
+causal magnitude claim. These outcomes cannot be combined into a positive result.
+
+* Necessary state versus duplicated representation
+
+The actual O2 Gambit-generated C for the previous cached path explicitly allocates
+four boxes and three wind closures on each invocation. The boxes retain selected
+span, normal return, first report and checkpoint. This is compiler evidence of
+representation cost, not proof that it dominates the previous p99 or CPU change.
+
+| Data | New owner / lifetime | Why retained |
+|------+----------------------+--------------|
+| Policy identity, declared cost, selected bound, checkpoint procedure | Read-only plan descriptor | Reentry must preserve the original bound and cannot charge a replacement policy |
+| Latest descriptor set keyed by policy | Application layout, one published entry | Avoid rebuilding equivalent metadata and sliced checkpoint closures |
+| First selected descriptor | One invocation-owned activation | Must survive continuation capture and cannot be pooled across invocations |
+| Normal-return marker | Activation, reset on every dynamic entry | Exceptional replay must not inherit a prior successful return |
+| First-report marker | Activation, cleared after first exit | Reentry cannot create another plan-selection report |
+| Actual lease owner, class, depth, ready/dispatch obligations | Existing Scheme budget | Shared across green threads under the existing ownership protocol |
+| Result IDs, roots, retained capacity | Existing independent completion protocol | Metadata and activation flags cannot refund or retire them |
+
+The new path uses one private activation record in place of four independently
+boxed variables. Its descriptor contains no mutable invocation flags. The three
+wind callbacks remain because lease entry/exit must run for exceptions and full
+continuations. No global interrupt disabling, linear-only continuation restriction
+or Rust replacement execution is introduced. Generated Scheme infers the fresh activation type. The private token builder also
+establishes the immutable descriptor type; typed accessors inside the activation
+wrapper avoid repeatedly validating that same descriptor. Public layout/config
+validation remains checked. Actual code generation and native qualification must
+verify this representation before performance claims.
+
+* Metadata publication and reuse
+
+A layout holds one fully formed cache entry keyed by the policy object. Its four
+slots cover bulk/short and maximum/contended permissions; equal spans can reuse a
+descriptor. Whole descriptors have no checkpoint. Sliced descriptors share a
+stateless procedure bound to budget, policy identity, class and span. All mutable
+work/queue state remains in the existing budget, never in the descriptor.
+
+A cold miss constructs a complete entry before atomically publishing its pointer.
+An interrupted cold construction may duplicate equal metadata; it cannot publish
+fields from two different policies. This is not a claim of globally unique object
+identity. A stable sequential hit reuses the published entry. The layout slot
+holds at most one entry, rather than an unbounded policy map. Displaced entries
+are collectible unless retained by live activations/continuations. A latest old
+entry may remain cached until layout reuse or VM destruction; this is bounded
+cache retention, distinct from per-call state growth or an external root leak.
+Application-created layouts and deliberately retained continuations have their
+own lifetimes; their retained Scheme heap is not silently discarded.
+
+Grant permission is still copied under the existing Scheme mutex. Already selected
+48-record work retains that bound across late arrivals. Future grants observe
+pending, queue and ready-generation invalidation. Contended permission remains
+four records. Neither descriptor reuse nor cache replacement rewrites an active
+span. Original Actor quantum, cooperative opportunities, admission charges and
+result-retirement ownership remain unchanged.
+
+* Reentry, exceptions and nested ownership
+
+Each invocation allocates its own mutable activation record. Reentering its
+continuation reacquires the lease and resets its normal marker, but retains its
+immutable descriptor. Multiple successful returns charge the retained declaration;
+that conservative logical-work count is not exact CPU work during partial replay.
+An exceptional or escaped unfinished return does not get whole-body credit.
+First-report state belongs to the invocation and is not reset on reentry.
+
+Different invocations may share a descriptor/checkpoint procedure. They cannot
+share normal/report flags. Native controls suspend invocation A, complete B, then
+raise inside A without exiting A's outer dynamic extent. A must not receive B's
+normal credit. Another control successfully resumes a continuation and then
+resumes it exceptionally; the latter must not inherit the successful marker.
+
+A lower-level suspension gap was found during ownership audit: resume always
+reacquired a lease even after its class budget was disabled, while outer unwind
+skipped release at zero limit. Resume now follows the same positive-limit guard.
+A native parked-unit control disables both budgets before resume and requires
+idle ownership afterwards. The actual Rust endpoint already rejects policy
+configuration while jobs are active; its guard is preserved. This distinct
+protocol control does not attribute historical watchdog failures.
+
+Same-class nested invocations keep independent flags and preserve depth. A nested
+parameterization cannot relabel an already-owned lease to another class; the
+failed attempt releases its mutex without changing the original owner/depth.
+A saved bulk checkpoint cannot charge a short-class lease. These checks apply
+at lease acquisition or sliced checkpoints, not each whole-body record. Declared
+layout bounds remain a cooperative application contract; arbitrary nested or
+unreported work is not hard preemption or a wall-time guarantee.
+
+Replacing/disabling the work policy changes identity. Old continuations retain
+their old selected bounds, but cannot add work or plan counts to the new policy.
+This does not make old code satisfy a smaller replacement bound. Existing item
+completion remains idempotent and every result independently retires its root
+and retained capacity. Rust only distributes across fixed VM owners; complete
+Scheme execution remains inside Scheme.
+
+* Actual API, reused model and directed gates
+
+=configure_scheme_service_activation_plan_on= configures ABI 17 operation 28 and
+checks its exact mode receipt. Existing ABI 16 lease-cell mode is retained as the
+matched control. Both use =SchemeWorkExecutionPolicy= and existing native types.
+Opaque Scheme metadata identity is diagnostic, never a root/capacity authority.
+
+The existing Runtime model adds invocation ownership to the same CPU/root state.
+Its bounded witnesses cover shared logical metadata, independent nested flags,
+repeated reentry, successful-then-exceptional replay, smaller policy replacement,
+and close/drain. Two concrete mutations must be rejected: crediting A using B's
+normal marker, and crediting a stale-policy return to the replacement epoch.
+Finite model success is neither native allocation evidence nor a performance SLO.
+
+From the repository root with Cargo and the native SDK on PATH:
+
+#+begin_src text
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_completion_scenarios_and_control --locked -- --ignored --exact --nocapture
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --activation-plan-ab
+#+end_src
+
+The first A/B isolates storage: ABI 16 cells versus ABI 17 shared metadata, both
+with four/48 work bounds, joint dispatch, identical typed Scheme workload, four
+same live VMs, one O2 image, Tokio two workers and unchanged capacities/Actor
+quantum. Exact work and plan conservation apply to both arms, not just candidate.
+Cold metadata construction remains included after each policy reset. No thread,
+window or workload matrix is added. No profiler attaches to timed work.
+
+Wait for compiler-free preconditions without pausing any task. Retain compiler
+boundary observations and reject a contaminated capture as admission evidence.
+Only a stable accepted increment can lead to =--activation-protocol-ab= against
+joint/work off in the same image. Incremental storage gains alone cannot admit
+the entire unpublished protocol stack. Keep the five-second meaningful-progress
+watchdog and all historical failures; do not relabel a control pass as attribution.
+
+* Native gate failure retained
+
+A native rerun failed with =QueueFull= in the saturated =NativeCycle= diagnostic
+fixture before activation qualification. The fixture used try-submit after a
+prior callback reply, assuming the previous reservation had already retired.
+Reply delivery and capacity retirement are separate boundaries. That fixture now
+uses the existing FIFO native backpressure API; admission and reply share its
+original absolute five-second deadline. Request/work limits and production
+admission remain unchanged. The failure log is retained; cleanup was not attested
+on that failed run, and its image identity was not independently frozen. This is
+an assertion/admission failure, not a watchdog timeout or a performance result.
+
+* Final correctness and compiler receipts before performance capture
+
+The reused Runtime model passed in 773.92 s (779.801 s including its controller),
+across both existing domains and all 22 required mutation counterexamples. Source
+SHA-256: =4432d48eb858f808ca5ed37b543ee63836945e02b952c6a9b6b1587a393c8ef8=.
+This includes the new alias/epoch controls, multishot replay and accepted close.
+Lower-level budget-disable-during-suspension is separately covered natively;
+the actual Rust endpoint continues to reject configuration with active jobs.
+
+Final strict Clippy, formatting and generated-artifact verification passed.
+The dispatch unit gate passed all 45 tests. The final native gate passed all
+three integration tests in 30.86 s, with four joined owners, zero roots, removed
+files and returned descriptors. This includes the parked A/completed B/exception
+control, exceptional replay, shared checkpoint identity, same-class nesting,
+cross-class rejection, replaced policy identity, disabled suspension and held
+native typed roots across callback and GC. No admission quota or deadline changed.
+
+O2 C confirms the storage distinction in this same image:
+
+| Site / fields | ABI16 cells | ABI17 immutable metadata + activation |
+|---------------+-------------+---------------------------------------|
+| Mutable box allocation sites on entry | 4 | 0 |
+| Private activation structure on entry | 0 | 1 |
+| Wind closures | 3 | 3 |
+| Captured wind-environment slots | 7+4+7 = 18 | 5+2+2 = 9 |
+
+The two remaining generic structure reads in the activation wrapper test the
+existing budget limit at entry/exit; descriptor reads use type-proven private
+accessors. The metadata helper reads layout cost only on a cache miss; the checked public
+entry still reads its declared layout. C source SHA-256:
+=4fb2054bdaf01fd773b1c99f8c2d13e07fe1dc2393d97dbd6f64007a5fb04c73=.
+These are static sites and environment fields, not measured allocation bytes,
+CPU savings or tail-latency attribution. Cold descriptor construction is separate
+and remains included in the directed benchmark after policy resets.
+
+The final dedicated watchdog failure control passed in 5.829 s. The
+five-second meaningful-progress deadline remains unchanged, phase chatter cannot
+renew it, the intentionally stalled child exits 70, and capture descriptors return
+to baseline. This does not identify historical missing frames or attest cleanup
+on prior failed runs.
+
+* Directed storage A/B outcome
+
+The compiler-free precondition passed twice before capture; boundary observations
+before and after timed execution found no compiler. No other task was paused.
+This bounds the interference observation; it is not continuous OS trace evidence.
+The unprofiled 40-sample capture completed in 7.801 s with no controller timeout.
+Both arms used the same four live VMs and native image. All workload, plan and
+completion conservation checks passed. Final cleanup joined four owners, reported
+zero roots, quiesced the service and removed files.
+
+| Load / metric | ABI16 control | ABI17 candidate | Change |
+|---------------+---------------+-----------------+--------|
+| CPU orders/s | 343127.605 | 360003.521 | +4.918% |
+| CPU pooled short p99, us | 366.625 | 407.125 | +11.047% |
+| CPU pooled bulk p99, us | 1111.500 | 604.083 | -45.652% |
+| CPU maximum owner finish spread, us | 501.375 | 483.208 | -3.623% |
+| Mixed orders/s | 64883.788 | 63717.027 | -1.798% |
+| Mixed pooled short p99, us | 487.917 | 464.000 | -4.902% |
+| Mixed pooled bulk p99, us | 2057.708 | 1882.584 | -8.511% |
+| Mixed maximum owner finish spread, us | 1528.959 | 1591.000 | +4.058% |
+
+Paired medians are separate estimators: CPU throughput +4.387% (9/10 pairs
+improved), short p99 +2.702% (4/10 improved), bulk p99 -3.047% (8/10 improved).
+Mixed throughput -2.112% (3/10 improved), short p99 -0.189% (5/10 improved), bulk
+p99 +0.484% (4/10 improved), finish spread +2.931% (4/10 improved). The worst
+mixed short pair increases 407.521%; a pooled improvement cannot hide that tail.
+Per-window short p99 is the maximum of 64 probes; pooled p99 covers 640 probes.
+
+The increment is not admitted: CPU short latency worsens and mixed throughput
+falls in seven paired windows. No repeated capture, broader matrix, combined
+protocol gate, commit, push or default change follows this result. Static
+allocation reduction is verified; stable end-to-end latency benefit is not.
+
+The same-image workload handoffs also differ (CPU 500 to 412, mixed 542 to 562).
+Faster construction can change arrival overlap and therefore permission/lease
+transitions, despite equal conserved logical work. These observations do not
+prove a GC, OS wakeup or bookkeeping bottleneck. Stage quantiles overlap and
+cannot be subtracted to infer one. CPU utilization was not measured here.
+
+The next protocol decision must separate immutable lookup/activation storage
+from executed-work reporting and lease-release obligations: invocation normal
+and first-report markers remain private, checkpoints retain epoch/class fences,
+and each result independently owns its root/capacity retirement. Dynamic-wind
+callbacks cannot be deleted or activations pooled to recover throughput. Before
+another candidate, establish which service-cycle transition can own accounting
+without delaying short execution/completion or requiring per-handler checks in
+an uncontended whole-body plan. The current result rejects storage reduction as
+a complete solution; it does not authorize a new attribution or threshold tweak.
+
+Frozen host SHA-256:
+=36a0a509c5d205c61788807c48940e48123eabf44370be290fc452d62d7f2973=.
+Native image SHA-256:
+=edd7329ed75e49075b3c7fa6df9773d145be88d33537244a49f1c203fe937401=.
+Pre-result source archive SHA-256:
+=afb38a2af404ade35eefc9a535684f0ad8747825745e58cf4d7925dbeeae8319=.
+This report's outcome section was added after that source snapshot. Raw samples,
+paired audits and failed receipts remain private; no evidence files are tracked.
+Historical watchdog failures remain unattributed beyond the specific controls
+already described; this successful capture does not close those incidents.

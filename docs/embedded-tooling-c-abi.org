@@ -1,0 +1,881 @@
+#+TITLE: Embedded Gerbil Package Operations
+#+LANGUAGE: en
+
+* API and ownership
+
+The default =gerbil-scheme= runtime exposes package operations through its
+=build= module, backed by =scheme/build.ss= and =abi_build.rs=. The existing
+=GerbilRuntime= owns the one-shot, thread-affine VM. No second tooling session,
+frontend subprocess wrapper or consumer-owned scheduler is introduced.
+
+| API | Official operation |
+|-----+--------------------|
+| configure_package_paths | Bind one immutable package prefix and standard library search path |
+| build_package | Load the package build.ss and call its main with compile |
+| clean_package | Invoke the package-owned build.ss clean action through the same C ABI owner |
+| run_package_main | Call the actual build.ss main with ordinary checked arguments |
+| test_package | Run the official functional GxTest harness over a nonempty file selection |
+| stage_package_program | Stage the compiler-owned AOT manifest with rooted module imports |
+| build_package_spec | Compile an existing Scheme declaration using std/make |
+| stage_package_load_closure | Stage the existing rooted module resource closure |
+| build_package_cancellable / clean_package_cancellable / test_package_cancellable | Reject before entry or retain the entered result through return |
+
+The safe API checks the live owner thread. =gerbil-scheme-sys= validates borrowed
+UTF-8 spans and arrays, copies C strings for the call and retains every borrow
+until return. Bridge-owned C exports invoke Scheme using Gambit's C interface.
+These are not hypothetical official C symbols named gerbil_build or gerbil_test.
+The Scheme adapter calls existing Gerbil procedures; it does not replace
+PackageSpec, the compiler, the test harness or the package's build language.
+
+The package entry preserves init-owned build dispatch. For a Yuanxu build,
+use =build_package= or =run_package_main= so the package's =build.ss= can
+consume and publish its selected projection. =build_package_spec= is the
+lower-level interface for a plain =std/make= specification.
+
+For tests, GxTest discovers explicit files and directories. The Bridge
+rejects empty discovery and passes that same roster through import and
+execution. This follows the explicit-file boundary of Yuanxu test
+admission while keeping the result and cleanup inside the existing VM.
+
+* Admitted image
+
+
+The default image initializes the native runtime-host, core and UTF-8 modules.
+Stable C projections live in that core. Package implementation =scheme/build.ss=
+is a normal compiled Gerbil =.o1= library product from the existing =build.ss=;
+the first package operation loads it through the native module loader and loads
+the expander in the same VM. The compiler and GxTest are not eager core imports.
+The generated-SCM provenance check remains mandatory; regeneration uses
+=just bridge-regenerate=, without manually editing source hashes.
+
+The C bridge admits package operations only when initialization used the
+matching default linker. A different downstream linked program does not gain
+that capability merely by initializing a VM. The existing =external-program=
+profile retains consumer-owned linking and omits the default build API.
+
+The paired installation is supplied through Gambit's setup parameters,
+including gambitdir and gambitdir_map. Child gsc processes receive Gambit's
+standard relocation options too. This follows the existing package-owned
+toolchain mapping and the [[https://github.com/gambit/gambit/blob/master/lib/main.c][Gambit setup contract]].
+One-time image bootstrap and real C compiler/linker processes remain distinct
+from direct public build/test invocation.
+
+* Package context and host state
+
+Native dependency discovery belongs to this package's build declaration.
+=build.ss= and low-level program staging include the same =scheme/link-options.ss=
+declaration, using =std/make pkg-config-libs= for OpenSSL, zlib and SQLite.
+Package metadata and flag construction remain with the standard library.
+No private shell command replaces the standard interface. Staging records
+these target flags before caller additions and the installed Gerbil link flags.
+An old installation path is not a reason to probe alternate host libraries in a
+downstream consumer. Missing target package metadata fails staging naturally.
+The archive consumer preserves the ordered Cargo search paths and typed link
+modes. Cargo's target linker validates availability, target compatibility and
+static/dynamic mode; producing an archive alone does not qualify an executable.
+A system directory omitted by pkg-config is not a missing dependency. Rust must
+not reinterpret a dynamic library as a static archive or reconstruct the
+linker's implicit search from filename suffixes.
+
+Discovery runs during builds, never during Policy evaluation or provider sends.
+The host supplies its target pkg-config environment, including keg-only package
+metadata when needed. Compiler/linker selection and package metadata search are
+separate inputs: configuring pkg-config does not select the C compiler.
+=gerbil test -g -v 5 t/link-options-test.ss= checks ordinary staging, preservation
+of explicit flag ordering, standard system-directory classification and refusal
+when target metadata is unavailable. Cargo's pkg-config environment invalidation applies to
+the default image that consumes these inputs; the external lifecycle-only
+archive does not depend on another consumer's pkg-config search path.
+
+Each call scopes its directory, expander context and standard Gerbil paths.
+Prefix binding is immutable for the tooling owner's lifetime. Standard
+GERBIL_PATH, GERBIL_LOADPATH, GAMBOPT and GERBIL_BUILD_CORES values are restored
+on return, including failures. Missing values are removed using Gerbil's
+single-argument setenv; passing false as the value is not equivalent.
+
+Build capacity is resolved from the executing host's cpu-count. A stale CI
+core value or a build-host CPU count embedded in a reusable driver is not
+execution authority. build.ss retains module, pkg-config and compiler policy.
+
+The C boundary saves host descriptors and signals, installs the actual
+Gambit child notification handler for package work and restores host state
+before publishing its result. This is trusted, exclusive build-host tooling;
+it does not isolate arbitrary package code from unrelated host threads.
+Do not run unrelated subprocess or environment access concurrently with an
+entered package operation. Tokio coordination must not migrate the affine VM.
+
+* Exceptions, cancellation and completion
+
+All Scheme argument materialization and package work must be inside the
+exception boundary. A foreign helper's namespace must agree with its Gerbil
+extern declaration. Testing exposed an uncaught argument-helper failure that
+escaped C entry; the adapter now contains it before returning a package code.
+Transport status and the package result remain distinct. On transport refusal,
+the caller's result output stays unchanged.
+
+The caller-owned cancellation flag is monotonic for the call's lifetime. The
+acquire load is the entry fence. CancelledBeforeEntry performs no Scheme work.
+After that fence, Completed retains both the actual code and the cancellation
+observation. Cancellation neither rolls back artifacts nor interrupts arbitrary
+Scheme code. A dropped outer waiter cannot release the owner or acknowledge
+cleanup while foreign work is pending.
+
+A zero result alone does not admit a build or test batch. Consumers must check
+expected artifacts and the complete nonempty case/module inventory. GxTest's
+own discovery, assertions and failure code remain authoritative. Before each
+request, the native test selector reloads and evaluates the selected test entries;
+library dependencies remain cached. This prevents suite objects from accumulating
+subtests across repeated requests. A regression issues three requests and requires
+exactly three case executions; the previous implementation executed six. Freeze
+source/dependency inputs and use a new build host for a different source cut.
+
+* Executable evidence
+
+=just bridge-build= runs the real package integration test and strict
+Clippy. The existing test-child isolation convention supervises actual output,
+15-second total time and five-second idle time. Failure cleanup cannot become
+a passing natural-exit receipt. The Tokio supervisor uses available host cores.
+
+The fixture exercises actual compilation and artifacts, same-process owner
+identity, passing and failing official tests, a failed path, immutable prefix,
+pre-entry cancellation, cancellation after a real entered test, subsequent
+owner use, program staging, actual build.ss arguments, malformed UTF-8,
+post-close refusal and natural VM/process shutdown. A historical source cut
+reported a 2.11-second local natural exit with 12 workers. That observation does
+not qualify the latest PR source: the macOS job at =6552c7f= completed its body
+and cleanup marker, then failed with SIGSEGV. Its full log is retained; natural
+exit admission remains open until the failure is reproduced and repaired. Strict lint and
+cross-platform CI are separate receipts; this fixture does not qualify the
+complete MRR package or establish a performance distribution.
+
+Initial setup failures, missing child relocation, environment-restoration
+failure, escaped FFI failure and an Apple linker bus error are retained in the
+ignored investigation cache. No dependency pins, optimization level, watchdog
+or CPU capacity are relaxed to convert those failures into acceptance.
+
+* Compiler-owned function layout
+
+The qualification actor image has 8,364 generated labels, below the existing
+20,000-label generic GCC threshold, but still produced one expensive host C
+function. The cancelled owner jobs were waiting in that compiler, not in a
+failed Rust or Scheme assertion. The compiler-owned staging manifest now admits
+the optional per-module host_layout values compiler-default and
+separate-procedures; unknown values reject. Only the qualification actor module
+selects separate-procedures, using Gambit's supported SINGLE_HOST_LIMIT=1.
+Other modules retain their existing policy. Resolved options participate in
+the existing object fingerprint, so changing layout recompiles that object and
+an identical repeat reuses it. Optimization, ABI, actual host CPU capacity and
+watchdogs are unchanged. No consumer CI linker flags or compiler environment
+switches implement this policy.
+
+The complete local one-processor actor entry naturally finished all nine cases
+in a cold 11m30s invocation, including checksum, fault-control and final cleanup
+observations. This is separate from remote CI and from package-tools C ABI qualification.
+
+* Host environment survives native shutdown
+
+The first Darwin CI run completes all foreign calls and returns from VM cleanup,
+then receives SIGSEGV. Local allocator churn after cleanup reproduces the defect:
+the crash is in platform_strlen called by Rust vars_os, reading the overwritten
+0x5555555555555550 pointer. This is a concrete use-after-free counterexample;
+the previous natural-exit fixture did not establish environment lifetime.
+
+Gambit's [[https://github.com/gambit/gambit/blob/master/lib/os_shell.c][shell environment implementation]] can extend the process environment
+pointer table, then free that table during cleanup without replacing environ.
+Restoring variable values alone is insufficient. The bridge now captures a deep
+host-owned copy before shutdown and installs it immediately after native cleanup.
+The surviving table and strings transfer to the host process environment's
+lifetime. Snapshot failure refuses cleanup acknowledgement. This is finalization
+work, not a request-path allocation or a new environment-variable control.
+
+The strengthened test retains the whole environment, performs ordinary host
+allocations after VM teardown and checks exact preservation without printing
+potentially sensitive values. It keeps natural exit and the original deadlines.
+A separate MallocScribble diagnostic reaches a child compiler failure earlier
+and is retained as inconclusive for this focused post-shutdown counterexample.
+
+* One compiler environment for process and embedded owners
+
+The complete MRR build exposed Homebrew GCC reading inherited Nix compiler headers through
+ambient CPATH. The former command entry already excluded unrelated compiler
+settings, but the C ABI owner had not reused that projection. The existing
+shared tool_environment source now owns that single projection. The AOT process
+builder and default tooling VM both consume it. The VM applies it before setup
+and restores the original values after teardown; there is no compiler command
+spawn or consumer-owned environment policy on this path. Explicit downstream
+program initialization retains its original environment.
+
+The complete fixture receives a CPATH containing a deliberately rejecting
+stdio.h and an invalid inherited SDKROOT. Actual Scheme compilation must pass,
+and the exact original host environment must be restored after shutdown.
+The real MRR failure remains in ignored cache; passing the focused poison
+counterexample does not replace full consumer acceptance.
+
+* Compiled consumers and real work observation
+
+The complete fixture now requires nonempty SSI and module/runtime/macro object
+files and imports the compiled package by its declared identity. Its runtime
+procedure and exported macro are checked by official GxTest. A source-relative
+import alone could bypass the package artifacts and is insufficient evidence.
+
+The complete MRR inventory exposed a missing observation path at grammar
+preparation. Test calls now scope the official expander import/evaluation
+callbacks and observe runtime loader entry/return, delegating to the captured
+original operations and restoring them on every unwind. These are actual work
+events; no timer output or deadline extension is involved. Consumers may forward
+their producer's existing Parser trace through normal test process configuration.
+
+* Darwin program-image packaging
+
+A retained Apple linker crash reports stack exhaustion in markLive while Rust's
+executable dead-strip traversal walks the complete Scheme graph. The exact
+snapshot later replays successfully; that replay does not erase the crash or
+establish a deterministic failure. The package now reuses existing program-image
+link assembly to package the default Darwin tooling graph as one shared image.
+Rust links its C ABI instead of traversing the graph again as executable atoms.
+Linux retains the existing archive path. No caller RUSTFLAGS, linker replacement,
+stack enlargement, dependency update or weaker test gate implements this boundary.
+
+The shared image has a package-owned absolute install identity in its build
+output. It is qualified for that persistent build host and paired Gerbil
+installation, not arbitrary relocation. Its code mapping lasts for the host
+process lifetime. GerbilRuntime remains the single affine VM owner; this is
+packaging, not another VM, a new scheduler or a security isolation boundary.
+The complete local fixture naturally exits in 4.00 seconds with 12 workers,
+under the original 15-second wall / five-second idle gate, and strict runtime
+and AOT-owner Clippy pass. The OpenSSL dependency is selected by standard
+pkg-config configuration matching the Gerbil package; a concurrent host keg
+change is recorded separately from the linker recursion failure.
+
+* Package cleanup is a Scheme action
+
+=clean_package= and its checked C export =gerbil_scheme_rust_package_clean=
+invoke the package's ordinary =build.ss clean= on the existing VM owner. This
+matches the action to which official GxPkg delegates current-package cleanup,
+without launching the build script as another process. Cleanup requires an
+explicitly bound package prefix; the generic main entry enforces the same
+precondition for the clean action before loading package code.
+
+The root build.ss retains standard PackageSpec cleanup and then delegates
+remaining module sidecars to =scheme/package-clean.ss=. That Scheme module
+reads its declared namespace from the package identity and removes only the
+namespace under the selected library prefix. Traversal includes hidden outputs,
+excludes dot/parent entries and uses lstat semantics to unlink symbolic links
+without following them. Errors propagate as package failure; repeated clean is
+idempotent. Cargo remains the owner of its OUT_DIR and compiled tooling image.
+Explicit caller-owned staging directories have their separate lifetime. Package
+cleanup does not unload the live VM or establish a fresh source cut.
+
+Rust transports the typed action and result. It does not enumerate SSI/object
+files, infer cleanup from timestamps or use generated-file existence to decide
+whether the action should run. Build-product, clean-product and staging assertions
+now live in actual Scheme =t/*-test.ss= fixtures. Rust copies those source inputs
+and checks only invocation status, process identity, cancellation and host lifetime.
+
+The real sequence builds a module and macro, checks their compiled products in
+GxTest, refuses a cancelled clean before entry, cleans, verifies that the generated
+namespace is gone, repeats clean, rebuilds and imports the compiled module.
+Hidden outputs and a link to another package exercise the traversal boundary;
+source inputs and the other package remain. Missing directories, unbound prefixes,
+malformed UTF-8 and calls after final close must refuse. Success, failure and
+cancellation still require natural exit under the original gates. A syntax error
+in the first native fixture and its failed transcript remain in ignored cache;
+that failed run is not counted as acceptance.
+
+The final local clean-action fixture naturally exits in 2.95 seconds with 12
+workers; strict Clippy passes. The complete AOT owner entry also passes 29 library
+and 19 input/protocol tests; its seven existing opt-in scenarios remain unchanged.
+The initial source-fingerprint fixture failure was repaired by including and
+independently mutating the real cleanup source, preserving the previous runtime
+input invalidation checks.
+
+Darwin CI at the preceding implementation revision completed the real C ABI test
+with three executing-host workers and natural exit in 3.56 seconds. That job then
+hit its 30-minute limit while preparing the distinct Clippy graph. Execution and
+static lint now have independent jobs with the same exact commands and unchanged
+per-job limits. Both remain required workflow checks. No output cache, artifact
+existence shortcut or weaker 15-second / five-second runtime gate implements this
+separation. The cancelled whole job remains unqualified despite its passed test.
+
+* Rust integration library regression acceptance (2026-11-02)
+
+The Rust integration library owns admission of the complete C ABI, not just a downstream Library's
+build return code. Existing sys unit tests now independently compile the public
+C declarations and type-check the Rust exports, check malformed UTF-8/argument
+arrays and unchanged result sentinels, and preserve an empty ordinary argv
+string through transport to the lifecycle fence. The empty-argument case first
+failed with InvalidValue; copying an empty CString fixes it without relaxing
+nonempty directory validation. No new package fixture or feature is introduced.
+
+A second regression uses the existing =scheme/runtime-host.ss= and native
+=std/make= / =gerbil-rs-stage-program=. It checks the actual emitted module
+identities, not just the presence of program.json. Before repair, the compiler
+context selected the stale source-tree =scheme/runtime.ssi= after native make;
+that interface omitted the codec dependency although the generated interface
+contained it. The real integration-library host graph included runtime but zero utf8 modules.
+The source-tree SSI and its special tracking are removed. Interfaces now come
+from canonical native compilation. The same four sys ABI tests pass, including
+exactly one codec module in the emitted consumer graph.
+
+The initial hypothesis that opaque foreign bodies themselves caused this
+omission was disproved by the native compiler's import traversal and interface
+origin. The attempted helper refactor was reverted; no wrapper or manual
+module-list repair remains. Do not attribute this missing-dependency regression
+to the Apple linker crash or to the remote post-cleanup SIGSEGV.
+
+Existing conversion contracts additionally check exact UTF-8 byte capacity,
+insufficient capacity with unchanged length output, guard bytes, empty input,
+embedded NUL, Unicode and multiple chunks. The exact-capacity case first failed
+with InvalidValue. The encoder now preflights actual widths within each existing
+256-scalar, allocation-free, interrupt-disabled leaf before writing. It retains
+all real type/scalar/range rejection. The former ASCII offset bound is explicitly
+accepted when its bytes fit; four-byte scalar input retains the corresponding
+true insufficient-capacity rejection. Runtime, build/test, natural exit and
+strict lint still require their separate current-source receipts.
+
+Investigation receipts are private ignored logs; failed source validation,
+original remote SIGSEGV, native Apple markLive stack-overflow reports and vendor
+linker snapshots are retained. No upstream patch, dead-strip disabling, expanded
+stack, compiler substitution or relaxed acceptance gate is used.
+
+Current-source local receipts: all 21 sys tests pass, the public runtime lifecycle
+and build/test integration targets pass with natural process exit, and strict
+Clippy passes for both owners. The existing Scheme codec conformance test passes
+all 1,112,064 Unicode scalar values against the official implementation. The
+existing bridge-build recipe and its macOS/Linux CI job now include the sys ABI
+contracts and runtime conversion test, rather than qualifying package calls alone.
+The 15-second total and five-second idle limits are unchanged. One existing
+runtime report test remains explicitly ignored; it is not counted as a pass.
+These are local current-source results, not a green remote PR or a clean-checkout
+receipt. Clean-source validation remains required before downstream promotion.
+
+* Concurrent PR integration checkpoint
+
+The original PR branch was rebased onto =fde6079bc42652b3095439b46f8ba8364e07f3ed=.
+The four concurrent commits retain host-environment storage after cleanup, reuse
+the compiler environment, package the Darwin default image, and delegate clean
+to Scheme. Their expanded compiled-consumer, cleanup, poisoned-header and
+post-shutdown allocation checks are retained in the renamed existing build test.
+The exact-three-executions regression is integrated into the same existing
+passing case. Execution and lint remain separate CI jobs with unchanged limits.
+Receipts from =6552c7f= qualify that earlier source cut only. The first isolated
+source archive attempt failed before ABI tests because the sandbox refused the
+standard build-gate cache directory; that failure is retained. It is not evidence
+of an ABI failure or clean-checkout acceptance. No gate was disabled.
+
+* Evidence-retention incident
+
+At approximately 21:37 local time on 2026-11-02, the ASCENT investigation
+cache directory disappeared while qualification was still running. No removal
+of that directory was issued by this migration work. Earlier statements that
+raw failure logs and linker snapshots are retained describe their prior state;
+their current availability is no longer established. Source stashes and isolated
+source snapshots survive. The completed local commands and counts remain in the
+conversation tool receipts, but those excerpts do not replace complete raw logs.
+The affected isolated run is not accepted as a retained clean-source receipt.
+An unchanged entrypoint may be executed again to obtain a complete retained log;
+that repetition must not erase the incident or select a favorable result.
+Subsequent receipts are stored separately under the system temporary directory.
+Full historical failure retention remains an explicit limitation.
+
+* Retained isolated-source result
+
+The isolated source export is HEAD =fde6079= plus the explicitly owned migration
+changes, excluding pending actor/service edits. It initially had no target or
+installed package prefix. Its full bridge-build invocation naturally returned
+zero, but the removed log prevents a complete retained cold-build receipt.
+An unchanged repeat in that source export, using its generated cache, has a
+complete retained log: 21 sys tests, the real build/clean/GxTest test and runtime
+conversion test pass, as do both strict Clippy commands. The supervised process
+naturally exits in 3.942791625 seconds with 12 workers and unchanged 15/5-second
+limits. The passing-case counter is exactly three. This is not a latency gain
+claim, a replacement cold-build receipt, or complete downstream acceptance.
+
+The same isolated export passes 29 AOT library tests and 19 integration tests;
+seven existing AOT tests remain ignored. The native scheme-contracts entry
+passes official codec parity for all 1,112,064 Unicode scalars, invalid-scalar
+and bounded-type rejection, snapshot independence and root release/GC isolation.
+One existing runtime latency report remains ignored. Format checking passes.
+The independent source export does not include pending owner/service edits and
+is not presented as a fresh Git-clone receipt. Remote CI, Linux and the ASCENT
+consumer remain separate acceptance boundaries. No downstream dependency REV is
+promoted by these integration-library results.
+
+* Actor CI link-declaration correction
+
+The actor job for PR #18 at =590d22a= failed before native object compilation:
+its staged graph omitted the package-owned search paths and admission rejected
+libcrypto. The default C ABI producer already consumed
+=gerbil-scheme-rust-link-options= from build.ss, but the qualification producer
+did not pass those declarations to gerbil-rs-stage-program. The initial actor repair loaded that same build.ss declaration and forwarded
+its native link options. The integrated shared-declaration contract below
+subsequently makes low-level staging itself the owner of those flags.
+Rust does not probe pkg-config, synthesize search directories, accept a missing
+library, or change static/dynamic semantics. The original failed job log is
+retained separately. Existing actor, Tokio and link-search checks remain the
+qualification; their workloads and gates are unchanged. Gerbil is the language
+and toolchain; gerbil-scheme-rust is the Rust integration library.
+
+The Ubuntu bindings failure is a stale UTF-8 negative control: the test expected
+a 19-byte buffer to reject a string whose UTF-8 encoding is 12 bytes. The
+byte-capacity repair correctly admits that buffer. The same existing test now
+requires rejection at the actual byte length minus one, and acceptance at exact
+length, 19 bytes and full buffer length. Type/null/released-root checks, sentinel
+checks and guard bytes remain in place. This corrects the test's byte predicate;
+it does not weaken transport validation or change the task to suppress failure.
+The original Ubuntu failure log is retained alongside the actor/lint logs.
+
+* Native-standard repair and validation (2026-11-03)
+
+Gerbil is the language and toolchain, Gambit is its compiler/runtime, and
+=gerbil-scheme-rust= is the Rust integration library. None of these package
+operations assumes a separate Gerbil SDK. Apple SDK terminology retains its
+platform meaning.
+
+The previous default image eagerly initialized compiler/test dependencies even
+for scalar users. Attribution measured 190.132 ms initialization in a 192.271 ms
+30,000-call test, violating its existing 100 ms total gate. The core/build split
+above removes this unwanted initialization dependency. The existing generated
+installation header also binds the actual native package library output path;
+there is no new environment protocol, search-path synthesizer or fallback.
+The native build host remains paired with that output and its toolchain, rather
+than claiming arbitrary binary relocation. Moving work to first package use is
+not a whole-workflow performance claim.
+
+An attempted deferred linked-metadata implementation failed native module
+lookup and was rejected. Native dynamic loading then exposed five-second idle
+failures. A retained process sample identifies active dyld library/signature
+mapping, rather than a mutex deadlock. Compiled Scheme inspection also shows
+Gerbil optimizing checked =load-module= calls into =__load-module=; rebinding
+the checked procedure cannot observe those calls reliably. The final adapter
+uses Gambit's native =##get-module-set!= extension to delegate to the existing
+resolver while observing actual requests. Dynamic scope restores it on normal
+return and exceptions. No timer emits progress and no deadline is enlarged.
+The existing Scheme test now checks delegation, exception identity, nested
+observation and restoration after both success and failure.
+
+Export resolution has an explicit owner-local progress policy, initially
+=Observed=. =Quiet= omits SDK internal module progress while forwarding module
+output and errors; this choice persists for later export resolutions on that
+runtime owner. Package build, test, clean and staging continue to report real
+progress regardless of the resolution policy. The C boundary accepts only
+zero or one and refuses configuration without the live package-capable owner
+or during an active package call. Quiet resolution may be silent for a long
+load; it must not be used to claim a progress-watchdog pass.
+
+Package =build.ss= remains the authority for foreign-library flags. All three
+existing program producers consume the same staging entry. It includes the
+package declaration once and combines it with caller =gsc-options:=.
+The resulting options reach =compile-exe= and Gerbil's =gcc-ld-options= projection for
+the archive manifest, preserving order and excluding CC-only flags. An existing
+metadata test failed with the old adapter's unexpected-keyword error and passes
+with the final implementation. Missing native libraries still reject admission.
+The Bazel singleton-reference lint is fixed without suppressing warnings.
+
+The selected Homebrew installation is Gerbil commit =1cfb032=. Its Cellar prefix
+contains native sources but no Markdown manuals; the exact matching source
+checkout supplied the Actor, std/make and build-tool manuals. Installed native
+Actor tests establish the matching protocol API. The existing package test now
+checks an Actor reply of 42, dead-peer timeout and receive timeout, with explicit
+thread cleanup. Its existing build.ss has the standard executable gxi shebang.
+The same source passes official =gerbil build= and =gerbil test=, and executes
+exactly three times through the repeated C ABI requests. No new fixture target,
+feature switch or compatibility implementation is introduced. The Linux
+=2591= source exposes the same API; actual remote Linux execution remains a
+separate gate.
+
+Retained local source-export checks are serial, not selected retries:
+- =native-checks.THl1q2=: workspace test 683 passed, 15 ignored, zero failed;
+  workspace strict Clippy passed; Scheme one-processor Actor control, Tokio
+  one-worker and machine-worker controls passed; Actor-feature strict Clippy
+  passed. Injected worker failures are required negative controls.
+- The real package lifecycle exits naturally with 12 workers in 11.778091042 s
+  under unchanged 15 s total / 5 s idle gates. Actor markers occur exactly three
+  times. Initialization plus 30,000 scalar calls takes 5.894459 ms under the
+  unchanged 100 ms total gate; this single receipt is not a latency estimate.
+- Final =scheme-contracts= passes all 1,112,064 Unicode scalars and root/GC
+  checks, plus the resolver restoration regression. Program metadata passes
+  with ordinary=21, expanded=86, duplicate-identities=0 and missing-inputs=0;
+  standard native options retain their order.
+
+The 2026-11-02 local qualification recorded rejected prototypes, prior CI
+failures, timeout samples and the first workspace failure on stale diagnostic
+expectations. Those unpublished logs are not portable evidence references. The later expectations fix
+preserves phase/order/no-heartbeat assertions. These local results exclude
+unpublished concurrent service work and are not a fresh Git-clone receipt.
+Ignored and cancelled tests are not passes. Latest-head remote CI, Linux and
+ASCENT consumer acceptance remain separate, unqualified boundaries. The earlier
+evidence-retention incident above remains disclosed.
+
+** Version-bound standard references
+
+- [[https://github.com/mighty-gerbils/gerbil/blob/1cfb032c7a1612637da6205f5f8a15683eba3ba0/doc/reference/std/actor.md][Gerbil Actor reference, selected Homebrew source commit]].
+- [[https://github.com/mighty-gerbils/gerbil/blob/1cfb032c7a1612637da6205f5f8a15683eba3ba0/doc/reference/std/make.md][Gerbil std/make reference, same commit]].
+- Native =src/std/actor/interaction-test.ss= and =src/gerbil/compiler/driver.ss=
+  in that exact source provide executable protocol and =gsc-options= contracts.
+  The local receipt directory retains the matching Markdown inputs.
+
+The final cleanup removes the obsolete checked =load-module= rebinding from
+=with-test-progress=. Native resolution uses the shared resolver extension;
+source import/evaluation use only the expander's own parameters. On that final
+source, =native-final.OQPeDA= passes the complete existing =bridge-build= entry:
+22 sys tests, real package operations and runtime lifecycle, plus both strict
+lint commands. The package process exits naturally in 9.767963625 s with 12
+workers; the 15/5-second gates are unchanged. The native metadata linker control
+also prints =LAZY-METADATA-INITIALIZATION-OK=. An earlier direct invocation
+outside the Justfile selected Nix =ld= and failed system-symbol linking; its
+failure remains retained. The passing invocation uses =just --command= and the
+existing exported PATH; no tool path or linker workaround was added. Earlier
+full-workspace and smoke results above precede this observer-only cleanup.
+
+* Concurrent native-declaration integration (2026-11-03)
+
+The first push of local =781058b= was rejected because original PR #18 advanced
+through =2bc6ba1= and =57d2cd9=. No force push was attempted. Their shared
+=scheme/link-options.ss= declaration, build extra-inputs, pkg-config environment
+tracking, archive source observation and associated regression tests are
+preserved. The integration removes duplicate caller-side declaration loading;
+all low-level staging receives the same package flags once. Additional caller
+flags use native =gsc-options:= rather than a custom =link-options:= alias.
+There is no compatibility keyword.
+
+Ordinary =pkg-config-libs= suppresses target system-library search directories.
+On this host, =--libs= omits =-L/usr/lib= while =--keep-system-libs= retains it.
+That earlier declaration used =std/make pkg-config= with a pkgconf-specific
+retention option. It is not supported by pkg-config 0.29.2; the correction below
+uses the standard =pkg-config-libs= interface. It does not infer host search
+paths or weaken archive availability/static-mode admission. The native tests
+also suppress a known target directory through pkg-config's own system-path
+classification and require that declared directory to survive staging.
+
+The isolated integrated index export =integrated-source.gT8GwN= records a
+before/after control. Before the repair, three path/order cases fail and the
+missing-metadata refusal case passes. The installed =gerbil test= command
+returns zero despite =ERROR HARNESS=, so that invocation is explicitly rejected
+as acceptance. Calling the same native GxTest =main= and exiting with its result
+retains the failing return code. After the repair, all four cases print
+=CASE-OK= and GxTest prints =OK= with return zero. Native Scheme contracts,
+resolver restoration and standard compiler-options metadata checks also pass.
+Compiler products are regenerated from the merged source, rather than selecting
+either side's stale output or editing its digests. The interrupted clean-export
+run at =781058b= is not claimed as a clean-checkout pass for the merged source.
+
+The integrated =bridge-build= entry passes: 22 sys tests, real package operations
+and runtime lifecycle, and both strict Clippy commands. Natural package-process
+exit is 9.284350542 s with 12 workers and unchanged 15/5-second limits. All four
+completed Linux jobs at concurrent head =57d2cd9= fail at the same strict
+=libssl= path admission; their separate raw logs are retained. Final-head Linux
+results still require execution. The existing native CI preparation step now
+runs the resolver/codec tests and shared-link suite using its already-built
+package, with GxTest's result propagated explicitly. No extra job or build runner
+is introduced.
+
+* Native local-package discovery regression (2026-11-03)
+
+** Remote gate follow-up
+
+At =ff50ec4= the Darwin C ABI and Bazel jobs both fail the new local-prefix
+case at the unchanged five-second output deadline, before the first library
+load observation. This does not establish whether initialization, filesystem
+preparation, or package loading stalled. The existing test now records actual
+owner initialization entry and return with elapsed time. These are completed
+phase observations, not a timer or an alternative deadline; both package cases
+retain the 15-second wall and five-second output gates and natural teardown.
+
+The Darwin bindings job completes every executed step successfully, but its
+aggregate exceeds its 30-minute job budget. Compiler controls consumed six
+minutes before the independent workspace graph. The exact compiler controls
+and metadata commands now run in a separate platform-matrix job, retaining
+their command arguments and the 30-minute limit. Workspace check, tests,
+benchmarks and strict Clippy remain required. This is scheduling separation,
+not evidence that the local-prefix timeout is fixed. Exact-head remote
+qualification remains required.
+
+** Genuine output must cross the C ABI before return
+
+The host descriptor guard previously replayed its private stdout/stderr files
+only after an entire foreign call returned. Scheme's force-output therefore
+did not imply that the supervising pipe observed the work. This is a concrete
+observability defect even when a sufficiently fast call passes its deadline.
+The host guard must retain private file descriptions so Gambit's file-status
+changes cannot propagate into the embedding host's inherited descriptors.
+
+The existing module resolver and test import/evaluation observations now flush
+their Scheme ports and invoke an owner-local C output callback. The guard uses
+pread with a per-stream delivery cursor, preserving the write offset shared
+with Scheme and compiler children. Partial writes advance only the delivered
+cursor; final restoration drains only remaining bytes, closes every private
+stream and restores descriptors and signals. A forwarding error is sticky and
+prevents a successful transport result. Per-stream byte order is retained;
+no total order between stdout and stderr is claimed.
+
+The callback pointer storage has process lifetime. Only a live affine C ABI
+entry installs an active host guard; nested entry is rejected, and every
+success/failure exit clears that stack pointer. Standalone Scheme loading has
+no observer by default. The first draft used unsupported Gambit C-to-Scheme
+function conversion and crashed; the replacement uses the ordinary pointer
+ABI to address typed callback storage and a Scheme parameter for observer
+binding. The failed build, crash report and unsuccessful regeneration are
+retained locally, rather than treated as passing evidence.
+
+The existing cancellation case emits an entered-work receipt. Its supervising
+Tokio process must receive that receipt on the real pipe before acknowledging
+it; the joined cancellation observer then releases the waiting Scheme call.
+Replay only after return cannot satisfy this handshake. No timer-generated
+output, extra timeout, additional runtime owner or compiler policy is added.
+Successful cases also remove their own test directories after package cleanup,
+VM teardown and environment checks. Test-owned staging cleanup does not change
+the package clean action's narrower ownership contract.
+
+The final local =just bridge-build= run passes 22 sys tests, both package
+cases, the existing runtime lifecycle case and both strict Clippy commands.
+The two supervised cases exit naturally in 5.078172542 and 7.811096292 seconds
+with 12 host workers and unchanged 15/5-second gates. The existing unsupported
+lifecycle case remains ignored; this is not additional coverage. A test-only
+mutation disabling the output observer fails the unchanged idle gate at
+9.580319792 seconds total, while the ordinary local-prefix case still passes.
+Restoring the fixture produces the full passing run above. These are
+functional/negative-control receipts, not paired performance measurements.
+
+The real ASCENT consumer at candidate =9207638= failed before its build script
+could import Yuanxu: the C ABI loaded build.ss without first selecting the local
+package environment. Explicitly configured small cases did not cover that
+standard default path. The installed Gerbil package command's native
+=build-pkgs= / =clean-pkgs= implementation calls =setup-local-pkg-env!= before
+script loading. The integration library now uses that same procedure for
+build/main/spec operations and native test selection. No compiler path, package
+path override, compatibility loader or new public argument is introduced.
+
+The existing immutable prefix binding retains the native selection for later
+calls. Existing scoped path restoration now also encloses the first discovery
+call, including exceptions. Unbound cleanup still refuses entry; pre-entry
+cancellation still performs no discovery or directory creation. Subsequent
+cleanup uses the selected owner prefix. Dependency installation remains the
+native package manager's responsibility; build does not silently fetch packages.
+
+A second case in the existing package test target uses the same existing source
+package, not a new fixture. A load-time assertion rejects a missing native prefix
+before any compiler output can fall back into a host-global package directory.
+The case fails with code 70 before the implementation change. After it, the
+case checks local .gerbil products, same-process build identity, canonical native
+prefix rebinding, refusal of a different prefix, passing and failing GxTest,
+per-call environment restoration, cancellation and cleanup isolation. The
+existing explicit-prefix scenario and all of its assertions remain present.
+The existing child supervisor selects the actual test name and serializes
+one-shot cases; each retains host capacity and its original 15 s total / 5 s
+idle gate. No feature switch or second runner is added.
+
+The first new test draft compared active runtime state with the caller's
+pre-initialization environment. That was an incorrect boundary: the existing
+compiler projection spans VM initialization through teardown. The corrected
+case checks the active-owner snapshot after every call and the full caller
+snapshot after Drop. A second incorrect draft used macOS's /var spelling while
+native discovery selected /private/var; it now supplies the same canonical
+native prefix, preserving the different-prefix refusal. These failed drafts
+are retained separately and did not cause weaker production validation.
+Diagnostics no longer print complete environment maps.
+
+The checked-artifact =bridge-build= entry passes all 22 sys tests, both package
+cases and runtime lifecycle, plus both strict lint commands. The original case
+exits naturally in 6.965942541 s, and the new discovery case in 4.556149208 s,
+each with 12 workers and unchanged gates. Those separate invocations are
+functional receipts, not a latency comparison or net-benefit claim. Full
+workspace and clean Git-checkout results for the follow-up remain separate
+until recorded. Earlier =9207638= results do not qualify later source changes.
+
+The follow-up checked-artifact workspace test passes aggregate counters of
+685 passed, zero failed and 15 ignored; full workspace strict Clippy passes.
+The two package cases exit naturally in 9.145700541 s and 4.585919875 s in that
+workspace invocation. The unchanged scalar gate is 5.465125 ms including
+initialization and 30,000 calls. These are pass/fail gates, not a performance
+admission. Tests and implementation bytes match the isolated source export;
+only the API documentation was clarified afterward. The first draft's full
+environment-map diagnostics are redacted in its retained log; the original
+log digest, failure trace and differing key names remain recorded. No raw logs
+or environment values are published to Git.
+
+* Dynamic GxTest CLI and independent progress output
+
+The existing =scheme/build= module accepts =test <package-directory> <test-path>=
+through its normal =main= entry. It delegates to the same =package-test= adapter
+as the C ABI: official GxTest owns discovery, Suites, failure status and cleanup.
+An empty argument list retains tooling-image initialization. No Rust command
+wrapper, alternate build catalog or additional VM owner is introduced.
+
+=gerbil-rs-observe-module-work= is a public Scheme scope with an optional progress
+port. Its default preserves existing build-host output. Selecting stderr lets
+isolated dynamic children retain captured business stdout while forwarding real
+resolver operations to their parent's watchdog. The action's output port stays
+unchanged; nested return values, exceptions and resolver restoration retain the
+existing contract. Progress is emitted only when the official resolver is called.
+
+The embedded adapter calls GxTest's existing functional =run-tests= entry after
+its standard module has initialized. The process-oriented =main= may invoke
+=exit= in supported Gerbil distributions; it cannot own an embedded call's
+unwind. Discovery and Suite execution still belong to GxTest. The dynamic CLI
+returns naturally for status zero and publishes a nonzero status only after
+package scopes have restored their state. The C ABI returns that same status
+to its host without terminating the host process.
+
+Orgize's complete source Suite now exercises this shared entry: 230 Cases and
+18 Suites, with the independent intentional-failure control retaining status 42.
+Darwin qualification enables the platform's read-only =DYLD_PRINT_APIS= diagnostic
+for the child so actual =dlclose= operations remain visible during full cleanup.
+There is no timer-generated output, image pinning, unload suppression or change
+to the 120-second wall and five-second silence gates. A prior post-=OK= stack
+sample placed execution in Gambit's dynamic-module cleanup and dyld unloading;
+terminal test output alone did not establish process completion.
+
+Platform reference: [[https://github.com/apple-oss-distributions/dyld/blob/main/dyld/DyldAPIs.cpp][Apple dyld API implementation]].
+
+* Standard Make package-query correction (2026-11-08)
+
+The shared declaration calls =std/make pkg-config-libs= directly. The previous
+=--keep-system-libs= argument was a pkgconf extension rejected by pkg-config
+0.29.2. The intermediate private =shell-config= query was withdrawn. Package
+querying stays with the standard library; no environment variable is globally
+changed to force its output.
+
+System-directory qualification checks real target linking rather than requiring
+a literal =-L= directory in the query output. The =native-link-inputs= observation now
+projects compiler-owned options; it does not claim that producing the AOT
+archive establishes an executable link. Ordered paths, duplicates and typed
+Cargo library modes are retained. Cargo's final target linker owns resolution
+and target-architecture refusal, including valid implicit system directories. No additional
+pre-linker or host package fallback is introduced.
+
+The existing source tests retain package metadata refusal and explicit flag
+ordering. System-directory classification must match =pkg-config-libs= rather
+than a private retention rule. Rust tests use real target archives/shared
+libraries and Rust consumers instead of text files named like libraries. They
+cover missing libraries, an unrelated library failing to satisfy the request,
+dynamic-only input refusing static mode, implicit system lookup, and a library
+whose target header is changed to a different architecture. Accepted consumers
+use the actual rlib bundling, final executable link and execution chain to check
+the exported function. A direct-binary-only fixture does not represent Cargo's
+static-library bundling contract. Unit projection checks separately
+retain exact search-path and library ordering.
+
+The complete AOT crate unit gate passes 35 tests, with the same seven existing
+explicitly ignored diagnostic/performance controls unqualified. Its integration
+gate passes all 19 tests. Strict Clippy and formatting pass. The existing
+=just bridge-regenerate= entry updates both compiler-produced SCM files and
+their whole-file/source receipts; hashes are not rewritten independently.
+Both pkgconf and pkg-config 0.29.2 pass all four Scheme link-option Cases,
+including missing target metadata. The existing program metadata and real
+metadata-link controls pass: ordinary=21, expanded=86, duplicate-identities=0,
+missing-inputs=0; option order and lazy initialization markers remain intact.
+These are local existing-toolchain results, not new-head remote CI.
+The existing =just bridge-test= consumer also passes naturally: the real
+Gerbil scalar export and abandoned-receiver/root-release controls succeed.
+The first 120-second attempt stops during compilation before assertions;
+the incremental invocation completes compilation and the real consumer within
+the same 120-second fence. Its 0.10-second test execution is not a cold-build
+latency claim. The installed Gerbil/Gambit tools are used throughout.
+
+An initial cold Cargo preparation reaches the local 120-second fence before
+assertions. A direct-binary fixture and a verbatim-filename experiment are
+rejected because they do not model Cargo's rlib bundling; ordinary Cargo
+serialization is preserved. An unrelated developer-environment preparation is
+cancelled before test launch and is not counted as verification. The passing
+functional runs use Cargo's existing incremental products and do not establish
+a cold-build timing claim. Earlier query experiments are not a verdict for this
+boundary. Full consumer delivery and the 180-second cold
+package installation remain independent obligations. The installed Gerbil test
+launcher can return zero despite =ERROR HARNESS=; such a result is refused even
+when the command status is zero.
+
+* Linked program installation context
+
+A linked program can load Gerbil language metadata during initialization. Its
+lifecycle owner must therefore bind the installation paired with the compiler,
+not rely on a consumer exporting =GERBIL_HOME= or on the compiler's original
+build-machine default prefix.
+
+The external-program and default build images share the generated installation
+mapping. The external lifecycle supplies that mapping through Gambit's setup
+parameters. It does not mutate process environment, add a consumer loader,
+change the ABI, or alter processor selection and cleanup. Package child-process
+handling remains exclusive to the default build image.
+
+The AITIA linked-program Case exposed this boundary: the original setup reports
+=RuntimeUnavailable= with diagnostic =[2, 1, 0, 0]=. An independent verbose
+initialization identifies =cannot find library module :gerbil/core=. Ordinary
+Scheme execution and Rust workspace tests do not qualify this startup path.
+Producer unit/lint and external-program compilation, followed by the unchanged
+AITIA linked-program Case, are distinct evidence obligations. Diagnostic
+verbosity is not an acceptance-policy change or an accepted replay result.
+
+For the shared mapping repair, the AOT library controls pass (35 passed,
+seven pre-existing ignored), and the complete AOT integration target passes
+(19 passed). Strict Clippy, formatting and the real external-program lifecycle
+object build pass under the existing 120-second boundaries. These producer
+results do not by themselves qualify the downstream linked-program replay.
+
+The first CI run of that repair exposed an independent-instance regression:
+four Darwin qualification jobs failed compiling =ffi/runtime.c= because
+=GERBIL_SCHEME_RUST_EXTERNAL_PROGRAM= also denotes an instance-owned linker.
+That flag alone does not establish ownership of a generated installation map.
+The package build now explicitly selects =GERBIL_SCHEME_RUST_TOOLCHAIN_HOME=
+when it emits the mapping; isolated instance adapters retain their existing
+setup behavior. Both existing =instance_probe.c= and =owner_instance.c= compile
+successfully without =build-home.h= under the original 120-second limit.
+The complete AOT library and integration controls pass: 54 passed and seven
+pre-existing ignored. These focused controls do not replace exact-head CI.
+
+Startup and linker object compilation now share the module object's existing
+host/Cargo-bounded native work queue. Their generated C is available before this
+queue starts, so the linker can begin first without waiting for every module
+object. Compiler options, input fingerprints and final archive member order are
+preserved. Every running task joins before an error returns or an archive can
+be published. The native batch observation includes these two existing objects.
+The complete AOT crate controls pass with the shared-batch and four-worker
+failure/join controls: 56 passed and seven pre-existing ignored. Exact-head CI
+and the downstream cold build and linked-program replay remain separate gates.
+
+* Host signal ownership during Linux cleanup
+
+SIGPIPE disposition belongs to the process, while =pthread_sigmask= protects
+only its calling thread. The Weaver native owner qualification exposed this
+distinction: GDB stopped a Tokio TLS worker inside =writev= while the Scheme
+owner was inside =___cleanup_mem_vmstate=. Gambit's earlier interrupt cleanup
+had already selected =SIG_DFL= for SIGPIPE. An owner-local mask cannot protect
+that concurrent writer. Final handler restoration does not close this window.
+
+The Linux build reads the paired archive's ELF symbols with Rust's =object=
+reader. It preserves separate archive members and only partially links members
+with undefined references to Gambit's =___set_signal_handler= to route those
+calls through the SDK cleanup
+scope. Inside that scope, Gambit cannot change SIGPIPE disposition. Other
+signals, ordinary Gambit operations outside cleanup, and host libc signal
+operations retain their normal behavior. The existing owner mask still drains
+new internal SIGPIPE events and preserves the caller's mask and pending events.
+Since Gambit leaves SIGPIPE unchanged in this scope, restoration also preserves
+a legitimate concurrent host update to that action.
+
+This binding is completed inside the SDK archive. It requires no linker flag
+in consumer executables, does not interpose libc, and changes no Gambit source
+or installed library. Both the default tooling image and external-program
+lifecycle use the same private paired archive. The lifecycle object remains
+separate from Gambit's members. Existing module object compilation
+options, ordering and concurrency limits are independent of this binding.
+
+The Linux AOT control =native_bundle_preserves_other_threads_and_host_signal_updates=
+prepares the same private paired archive from native signal-helper fixtures.
+A barrier places an unmasked host worker's real =writev= to a closed
+socket inside the cleanup window. The guarded image must return =EPIPE= and
+preserve host updates and the owner mask. The same objects without the scoped
+binding must terminate with SIGPIPE despite retaining the owner mask. The final
+host link has no wrapping flags. These controls and the unchanged native Weaver
+owner qualification are required before the repair is accepted.
+
+The control pulls native callers before the lifecycle object, reproducing Cargo
+dependency ordering. Bundling those callers into the lifecycle object would
+duplicate their strong definitions when a program dependency already supplied
+them. A separate program-binding control requires a library fallback symbol to
+remain unselected when the host supplies its own binding. Whole-library prelinking
+would also pull Scheme globals prematurely. Both failures were exposed by the
+real external Arrow program. The private paired archive preserves lazy member
+selection without weakening symbols or accepting duplicate definitions.
+Member selection uses binary symbol records, not member-name lists or parsed
+tool diagnostics. The installed paired Gambit library remains untouched.

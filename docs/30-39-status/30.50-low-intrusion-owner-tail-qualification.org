@@ -1,0 +1,208 @@
+#+title: Low-intrusion owner tail qualification
+#+date: 2026-10-22
+
+* Scope and CI boundary
+
+This round builds on =2369da298705dbe7c5d8045fb380d263c240161b= in PR #18.
+Run =39752254043= completed successfully: both Cargo platforms, both Bazel
+platforms, Quint and fixed-owner native lifecycle passed. The unsupported SMP
+job remained explicitly skipped. This is predecessor evidence, separate from
+CI for the resulting qualification commit.
+
+The retained change is an executable qualification improvement, not a claimed
+production routing speedup. Scheme still owns complete execution, Actor/green
+thread scheduling, roots, continuations, exceptions and GC. Rust dispatches
+across fixed owner instances. No runtime default, native optimization level,
+progress watchdog, production type ABI or production routing/supply API changes.
+
+* Observation scope and matched control
+
+=--probe-observation= retains nine entry marks and three native snapshots per
+short request. Snapshots bracket construction and the pending interval before
+projection. They report owner thread CPU, native GC wall/count and roots; GC
+user/system counters are process scoped and must not be added across owners.
+There are no per-bulk diagnostic reads, whole-owner phase histories, Mach state
+polls, calibration workloads or native select/sleep recording in this mode.
+The native anchor-only control disables both logical and native wait tracing;
+readback rejects any retained wait event. Snapshot counts reflect actual
+availability and are asserted, rather than inferred from the requested mode.
+
+=--observer-ab= uses the actual pooled native API in both arms: four live VMs,
+two Tokio workers, batch eight, cooperative budget one, NativePort, feed one,
+coalesced notification, progress-aware routing, four slots/work 32 per owner
+and three active bulk callbacks per owner. Both retain the native short layout.
+Only short-request observation differs. Both arms use matching out-of-timing
+Scheme clock fences, avoiding unequal control allocations before each sample.
+The timed Off arm has no probe counters or entry marks. This is distinct from
+an ordinary unobserved run, which does not execute those fences at all.
+
+Each sample retains 8192 native orders with 48 lines, 64 four-line serial short
+probes and their nominal 500 us schedule. Actual latency starts before admission;
+scheduled latency also contains delayed arrivals. The mixed workload retains
+actual Scheme waits. =--blocks=50= repeats the normal alternating AB/BA pair ten
+times more often than default; the same four VMs survive the whole capture.
+There are 100 samples and 6400 short requests per arm/load, 25600 short requests
+per long capture. The native progress gate remains five seconds.
+
+* Observer cost and retained negative runs
+
+Two ordinary five-block observer controls completed first. CPU throughput
+changed +0.84% and -1.80%; mixed throughput -0.72% and +0.49%. CPU short p99
+changed -1.15% and +5.28%; mixed p99 -0.28% and +1.74%. These are paired results,
+not a universal observer-cost bound.
+
+The two subsequent 50-block captures used the exact same executable/image.
+Each table row is Off versus Probe. Orders/s is the existing median completion
+throughput; p99 pools actual short latencies. Progress is the minimum fraction
+completed when the first owner finishes, not a starvation proof.
+
+| Capture/load | Orders/s Off -> Probe | Short p99 ms Off -> Probe | Minimum progress Off -> Probe |
+|--------------+-----------------------+--------------------------+-------------------------------|
+| A CPU | 415448 -> 415334 | 0.407875 -> 0.421083 | 98.44% -> 98.74% |
+| A mixed | 67027 -> 67122 | 0.484833 -> 0.486125 | 98.78% -> 98.65% |
+| B CPU | 156494 -> 153825 | 4.944583 -> 4.735083 | 45.85% -> 57.73% |
+| B mixed | 66131 -> 66080 | 0.920375 -> 0.924209 | 98.77% -> 98.65% |
+
+Capture A finished in 35.26 s. Off had three requests above 1 ms (maximum
+3.361 ms); Probe had 18 (maximum 8.392 ms), all in one mixed sample/block 35.
+Its mixed finish spread reached 8.801 ms versus Off's 1.640 ms. Close median
+throughput and p99 do not erase that negative extreme-tail result, nor prove
+that observation caused the cluster.
+
+Capture B finished in 43.38 s and reproduced large tails with observation off:
+501 requests above 1 ms in each arm, maxima 20.612 ms Off and 39.335 ms Probe.
+CPU throughput and fairness degraded severely in both arms; short overlap with
+bulk work fell to 27 of 64 in at least one sample. It is retained as a tail
+reproduction, not accepted as quiet-host optimization qualification. No other
+process was stopped. A later host snapshot is not concurrent attribution of
+the preceding stalls; it cannot identify which process, if any, caused them.
+
+* Construction, GC and waiting are different costs
+
+The largest A request (8.392 ms) spent 8.199 ms after admission before owner
+entry. Its wake write completed in microseconds; construction was 22.250 us,
+pending 144.416 us and projection 2.709 us. GC counters did not advance between
+its three snapshots. Several owners appear in the same outlier cluster. A
+successful/coalesced wake is not evidence that an owner was idle or ran promptly.
+
+There is also genuine GC-associated construction in A: one construction took
+796.166 us wall, 795.542 us owner CPU, 784.874 us GC wall and one collection.
+27 of 12800 observed short constructions crossed a collection. This cost is
+material but does not explain the largest pre-entry cluster. GC before the
+first snapshot remains outside per-probe counter attribution.
+
+B's largest request took 39.335 ms: 8.356 ms before owner entry and 30.887 ms
+in the construction span. In Probe this span includes two diagnostic reads;
+their individual costs were not yet recorded in these frozen captures. It
+cannot be narrowed to time inside the constructor. The span consumed only
+49.917 us of owner
+CPU and had zero GC count/wall increment. It therefore cannot be called 30 ms
+of allocation/GC computation. The second-largest observed request spent
+19.888 ms before entry, with only 16.583 us construction. Counter evidence
+separates non-CPU wall delay from execution, but cannot distinguish Runnable
+wait, a blocking lock, or another off-core cause for these exact requests.
+
+The fixture reports GC count and heap/live capacity through existing native
+interfaces, not an exact allocated-byte counter for each constructor. Heap
+capacity must not be relabeled allocation volume. No unverified allocator
+formula or Gambit internal layout dependency was added.
+
+* Separating the observer's own wall cost
+
+The final fixture adds =probe_native_snapshot_ns=: three explicit wall durations
+around the existing diagnostic calls. No new native counter read is introduced.
+Off emits null entries and makes no timing calls for these snapshots. The two
+construction diagnostic reads remain within the original construction span;
+the third is within projection. Their durations must not be called constructor
+or projector work. Snapshot CPU/GC attribution still has its original boundary.
+
+A final same-VM 50-block Off/Probe capture (36.23 s) validated 12800 observed
+triples, matching absent Off entries and both construction reads bounded by the
+construction wall span. Its paired results are below; this is a distinct source
+identity from A/B above.
+
+| Load | Orders/s Off -> Probe | Short p99 ms Off -> Probe | Minimum progress Off -> Probe |
+|------+-----------------------+--------------------------+-------------------------------|
+| CPU | 415370 -> 415759 | 0.401833 -> 0.393916 | 98.43% -> 98.74% |
+| Mixed | 64213 -> 64197 | 0.638958 -> 0.643417 | 98.78% -> 98.78% |
+
+Maximum observed actual latency was 0.876 ms; Off retained two requests above
+1 ms, including a 5.802 ms request with 5.660 ms before owner entry. The 20-39 ms
+tail did not recur. This asymmetric rare-tail result is retained, not promoted
+as an observer performance improvement.
+The largest individual diagnostic read was 20.417 us in a 21.875 us construction
+span with zero GC. Another post-construction diagnostic read took 16.250 us
+inside a 17.792 us construction span, with zero GC and only 2.041 us owner CPU
+between native snapshots. This confirms an attribution gap in the earlier
+wall-only label: the observer itself can dominate a measured construction span.
+It does not retroactively identify where B's 30 ms span stalled. New costs stay
+visible rather than being silently subtracted from end-to-end latency.
+
+* Kernel evidence and its remaining limit
+
+Two Probe-only full-payload =--trace-once= captures completed recorder/export
+with target exit zero, four owner TIDs, 16 timed anchors and coverage of all
+256 ingress intervals each. Native monotonic resolution was 1 us; intersected
+offset uncertainty was +/-1.125 us, before adding each request's clock anchor
+uncertainty and another native tick. Missing/overlapping intervals remain
+rejected. Both used the qualified five-second rolling window and reduced
+Time Profiler plus Thread State Trace recipe, without the full in-process
+phase observer.
+
+The first's largest ingress was 799 us: 759.459 us Running, 10.583 us
+Interrupted and 28.958 us Preempted. The second's largest ingress was 344.084 us,
+all Running at the trace's resolution. Neither captured the long-run 20-39 ms
+requests. The two kernel captures are local scheduling evidence for their own
+requests, not a basis for transferring state labels onto another capture.
+Whole-run blocked totals include startup, idle time and cleanup and are not
+request service delays. Kernel-traced throughput is not performance acceptance.
+Natural getrusage caller resolution reached =___process_times= but the recorded
+stack did not retain its native GC callers. Those syscalls are therefore not
+admitted as paired GC boundaries; their presence alone does not prove GC.
+
+* Consequence for routing and supply
+
+The admission-to-dequeue stage is where the largest A tails occurred. Some B
+construction spikes instead consist almost entirely of non-CPU delay. Routing
+cannot safely treat either a completed wake or a historical phase label as a
+current execution-duration prediction. Moving an already accepted rooted job
+between owners would violate the native ownership boundary.
+
+The prior phase-routing candidate remains withdrawn. This round does not
+introduce another speculative router, GC policy or completion-retirement
+budget: no measurement here attributes the largest tail to result projection
+or proves that changing those policies fixes the off-core interval. Production
+routing/supply optimization remains open until an actual long-tail request has
+covered scheduler/blocking evidence or another directly measured protocol cause.
+All negative runs are retained; no default is promoted on a quiet subcapture.
+
+A separate existing fixed-owner versus pooled-supply Probe capture retained its
+negative CPU throughput result (415781 -> 408843 orders/s, -1.67%) and modest
+mixed result (66471 -> 66850, +0.57%). Mixed p99 changed 0.569 -> 0.485 ms; CPU
+p99 0.429 -> 0.433 ms. This is a directed existing-policy comparison, not a new
+algorithm speedup and not transferable to the degraded capture B.
+
+* Reproduction and local acceptance
+
+Use the Cargo-owned service bench commands in its README. No Bash driver,
+new build system, raw trace/log upload or private absolute path is required.
+Probe/Phase/observer smoke modes all completed their native cleanup assertions.
+The existing CI native job now includes the Probe and observer-cost smokes.
+Both 400-sample long captures joined all four owners with zero roots, successful
+Scheme quiescence and copied image files removed. Stable VM identities, settings
+readback, correct native results and returned capacity remain sample gates.
+
+Final local native fixtures passed: capacity (2.56 s), producer (2.31 s) and
+Scheme service (5.29 s), including cancellation/timeout/close controls and Scheme
+capabilities. Focused bench Clippy with warnings denied passed. Formatting
+and diff checks passed. Remote CI for the resulting head
+is separate from these local receipts.
+
+Frozen private artifact SHA256 identities:
+
+- Repeated-capture executable: =cc10695ce179b4f49db1464caeeed09a4ad3fcd16400c3f3604cb9c2cf53161b=.
+- Final counter-cost executable: =5eb9f1a585343809858fbcd49558af062ca2846e2be55ecef1c1af9b2007f48a=.
+- Native image: =bb7d28e334a918152cb669ada8bd578fc9a836d036b790df179595a68ab83cd8=.
+
+Source manifests, archives, raw output and failed preliminary lint output remain
+outside Git. Do not multiply these results by historical speedup claims.

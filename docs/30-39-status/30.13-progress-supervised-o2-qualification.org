@@ -1,0 +1,200 @@
+#+TITLE: Progress-supervised O2 qualification and matched native workloads
+#+STARTUP: overview
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Updated build admission
+
+The user authorized a longer build when the compiler has genuine progress.
+The earlier 120-second timeouts in [[file:30.12-dynamic-module-optimization-ab.org][30.12]] remain historical failures under
+that earlier rule. They are not rewritten as successful builds. The current
+O2 completion attempt uses a 600-second outer ceiling and observed compiler
+progress. Scheme calls retain their five-second deadline.
+
+* Observed cause and minimal change
+
+The SDK declares =___SINGLE_HOST= with an unlimited =___SINGLE_HOST_LIMIT=.
+Gambit's generated =contract~10.o1.c= declares 5034 labels. The earlier native
+sample found all 801 recorded samples under GCC's =pass_reload::execute=,
+with LRA live-range, constraint and spill work. That sample locates an
+expensive compiler stage; it does not prove that every slow module has the
+same cause, or quantify the separate effect of host contention.
+
+The extended attempt exposes compiler-written =.ira=, =.reload=, =.i= and
+=.s= progress through the existing native process monitor. Completed O2
+objects advanced from 91 to 99, 123, 129, 138, 148 and 151. One observed
+=contract~10= reload dump grew from approximately 0.5MB to 222MB, and the
+compiler subsequently completed its 1,238,552-byte object. A later sample
+attempt found that compiler process already gone; its object existed. This
+is evidence of finite compilation for that previously interrupted module.
+
+The fixed 120-second wall cutoff therefore interrupted real compilation.
+It was insufficient evidence for a runtime deadlock. Existing host activity
+and compilation diagnostics affect wall time; this is not a quiet-host build
+speed comparison.
+
+The minimal source change adds =GERBIL_BUILD_OBJECT_PROGRESS=1= to the
+existing native build helper. It requests allocation dumps and temporary
+compiler products after computing the code-generation input fingerprint.
+It does not enable broader GSC verbosity, invalidate previously matching
+optimized objects, change Scheme compilation, or substitute a compiler.
+Only compiler-written growth generates progress events; polling does not.
+The existing native process helper removes owned diagnostic products after
+each compile. Interrupted attempts may leave their diagnostic files behind.
+
+Dynamic C optimization stays at =-O2=. The existing =-fno-gcse-lm= policy
+is unchanged; no additional optimization subpass was disabled. The SDK's
+C-host partitioning limits were inspected but not changed. Gambit's
+[[https://github.com/gambit/gambit/blob/v4.9.8/include/gambit.h.in][upstream header]] documents that C-host choice separately from VM/thread ownership.
+The observed generated parts had no label count above the installed
+=___OPTIMIZED_MODULE_LIMIT=20000= threshold.
+
+* Runtime and comparison boundary
+
+The actual Python API enters four independent Scheme VM images on four fixed
+OS owners. Rust direct/Tokio/Rayon modes distribute tasks to those owners;
+Scheme retains its macro expansion, interpreter, GC, continuations and Actor
+scheduler. Runtime operation deadlines and result/error semantics are unchanged.
+
+The O0 control is the wheel recorded in 30.12, with exactly the same Scheme
+macro fixture and runtime request protocol. Native compiler diagnostics are
+not part of timed Python execution. The O2 wheel is tested in its own Python
+environment. Each macro comparison uses a new process, all four owners,
+identical hygienic source, iteration count, warmups and measured work count.
+The process order is balanced as O0 / O2 / O2 / O0.
+
+A completed comparison on a busy host is observational. It cannot establish
+performance preservation or an optimum. All per-round negative and noisy
+results must remain. Native-ready batch tails exclude Python projection;
+32 batch samples per operation are diagnostic tails, not a qualified
+production p99. The direct/Tokio/Rayon thread sweep requires explicit quiet
+host admission, including compiler, Gerbil, Lean and other high-CPU activity.
+
+* Completed native artifact and capability gate
+
+The O2 wheel completed in 347.17s with exit zero under the authorized
+progress-supervised ceiling. It reused 91 matching dynamic object cache
+entries and completed 69 additional optimized dynamic objects. This is not
+a clean-build timing claim. All 160 selected dynamic objects completed,
+and no owned diagnostic products remained after successful compilation.
+
+The wheel SHA256 is
+=d1832ed263e0d218173129e28aa7f75700116eda03ae50986ddddb21f3d74715=.
+Its three grouped native modules total 11,486,968 uncompressed bytes;
+the matched O0 control totals 20,045,160 bytes. This is an artifact-size
+observation. All 19 packaged Scheme source files have identical hashes
+between these two wheels.
+
+The installed O2 wheel passed the four-owner full Scheme probe: hygienic DSL
+expansion, runtime macro definition, interpreted closure retention through
+GC, exception propagation/recovery and destruction. It also passed all ten
+installed regression tests in 5.928s, including native types, multi-shot
+delimited continuations, state isolation, all dispatch modes and finite
+Actor work/fairness assertions. Shutdown roots were =[0,0,0,0]= and the
+private runtime directory was removed. This qualifies the exercised
+capabilities; it is not an exhaustive proof of every Scheme program.
+
+* Actual O0/O2 same-load observations
+
+All four declared processes exited zero. Each used four fresh fixed owners,
+two dispatcher workers, 32 iterations per native request, two warmup rounds
+and eight measured rounds. Each operation has 32 measured batch samples per
+process. All results and all four-owner shutdown checks passed.
+
+| Process | Expand batches: median / empirical p99 ms | Expansions/s | Expand + eval: median / empirical p99 ms | Evaluations/s |
+|---------+------------------------------------------+--------------+-----------------------------------------+---------------|
+| O0 first | 7.42 / 28.88 | 3,203.83 | 13.68 / 35.82 | 2,375.93 |
+| O2 first | 5.70 / 40.13 | 3,557.05 | 7.55 / 33.71 | 2,428.09 |
+| O2 second | 8.90 / 54.90 | 2,172.01 | 8.18 / 28.14 | 2,831.01 |
+| O0 last | 8.38 / 43.77 | 2,983.80 | 9.13 / 79.01 | 1,885.58 |
+
+All 256 measured batches have foreign host activity observations. No build
+or diagnostics-test compiler owned by this task overlapped these timed
+processes. Other Gerbil, devenv, GUI and system jobs were active. The second
+O2 pure-expansion process has lower throughput and worse tails than both O0
+processes. The first O2 pure-expansion tail also exceeds the first O0 tail.
+These negative results remain. This comparison has actually executed O2;
+it still does not establish a quiet-host improvement or non-regression.
+The reported rates count operations inside serial native batches; they are
+not maximum four-VM parallel throughput or end-to-end request p99.
+
+* Quiet-host dispatch gate
+
+After all of this task's compiler work and macro timings finished, the
+actual Just direct/Tokio/Rayon benchmark entry point was invoked with
+=--owners 4 --workers 2 --require-quiet=. It returned status 75 before
+opening the pool. Other Gerbil/gxtest, devenv, Java and UI activity was
+observed. The quiet-host topology sweep therefore remains NOT RUN. No
+thread-count winner or admitted throughput/p99/fairness optimum is claimed.
+The existing finite dispatch/Actor correctness tests passed on O2, but
+they do not replace quiet-host performance admission.
+
+* Native diagnostic verification
+
+The owned diagnostics scope passed all 14 tests, including actual GCC
+byte-for-byte parity between O2 objects compiled with and without allocation
+observability, cleanup, real-byte event forwarding, stalled-file suppression,
+partial/nonblocking writes and child stdio isolation. The native parity test
+requires an explicitly supplied GCC and remains opt-in for machines without it.
+This byte parity is demonstrated by the test fixture, not asserted for every
+possible C program.
+
+The first test-build observation window reached 120s before executing tests.
+A continued, progressing dependency build finished in 176.88s but the broad
+=--include-ignored= invocation also selected an existing linker test without
+its required owned source fixture: 14 tests passed, one configuration failure.
+That failure is retained. The corrected owned scope excludes the two separate
+opt-in generated-source fixtures; it passed 14/14 in 6.17s. No source assertion
+or ignored-test requirement was weakened. Strict helper Clippy is recorded
+separately in the accompanying receipts.
+
+* Reproduction and remaining gate
+
+Enable =GERBIL_BUILD_OBJECT_PROGRESS=1= on the normal maturin/native build
+entry point to expose allocation progress without changing optimization.
+The successful run used =GERBIL_BUILD_CORES=4= and
+=GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2=. The build supervisor observed real
+object and phase progress before allowing the run past 120 seconds.
+No automatic unbounded-wait policy was introduced.
+
+Run the actual installed benchmark recipes with the Python interpreter of
+each wheel, using the same process order and workload parameters:
+
+#+begin_src sh
+just -- bridge-python-macro-ab /path/to/O0/bin/python --label O0-first
+just -- bridge-python-macro-ab /path/to/O2/bin/python --label O2-first
+just -- bridge-python-macro-ab /path/to/O2/bin/python --label O2-second
+just -- bridge-python-macro-ab /path/to/O0/bin/python --label O0-last
+just -- bridge-python-owner-ab /path/to/O2/bin/python --owners 4 --workers 2 --require-quiet
+#+end_src
+
+The strict production-helper Clippy check passed in 2.40s after timed runs.
+The wheel still depends on the installed Homebrew native libraries; no
+portable-wheel, remote CI or release acceptance is claimed.
+
+The remaining performance gate is a quiet host: repeat macro admission there,
+then execute the direct/Tokio/Rayon topology matrix from 30.11. Preserve every
+raw result and compare throughput, native-ready and full-response tails, and
+finite completion fairness before selecting a topology. Current noisy macro
+results do not establish that O2 expansion performance is preserved.
+
+Exact source/SDK/wheel identities, every cohort, all observed negative results
+and typed outcomes are retained in
+identity.json,
+outcomes.json and
+macro-summary.json.
+
+A read-only ownership audit found the three persistent high-CPU devenv
+processes in another project directory, with parent PID 1 and start times
+predating this build attempt. Their ownership is outside this runtime
+qualification. The audit is retained in
+host-ownership-audit.txt. No source or process changes were made to that
+project to obtain a benchmark sample.
+
+* Follow-up: quiet-host capture preparation
+
+[[file:30.14-quiet-host-tail-and-fairness-protocol.org][30.14]] records the next admission result, larger declared tail sample count,
+completion-wait fairness metrics and timing boundaries. It does not replace
+this report's historical noisy O0/O2 results with a quiet-host claim.

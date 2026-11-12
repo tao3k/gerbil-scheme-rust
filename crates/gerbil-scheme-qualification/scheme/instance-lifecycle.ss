@@ -1,0 +1,80 @@
+;; Test-only shift/reset expressed in Scheme call/cc. The delimiter intercepts
+;; resumption before any previous foreign return; no continuation enters Rust.
+(def instance-meta (lambda (_) (error "missing instance delimiter")))
+(def instance-saved #f)
+(def instance-churn #f)
+(def instance-fluid (make-parameter 0))
+(def instance-before 0)
+(def instance-after 0)
+(def (instance-reset thunk)
+  (call/cc
+   (lambda (return)
+     (let (previous instance-meta)
+       (set! instance-meta
+         (lambda (value) (set! instance-meta previous) (return value)))
+       (let (value (thunk)) (instance-meta value))))))
+(def (instance-shift handler)
+  (call/cc
+   (lambda (resume)
+     (let (value (handler (lambda (value)
+                            (instance-reset (lambda () (resume value))))))
+       (instance-meta value)))))
+(def (instance-lifecycle operation owner)
+  (with-catch (lambda (exn) (display-exception exn (current-error-port)) -1)
+    (lambda ()
+      (unless (zero? (instance-fluid))
+        (error "captured dynamic binding leaked across foreign return"))
+      (case operation
+        ((1)
+         (set! instance-marker owner)
+         (set! instance-before 0)
+         (set! instance-after 0)
+         (instance-reset
+          (lambda ()
+            ;; Only the captured Scheme continuation retains this heap object
+            ;; after the first foreign call returns to Rust.
+            (let (payload (make-vector 65536 owner))
+              (vector-set! payload 0 (current-thread))
+              (parameterize ((instance-fluid owner))
+               (dynamic-wind
+                (lambda () (set! instance-before (1+ instance-before)))
+                (lambda ()
+                  (let (value (instance-shift
+                               (lambda (resume) (set! instance-saved resume) 23)))
+                    (unless (and (= instance-marker owner)
+                                 (= (instance-fluid) owner)
+                                 (eq? (vector-ref payload 0) (current-thread))
+                                 (let loop ((i 1))
+                                   (or (= i (vector-length payload))
+                                       (and (= (vector-ref payload i) owner)
+                                            (loop (1+ i))))))
+                      (error "captured payload or instance marker corrupted"))
+                    (+ owner value)))
+                (lambda () (set! instance-after (1+ instance-after)))))))))
+        ((2 3)
+         ;; Churn and collect in a subsequent foreign call, then resume the
+         ;; same rooted continuation twice across two separate FFI returns.
+         (let loop ((i 0))
+           (unless (= i 8)
+             (set! instance-churn (make-vector 65536 (+ owner i)))
+             (##gc)
+             (loop (1+ i))))
+         (set! instance-churn #f)
+         (instance-saved (if (= operation 2) 7 9)))
+        ((4)
+         (unless (and (= instance-before 3) (= instance-after 3))
+           (error "multi-shot dynamic-wind imbalance" instance-before instance-after))
+         (let (caught
+               (with-catch (lambda (_) 31)
+                 (lambda ()
+                   (dynamic-wind
+                     (lambda () (set! instance-before (1+ instance-before)))
+                     (lambda () (error "expected instance exception"))
+                     (lambda () (set! instance-after (1+ instance-after)))))))
+           (unless (and (= caught 31) (= instance-before 4) (= instance-after 4))
+             (error "exception dynamic-wind imbalance"))
+           (set! instance-saved #f)
+           (##gc)
+           31))
+        ((5) (if instance-saved -1 instance-marker))
+        (else (error "unknown lifecycle operation" operation))))))

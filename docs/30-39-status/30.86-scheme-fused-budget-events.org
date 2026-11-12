@@ -1,0 +1,184 @@
+#+TITLE: Scheme event publication inside existing budget transactions
+#+OPTIONS: toc:2
+
+* Decision and scope
+
+The repaired but performance-rejected ABI31 experiment is retained in
+[[file:30.85-scheme-budget-owned-runtime.org]]. Its paired throughput regressed
+for both CPU and mixed loads. Favorable pooled numbers did not qualify it.
+This revision changes event transaction boundaries before timing another image;
+it does not tune yield thresholds or repeat an unchanged candidate.
+
+=SchemeServiceCyclePolicy::RuntimeEvent= remains the actual opt-in Rust API
+through =configure_scheme_service_boundary_plan_on=. Its ABI and native type
+contract are unchanged. Scheme owns execution, scheduling, Actor turns, green
+threads, GC, continuations and exceptions. Rust dispatches across instances and
+projects each result on its fixed owner. No default setting is changed.
+
+* Transaction ownership
+
+| Event | Previous critical sections | Revised critical sections | Preserved authority |
+|-------+----------------------------+---------------------------+---------------------|
+| Managed short submission | Context registration plus work publication: 2 | 1 existing work/cache transaction | Pending execution is not a received grant |
+| Actor publication with four active children | 4 independent registrations | 1 bounded registration transaction | Four independent context tokens, before mailbox delivery |
+| Held lease suspends | Release plus phase publication: 2 | 1 existing release transaction | Full nesting is saved; selected peer is not yet received |
+| Held lease resumes | Phase restore plus acquire: 2 | 1 existing receiving transaction | Actual wait/receive and nesting restored before user suffix |
+| Runnable yield with no lease and phase already eligible | 2 no-op phase transactions | 0 | The existing Scheme yield still executes |
+| External wait without held lease | One transaction per phase change | Unchanged | Suspension remains distinct from runnable work |
+| Context entry / terminal unwind | One per dynamic event | Unchanged | Index and entered/retired totals publish together |
+
+These counts come from the selected source paths, not measured CPU attribution.
+The unobserved ready-first control also receives the fused suspension path;
+there is no intentionally slower control. Old mirrored experimental policies
+retain their existing implementation for semantic controls.
+
+The release body is a fixed structural macro shared by ordinary release and
+suspension. It adds no per-handler callback, phase test or second lease record.
+The receiving function is generated from the existing acquisition body with
+resume-specific publication; ordinary handler specializations remain free of
+Runtime acquisition/release bookkeeping. A blocked receiver still updates only
+at actual block/resume, using existing queues and grant ownership.
+
+Short job publication now creates its token in the existing pending-work/cache
+transaction before sending the job. Bulk context registration remains a
+necessary independent event where no pending-short transaction exists. Actor
+registration batches only metadata for the producer's already-bounded active
+children, not user execution. It never makes the batch uninterruptible.
+
+* Continuation and exception boundary
+
+Dynamic entry and exit still update the context index and phase counts under
+the existing budget mutex. Retirement is not postponed to job collection or
+Actor reply; continuation escape and exceptional exit must release that dynamic
+extent immediately. Reentry reinstates the retained context's epoch and its
+original declared work bound. Stale epoch events cannot update a new ledger.
+
+A held suspension releases the entire saved nesting and publishes suspension
+before granting peers, under one mutex acquisition. Resume publishes eligibility
+inside the receiving transaction; actual blocking remains lease wait until the
+owner check succeeds. Original nesting is restored before the user suffix runs.
+Every user thunk, external wait and Scheme scheduler yield runs outside the
+mutex. Lock order remains service then budget; no budget transaction takes a
+service lock, waits for a user computation or transfers a root/capacity permit.
+
+The existing independent completion, cancellation, timeout and close protocols
+remain. A caller timeout cannot retire already-accepted Scheme work, and an
+individual result retains its own root and capacity retirement.
+
+* Model and native checks
+
+The existing joint Tokio/fixed-owner/Actor/green-thread model reuses its dispatch,
+waiter, CPU lease, blocking, Actor child phases and activation stack/index.
+New witnesses check fused short publication without an execution acknowledgement,
+both children published before Actor execution, external release/resume across
+cancel/close with roots retained, and a required suspended-owner mutation.
+Existing split-index-retirement, stale-epoch, multishot and exception controls
+remain. There is no new lease or waiting-queue model.
+
+Typecheck and 104 directed cases across both completion domains pass, as do
+400 cross-layer random samples of up to 64 steps, seed 42. Model source SHA256:
+=00e534c8b8e92d61f729aeeaf8225431b1af52689a9bac4da0b246c9dfc87cfc=.
+These finite checks do not establish native timing or universal liveness.
+
+The new real Scheme fixture escapes from inside an external suspension nested
+under two budget extents, reenters normally, forces GC, then reenters with an
+exception. It checks external/owned snapshots, restored outer ownership and
+zero terminal phases with entered/retired conservation. Actual typed API tests
+also cover initialization failures, close/cancellation/timeout drain and
+first-grant ownership. Strict Clippy passes. The three native tests pass in
+31.15 seconds, four owners joined, roots zero, files removed, FD return and
+native close 2.59 ms. The five-second meaningful-progress watchdog is unchanged.
+
+* Targeted net-cost experiment
+
+Use the existing Rust =scheme_service= bench with
+=--progress-fair-ab --fixed-short-selective --runtime-event-cost-ab=, compiled
+through Cargo with =GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2=. The control is unobserved
+=ReadyFirst=, the candidate =RuntimeEvent=. Both use the same four live VM
+instances and native image, Tokio two workers, window four, work 32, batch eight,
+Actor quantum one, class/feed one, contended work four and maximum span 48.
+Only the existing CPU and mixed workloads run, five ordered/reversed blocks,
+with native observation off. This is not Python end-to-end qualification.
+
+The complete capture below followed a preflight that observed a compiler appearing and
+exited before any manifest or sample. No performance claim or cleanup receipt
+is inferred from that deferral; no task was paused or Automation added.
+
+Retain exact compiled host/image/source identities, negative samples, matched
+logical work, first grants, per-result retirement and final cleanup. Throughput
+is primary; CPU utilization rising is not itself regression. Report paired and
+pooled throughput, actual/scheduled/bulk p99 and owner fairness. Commit only
+after performance acceptance; preserve the rejected predecessors.
+
+* Historical watchdog
+
+A focused evidence inventory still finds the original first-port native failure
+log but no matching archived failed image/binary or last progress. Its cause
+remains UNATTRIBUTED and cleanup UNVERIFIED. The later ABI31 index-publication
+failure belongs to another image and is not an explanation for that watchdog.
+New native passes do not close the historical attribution gap. Current timing
+captures freeze source, host and native image identities before execution.
+
+* Complete net-cost result: rejected
+
+=service-runtime-fused-v31-r1= completed all 40 windows in 8.04 seconds,
+exit 0, empty stderr, unchanged compiled host/image/source identities, no
+controller timeout and empty compiler boundaries. Native image SHA256:
+=9fde369b90e7354413c1cc4d90ad8d6d5223254c14e8bc11a7580e4c1f8775c5=.
+Compiler checks at the boundaries do not establish absence of other OS work.
+
+Every window preserves 8192 orders, 64 short probes, exact declared work,
+first grants and 1088 results. The observed candidate enters/retires 5184
+contexts per window; the unobserved control registers none. Final cleanup
+attests four owners joined, zero roots, removed files and quiescent service.
+No native protocol assertion or watchdog failure occurred in this capture.
+
+| Load | Paired median throughput | Actual short p99 | Scheduled p99 | Bulk p99 | Owner completion spread |
+|------+--------------------------+------------------+---------------+----------+-------------------------|
+| CPU | -3.07% | +4.83% | +3.31% | +1.82% | -3.66% |
+| Mixed | -1.52% | +2.89% | -12.25% | -7.54% | +12.25% |
+
+Throughput improved in only five of ten CPU pairs and three of ten mixed pairs.
+Paired throughput ranges were -38.10% to +29.45% and -23.89% to +15.14%.
+Pooled throughput also regressed: CPU -14.69%, mixed -3.94%; actual short p99
++5.21%/+9.63%, bulk p99 -5.58%/+11.35%, maximum owner completion spread
++138.72%/+80.21%. Pooled CPU orders/s changed 282816->241276; mixed
+54543->52394. These are workload throughput, not generic RPC requests/s or
+Python end-to-end results. Different aggregation methods are reported
+independently and are not substituted for one another.
+
+Work handoffs fell 761->368 for CPU and 575->216 for mixed. Active service
+passes fell 5084->4878 and 6707->5365. Fewer handoffs, passes or source-level
+critical sections did not produce net acceptance. Source fusion is real;
+the runtime-cost hypothesis remains unqualified. Do not subtract this independent
+capture from the preceding image to claim the speedup of an individual fusion.
+
+Same-request top-ten tail components put before-entry/pending shares at
+43.39%/55.97% for CPU control and 12.26%/74.76% for the candidate; mixed
+47.38%/52.06% and 71.99%/27.41%. CPU candidate construction contributes 12.76%
+of that top-ten total, driven by a spike. These additive components do not
+identify whether pending or construction time was CPU execution, GC, blocking
+or OS scheduling. No unique lock/GC/OS attribution is made.
+
+The candidate is rejected for performance. No commit, push or default change
+was made. The preflight deferral, preceding native failure, negative captures
+and complete current result remain retained outside the repository. No raw
+logs, images, patches or capture archives were added to GitHub. No expanded
+thread/VM matrix, Automation, task pause or unchanged-image repeat was used.
+
+* Next architectural question
+
+Three concrete transaction fusions have not established a net gain. Further
+coalescing must not become the default response. Audit which eligibility facts
+are already owned by budget queues, receiving grants, Actor mailboxes and the
+native Scheme runnable/blocked scheduler, and whether cold diagnostic progress
+can be separated from scheduling authority. The current event path still owns
+per-job/per-turn activation tracking; that is a source fact, not a measured
+exclusive cause of the loss. A future replacement needs the existing joint
+model, actual API wiring and a new net-cost gate.
+
+Do not recover throughput by postponing dynamic-wind retirement, recycling
+mutable continuation-owned tokens, hiding exceptional exits, weakening Scheme
+execution or changing default policy. Retain independent completion roots and
+capacity. The historical watchdog attribution gap remains open independently
+of the current bounded native acceptance.

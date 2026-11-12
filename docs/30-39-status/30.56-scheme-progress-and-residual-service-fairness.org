@@ -1,0 +1,259 @@
+#+title: Scheme progress and residual-service joint fairness
+#+options: toc:nil num:nil
+
+* Decision from the previous evidence
+
+Report 30.55 rejects both interleaved constructors and snapshot-first refill as
+general improvements. Neither callback count nor fair short wake duties express
+how much accepted Scheme service remains. This change adds advisory native
+progress and a joint short/bulk claim policy; it does not change refill order,
+VM count, class execution budgets or any default.
+
+* Two independent ledgers
+
+| Ledger | Charge | Reduction | Authority |
+|--------+--------+-----------+-----------|
+| Resource | Existing active/work/slot permits at owner claim | Native projection/root retirement only | Admission bounds, lifetime and close drain |
+| Service | Declared native units at Scheme submission | Stable Scheme unit IDs; all remaining units at success/exception completion | Advisory destination/claim ranking only |
+
+A completed unit does not free any resource credit or native root. Even zero
+remaining service can coexist with held projection roots, outstanding result
+ownership and full resource charges. Observation timeout/drop does not retract
+accepted native work. Uncommitted Rust payloads can select a different owner;
+accepted Scheme values, Actors and continuations remain fixed.
+
+The Scheme ledger serializes report/deduplication, finish and receipt under one
+Scheme mutex. No application callback runs under that mutex. A stable unit ID
+is counted once even when a multishot continuation resumes after GC. Reporting
+on a finished job is inert. Native Actor batches propagate the job context and
+report completed item identities, including terminal item failure. Other Scheme
+handlers may explicitly use =gerbil-rs-progress-unit!=, or keep their full
+conservative charge until completion. If an Actor batch's item count differs
+from the declared work charge, automatic partial reports are disabled; execution
+and ordinary native types are preserved. Units are logical application work,
+not elapsed-time estimates or preemption boundaries.
+
+* Native and public API boundary
+
+=enable_scheme_service_progress_on(owner)= explicitly activates an
+idle ABI-v6 owner and verifies the Scheme reply. Configuration requires bounded
+native work capacity; active work/producer registration rejects reconfiguration.
+Activation is fixed until VM shutdown. This closes a race where a waiting
+producer could pass capability validation just before another caller disabled
+its receipts. Repeated idle activation is idempotent; active activation fails.
+=scheme_service_progress_on(owner)= reads the last cached native-turn receipt,
+not a profiler, a new Scheme query or a current OS scheduling state.
+
+ABI v6 adds an optional four-word submit header carrying the frozen declared
+charge, and an opt-in completion receipt =[-6, bulk_remaining, short_remaining,
+completed_ids...]=. The existing completion command returns the metadata: no
+background timer, periodic diagnostic polling or per-unit Rust FFI callback is
+introduced. Disabled services keep the existing submit/ready wire formats.
+Application payloads and results retain the native type interface.
+
+The owner charges its cached hint conservatively after successful native submit,
+then replaces the pair atomically at the next native turn. This includes
+submissions since the last receipt without overwriting or summing stale snapshots.
+The cached count pair is advisory and may lag Scheme progress. Its separate
+=waiting_for_claim= field declares the owner has completed arm/recheck and is
+entering native wait; the owner clears it before another host turn and on close.
+It excludes active constructors/projectors from bulk opportunity selection, but
+is not an OS blocked/runnable measurement or a bound on Scheme execution inside
+the native wait. The cache never bypasses capacity,
+Actor affinity, the admission/close fence or native lifecycle validation.
+
+* Joint fairness algorithm
+
+** Bulk claim opportunities
+
+=SchemeServiceSupplyAdmission::ProgressFair= requires progress on all registered
+owners. A shared source checks the claimant's cached residual service against
+other live owners with enough native work/slot and active capacity for the FIFO
+head, and a published wait declaration. It allows one head charge of slack. If a lower-service eligible peer exists
+beyond that slack, it notifies the peer and returns the claimant's speculative
+credits before the owner takes another turn.
+
+Only one such deferral is allowed before the claimant may acquire the next
+head. A descheduled, cancelled or closing peer cannot own an exclusive claim or
+hold native capacity. The next claim remains runnable even if the notified peer
+never executes. Source FIFO, final lifecycle fences, cancellation/deadline and
+immutable accepted owner semantics are unchanged. This is an opportunity
+protocol, not a global finish barrier or a scheduler time guarantee.
+
+** Short notification duties
+
+=SchemeShortWake::ProgressFair= ranks eligible registered sleepers by the same
+residual-service hint. Lower service wins, with existing FIFO order breaking ties.
+After two eligible bypasses, a waiter enters a promoted class; promoted waiters
+are served in FIFO order before ordinary residual ranking. The threshold is a
+promotion rule, not a universal two-grant wait bound when many owners are already
+promoted. Ineligible owners accrue no new bypass debt. Resume/claim/close clears
+obsolete duties; no native permit or Rust payload is reserved by a wake.
+
+Running owners still claim visible short work before sleeping, even when a peer
+was notified. There is no recursive native advance inside selection. Scheme
+continues to own class arbitration, green threads, Actors, continuations, waits,
+exceptions and GC. Rust only distributes uncommitted cross-instance work.
+
+* Existing model refinement and native obligations
+
+The existing =owner_lifecycle.qnt= adds stable reported-unit sets, a bounded peer
+opportunity and short promotion debt. Resource conservation remains the original
+invariant. New scenarios cover idempotent progress, zero authority to return
+credits, delayed-peer work conservation, low-service short selection, promoted
+waiters, timeout/close drain and an intentionally premature credit-release
+mutation. The aggregate gate runs the new progress traces and requires a real
+invariant counterexample from the mutation. It does not substitute for native
+correctness or prove an OS time bound. The existing two-owner domains do not
+prove an arbitrary-owner latency/fairness theorem.
+
+Native qualification observes an eight-unit Actor batch with six completed
+units while all eight resource credits remain charged. It also executes a
+coarser one-unit/eight-item native type contract without partial accounting,
+GC/multishot unit replay, Scheme exceptions, construct/project panics, queued
+cancellation/expiry, held projections and accepted-work close drain. Progress
+mode participates in the existing native service and pool-stream tests.
+
+An initial native run passed the new progress/replay checks but failed a later
+old wake scenario because the new fixture left its latch open. Restoring the
+latch after the completed partial-progress scenario fixes test-state pollution;
+the five-second gate is unchanged. Its failure capture remains private. An
+initial Quint command matched non-test action names as well as test runs and
+reported uninitialized-state errors; the four deterministic scenarios themselves
+passed. That command error is not admitted as a protocol counterexample.
+
+* Directed matched comparison
+
+#+begin_example
+just bridge-scheme-service-benchmark --progress-fair-ab
+#+end_example
+
+Both arms use the same four live VMs and native O2 image, two Tokio workers,
+8192 real orders and 64 short probes, slot/work limits 4/32, batch eight, quantum
+one, native-port wake and three active bulk jobs per owner. Both enable the same
+native progress receipts; the control uses =OwnerLocal= plus FIFO =Selective=
+wake, and the candidate uses =ProgressFair= for bulk and short duties. Neither
+uses =RetirementRefill=. This isolates the joint policy with equal progress
+instrumentation; it does not measure progress-instrumentation cost versus the
+old disabled default. No matrix or unchanged recapture is added.
+
+Raw output, initial failures, frozen artifacts and full-source hashes stay outside
+Git. The binary and native-image identities are recorded before timing. Native
+progress retains its five-second watchdog. Short native-completion p99 is the
+projection completion clock, not the time a Tokio caller resumes; scheduled-probe
+latency is reported separately. GC wall time is not treated as owner CPU time.
+
+* Build and local acceptance
+
+The selected toolchain reports Gerbil =1cfb032= on Gambit =ea114fc=, target
+=aarch64-apple-darwin25.6.0=. The existing Gerbil/C native chain and installed SDK
+are retained; dynamic application modules use =GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2=.
+There is no Scheme-to-Rust translation or new build driver.
+
+Focused units pass 32 tests; warnings-denied Clippy passes. The final native
+service suite passes three tests in 13.45 s, including the stable activation and
+terminal deduplication-storage release. Finished contexts retain their inert
+marker for old continuations and release their obsolete per-unit ID table.
+The aggregate model gate passes in 150.79 s, including all existing controls,
+1,000 new bounded progress traces and the required premature-credit counterexample.
+The four new scenarios also pass independently in both existing owner domains.
+These are separate receipts, not a model-derived native acceptance claim.
+
+Predecessor =04adf7d771a1e79a2777b01f86547c72eba90237= CI run
+=39782116053= completed successfully: six supported jobs passed; the unsupported
+SMP lane was explicitly skipped. New-head CI remains independent after publication.
+
+* Initial joint policy: retained negative result
+
+The first frozen capture =service-progress-fair= completes all 40 samples and
+clean native teardown. It uses residual service and capacity for bulk peer
+eligibility, without the final wait-declaration guard. The result is a tradeoff:
+
+| Workload | Metric | FIFO control | Initial joint policy | Change |
+|----------+--------+--------------+----------------------+--------|
+| CPU | Orders/s | 269,765 | 255,965 | -5.12% |
+| CPU | Bulk service p99, ms | 1.261667 | 1.430333 | +13.37% |
+| CPU | Native-completion short p99, ms | 0.452833 | 0.583750 | +28.91% |
+| CPU | Scheduled-probe p99, ms | 1.966750 | 10.667084 | Worse |
+| CPU | Maximum owner finish spread, ms | 0.857542 | 0.514958 | -39.95% |
+| Mixed | Orders/s | 61,100 | 61,658 | +0.91% |
+| Mixed | Bulk service p99, ms | 2.780584 | 2.598792 | -6.54% |
+| Mixed | Native-completion short p99, ms | 0.739041 | 0.648833 | -12.21% |
+| Mixed | Scheduled-probe p99, ms | 2.424125 | 12.131458 | Worse |
+| Mixed | Maximum owner finish spread, ms | 1.518833 | 1.478500 | -2.66% |
+
+CPU minimum owner progress improves from 95.9707% to 98.6364%, while the minimum
+observed Actor peer count changes from 1 to 0. Mixed minimum owner progress is
+98.7903% / 98.7854%. These are not uniform fairness or latency improvements.
+Native completion does not include the later Tokio caller resumption. The
+scheduled and admission clocks retain their regressions. No promotion is admitted.
+
+Code inspection identifies a distinct eligibility gap: native credits can be
+free while a peer is still in an arbitrary constructor/projector. Residual work
+and resource eligibility do not constitute a claim-ready handshake. The final
+policy therefore additionally requires the peer's existing arm/recheck/native-
+wait declaration before offering it a bulk turn. It still falls back after one
+opportunity and never reserves native capacity for the peer. This is a protocol
+refinement, not a claim that the capture alone proves an OS/GC cause.
+
+The new =progressBusyPeerClaimTest= keeps free peer capacity but no wait
+declaration and verifies immediate work conservation. The existing peer-delay
+scenario now explicitly parks the peer before granting its opportunity. The
+focused model gate discovers all five progress scenarios in both owner domains,
+then runs the same 1,000 progress traces and required mutation counterexample.
+It passes in 17.76 s. Unchanged model gates are not repeated for this refinement.
+
+* Final wait-declaration capture
+
+Capture =service-progress-waiting-peer= completes 40 matched samples, stable
+VM identities, four joined owners, zero external roots, quiescent Scheme services
+and removed copied image files. Both policies retain the same native-progress
+instrumentation, and neither uses retirement refill.
+
+| Workload | Metric | FIFO control | Wait-declaration joint policy | Change |
+|----------+--------+--------------+-------------------------------+--------|
+| CPU | Orders/s | 160481.258847 | 146118.614604 | -8.95% |
+| CPU | Bulk service p99, ms | 2.703084 | 3.834500 | +41.86% |
+| CPU | Native-completion short p99, ms | 0.999000 | 2.041417 | +104.35% |
+| CPU | Scheduled-probe p99, ms | 42.572833 | 39.306209 | -7.67% |
+| CPU | Maximum owner finish spread, ms | 1.721083 | 0.877917 | -48.99% |
+| Mixed | Orders/s | 34531.834298 | 35930.704391 | +4.05% |
+| Mixed | Bulk service p99, ms | 10.191125 | 13.346250 | +30.96% |
+| Mixed | Native-completion short p99, ms | 2.880500 | 2.560416 | -11.11% |
+| Mixed | Scheduled-probe p99, ms | 91.105417 | 55.547250 | -39.03% |
+| Mixed | Maximum owner finish spread, ms | 4.495916 | 3.108834 | -30.85% |
+
+CPU minimum owner progress is 97.6190% / 97.9021%; mixed is 98.7069% / 98.5222%.
+Observed minimum Actor peer count remains 1 / 1 for CPU and 0 / 0 for mixed.
+The short improvement and lower finish spread do not imply uniform fairness:
+mixed minimum progress is slightly worse, and bulk service p99 regresses in both
+loads. CPU throughput and native-completion short p99 also regress materially.
+
+The final run supports a mixed-throughput/short-tail/finish-spread tradeoff in
+this capture, not performance promotion. Both captures ran on the shared local
+host with other tasks untouched. Their absolute controls differ substantially;
+do not attribute cross-capture differences to the wait guard or instrumentation
+without a matched control. No quiet-host result, isolated OS/GC attribution,
+old-default speedup or progress-instrumentation overhead claim is admitted.
+No unchanged recapture or wider matrix was used to seek a favorable result.
+
+The final binary SHA-256 is
+=eb31cd0b6d59f1ec167d0557cc1702202ee1d2cc1b1c5d06e8c13dd6d3c80db9=.
+The earlier joint-policy binary is
+=077622318001122fd13365e8b2f08c04054e2ddb50957ae466937ee71077b9ff=.
+Both use native image SHA-256
+=0e9b13d5701d719407d142ca9bdd013d7a7f12d11cd87c7adc0cba55301c2160=.
+Private manifests retain complete source and artifact hashes. No raw capture,
+absolute host path, binary or generated comment hash is added to the PR.
+
+The final wait-declaration variant passes focused warnings-denied Clippy, its
+changed peer-opportunity unit test, all three native service tests (13.27 s),
+and the focused model gate (17.76 s). The earlier 32-unit and full aggregate-model
+receipts are retained separately; unchanged suites were not repeatedly expanded.
+Defaults remain unchanged. CPU throughput/tail acceptance, instrumentation cost
+versus the disabled default, sustained memory convergence and an arbitrary-owner
+fairness/time bound remain unqualified.
+
+CPU short owner counts (control / candidate): =[165, 162, 146, 167]= / =[133, 154, 177, 176]=.
+
+Mixed short owner counts (control / candidate): =[147, 187, 137, 169]= / =[125, 164, 136, 215]=.

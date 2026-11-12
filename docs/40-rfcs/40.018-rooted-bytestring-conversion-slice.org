@@ -39,12 +39,12 @@ The native bridge detects conversion failures and maps them to root token zero.
 The checked Rust ABI maps zero to =GerbilStatus::InvalidValue=.
 
 The embedded archive intentionally links only the binding module and Gambit,
-not the complete Gerbil std module graph. Therefore =scheme/native.ss= carries
+not the complete Gerbil std module graph. Therefore =scheme/runtime.ss= carries
 a small AOT bridge implementation that pins the official
 =:std/misc/bytes= wire semantics. It does not move conversion into Rust, and it
 does not depend on unresolved std/prelude procedures such as =__with-catch=.
 Validation is branch-based and returns token zero instead of raising across the
-C ABI. The lowered =scheme/generated/native.scm= remains tracked and drift
+C ABI. The lowered =scheme/generated/runtime.scm= remains tracked and drift
 checked.
 
 * Root ownership contract
@@ -107,7 +107,7 @@ The complete measured scenario took =34212125ns=.
 
 * Generated SCM provenance boundary
 
-The committed =scheme/generated/native.scm= is an AOT build artifact, not a
+The committed =scheme/generated/runtime.scm= is an AOT build artifact, not a
 Rust source-analysis input.  The bindings crates therefore do not depend on a
 Gerbil parser, Rowan, or =gerbil-scheme-language-project-harness=.
 
@@ -123,7 +123,7 @@ The replacement contract is syntax independent:
 1. =GERBIL_SCHEME_RUST_UPDATE_GENERATED_SCM=1= writes the compiler output and
    a provenance header together.
 2. The header binds the artifact to SHA-256 fingerprints of =build.ss=,
-   =gerbil.pkg=, =scheme/native.ss=, and =scheme/native.ssi=.
+   =gerbil.pkg=, =scheme/runtime.ss=, and =scheme/runtime.ssi=.
 3. A second SHA-256 fingerprint covers the committed SCM body, so manual body
    drift fails closed.
 4. =GERBIL_SCHEME_RUST_CHECK_GENERATED_SCM=1= validates both fingerprints and

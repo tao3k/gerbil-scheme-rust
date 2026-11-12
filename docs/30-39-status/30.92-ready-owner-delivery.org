@@ -1,0 +1,200 @@
+#+TITLE: Indexed ready-owner delivery and independent native refill
+#+STARTUP: overview
+
+* Evidence and protocol responsibility
+
+The unified claim/final observer preserves early claim observation, but its
+qualified observed workload rejects performance: mixed client-total p99 worsens
+28.59% while native short p99 changes only +0.53%. Mixed post-send to ready-poll
+bounds increase, and serial probe backlog amplifies a late client observation.
+The prior experiment does not prove OS blocking, GC CPU cost or a specific Tokio
+queue cause. Repeating unchanged samples cannot identify that cause.
+
+FIFO bulk delivery introduces a separate architectural dependency: a completed
+result from one owner cannot reach its caller until an earlier input assigned
+to another owner completes. This dependency is unnecessary for stateless pool
+work. It can bunch client work, but its contribution to the previous tail is a
+hypothesis until matched A/B; it is not established by the old timing evidence.
+
+=submit_scheme_service_pool_ready_stream= is an explicit alternative over the
+same pool source, validation, registrations, native quotas and revocable offers.
+It returns =SchemeServiceReadyStream<R>= with =SchemeServiceReadyResult<R>=:
+original input =sequence=, actual optional =owner=, independent task =result=,
+and =native_completed=. Successful output has an actual fixed owner. Pre-entry
+rejection can have no owner. Public defaults and the existing FIFO API remain
+unchanged. Callers requiring input order must reconstruct it explicitly.
+
+* Three independent progress responsibilities
+
+1. Native completion projects the typed result and balances transient roots.
+   Existing per-result native/work/stream retirement and refill retain their
+   original linear ownership. No client acknowledgement gates an owner refill.
+2. Result publication moves one indexed Rust result into its actual owner's
+   ready queue. Each staged input has one consuming reply sender; aggregate
+   unread result count cannot exceed the original bounded input count. A single
+   owner may execute all inputs, so each bounded channel permits that count.
+   Channel allocation is incremental; the logical bound is aggregate, while
+   per-owner channel metadata and allocation overhead must be measured.
+3. Client receive polls queues from a rotating cursor and consumes at most one
+   ready result. A continuously ready owner is visited within the participating
+   owner count of successful receives. Empty owners do not stall the rotation.
+   This is opportunity fairness per client receive, not OS time fairness or a
+   guaranteed Tokio resumption deadline. Normal Tokio cooperative accounting is
+   preserved. No explicit yield, periodic timer or new executor is introduced.
+
+The sender never awaits a client or a new native slot to publish an already
+completed result. A channel-capacity failure cannot occur under one publication
+per original input; a closed/invalid destination reports failed delivery and
+uses the existing owner-local native retained rollback. Ordinary oneshot results
+use the original send path through the same typed reply boundary. Rust result
+queues are not extra Scheme roots or execution leases. Application-retained
+values keep their existing explicit ownership contract.
+
+* Wait, cancellation and close boundaries
+
+All empty owner receivers register the current task waker during one pending
+poll. Already-ready channels are checked before suspension; replacing a task
+waker reaches each polled receiver. Tokio channel/waker/cooperative-budget
+semantics remain trusted transport primitives, exercised by real controls.
+Short requests keep their unified claim/final observer, including its early
+claim opportunity. They do not share the bulk result queue or its input index.
+
+Ready-stream observation timeout leaves unread identities and queues intact,
+allowing a later receive. This differs explicitly from consuming a FIFO ticket
+before waiting. Inner task errors retain their sequence and native timestamp.
+Unexpected final sender closure reports =Closed= once rather than silently
+ending with missing identities. Stream drop/cancel wakes existing producers and
+rejects uncommitted Rust input. Accepted Scheme graphs drain on their owner;
+closed result receivers cannot free native roots early. Producer registration
+retires after native drain independently of unread Rust results.
+
+The API does not preempt a native projector or arbitrary Scheme computation.
+An indivisible constructor/projector remains part of its owner service turn;
+Scheme Actor/green-thread execution and continuation/exception rules are unchanged.
+This work changes result delivery across instances, not Scheme execution or SMP.
+
+* Model and actual API controls
+
+Reuse =specs/owner_lifecycle.qnt= and its existing Tokio/owner/Actor/green-thread
+state. Publication appends the same completed identity to its owner result queue;
+ready receive rotates owners and records the expected versus chosen owner.
+Safety checks bound occupancy, prohibit duplicate/consumed identities, preserve
+wake debt for an armed consumer and distinguish native retirement from result
+consumption. Existing short-claim and native ownership transitions stay intact.
+Directed cases include refill before consumption, early wake, drop with native
+drain, head-of-line bypass, owner rotation, and explicit lost-wake/unfair-pick
+mutations. Finite safety checks do not establish wall-clock fairness or p99.
+
+Real transport controls exercise ready bypass, rotation with an owner backlog,
+latest-waker registration, timeout followed by receive, missing sender closure,
+dropped receiver and invalid owner identity. Native controls hold the first
+input in a real projector: the other owner retires its producer and all native
+credits before its unread results are consumed, then those later identities
+arrive before input zero. The held graph keeps its native credit across client
+timeout. Construction/Scheme/projection failures retain their input identities;
+staged cancellation/drop reuses the normal producer drain. Complete native GC,
+continuation, exception and teardown controls remain enabled.
+
+* Targeted performance contract
+
+Use the standard O2 Cargo/native graph and actual Rust bench:
+=--progress-fair-ab --fixed-short-selective --ready-owner-ab=.
+Both arms use the same four live VMs/image, Tokio two workers, window four,
+work 32, bulk batch eight, Actor quantum one, NativeBudget, AfterRetirement,
+original client timers, same unified short observer and short trace mode.
+Only FIFO bulk result collection versus indexed ready-owner collection varies.
+The candidate restores input order in a bounded Rust vector for the existing
+independent oracle; that storage and indexing cost remains inside its timing.
+Native input, result count and logical Scheme work are unchanged. No matrix
+expansion or default promotion is allowed.
+
+This compares observed workloads. Empty compiler boundaries qualify only those
+boundaries, not continuous host isolation. Preserve failed/unqualified captures
+and evaluate total-work/time, paired throughput, native/client p99 and owner
+completion spread separately. Performance acceptance is required before commit
+or push. Passing a finite model or native lifecycle suite cannot substitute.
+
+* Historical watchdog
+
+The original first-port watchdog remains UNATTRIBUTED, and its original cleanup
+UNVERIFIED: a matching failed image/phase/stack is unavailable. Current native
+runs freeze host binary, source and native image before execution and retain
+failures under the unchanged five-second meaningful-progress gate. Current
+success does not explain the historical failure. Raw logs, snapshots, binaries
+and host-local receipt paths remain private.
+
+
+* Executed correctness and build gates
+
+Both existing joint domains pass 199 directed cases (98 small, 101 wide).
+The same model passes 400 random samples, up to 64 steps, seed 42. SHA256:
+=21e5a9992e248a5ad3ec6a1239e3a70a0fb4e331dedbf81f34c0ebc3ad86e098=.
+A failed witness attempted the short-only dispatch acknowledgement for bulk work;
+it was corrected to the existing bulk registration/grant protocol. The finite
+ownership/wake/fair-pick invariants were not weakened. Its failed receipt remains.
+An initial Quint value-syntax error is also retained.
+
+Six new transport controls and thirteen existing claim/notification/close
+controls pass. Strict bench/native and model-harness Clippy pass; O2 release
+builds through the ordinary graph. The final native suite passes three cases in
+37.95 seconds, four owners joined, roots zero, files removed and FD returned;
+native close is 2.65 ms. The preceding native pass is retained separately.
+Policy, missing feature/fixture migration and lint failures were repaired in
+source without suppressions. No timeout or default was widened.
+
+The ordinary async ticket layout and receiver remain unchanged. The internal
+service job reply sender becomes a typed transport enum; both A/B arms share
+that representation. This experiment does not isolate its cost relative to an
+older production build. Ready-stream metadata/transport/oracle costs remain in
+the candidate timing; no general default-path speed claim follows.
+
+PR18 remote head =c4b95dfaa116bd67b110d94826535fd27f227b85= has six effective
+successful CI checks. Those checks attest that remote head, not this unpushed
+candidate. The SDK-unavailable SMP check is outside this fixed-owner claim.
+
+Reinspection of archived watchdog receipts distinguishes a loader stall before
+libtest main, sampled at dyld start with no Scheme frame, from the unexplained
+first-port native watchdog. A passing immutable watchdog control is also an
+archived fact, not a new native attribution. No matching first-port failed
+image/phase/stack was recovered, so its status remains unchanged.
+
+
+* Executed A/B: ready-owner delivery alone rejected
+
+The single qualified capture completes 40 windows in 7.242 seconds, exit zero,
+no stderr or controller timeout, empty compiler boundaries and unchanged frozen
+binary/source/image. Release native image SHA256 is
+=ba8125c6df45516c836e00eef990492df41ff64237222816184db0bf3edfa51e=,
+identical to the previous release workload. All native work, timestamps and
+owner identities pass the audit; four owners join with zero roots, removed files
+and a quiesced service. Preflights that found compiler processes ran no samples.
+
+| Candidate relative to control | CPU | Mixed |
+|-------------------------------+-----+-------|
+| Total work / sum elapsed time | +0.52% | +4.30% |
+| Paired throughput median | -0.73% | +0.45% |
+| Emitted median-window throughput | -2.04% | -0.15% |
+| Pooled native short p99 | +37.68% | +2.01% |
+| Pooled client-total p99 | +457.87% | -19.89% |
+| Pooled bulk p99 | -0.56% | -39.64% |
+| Maximum owner completion spread | +11.63% | -68.03% |
+
+Only four CPU and six mixed throughput pairs improve. Paired mixed client-total
+p99 worsens by median 2.85% (four pairs improve), while client-delivery p99
+worsens by median 70.16% (only one pair improves). Paired native short p99
+worsens 23.30% CPU and 4.21% mixed. CPU client p99 grows 2.302 to 12.842 ms;
+mixed falls 11.945 to 9.569 ms. Owner maximum spread changes 0.414 to 0.462 ms
+CPU and 5.653 to 1.807 ms mixed. Do not substitute a favorable pooled statistic
+for the paired result. Status is REJECTED_PERFORMANCE; no commit/push/default
+promotion and no further unchanged-candidate sample.
+
+In this same capture, CPU candidate native-entry-wait p99 grows 131.458 to
+421.084 microseconds; native construction p99 changes only 4.833 to 5.500
+microseconds. CPU candidate top-ten native tails spend 61.15% of summed elapsed
+time before native entry. The largest CPU client tails spend 96.02% in serial
+backlog. Mixed client tails also remain dominated by serial backlog (93.73%).
+No observation here separates OS runnable wait from actual native blocking.
+Ready-owner fairness removes the FIFO dependency but does not ensure the
+independently scheduled short client is polled promptly. A further protocol must
+supply an explicit client progress opportunity at bulk service boundaries,
+while native owner refill remains independent of client observation.

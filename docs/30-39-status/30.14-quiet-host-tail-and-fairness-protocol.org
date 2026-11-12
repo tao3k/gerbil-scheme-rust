@@ -1,0 +1,151 @@
+#+TITLE: Quiet-host tail and completion fairness protocol
+#+STARTUP: overview
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Follow-up execution
+
+The user subsequently authorized immediate execution on the local host without
+a quiet-host gate. All four macro captures and 18 dispatch topology/load cells
+completed. See [[file:30.15-local-native-ab.org][30.15]] for the complete measurements, negative results,
+paired-round uncertainty and the remaining topology-selection boundary. The
+preparation results below remain historical; no rejected receipt was relabeled.
+
+* Preparation admission result
+
+The next requested order is quiet-host O0/O2 macro qualification, then the
+same-load direct/Tokio/Rayon topology comparison. At preparation time the local machine
+failed the existing quiet-host predicate: other Gerbil/gxtest, Lean,
+Java and persistent devenv workloads are active. The macro preflight returned
+75 before opening a Scheme pool. Neither a new macro performance run nor a
+new dispatch performance run is admitted here. Other tasks are not suspended.
+At that point an idle, supported test host was requested from the user.
+
+The existing O0 and O2 wheels are ARM64 Darwin artifacts. A remote execution
+host must support those artifacts and their Homebrew native dependencies;
+an arbitrary Linux host cannot run these wheels. Both variants must run on
+the same host with matching workload and environment. Source and artifact
+identities remain in [[file:30.13-progress-supervised-o2-qualification.org][30.13]]. Its noisy negative results remain unchanged.
+
+* Measurement changes prepared without changing execution
+
+Only the Python benchmark harness and offline metric checks change in this
+follow-up. The Scheme source, native modules, Rust library, fixed owner
+threads and native type API remain unchanged. Rust still distributes
+requests across instances; Scheme still owns Actor/green-thread scheduling,
+macro execution, GC, exceptions and continuations.
+
+Both benchmark entry points retain every recorded host observation. With
+=--require-quiet=, a busy initial snapshot returns 75 before pool startup.
+Activity detected later rejects the completed capture with status 75 after
+normal cleanup, retaining all samples. =QUIET_SNAPSHOTS= describes the sampled
+host predicate, not proof of uninterrupted isolation or statistical
+non-regression. No CPU threshold or native operation deadline is relaxed.
+
+The macro benchmark records both API-ready duration and
+=projected-and-released response_ns=. Its result assertion is outside the
+response timer. The dispatch benchmark similarly records each output's
+projection/release completion relative to the whole batch API call, plus
+native API throughput and projected-response throughput. Correctness checks,
+completion sorting and fairness analysis run after response timing. Old
+projection measurements included validation work; their absolute values must
+not be compared directly with this revised measurement boundary.
+
+The projected response tail describes the actual bulk-return API followed by
+ordered projection and release. It is not streaming, independent-arrival
+request p99 or a coordinated-omission-free open-loop experiment.
+
+* Completion fairness beyond equal final counts
+
+Final completion counts and =jain_worker_completion_coverage= describe finite coverage. They
+can be equal even if one group is serviced only after another group's entire
+queue drains. The harness now also records:
+
+- Per-assigned-owner maximum time between completions while offered work
+  remains, including initial waiting after native window admission.
+- Per-assigned-owner maximum intervening completions by other owners while
+  its offered work remains.
+- Per-Scheme-Actor-worker intervening completions, using the native Scheme
+  completion ranks, in addition to rank displacement and completion counts.
+
+Owner attribution follows the current native API's round-robin contract.
+The Rust implementation resets its admission clock for each 128-request
+window; metrics therefore never sort native-ready timestamps across windows.
+Global input-index owner assignment continues across windows. Equal native
+timestamps use input index as a deterministic tie breaker. Once a group's
+last offered job finishes, later work by other groups is not charged as that
+group's starvation. These are finite completion diagnostics, not a proof of
+starvation freedom. Actor ranks do not provide per-item elapsed time.
+
+* Declared quiet-host captures
+
+For macros, preserve O0 / O2 / O2 / O0 process order, four owners and the same
+32-iteration real hygienic macro source. Increase each process to 128 measured
+rounds: 512 batches per operation/process and 1024 per operation/variant across
+the two processes. Even that sample count does not by itself establish
+non-regression. Preserve all tails, host observations and uncertainty; do not
+select favorable rounds or discard a rejected attempt.
+
+#+begin_src sh
+just -- bridge-python-macro-ab /path/to/O0/bin/python --label O0-first --rounds 128 --require-quiet
+just -- bridge-python-macro-ab /path/to/O2/bin/python --label O2-first --rounds 128 --require-quiet
+just -- bridge-python-macro-ab /path/to/O2/bin/python --label O2-second --rounds 128 --require-quiet
+just -- bridge-python-macro-ab /path/to/O0/bin/python --label O0-last --rounds 128 --require-quiet
+#+end_src
+
+Only after this macro capture is evaluated, start the staged dispatch sweep:
+
+| Axis | Initial cells | Fixed control |
+|------+---------------+---------------|
+| VM owners | 1, 2, 4 | Fresh process per topology; native Scheme code unchanged |
+| Rust dispatch workers | 1, 2, 4 | Same configured count for Tokio/Rayon pools |
+| Workload | CPU, mixed cooperative wait | 128 requests, 32 items/request, identical line input |
+| Measured rounds/mode | 16 | Balanced four-order pattern, preceded by all-mode warmups |
+| Dispatch modes | direct, Tokio, Rayon admission, Rayon blocking | Same live VM identities within a topology cell |
+
+This is 18 initial topology/load cells, not a complete search or an optimum.
+Each mode/cell has 2048 native-ready samples. Record actual OS thread counts,
+API/projected throughput, both tail definitions, owner waiting gaps, Actor
+completion gaps, coverage and rank displacement. Four Scheme Actor workers
+remain fixed by the existing native fixture. Extend owner/worker counts only
+around a measured capacity boundary; label oversubscription controls.
+
+#+begin_src sh
+just -- bridge-python-owner-ab /path/to/O2/bin/python --owners 4 --workers 2 --rounds 16 --cpu --require-quiet
+just -- bridge-python-owner-ab /path/to/O2/bin/python --owners 4 --workers 2 --rounds 16 --require-quiet
+#+end_src
+
+Store every process in a fresh receipt path. A rejected macro capture does not
+license proceeding to the dispatch sweep or rerunning until a favorable result
+appears. The native per-call/window limit remains five seconds. Statistical
+capture length is a separate whole-process budget.
+
+* Offline and admission checks completed
+
+Four focused metric tests pass. They include equal coverage with late service,
+no artificial trailing wait for a finished owner, and a 129-request case that
+crosses the native window clock reset while preserving the owner offset.
+The new owner attribution also replays 20 historical real native timing
+cohorts, each with 32 completed requests per assigned owner. Those old timings
+remain historical noisy observations, not new quiet-host performance results.
+
+Both actual Python entry points were replayed with a recorded busy-host
+observation. Both returned 75, and the native initialization-attempt marker
+remained false. This verifies pre-start rejection without running Scheme
+work or qualifying a runtime through a mock. The new post-start rejection
+and extra response metrics still require a real quiet-host capture.
+
+* Receipts and evidence boundary
+
+Both installed extension binaries match their respective recorded wheel
+member hashes. The O0/O2 artifacts were reused without rebuilding or changing
+Scheme/Rust execution. This verifies artifact selection, not new performance.
+
+The source/artifact identities and current blocked status are retained in
+identity.json and
+outcomes.json.
+The recorded preflight, four metric tests and historical/busy-entrypoint
+replays are separate receipts. No quiet-host measurement or non-regression
+conclusion is claimed by these preparation checks.

@@ -1,0 +1,200 @@
+#+title: Revocable Rust offers and irrevocable Scheme entry
+#+options: toc:nil num:nil
+
+The provisional-native-credit/mailbox protocol below is historical;
+[[file:30.60-dedicated-offer-ports.org][30.60]] refines notification storage and moves native admission to the owner.
+
+* Architecture decision
+
+Report [[file:30.58-capacity-backed-peer-delivery.org][30.58]] retains two failed performance captures. Its weak-mailbox
+revision removes a lifecycle-table lock, yet CPU throughput regresses 2.36% and
+mixed maximum owner finish spread regresses 35.77%. Available capacity and inbox
+acceptance do not establish that a receiver can execute. More yield thresholds
+cannot repair ownership that has already bound work to an unavailable owner.
+
+The experimental ProgressFair pool API now separates notification, actual owner
+receipt and native ownership. The complete Scheme runtime remains the execution
+engine. Rust owns bounded admission and distribution of unentered typed messages.
+
+| State | Payload and credit authority | Permitted transition |
+|-------+------------------------------+----------------------|
+| Rust source | Shared typed request; no native graph | Local entry or bounded offer |
+| Offered | One offer owns payload and provisional target active/work/slot credits | Target receipt, withdrawal, cancellation, deadline or close |
+| Owner received | Borrowed claim token; payload still in offer | Entry competes with withdrawal |
+| Entry fence | Unique payload take after lifecycle/deadline checks | Fixed owner begins native construction |
+| Scheme pending / ready | Original owner, Scheme graph and native permits | Scheme scheduling, completion and projection |
+| Retired | Native roots gone; active/work/slot credits returned | Owned Rust result delivery |
+
+The entry fence is conservative: it precedes M::construct, which may allocate
+Scheme roots, invoke a closure, raise an exception or use continuations. Waiting
+until service submission returns a native identifier would be too late. After
+the fence, Rust cannot withdraw, move or retry the message on another runtime,
+even if construction later fails. Observer timeout/drop does not retire accepted
+Scheme work. Concurrent entry versus cancellation follows the final entry check;
+source rejection and entry compete for the same uniquely owned payload.
+
+* Work-conserving supply and lifetime
+
+A producer first attempts its existing local acquisition. Only a pending local
+acquisition may issue one progress-ranked peer offer per turn. Existing native
+residual accounting, one-head slack, FIFO semaphore waits and Scheme budgets
+remain unchanged. A ready producer considers outstanding offers before newer
+unoffered input. It must acquire its own active/work/slot credits, withdraw the
+Rust payload, return the old target credits outside source locks, then enter on
+its own owner. No native graph or continuation participates in withdrawal.
+
+An offer owns Mutex<Option<Request>>. Withdrawal and first entry each take that
+single Option; exactly one wins. The mailbox contains only an Arc notification
+with no independent payload or credit. After withdrawal it is a tombstone and
+cannot execute, retain capacity, resurrect work or redirect a replacement owner.
+Every new offer has a fresh Arc identity, so an old claim cannot authorize its
+replacement. Destination identity remains a registration-issued weak mailbox
+and weak Wake capability, without a pool lifecycle-table hot-path lookup.
+
+The shared source retains outstanding offers until entry or rejection. Producer
+finality includes those offers and the existing active-credit drain. The source
+holds offers strongly; each offer holds the source weakly, avoiding a reference
+cycle. Provisional offers are bounded by native active/work/slot credits; stale
+markers remain bounded by the existing mailbox capacity. Source and offer locks
+never span Scheme entry, result projection or application destruction. Credit
+return precedes application destruction and is never deferred behind a later
+projector. Source wake fanout follows the first native call, so notification work
+does not insert a scheduling gap before construction.
+
+Cancellation, absolute source deadline and close reject unentered offers and
+return provisional credits. Already entered native work drains on its original
+owner, including exception and close paths. A successful channel send therefore
+counts an offer notification, not accepted native execution. Cached public
+peer_deliveries, peer_withdrawals and peer_entries distinguish notifications,
+ready-owner reclamation and successful target entry fences. They are cumulative
+receipts, not resource-release authority or OS running-state measurements.
+
+* Model and actual API validation
+
+The existing owner_lifecycle Quint model is refined in place. Offers reuse its
+reserved/work/slot/producer ledger rather than adding a second resource model.
+Received epochs model fresh offer identities and reject stale entry after
+withdrawal/reissue. New scenarios cover received-but-withdrawable claims,
+replacement-owner entry, source cancellation, close before entry, observation
+timeout after entry, exception drain and an intentionally unsafe stale entry.
+The existing premature-progress-credit mutation remains required. Finite domains
+and two offer incarnations do not prove OS scheduling or arbitrary-owner fairness.
+
+Rust controls cover full/disconnected/retired mailboxes, cancellation, expiry,
+close, received-claim withdrawal and 32 entry/withdraw races. The native API
+fixture blocks a real owner inside its earlier constructor. One case cancels
+its later unentered offer and verifies all provisional credits return before
+releasing that constructor. Another makes a different native owner available,
+requires a real withdrawal receipt and executes the reclaimed typed workload.
+Both drain already entered work without moving Scheme state. The surrounding
+native suite retains GC, multishot continuations, Scheme exceptions, constructor
+and projection failures, final zero external roots and copied-file removal.
+
+The first native attempt observed inbox_remaining reaching zero before the
+remaining permit fields finished returning. It failed a slot assertion; the
+failure and resulting blocked-constructor disconnect remain private evidence.
+The corrected fixture waits for inbox, slots and work together within the same
+5-second bound. Advisory hint retirement never becomes release authority.
+
+* Directed A/B contract
+
+#+begin_src text
+just bridge-scheme-service-benchmark --progress-fair-ab --fixed-short-selective
+#+end_src
+
+The additional option holds short routing Selective in both arms, isolating bulk
+offer ownership instead of jointly changing short wake ranking. Both arms use
+the same four live Scheme VMs, O2 native image and native progress receipts.
+Control is OwnerLocal; candidate is revocable-offer ProgressFair. Two Tokio
+workers, slots/work 4/32, bulk active 3 per owner, batch 8, quantum/feed/Scheme
+budget 1 and NativePort waiting remain fixed. Five AB/BA blocks use 8192 real
+orders and 64 four-line probes per sample: 40 samples over CPU and mixed loads.
+
+The result oracle, VM identities and shutdown cleanup must pass. Notifications,
+entry fences and withdrawals are read outside timing. Short p99 ends at native
+projection completion, before Tokio caller resumption. Bulk wall time includes
+GC, waits and host interleaving; it is not isolated CPU execution. Other host
+tasks are untouched; this is not an exclusive-host claim. The native progress
+watchdog remains 5 seconds and the outer capture controller remains 120 seconds.
+No unchanged recapture or expanded matrix follows this algorithm comparison.
+
+Defaults remain Queued bulk admission and Broadcast short wake. This policy is
+experimental. It does not preempt non-yielding Scheme computation, synchronous
+constructors/projectors or GC, nor provide a wall-clock fairness guarantee.
+Long-run memory convergence remains a separate qualification obligation. All
+failures, raw samples, frozen sources, binaries and whole-file identities stay
+private. No local absolute path is required by the reproduction command.
+
+* Current validation and results
+
+The targeted existing model gate passes in 120.43 seconds, including both finite
+domain scenario sets, 1000 traces of 64 transitions with seed 42 and the required
+premature-credit counterexample. All 39 instance units pass. Warnings-denied
+Clippy passes, all three native service tests pass (13.88 seconds), and the
+release benchmark builds. The compile-only test helper omission and the later
+100-line fixture lint failure are retained with the initial native failure.
+
+The one changed capture =service-revocable-offer= completes 40 samples and exits
+normally in 6.42 seconds. Every candidate sample issues actual offers; control
+samples issue none. CPU totals are 1117 offers = 539 ready-owner withdrawals +
+578 target entry fences. Mixed totals are 626 = 158 withdrawals + 468 entries.
+That identity is checked per sample, not just in aggregate. All four owners join,
+external roots are zero, native services quiesce and copied image files disappear.
+
+| Workload | Metric | OwnerLocal control | Revocable-offer candidate | Change |
+|----------+--------+--------------------+---------------------------+--------|
+| CPU | Orders/s | 354697.292792 | 338952.418561 | -4.44% |
+| CPU | Bulk service p99, ms | 0.606083 | 0.633333 | +4.50% |
+| CPU | Native-completion short p99, ms | 0.416500 | 0.420250 | +0.90% |
+| CPU | Short admission p99, ms | 0.079166 | 0.050791 | -35.84% |
+| CPU | Scheduled-probe p99, ms | 2.016500 | 2.028833 | +0.61% |
+| CPU | Maximum owner finish spread, ms | 0.515375 | 0.402375 | -21.93% |
+| Mixed | Orders/s | 65959.747581 | 67160.133509 | +1.82% |
+| Mixed | Bulk service p99, ms | 1.815167 | 2.041209 | +12.45% |
+| Mixed | Native-completion short p99, ms | 0.473208 | 0.451167 | -4.66% |
+| Mixed | Short admission p99, ms | 0.089083 | 0.728458 | +717.73% |
+| Mixed | Scheduled-probe p99, ms | 1.918667 | 10.238125 | +433.61% |
+| Mixed | Maximum owner finish spread, ms | 1.659291 | 1.591042 | -4.11% |
+
+CPU minimum owner progress is 98.7903% / 98.7952%; mixed is 98.8189% / 98.7952%.
+Minimum Actor peer count is 1 / 1 for CPU and 0 / 0 for mixed. Both maximum owner
+finish spreads improve. Mixed throughput and native-completion short p99 improve,
+but CPU throughput and bulk p99 regress. Mixed short admission and scheduled
+probe tails regress sharply; those failures remain part of the result. This is
+protocol closure and partial fairness improvement, not performance promotion.
+The default admission and wake algorithms remain unchanged.
+
+The boundary conclusion is narrower than a general scheduler speedup: removing
+pre-entry owner binding lets real work escape a blocked receiver, but does not
+remove offer allocation, mutex/queue bookkeeping, provisional-credit turnover,
+stale mailbox occupancy or source-wake fanout. Those costs are present in code;
+this capture does not isolate their individual time contributions. In mixed
+load, the short construction/projection p99 stays near microseconds while
+admission/scheduled latency grows. It is therefore insufficient to call the
+remaining tail a Scheme arithmetic or pure GC regression. Cached receipts do
+not establish OS blocked/runnable time. Another unchanged sampling run, owner
+yield threshold or larger matrix would not provide causal attribution.
+
+Further protocol work should make notifications reflect newly eligible source
+work or credit transitions, bound stale notification occupancy separately from
+payload credit, and keep short-class readiness independent of bulk offer fanout.
+These are follow-up algorithm obligations, not implemented/promoted claims here.
+Scheme still owns Actor/green-thread execution; no Rust execution scheduler or
+native-state migration is introduced. Long-run memory convergence is not inferred
+from this finite lifecycle capture.
+
+Binary SHA-256:
+=ce24db78e2f764a0b86bcf2df5e1afbede83914a768ee93f4653b0c4220f7f33=.
+Native image SHA-256:
+=eb9d61706ec0c047967aec39c298d20d0952da56074ffbeba1a56b19ae8e9412=.
+Runtime, benchmark, native-control and model sources match the private frozen
+manifest; only this report is completed after timing. Previous captures used
+different joint short policies, so their absolute numbers are not an isolated
+old-binary A/B for this one.
+
+CPU short owner counts (control / candidate): =[155, 158, 174, 153]= / =[159, 159, 153, 169]=.
+
+Mixed short owner counts (control / candidate): =[204, 128, 153, 155]= / =[166, 170, 163, 141]=.
+
+The predecessor =c26cfbd= completes all six supported CI jobs successfully;
+SMP is explicitly skipped. New-head CI is separate from these local receipts.

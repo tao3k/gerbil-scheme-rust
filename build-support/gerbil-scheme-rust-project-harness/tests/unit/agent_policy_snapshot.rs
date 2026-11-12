@@ -29,7 +29,7 @@ fn agent_policy_mod_exports_have_explicit_test_coverage() {
         "data_shape",
         "dependency_graph",
         "doc_boundary",
-        "native_abi",
+        "abi",
         "pack",
         "process_command",
         "scenario_requirements",
@@ -316,7 +316,7 @@ fn rust_agent_tokio_runtime_boundary_snapshot() {
 }
 
 #[test]
-fn rust_agent_native_abi_contract_snapshot() {
+fn rust_agent_abi_contract_snapshot() {
     let temp = TempDir::new().expect("temp dir");
     let root = temp.path();
     write_manifest(root, "rust-agent-native-abi-contract");
@@ -324,12 +324,12 @@ fn rust_agent_native_abi_contract_snapshot() {
     fs::write(
         root.join("src/lib.rs"),
         "//! Test crate.\n\
-         pub mod native_abi;\n\
+         pub mod abi;\n\
          pub mod owned_abi;\n",
     )
     .expect("write lib");
     fs::write(
-        root.join("src/native_abi.rs"),
+        root.join("src/abi.rs"),
         "//! Native ABI owner missing its contract constants.\n\
          #[repr(C)]\n\
          pub struct NativeUtf8 {\n\
@@ -357,7 +357,7 @@ fn rust_agent_native_abi_contract_snapshot() {
         root,
         "RUST-AGENT-NATIVE-ABI-001",
         1,
-        "rust_agent_native_abi_contract",
+        "rust_agent_abi_contract",
     );
 }
 

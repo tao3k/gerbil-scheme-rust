@@ -18,4 +18,20 @@ unsafe extern "C" {
     /// must not escape exceptions or initialize another runtime. Call only
     /// through the serialized lifecycle owner; `None` is rejected.
     pub fn gerbil_scheme_rust_runtime_init_program(linker: Option<GerbilProgramLinker>) -> i32;
+
+    /// Initialize a linked program with exactly one active Scheme processor.
+    ///
+    /// # Safety
+    /// The same linker and lifecycle requirements as
+    /// `gerbil_scheme_rust_runtime_init_program` apply. This configures only
+    /// intra-VM parallelism; it does not create or admit independent VMs.
+    pub fn gerbil_scheme_rust_runtime_init_program_single_processor(
+        linker: Option<GerbilProgramLinker>,
+    ) -> i32;
+
+    /// Return the selected VM's actual processor population, or zero if inactive.
+    ///
+    /// # Safety
+    /// Call only on the live runtime's owning thread, outside cleanup.
+    pub fn gerbil_scheme_rust_current_vm_processors() -> u32;
 }

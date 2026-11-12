@@ -1,0 +1,278 @@
+#+title: Native Expander Startup and Concurrent Dispatch Benchmark Matrix
+#+date: 2026-10-19
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Admission order
+
+First close the cold expander and bounded owner-destruction gates through the
+installed Python API. Native Scheme types, macros, continuations, exceptions,
+GC and internal actor/green-thread scheduling must remain available. Rust may
+only distribute requests across fixed native VM owners. No SMP work is included.
+All existing five-second native gates remain unchanged. A timeout remains a
+failure even if a later warm request succeeds.
+
+* Concrete startup diagnosis
+
+The canonical native executable completes expander startup and evaluation with
+SDK module files. With byte-identical wheel copies it exceeds five seconds.
+A standalone inode-preserving control succeeds. SDK-to-copy content hashes,
+valid code signatures and native linker identities were checked.
+
+A fresh bundle's raw dlopen took approximately 400ms. Ordinary Darwin signature
+registration took less than 1ms; Library Validation took approximately 252ms.
+After those normal checks, same-process dlopen took approximately 0.5ms. No
+validation check, quarantine flag, entitlement or system protection was disabled.
+
+Parallel prevalidation is rejected: 32 threads completed only 16 of 172 modules
+inside five seconds. The hardlink-alias hypothesis was also rejected: the
+current closure had no duplicate native bundle content. APFS clones and local
+ad-hoc resigning did not close the gate. These negatives are retained.
+
+The successful native control coalesced the 35 dynamically observed bootstrap
+parts into one physical Gambit bundle. Each logical module retained its own
+compiler-generated linker export and lazy initialization. Logical paths were
+hardlinks within that one standalone namespace. Expander startup and evaluation
+then completed inside five seconds. This is ordinary Scheme -> Gambit C ->
+native compilation, not Scheme-to-Rust lowering or an SDK/SMP rebuild.
+
+Production integration consumes the official expander's entire declared native
+closure, partitions only when linker basenames collide, reuses the existing
+native compiler identity cache, and ships explicit logical-to-physical mappings.
+Every VM copies its own physical bundles; only aliases within one VM share an
+inode. This does not permit shared mutable module state across owners.
+Installed four-VM verification passed on wheel SHA256
+=b0ec6b97ecf5a5f82587509fba08741ca2b0dc50f8779fd9f13ee6a0330cddb6=.
+The official closure includes modules that export public C functions as well as
+the Gambit linker. Those modules remain separate. A grouped image must expose
+exactly its original set of Gambit linker symbols; extra or missing exports fail
+the build. =-module-ref= and =-linker-name= preserve the original Gambit identities.
+Logical module initialization is still lazy and owned by the ordinary loader.
+
+All four native first DSL calls completed inside five seconds: 807.25, 479.26,
+493.14 and 478.44ms. Runtime-defined hygienic macros, interpreted closures held
+across GC, Scheme exceptions/recovery and clean destruction passed. The installed
+suite passed 10 tests in 5.417s, with no skips. Closure inventory/publication tests
+passed 27 cases, including escaping/missing/shadowed aliases, private metadata
+preservation and grouped-native tamper rejection. Strict instance-runtime Clippy
+passed. This is local capability evidence for these cases, not universal Scheme
+conformance, portability or remote exact-head CI.
+
+After full expansion, shutdown joined all four owners, reported zero roots and
+removed the private directory. No timeout was widened and no pending owner was
+force-terminated or falsely reported clean. The prior timeout receipts remain
+unchanged in 30.10; the new source/artifact receipts are separate.
+
+The provisional grouped dynamic modules use =-O0=. The original installed SDK,
+main runtime archive and statically compiled ledger/Actor workload retain their
+existing compiler settings. Phase compilation with =-O1= and a trial of the
+existing GCC policy reached the 120-second build gate. The failed cold builds
+remain failed; cache-assisted builds are not counted as cold build passes. One
+=-O0= native build completed in 95s, and the later export-contract build completed
+in 39.06s using validated compiler-cache hits. Macro/expander throughput at =-O0=
+requires its own matched comparison before optimal performance can be claimed.
+See [[https://gambitscheme.org/4.9.8/manual/][the Gambit 4.9.8 compiler documentation]] for the native module/linker controls.
+
+* Final installed artifact and durable receipts
+
+The final wheel rebuilt in 58.71s within the unchanged 120-second build cap,
+using validated native cache hits. Its SHA256 is
+=fa9494eb7d5f5d96bcbb9b1a7ace58a45cc94bd4355338c6be4ba228b1ac68e7=.
+It ships 159 logical grouped native parts as three physical bundles (20,027,912
+uncompressed bytes); modules with extra public C exports remain separate.
+It was installed again and the full gate passed on every owner: 713.17, 522.48,
+510.22 and 497.99ms. Clean destruction reported =[0,0,0,0]= native roots and
+removed the private directory. All 10 installed tests passed in 5.552s.
+
+The source/dependency/wheel identities, raw positive and negative logs, build
+failures and observation summaries are in
+identity.json and
+outcomes.json. The source snapshot is dirty; no commit, push, release or
+remote CI acceptance is claimed. The wheel still requires host Homebrew native
+dependencies and its macOS tag is not cross-platform/old-macOS admission.
+
+Strict instance-runtime and canonical native-group build-helper Clippy passed.
+The separate producer Clippy invocation timed out during its native build at
+120 seconds; it is explicitly incomplete. The package fixture initially found
+an existing file-resource root calculation defect in closure staging. Reusing
+its existing directory/file inventory owner fixed that defect; 27 package tests
+then passed, including Rayon verification and native group tamper rejection.
+
+The benchmark observer's first thread-count sweep failed from Python local
+import shadowing. Its tracebacks are retained separately. After correcting that
+observer, every preselected sweep cell completed; failures were not removed or
+reclassified as warmup.
+
+* Benchmark implementations
+
+| Candidate | Role | Current admission |
+|-----------+------+-------------------|
+| Direct bounded owner queues | Enqueue cohort and wait for native completion | Implemented; earlier A/B retained |
+| Tokio futures + oneshot | Asynchronous cross-instance admission and completion | Implemented; earlier regression retained |
+| Rayon parallel admission | Parallel enqueue; fixed owners execute Scheme | Implemented; installed native results checked |
+| Rayon blocking completion | Bounded Rayon workers wait on fixed-owner tickets | Implemented; separate bounded waiting control |
+| Sequential package verification | Complete per-path SHA admission | Implemented |
+| Rayon package verification | Same immutable file inventory and SHA rules | Existing =parallel-verification= feature; separate startup comparison |
+
+Rayon is not allowed to enter or move a Scheme VM on a work-stealing worker.
+Tokio spawn_blocking, if measured as a control, may wait on owner tickets only.
+Neither becomes a replacement scheduler for Scheme green threads.
+
+* First measured configuration: preserve all four modes
+
+The first four-way comparison uses four fixed Scheme VM owners, two Tokio
+workers, two explicitly bounded Rayon workers, 128 requests/cohort, 32 Actor
+items/request, 48 integer line calculations/item, quantum 1 and cooperative
+1ms waits on selected items. Each mode has a warmup, then four measured cohorts
+in balanced reversed/rotated orders. All modes run on the same live VM states.
+Native replies, per-item totals, rank permutations and worker assignments are
+checked. Raw per-request values are retained, not averages of round p99s.
+
+| Mode | Actor items/s median | Pooled native-ready p99 | Rank displacement p99 |
+|------+----------------------+-------------------------+-----------------------|
+| Direct | 11,795.07 | 248.96ms | 9 |
+| Tokio | 11,375.88 | 261.75ms | 9 |
+| Rayon admission | 11,021.88 | 246.13ms | 9 |
+| Rayon blocking | 7,713.30 | 409.28ms | 9 |
+
+Each Actor worker completed 1,024 items/cohort; Jain worker fairness was 1.0.
+The retained =ready_ns= clock covers admission-window start through native
+result-ready. It excludes Python input reading and result projection and is
+not an end-to-end per-request Python p99. Window waits now consume one common
+five-second budget in every mode. Rayon blocking has fewer in-flight jobs at
+small worker counts and is intentionally a distinct control.
+
+No relevant compiler processes were captured immediately before/after the run,
+but strict checks overlapped this period and load was not recorded per round.
+The host was not isolated; these are observational results, not an admitted
+optimal configuration or stable speedup. Negative results remain. No default
+worker count or backend was changed in response to this single configuration.
+
+The new package also completed the existing 8,320-call reuse control: native
+GC live bytes stayed 517,312 per VM with zero roots, malloc live stayed
+29,491,472 bytes across checkpoints and fell to 2,879,392 after close. RSS
+remained approximately 92MiB after shutdown; mappings/allocator reservation
+are still distinct from live-root retention. This run does not assert immediate
+OS page return or indefinite leak freedom.
+
+* Dispatcher worker sweep: observational, not optimality admission
+
+All cells retain four real Scheme VM owners and the same 128x32x48 native work.
+Each cell uses a new process and pool; paired modes inside the cell share those
+exact VM states. Rust dispatcher workers are independent of the four VM owners.
+Each numeric pair below is Actor items/s median / pooled native-ready p99 ms.
+
+| Load / dispatch workers | Direct | Tokio | Rayon admission | Rayon blocking | Rounds with compiler activity |
+|-------------------------+--------+-------+-----------------+----------------+-------------------------------|
+| cpu-w2 | 13,813 / 184.94 | 13,611 / 224.57 | 13,643 / 173.26 | 9,133 / 338.77 | 2/20 |
+| cpu-w4 | 9,120 / 425.71 | 8,051 / 380.87 | 8,510 / 409.13 | 7,904 / 547.61 | 12/20 |
+| mixed-w1 | 6,595 / 536.37 | 8,439 / 372.79 | 8,277 / 348.76 | 3,268 / 1337.27 | 20/20 |
+| mixed-w4 | 7,155 / 398.27 | 7,229 / 443.70 | 6,233 / 445.07 | 4,789 / 707.80 | 20/20 |
+
+OS thread counts after lazy Rayon construction were 7, 9 or 13 for one, two or
+four dispatch workers respectively; the baseline includes the caller and four
+fixed native VM owners. Idle Tokio/Rayon workers are present for subsequent
+paired rounds. Actor worker Jain fairness remained 1.0 and all expected work
+completed in every arm. This finite observation does not prove starvation freedom.
+
+The final CPU/four-worker cell and both mixed cells had external compiler
+activity. The CPU/two-worker cell also observed activity in some rounds.
+These observations do not support selecting four workers as a stable optimum
+or comparing independent cells as if host load were controlled. Raw rows stay
+intact; no contaminated round was discarded to manufacture a winning setting.
+A quiet-host capacity sweep with end-to-end per-request latency is still needed.
+
+* Required workloads
+
+| ID | Real work | Main question |
+|----+-----------+---------------|
+| B01 | Cold open, expander, hygienic macro, close | Initialization cost and bounded destruction |
+| B02 | Warm native scalar/bytevector echo | Queue, owner wake and dispatch floor |
+| B03 | Exact bigints, vectors and tables | Type construction versus result projection |
+| B04 | Allocation churn and explicit GC | GC contribution to p99 and live-memory plateaus |
+| B05 | Retained closure and multi-shot delimited continuation | Capability and owner-affinity preservation |
+| B06 | Scheme exception, rejected task and recovery | Cleanup, lost replies and error isolation |
+| B07 | Scheme Actor invoice computation | CPU throughput and fair worker progress |
+| B08 | Same Actor work with cooperative 1ms waits | Green-thread overlap and host oversubscription |
+| B09 | Mixed short/long batches with fixed input order | Head-of-line blocking and oldest-request age |
+| B10 | Concurrent Python callers and native Rust callers | Python/GIL/projection versus host dispatch limits |
+| B11 | Steady reuse, pending close and file retirement | Heap, mappings, descriptors, threads and RSS |
+| B12 | Sequential/Rayon verification of identical resources | Package preparation cost, separate from VM execution |
+
+B07/B08 reuse the actual native Scheme actor API and integer line computation.
+No JSON workload or handwritten Rust replacement is an admissible control.
+Every output, exception, completion rank and expected work count is checked.
+
+* Controlled tuning axes
+
+| Axis | Cells | Constraint |
+|------+-------+------------|
+| Scheme VM owners | 1, 2, 4, 8 | Four remains the default; exceed host capacity only as an oversubscription control |
+| Rust dispatcher workers | 1, 2, 4, 8, 16 | Dedicated fixed-size runtime/pool; record actual OS threads |
+| Offered in-flight requests | 1, 8, 32, 128 | Same cohort/arrival trace in every arm |
+| Items per native batch | 1, 8, 32, 128, 256 | Same total useful work |
+| Scheme Actor workers | 1, 2, 4, 8, 16 | Scheme-owned fixture configuration; current ledger fixture uses four |
+| Scheme yield quantum | 0, 1, 4, 16 | Preserve exceptions and complete batch draining |
+| Load | CPU, cooperative wait, mixed/long-tail | Identical deterministic inputs/seeds |
+| Native transfer | Scalar, typed span, retained graph | Separate construction and projection costs |
+
+These are planned tuning cells, not a claim that every knob is already exposed
+or every combination has run. Use a staged sweep rather than a full Cartesian
+product: qualify topology, fix payload/quantum, sweep host capacity, then refine
+batch/actor settings around the measured Pareto frontier.
+
+* Measurement and selection rules
+
+- Keep the same live VM states in paired comparisons. Initialize and warm both
+  arms before balanced ABBA/Latin-square orders. Use a fresh process per topology
+  cell so intentionally retained image mappings do not pollute later cells.
+- Report startup separately. Never count cached module preparation as cold open.
+- Record offered arrival, enqueue, owner start, native construction, Scheme
+  service, GC, native-ready, response delivery and Python projection. A cohort
+  native-ready p99 is not end-to-end Python request p99.
+- Include queue/admission waiting in latency, including rejected, timed-out and
+  unfinished work. Avoid coordinated omission and averages of per-round p99s.
+- Report throughput, pooled p50/p95/p99, validated sample count and uncertainty;
+  add p99.9 only with sufficient samples. Preserve every raw round and outlier.
+- Record per-owner and per-Actor completions, Jain fairness, maximum completion
+  gap and oldest-request age. A throughput winner may still lose the fairness
+  or p99 budget; no single maximum is optimal for all load classes.
+- Track CPU time, OS thread count/context switches, native roots, post-GC live
+  bytes, malloc live/reserved bytes, file descriptors, mapped images and current
+  RSS. Reserved/mapped memory is not automatically a live-object leak.
+- Performance admission requires a quiet host with recorded compiler/host-load
+  observations. Do not stop unrelated acceptance work to obtain a clean sample.
+  Keep contaminated runs and label them; do not select favorable reruns.
+- Keep exact source, SDK, dependency, binary and wheel identities. No numerical
+  optimum or speedup is admitted until the full capability gate and matched
+  workload checks pass on the measured artifact.
+
+* Executable benchmark entry points
+
+#+begin_src sh
+just bridge-python-owner-full /path/to/installed/python
+just bridge-python-owner-tests /path/to/installed/python
+just -- bridge-python-owner-ab /path/to/installed/python --owners 4 --workers 2
+just -- bridge-python-owner-ab /path/to/installed/python --owners 4 --workers 4 --cpu
+just -- bridge-python-owner-ab /path/to/installed/python --owners 2 --workers 2 --items 128 --quantum 4
+just bridge-python-owner-reuse /path/to/installed/python
+#+end_src
+
+The benchmark accepts =--owners=, =--workers=, =--requests=, =--items=,
+=--quantum= and =--cpu=. Default API behavior remains four Scheme owners and two
+Rust dispatcher workers. Rayon pools are lazy, per-host and fixed-size. Their
+work-stealing workers only submit or wait; they never enter Scheme.
+
+The remaining VM-count/batch/actor/yield sweep, per-phase queue/GC attribution, sufficient
+end-to-end p99/p99.9 samples and macro-expander optimization comparison remain
+open. The table lists the benchmarks needed for the next tuning stage; it does
+not pretend those cells have already run. The existing Rayon inventory feature
+has semantic tests; it has not yet received a matched startup-speed comparison.
+
+* Follow-up: optimized dynamic-module comparison
+
+[[file:30.12-dynamic-module-optimization-ab.org][30.12]] records the O0/O2 target, diagnostic O1 results, native compiler
+stage distinction and explicit quiet-host admission. The historical O0
+artifact and failures above remain unchanged.

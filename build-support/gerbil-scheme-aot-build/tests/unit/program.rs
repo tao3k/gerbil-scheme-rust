@@ -80,6 +80,7 @@ fn program_rejects_a_forbidden_runtime_module_before_compilation() {
             out_dir: &root.join("out"),
         },
         ProgramArchiveContract {
+            max_modules: std::num::NonZeroUsize::new(1024).unwrap(),
             required_modules: &["example/application"],
             forbidden_modules: &["example/build-control"],
             linker_main_symbol: "example_program_main",
@@ -228,6 +229,7 @@ fn downstream_program_contract_selects_its_own_required_module_and_main_symbol()
             out_dir: &root.join("out"),
         },
         ProgramArchiveContract {
+            max_modules: std::num::NonZeroUsize::new(1024).unwrap(),
             required_modules: &["example/application"],
             forbidden_modules: &[],
             linker_main_symbol: "example_program_main",
@@ -328,4 +330,71 @@ fn slow_native_child_publishes_its_phase_before_exit_without_repeated_heartbeats
     ));
     assert!(receiver.try_recv().is_err());
     fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn program_module_budget_is_explicit_and_checked_before_compilation() {
+    let root = super::support::unique_temp_dir("gerbil-program-module-budget");
+    fs::create_dir_all(&root).unwrap();
+    let manifest = root.join("program.json");
+    let modules: Vec<_> = (0..1070)
+        .map(|index| {
+            json!({"module": format!("example/module-{index}"),
+                           "scm": "unused.scm", "system": false})
+        })
+        .collect();
+    fs::write(
+        &manifest,
+        serde_json::to_vec(&plan(json!(modules))).unwrap(),
+    )
+    .unwrap();
+    let observations = Observations(Mutex::new(Vec::new()), Mutex::new(Vec::new()));
+    for (limit, expected) in [
+        (
+            1069,
+            "AOT program contains 1070 modules, exceeding its host limit 1069",
+        ),
+        (
+            1070,
+            "AOT program must not contain forbidden module example/module-1069",
+        ),
+    ] {
+        let error = build_program_archive_with_contract(
+            ProgramArchiveRequest {
+                manifest: &manifest,
+                gsc: Path::new("/missing-compiler-must-not-run"),
+                archive_name: "test_program",
+                linker_name: "test_linker",
+                out_dir: &root.join("out"),
+            },
+            ProgramArchiveContract {
+                max_modules: std::num::NonZeroUsize::new(limit).unwrap(),
+                required_modules: &["example/module-0"],
+                forbidden_modules: &["example/module-1069"],
+                linker_main_symbol: "example_program_main",
+                additional_objects: &[],
+                native_headers: &[],
+            },
+            &observations,
+        )
+        .unwrap_err();
+        assert_eq!(error, expected);
+        assert!(observations.0.lock().unwrap().is_empty());
+        assert!(!root.join("out").exists());
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn default_program_module_budget_remains_bounded() {
+    let modules: Vec<_> = (0..1025)
+        .map(|index| {
+            json!({"module": format!("example/module-{index}"),
+                           "scm": "unused.scm", "system": false})
+        })
+        .collect();
+    assert_eq!(
+        rejected_plan(&plan(json!(modules))),
+        "AOT program contains 1025 modules, exceeding its host limit 1024"
+    );
 }

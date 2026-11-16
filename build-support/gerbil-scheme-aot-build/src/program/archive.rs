@@ -87,6 +87,8 @@ pub struct ProgramArchiveRequest<'a> {
 /// Extension points for a downstream compiler-owned AOT program.
 #[derive(Clone, Copy, Debug)]
 pub struct ProgramArchiveContract<'a> {
+    /// Host-owned bound on the compiler manifest's complete module closure.
+    pub max_modules: std::num::NonZeroUsize,
     /// Modules that must each occur exactly once in the compiler manifest.
     pub required_modules: &'a [&'a str],
     /// Modules that must not enter this downstream program's runtime closure.
@@ -196,6 +198,7 @@ pub fn build_program_archive_observed(
     build_program_archive_with_contract(
         request,
         ProgramArchiveContract {
+            max_modules: std::num::NonZeroUsize::new(1024).unwrap(),
             required_modules: DEFAULT_REQUIRED_MODULES,
             forbidden_modules: &[],
             linker_main_symbol: "gerbil_scheme_rust_program_main",
@@ -220,6 +223,7 @@ pub fn build_program_archive_with_contract(
     validate_linker_name(contract.linker_main_symbol)?;
     let plan = read_manifest(
         request.manifest,
+        contract.max_modules,
         contract.required_modules,
         contract.forbidden_modules,
     )?;
@@ -298,17 +302,22 @@ fn validate_linker_name(linker_name: &str) -> Result<(), String> {
 
 fn read_manifest(
     manifest: &Path,
+    max_modules: std::num::NonZeroUsize,
     required_modules: &[&str],
     forbidden_modules: &[&str],
 ) -> Result<ProgramManifest, String> {
     let plan: ProgramManifest =
         serde_json::from_slice(&std::fs::read(manifest).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
-    if plan.schema != "gerbil-scheme-rust.aot-program.v1"
-        || plan.modules.is_empty()
-        || plan.modules.len() > 1024
-    {
+    if plan.schema != "gerbil-scheme-rust.aot-program.v1" || plan.modules.is_empty() {
         return Err("invalid AOT program manifest".into());
+    }
+    if plan.modules.len() > max_modules.get() {
+        return Err(format!(
+            "AOT program contains {} modules, exceeding its host limit {}",
+            plan.modules.len(),
+            max_modules
+        ));
     }
     let module_counts = plan
         .modules

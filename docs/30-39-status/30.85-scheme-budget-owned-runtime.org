@@ -1,0 +1,187 @@
+#+TITLE: Budget-owned Scheme Runtime progress
+#+OPTIONS: toc:2
+
+* Decision and predecessor
+
+The ABI30 net-cost candidate in
+[[file:30.84-scheme-runtime-joint-progress.org]] was rejected. Incremental gains
+against an equally observed control did not survive comparison with unobserved
+ready-first. Repeatedly mirroring budget ownership at every handler lease was
+unnecessary work; fewer handoffs alone did not establish a performance gain.
+Historical samples and failures remain evidence, not a reason to change defaults.
+
+* One authoritative protocol
+
+ABI31 adds opt-in =SchemeServiceCyclePolicy::RuntimeEvent= to the existing
+=configure_scheme_service_boundary_plan_on= API. Scheme retains execution,
+Actor scheduling, green threads, exceptions, continuations and GC. Rust retains
+cross-instance dispatch and owner-bound native projection.
+
+| Event | Runtime context maintenance | Existing authority |
+|-------+-----------------------------+--------------------|
+| Accepted job / child turn | Register one eligible context | Existing dispatch and Actor mailbox |
+| Uncontended acquire / release | None | Budget owner, nesting depth and work settlement |
+| Contended acquisition actually sleeps | Eligible to lease wait | Existing mutex, waiter queue and grant notification |
+| Sleeping acquisition receives its grant | Lease wait to eligible | Existing budget owner check after wake |
+| External suspension / resume | External wait / previous state | Existing suspension dynamic extent |
+| Coordinator join / resume | Actor barrier / previous state | Existing independent child turns |
+| Normal return, escape or exception | Retire context and remove activation ownership | Existing dynamic-wind |
+| Continuation reentry | Reactivate the original epoch context | Existing immutable plan and retained declaration |
+
+A selected waiter remains waiting until that thread resumes and observes its
+budget ownership. Selection neither acknowledges execution nor retires any
+completion root or admission capacity. No new lease layer or waiter queue is
+introduced. No handler timer, fixed polling check or extra yield is introduced.
+
+The existing budget algorithm is generated twice by a fixed structural macro:
+the event path omits per-acquisition/per-release Runtime bookkeeping; the old
+mirrored path remains an explicit experimental control. The idle configuration
+selects existing before/after hooks once. Normal unobserved ready-first also
+uses the core budget path, so net A/B does not compare against an artificially
+slower control.
+
+A context is eligible while either runnable or holding a received lease. The
+service-cycle decision needs that union, not a second copy of budget ownership.
+Cold typed snapshots derive the exclusive =running= class from the budget's
+owner and a bounded activation index. The index changes at dynamic entry/exit,
+not at each item handler. It removes entries when their final extent exits and
+rejects retained ownership after complete retirement. It is diagnostic state,
+not a scheduling queue. A selected-but-unreceived context remains lease wait.
+=running= means received Scheme lease, never proof of OS CPU execution.
+
+Registration, activation publication/retirement, suspension changes, service
+selection and diagnostic snapshots reuse the existing budget mutex. Index
+removal and retirement are one observable transition. The user thunk, scheduler
+yield and external wait run outside these short critical sections. No new lock
+or per-handler Runtime acquisition/release bookkeeping is introduced.
+
+* Continuations, exceptions and close
+
+Old epoch tokens cannot mutate the current ledger through budget events. A
+multishot continuation reenters and leaves its own dynamic extent independently;
+normal, exceptional and escaped extents balance entered/retired totals. The
+existing maximum selected work span and nested class restrictions remain.
+Blocking outside the explicit suspension API remains unclassified; this is a
+cooperative protocol, not arbitrary-code preemption or a wall-clock bound.
+
+Existing cancellation, timeout and close ownership is retained: unaccepted
+reservations return credit; accepted native work drains to its terminal result;
+each result independently releases its root and capacity. No lock inversion or
+Scheme root in prepared Rust input is introduced.
+
+* Joint model and native acceptance
+
+The existing Tokio/owner/Actor/green-thread model now derives diagnostic phases
+from its existing waiter set, received CPU lease, actual blocking and Actor
+barrier. There is no new mirrored model variable or independent lease machine.
+Directed witnesses distinguish selected notification from receipt, and Actor
+external suspension from Tokio polling occupancy. The invariant checks that
+these pure projections agree with the existing authority. This proves neither
+native performance nor allocation cost.
+
+Native fixtures exercise typed calls, real GC, direct lease snapshots, actual
+contended waits, stale epochs, multishot reentry, exceptional unwind and terminal
+context retirement. The historical native watchdog remains unattributed: its
+captured failure has no phase/stack or bound image identity. New passes cannot
+attribute or erase it. The existing five-second real-progress watchdog remains.
+
+* Targeted net-cost experiment
+
+The completed experiment used the Rust =scheme_service= bench with
+=--progress-fair-ab --fixed-short-selective --runtime-event-cost-ab=.
+The control is unobserved =ReadyFirst=; the candidate is =RuntimeEvent=.
+Both use the same four live VM instances and native image, O2 build, Tokio two
+workers, window four, work 32, batch eight, Actor quantum one, class/feed one,
+contended work four and maximum span 48. Five ordered/reversed blocks cover only
+CPU and the existing mixed workload, with native observation off. Check compiled
+image identity, exact logical work, first-grant receipts, results, roots and
+terminal drain. Throughput is primary; CPU utilization alone is not a regression.
+Report short/scheduled/bulk p99 and owner completion spread, including negatives.
+Do not change defaults or submit a rejected candidate.
+
+* Retained first-candidate failure
+
+=service-runtime-event-v31-r1= failed with exit 101 after 20 CPU and two mixed
+samples, before the complete experiment or terminal cleanup receipt. Both
+compiler boundaries were empty and host/image identities were unchanged. The
+Scheme error was =retired runtime retained activation ownership= during a mixed
+runtime snapshot. This is native protocol rejection, not a performance result;
+cleanup is unverified. Do not promote its partial CPU measurements.
+
+The first implementation published context totals and the activation index
+without one shared serialization boundary. The fix reuses the budget mutex for
+both event publication and observation. It does not remove the assertion, add
+handler polling, increase a timeout or mask the failure. The existing activation
+model now carries its observation index alongside its stack; publication and
+retirement change them together, including continuation reentry and exceptional
+exit. A split-retirement mutation must violate the joint safety invariant.
+This new failure does not attribute the historical watchdog from a different
+image/version. The repaired image requires new native acceptance and its own
+complete same-VM net-cost experiment.
+
+* Repaired-image local checks
+
+Strict Clippy passed without suppressions. The repaired native suite passed all
+three tests in 36.67 seconds, with four owners joined, zero roots, removed files,
+FD return and native close 7.72 ms. Expected injected construction/projection
+exceptions remain part of the passing controls. The five-second progress limit
+was unchanged. These checks do not establish performance acceptance.
+
+The refined existing model passed typecheck, 96 directed cases across both
+completion domains and 400 cross-layer random samples of up to 64 steps,
+seed 42. This includes the index split-retirement mutation and existing normal,
+exceptional, stale-epoch and continuation ownership controls. Canonical generated
+Scheme checks and formatting passed; generated files remained unchanged during
+the atomic-publication repair. Model source identity:
+=f03843e4347b9c72532c91c276d1261ff8f5c0713b8b859ecc84b0b647cf6155=.
+
+* Complete repaired-image net-cost result: rejected
+
+=service-runtime-event-v31-r2= completed all 40 windows in 13.94 seconds,
+exit 0, empty stderr, unchanged host/image/source identities and no compiler at
+either boundary. Native image SHA256:
+=8f567f695b7fe5bd6098c55c818ccba0c25936697fe9c5e5bf04b4f7ed2fb605=.
+This is not proof that all other OS activity was absent.
+
+Each window preserves 8192 orders, 64 short probes, exact declared work,
+first-grant ownership and 1088 results. The event candidate enters/retires 5184
+contexts per window; the unobserved control registers none. Final cleanup
+attests four owners joined, zero roots, removed files and quiescent service.
+The split-publication assertion did not recur in this complete run; that is
+bounded native evidence, not a universal proof or historical-watchdog closure.
+
+| Load | Paired median throughput | Actual short p99 | Scheduled p99 | Bulk p99 | Owner completion spread |
+|------+--------------------------+------------------+---------------+----------+-------------------------|
+| CPU | -10.22% | +3.62% | +23.69% | +4.90% | -0.02% |
+| Mixed | -2.85% | -9.37% | -2.95% | -1.77% | -18.27% |
+
+CPU throughput improved in four of ten pairs; mixed throughput in five.
+Pairwise throughput ranges were -85.35% to +166.39% for CPU and -17.89% to
++46.42% for mixed. Pooled throughput was +1.22%/+4.83%, while pooled bulk p99
+was +41.46%/-10.79% and maximum owner spread -50.48%/+12.58%. Paired and pooled
+results disagree. Neither favorable pooled numbers nor reduced short tails
+establish stable net throughput improvement. CPU utilization itself is not an
+admission failure; the measured throughput and inconsistent tails are.
+
+Same-request top-ten tail components put before-entry/pending shares at
+82.40%/17.46% for CPU control and 42.02%/57.89% for the event candidate;
+mixed shares were 62.45%/36.80% and 49.23%/42.42%. These are additive components
+of the same requests, not differences between quantiles. Pending combines
+execution, suspension, GC, OS scheduling and collection; it cannot identify an
+individual CPU, GC or lock cause. Work handoffs were 397->515 for CPU and
+399->350 for mixed. Counts alone do not explain the performance variance.
+
+The candidate is rejected for performance and remains unpublished. No commit,
+push, default change, expanded thread/VM matrix or favorable-repeat capture was
+made. The earlier incomplete native failure and ABI30 negatives remain intact.
+This comparison qualifies neither the whole unpublished stack nor Python
+end-to-end behavior against a released library.
+
+The next protocol step is to merge necessary context publication with existing
+budget transactions where ownership permits, instead of paying separate
+critical-section entry for observational state. Dispatch/Actor publication and
+terminal custody are different boundaries: dynamic-wind retirement cannot be
+postponed beyond continuation escape or exceptional exit merely to coalesce
+work. Keep cold snapshot consistency, short execution opportunity, independent
+root/capacity retirement and full Scheme execution. Do not add another lease,
+tune yielding thresholds or claim mutex/GC attribution from the current data.

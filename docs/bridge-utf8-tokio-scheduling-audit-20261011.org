@@ -1,0 +1,178 @@
+#+TITLE: Tokio bridge synchronization and response-handoff audit
+#+DATE: 2026-10-11
+
+* Boundary
+
+This adds opt-in observability, not a replacement channel, custom executor,
+or accepted scheduling optimization. Receive batching and reusable-response
+channels remain reverted. The production encoder, SDK, kernel, runtime worker
+policy, and unsupported SMP acceptance are unchanged.
+
+Reproduce with =just bridge-utf8-matched --scheduling-audit all=. The exact
+locked dependency is Tokio 1.53.1. A single Scheme owner receives requests
+using the original bounded MPSC and replies using per-request oneshots.
+There are twelve Tokio workers, twenty-four callers and admission capacity
+twelve on this host, selected from available parallelism. Rust client
+concurrency is not Scheme parsing parallelism.
+
+The two modes are ordinary timestamp observation and perturbed wake/CPU/GC
+observation. Both use the same message shape, AOT image, encoder, queue,
+owned-result validation and caller count in one process. Ten ABBA groups
+produce twenty batches per mode for each 1,000 / 10,000 / 100,000-request
+load and character distribution. Mode one is not an optimization candidate.
+Paired ratios quantify observer overhead; no slower observer result is
+promoted as a production performance change. Normal =--queued= is untouched.
+
+* Official source path
+
+The registry source is at
+=~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/=.
+
+- =sync/oneshot.rs:547=: per-request shared response allocation.
+- =sync/oneshot.rs:1299–1315=: completion state and conditional receiver wake.
+- =sync/batch_semaphore.rs:397–494=: exhausted admission permits can enter
+  the mutex-protected FIFO waiter queue.
+- =sync/batch_semaphore.rs:307–366=: permit release gathers waiter wakers
+  and wakes them outside the waiter lock.
+- =runtime/scheduler/multi_thread/worker.rs:1341–1366=: scheduling from
+  outside a Tokio worker takes the remote-injection path.
+- =worker.rs:1420–1427=: that path locks shared scheduler state and pushes
+  into the injection queue.
+- =worker.rs:1076–1128=: workers periodically inspect or drain remote work
+  under shared state; local LIFO selection is a distinct path.
+
+The Scheme owner is a dedicated OS thread, not a Tokio worker holding a
+scheduler core. Its response notification therefore cannot be assumed to
+use local LIFO scheduling. Changing the LIFO policy without this distinction
+would not establish a fix. =spawn_blocking= alone does not remove the
+foreign-thread response handoff or turn one Scheme owner into parallel parsers.
+
+* Counters and attribution
+
+Each request records admission, owner queue, service, end-to-end response,
+and the interval from the owner marking its result ready to the caller
+receiving it. That last interval includes publication, notification,
+synchronization, worker rescheduling, and receiver completion. It is not
+equated with pure mutex contention or pure off-CPU time.
+
+The diagnostic mode forwards the original caller-task waker through a
+bounded per-caller probe, counting reply-future polls, Pending outcomes,
+and wake calls observed during that poll window. A wake call is not a task
+poll, OS context switch, or guaranteed immediate task execution. Notifications
+outside the per-request counter window may not be assigned to that row.
+The probe never drops, delays intentionally, or substitutes a notification.
+Task-waker identity is asserted. Instrumentation itself adds reference-count
+and counter operations and is deliberately not presented as a speed gain.
+
+Native owner-local snapshots read official VM GC fields and
+=CLOCK_THREAD_CPUTIME_ID=. Process snapshots read =getrusage(RUSAGE_SELF)=
+with local output storage. Process CPU can exceed elapsed wall time because
+several threads run concurrently; subtracting process CPU from batch wall
+would be invalid. CPU from the owner-thread interval can be compared with
+owner service wall time, subject to snapshot overhead.
+
+OS context-switch and fault-accounting scopes are not confused with the
+owner thread. Switch counters read during an owner service window are
+process-wide and can include Tokio workers. A zero global queue depth sampled
+after completion does not prove that the queue was empty during requests.
+Worker park counts are cumulative observations, not busy-poll counts or OS
+context-switch counts.
+
+Mode zero has no owner CPU/GC or probe measurements; corresponding zero
+fields mean unmeasured, not evidence of zero work. Spikes are retained when
+service or handoff exceeds 1 ms; this reporting threshold is not an acceptance
+threshold. The narrow off-CPU-service indicator additionally requires owner
+CPU below 10% of service wall and GC count zero. It does not identify the
+specific cause of descheduling, memory stalls, or mutex blocking.
+
+* Memory interpretation
+
+Exact timing storage retains thirteen u64 fields per request in this
+diagnostic implementation. At 100,000 requests per batch and twenty batches,
+that reserves 208,000,000 bytes per mode, or 416,000,000 bytes together.
+Quantile scratch, per-batch task/result vectors, roots and runtime storage
+are additional costs. Storage and reporting are common across modes.
+This large observer reserve is explicitly not a production requirement
+or an allocation-policy improvement.
+
+Process peak RSS is a monotonically accumulated high-water mark across both
+modes and preceding loads; it is not a variant-isolated RSS comparison.
+Darwin returns RSS in bytes; other supported Unix targets return kilobytes,
+which the diagnostic converts to bytes. Cumulative Rust allocation traffic
+from the preceding response-channel audit is a different metric and is not
+substituted for current resident memory.
+
+* Evidence
+
+Raw receipt: =benchmarks/20261011-utf8-tokio-scheduling-audit-all.log=.
+Time values labelled =ns= are nanoseconds, =wall_ms= are milliseconds,
+and throughput is completed requests per second. Quantiles use exact nearest
+rank on individual request observations, not twenty batch averages.
+
+An already observed mixed-text handoff spike has service 11,416 ns, owner
+CPU 10,583 ns, GC count zero and handoff 16,235,959 ns. Its reply has two
+polls, one Pending and one forwarded wake. This attributes the large delay
+to the post-service response handoff, not encoding or GC, and rules out a
+reply-poll storm for that sample. It does not separately time the injection
+mutex hold and runnable-task waiting intervals.
+
+* Completed matrix and measured tails
+
+Independent receipt counting confirms 840 completed batches, 31,080,000
+requests, zero content errors, 42 groups each containing twenty batches,
+42 pooled summaries, and 840 counter records. The command exits successfully
+as an observability audit, with =optimization_admission=false= and
+=instrumentation_slower=true=. This is not a passed optimization gate:
+intrusive observation is slower overall and is never the default path.
+
+Reverse-prefix results follow. Each total wall spans twenty batches.
+P95/P99 are individual request response quantiles, in milliseconds.
+
+| Requests/batch | Observation | Total wall (s) | Requests/s | P95 (ms) | P99 (ms) |
+|----------------+-------------+----------------+------------+----------+----------|
+|          1,000 | ordinary    |       0.181579 | 110145.048 | 0.383000 | 0.903416 |
+|          1,000 | perturbed   |       0.236700 |  84495.053 | 0.427833 | 2.187125 |
+|         10,000 | ordinary    |       2.713331 |  73710.142 | 0.560792 | 2.482000 |
+|         10,000 | perturbed   |       2.549005 |  78461.986 | 0.482708 | 1.954375 |
+|        100,000 | ordinary    |      19.909626 | 100453.922 | 0.389875 | 0.904583 |
+|        100,000 | perturbed   |      24.691385 |  80999.912 | 0.470042 | 1.336250 |
+
+The isolated 10,000 aggregate improvement is not an optimization gain.
+This implementation adds observer fields and memory; it must not be compared
+as a matched performance candidate against the earlier frozen run.
+
+Across 15,540,000 diagnostic requests, the reply future had 31,079,781 polls,
+15,539,781 Pending outcomes and 15,539,781 forwarded wakes counted within
+poll windows. This is almost exactly one Pending and one completion poll per
+request, not evidence of repeated reply polling or a notification storm.
+It does not rule out contention elsewhere in admission or scheduling.
+
+There are 20,013 retained spike rows. The largest handoff sample is reverse
+prefix at the 100,000 load: handoff 41.554083 ms, service 15.334 microseconds,
+owner CPU 14.334 microseconds, GC count zero, two reply polls and one wake.
+The largest service sample in that distribution is 32.293875 ms with owner
+CPU 40.709 microseconds, GC count zero and seven process-wide involuntary
+switches observed during the service window. The process-wide switches are
+not attributed individually to the owner. Across diagnostic requests, 296
+service spikes meet the narrow low-owner-CPU/non-GC condition.
+
+Diagnostic owner CPU totals 83.744698 s and GC wall totals 2.037966 s,
+with 9,619 recorded collections. These totals span all diagnostic loads and
+are not percentages of single-thread wall time or proofs that GC can be
+removed. The identified non-GC service and post-service handoff outliers
+show why GC-count reduction alone did not solve the response tail.
+
+Observed process peak RSS is 540,409,856 bytes (about 515.4 MiB), including
+the large audit reserve. It is a shared high-water mark, not production
+resident memory or evidence that the ordinary mode consumes that much.
+
+The production encoder and generated sources match
+=fc4562c91af0c8ed81840b5ceaaf40712555e0aa=. The historical reference
+=6ad680c6311957eadf2529765ab1efd751132554= is untouched. No scheduling
+parameter, channel policy, or kernel change is promoted. The optional
+diagnostic surface is validated with the existing actor-AOT clippy gate,
+Rust format check, whitespace check, and full Unicode buffer contracts.
+
+Local observability results do not qualify Org parsing, multiple Scheme
+processors, or a new remote CI head. No kernel or SDK rebuild is required;
+only the qualification artifact is compiled.

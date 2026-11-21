@@ -1,0 +1,131 @@
+#+title: Capacity release and notification qualification
+#+date: 2026-10-22
+
+* Decision and evidence boundary
+
+Retain Watch admission notifications and all defaults. A new ArmedNotify
+prototype reduced a component CPU cost but regressed CPU-workload throughput
+in both unobserved captures. It was withdrawn, including its API, tests and
+benchmark mode. The retained change measures the previously unobserved capacity
+release boundary and calibrates optional OS/thread-CPU observation.
+
+This does not close exact kernel scheduling attribution or establish a p99 fix.
+Rust still distributes across independent fixed-owner Scheme runtimes; native
+Scheme types, GC, continuations, Actors and exceptions remain intact. No SMP,
+Scheme-to-Rust translation, SDK change or default change is involved.
+
+* Predecessor CI
+
+Exact predecessor: =cbc99b5aef844d2b752e9b6a0de1c8d7485da4d0=.
+GitHub Actions run =39728079595= has successful native lifecycle, Quint,
+macOS Cargo and both Bazel jobs. Ubuntu Cargo remained running at the report
+check; this is not an all-green claim.
+
+* Actual blocking and the missing boundary
+
+An own-process stack sample reached =CapacityPermit::drop= through Tokio
+Watch BigNotify into a pthread mutex wait. Producer-open mutex contention is
+separate; the earlier epoch-fence experiment remains rejected (report 30.47).
+
+Retire enclosed projection/completion, but the retained permit destructor ran
+after that observation closure. Release now encloses slot/work return and host
+notification after projection. Existing five phase indices remain unchanged;
+Release is sixth. Observation remains opt-in, with no new clocks when disabled.
+
+The prototype replaced only the host capacity-generation event transport.
+An armed Notify future was created before scanning, including cancellation,
+close and generation-swap handling. Native service, quotas and supply bounds
+were unchanged. Protocol tests passed; that did not predict performance.
+
+* Directed same-VM, same-load comparison
+
+Each capture reused the same four live VMs between arms, with two Tokio threads,
+native O2, native typed payloads, 8192 orders of 48 lines in batches of eight,
+and 64 four-line short probes with nominal 500 us spacing. Each owner had four
+request slots, work budget 32, and at most three active service jobs. Pooled
+staging was bounded at 128 callbacks / 1024 work units; feed one, coalesced wake
+and progress-aware routing were identical. Native wake readback was NativePort
+on all four owners. Original request/progress limits were unchanged.
+
+Watch is A, ArmedNotify is B. Both unobserved captures contain 40 samples and
+clean four-owner shutdown, zero roots and removed files. Diagnostic sampling
+is a separate capture, not pooled into performance claims.
+
+| Capture/load | Orders/s A -> B | Short actual p99 ms A -> B | Min normalized progress % A -> B | Finish spread ms A -> B |
+|--------------+-----------------+----------------------------+----------------------------------+-------------------------|
+| A CPU        | 70758 -> 48870  | 27.719 -> 43.640            | 97.25 -> 18.47                    | 3.84 -> 70.61           |
+| A mixed      | 23336 -> 22970  | 6.209 -> 16.546             | 98.54 -> 98.37                    | 17.79 -> 65.13          |
+| B CPU        | 113074 -> 85241 | 17.130 -> 27.841            | 95.10 -> 97.79                    | 82.08 -> 50.14          |
+| B mixed      | 25482 -> 22634  | 16.190 -> 6.693             | 98.76 -> 98.49                    | 14.70 -> 3.42           |
+| Diagnostic CPU | 71504 -> 106670 | 15.681 -> 10.841         | 98.47 -> 97.76                    | 96.37 -> 7.17           |
+| Diagnostic mixed | 23452 -> 23293 | 10.003 -> 9.552        | 98.56 -> 98.69                    | 6.11 -> 10.84           |
+
+Unobserved CPU throughput fell 30.94% and 24.62%. Mixed p99 changed in opposite
+directions. The observed CPU result has the opposite sign: instrumentation and
+host variability preclude a general performance conclusion from that capture.
+The prototype is rejected, without changing defaults or discarding negatives.
+
+Release mean CPU per call fell from 714 to 445 ns for CPU load and 749 to
+494 ns for mixed load in the diagnostic capture. Mean Release wall time was
+1.69 -> 1.56 us and 1.36 -> 1.30 us; no Release GC delta occurred. An overlapping
+Watch Release span reached 0.720 ms wall versus 0.010 ms CPU. This is a genuine
+blocking path, but these observations do not explain the much larger native
+wait/GC-wall tails or justify adopting the transport change.
+
+* Wall time, CPU time and OS attribution
+
+Thread CPU is measured separately from wall time. GC wall duration overlaps
+these enclosing owner intervals. SDK GC CPU accounting is process-scoped;
+never sum it across owners or subtract it from wall to infer collector-only CPU.
+RUNNING point samples include running/runnable states and cannot distinguish
+on-core execution from time waiting for dispatch.
+
+The retained observed smoke ran eight controls before warmup on the same four
+initialized owners. Four concurrent 20 ms sleeps used 0.007--0.015 ms thread
+CPU over 20.37--26.92 ms wall. Four CPU-demanding Rust loops each consumed
+20.005--20.012 ms CPU over 41.10--55.84 ms wall. GC wall and collection counters
+were bitwise unchanged. The controls demonstrate non-CPU wall time without GC;
+they do not measure exact runnable wait or replace native Scheme workloads.
+
+A System Trace attached only to the owned benchmark PID reached its five-second
+collection limit but hung finalizing. The recorder was stopped at its 90-second
+watchdog; the benchmark independently completed 40 samples and clean shutdown.
+The incomplete trace was retained privately. Read-only export failed with
+=Document Missing Template Error= (exit 10). No usable exact kernel scheduling
+data was recovered, and the failed trace is not a profiler acceptance result.
+
+Consequently routing/supply changes cannot yet be justified by an asserted
+kernel runnable-wait duration. The next targeted attribution gate is usable
+per-owner running/runnable/blocked intervals correlated with native wait and
+Release spans; keep real blocking and descheduling distinct. Do not repeat the
+unchanged failed capture or tune routes from sparse point states alone.
+
+* Validation and reproducibility
+
+Commands are standard Cargo entry points, with the project's pinned SDK and
+=GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2=. No Bash driver or new dependency is added.
+
+#+begin_src text
+cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --pooled-ab --phase-observation
+cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --test owner_producer --locked
+cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --test scheme_service --test owner_capacity --test owner_producer --test owner_dispatch_faults --locked -- -D warnings
+#+end_src
+
+The retained observed smoke completed eight workload samples and clean shutdown.
+Final retained-source native producer and service tests passed (3.32 s and
+6.76 s); focused bench/native Clippy with warnings denied, formatting and diff
+checks passed. CI now includes that existing-mode smoke. Prototype-only gates passed: 12 focused
+unit tests, capacity/dispatch-fault/producer/service native fixtures and 1000
+unchanged lifecycle model traces of depth 64, seed one. Those receipts qualify
+the withdrawn prototype, not performance or the final head's remote CI.
+
+Private frozen prototype identities (raw data and artifacts are not committed):
+
+- Binary SHA256: =196d111e288b7f5e437e244901858228eb03550cc13ef6fc30dcc4f9699b44fc=.
+- Native image SHA256: =dbecadc5617173c15cead81ebda74e67466dcc246f132707263d21ddb457680c=.
+- Source archive SHA256: =866b9f4edd97ddc99d9ec2ab15c979456876cd8f5ebac24015a4bd84ad6c17ba=.
+- Manifest records 1010 runtime input hashes, predecessor identity and owned source.
+
+The source archive preserves the rejected mode for reproduction without leaving
+it in the supported library API. Earlier failures and the incomplete trace are
+retained privately. No historical receipts are rewritten.

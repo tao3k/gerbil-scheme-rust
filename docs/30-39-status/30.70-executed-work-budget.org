@@ -1,0 +1,268 @@
+#+title: Executed-work budgets across short routing and Scheme completion
+#+startup: overview
+
+* Status and acceptance boundary
+
+This is an uncommitted ABI 14 experiment. Defaults remain unchanged. No
+performance acceptance is claimed from native correctness or finite-model
+success. Historical negative captures and unattributed watchdog failures remain
+open. Rust distributes across fixed owners; Scheme retains its complete runtime,
+actors, green threads, exceptions, continuations and GC.
+
+* Three independent authorities
+
+| Quantity | Bulk batch | Short request | Lifetime / authority |
+|----------+------------+---------------+----------------------|
+| Retained admission work | 8 items | 1 item | Existing Rust reservation through independent result retirement |
+| Executed application work | 8 x 48 line records | 4 line records | Scheme handler reports completed safe spans |
+| Item completion progress | 8 item IDs | 1 item ID | Existing idempotent Scheme ledger; no early credit refund |
+
+A record is a workload-specific logical cost, not CPU cycles or elapsed time.
+These rows are not interchangeable. In particular, changing admission charges to
+384 would break the existing work limit of 32 and would not implement a CPU
+budget. Results still independently release their own roots and capacity.
+
+* Protocol
+
+- An idle owner opts in through =configure_scheme_service_work_on(owner, 4)=.
+  Zero disables the policy and remains the default. Positive work budgets require
+  existing cooperative class arbitration; disabling that arbitration first is
+  rejected. Selecting any completion policy resets the work experiment.
+- Scheme application handlers bind =gerbil-rs-service-work-checkpoint= once.
+  A completed safe span reports its logical cost, at most the configured bound.
+  The order workload uses four-record spans; short and bulk use the same record
+  computation and native types. Arbitrary handlers need not opt in and are not
+  preempted or restricted by Rust.
+- Short submission registers a dispatch obligation before worker publication;
+  actual Scheme worker start settles it. Queued opposite-class lease requests
+  remain in the existing Scheme budget queues. Start does not mean completion.
+- At a work boundary, a pending short dispatch, an opposite-class waiter, or a
+  new short-result ready generation requires an execution opportunity. The
+  current lease is suspended using the existing continuation-safe dynamic extent,
+  Scheme yields once, then reacquires through the existing class arbiter.
+- Without these obligations, a checkpoint updates bounded fuel and work counts;
+  it takes no mutex, allocates no queue entry and does not yield. The original
+  Actor quantum and service policies are unchanged in both A/B arms.
+- The optional =more-work?= checkpoint argument is false at the terminal span.
+  That span is still charged, but the already computed result proceeds directly
+  to the existing handler release/completion path instead of yielding first.
+- A ready generation is offered once, rather than yielding repeatedly while a
+  retained result remains queued. Existing short-first harvest, completion token,
+  per-result projection, root release and capacity retirement remain authoritative.
+  The offer is a scheduling opportunity, not proof that the host already retired
+  the result. Once the last short-ready ID is harvested, its generation is
+  settled because the host now owns its completion token. This does not release
+  its root or capacity early. A later uncontended bulk must not yield for that
+  already harvested generation. No start acknowledgement writes an unactionable
+  native wake byte.
+
+The executed-work counters count reported completed spans, including spans
+replayed by continuations. An exception inside a span can end it before a report;
+these counters are not an exact count of every instruction or partial failed
+span. A checkpoint captured by a retained continuation becomes inert after its work
+policy is disabled or replaced, and cannot charge a replacement policy.
+The item ledger independently prevents continuation reentry from reporting
+one item twice. Work counters do not release capacity or erase Scheme roots.
+
+* Bounds and limitations
+
+The cooperative bound applies at application-declared safe spans. It is not a
+wall-clock deadline and cannot preempt arbitrary Scheme code, GC, OS descheduling
+or type construction outside those spans. The single-owner Runtime model keeps
+GC and OS unavailability separate. Its four-record abstract compute transition
+refines existing item execution without changing item admission or custody.
+Neither route separation nor these checkpoints alone explains historical
+millisecond outliers; no same-spike OS/GC attribution is available.
+
+* Executable verification
+
+Native qualification exercises the public API, eight 48-record orders versus
+four-record short work, no extra handoff without competition, malformed Scheme
+input, recovery, deterministic class contention, exception unwind and continuation
+reentry. Existing lifecycle qualification retains full types, native roots,
+GC/multishot continuations and independent close/cleanup gates.
+
+The existing =service_sharing= Runtime model is refined, not replaced. It covers
+partial executed spans without item completion, a competing short execution and
+independent retirement, continuous uncontended bulk execution, cancellation/close,
+and a required counterexample when a contended work boundary is bypassed.
+
+Reproducible commands from the repository root:
+
+#+begin_src text
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_completion_scenarios_and_control --locked -- --ignored --exact --nocapture
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --work-budget-ab
+#+end_src
+
+* Directed comparison
+
+Both arms reuse the same four live VMs, optimized native image, native typed
+inputs, numeric entry/projection, joint dispatch protocol, ProgressFair supply,
+Selective short routing, request/work limits, Actor quantum and original workload.
+Only the candidate enables executed-work spans and ready-generation opportunities.
+There is no scheduler/thread-count matrix expansion. Same-run native work receipts
+must equal 393216 bulk records and 256 short records per candidate sample; the
+control reports zero for the disabled independent work feature. Every candidate
+sample must acknowledge all short dispatches and leave no pending obligation.
+
+The existing benchmark remains serial in its short client. Scheduled latency
+includes accumulated issue lateness. Owner callback completion is not client
+consumer wake time. Quantiles overlap and must not be added or subtracted to
+invent exclusive stage costs. Compare throughput, short/bulk p99 and owner finish
+spread together, retaining each AB/BA pair and all negative/outlier samples.
+
+* Implementation cost and final gates
+
+The first implementation updated global work totals and capped fuel at every
+checkpoint and checked a modulo boundary for each line. The final implementation
+uses four-record span loops and accumulates executed work in the owning lease.
+Release/suspension commits that lease's total before changing its owner; the
+native observation includes any unsettled count. Exception/nonlocal exits and
+continuation reentry use the existing dynamic extent. Admission reservations,
+completed item identities, class rules and result/root retirement are unchanged.
+The Runtime model's exhausted/not-exhausted work state abstracts this accounting
+representation; the logical protocol/model source did not change for this
+amortization. Native exact-count and grant/suspension conservation gates validate
+the concrete implementation; this is not a machine-checked compiler refinement.
+
+Final gates:
+
+- 45 Rust instance unit tests passed; strict Clippy passed without suppressions.
+- Three native integration tests passed (29.56 s test time), including exact
+  executed records, zero additional uncontended handoffs, two-class contention,
+  malformed input/recovery, exception unwind, continuation reentry, stale
+  checkpoints after idle replacement, and no stale handoff after short harvest.
+- Existing prepared-input cancel/expiry/close fixtures execute with the work
+  policy enabled. Four owners join with zero roots, removed image files, returned
+  descriptors and quiesced services. This is not an RSS soak or a universal
+  dynamic-mapping unload proof.
+- Reused Runtime model gate passed (351.35 s test time), including partial work
+  without item completion, short execution/independent retirement, uninterrupted
+  bulk after harvest, uncontended execution and cancel/close. All 14 required
+  two-domain mutation counterexamples were detected. Model source SHA-256:
+  =51330df0ad860c5f4badba32acdd4f64cbc9716f47ee2514f1b0ac48e3373f15=.
+- Final generated-source check with update disabled, formatting, and O2 release
+  build passed. No optimization downgrade, timeout increase or default change.
+- The dedicated watchdog control passed at its original Cargo path. Strict
+  signature verification passed; phase chatter did not renew the unchanged 5 s
+  meaningful-progress deadline, the intentionally stalled child exited 70, and
+  the parent/capture cleanup passed in 5.862 s. Its binary SHA-256 is
+  =966965f930e674538992cc8aff325c8211f0f346623bc719296c7c9d9f83cc40=.
+  Historical unattributed native watchdog failures remain open. A passing
+  enforcement control and a later native pass do not explain those old failures.
+
+* Capture history and negative controls
+
+** Initial incomplete capture
+
+=service-executed-work-v14= exited 101 after one measured control CPU sample.
+The old observer required bulk grants to equal input count and rejected 8268
+candidate grants versus 8192 inputs. Cleanup is unverified; this is neither a
+complete performance comparison nor a passing candidate. The record is retained.
+
+Only that obsolete observer was repaired before =service-executed-work-v14-r2=:
+actual bulk grants must equal input orders plus original I/O reentries plus work
+handoffs, and suspensions must equal original I/O waits plus work handoffs. The
+short path has one terminal span, so its grant count remains exactly the probe
+count. Native protocol, inputs and limits were unchanged. This is exact
+conservation, not a weakened inequality or an updated quota expectation.
+
+** First complete capture: rejected
+
+=service-executed-work-v14-r2= completed 40 samples and clean teardown in 6.487 s.
+CPU throughput regressed 29.575%, pooled short p99 110.522%, bulk p99 160.303%,
+and maximum owner finish spread 1989.180%. All ten paired CPU bulk windows were
+slower; median throughput change was -30.569%, median bulk p99 +51.551%, median
+finish spread +34.920%. CPU short per-sample p99 median improved 2.350% (6/10
+pairs), despite the worse pooled tail; neither estimator replaces the other.
+Mixed throughput regressed 0.899%, short p99 3.840% and bulk p99 3.671%.
+
+Candidate handoffs were 516 CPU / 656 mixed across 81920 orders per load. The
+observed systematic CPU loss is not evidence of frequent uncontended yielding:
+native tests prove zero additional uncontended handoffs, and executed-work
+conservation passed. The static hot path still performed per-line modulo and
+per-span global accounting. That motivated the lease-level aggregation and span
+loops described above. No same-spike CPU profile isolates the exact cost of each
+operation, and the historical outliers are not attributed to GC or OS scheduling.
+
+The first complete comparison remains rejected and is not overwritten or
+combined statistically with the following distinct-source capture.
+
+** Final capture: also held
+
+=service-executed-work-v14-r3= completed 40 samples and clean teardown in 8.624 s.
+The same four live VMs/native image are used by both arms within this capture.
+Boundary process snapshots found no compiler processes; these snapshots do not
+prove the absence of all host interference throughout the run. No profiler was
+attached. Each load has ten adjacent AB/BA pairs, 8192 bulk orders and 64 short
+probes per sample. No thread-count, window, quantum or workload matrix was added.
+
+| Metric | CPU control -> candidate | Mixed control -> candidate |
+|--------+--------------------------+----------------------------|
+| Orders/s | 382348.137 -> 313115.938 (-18.107%) | 64971.978 -> 64933.225 (-0.060%) |
+| Pooled short owner-completion p99, us | 346.417 -> 407.709 (+17.693%) | 467.000 -> 409.583 (-12.295%) |
+| Pooled bulk service p99, us | 702.584 -> 714.042 (+1.631%) | 1818.750 -> 1887.750 (+3.794%) |
+| Maximum owner finish spread, us | 473.584 -> 466.334 (-1.531%) | 1673.667 -> 1680.500 (+0.408%) |
+
+Paired audit of these same samples:
+
+| Metric | CPU median change; improving pairs | Mixed median change; improving pairs |
+|--------+------------------------------------+--------------------------------------|
+| Throughput | -18.141%; 1/10 | -0.084%; 4/10 |
+| Per-sample short p99 | +8.225%; 4/10 | -18.260%; 7/10 |
+| Per-sample bulk p99 | +8.810%; 2/10 | +1.360%; 4/10 |
+| Owner finish spread | +10.423%; 5/10 | -5.708%; 6/10 |
+
+Worst short per-sample p99 changes remain +304.839% CPU / +641.699% mixed.
+CPU Actor-peer minimum is 1 -> 0, mixed 0 -> 0. This is retained as a negative
+observation, not standalone proof of starvation. Final completion of every
+accepted request and resource teardown are separately verified. Pooled 640-probe
+p99 and 64-probe sample p99 (the maximum) are distinct estimators.
+
+Every candidate sample reports exactly 393216 bulk records and 256 short records,
+zero pending dispatches, 64 actual worker acknowledgements, 1088 results, conserved
+entered/withdrawn offers, and all four owners used. Candidate work handoffs total
+600 CPU / 760 mixed across 81920 orders per load. The final cleanup joins four
+owners, reports roots =[0,0,0,0]=, removes image files and quiesces service state.
+The disabled control counter is zero; both arms execute identical real Scheme
+work. Rust does not schedule intra-VM actors or convert Scheme into Rust.
+
+** Identity and interpretation
+
+- Parent local/PR revision: =3d53f5484653f6fe1d66740b1720d711349a4cef=.
+- Final host binary SHA-256: =4cf2a4e86a6e18568604bc03e7f2e832ab628b2124d05716427f99adaa6c739b=.
+- Final native image SHA-256: =aa9ee241035aa69aea087bb4f81141049a63f9021edf31c410c82e97b1eb9bbf=.
+- Final source archive SHA-256: =89a25874621b9a0ba57a4d2fc39c9fe014626ba1b414918fdb224ec0f3085b3a=.
+
+The host binary is unchanged between the two complete captures, but the native
+image changes. Both identities are required: a copied host binary alone is not a
+replay of an older native image. Each frozen source/archive/image identity and
+all raw negative samples are retained outside the repository. Maintained reports
+contain no host-private paths, logs, binaries or patches. Reproduction uses the
+repository-root Cargo commands above and its native build graph.
+
+Do not subtract the percentages from the two captures to claim an isolated
+optimization gain: their controls/VM sets differ. The valid result is each
+within-capture comparison. Construction includes native submission, and wall
+intervals can include Scheme scheduling, allocation/GC and OS delay. No exclusive
+CPU attribution is derived by subtracting pooled stage quantiles.
+
+* Decision and next architectural boundary
+
+Performance acceptance FAILED. No new commit, staging or push to PR #18. Defaults
+remain unchanged. Mixed short-tail improvement does not compensate for systematic
+CPU throughput loss and bulk-tail negatives. The incremental comparison also uses
+the previously uncommitted joint-dispatch protocol in both arms; even a favorable
+increment alone would not authorize publishing the complete patch stack without
+an accepted-baseline comparison.
+
+The three cost/custody contracts are implemented and tested, but preserving CPU
+throughput with this checkpoint representation remains unresolved. Further work
+should remove the fixed cost of the uncontended path through a Scheme-owned
+execution plan or compiler specialization, rather than collecting more unchanged
+samples or tuning class thresholds. Any run-to-completion fast path must explicitly
+state the maximum already-started nonpreemptible cost: it cannot silently promise
+four-record handoff for new arrivals while executing an unchecked 48-record body.
+That bound and continuation reentry must be part of the cost/type/model contract
+before such a path is implemented. Full Scheme execution remains authoritative.

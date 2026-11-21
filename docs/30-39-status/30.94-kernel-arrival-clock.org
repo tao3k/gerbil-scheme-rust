@@ -1,0 +1,184 @@
+#+TITLE: Planned arrival, kernel clock observation and bounded native admission
+#+STARTUP: overview
+
+* Contract gap
+
+The existing workload plans 64 short arrivals at 500 microsecond intervals from
+one release Instant. Tokio Sleep has millisecond granularity. A requested
+sub-millisecond plan therefore does not imply a sub-millisecond timer service.
+The rejected client-turn capture is retained; changing bulk client polling did
+not solve its mixed client p99. This is evidence to fix the arrival contract,
+not proof that the timer explains every native or OS tail.
+
+Planned arrival, timer observation, actual issue, bounded queue publication,
+owner claim, native completion and client consumption remain distinct. Neither
+a timer event nor an issue token owns a native permit or Scheme root. The
+original planned-issued-native-consumed-v3 partition and its denominators stay
+unchanged, including serial backlog. The serial probe source is unchanged.
+An absolute planned arrival is not a promise that the source can issue while
+its preceding request still awaits consumption.
+
+* Actual opt-in API
+
+The arrival-clock Cargo feature enables InstanceArrivalClock and
+InstanceArrival::wait_with_clock. The clock uses an exclusively borrowed,
+reusable, single-shot Darwin kqueue timer registered with the current Tokio
+I/O reactor. NOTE_NSECONDS expresses the remaining duration without rounding
+to milliseconds. Each wait arms a timer even for an overdue plan; it never
+skips a timer, busy-waits, creates a thread or changes worker priority/leeway.
+Nanosecond input units are not a nanosecond OS scheduling guarantee. A late
+observation remains visible in the original deadline-resume component.
+
+InstanceArrivalWake exposes planned, arm_started, armed, observed and generation.
+Issue is recorded after observation and timer teardown. The original deadline
+is preserved; no wall-clock conversion is used. Timer consumption uses a zero
+kernel timeout, clears stale reactor readiness on WouldBlock and validates the
+returned generation. A cancellation guard disarms the timer. Reuse arms a new
+generation. Dropping the clock closes its owned descriptor. Kernel errors and
+overflow fail explicitly; they do not silently issue or fall back to Sleep.
+
+The first backend supports macOS only; other hosts return Unsupported. Creating
+a clock requires a Tokio runtime with I/O enabled; like AsyncFd, an entered
+runtime with its I/O driver disabled panics. No-runtime creation returns an
+error. Existing tokio-dispatch feature selection and public defaults do not
+enable this backend or its additional reactor dependencies.
+
+The actual native test carries the issue token into the existing short-pool
+submit_progress/wait_observed API. Pending Rust input is bounded by the pool,
+while native credits begin only at owner claim. A cancelled timer never enters
+that pool; a dropped/expired unclaimed ticket refunds its slot. Claimed work
+still retires on its fixed Scheme owner. Scheme execution, GC, Actor/green
+threads, continuations and exception ownership are unchanged.
+
+* Joint model and controls
+
+The existing owner lifecycle/runtime model gains clock generation, pending
+event and observed state. Observation grants neither issue nor admission.
+Directed witnesses cover future/overdue arrival, cancellation and reuse,
+producer-aware close, early/stale-event mutations and direct-admission mutation.
+Generation is finitely bounded in the model; it does not prove real OS latency.
+Previously rejected model fixture runs are preserved: the first lacked pool
+producer registration; the second tried to join registered producers before
+finishing them. Neither failure was repaired by weakening safety properties.
+
+The first real clock run failed all three tests at reactor registration with
+EINVAL, before any Scheme call. Tokio AsyncFd::new requests both read and write
+interest, whereas Darwin only accepts EVFILT_READ for a nested kqueue. The
+implementation now uses explicit READABLE interest; the failed run is retained.
+This is a reactor registration fix, not a timer or latency pass.
+
+Executable controls exercise real timer events, stale readiness, cancellation,
+duration overflow, descriptor release and actual bounded short-pool submission
+behind blocked native owners. The full native lifecycle suite retains its
+five-second meaningful-progress watchdog. The historical first-port watchdog
+failure remains unattributed and its original cleanup unverified; a fresh pass
+does not explain it. New binaries, source identities and images are frozen
+before native execution so any recurrence can be attributed.
+
+The final model hash is
+=c4ffdf76880e1b26a74bbe9b7cda2f73c42500d3866637c6f0a1cad50ce2bf3f=.
+It passes 223 directed regressions (110 small, 113 wide), the 14 new clock
+witnesses in isolation and 400 random traces. Strict benchmark/native/model
+harness lints, three clock controls, 22 existing client/ready/short-pool controls
+and default-feature-path lints pass. The three native cases pass in 31.94 s;
+the main pool joins four owners with zero roots, removed files and FD return.
+Its native close is 2.755584 ms. These are correctness receipts, not performance
+acceptance or a historical watchdog explanation.
+
+* Matched performance qualification
+
+Use the standard O2 Rust bench with the explicit arrival-clock feature and
+=--progress-fair-ab --fixed-short-selective --arrival-clock-ab=.
+Both arms share four live native VMs, two Tokio workers, batch eight, work 32,
+window four, Actor quantum one, NativeBudget, retirement-before-send,
+ready-owner bulk delivery and the unified short observer. Both use independent
+Tokio clients. The only selected difference is unconditional Tokio Sleep versus
+an unconditional kernel timer for the same original arrival plan. Clock setup,
+arming, observation, teardown and trace assembly are measured costs. The timer
+fd is allocated inside the measured probe future. The control retains Sleep.
+
+Qualification uses five ordered and reversed CPU/mixed blocks. There is no
+expanded matrix. Every window must retain the same 8192 bulk orders, 64 short
+plans, native-work oracle, roots, budgets and cleanup, with no compiler present
+at either capture boundary. Candidate windows must contain 64 real armed timer
+generations; no overdue timer bypass is accepted. The original client total,
+native p99, throughput and owner spread are reported with negative results.
+Performance acceptance is separate from model and native correctness. No
+candidate is committed or promoted merely because its model or tests pass.
+
+* Primary references
+
+- [[https://docs.rs/tokio/1.53.1/tokio/time/struct.Sleep.html][Pinned Tokio Sleep granularity]]
+- [[https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/kqueue.2.html][Apple kqueue contract]]
+- [[https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_event.c][Apple timer unit conversion and one-shot implementation]]
+
+The local SDK constants and pinned libc declarations are the build authority;
+the upstream source explains units and does not attest this host's latency.
+
+* Rejected targeted A/B
+
+Receipt service-arrival-clock-v32-r1 finishes in 9.053 s with 40 matched windows,
+no compiler at either boundary, unchanged frozen sources/image, no benchmark
+stderr and clean four-owner shutdown. Every window passes the original native
+work, lifecycle and additive latency identities. All 1280 candidate requests
+have a real matching timer generation; every observation follows its original
+plan and precedes issue. There are no skipped overdue timers.
+
+Throughput below is total identical bulk work divided by total bulk elapsed
+time. P99 values pool the original request samples; owner spread is the maximum
+window spread. These aggregation rules are unchanged and distinct from paired
+medians. Values are not inferred by subtracting unrelated p99 measurements.
+
+| Metric | CPU control | CPU candidate | Mixed control | Mixed candidate |
+|--------+-------------+---------------+---------------+-----------------|
+| Throughput, orders/s | 267778 | 212704 (-20.57%) | 56621 | 58287 (+2.94%) |
+| Native short p99, ms | 0.520291 | 0.754792 (+45.07%) | 0.682167 | 0.631541 (-7.42%) |
+| Planned-to-client p99, ms | 3.098708 | 16.019666 (+416.98%) | 17.257834 | 2.696000 (-84.38%) |
+| Bulk native p99, ms | 1.296625 | 1.673583 (+29.07%) | 3.668167 | 2.998250 (-18.26%) |
+| Owner finish spread, ms | 0.413833 | 1.125250 (+171.91%) | 1.930583 | 1.911625 (-0.98%) |
+
+Paired CPU throughput median is -13.20%, with only 2/10 pairs improving;
+paired CPU native p99 is +39.27%. Paired mixed throughput median is +0.34%,
+6/10 improving, and mixed planned-to-client p99 median is -63.15%, 8/10
+improving. Mixed bulk p99 paired median still worsens 8.22% and owner spread
+paired median worsens 3.32%, despite their favorable pooled/max summaries.
+CPU client p99 paired median improves 8.27% but the retained large negative
+windows make pooled p99 much worse. No claim of universal tail improvement is
+supported.
+
+The original deadline-resume p99 falls 60.20% CPU and 74.86% mixed. Paired
+medians fall 74.24% and 83.33%, respectively. Timer precision expression is
+therefore useful, but does not explain away the remaining regressions.
+Candidate arm p99 is 7.417 us CPU / 7.333 us mixed; teardown-to-issue p99 is
+1.667 us / 1.125 us. Armed-to-observed duration includes intended waiting and
+must not be called overhead. Observation lateness includes previously accrued
+serial backlog and must not replace the original latency partition.
+
+In the candidate CPU top-ten client tails, 95.43% of the same requests' summed
+latency is prior serial backlog. This is accumulated delay, not a root cause.
+In the worst CPU window, request 35 is natively ready at release +26.523458 ms
+and consumed at +29.901458 ms, adding 3.378 ms delivery delay. Its own
+native time is 0.563417 ms and deadline-resume is only 3.625 us, yet it inherits
+8.454916 ms backlog. Other requests in the same window add 2.32 and 2.21 ms
+native-ready-to-client delays. These are actual same-run timeline boundaries,
+not OS runnable/blocking evidence.
+
+CPU before-native-entry p99 grows from 107.041 us to 340.541 us; construction
+p99 grows 10.917 to 21.334 us, while pending execution/GC wall p99 declines
+475.667 to 464.625 us. Client-delivery p99 grows 669.959 to 2031.292 us.
+These phase quantiles identify remaining protocol boundaries; they cannot be
+added, treated as exclusive causal costs, or relabeled as GC CPU or OS waits.
+The causal explanation for CPU throughput and scheduler tails remains open.
+The corrected arrival timing also changes when contention occurs even though
+the planned load and native work are identical. The capture measures that net
+effect; it does not isolate syscall cost as the cause of the throughput loss.
+
+This candidate is REJECTED for performance. Keep it explicitly opt-in for
+reproducible diagnosis; no public default, commit or push changes. Do not run
+the unchanged candidate again to select favorable windows. The next protocol
+work must address actual native admission/entry and completed-result client
+service opportunities together, without retaining native credit/root ownership
+until client consumption or repeating the rejected client-turn-only shortcut.
+The clock contract is necessary but is not end-to-end fairness acceptance.
+The original first-port watchdog remains unattributed; this passing capture
+and native suite do not replace its missing failed-image/phase/stack evidence.

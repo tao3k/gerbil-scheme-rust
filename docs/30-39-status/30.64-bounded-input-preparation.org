@@ -1,0 +1,307 @@
+#+title: Bounded Rust input preparation and ready-result retirement priority
+#+options: toc:nil num:nil
+
+* Decision and scope
+
+[[file:30.63-native-owner-service-cycle.org][30.63]] retains the NativeCycle negative results. Its input opportunity may
+construct a fresh Scheme bulk payload between two already-harvested results.
+This experiment separates Rust input acquisition from native construction and
+compares the previous NativeCycle directly with PreparedCycle on the same VMs.
+Snapshot remains the default. This is an explicit experimental policy, not a
+replacement for the complete Scheme runtime or its native scheduler.
+
+Rust distributes independent work across fixed owners. Each owner keeps a
+complete Gerbil/Gambit runtime, native types, Actor/green-thread scheduling,
+continuations, exceptions and GC. Stateful work remains affine. The native build
+remains Cargo, the package's Gerbil build, Gambit C and the selected C optimizer.
+
+#+begin_src rust
+dispatcher
+    .configure_scheme_service_completion_on(owner, SchemeServiceCompletion::PreparedCycle)?
+    .wait(timeout)?;
+// Submit through the existing typed service stream/pool APIs.
+#+end_src
+
+* Ownership and precedence
+
+| State | Rust input and credits | Scheme authority | Transition |
+|-------+------------------------+------------------+------------|
+| Source staged | Existing bounded source and work accounting | No new graph | Existing producer acquisition or revocable offer |
+| Prepared | At most one owned input per owner; existing active/slot/work credits | No native session or new root | Recheck cancellation, deadline and owner close |
+| Offer pending | Existing one-slot offer port; payload stays withdrawable | No native graph | Claim and entry fence only after snapshot retirement |
+| Ready snapshot | Existing linear token and independently rooted result slots | Complete native result graphs | Project and release each result separately |
+| Entry frontier | Prepared input passes final lifecycle check | Construct through existing SchemeServiceRequest | Native ownership becomes fixed |
+| Entered | Credits span execution, native root retirement and projection | Scheme schedules actual work | Existing completion protocol |
+
+PreparedCycle adds native policy mode 4, advertised by service ABI 10. Native
+batch take and slot transfer are the same protocol as ABI 9. The native receipt
+is validated before the owner publishes its Rust policy flags; unsupported
+images cannot silently select this mode.
+
+Within a harvested snapshot, ready results take precedence over new typed
+Scheme construction. Each result's root and credits still return independently.
+A bounded preparation opportunity may acquire one Rust input after a retirement;
+subsequent opportunities cannot grow that slot. The full snapshot retires before
+the prepared input enters Scheme. Producer preparation has no Image or
+NativeSession argument. Synchronous native producers have no preparation hook.
+
+The ordinary inbox preserves its FIFO head. Typed Scheme submissions and control
+messages remain deferred during this snapshot; ordinary native owner callbacks
+retain their existing semantics. Explicit application callbacks can themselves
+enter Scheme, so this is not a general prohibition on arbitrary FFI callbacks.
+The multi-feed shortcut cannot put fresh bulk construction ahead of collection
+in PreparedCycle. Short routing, Scheme class budgets and scheduling remain the
+existing mechanisms; this experiment makes no preemption guarantee.
+
+Pending peer offers stay in their existing revocable port during retirement.
+Preparation neither claims them nor reserves their target credits. After the
+snapshot, the original offer entry fence still checks withdrawal, cancellation,
+deadline, close, active credit and native capacity together. There is no second
+offer queue or duplicated capacity registry.
+
+A prepared producer input reuses its existing credits. Cancellation, expiry and
+close are checked again immediately before native construction. Rejection
+returns both partial/native and stream credits through the existing rejection
+path. The producer registration prevents replacement of that owner's capacity
+identity. Close/error drains native graphs before releasing any credit retained
+for failed native result transfer; prepared input itself owns no Scheme graph.
+
+Bounds are on input count and declared work through existing stream/source
+configuration, plus one prepared input per owner. Arbitrary application-owned
+Rust payload bytes have no new aggregate heap-byte bound. Native construction
+and projection retain their existing byte quotas; do not infer a whole-process
+memory bound from the one-slot preparation rule.
+
+* Executable protocol checks
+
+The new native contract holds three real Scheme Actor batches at a common ready
+frontier and leaves a fourth Rust input in the producer. It verifies:
+
+- only three constructors run while the first three results retire;
+- the prepared input uses the returned existing slot/work and active credits;
+- GC during a held projector sees only the batch root and current result root;
+- continuing constructs the fourth input after all three results retire;
+- cancellation, deadline expiry and owner close reject the fourth input without
+  invoking its Scheme constructor;
+- non-close paths return all slot/work and producer-registration credits;
+- all four cases join with zero native roots and removed instance files.
+
+These run alongside existing native GC, multi-shot continuation affinity,
+exceptions, false/void, quota, failed-slot transfer, backpressure and close-drain
+controls. An actual native failure remains a failure regardless of model status.
+The native progress watchdog remains five seconds. The performance controller
+remains 120 seconds.
+
+The existing owner lifecycle/shared-resource model is extended with a prepared
+reservation, not replaced. Prepared input is a subset of held reservations,
+disjoint from native roots, and bounded to one per owner. Entry waits until that
+owner's harvested slots are empty; cancel/close discard the reservation. The
+required unsafe-overtake counterexample checks that this precedence rule is
+observable. Existing offer, capacity, premature-credit and stale-ack controls
+remain in the same model. Finite scenarios/sampling do not prove unbounded
+liveness, scheduler timing, native correctness or performance.
+
+* CI failures and watchdog evidence
+
+The predecessor CI run [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39885599314][39885599314]] reported two concrete failure branches:
+
+- Both Linux and macOS Bazel rejected tracked generated SCM: the whole-file digest/build-input
+  receipt did not match the changed runtime. Regenerate using the existing
+  =just bridge-regenerate= path, updating actual generated content and external
+  whole-file receipts, without inserting a digest into source comments.
+- The full Quint suite instantiated three same-owner NativeCycle witnesses in
+  the general domain where job 2 belongs to a different owner. Keep their
+  protocols unchanged as reusable actions and instantiate those witnesses only
+  in the explicit completion domains. General cross-owner scenarios still run.
+
+The first two local prepared-contract attempts hit the unchanged watchdog.
+The fixture released its latch after observing three suspended Actor tasks,
+then waited inside the owner for three ready batches. Three suspended tasks did
+not establish that three batches had been constructed. The owner could not
+submit the remaining batch while inside that observer. The repaired fixture
+checks all three Rust constructor events before invoking the ready barrier.
+These failed attempts retain exit 70 and cleanup UNVERIFIED in private evidence;
+they are not reclassified as passes or an OS/GC stall.
+
+The older unattributed first-port watchdog still lacks the failed image and last
+meaningful progress identity. Its cause and cleanup remain unverified. Later
+passes do not close it. Compiler/type/lint failures from this development round
+are retained separately from native watchdog failures.
+
+* Reproduction
+
+#+begin_src sh
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-regenerate
+cargo test -p gerbil-scheme-qualification --features instance-dispatch \
+  --test scheme_service --test service_watchdog --locked
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test \
+  owner_model::owner_completion_scenarios_and_control --locked -- \
+  --ignored --exact --nocapture
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-scheme-service-benchmark \
+  --progress-fair-ab --fixed-short-selective --prepared-cycle-ab
+#+end_src
+
+No new shell script or independent build system is introduced. Commands are
+repository-relative; raw captures, binaries, source archives and host paths stay
+outside version control.
+
+* Targeted A/B admission
+
+The final targeted model gate passes in 120.36 seconds (118.92 in the test).
+It retains the original/coalesced/native-cycle sampled lanes and adds
+PreparedCycle sampling in both completion domains (1000 samples, 64 steps,
+seed 42), the ready-priority/cancel-close scenarios, and two required unsafe
+prepared-entry counterexamples. All eight expected mutation counterexamples
+are found. Separately, all 16 general shared-resource scenarios pass in each
+original cross-owner domain, closing the predecessor's domain-instantiation
+failure without dropping those scenarios.
+
+Final library/native test sources pass Clippy. The changed model harness also
+passes its separate Clippy target. The native suite passes 3/3
+in 19.73 seconds and the watchdog control 1/1 in 5.02 seconds; compilation and
+controller wall time is 35.35 seconds. Three typed completion-metadata tests
+pass. Regeneration succeeds, followed by a separate generated-SCM check with
+update disabled. The benchmark-only CLI correction passes Clippy again and the
+final O2 release build completes in 31.91 seconds.
+
+The initial frozen benchmark exits 101 in 0.51 seconds before producing any
+samples: its new comparison argument was omitted from the explicit argument
+validation list. That failed capture is retained. The entry validation is
+repaired, rebuilt and frozen under a different capture identity. No workload
+sample or native watchdog failure is inferred from that CLI rejection.
+
+One subsequent A/B capture exits 0 in 6.89 seconds with no controller timeout:
+
+- four identical live VMs and the same native image across both arms;
+- NativeCycle control versus PreparedCycle candidate, Tokio two Rust workers;
+- ProgressFair bulk supply and Selective short routing in both arms;
+- slot budget 4, work budget 32, three active bulk batches of eight;
+- Scheme quantum/feed/native work budget 1, NativePort wake;
+- 8192 real orders and 64 short requests per sample;
+- five alternating AB/BA blocks, ten samples per arm/load, 40 samples total;
+- observation Off, no profiler or own build/model/pollers during capture;
+- other local tasks untouched, defaults unchanged.
+
+All samples pass workload identity, actual native policy and quiescence checks.
+Each arm retires 1088 results per sample; offer publications equal withdrawals
+plus entries; all four owners participate. The final receipt joins all four,
+reports roots [0,0,0,0], quiescent services and removed instance files. This does
+not prove every SDK mapping unloads or RSS convergence over a long soak.
+
+Throughput uses median bulk completion duration. Latency p99 pools ten samples
+per arm/load. Owner completion spread is the maximum sample spread. These are
+ratios within this single matched capture, not cross-run baseline comparisons.
+
+| Load | Metric | NativeCycle | PreparedCycle | Change |
+|------+--------+-------------+---------------+--------|
+
+| cpu | Orders/s | 317896.210 | 300717.655 | -5.40% |
+| cpu | Native short p99 (us) | 529.792 | 716.458 | +35.23% |
+| cpu | Scheduled short p99 (us) | 4843.209 | 39390.083 | +713.31% |
+| cpu | Short admission p99 (us) | 885.709 | 1754.583 | +98.10% |
+| cpu | Short pending p99 (us) | 481.709 | 529.500 | +9.92% |
+| cpu | Short construction p99 (us) | 18.458 | 20.916 | +13.32% |
+| cpu | Short projection p99 (us) | 9.917 | 5.625 | -43.28% |
+| cpu | Bulk service p99 (us) | 1360.875 | 2090.833 | +53.64% |
+| cpu | Bulk pending p99 (us) | 1276.375 | 1989.875 | +55.90% |
+| cpu | Owner finish spread (us) | 3892.250 | 486.166 | -87.51% |
+| mixed | Orders/s | 63620.370 | 64618.695 | +1.57% |
+| mixed | Native short p99 (us) | 506.833 | 487.083 | -3.90% |
+| mixed | Scheduled short p99 (us) | 2001.667 | 1855.000 | -7.33% |
+| mixed | Short admission p99 (us) | 86.917 | 88.292 | +1.58% |
+| mixed | Short pending p99 (us) | 492.625 | 477.167 | -3.14% |
+| mixed | Short construction p99 (us) | 9.584 | 7.542 | -21.31% |
+| mixed | Short projection p99 (us) | 3.250 | 2.208 | -32.06% |
+| mixed | Bulk service p99 (us) | 1923.416 | 1986.084 | +3.26% |
+| mixed | Bulk pending p99 (us) | 1902.000 | 1948.083 | +2.42% |
+| mixed | Owner finish spread (us) | 1721.917 | 1302.833 | -24.34% |
+
+CPU groups the same 10880 results into 4120/4717 native harvest batches;
+mixed groups 10880 into 4810/5414. PreparedCycle needs 14.49%/12.56% more
+harvest batches, respectively. Minimum owner progress fractions at first finish
+are 0.984694/0.986957 for CPU and 0.988095/0.988000 for mixed; raw progress
+minima are 1544/1352 and 1968/1952. No owner is filtered. Overlapping short
+requests are at least 49/52 of 64 for CPU and 64/64 for mixed. Actor-peer minima
+are 1/0 and 0/0; this is not universal starvation freedom.
+
+Decision: NOT PROMOTED. The ownership boundary is implemented and natively
+qualified, but the CPU throughput and tail regressions fail performance admission.
+Mixed throughput +1.57% and short p99 -3.90% do not establish a robust overall
+win. Owner finish spread improves in both loads, without improving every fairness
+metric. CPU utilization itself is not classified as a regression. Snapshot
+remains the default; both experimental policies and all negative receipts remain.
+
+* What the existing evidence says to change next
+
+The one-slot Rust preparation boundary solves pre-entry cancellation/root
+ownership and prevents native bulk construction between harvested projections.
+It does not restore the original overlap of supply and native execution. After
+snapshot retirement the prepared request enters, then the ordinary owner loop
+collects again. The measured increase in harvest batches is consistent with
+smaller completion groups and additional cycle boundaries; the capture does
+not isolate the CPU cost of each boundary.
+
+Offline analysis of the same captured stage arrays adds no workload rerun:
+
+| Load | Stage | NativeCycle p50/p99 (us) | PreparedCycle p50/p99 (us) |
+|------+-------+--------------------------+--------------------------|
+| cpu | Bulk construction | 2.458/411.417 | 2.542/414.042 |
+| cpu | Bulk projection/retirement | 6.084/26.042 | 6.042/29.458 |
+| mixed | Bulk construction | 2.542/458.208 | 2.583/453.209 |
+| mixed | Bulk projection/retirement | 6.167/16.625 | 6.209/18.834 |
+
+These wall intervals include possible allocation, GC and descheduling. There is
+no same-spike runnable/blocked evidence here; pooled quantiles cannot be
+subtracted into a causal OS-wait or GC CPU duration. Process GC CPU and owner
+thread CPU retain their separate scopes.
+
+The next architectural work should retain the root-free/withdrawable pre-entry
+boundary while amortizing native construction and harvest transitions within
+one bounded owner service cycle. The typed batch interface and its exact
+root/credit ownership need to be established before implementation: ready
+retirement frontier, lifecycle recheck, capacity-authorized native entry,
+Scheme-owned execution, then completion. An optimized native type/batch
+constructor must preserve generic typed requests, exception behavior and
+continuations; it cannot move the Scheme scheduler into Rust. Increasing a
+wake threshold or staged-window default would not establish this protocol.
+
+This capture rejects the current prepared-entry implementation as a performance
+promotion. It does not identify a unique OS/GC cause or justify another full
+matrix. The next candidate needs a concrete reduction in native transitions
+and typed construction work, followed by one targeted matched comparison.
+
+* Frozen identities and publication boundary
+
+- Release executable SHA-256: =cc36fadfbf16d05ed7707c23397a7e589d2c367e3daf20cf7c9bdffbcb804342=.
+- Native image SHA-256: =37939a0d980ac58c470ef93666292945958894730fe099185feaee55bd6f3d35=.
+- Source archive SHA-256: =a2205daa5e02952e52099f0a9cfeea7385084fa3dd679bc53b6c64ff92d38682=.
+
+Private evidence binds the executable, native image, exact measured source files,
+controller outcome, raw samples, failures and cleanup. The archive precedes this
+final report. Runtime/build/model sources match the measured source apart from
+the preparation module/wake flag feature gates described below.
+No raw logs, binaries, captures, archives or private host paths are committed.
+New-head remote CI remains a distinct gate from these local receipts.
+
+* Feature boundary follow-up
+
+Post-push review found that =service_prepare= lacked the same =tokio-dispatch=
+module condition as the producer/offer types it uses. The isolated-only Clippy
+check then exposed the matching unguarded wake flag as dead code. Guard the
+module, flag and initialization with that same feature condition; check both
+isolated-instances without Tokio and the enabled qualification target. The
+failed isolated-only check is retained; no dead-code suppression is added.
+Both corrected Clippy targets pass: isolated-only in 1.51 seconds and enabled
+qualification in 2.49 seconds.
+The measured benchmark enables instance-dispatch, which enables tokio-dispatch;
+the preparation module is present in both measured and corrected builds. This
+is a conditional-compilation packaging repair, with no change to the measured
+algorithm, runtime code bodies, native image or workload. The frozen capture
+remains attached to its original source identity; no extra workload run or
+new performance claim is produced for these feature conditions.
+
+* Follow-up
+
+[[file:30.65-native-service-construction-pipeline.org][30.65]] retains this negative result and compares PreparedCycle with fused
+native service-input construction and retirement-bounded refill. CPU gains and
+mixed-throughput regression are both retained; defaults stay unchanged.

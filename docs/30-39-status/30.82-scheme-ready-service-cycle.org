@@ -1,0 +1,171 @@
+#+TITLE: Scheme ready collection and single-pass native service cycles
+#+OPTIONS: toc:2
+
+* Evidence and scope
+
+Unpublished opt-in ABI26/27 comparison; defaults remain unchanged. ABI25's
+checkpoint totals were almost identical between arms, despite changes in tail
+statistics. See [[file:30.81-scheme-execution-checkpoints.org]]. This did not
+establish that scheduling opportunities became useful execution or timely
+completion retirement.
+
+Source review found two uncounted edges. The harvest path calls a debt-driven
+checkpoint, then can yield again when no result has appeared. The checkpoint
+counter records only the first yield. A ready bulk graph can also wait behind
+a checkpoint before its result, root and capacity are retired. These are
+concrete protocol mechanisms; they are not unique OS/GC tail attribution.
+
+* One service-cycle decision
+
+| Entry state | ReadyFirst harvest action | Ownership effect |
+|-------------+---------------------------+------------------|
+| Any ready result | Collect now; short result first, then existing bounded bulk snapshot | Transfer existing completion custody; execution debt is unchanged |
+| No ready result, progress debt | One Scheme scheduler pass, then recheck/collect | Only a real receiving grant or terminal event can settle execution debt |
+| No ready result, no progress debt | One ordinary Scheme scheduler pass, then recheck/collect | No invented execution credit |
+| Still empty after the pass | Return empty; existing native wait protocol remains available | No second explicit harvest yield or speculative root/capacity release |
+| Wait entered with results already ready | Do not insert a debt checkpoint before the readiness recheck | Existing wait/readiness protocol returns actionable work |
+
+This replaces the harvest decision; it does not add a yield, lease, threshold,
+receiver fence or outer batch execution unit. CheckpointFirst retains ABI25's
+ordering and possible second yield as the matched control. Both policies use
+the same registered handler layout, execution debt, class arbitration, work
+quantum and shared wake policy. The policy and counter state are allocated once
+per idle-configured work epoch, with no new handler-level checks or allocation.
+
+Ready-first collection cannot by itself fabricate an infinite ready backlog.
+If no Scheme worker runs, every nonempty collection consumes distinct ready
+jobs from the bounded accepted set. After those results retire, a subsequent
+empty harvest must offer a Scheme scheduling pass. If new completions appear,
+actual Scheme execution already occurred. This conditional progress argument
+assumes the owner continues its service loop and projection callbacks return;
+it is not a wall-clock or arbitrary-code preemption guarantee. Ready-first
+collection also cannot acknowledge another worker's execution obligation.
+
+Completion token epochs, per-result native slots, rooted values and independent
+capacity retirement are unchanged. A collected graph still holds its root
+until its own projection/clear; closing, cancellation and timeouts retain the
+existing accepted-job drain. Scheme owns the scheduler and all continuations.
+Rust continues cross-instance dispatch and owner-bound FFI/projection.
+
+No service mutex is held across a yield. Service-to-budget lock order and the
+receiving-thread first-grant receipt remain unchanged. Cache invalidation and
+continuation replay use the existing work epoch and immutable handler plan.
+
+* Native types and evidence contract
+
+The actual Rust API is =configure_scheme_service_boundary_plan_on= with the explicit
+=SchemeServiceCyclePolicy::{CheckpointFirst, ReadyFirst}=. No default changes.
+=SchemeServiceCycleProgress= distinguishes direct collections, explicit boundary
+scheduler passes, active-job scheduler passes, short results collected and
+bulk results collected. Both arms
+maintain the same counters. These events cannot retire roots, permits or
+execution debt. The typed decoder rejects invalid flags, negative/overflowed
+values and impossible direct-collection counts.
+
+Counters include boundary work performed around idle observations; they do not
+measure instruction time or every Scheme/OS context switch. Active passes
+require the native job table to remain nonempty at the pass; idle observations
+after all native jobs are transferred cannot increment that subset. The typed
+decoder requires active passes not to exceed total passes. This separates
+workload advancement from idle control-query traffic without a profiler. Worker handoff
+yields and native blocking are separate from the counted explicit boundary
+passes. Readbacks occur outside timed workload windows. Existing completion
+and execution receipts independently validate the number of results, grants,
+roots and capacity, rather than equating checkpoint count with useful work.
+
+* Reused model and native controls
+
+The existing Runtime model gains a ready-first cycle mode, not a second model.
+It forbids inserting the cycle pass ahead of an actionable completion and
+requires an empty cycle to consume one opportunity before returning. Directed
+controls cover ready bulk collection while short execution debt remains,
+projection before capacity return, a finite ready backlog reaching an empty
+cycle, one-pass reset, closing/abandoned ungranted drain and a premature-pass
+mutation. Existing replay, exception, registration, cache and ready-token
+controls remain. Finite safety checks do not prove OS latency or unconditional
+starvation freedom.
+
+Native qualification configures both policies through the owner API, exercises
+real typed Scheme jobs and validates collection counters for normal, exceptional
+and abandoned results. Existing GC, multi-shot continuation, class fairness,
+backpressure, timeout, cancellation and close controls remain mandatory.
+
+* Targeted performance gate
+
+Compare only these two service-cycle policies using the existing four live
+VMs/image, O2, Tokio two workers, window four, work capacity32, batch eight,
+Actor quantum one, class/feed budget one, work quantum four/maximum48 and five
+AB/BA blocks for CPU and mixed loads. Observation stays off. Preserve actual
+and scheduled short p99, throughput, bulk p99, owner finish spread, protocol
+conservation and complete cleanup. No expanded matrix or unchanged-source
+recapture is used to seek favorable statistics. Five-second native progress
+and120-second capture bounds remain unchanged. Historical watchdog attribution
+is still required; a current successful run does not close a historical failure.
+
+* Final result: rejected
+
+PR head =c4b95dfaa116bd67b110d94826535fd27f227b85= passed both macOS and
+Ubuntu Bazel CI. This closes the earlier build-input receipt failure at that
+head; it does not qualify the unpublished Runtime candidate.
+
+The reused model passed102 directed witnesses and400 randomized sequences of
+at most64 steps. Strict Clippy, formatting and generated-SCM checks passed.
+Native qualification before the active-pass counter refinement passed3 tests;
+final-source qualification passed3 tests in30.25s, joined4, roots0, files
+removed and FD return, with close5.610666ms. Final O2 release construction
+passed. An interrupted build had no final receipt; a subsequent resumed build
+failed on unresolved Rust internal LLVM symbols before test execution. A
+nonincremental Cargo rebuild linked and passed. These logs remain preserved;
+this supports a local incremental-product issue without attributing it to the
+Scheme FFI or historical native watchdog. Initial duplicate API, documentation
+lint, oversized fixture and overly broad guard-edit failures remain recorded;
+all were repaired before performance capture without suppressions.
+
+After external compilers finished naturally, one capture produced40 samples in
+7.533s, exit0 and empty stderr. Host/image identities were unchanged, compiler
+boundaries empty, exact work/result/plan/grant conservation and four-owner
+cleanup passed. Boundary checks do not rule out all mid-window host activity.
+Each arm/load aggregate transferred640 short and10240 bulk results; execution
+debt and root/capacity receipts remained independent and balanced.
+
+| Paired-window median change | CPU | Mixed |
+|-----------------------------+-----+-------|
+| Throughput | +7.55% (7/10 improved) | -5.73% (3/10 improved) |
+| Actual short p99 | -26.71% (6/10 improved) | +7.68% (4/10 improved) |
+| Scheduled short p99 | -4.64% (6/10 improved) | +3.31% (3/10 improved) |
+| Bulk p99 | -15.23% (7/10 improved) | +25.71% (2/10 improved) |
+| Owner finish spread | -31.69% (7/10 improved) | +8.07% (2/10 improved) |
+
+Pooled CPU throughput rose3.06%, while pooled actual short p99 rose18.17%
+despite its better paired median. Pooled mixed throughput fell4.64%, actual
+short p99 rose25.79%, scheduled short p99 rose14.68%, bulk p99 rose201.69%
+and maximum owner finish spread rose21.77%. These negative pooled tails are
+not erased by favorable CPU paired statistics. Both CPU arms had two windows
+with zero minimum peer-at-start overlap; every mixed window in both arms did.
+All owners progressed and drained; this start-overlap statistic is not an
+unconditional starvation or whole-run fairness proof.
+
+| Explicit cycle events, all10 windows | CPU control | CPU candidate | Mixed control | Mixed candidate |
+|-------------------------------------+-------------+---------------+---------------+-----------------|
+| Direct collection cycles | 3378 | 3458 | 4216 | 4292 |
+| Total boundary scheduler passes | 5643 | 5549 | 7416 | 7335 |
+| Active-job boundary scheduler passes | 5176 | 5065 | 7061 | 6993 |
+| Debt-driven checkpoints | 640 | 638 | 640 | 638 |
+
+The new protocol reduces active passes by2.14% CPU and0.96% mixed, and increases
+direct collection cycles by2.37%/1.80%. Thus it changes the intended mechanism,
+but a very small fraction of total active service scheduling. Checkpoint counts
+alone had concealed that distinction. These totals do not uniquely establish
+that the mixed regression is caused by too few useful passes, nor that fewer
+passes explain CPU gains. Native pending includes execution, green-thread
+waiting, GC, host scheduling and completion custody; it is not CPU time.
+
+The ready-first cycle is rejected for publication. It improves the CPU lane in
+this capture but does not solve mixed scheduled tails or owner fairness. No
+unchanged-source recapture, expanded matrix, full-stack promotion, default
+change, commit or push follows. The next protocol decision must incorporate
+whether a scheduling opportunity advanced a worker or merely moved custody,
+not add another yield or infer execution from count reductions. Native typed
+inputs, Scheme Actor/continuation/GC semantics and per-result retirement remain
+mandatory. No new watchdog failure occurred; the original historical failure
+still lacks same-failure attribution.

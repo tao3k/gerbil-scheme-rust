@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::parser::native_syntax::item_projection::RustItemProjectionNodeSyntax;
+use crate::parser::syntax::item_projection::RustItemProjectionNodeSyntax;
 use crate::parser::{ParsedRustModule, RustTopLevelItemSyntax};
 
 use super::format::render_item_locator_line_with_read;

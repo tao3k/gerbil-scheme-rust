@@ -1,0 +1,221 @@
+#+title: Owner Wakeup, Native Type GC, and Explicit Scheme Runtime Requirements
+#+date: 2026-10-19
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Scope and identity
+
+This continues the Rust--Gerbil library work on =codex/typed-fold-aot=,
+base commit =bb71bbb5ad91bbaef2035979319514c7ced4c4ca= plus uncommitted sources.
+The source inventory, native artifacts and raw logs are bound in
+the receipt manifest. This is local Darwin evidence, not remote CI,
+installed-wheel migration or a release. Earlier negative receipts remain intact.
+
+Scheme continues through Gerbil -> Gambit C -> native code. Rust dispatches
+between fixed owners, each carrying a complete Scheme runtime. Scheme retains
+GC, closures, dynamic bindings, exceptions, continuations and Actor/green-thread
+scheduling. No Scheme-to-Rust translation or shared-VM SMP change is involved.
+
+* Correcting the actual no-VM restriction
+
+The old transition document said the Rust runtime was not a scheduler around a
+Scheme VM. That blanket requirement contradicted the implemented instance API.
+The architecture guides and Rust API overview now explicitly describe the
+Scheme-hosting path. Existing Python Rust-only subset providers remain separate;
+they are not silently rewired or advertised as complete Scheme execution.
+
+There was also a real admission restriction: the Owned C ABI accepted only
+=NO_VM=. Its version-1 layouts now accept exactly one explicit runtime declaration:
+
+| Declaration | Requirement |
+|-------------+-------------|
+| =NO_VM= (1) | Callback/release does not depend on Scheme |
+| =SCHEME_VM= (2) | Callback/release runs on the live VM's fixed owner; the producer or admitted scope retains VM, captures and code through final release |
+
+Zero, combined flags (3), and unknown flags still reject. Runtime declaration
+is not a lease, implicit initialization, provider fallback or proof of safe entry.
+A dependent result needs independent lifetime protection if it outlives the
+callable/state. A copied result may correctly remain =NO_VM=. The existing
+non-Send/non-Sync handles retain thread affinity. Old adapters reject the new
+flag explicitly; no ABI struct layout or existing =NO_VM= meaning changes.
+
+The unsafe constructor's caller must establish lifetime through all callbacks,
+including release on rejected admission. This does not create a safe persistent
+cross-task VM lease. Normal =NativeRoot= references still cannot leave their
+owner task. See [[file:../owned-c-abi.md][the complete callback contract]].
+
+The =--owned-vm= qualification uses the real public =ForeignCallable= inside
+native tasks on four =InstancePool= owners. Its thin callback converts existing
+owned types to native s64vectors, calls the compiled Scheme entry, and copies
+results; it implements no business algorithm. The Scheme fixture performs GC,
+closure computation, multi-shot continuation resumption and exception unwinding.
+A genuinely =SCHEME_VM=-dependent result retains its own native strong root
+after all callable aliases close, survives another GC, and releases before the
+borrowed native session ends. Root count returns to zero. This checks result
+lifetime independently of the callable context.
+
+* More precise measurements
+
+=BatchTimeline::items_constructed= separates per-item numeric construction from
+collection/envelope construction. Optional =NativeSession::diagnostics= snapshots
+read six doubles: cumulative SDK GC user/system/real seconds, owner thread CPU
+seconds, strong-root count and GC count. The native export performs no Scheme
+entry or explicit allocation. Missing/failed snapshots are =None=; older ABI-v3
+images need no new export for ordinary execution. The normal batch API performs
+no extra clock or diagnostic reads. Profiling itself has observer overhead.
+
+GC real time is elapsed time recorded by the paired SDK; it may include
+preemption during collection. SDK user/system accounting is not assumed to be
+thread-exclusive. Owner CPU time is measured independently with
+=CLOCK_THREAD_CPUTIME_ID=. Counter deltas are cumulative differences, not an
+exclusive scheduler/collector CPU decomposition. No SDK source or flags changed.
+
+The final real-order trace contains 10 samples per load/batch cell. Each sample
+processes 1,024 actual Scheme order calculations in cohorts of 128, using the
+existing independent Rust result oracle and Scheme completion-rank checks.
+All records exist at cohort release. Results use the root-balanced owner
+completion timestamp. Numeric items contain 48 order lines, not JSON.
+
+** Idle owner control
+
+=--owner-wake= initializes four real VMs and submits one no-Scheme native task
+per owner per cohort. Every cohort is fully acknowledged before the next;
+there is no preceding application backlog. GC count remains unchanged and
+strong-root count stays zero. The diagnostic contrasts immediate next-cohort
+submission with an explicit 1ms idle interval, 2,048 observations each.
+
+| Condition | Dispatch median / p99 | Admission upper-bound p99 | Post-admission wait lower-bound p99 |
+|-----------+-----------------------+---------------------------+------------------------------------|
+| Immediate next cohort | 6.834 / 28.125 us | 6.292 us | 26.375 us |
+| Idle 1ms | 10.250 / 2146.833 us | 9.333 us | 2145.375 us |
+
+The idle dispatch maximum was 4.349ms. These stalls arise before any Scheme
+construction or computation; they cannot be blamed on GC or a queue of earlier
+Scheme tasks. The measurement still includes channel wakeup and OS scheduling,
+and does not identify an exclusive kernel scheduling cause. The artificial idle
+control is diagnostic, not a matched application speedup or production SLO.
+
+** Type construction and collector time
+
+In the final artifact's real-order trace, every batch-32 item-construction span
+above 500us had a GC event. Conditional means over those slow spans were:
+
+| Load | Slow spans / with GC | Construction wall | SDK GC real delta | Owner CPU delta |
+|------+----------------------+-------------------+-------------------+-----------------|
+| CPU | 22 / 22 | 722.369 us | 679.460 us | 687.756 us |
+| Mixed waits | 17 / 17 | 577.250 us | 544.282 us | 561.870 us |
+
+These are means conditional on a slow construction, not marginal p99 values.
+The final CPU batch-32 slowest 1% (four batches) averaged 1,243.448us end to end:
+896.219us item construction (838.995us GC real delta), 7.437us envelope,
+147.594us dispatch, 130.740us Scheme entry, and 35.729us projection. Other host
+and retirement spans account for the remainder. Projection was not the main tail.
+
+The tail mix is not stable across runs: the earlier CPU batch-32 slowest 1%
+averaged 2,253.021us total with 2,078.240us dispatch and no construction GC in
+those particular tail batches. A mixed one-item construction lasted 1,487.542us
+with only 11.791us owner CPU and no GC. Retain both observations: wall-clock
+slowness is not automatically allocation or collector cost. The first diagnostic
+also formatted detail strings between requests; final diagnostics store numeric
+records and format only after the sample. Neither profile supplies throughput
+acceptance for the ordinary API.
+
+* Rejected minimum optimization: earlier temporary-root release
+
+The candidate released individual input roots after building their containing
+Scheme vector, then released input/quantum roots after constructing the envelope.
+The containing Scheme objects remained strong roots. This reduced redundant
+external roots; it did not eliminate the live input objects or change GC policy.
+Scheme handlers, four actors, between-item yields and wait behavior were identical.
+
+The final =--root-ab= reproduction keeps this candidate in qualification only.
+Both arms use the same =submit_native_on= route and conversion function in the
+same image, pool and four live VMs. Variant 0 retains original lifetimes; variant
+1 releases earlier. Ten ABBA blocks give 20 samples and 20,480 orders per cell.
+Batch 1 uses quantum 0; batch 32 uses quantum 1. Producer, owner assignment,
+oracle and fairness checks are shared with the actual public batch workload.
+
+The qualification conversion has known small, fixed-width valid outputs and
+uses the existing per-vector bounds; it is not a replacement for the public
+batch API's admission and aggregate-output error checks. Those are verified
+separately by =--orders=. There is no caller-selectable production root policy.
+
+| Load / batch | Throughput original / candidate (orders/s) | P99 original / candidate (ms) | Minimum peer progress original / candidate |
+|--------------+--------------------------------------------+-------------------------------+--------------------------------------------|
+| CPU / 1 | 177049 / 161783 | 3.713 / 1.621 | not applicable |
+| CPU / 32 | 496174 / 502423 | 0.531 / 0.581 | 7/8 / 7/8 |
+| Mixed / 1 | 18067 / 18764 | 12.080 / 11.195 | not applicable |
+| Mixed / 32 | 46367 / 45917 | 9.538 / 6.825 | 2/8 / 2/8 |
+
+Throughput is 1,024 divided by the lower sample-median elapsed time; p99 is
+nearest-rank over all 20,480 order latencies, never an average of sample p99s.
+All items in a batch receive its public completion timestamp. Fairness measures
+minimum peer completions when the first actor finishes its assigned items;
+it is not a global scheduler fairness theorem.
+
+The final CPU batch has a small throughput gain but a 9.3% p99 regression.
+Other runs also rejected the candidate: an earlier CPU batch p99 changed
+1.313 -> 2.189ms, mixed batch 4.773 -> 9.585ms. One symmetric reproduction
+lowered CPU peer progress from 7/8 to 6/8. Mixed final tails improve but earlier
+mixed tails regress. No stable all-metric improvement is established.
+
+The first two runs compared the frozen original native conversion with the
+then-modified public batch API; that control omitted generic admission and
+aggregate-output bookkeeping. They are retained as exploratory negatives, not
+pooled with the final symmetric reproduction. Both symmetric logs and original
+negative logs are archived. The production batch's original root lifetimes
+were restored byte-for-byte except the no-op-on-normal-calls item phase marker.
+No busy-spin loop, weakened GC, reduced Scheme capability or longer gate was
+introduced to hide either wakeup or collector tails.
+
+* Native acceptance and remaining limits
+
+- Strict Clippy for all targets in the bridge, qualification and owned adapter
+  passes with warnings denied. The initial exact-double-comparison lint failure
+  remains in the receipts.
+- The independent Owned C ABI integration controls still pass: existing closure,
+  transactional state, release, error and parallel independent-owner behavior.
+- =--owned-vm= passes on all four real owners, including explicit invalid runtime
+  declarations, native Scheme closure/GC/multi-shot continuations, exceptions,
+  alias closure and once-only context release (including rejected contexts).
+  A VM-dependent result remains rooted after callable close and GC, then releases
+  on the owner before shutdown; native reuse/type/panic smoke controls also pass.
+- =--orders= verifies the public native batch path, all actor failure lanes,
+  recovery, transfer bounds, 256-item admission and aggregate output bounds.
+- All recorded native shutdowns require joined owners, zero roots, removed
+  copied-image files and terminal I/O scratch retirement. Initialized mappings
+  remain retained as previously documented; hot unloading is not proved here.
+- Older ABI-v3 images without diagnostics remain usable for ordinary execution.
+  A missing diagnostic does not acquire zero-valued counters or disable checks.
+
+The result is a corrected runtime contract and finer executable attribution.
+The new root optimization is rejected; p99 optimization remains open. Packaging,
+Python consumer migration and portable runtime isolation require their own
+acceptance. No result here repairs ordinary shared-runtime multi-VM foreign
+entry or establishes general process crash containment.
+
+* Reproduction
+
+Use the existing Just/Cargo/Gerbil build graph, retaining the original five-second
+startup, response, shutdown and genuine-progress gates:
+
+#+begin_src sh
+just bridge-instance-resources --owned-vm
+just bridge-instance-resources --owner-wake
+just bridge-instance-resources --orders-profile
+just bridge-instance-resources --root-ab
+just bridge-instance-resources --orders
+#+end_src
+
+Raw stdout/stderr, negative candidate source, artifact/source hashes, final
+metrics and native module inventory are under
+20261019-owner-wakeup-gc. This source inventory is scoped to the touched
+bridge, owned ABI and qualification path; it is not a complete dependency
+supply-chain attestation. Historical artifacts retain their own identities. The measured executable was
+saved before adding the final result-root lifetime assertions; its native order,
+batch and profiling source paths are unchanged. The final acceptance executable
+has its own hash and runs the strengthened owned-result and native smoke checks.
+Exploratory runs without a saved exact intermediate binary are marked as such;
+the manifest does not assign the final executable's identity to those logs.

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "purpose": "Fix a real source REV, then reproduce before further optimization",
+  "parent_revision": "6d4ec27ccf166b89279999cce66e33ce1e34c643",
+  "source_revision_identity": "The commit containing this file; record git rev-parse HEAD from its clean checkout",
+  "historical_observation_p99_ns": 298000,
+  "historical_binary_original_source_revision_proven": false,
+  "native_qualification_sources_match_historical_manifest": true,
+  "rust_host_source_is_labeled_reconstruction": true,
+  "rejected_peak_observer_runtime_hooks_present": false,
+  "rejected_counterexamples_retained": true,
+  "build_command": "cargo bench --offline -p gerbil-scheme-qualification --features owner-wait-diagnostic --bench gerbil_actor_arrival --no-run",
+  "vm_check_command": "cargo test --offline --release -p gerbil-scheme-qualification --features owner-wait-diagnostic --test owner_wait_vm",
+  "run_arguments": ["--owner-wait-scope", "--rate=500000", "--seconds=10"],
+  "image_selection": "Explicit GERBIL_SERVICE_BENCH_IMAGE pointing to the newly built frozen diagnostic image",
+  "workload": {
+    "owners": 1,
+    "scheme_workers": 4,
+    "rate": 500000,
+    "seconds": 10,
+    "planned_messages": 5000000,
+    "warmup_rate": 1000,
+    "warmup_seconds": 1,
+    "watchdog_seconds": 5,
+    "original_outstanding_guard": 128
+  },
+  "replay_status_at_source_freeze": "pending",
+  "rules": {
+    "no_optimization_before_replay": true,
+    "no_new_instrumentation": true,
+    "no_queue_or_timeout_changes": true,
+    "do_not_promote_a_worse_run_to_baseline": true,
+    "report_p99_throughput_rejection_and_debt_separately": true,
+    "do_not_claim_exact_298us_without_observing_it": true,
+    "no_push_or_pr_update": true
+  }
+}

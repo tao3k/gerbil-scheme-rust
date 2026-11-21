@@ -1,0 +1,120 @@
+#+TITLE: Bounded Gambit Host Function Layout
+#+LANGUAGE: en
+
+* Ownership and failure
+
+The selected Gambit header defines both =___SINGLE_HOST_LIMIT= and
+=___OPTIMIZED_MODULE_LIMIT=. A configured single-host build has no host split
+when the former is zero. Generated modules can therefore place tens of
+thousands of labels in one C function. MRR's retained POO table contains 20,116
+labels; its failed GCC compilation reports approximately 91,000 basic blocks and
+445,000 registers before signal 9. Signal 9 alone does not identify which
+operating-system resource policy terminated the compiler.
+
+The producer's POO =build.ss= already uses a 10,000-label split for that module.
+Recompilation of its static Scheme carrier by a generic program archive does
+not inherit the producer's =gxc:= command-line options. Installed dynamic-module
+success therefore does not qualify the archive's single-host compilation.
+
+* Compiler-owned remedy
+
+For generated module objects built by the configured GCC lane, the program
+archive sets =___SINGLE_HOST_LIMIT= to Gambit's own
+=___OPTIMIZED_MODULE_LIMIT=. The paired header supplies the numeric threshold
+and selects multiple host functions when necessary. Cargo's =OPT_LEVEL= selects
+runtime, startup and linker-object optimization. Standalone archive calls use
+=-O2=, and lazy metadata follows the paired compiler's default.
+Cargo level =0= uses =-O1= to retain optimized C tail calls. Module closure,
+runtime headers, concurrency, linker entry and the existing GCSE load-motion
+exclusion remain part of the archive contract. Code-generation options are part of the existing
+object fingerprint; the old single-host object cannot satisfy the new recipe.
+
+This is a generic archive safety default, not reproduction of every producer's
+module-specific compiler option. It does not replace source-owned build.ss or
+authorize changing an unrelated runtime ABI. Runtime compatibility still needs
+the complete linked consumer entry and its real tests.
+
+On Linux, Gambit can bind the embedding owner thread to one CPU. The SDK's
+existing host-state boundary captures and restores the caller's exact CPU
+affinity around initialization, package operations and cleanup. Native worker
+discovery and compiler children therefore retain the host's admitted CPUs,
+including container restrictions. Cargo's =NUM_JOBS= still bounds the native
+batch; this does not introduce a worker override or modify Gambit sources.
+The runtime and package tests check the calling thread's allowed CPU list.
+The same host-state boundary retains the caller's SIGPIPE disposition; Rust
+pipe writes must still return BrokenPipe after native setup and cleanup.
+A real pipe with an exited reader exercises that contract in the runtime test.
+Linux cleanup also blocks owner-thread SIGPIPE until the host disposition is
+restored: Gambit resets it before retiring I/O devices. The boundary restores
+the original thread mask and retains an already pending host SIGPIPE, while
+consuming a newly generated cleanup signal without waiting. The Linux C ABI
+gate checks real closed-pipe writes and an unguarded signal-13 control. This
+adds no mask operation to scalar access or application message dispatch.
+
+* Retained-source evidence
+
+The exact failed generated C source compiles with the remedy and the same
+paired compiler in 66.36 seconds. The system time utility reports maximum RSS
+of 1,756,725,248 bytes; this is a compiler-process observation, not peak memory
+of a concurrent complete build. The object is 3,945,400 bytes. Native child
+completion is observed naturally under the original 1,800-second wall and
+five-second idle supervision. No new optimization dump, timer heartbeat or
+concurrency cap supplies progress. The earlier SIGKILL evidence is retained.
+
+This focused receipt is not complete MRR acceptance or a performance comparison
+against a successful baseline. Logs and generated objects remain temporary.
+Frozen consumer dependency pins do not acquire this upstream patch silently.
+
+* Link-kind and release admission
+
+The complete consumer entry exposes an independent link admission defect:
+ordinary SDK =-lcrypto= dependencies were being required to provide a static
+archive. Discovery now retains the declared link kind. A normal library can
+resolve to a shared library or archive; =static=crypto= still requires an
+archive and refuses a shared-only package. A standard test covers that negative
+case. No link order is rewritten. The setup action publishes package-manager
+pkg-config search roots instead of injecting linker library paths.
+
+Consumers must provision the release through this build owner's setup action
+as well as consume its Rust build API. An older Darwin release lacks
+=add-compile-output-job!= required by the pinned Ascent producer; selecting it
+from a separate old action is not the same admitted source/toolchain cohort.
+The setup action's already declared newer Darwin release contains that API.
+This does not imply adopting the unfinished embedded tooling feature or changing
+the consumer's independently pinned runtime bridge.
+
+* Thread receipt observation
+
+Ubuntu reports three task-directory entries against an initial count of two
+immediately after the last Tokio build lease is dropped. Tokio's blocking pool
+joins its worker handles during shutdown; kernel task-directory visibility is
+not an instantaneous completion receipt. The standard isolated child test now
+observes return to the exact baseline within the existing five-second operation
+gate. A persistent extra task still fails; actual host worker count, repeated
+owner creation and the final exact-count assertion remain. No runtime shutdown
+deadline or CI watchdog is extended. The original Ubuntu failure is retained.
+
+* Arrow check preparation
+
+The Darwin compiler-control job at =45b74a5= exceeded its unchanged 30-minute
+limit. Arrow's three library tests passed, library Clippy passed, and the
+linked-program ownership test passed. The final Clippy compilation was
+interrupted. The job annotation confirms a time-budget failure, not a failed
+Arrow ownership assertion. The full failed transcript remains local evidence.
+
+The Arrow lint commands now include library and test targets. This retains
+test dependency features across test and lint while checking additional test
+code. Default-runtime and external-program builds stay separate: combining
+them into one feature-unified Cargo invocation would lose the original
+default ABI configuration. Both original test commands and all original lint
+surfaces remain; no extra shards, profile changes or timeout increases are
+used.
+
+The expanded four-command sequence passed locally, including the three
+library tests and one linked ownership test. Cargo-native timings recorded
+5m45s for the default test build, 38.58s for expanded default Clippy, 3m23s for
+the linked test build and 1m57s for expanded linked Clippy. The target directory
+was partially warm and fingerprint logs include an isolated =GERBIL_PATH=
+change. These are preparation observations, not a matched cold comparison
+with CI and not proof that its 30-minute gate is repaired. Inspect the next
+exact-head CI result before claiming acceptance.

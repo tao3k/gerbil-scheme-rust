@@ -1,0 +1,208 @@
+#+title: Native Batch API and Scheme Actor Qualification
+#+date: 2026-10-19
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Implementation and checkout
+
+Local working-tree evidence on =codex/typed-fold-aot=, base
+=bb71bbb5ad91bbaef2035979319514c7ced4c4ca=. This historical branch name does
+not describe the current execution route: the existing native Gerbil-to-C
+compiler graph compiles the new library Scheme module and application handler.
+Rust constructs/projects native values and routes batches to fixed instances.
+There is no Scheme-to-Rust lowering, SDK rebuild or SMP scheduler change.
+Unrelated Python and compiler work remains in the checkout.
+
+The public Rust entry is =InstanceDispatcher::submit_numeric_batch_on=.
+The reusable Scheme library is =scheme/actor-batch.ss=, installed by the
+canonical =build.ss=. =make-gerbil-rs-actor-batch= creates persistent local
+mailbox workers; =gerbil-rs-actor-batch!= accepts a bounded native envelope;
+=gerbil-rs-actor-batch-close!= joins them. Scheme uses the native =spawn=,
+=thread-receive=, =thread-send=, =thread-yield!= and =thread-join!= mechanisms.
+This is a local mailbox service, not a qualification of the complete
+=:std/actor= remote envelope or supervision protocol.
+
+The service creates a private green coordinator per turn, preserving unrelated
+messages in the foreign-entry thread's mailbox. Handler exceptions drain all
+items and worker acknowledgements before foreign return. Reuse after failure
+is checked on every worker lane. A failed batch can have successful side
+effects; admission, failure and timeout do not imply transactional rollback.
+
+Existing =submit_native_on= and native scalar/string/vector interfaces remain
+available for other application shapes. The batch convenience method currently
+accepts/returns one numeric-vector family per call; this is an interface scope,
+not a replacement for Scheme objects, continuations, allocation or execution.
+
+* Workload and matched controls
+
+The application runs actual Scheme order validation and aggregation: each order
+contains 48 native =(sku, quantity, unit-cents)= triples. Scheme validates lines,
+computes unit/gross totals and 16 SKU subtotals, returning native numeric vectors.
+Generated deterministic records are used, not a captured production trace.
+Every result is checked against an independent Rust aggregate oracle; Rust's
+oracle is validation only and never handles a scheduled Scheme request.
+
+Each sample processes 1,024 orders in eight cohorts. Each cohort releases 128
+already-constructed orders at once; queue capacity is 128 for every case.
+All cases have identical item payloads and owner placement: contiguous groups
+of 32 orders map to the same owner in both the one-item and batched controls.
+No queue rejection, silent loss or automatic retry is admitted in timed runs.
+The four cases are =(batch, quantum)= =(1,0), (8,1), (32,0), (32,1)=.
+All cases use the same four-worker Scheme service and per-turn coordinator.
+Each is warmed once, then measured in five forward/reverse blocks, yielding ten
+samples per case. One-owner and four-owner groups are separate experiments;
+they are not a balanced owner-count scaling comparison.
+
+CPU-only orders are compared separately from mixed orders. In the mixed fixture,
+request IDs divisible by seven perform a native Scheme =thread-sleep! 0.001=
+before computing. This spreads waits among mailbox workers. It exercises green
+wait overlap, not a network stack or external database service.
+
+The first exploratory fixture used IDs divisible by eight, which assigned every
+wait to worker zero in four-worker batches. Its completed run is retained as a
+skewed-actor control. Its receive-observation timestamps predate the new owner
+completion receipt and cannot be compared directly with final tail measurements.
+That result demonstrates a placement bottleneck; more workers alone do not
+redistribute one worker's serial mailbox work.
+
+* Measurement definitions
+
+Throughput is 1,024 divided by the lower median complete sample duration
+(nearest-rank p50 over ten samples). That duration
+includes host input generation, admission/cloning, native conversion, Scheme
+execution, result projection and host validation. Pool creation and untimed
+contracts are excluded and initialization is reported separately.
+
+Tail latency is cohort release to the owner's completion timestamp, after all
+native root guards drop/balance and before reply publication. All orders in a
+batch receive that batch's timestamp, so this is delivery-boundary latency,
+not an individual actor's earlier internal completion time. Per-case p95/p99
+pool all 10,240 orders, retaining slow samples. No automatic batch fill delay
+exists; an application collecting items over time must measure that delay too.
+=probe-p99= selects IDs congruent to 31 modulo 32 from the same cohorts; those
+probes are mixed-work positions, not a separately prioritized client.
+
+=peer-min= measures intra-instance progress: when the first of four workers
+finishes its assigned items, count each worker's completed items and take the
+minimum, then retain the minimum across measured batches. Ranks and worker
+assignment are checked. Batch one has no multi-worker fairness measurement.
+This metric distinguishes item-boundary yielding from one actor finishing its
+whole CPU slice before peers run. It does not prove fairness among concurrent
+Rust producers, priority classes or arbitrarily long individual handlers.
+
+A yield inside a foreign call schedules Scheme green threads only. The next
+Rust queue entry waits for the entire current batch to return. Batch size caps
+item count, not elapsed handler time; CPU-heavy handlers need internal
+cooperative points. No global fairness or crash-containment guarantee is added.
+
+* Contracts and retained boundaries
+
+The native run rejects empty/257-item batches, quantum 257 and oversized input
+before admission; validates a full 256-item batch; injects invalid orders on all
+four worker lanes and verifies subsequent successful reuse; checks aggregate
+output rejection before allocating the excess result and successful reuse;
+forces GC and checks zero external roots; closes Scheme workers, joins native
+owners and verifies cleanup status, terminal IO release and copied-path removal.
+
+Initialized native image mappings remain retained under the previous lifecycle
+contract. Fixed pool reuse is still required; this work does not claim safe hot
+unload or bounded memory for unlimited pool replacement. The SDK and production
+=ffi/runtime.c= are unchanged. These are local native receipts, not remote CI,
+a release or a production latency guarantee.
+
+* Results
+
+Final measurements and source-bound receipts are recorded below.
+
+| Owners | Workload | Batch / quantum | Orders/s | p95 ms | p99 ms | Probe p99 ms | Peer minimum |
+|--------+----------+-----------------+----------+--------+--------+--------------+--------------|
+| 1 | CPU | 1 / 0 | 80,928 | 1.870 | 3.014 | 3.469 | 0 |
+| 1 | CPU | 8 / 1 | 161,322 | 1.070 | 1.567 | 1.617 | 1 |
+| 1 | CPU | 32 / 0 | 180,332 | 1.079 | 1.513 | 1.513 | 0 |
+| 1 | CPU | 32 / 1 | 162,976 | 1.325 | 1.917 | 1.917 | 6 |
+| 1 | mixed wait | 1 / 0 | 3,902 | 41.446 | 69.429 | 73.766 | 0 |
+| 1 | mixed wait | 8 / 1 | 6,076 | 23.725 | 37.955 | 41.776 | 0 |
+| 1 | mixed wait | 32 / 0 | 14,314 | 10.284 | 17.451 | 17.451 | 0 |
+| 1 | mixed wait | 32 / 1 | 14,395 | 14.356 | 32.879 | 32.879 | 2 |
+| 4 | CPU | 1 / 0 | 180,369 | 0.891 | 1.349 | 1.632 | 0 |
+| 4 | CPU | 8 / 1 | 308,655 | 1.529 | 4.220 | 4.238 | 1 |
+| 4 | CPU | 32 / 0 | 362,264 | 1.459 | 3.634 | 3.634 | 0 |
+| 4 | CPU | 32 / 1 | 335,820 | 1.175 | 3.041 | 3.041 | 7 |
+| 4 | mixed wait | 1 / 0 | 18,511 | 6.218 | 7.021 | 7.554 | 0 |
+| 4 | mixed wait | 8 / 1 | 23,582 | 5.652 | 6.691 | 7.683 | 0 |
+| 4 | mixed wait | 32 / 0 | 45,699 | 3.546 | 6.543 | 6.543 | 0 |
+| 4 | mixed wait | 32 / 1 | 45,299 | 3.640 | 8.681 | 8.681 | 2 |
+
+For four CPU owners, batch 32 / quantum 1 improves median sample throughput
+by 1.86x versus the single-item batch API. At the first worker's completion,
+all workers have completed at least seven of their eight assigned items;
+the no-explicit-yield batch control has minimum peer progress zero. This is
+observed intra-Scheme fairness, not a scheduler theorem. However pooled p99
+worsens from 1.349 ms to 3.041 ms. Batch 32 / quantum 0 also regresses p99.
+
+For four mixed-wait owners, batch 32 / quantum 1 improves median throughput
+by 2.45x, while p99 worsens from 7.021 ms to 8.681 ms. Batch 32 / quantum 0
+has p99 6.543 ms in this run. A peer minimum of zero in mixed waits can mean
+that a worker is legitimately waiting, not CPU starvation. Neither eight-item
+batching nor an explicit yield is a universal p99 improvement.
+
+Decision: retain explicit, caller-selected batching and quantum. This result
+closes executable API integration, semantic parity, bounded transfers and local
+fairness measurement. It does not close a universal p99 non-regression gate;
+no automatic batching/quantum default is installed. Applications with a latency
+budget must qualify their own arrival process, handler sizes and batch fill delay.
+
+Initialization is excluded from timing: one owner took 527.5 ms; four sequential
+owner initializations took 2,046.7 ms. All six owners in the batch process joined
+with roots zero, native cleanup zero, 2,048 terminal IO bytes released per owner,
+and copied paths removed. Existing native smoke validation passed nine numeric
+families, four scalar families, mixed vectors, Unicode/NUL/NaN/signed-zero,
+Scheme continuation/GC checks, 720 successful tasks, 42 injected Scheme errors
+and six contained Rust panics. Its six-epoch retention control grew and cleared
+134,219,264 live bytes; roots were zero and FD/thread counts returned to baseline.
+The smoke error counts cover owner zero, while the new batch handler faults
+cover all four worker lanes on every tested owner.
+
+No compiler processes were present in the final before/after snapshots. This
+is still a shared laptop, not an isolated performance host; snapshots do not
+exclude intervening activity. All slow samples are retained. Grouped one/four
+owner results must not be used to claim cross-owner scaling.
+
+* Negative receipts and repairs
+
+- =build-run.log=: completed exploratory skewed-wait fixture, before private
+  coordinator and owner completion timestamps; retained, not pooled with final data.
+- =clippy.log=: first strict lint failure for =manual_is_multiple_of=. The fix
+  uses stable =rem_euclid= to preserve the declared Rust MSRV rather than adopting
+  a newer stabilized convenience method or suppressing the lint.
+- =orders-rank-failure.log=: rank permutation assertion failed. A shared Scheme
+  completion counter was read after allocation/preemption, producing repeated
+  output ranks. A native Scheme mutex now protects increment and captures the
+  returned rank; the per-item result uses that local snapshot. This is a fixture
+  measurement repair; no Rust lock schedules Scheme actors. Cleanup on this
+  failed process was not fully observed.
+- =orders-loaded.log=: completed correctness/contracts run, but external native
+  compilers appeared in the after snapshot. Excluded from performance conclusions.
+- =smoke-vector-failure.log=: mixed native vector compatibility regression.
+  The fixture initially treated every vector as an order envelope. A dedicated
+  =gerbil_owner_orders_call= export now selects the application, preserving the
+  existing generic native entry. The same compatibility smoke then exited zero.
+
+* Reproduction and receipts
+
+#+begin_src sh
+env -u SDKROOT \
+  just bridge-instance-resources --orders
+# Existing native compatibility and lifecycle regression:
+env -u SDKROOT \
+  just bridge-instance-resources --smoke
+#+end_src
+
+The final timing run invoked the Cargo-built release binary directly after
+compilation, with the same arguments, so no owned compiler overlapped timing.
+The original five-second startup/response/shutdown/progress gates remain intact.
+See the receipt inventory, raw samples and source/image digests. Strict current
+Clippy, generated Scheme provenance and native-root compile-fail ownership
+checks are recorded separately from execution/performance evidence.

@@ -1,0 +1,244 @@
+#+TITLE: Native batch construction, owner skew and mixed service attribution
+#+STARTUP: overview
+
+* Published predecessor and decision
+
+PR #18 head =2ca8dea8be7c54c5a55f4d1d061f5f579e50ecc3= completed CI run
+=39552435474=: six active jobs passed; Scheme SMP was explicitly skipped.
+The present refinement has separate local qualification and requires its own
+exact-head CI after publication. Earlier results in [[file:30.30-bounded-native-owner-producer.org][30.30]] remain historical.
+
+Completed-work throughput is the primary performance outcome. Higher CPU utilization
+alone is not a regression. Tail latency and owner progress remain independent
+observations. The selected refinement reduces native input construction overhead
+inside the explicit owner-producer API. Ordinary batch APIs, Python/backend mode
+selection, thread/VM counts and configured capacity defaults do not change.
+
+* Evidence-directed attribution
+
+The old B/C captures are reconstructed per batch and owner using the original
+native offsets, service spans and Scheme spans. The percentile convention is
+=ceil(N * percent / 100) - 1=, identical to the Rust corpus helper. Component
+quantiles are not subtracted to infer individual-call costs.
+
+Of the slowest 103 CPU control batches in each old cohort, 102 and 84 have a GC
+before projection ends; median Scheme-span shares of those tails are 4.6% and
+6.2%. This points to native construction/projection/retirement, not just Tokio.
+Old counters stop at projection, so they cannot assign later retirement GC.
+
+In the old mixed producer tails, median Scheme shares are 99.3% and 99.5%; only
+9 and 12 of 103 have an observed pre-retirement GC. Each owner receives 256
+batches. Its handler has 293/293/292/293 one-millisecond waits in total, but each
+batch has exactly one wait on its ideal four-Actor critical path. That small
+input-count difference does not explain the measured owner completion skew.
+Per-sample finish identities are checked as first-entry plus total native service
+plus intervening gaps. Those service differences dominate most producer skews;
+this does not distinguish timer wake latency from host preemption.
+
+The final qualifier retains input, envelope, Scheme, projection, root-retirement
+and balance/completion spans. Native cumulative thread CPU and collector counters
+are observed at the same boundaries, including after local roots are released.
+Combined construction exposes one boundary; item/envelope timestamps coincide,
+without inventing a marker inside the foreign call. Normal unprofiled execution
+has no new phase-clock reads. Cursor rows retain the existing offer timestamp,
+which precedes registration enqueue; it is not native acceptance of staged work.
+
+* Rust and Scheme implementation
+
+=NativeSession::numeric_batch_envelope= passes borrowed numeric row pointers and
+lengths synchronously to =gerbil_scheme_rust_numeric_batch_create=. Scheme copies
+all nine supported numeric families into actual Scheme vectors, creates the quantum
+and input envelope, then publishes one external strong root. Scheme stack/heap
+reachability protects partially constructed values across GC. No Rust pointer or
+borrowed Scheme body pointer is retained. Bounds and cumulative native input bytes
+are checked before entry. Failed construction publishes no partial external root.
+
+At batch eight the input path changes from eight item roots plus input, quantum
+and envelope roots (11 registrations) to one complete envelope root. Child objects,
+handler work, output content and all original calls remain. Explicit owner producers
+use this native constructor if the image exports it. Older native images continue
+through the existing rooted Scheme implementation; no VM-less path is introduced.
+The public constructor itself rejects unavailable support explicitly.
+
+The standard native image builder and qualification builder export the new symbol.
+Tracked Scheme compiler output is regenerated with =just bridge-regenerate= and
+its source provenance is retained. Compilation remains Gerbil -> Gambit C -> native
+O2. There is no SDK patch, Bash driver, evaluator replacement or SMP change.
+
+** Withdrawn indexed projection
+
+An initial local experiment avoided temporary child roots by resolving a parent
+slot separately for numeric sizing and copying. The pure numeric order corpus
+passed, but a Scheme green thread could replace that mutable parent slot between
+foreign entries. Keeping the parent alive does not freeze its selected child's
+identity. This candidate was withdrawn before publication.
+
+The final =copy_numeric_element= selects an independent child root, then sizes
+and copies that stable object with the existing audited ABI. Both final A/B arms
+use this projection. Full Scheme mutation/scheduling semantics take precedence
+over eliminating that root. The unpublished indexed-only captures, their mixed
+throughput losses of 2.0%/8.7%, combined experimental results and source archive
+remain retained as unqualified evidence. Their gains do not qualify this version.
+
+* Focused native controls
+
+The existing owner-capacity, dispatcher-fault and producer native targets pass.
+They retain finite admission and generation fencing, whole-batch error/drain and
+recovery, forced GC, multi-shot continuations, dynamic-wind cleanup, abandoned
+receivers, bounded aggregate output and close without host waiter repoll.
+The producer control verifies actual native-constructor use, one envelope root
+at construction, zero after retirement and matching combined phase marks.
+
+The existing resource smoke verifies nine numeric families including empty child
+vectors, signed zero and NaN payload bits; the original envelope can be released
+before forced GC while the returned parent protects its children. It rejects
+invalid index/type/quantum/count and transfer bounds. Six reuse epochs of 128 jobs
+complete with 720 successes, 42 expected Scheme errors and six injected Rust
+panics. Four owners join with zero roots and removed copied files; file/thread
+counts return. Four retained code images follow the existing policy. This is not
+new image-unloading or long-RSS acceptance, and does not separately qualify all
+macro/DSL/general procedure operations.
+
+Strict core Tokio/non-Tokio, sys all-target and changed native-test/benchmark lints
+pass. The existing protocol model is not duplicated: owner admission/close actions
+are unchanged. The predecessor's finite Quint pass is separate from these native
+checks and from the new commit's CI.
+
+** Retained failures
+
+The first local owner-capacity run exits 70 with =CAPACITY-STALL cleanup=UNVERIFIED=.
+Its original stage/root cause is unresolved. Real stage labels are added to the
+existing watchdog; a separately sampled diagnostic run passes under the same
+five-second gate. Its loader/startup samples do not establish a repair of the
+original failed process. All later passes leave this failure recorded separately.
+
+The first new-constructor type smoke fails because the compiled symbol is absent
+from the native image's export list. Both standard export lists are fixed and the
+same native controls pass afterwards. This is an actual repaired build-surface
+gap, not a skipped capability. A smoke driver's inverted post-run assertion is
+also retained as a postprocessing failure: validating the original capture proves
+native exit zero and clean joins; no rerun is relabeled to hide it.
+
+* Final same-VM experiments
+
+Only two directed pairs use the final safe frozen artifact: constructor-only,
+and ordinary caller replenishment versus the actual optimized owner producer.
+No thread/VM grid is added. Both retain four VM identities, two Tokio workers,
+request slots four, work budget eight, batch eight and Scheme quantum one.
+Each sample executes 8,192 48-line bulk orders plus 64 four-line short probes.
+Ten AB/BA samples per arm/load are retained in each of two cohorts. Constructor
+control changes only input construction; both arms retain child-root projection.
+The pipeline comparison includes the existing producer protocol plus this input
+optimization, and must not be presented as the constructor's isolated speedup.
+
+Each complete cohort retains 40 samples, four results, four Scheme batch-error
+recovery controls and four clean owner joins, zero roots and removed files.
+All candidate samples report exactly 1,024 native-constructor calls; controls
+report zero. The existing five-second gates are unchanged. Shared-host conditions
+are not quiet-host certification. Closed-loop probes retain scheduled and actual
+entry clocks; faster bulk completion can reduce their overlap.
+
+** Constructor-only pair
+
+Rates are bulk orders/s. Latencies are milliseconds, control -> candidate.
+
+| Cohort/load | Bulk rate | Change | Native service p99 | Actual-entry short p99 | Minimum owner progress |
+|-------------+-----------+--------+--------------------+------------------------+------------------------|
+| A / CPU | 406044 -> 456980 | +12.5% | 0.444 -> 0.422 | 16.963 -> 4.802 | 1248 -> 1704 |
+| B / CPU | 420496 -> 455225 | +8.3% | 0.434 -> 0.421 | 0.973 -> 0.690 | 1912 -> 1704 |
+| A / mixed | 24258 -> 24235 | -0.09% | 3.557 -> 4.925 | 11.301 -> 12.734 | 1904 -> 1960 |
+| B / mixed | 20859 -> 24394 | +16.9% | 5.221 -> 4.093 | 38.322 -> 5.009 | 2016 -> 2016 |
+
+CPU constructor gains repeat. Mixed A is flat/slightly negative and its service
+and short-request tails worsen; CPU B minimum owner progress also worsens.
+These negatives prevent a universal latency or default-selection claim.
+Across ten CPU samples the summed measured bulk-owner CPU spans decrease from
+0.587 to 0.494 seconds (A) and 0.604 to 0.504 (B); mixed spans decrease from
+0.804 to 0.645 and 0.843 to 0.699. These are measured owner-local phases only,
+not whole-process CPU utilization or Tokio/Python/GIL cost.
+
+** Actual optimized producer pair
+
+| Cohort/load | Bulk rate | Change | Native service p99 | Actual-entry short p99 | Minimum owner progress |
+|-------------+-----------+--------+--------------------+------------------------+------------------------|
+| A / CPU | 423957 -> 668205 | +57.6% | 0.413 -> 0.364 | 0.588 -> 0.695 | 1872 -> 1296 |
+| B / CPU | 417788 -> 694681 | +66.3% | 0.468 -> 0.365 | 3.415 -> 3.014 | 632 -> 1400 |
+| A / mixed | 23798 -> 24596 | +3.4% | 4.750 -> 6.034 | 26.169 -> 6.393 | 2000 -> 1872 |
+| B / mixed | 24201 -> 24348 | +0.6% | 5.544 -> 4.306 | 28.305 -> 2.092 | 1936 -> 1968 |
+
+The CPU throughput gain is repeatable in this matched pair. Mixed throughput
+is near its waiting-time ceiling; A's mixed native service tail and CPU short p99
+still regress. No comparison transfers across the earlier frozen executables.
+
+Scheduled CPU probe p99 also worsens in both cohorts: 2.013 -> 3.032 ms (A)
+and 35.881 -> 37.943 ms (B). Minimum short-probe overlap falls from 35 to 20
+and 33 to seven of 64. Thus actual-entry improvements do not establish scheduled
+latency or steady-state fairness. Both mixed arms retain all 64 probes during
+bulk execution. Actor peer minima are 1 -> 1 (CPU A), 1 -> 0 (CPU B), and
+0 -> 0 in both mixed cohorts; internal Scheme fairness is not repaired.
+
+| Cohort/load | Median common-window outside-service fraction | Median owner finish spread, ms |
+|-------------+-----------------------------------------------+--------------------------------|
+| A / CPU | 22.38% -> 5.07% | 0.722 -> 0.524 |
+| B / CPU | 24.11% -> 4.35% | 1.097 -> 0.561 |
+| A / mixed | 3.64% -> 0.20% | 3.876 -> 4.349 |
+| B / mixed | 1.24% -> 0.21% | 3.880 -> 4.146 |
+
+Gaps use bulk and probe intervals clipped to the common bulk-active window,
+excluding probe-only tails. They include delivery, credit return, handoff and host
+scheduling, not just Tokio CPU. Reduced gaps do not ensure equal owner completion:
+both mixed finish spreads worsen even though short-request waiting improves.
+Cursor offer-to-first-entry p99 is 0.141/1.049 ms (CPU A/B) and 0.163/1.045 ms
+(mixed A/B), including any genuine shared-credit and queued-request waiting.
+
+** Remaining root cause and limits
+
+In the final pipeline's mixed candidate tails, Scheme spans occupy median
+99.75%/99.71% of service time; measured owner CPU is only 0.78%/0.92% of that
+Scheme wall span. Only six/three of the slowest 103 batches have a GC anywhere
+in the observed turn, and median Scheme GC fractions are zero. This supports
+waiting/wake scheduling or host preemption as the dominant remaining tail class,
+not arithmetic, numeric projection or frequent GC. It does not separate SDK timer
+overshoot from OS scheduling; no SDK scheduler repair is claimed.
+
+The workload intentionally sleeps one millisecond in selected Scheme handlers.
+At most four owners * eight orders / one millisecond gives an idealized 32,000
+orders/s bulk ceiling, before native work and scheduling. Removing those waits
+would change the load. The observed mixed bulk rate around 24,000 orders/s is
+therefore not comparable to the CPU-only rate as if both represented pure compute.
+
+A withdrawn candidate also retains a severe startup-skew sample: the first short
+request is admitted in 10 microseconds, waits 18.857 ms before native entry and
+executes in 0.092 ms. This locates that particular delay after admission and before
+execution; it does not establish a general OS-only cause. No owner-start barrier,
+forced yield, work stealing of Scheme state or reduced Scheme capability is added
+to make progress metrics look better. Remaining work must distinguish real native
+wake/preemption behavior with producer-owned evidence, preserving those semantics.
+
+* Reproduction and source identity
+
+Run the existing native build and focused Rust benches from the repository root:
+
+#+begin_example
+just bridge-regenerate
+just bridge-owner-capacity-benchmark --test --transfer-ab
+just bridge-owner-capacity-benchmark --transfer-ab
+just bridge-owner-capacity-benchmark --test
+just bridge-owner-capacity-benchmark
+#+end_example
+
+Frozen executable SHA-256: =ba973b69115672a3d07b54bad6dd4500b90cc51c66c3cd77a1faa8b8d216ee2f=.
+Native image SHA-256: =5aa3fbaecabfab9004d7c42494854682f4a0f7bc2c333dfe888ef86a302b6057=.
+The native image is shared between both arms; full source hashes are bound before
+measurement and checked again against the final commit. External evidence names
+are =safe-transfer-manifest.json=, =safe-transfer-summary.json=,
+=safe-constructor-a.jsonl=, =safe-constructor-b.jsonl=, =safe-pipeline-a.jsonl= and
+=safe-pipeline-b.jsonl=. Withdrawn source/captures and failures retain their own
+identities. No raw logs, binaries, patches or private machine paths are published.
+
+* Exact-head CI and next diagnostic
+
+CI run [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39560525020][39560525020]] completed successfully for =ce9a2af=: all six active
+jobs passed; Scheme SMP remains explicitly skipped. The subsequent bounded
+native wait attribution and retained owner-QoS trade-offs are documented in
+[[file:30.32-native-wait-attribution-and-owner-qos.org][Native Wait Attribution and Explicit Owner OS Policy]].

@@ -1,0 +1,269 @@
+{
+  "schema": 1,
+  "recordId": "frozen-7f-control-4513us",
+  "classification": "preserved research working point; not full performance admission",
+  "sourceRevision": "7f915dfdc70c4b346fac912a62f9551ac7ea3926",
+  "workload": {
+    "unit": "validated four-line service message",
+    "arrival": "open scheduled arrivals",
+    "offeredPerSecond": 1000000,
+    "offeredSeconds": 1,
+    "totalPlanned": 1000000,
+    "schemeVMs": 1,
+    "schemeWorkers": 4,
+    "transferFrames": 3,
+    "perMessageRustEntries": 0,
+    "warmup": {
+      "offeredPerSecond": 1000,
+      "offeredSeconds": 1,
+      "totalPlanned": 1000,
+      "excludedFromMain": true
+    }
+  },
+  "measurement": {
+    "latency": "original planned timestamp to real source consumption after worker execution and independent verification",
+    "throughputFormula": "completed * 1000000000 / elapsed_ns",
+    "histogramUpperBoundResolutionNs": 1000,
+    "backlog": "planned-due minus real consumed",
+    "sourceDebt": "planned-due minus published",
+    "sourceAndTotalPeaksIndependent": true,
+    "backlogPercentiles": "not collected",
+    "betweenSamplePeakUncertainty": "unknown",
+    "p50AndP95": "not collected"
+  },
+  "main": {
+    "accepted": 1000000,
+    "accepted_timeouts": 0,
+    "all_arrival_max_generator_lag_ns": 4851167,
+    "completed": 1000000,
+    "completed_per_second": 999944.8780385981,
+    "data_access_edge_contract": true,
+    "defaults_changed": false,
+    "diagnostic_native_observation": false,
+    "diagnostic_no_actor_handoff": false,
+    "diagnostic_owner_watch": false,
+    "elapsed_ns": 1000055125,
+    "event": "gerbil_actor_arrival",
+    "failed": 0,
+    "latency_bucket_upper_bound_ns": 1000,
+    "mailbox": true,
+    "native_active": 3,
+    "native_coalesced_wake": false,
+    "native_data_access": true,
+    "native_source_park": false,
+    "offered_elapsed_ns": 999999000,
+    "owned_source_schedule": true,
+    "owners": 1,
+    "performance_admission": {
+      "failures": [
+        "historical_p99_exceeded_or_missing",
+        "original_outstanding_window_exceeded_or_missing"
+      ],
+      "passed": false,
+      "scope": "capacity_1m_to_5m_three_second_goal"
+    },
+    "planned": 1000000,
+    "rate": 1000000,
+    "ready_drain_pipeline": false,
+    "rejected": 0,
+    "rejection_percent": 0,
+    "remaining_native": 0,
+    "remaining_staged": 0,
+    "rust_per_message_entries": 0,
+    "scheme_workers": 4,
+    "scoped_user_initiated_qos": false,
+    "seconds": 1,
+    "snapshot_gc_duplicate_and_unread_close_contract": false,
+    "source_backpressure": {
+      "drain_after_schedule_ns": 56125,
+      "last_publication_elapsed_ns": 1000052709,
+      "maximum_due_unconsumed_messages": 4853,
+      "maximum_pending_source_messages": 4851,
+      "original_window_guard_passed": false,
+      "samples_over_original_window": 664696
+    },
+    "successful_planned_to_consumed_p999_ns": 4819000,
+    "successful_planned_to_consumed_p99_ns": 4513000,
+    "warmup": false,
+    "watchdog_seconds": 10,
+    "whole_native_call_ns": 1009152667,
+    "window": 128
+  },
+  "warmup": {
+    "accepted": 1000,
+    "accepted_timeouts": 0,
+    "all_arrival_max_generator_lag_ns": 15417,
+    "completed": 1000,
+    "completed_per_second": 1000.9995390807532,
+    "data_access_edge_contract": true,
+    "defaults_changed": false,
+    "diagnostic_native_observation": false,
+    "diagnostic_no_actor_handoff": false,
+    "diagnostic_owner_watch": false,
+    "elapsed_ns": 999001459,
+    "event": "gerbil_actor_arrival",
+    "failed": 0,
+    "latency_bucket_upper_bound_ns": 1000,
+    "mailbox": true,
+    "native_active": 3,
+    "native_coalesced_wake": false,
+    "native_data_access": true,
+    "native_source_park": false,
+    "offered_elapsed_ns": 999000000,
+    "owned_source_schedule": true,
+    "owners": 1,
+    "performance_admission": {
+      "failures": [
+        "fixed_load_not_covered",
+        "all_planned_messages_not_completed"
+      ],
+      "passed": false,
+      "scope": "capacity_1m_to_5m_three_second_goal"
+    },
+    "planned": 1000,
+    "rate": 1000,
+    "ready_drain_pipeline": false,
+    "rejected": 0,
+    "rejection_percent": 0,
+    "remaining_native": 0,
+    "remaining_staged": 0,
+    "rust_per_message_entries": 0,
+    "scheme_workers": 4,
+    "scoped_user_initiated_qos": false,
+    "seconds": 1,
+    "snapshot_gc_duplicate_and_unread_close_contract": false,
+    "source_backpressure": {
+      "drain_after_schedule_ns": 1459,
+      "last_publication_elapsed_ns": 999000292,
+      "maximum_due_unconsumed_messages": 1,
+      "maximum_pending_source_messages": 1,
+      "original_window_guard_passed": true,
+      "samples_over_original_window": 0
+    },
+    "successful_planned_to_consumed_p999_ns": 29000,
+    "successful_planned_to_consumed_p99_ns": 22000,
+    "warmup": true,
+    "watchdog_seconds": 10,
+    "whole_native_call_ns": 1014056125,
+    "window": 128
+  },
+  "cpuGcEnvelopes": [
+    {
+      "event": "native_call_cpu_gc_envelope",
+      "values": {
+        "gc_count_enclosing": 2,
+        "gc_cpu_enclosing_ns": 1067000.0000000002,
+        "gc_wall_enclosing_ns": 1068115.234375,
+        "owner_cpu_upper_ns": 1004331917,
+        "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+      },
+      "warmup": true
+    },
+    {
+      "event": "native_call_cpu_gc_envelope",
+      "values": {
+        "gc_count_enclosing": 39,
+        "gc_cpu_enclosing_ns": 17989000.00000031,
+        "gc_wall_enclosing_ns": 17893791.19873047,
+        "owner_cpu_upper_ns": 998903957.9999999,
+        "scope": "encloses call, startup and terminal capture; not phase-exclusive"
+      },
+      "warmup": false
+    }
+  ],
+  "cleanup": {
+    "clean": true,
+    "event": "gerbil_actor_cleanup"
+  },
+  "nativeExit": 101,
+  "startup": {
+    "protocol": "Node spawnSync; regular stdout/stderr files",
+    "node": "v24.14.0",
+    "arch": "arm64",
+    "osRelease": "25.6.0",
+    "cpuCount": 12,
+    "totalMemoryBytes": 34359738368,
+    "argv": [
+      "--capacity-research",
+      "--backpressure-owned-schedule",
+      "--rate=1000000",
+      "--seconds=1",
+      "--require-native-acceptance"
+    ],
+    "stdin": "ignored",
+    "stdoutAndStderr": "regular files",
+    "environment": "inherited environment plus GERBIL_SERVICE_BENCH_IMAGE; complete environment identity not recorded",
+    "profiler": false,
+    "perMessageObservation": false
+  },
+  "artifacts": [
+    {
+      "role": "reader",
+      "sha256": "f1e24bfcdb8a43cdd85a1fb1b366655c8047b041756e0a53f20325a1cc732d86",
+      "storage": "retained persistent local artifact; raw binary not tracked in Git"
+    },
+    {
+      "role": "image",
+      "sha256": "53ba9b24871cb1abd5b7e705bc04be83f1a1630bc7c22c7997db930aaed98e8d",
+      "storage": "retained persistent local artifact; raw binary not tracked in Git"
+    }
+  ],
+  "sourcePins": {
+    "benchSha256": "a3c9c16961ce68ed1040c3f156b4513ab5ab8fe22335b363922199c753caabeb",
+    "retainedBenchSha256": "a3c9c16961ce68ed1040c3f156b4513ab5ab8fe22335b363922199c753caabeb",
+    "generatedActorCSha256": "c60af2b2bc021f3a11bcc072400c80aba27fe3e03e6c16deb6ad3b9afa432868",
+    "generatedActorScmSha256": "6991ff02e36115023fb68ded532abc9daf4e335024eb78aa6815b57c0131e283"
+  },
+  "rawEvidence": {
+    "stdoutSha256": "9c8385692b3163530ec4ed87eb8b53bbc3f0812a30587c2d22dd15f0cf91cad6",
+    "stderrSha256": "316149451f3260439302bbe9241a94749b07f21935d5bfddf23097413ea4b262",
+    "launchSha256": "65f0694dc98bb352ec3a3f718a6083530d35a2f628c7381be88c99155efa0c60",
+    "planSha256": "9f927a558ebcebf4be996511d642aaba73dbc1df7e61c86672fa644cab626514",
+    "storage": "persistent ignored .ci artifacts; raw logs are not tracked in Git"
+  },
+  "comparisons": {
+    "historical7F": {
+      "p99Ns": 6393000,
+      "p999Ns": 6740000,
+      "completedPerSecond": 995244.02,
+      "peak": 6746
+    },
+    "laterSameByteControl": {
+      "p99Ns": 18018000,
+      "p999Ns": 18210000,
+      "completedPerSecond": 988600.5293499101,
+      "peak": 18218,
+      "sameReaderAndImage": true
+    },
+    "historical6D": {
+      "sourceRevision": "6d4ec27",
+      "offeredPerSecond": 500000,
+      "offeredSeconds": 10,
+      "totalPlanned": 5000000,
+      "p99Ns": 317000,
+      "p999Ns": 431000,
+      "peak": 351,
+      "cohort": "separate workload and startup; not directly comparable"
+    },
+    "attribution": "Same-source observations are not evidence of a code optimization; later slow observation is retained, not selected as a replacement baseline"
+  },
+  "boundaries": {
+    "nativeAdmissionPassed": false,
+    "backlogLimit": 128,
+    "peakWithinLimit": false,
+    "defaultsChanged": false,
+    "sdkChanged": false,
+    "gatesChanged": false,
+    "schemeCapabilitiesPreserved": true,
+    "newCandidateIncluded": false,
+    "longRunMemoryConvergence": "not established by this run",
+    "perActorFairness": "not established by this run",
+    "ciPerformanceAcceptance": false
+  },
+  "reproduction": {
+    "rebuild": "Use the pinned source revision and existing Rust gerbil_actor_arrival bench; rebuilt artifacts are a distinct cohort until qualified",
+    "originalBytes": "Verify the retained reader and image SHA-256 before invoking the recorded argv; the image is selected through GERBIL_SERVICE_BENCH_IMAGE",
+    "naturalExit": "Original executable prints results and clean shutdown, then exits 101 because unchanged admission fails; do not relabel exit 101 as a timeout or a pass",
+    "guarantee": "Frozen identity preserves provenance, not a guaranteed timing value"
+  }
+}

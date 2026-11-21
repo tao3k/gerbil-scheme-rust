@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "purpose": "Record the PR source port of the 3477a02 private Scheme op62 path and its local native replay.",
+  "source": {
+    "prParent": "9aa4de6adc1f566f78586b046ba9452c1e996d7b",
+    "schemeResearch": "3477a026e4a14a4e65743f0a9535f78c6dde080c",
+    "portBuild": "411b600da5b06572509a5e1cec0d8c5056a7dd91",
+    "frozenReferenceSource": "d56f94ca943492b5f72bf8198a343475bbf43d19"
+  },
+  "workload": {
+    "owners": 1,
+    "schemeWorkers": 4,
+    "frames": 3,
+    "ratePerSecond": 1000000,
+    "offeredSeconds": 1,
+    "planned": 1000000,
+    "warmup": {
+      "ratePerSecond": 1000,
+      "offeredSeconds": 1
+    },
+    "tailFrom": "planned arrival",
+    "tailTo": "verified consumption",
+    "argv": [
+      "--capacity-research",
+      "--backpressure-owned-schedule",
+      "--rate=1000000",
+      "--seconds=1",
+      "--require-native-acceptance"
+    ]
+  },
+  "observations": [
+    {
+      "arm": "frozen historical rollback reference",
+      "readerSha256": "f1e24bfcdb8a43cdd85a1fb1b366655c8047b041756e0a53f20325a1cc732d86",
+      "imageSha256": "53ba9b24871cb1abd5b7e705bc04be83f1a1630bc7c22c7997db930aaed98e8d",
+      "stdoutSha256": "b9d432a59458e23152113d410627905606c57d0c169cdaaa3f444d426816055b",
+      "stderrSha256": "0f2c1ab4dc30c3709576415511c3c45eb342a251b4e57d902e49672c0b27e84b",
+      "metrics": {
+        "completed": 1000000,
+        "completedPerSecond": 999555.2808631042,
+        "p99Ns": 9149000,
+        "p999Ns": 9297000,
+        "sampledPeakDueUnconsumed": 9346,
+        "sampledPeakDueUnpublished": 9344,
+        "rejected": 0,
+        "failed": 0,
+        "acceptedTimeouts": 0,
+        "watchdogSeconds": 10
+      }
+    },
+    {
+      "arm": "PR port built from source",
+      "readerSha256": "68599115e327d3627afe82b257e1c52eba44cc3d944b6d4b81b9d29148e0dabf",
+      "imageSha256": "adf064ddb81f784a19ee6ea7783779b9171dbc874c46f0df504b502194dc9fd8",
+      "stdoutSha256": "5e461030cc799532ba62458418b6f092d7f3b400bee0c7daeaa2dd64f5580341",
+      "stderrSha256": "d559e8ef767bd97bb892373fd65f772c05890c149b44e8947b196aac35358ee5",
+      "metrics": {
+        "completed": 1000000,
+        "completedPerSecond": 995241.2945549785,
+        "p99Ns": 10083000,
+        "p999Ns": 11019000,
+        "sampledPeakDueUnconsumed": 11110,
+        "sampledPeakDueUnpublished": 11108,
+        "rejected": 0,
+        "failed": 0,
+        "acceptedTimeouts": 0,
+        "watchdogSeconds": 5
+      }
+    }
+  ],
+  "validation": {
+    "hostBoundaryContract": true,
+    "privateOp62ThousandMessageCheck": true,
+    "cleanShutdown": true,
+    "backlogLimit": 128,
+    "portLatencyWithin15ms": true,
+    "portPassedBacklog": false,
+    "portPassedPerformanceAdmission": false,
+    "benchmarkStatus": 101,
+    "buildPeakRssBytes": 5957517312,
+    "buildMemoryLimitBytes": 8589934592
+  },
+  "comparisonScope": "Separate local runs with separately built readers and images. This receipt establishes latency reproduction for the port. It does not establish a controlled speedup or performance admission."
+}

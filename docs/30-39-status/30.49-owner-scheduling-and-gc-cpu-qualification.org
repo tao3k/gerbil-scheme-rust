@@ -1,0 +1,212 @@
+#+title: Owner scheduling, GC CPU attribution and phase-routing qualification
+#+date: 2026-10-22
+
+* Outcome and exact-head CI
+
+Predecessor =f89fe2a42730d60695fba25aaf13c72f38a30fef= passed all supported
+CI jobs in run =39730963352=, attempt two. Attempt one timed out in macOS
+Bazel =cargo_check= at its existing 300-second limit; its other supported
+jobs passed. Only that failed job was rerun; no timeout was changed. Both
+attempts remain evidence, not an erased failure.
+
+The scheduling acquisition gate now has two complete four-owner captures.
+They distinguish actual on-core execution, runnable wait and blocking, with
+bounded alignment to native monotonic time. This closes the previous lack of
+usable owner scheduling intervals for these captures. It does not reproduce
+or explain every historical tens-of-milliseconds p99 excursion.
+
+An advisory owner-phase routing prototype was connected to the actual API,
+tested natively and compared in two unobserved same-live-VM captures. Its
+throughput/fairness results were inconsistent, so the API, hint publication,
+router changes and prototype tests were withdrawn. Frozen reproduction source,
+artifacts and negative results remain private. No production routing/supply
+policy or default is changed by this round.
+
+* Why earlier traces were insufficient
+
+The original broad System Trace ended acquisition but failed finalization
+within its controller limit. Reduced Time Profiler plus Thread State Trace
+could save readable scheduling tables. This was not sufficient by itself:
+short rolling windows sometimes discarded owner creation/identity metadata,
+leaving sentinel thread rows despite valid clock signposts. Starting capture
+after owner initialization also produced missing identity. Refreshing the
+unchanged thread name did not repair that loss and was removed.
+
+Unwindowed or larger full-repetition captures still exceeded their 45-second
+diagnostic controller; one overlapping-recorder attempt is not accepted as
+independent evidence. Recorder sampling showed a DTX connection semaphore
+wait at the sampled instant; later runs progressed into serialization. These
+are controller/finalization failures, not proof of permanent deadlock. Traces,
+compiler and harness failures are retained privately.
+
+The accepted route uses the reduced instrument set, launches the benchmark
+under xctrace, and captures a diagnostic single A/B per load. Payload sizes,
+warmups, native settings, VM identities and progress limits are preserved.
+Two captures saved/exported successfully with target exit zero and clean
+four-owner shutdown: the first used a two-second rolling window, the second
+five seconds. The latter retained owner creation through recorder flush and
+completed serialization after an observed 15-second artifact-progress receipt.
+A five-second window is a qualified setting for this directed capture, not a
+guarantee that arbitrary longer workloads retain their metadata.
+
+The observation flag is explicit and defaults off. The ordinary performance
+benchmark keeps all repetitions. =--trace-once= without observation is rejected.
+No Bash driver, new package dependency or alternative Scheme compiler is added.
+
+* Clock and coverage admission
+
+Each observation reset emits an Apple =os_signpost_event_emit= marker on its
+fixed owner. A native row =[before_ns, after_ns, tid]= bounds the emission.
+The log object is released after each marker. The macro is compiled by the
+existing host C compiler helper because Gambit's configured GCC does not
+support Apple's log-format builtin. Scheme still compiles through Gerbil,
+Gambit C and its configured native compiler; native optimization remains O2.
+
+The bench emits native anchor rows through the existing typed control path.
+Wait-event width stays six and kinds remain unchanged. Bazel now declares
+qualification C/header/Scheme inputs in its existing source group; the
+handwritten bridge has an explicit source exception to generated-C ignores.
+
+Markers are matched by both TID and native clock, not clock alone. The native
+monotonic resolution measured 1000 ns. Intersected offset bounds, including
+that resolution, gave approximately +/-1.000 us and +/-1.104 us for the two
+captures. The per-request Instant/native anchor added at most 666 ns / 416 ns,
+plus one native clock tick; the conservative combined alignment boundary was
+below 3 us, not just the kernel clock-offset boundary. Both retained all four
+owner TIDs and 16 timed-sample anchors.
+
+Each capture covered all 256 short-request ingress intervals and complete
+request intervals (four full-size samples, 64 probes each). Analysis resolved
+XML references, checked nonoverlapping owner state spans and rejected missing
+owner identities. The second capture covered 360 distinct overlapping native
+phase spans. These are interval measurements, unlike earlier Mach state points.
+
+* What the intervals actually show
+
+The second capture's per-class/arm ingress attribution is below. Totals span
+64 probes in each row. Times are microseconds and approximate at the stated
+clock boundary; Preempted/Interrupted remain separate from Runnable.
+
+| Load/arm | Maximum ingress | Total Running | Total Blocked | Total Runnable |
+|----------+-----------------+---------------+---------------+----------------|
+| CPU fixed supply | 418.5 | 1583.0 | 39.5 | 70.3 |
+| CPU pooled supply | 388.5 | 3409.7 | 34.9 | 105.2 |
+| Mixed fixed supply | 532.9 | 1794.4 | 25.2 | 54.9 |
+| Mixed pooled supply | 173.7 | 1049.8 | 32.0 | 76.9 |
+
+The largest individual ingress Runnable contribution was 11.3 us and Blocked
+8.2 us in this capture. The longest mixed ingress interval was 532.9 us:
+503.3 us Running, 21.6 us Interrupted and 8.0 us Preempted. It is not a
+half-millisecond scheduler-ready-queue delay.
+
+Complete request boundaries are reconstructed from the existing start-relative
+entry marks and actual/construct/pending/projection durations, not by assuming
+caller wake-return precedes owner execution. All 256 complete request intervals
+were covered. Representative tails from the second capture:
+
+| Case | Actual wall us | Construction wall / CPU us | Pending us | GC wall delta us | Kernel evidence |
+|------+----------------+----------------------------+------------+------------------+-----------------|
+| CPU pooled, owner 0 | 523.5 | 421.3 / 420.6 | 30.9 | 412.0 during construction | 493.5 Running; 13.7 Blocked; 14.5 Preempted |
+| Mixed pooled, owner 1 | 509.8 | 3.1 / 2.5 | 485.0 | 443.0 through pending | 501.2 Running; 4.6 Blocked; 3.1 Runnable |
+| Mixed fixed, owner 3 | 492.0 | 2.5 / 1.8 | 477.5 | 454.2 through pending | 490.6 Running; 1.3 Interrupted |
+
+GC-associated work can occur during construction, Scheme advance, projection
+or while another request is pending. The first capture also found a 453.8 us
+ingress interval almost entirely Running, overlapping a Submit phase with
+439.9 us GC wall and 454.0 us owner CPU. Thus these captured tails are chiefly
+on-core work, not missing wakeups. This is a bounded inference from matching
+intervals and enclosing counters, not an exact collector-only CPU measurement.
+
+Genuine blocking is separately visible: one native select span lasted 5471.0 us,
+with 5459.8 us Blocked, 6.3 us Runnable and 4.9 us Running; its native wrapper
+measured 6.5 us owner CPU. Another lasted 4489.0 us, mostly Blocked. These waits
+were not the half-millisecond short-request CPU tails above. Native service IO
+and cooperative sleep can legitimately block; a blocked interval alone does
+not establish starvation or a supply-protocol defect.
+
+SDK GC CPU remains process-level accounting. It is neither summed over owners
+nor subtracted from wall time. Per-request/phase thread CPU is enclosing owner
+CPU, not just that request's Scheme handler or collector. Kernel Runnable is
+not Running, and neither is inferred by wall-minus-CPU subtraction.
+
+The original tens-of-milliseconds tail did not recur in these two diagnostic
+captures. Observation changes costs and scheduling. These traces cannot rule
+out OS delays in other executions or stand in for unobserved performance.
+
+* Actual routing prototype and directed A/B
+
+The rejected prototype published an opt-in advisory hint around owner Submit,
+Advance and Retire turns, including type construction and projection. A scope
+guard restored it on normal return and unwind. Short routing kept quota and
+short-request priority first, then used the hint before native occupancy;
+batch ranking, rotating ties, native reservation and FIFO admission remained
+unchanged. A Scheme wait may itself execute Scheme, so a clear hint never
+promised an idle VM. It granted no credit and migrated no native state.
+
+Both arms used pooled bounded supply, actual NativePort readback, cooperative
+budget one, feed one, coalesced notification, four live VMs and two Tokio workers.
+Each capture reused those same VM identities across both arms. Loads were
+8192 orders of 48 lines, batches of eight and 64 four-line short probes with
+nominal 500 us spacing. Slots four/work 32, maximum three active bulk jobs per
+owner, and staging 128 callbacks/1024 work units were identical. Original
+watchdogs were unchanged. Actual constructed router modes were recorded after
+timing. No own profiler/compiler/model ran during the timed captures.
+
+A is ReselectProgress; B is the rejected service-phase hint candidate. Each
+capture contains 40 samples, alternating arm order, and clean four-owner exit.
+
+| Capture/load | Orders/s A -> B | Actual short p99 ms A -> B | Min normalized progress % A -> B | Finish spread ms A -> B |
+|--------------+-----------------+----------------------------+----------------------------------+-------------------------|
+| A CPU | 272528 -> 287376 | 4.118 -> 1.044 | 62.70 -> 98.54 | 13.658 -> 1.730 |
+| A mixed | 55170 -> 55327 | 1.651 -> 1.732 | 98.80 -> 98.80 | 1.479 -> 1.534 |
+| B CPU | 302190 -> 294246 | 1.193 -> 1.149 | 98.67 -> 98.56 | 0.744 -> 1.125 |
+| B mixed | 56925 -> 54874 | 1.760 -> 1.599 | 98.76 -> 98.79 | 1.570 -> 5.422 |
+
+CPU throughput changed +5.45% then -2.63%; mixed changed +0.29% then -3.60%.
+Mixed p99 changed +4.91% then -9.14%. The large first CPU p99 improvement
+coincided with a poor baseline fairness sample and did not repeat in magnitude.
+Second mixed finish spread grew more than threefold. No stable joint
+throughput/tail/fairness improvement was established; no hint API is retained.
+
+A phase snapshot is not a prediction of the next allocation or GC pause, and
+four VMs still share physical CPU/cache resources. Replacing the route's key
+alone does not give short jobs a bounded runtime service duration. The remaining
+optimization gate is low-intrusion attribution of the unobserved larger tails,
+then an explicit allocation/service-cost contract and matched native experiment;
+do not infer a GC budget or hard time bound from declared item count alone.
+
+* Validation and identities
+
+The withdrawn candidate passed two owner-scoped unit tests (hint restoration
+on panic; quota priority and unchanged batch order) and the real Scheme service
+fixture with added candidate admission cases (5.35 s). Those are candidate
+receipts, not final-head native or remote-CI acceptance. Full Scheme GC,
+continuations, exceptions, cancellation and root/close behavior were exercised.
+
+Retained code adds only qualification clock correlation, an explicit diagnostic
+repetition control, native build input declarations and English documentation.
+Rust remains cross-instance dispatch; complete Scheme execution is preserved.
+Final retained-source local gates: service, producer and capacity fixtures passed
+(6.67 s, 4.09 s and 2.26 s), focused Clippy with warnings denied, formatting and
+diff checks passed. The retained observed smoke completed four samples with
+all four owners joined, zero roots and removed files. New-head remote CI must
+be checked separately; predecessor success does not qualify a new commit.
+
+Frozen private identities (no raw logs, profiler files or machine paths committed):
+
+- Accepted trace executable SHA256: =1e1fbf44b534eb8c51b2350818284864cb0bef2990cf8307545a445034dc4b53=.
+- Pre-candidate trace source archive SHA256: =c2ce908548d98edeae91e091cc401a95c807026c34ffca6584fb696face164cc=.
+- Candidate binary SHA256: =babae740e50dda3e612743c6c09d27e074dd2835682cd90ba7a33b82dc426574=.
+- Candidate native image SHA256: =a1859c6058b2b147df2dffbfa73f8990ef5c8b7fc137900a37f41b38435a145f=.
+- Candidate source archive SHA256: =46265b786ab48d1534fd464c44d89063b29d5dae7600a5c2dd610fa057db7a55=.
+
+Use the Cargo/xctrace commands in the service bench README. Do not stack these
+paired results with older captured speedup multipliers or reinterpret the
+single-pair diagnostic as repeated performance qualification.
+
+
+* Primary method reference
+
+Apple's [[https://developer.apple.com/videos/play/wwdc2016/411/][System Trace in Depth]] explains the distinction between thread
+Running, Runnable and Blocked states. Numerical findings above come from the
+owned native captures, not from that reference or sampled state percentages.

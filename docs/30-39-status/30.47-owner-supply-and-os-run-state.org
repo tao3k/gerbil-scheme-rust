@@ -1,0 +1,184 @@
+#+title: Owner Supply and OS Run-State Qualification
+#+startup: overview
+
+* Exact predecessor CI and trace-consumer repair
+
+PR #18 head =ea108d799523a7212294b2bc9da59bd0205e06b3= did not pass native CI.
+Run =39725982024= completed its retirement, capability/reuse and owner-cost
+checks, then failed dispatcher smoke in =owner_capacity/wait.rs=. The native
+trace had changed from four to six columns, while this second consumer still
+parsed four. The native lifecycle protocol Quint job passed independently.
+This failure is not a throughput result, timeout or evidence of a lost wake.
+
+The consumer now validates the actual six fields and emits =wait_event_width=6=.
+The existing =--test --wait-trace= and =--test --qos-ab --wait-trace= commands
+are the targeted regression gates. No CI gate is removed or relaxed. Report
+30.46's successful CI refers to its predecessor =d81933b=, not this failed head.
+
+* Instrumentation in the actual owner path
+
+=SchemeServicePhase::Supply= appends a fifth phase, preserving the first four
+indices. It encloses the existing owner-local producer step, including capacity
+checks and pool directory access. Without explicit observation, the owner reads
+no additional phase clocks. No Scheme evaluator or scheduler is replaced.
+
+The Darwin Rust bench adds bounded nominal one-millisecond point observations
+of its own four named owner threads. Each row records owner, monotonic query
+bounds, kernel run state, cumulative thread CPU in microseconds, flags and
+suspend count. It never suspends an owner. Inspection rights, thread-list
+storage and the sampling thread retire before native shutdown, including unwind.
+Overflow/error counts must be zero. Both diagnostic captures complete forty
+samples with zero history loss, zero OS sampling errors/overflow, four joined
+owners, zero roots and removed temporary files.
+
+The kernel's =TH_STATE_RUNNING= includes running or queued-to-run: XNU maps
+=TH_RUN= to that value, and defines =TH_RUN= as running or on the run queue.
+See Apple's [[https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/thread.c][thread-info implementation]] and
+[[https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/thread.h][thread-state definition]]. These references explain the API classification;
+they are not a claim that an arbitrary upstream revision is the host kernel.
+A point observation does not label the time between samples or provide exact
+runnable-to-dispatch timestamps. Sampler interference is diagnostic overhead;
+performance captures run without this observer or the external stack sampler.
+
+* Blocking evidence versus runnable non-CPU evidence
+
+An own-process five-second stack sample of the unchanged frozen =service-wake=
+artifact finds =ServiceProducer::open= under =pthread_mutex_firstfit_lock_wait=: owner refill can actually block on the global admission directory mutex. This
+is a real blocking path, not a proof it explains the earlier GC-associated tails.
+The external sample completes the workload cleanly; it is not a speed receipt.
+
+The new phase/OS diagnostics separate several cases. These are full phases
+that overlap a short request inbox interval; counters and point counts enclose
+the full phase and are not clipped to the request overlap:
+
+| Artifact / load / supply | Phase wall ms | Owner CPU ms | GC wall ms | Select overlap ms | Wholly enclosed outside-select RUNNING points |
+|-------------------------+---------------+--------------+------------+-------------------+----------------------------------------------|
+| Control CPU fixed Submit | 76.815 | 0.759 | 76.730 | 0 | 45 |
+| Control CPU pooled Submit | 53.003 | 1.173 | 52.917 | 0 | 24 |
+| Control mixed pooled Submit | 34.370 | 0.939 | 34.310 | 0 | 12 |
+| Rejected candidate CPU pooled Wait | 110.456 | 0.644 | 110.343 | 0.002 | 58 |
+| Rejected candidate mixed pooled Advance | 68.513 | 0.117 | 0 | 0 | 20 |
+| Rejected candidate CPU pooled Supply | 11.922 | 0.006 | 0 | 0 | 9 |
+
+In the first Submit, kernel cumulative CPU increases only two microseconds
+between the first and last enclosed points. In the candidate pooled Wait the
+corresponding increase is 29 microseconds; in its pooled Supply it is zero.
+These point pairs enclose only part of each full phase and have different CPU
+quantization from the phase clock. The full-phase CPU values above remain the
+measurement of actual owner execution over the complete enclosing interval.
+
+The GC wall intervals are therefore not 76/110 ms of owner collector execution.
+At sampled points the owner is runnable/running with little CPU progress, which
+supports off-CPU scheduling delay outside select. It does not establish the
+exact dispatch delay, rule out waits between points, identify the competing
+thread, or measure collector-only CPU. Enclosing phase CPU includes other native
+work; SDK GC CPU remains process scoped and is never summed across owners.
+The zero-GC Advance also rules out GC as a universal explanation.
+
+* One protocol candidate, rejected after targeted qualification
+
+A private candidate issued a weak owner epoch at registration after validating
+capacity identity under the admission lock. Close invalidated every epoch under
+that same lock before directory detach; pre/post-capacity checks used the epoch
+and existing wake closure/failure flags. Accepted Scheme work still drained;
+no descriptor or VM was retained by the epoch. This removed directory lookup
+from resident supply without changing budgets, routing or Scheme execution.
+
+Its unit control passed concurrent directory ownership, explicit close
+invalidation and owner-index reuse. Eleven instance unit controls passed.
+Every captured candidate workload retired cleanly. Nevertheless removing that
+lock did not remove Supply's runnable non-CPU tails or give stable performance.
+The candidate source, unit control, manifest, captures and retirement diff are
+retained privately; its implementation is withdrawn from the final tree.
+No dormant mode, runtime flag or new default remains.
+
+* Directed performance captures and negative results
+
+Both binaries retain the exact native image
+=dbecadc5617173c15cead81ebda74e67466dcc246f132707263d21ddb457680c=.
+Both verify NativePort/budget one on all four owners before timing. Each runs
+the existing fixed-versus-pooled pair on the same four VM identities for its
+lifetime, two Tokio workers, O2 Scheme, 8192 real orders, batch eight and 64
+short probes, with unchanged work/slot/active bounds and original watchdogs.
+No other task is paused. No local compiler runs during performance captures.
+
+Capture order is control A, candidate A, candidate B, control B. Binaries
+necessarily initialize separate pools; cross-binary epoch comparisons have
+the same VM configuration/image/load, not identical live VM identities. Thus
+there is no same-live-VM admission claim for the rejected epoch implementation.
+Each within-binary fixed/pool comparison does retain the same live VMs.
+The following table compares only their pooled arms, ten samples per load:
+
+| Round / load | Control orders/s | Candidate orders/s | Actual short p99 ms, control -> candidate | Progress minimum %, control -> candidate | Finish spread ms, control -> candidate |
+|--------------+------------------+--------------------+------------------------------------------+------------------------------------------+---------------------------------------|
+| A CPU | 58867.83 | 141575.99 | 50.574 -> 34.348 | 72.76 -> 32.08 | 76.461 -> 27.748 |
+| A mixed | 15678.89 | 14028.19 | 16.798 -> 23.437 | 98.56 -> 98.75 | 19.571 -> 56.753 |
+| B CPU | 50011.78 | 34417.11 | 59.636 -> 44.816 | 40.45 -> 67.20 | 111.332 -> 46.473 |
+| B mixed | 16119.69 | 16747.87 | 25.952 -> 18.098 | 98.56 -> 98.60 | 4.588 -> 25.113 |
+
+CPU short p99 improves in both rounds, but round B CPU throughput falls 31.18%;
+round A mixed throughput falls 10.53% and mixed short p99 rises 39.52%.
+This fails stable throughput/tail admission. Do not select only the good CPU
+p99 values or promote the candidate as an overall improvement.
+
+The existing pool-supply gain itself also varies: in control A pooled/fixed
+CPU throughput is 58867.83/75308.02 and mixed is 15678.89/22147.68; in control
+B CPU is 50011.78/35055.17 and mixed is 16119.69/18666.81. Report 30.46's
+single favorable rebuilt capture is preserved, but these negative repeats
+prevent claiming a stable pooled throughput gain. Mixed progress minima near
+98.6% do not imply consistently small finish spread or unconditional fairness.
+No historical speedup multipliers are stacked.
+
+* Decision and remaining gate
+
+Retain the current pool source, its capacity/backpressure protocol, Scheme-owned
+execution and production defaults. Ship the trace-consumer correction and
+Supply/OS observability. Retire the epoch experiment rather than accepting an
+unproven trade-off. No new scheduling model or full thread-count matrix is added.
+
+The remaining causal gap is exact runnable/dispatch transitions and blocking
+stacks at individual tails. Point samples now distinguish runnable observations
+from persistent select waits, but do not close that gap. A future algorithm
+change must explain these measurements and qualify the same-live-VM workload
+without hiding negative results. Scheme retains native types, GC, continuations,
+Actors, green threads, exceptions and dynamic bindings; Rust distributes work
+across instances. No timeout, default or execution capability is weakened.
+
+* Commands, artifacts and local gates
+
+Current reproducible bench entry points use the existing build system:
+
+#+begin_src text
+just bridge-scheme-service-benchmark --pooled-ab
+just bridge-scheme-service-benchmark --pooled-ab --phase-observation
+#+end_src
+
+The rejected epoch was an uncommitted frozen experiment, not a published
+feature. These fingerprints identify the actual measured binaries and private
+source archives; they are not hashes added to generated-code comments:
+
+| Artifact | Release binary SHA-256 | Frozen source archive SHA-256 |
+|----------+------------------------+-------------------------------|
+| Control with Supply/OS observation | 81b0cf503036ad9559f69cea508bb284cab345326c1e89c9734d91bde5f52aa6 | bdf60a2b765d930bba696c9e9941358651065ac345cc0ec7ec46931b3b05f9e2 |
+| Rejected epoch | b3734ccd3fd56ea450a3850e9e3af52257a661b39c715fc849941c60e8c4d4ed | 6c06ac925e6447d9c922028c938c8a5460da382300297f24df4afedd2c31e075 |
+
+Native image bytes and native Scheme source remain unchanged across this
+investigation. Final diagnostics strengthen inspection-right cleanup on
+acquisition failure/unwind, read names through kernel inspection rather than
+potentially exiting pthread handles, and group metadata emission; no favorable performance
+claim is transferred to that final artifact from a rejected candidate.
+
+Final-tree native producer acceptance passes in 3.16 seconds and Scheme service
+acceptance in 7.61 seconds, excluding compilation. The existing controls retain
+GC, native types, continuations, exception recovery, cancellation, absolute
+deadlines, abandonment, capacity return and close/drain checks. Warnings-denied
+Clippy passes for both benches and both native tests in 3.47 seconds. The two
+original CI trace-smoke commands pass locally after the consumer repair.
+Quint source is unchanged; its predecessor CI success is model evidence only.
+Failed CI, initial compile/lint failures, all negative samples, source retirement
+receipts and raw diagnostics are retained privately. No raw logs, binaries,
+patches, personal absolute paths or Bash drivers are added to the repository.
+
+The final-tree instance unit suite passes ten controls. The development-profile
+service smoke completes eight samples with five phases, zero OS errors/overflow
+and clean four-owner retirement. These checks do not promote the withdrawn epoch.

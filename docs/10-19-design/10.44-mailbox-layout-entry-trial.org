@@ -1,0 +1,171 @@
+#+title: Whole-cycle layout-entry trial and current-control review
+
+* Disposition
+
+The isolated prototype is withdrawn from runtime consideration. The research
+checkout's Scheme runtime files remain at 7f915df; no candidate macro was applied
+to them. Its source, complete image and failed evidence remain archived. No
+performance improvement, root cause or solution to the 128 peak limit is claimed.
+The withdrawn runtime prototype is not committed. Only the models, check
+entrypoint and evidence records are published. SDK, policies, defaults, deadlines and queue/frame sizes
+are unchanged. No 5M trial follows this failed 1M admission.
+
+This is a completed code-level trial, not merely a design proposal. The candidate
+was constructed, compiled, linked, checked in a real VM and exercised once under
+the original workload. It is not a new accepted baseline.
+
+* Source-bound proposal and complete cost
+
+The actual frozen 7F expanded Actor source has SHA-256
+=6991ff02e36115023fb68ded532abc9daf4e335024eb78aa6815b57c0131e283=;
+its C source is =c60af2b2bc021f3a11bcc072400c80aba27fe3e03e6c16deb6ad3b9afa432868=.
+Parsed definitions confirm that only =orders-handler/rank= changes among 437
+definitions. The proposed source change is in the existing lexical work-layout
+macro, selecting its no-work branch before generic layout dispatch. The measured
+prototype is a corresponding refinement of frozen expanded Scheme; it is not
+claimed to be an untouched frozen image or an independently regenerated whole
+source graph.
+
+The original no-work path allocates one closure capturing three business values,
+then the generic dispatcher allocates another capturing thunk and declared cost.
+The prototype uses one closure capturing four values and still calls the ORIGINAL
+=call-with-gerbil-rs-service-unit=. Context reread, acquisition/release, exceptions,
+suspension and multishot dynamic extents remain owned by that existing API.
+Active work policies retain their original branches. No new queue, sleep/wake
+registration, Actor topology or per-message clock/observation is introduced.
+
+| Static property | Original | Prototype |
+|-----------------+----------+-----------|
+| Closures on selected no-work path | 2 | 1 |
+| Captured fields on that path | 3 + 2 | 4 |
+| Handler generated C bytes | 40,544 | 43,093 |
+| Complete handler ARM64 instruction lines, including alternatives | 1,144 | 1,240 |
+| Maximum absolute Scheme FP adjustment | 10 | 10 |
+| SP-relative lines in that handler | 0 | 0 |
+| Handler poll sites, all branches | 10 | 13 |
+
+The static host grows; total poll-site counts include alternative branches and
+cannot be called executed poll counts. The full call chain includes the original
+dispatcher and service-unit in the control. One allocation/dispatch reduction is
+real, but is not a quantified net CPU or GC benefit and cannot bound future pauses.
+No-work/empty-plan specialization must not bypass a live budget's unit gate.
+The earlier empty-context proposal was inspected separately: that proposal tried
+to avoid service-unit, whereas this trial retains it.
+
+Gambit's complete linker-info block is identical (52,347 bytes), permitting reuse
+of the existing program metadata. Only the Actor object changes in the image;
+common input hashes are rechecked. The budget-module C used for static inspection
+is byte-identical to the control object cohort's C; an adjacent prefix alone was
+not trusted as evidence. Existing loader dependency IDs match between images.
+A stale OpenSSL link search directory was replaced with its existing stable opt
+path without modifying or substituting the SDK or dynamic-library install IDs.
+
+* Correctness and build evidence
+
+- Seven focused QNT refinement checks precede the business trial. The completed
+  module additionally retains this trial and control-review counterexamples.
+- The actual candidate lexical macro passes eleven real Scheme cases: values,
+  declared span, original exception identity, GC retention, multishot returns,
+  budgeted no-work ownership/nesting/reentry, suspension release/resume and
+  four enabled work-policy modes. Existing function-only checks were rewritten
+  to exercise the lexical macro; they were not relabeled unchanged API checks.
+- The isolated whole image passes the original 21 result differential cases,
+  rank/checkpoint continuations, GC, bignum fallback, green waits and exception
+  identity. The frozen host reader also passes native types, cross-FFI multishot
+  continuations, Actor failure drain/reuse, terminal receipt and clean shutdown.
+  These are correctness receipts, not performance admission.
+- GCC O2 Actor-object observed process-tree peak: 845,594,624 bytes. The separate
+  macro-contract module observed peak is 4,304,437,248 bytes. Both remain below
+  the original 8 GiB monitor limit, with zero remaining owned RSS on exit. A
+  sampled peak is not an enforced kernel maximum. Compiler optimization-disabled
+  warnings are retained; no optimization level, memory cap or tuning parameter
+  was changed to obtain a pass.
+- One initial macro build could not find the SDK's baked-in runner GSC path;
+  GERBIL_GSC/GERBIL_GCC were explicitly bound to installed tools, without SDK
+  edits. An initial sandboxed VM attempt could not open its own descriptor pipe;
+  it is classified as an infrastructure restriction, not an Actor performance
+  failure. Authorized native execution then passed. Both failed attempts remain
+  recorded independently from real VM evidence.
+
+* Exact benchmark and unchanged references
+
+One VM, four resident workers, three transfer frames. A message is one validated
+four-line order, not a mailbox hop or HTTP request. End-to-end latency is original
+planned arrival through verified consumption, with 1 us histogram upper buckets.
+
+| Row | Offered/s and duration | Completed | Successful/s | p99 ms | p99.9 ms | Peak due-unconsumed |
+|-----+------------------------+-----------+--------------+--------+----------+--------------------|
+| 6D historical reference | 500,000/s, 10 s | 5,000,000 | 500,000.02 | 0.317 | 0.431 | 351 |
+| 7F historical reference | 1,000,000/s, 1 s | 1,000,000 | 995,244.02 | 6.393 | 6.740 | 6,746 |
+| This original-byte 7F control | 1,000,000/s, 1 s | 1,000,000 | 743,704.61 | 344.430 | 344.554 | 228,454 |
+| This isolated prototype | 1,000,000/s, 1 s | 1,000,000 | 601,466.38 | 662.645 | 662.727 | 405,237 |
+
+These are recorded peak samples, not a qualified exact maximum between samples.
+The model retains unknown peak uncertainty; the recorded breaches themselves
+already establish failure without inventing an exact maximum.
+
+The historical rows are separate cohorts, not paired current measurements.
+Neither historical peak passed 128. No historical reference is ratcheted.
+
+| Current main result | Control | Prototype |
+|---------------------+---------+-----------|
+| Rejected / native errors / accepted timeouts | 0 / 0 / 0 | 0 / 0 / 0 |
+| Maximum unpublished source debt | 228,452 | 405,235 |
+| Whole native call seconds | 1.358234583 | 1.680354041 |
+| Warmup p99 ms, 1,000/s for 1 s, excluded | 40.531 | 136.714 |
+| Clean shutdown | true | true |
+| Process exit | 101 | 101 |
+| Absolute latency / peak admission | Failed | Failed |
+
+Both exit 101 because the frozen reader enforces performance admission after
+clean shutdown. Its assertion text still says "500k"; the structured main rate
+and plan are 1M/s. That stale string must not redefine the workload. p50, p95 and
+backlog percentiles are NOT COLLECTED by this frozen reader; no new histogram or
+per-message observation was added to manufacture them.
+
+The current pair has -19.13% throughput and +92.39% p99, but the control itself
+is anomalous and both warmups differ severely. The pair does not identify which
+part of that difference the prototype caused. It cannot prove a qualified gain
+or a causal explanation of historical stalls. It does establish that this trial
+fails unchanged absolute gates; the prototype is not integrated or retried.
+
+The original Rust reader, Node spawnSync/regular-file launcher, original warmup,
+offered load and deadlines were reused. Generic A-then-B ordering does not mean
+the same image sequence: historical 7F ran second after the callback control,
+whereas this original-byte 7F control ran first before the prototype. The current
+outer process-tree guard adds a process and a detached child process group.
+Complete historical ancestor/environment state was not recorded, so exact startup
+equivalence and the cause of the difference remain unproved.
+Original image/reader pins are verified. Outer process-tree monitoring observed
+246,054,912 bytes, without modifying per-message execution. No profiler is used.
+
+* What the evidence permits next
+
+At a due-but-unconsumed peak D, at most three requests own published frames.
+Therefore unpublished source debt is at least D-3 at that cut. This is a bound,
+not subtraction of unrelated observed maxima. The current lower bounds are
+228,451 and 405,234. Most debt is not physically queued mailbox payloads;
+adding another result FIFO or simply creating more Actors cannot by itself
+supply the missing source progress.
+
+The full period must gain actual consumption opportunities AND spare service
+capacity. Preserved source eligibility, oracle and true frame return must remain
+charged. Fewer closures do not establish either an arrival/pause envelope or an
+individual-request fairness bound. The existing feasibility contract owns those
+obligations; this module does not introduce another scheduler.
+
+The existing combined launcher continues to B without a control-review boundary.
+That is an execution-protocol gap, even though the final claim gate rejects a
+bad control. Future use must execute A alone through that same existing entry,
+review its actual main receipt, and only then authorize B if the control is
+qualified. Pinning original bytes or finishing warmup cannot supply that review.
+The startup-format details and any intervening review must be retained; they
+cannot be silently claimed to reproduce a historical uninterrupted launch.
+The existing launcher is not changed and no new runner is introduced here.
+
+=mailbox_layout_entry.qnt= makes this sequence explicit with a trial-state fold,
+retains the failed complete outcomes, and checks the source-debt lower bound.
+It is wired into =just mailbox-research-gate-check= and the existing aggregate.
+External review qualification is still a source/receipt obligation, not a Boolean
+that a passing model can manufacture. The original natural stall cause and a
+runtime implementation passing 128 remain unresolved.

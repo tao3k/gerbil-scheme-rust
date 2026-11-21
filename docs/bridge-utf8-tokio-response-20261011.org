@@ -1,0 +1,138 @@
+#+TITLE: Tokio response allocation and scheduling audit
+#+DATE: 2026-10-11
+
+* Source-level findings
+
+This audit uses the exact locked Tokio 1.53.1 registry source, not examples
+from a different release. =sync/oneshot.rs:547= allocates an =Arc<Inner<T>>=
+for each new response channel. =Inner::complete= at lines 1299–1315 sets
+completion state and calls =wake_by_ref= when a receiver task is registered.
+This is one heap allocation per request in the original closed-loop adapter,
+not proof that allocation dominates end-to-end latency.
+
+The official bounded MPSC response alternative allocates a shared channel
+and initial message block (=sync/mpsc/chan.rs:118= and =list.rs:56–59=).
+Its sender still pushes into a concurrent queue and wakes the receiver
+(=chan.rs:535–540=). =list.rs:194–220= attempts to reuse consumed blocks.
+Avoiding fresh oneshots therefore removes allocation churn, not notification,
+queue atomics, or task scheduling. Waker calls are not OS context switches.
+
+The qualification adapter is currently the only Tokio scheduling site here:
+the Scheme runtime API does not secretly contain a parallel Tokio parser.
+No new scheduler framework is added to the standalone library.
+
+* Experiment boundaries
+
+The rejected receive-batching optimization stays reverted. Both response
+variants receive exactly one request at a time in the Scheme owner and reply
+immediately. The candidate reuses a bounded capacity-one response channel
+per caller. Each caller has exactly one outstanding request. The owner uses
+=try_send= and fails if the response slot is unavailable rather than blocking
+or silently dropping a reply. Only owned Rust Strings cross threads; Scheme
+roots remain on the owner thread.
+
+On this host, available parallelism selects twelve Tokio workers, twenty-four
+callers, and admission capacity twelve. These are observations, not universal
+hardcoded deployment limits. This is closed-loop bridge qualification, not
+Org parsing throughput, SMP qualification, or an open-loop overload SLO.
+
+Each load contains 1,000 / 10,000 / 100,000 requests per batch. Ten ABBA
+groups give twenty timed batches per variant, with identical encoding,
+client counts, admission, clocks, validation, and result ownership. Seven
+character distributions are tested. The one owner and AOT image are shared.
+Unlike the preceding receive-batching run, channel creation is inside the
+request latency boundary, so absolute measurements across the two runs must
+not be treated as matched.
+
+Acceptance retains all nine gates: paired median wall ratio and P95/P99
+ratios for admission, queue, service, and response, each at most one for
+every load/distribution. Every group is collected before rejection.
+Pooled exact nearest-rank percentiles are descriptive, not replacement gates.
+
+* Allocation and capacity evidence
+
+A process-wide Rust System allocator wrapper counts allocation/reallocation
+events and requested bytes in separate diagnostic batches. Atomic counters
+are disabled during all timed batches; the common enabled-check overhead
+remains in both variants. Scheme allocations and GC are not measured by this
+allocator. Events from unrelated Tokio maintenance can enter this diagnostic,
+so it is not a per-call attribution tracer.
+
+Mixed-text diagnostic results:
+
+| Requests | Variant | Allocations | Allocated bytes |
+|----------+---------+-------------+-----------------|
+|    1,000 | oneshot |       2,099 |      13,835,568 |
+|    1,000 | reused  |       1,195 |      13,819,440 |
+|   10,000 | oneshot |      20,075 |     138,214,032 |
+|   10,000 | reused  |      10,195 |     137,335,440 |
+|  100,000 | oneshot |     200,075 |   1,382,014,032 |
+|  100,000 | reused  |     100,195 |   1,372,495,440 |
+
+At 100,000, allocation count falls about 49.9%, but byte traffic falls only
+about 0.689%. These are cumulative allocated bytes, not retained live memory,
+RSS, or gigabytes simultaneously in use. Result String capacity still uses
+the unchanged checked four-byte-per-character bound. The response-channel
+optimization does not solve that much larger capacity cost.
+
+Twenty retained timing batches reserve 64,000,000 bytes per variant at
+100,000, or 128,000,000 bytes together, plus 16,000,000 bytes for quantile
+sorting scratch. These observer costs are common and outside timed batches.
+Reusable channels add per-caller channel/block storage rather than per-request
+oneshot storage; capacity one does not mean Tokio allocates only one slot.
+Allocation traffic is measured; a variant-isolated peak RSS comparison is not
+claimed.
+
+* Interpretation
+
+The complete matrix was rejected and the candidate, response-path switch,
+and global counting allocator were removed from the active benchmark.
+Independent receipt counting confirms 840 timed batches, 31,080,000 timed
+requests, 42 groups of twenty batches, 42 summaries, 189 performance
+decisions, and zero content errors. All 42 separate allocation batches
+completed. The final marker is =admitted=false= and exit 101 is the expected
+performance rejection, not an incomplete matrix.
+
+Mixed-text pooled results (each total spans twenty batches):
+
+| Requests/batch | Variant | Total wall (s) | Requests/s | Response P95 (ms) | Response P99 (ms) |
+|----------------+---------+----------------+------------+-------------------+-------------------|
+|          1,000 | oneshot |       0.229286 |  87227.321 |          0.474541 |          1.040750 |
+|          1,000 | reused  |       0.296590 |  67433.194 |          0.549875 |          4.071083 |
+|         10,000 | oneshot |       1.556701 | 128476.786 |          0.305375 |          0.535500 |
+|         10,000 | reused  |       1.652097 | 121058.261 |          0.311834 |          0.513708 |
+|        100,000 | oneshot |      15.914135 | 125674.442 |          0.311750 |          0.589667 |
+|        100,000 | reused  |      16.406029 | 121906.408 |          0.320917 |          0.729208 |
+
+The mixed-text 100,000 paired wall ratio is 1.077562; paired response
+P95/P99 ratios are 1.069774 / 1.461996. Pooled P99 ratios are a different
+statistic and must not be substituted for the paired acceptance result.
+The isolated 10,000 pooled P99 improvement does not make the full candidate
+acceptable.
+
+Reverse-prefix 100,000 shows 117707.151 versus 115537.337 requests/s and
+response P99 of 0.482000 versus 0.485708 ms (oneshot versus reused).
+Cross-distribution collection does not rescue the candidate.
+
+Reducing allocations alone cannot justify adoption. In particular, response
+delivery still uses queue atomics, reference-count changes, receiver polling,
+and scheduler wakeups. The measured response interval includes these costs;
+this audit does not invent a precise nanosecond cost for each internal wake.
+Further attribution must separate CPU work from off-CPU waiting rather than
+treating their sum as an allocator or encoding cost.
+
+The raw receipt is =benchmarks/20261011-utf8-tokio-response-abba-all.log=.
+Local bridge results do not qualify a new remote CI head or close the SMP gap.
+
+The full rejected implementation is recoverable in
+=benchmarks/20261011-utf8-tokio-response-rejected.patch=, checked with
+=git apply --check=. Apply only in an isolated checkout, then reproduce with
+=just bridge-utf8-matched --response-matched all=. The archived implementation
+passes the actor-AOT clippy gate. The final source only extracts the diagnostic
+helper to meet the existing function-size lint; measured behavior is unchanged.
+No performance gate or lint was suppressed. The restored active source is
+checked with =cargo fmt --all -- --check=, =just bridge-actor-lint=,
+=just bridge-utf8-matched --contracts=, and =git diff --check=.
+Production encoder and generated AOT sources remain byte-identical to
+=fc4562c91af0c8ed81840b5ceaaf40712555e0aa=; the historical frozen reference
+=6ad680c6311957eadf2529765ab1efd751132554= remains untouched.

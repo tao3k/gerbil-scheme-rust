@@ -1,0 +1,274 @@
+#+title: Scheme completion handoff and owner service opportunities
+#+options: toc:nil num:nil
+
+Follow-up: [[file:30.62-completion-opportunity-custody.org][30.62]] separates completion opportunity, ready-token custody and per-result retirement.
+The two rejected captures and historical watchdog boundary below remain retained.
+
+* Evidence and protocol decision
+
+[[file:30.60-dedicated-offer-ports.org][30.60]] retains CPU native short p99 +18.20%, short pending p99 +17.81%,
+and mixed bulk p99 +5.53%. Admission, construction and projection p99 do not
+establish that these are pure GC or OS costs. Existing data does not justify
+another unchanged capture or a wider dispatcher matrix.
+
+The source reveals two coupled decisions. A worker publishes completion and
+selects its next job under the same Scheme lock before yielding to the owner.
+New short work admitted during that yield therefore cannot participate in that
+selection. Separately, ready harvesting always yields before reading results;
+when no short job remains, it hands the entire bulk completion backlog to Rust.
+Thus execution, result retirement and new admission share an uncontrolled host
+opportunity boundary even though Rust input queues are separated.
+
+The explicit experimental =SchemeServiceCompletion::FairHandoff= protocol:
+
+1. Scheme publishes the completed graph and notification under its mutex. If
+   an eligible successor exists, it releases the mutex, yields to its scheduler,
+   then selects using its existing class/FIFO/Actor-lane rules. It does not bind
+   the successor before handoff. If no eligible job exists, it publishes the
+   worker as idle under the same mutex and uses the blocking receive as the
+   natural handoff. New affine jobs remain on their original Scheme worker.
+2. An already-ready result is harvested without an unconditional compute yield.
+   If no result is ready, the existing Scheme green-thread yield still applies.
+3. Each harvest returns at most one short and one bulk identity, including when
+   there are no short jobs. Further results remain rooted and visible in Scheme;
+   the native wait protocol cannot sleep past them.
+4. Rust projects the returned identities individually and releases each result's
+   native permit immediately after its projection/root balance. The next owner
+   turn can admit short input or supply more work. No resource return is deferred
+   across a later application projector.
+
+The library API is =configure_scheme_service_completion_on(owner, policy)=.
+Its ticket confirms native readback of the requested mode through private service
+ABI v7, command 13. Native configuration requires an idle job table and no active
+cooperative lease; activity rejects the switch. =Snapshot= remains the default.
+The budget and wake settings query retains its existing shape. Older native
+endpoints reject the new operation through the Rust version check.
+
+Scheme retains full types, Actors, green threads, continuations, GC, exceptions
+and native compilation. Rust distributes across complete fixed-owner runtimes;
+it neither schedules Scheme continuations nor migrates entered graphs. A yield
+is a scheduling opportunity, not an OS latency guarantee or preemption of an
+arbitrary synchronous constructor/projector/foreign call.
+
+* Historical watchdog: recovered facts and missing evidence
+
+The initial dedicated-port native run exits 70 at the five-second progress gate.
+Its raw log contains the test header and abnormal exit, but no last completed
+event, active phase, native stack or exact failed test-image snapshot. Libtest
+capture loses buffered progress on =process::exit=. A later same-binary diagnostic
+run passes; that does not identify the original stalled operation or its cause.
+The original failure remains UNATTRIBUTED and cleanup for that run UNVERIFIED.
+Neither subsequent native passes nor the model close that historical obligation.
+
+The diagnostic protocol now separates completed progress from phase context.
+A =PHASE= event changes the failure label but never renews the absolute progress
+deadline. Failure writes last completed event, phase and cleanup status directly
+to raw stderr before exit 70. Passing phase events add no diagnostic output.
+A bounded child-process control uses ordinary libtest capture and deliberately
+sends phase context continuously without completing work. It must still exit 70
+at the unchanged five-second gate and preserve its checkpoint/phase on stderr.
+Its parent kills a defective child after ten seconds; this is a controller bound,
+not a widened native acceptance deadline. No keepalive can admit stalled work.
+
+* Reused model and native acceptance
+
+The existing =service_sharing= module in =specs/owner_lifecycle.qnt= now distinguishes
+native ready roots from IDs handed to a host projection turn. Harvesting does not
+release roots or capacity. The harvest is bounded independently by owner and
+class; close and observer abandonment retain unprojected roots and wake duty.
+Projection uses the original lifecycle completion/credit transition. Existing
+worker assignment remains separate from completion, matching successor selection
+after the handoff. This is a finite opportunity/ownership model, not a theorem
+about OS scheduling or unbounded application execution.
+
+Two-domain scenarios cover partial harvest, retained ready roots, close and
+abandonment, and reject an unbounded same-class snapshot. The targeted gate runs
+1000 sampled traces of 64 steps per domain and requires mutation counterexamples.
+The first random mutation search failed to find a violation; its negative receipt
+is retained. The mutation gate now starts from the explicitly reachable state
+with two same-owner short results ready. It retains the same invariant and proves
+the mutation is rejected rather than treating an unexercised control as passed.
+The targeted gate passes in 49.54 seconds; the model is not rerun unchanged for
+additional numbers. Existing aggregate wiring includes these checks.
+
+Native controls exercise both completion policies with one persistent Scheme
+worker, short/general FIFO, exception retirement and active reconfiguration
+rejection. A bulk-only fixture checks the one-result boundary without a short
+job. A projection callback admits a new typed short request after the first bulk
+completion while two bulk jobs wait; it must participate before successor bulk
+selection. The four-owner contract retains GC, multishot continuations, errors,
+backpressure, cancellation/timeout and close drain; owners 1 and 3 explicitly use
+FairHandoff. The directed benchmark switches all four owners by arm.
+
+The completion-before-successor revision passes all four native tests in
+19.11 seconds, including the
+captured child-process watchdog failure control. Warnings-denied Clippy and the
+release benchmark build pass against the final benchmark CLI. The earlier native
+fixture failure is retained: polling Tokio admission inside a synchronous native
+projector lacked a reactor context. The test now explicitly enters the caller's
+existing Tokio handle before its nonblocking admission poll. No Scheme VM moves,
+new executor or production runtime change is involved. An earlier duplicate
+fixture observation opcode and lint failures remain retained as failed gates;
+they are not native watchdog explanations.
+
+* Directed same-routing comparison
+
+Use the existing native Cargo/Just benchmark:
+
+#+begin_src text
+env GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-scheme-service-benchmark --progress-fair-ab --fixed-short-selective --completion-fair-ab
+#+end_src
+
+The local SDK is Gerbil =1cfb032= / Gambit =ea114fc= on aarch64 Darwin 25.6.
+O2 describes the dynamic C module, not a rebuilt whole SDK. The existing native
+build resolves the SDK-paired Gambit compiler rather than an unrelated PATH tool.
+The targeted model gate is:
+
+#+begin_src text
+cargo test -p gerbil-scheme-rust-project-harness --test integration_test owner_model::owner_completion_scenarios_and_control --locked -- --ignored --exact --nocapture
+#+end_src
+
+Both arms use ProgressFair bulk offers and Selective short claims. Only completion
+handoff differs: Snapshot control, FairHandoff candidate. Both use the same four
+live VM identities and one native image, two Tokio workers, O2 dynamic compilation,
+owner slots 4/work 32, bulk active 3, batch 8, quantum 1, feed 1, Scheme budget 1,
+and NativePort wake. Each sample runs 8192 real orders and 64 four-line probes;
+five AB/BA blocks produce ten samples per arm per CPU/mixed load. Defaults remain
+Queued bulk and Broadcast short wake. There is no direct/Tokio/Rayon matrix growth.
+
+Native short completion timestamps precede caller resumption. Pending, admission,
+construction and projection distributions have distinct boundaries; pooled
+quantiles must not be subtracted. Process-wide GC CPU must not be summed across
+owners or subtracted from owner wall time. No profiler or OS poller runs in the
+timing capture; other user tasks remain untouched, without a host-exclusivity claim.
+
+** First mandatory-handoff prototype (retained negative)
+
+The first frozen-source capture completes all 40 samples in 6.90 seconds with
+exit 0. Both arms perform real peer offers, and every sample conserves published
+offers = withdrawals + native entries. Ports are empty at sample boundaries.
+Four owners join with zero external roots, quiesced services and removed copied
+image files. This does not establish full dynamic unload or long-run RSS convergence.
+
+| Workload | Metric | Snapshot control | FairHandoff candidate | Change |
+|----------+--------+------------------+-----------------------+--------|
+| CPU | Orders/s | 337421.354505 | 322988.055869 | -4.28% |
+| CPU | Bulk service p99, ms | 0.620584 | 0.630417 | +1.58% |
+| CPU | Native-completion short p99, ms | 0.440125 | 0.406375 | -7.67% |
+| CPU | Short admission p99, ms | 0.074208 | 0.079375 | +6.96% |
+| CPU | Short pending p99, ms | 0.407875 | 0.377833 | -7.37% |
+| CPU | Scheduled-probe p99, ms | 2.021625 | 2.059209 | +1.86% |
+| CPU | Maximum owner finish spread, ms | 0.474791 | 0.463167 | -2.45% |
+| Mixed | Orders/s | 65095.412894 | 64114.621415 | -1.51% |
+| Mixed | Bulk service p99, ms | 1.827833 | 1.884250 | +3.09% |
+| Mixed | Native-completion short p99, ms | 0.480667 | 0.498750 | +3.76% |
+| Mixed | Short admission p99, ms | 0.069500 | 0.069875 | +0.54% |
+| Mixed | Short pending p99, ms | 0.470500 | 0.470000 | -0.11% |
+| Mixed | Scheduled-probe p99, ms | 2.036458 | 2.009875 | -1.31% |
+| Mixed | Maximum owner finish spread, ms | 1.339000 | 1.336792 | -0.16% |
+
+CPU minimum owner progress is 98.7805% / 98.7952%; mixed is 98.8000% / 98.7805%.
+Minimum Actor peers remain CPU 1 / 1, mixed 0 / 0. The small finish-spread changes
+do not qualify a new fairness bound. Native CPU short construction p99 is
+11.750 / 8.958 us, projection is 1.917 / 2.667 us. Mixed construction is
+4.583 / 5.750 us and projection 2.000 / 2.042 us. These individual distributions
+must not be subtracted from each other or from total latency.
+
+No performance promotion: CPU native short p99 improves 7.67% and its own pending
+p99 improves 7.37%, but throughput regresses 4.28%, bulk p99 regresses 1.58%,
+admission p99 regresses 6.96% and scheduled p99 regresses 1.86%. Mixed throughput
+regresses 1.51%, bulk p99 regresses 3.09% and short native p99 regresses 3.76%.
+Mixed pending p99 is effectively flat (-0.11%); admission p99 increases 0.54%.
+This rejects mandatory completion handoff as a general performance improvement.
+The actual late-arrival ordering contract is established; it is not sufficient
+for end-to-end throughput/tail admission. The combined change does not isolate
+which additional handoff, harvest or native crossing pays each measured cost.
+No attribution to OS wait or GC is made from these results.
+
+The next protocol obligation is to preserve the demonstrated completion-before-
+successor opportunity without requiring a new host crossing for every bulk
+completion. That needs explicit outstanding handoff/ready ownership and a
+work-conserving batch boundary; another unchanged capture or yield-threshold sweep
+would not answer it. Snapshot, Queued bulk and Broadcast short defaults remain.
+The historical native watchdog cause remains open independently of these gates.
+
+Reproducible identities for the retained first capture:
+
+- Binary SHA-256: =3dce7e20c0fb6331a5d6d3afbd233f1398553a5d9042e70da042766ec551723e=.
+- Native image SHA-256: =1664719987c8d34e58087ab021c943afad4fecdbcfa59fe07c3aad0e6b2c1a61=.
+- Source archive SHA-256: =6d1c8d29fc4acf8227b36bb63e0bfb270971b799590c6dfe528a06af1abba602=.
+
+Raw logs, source archive, failed gates, exact source manifest and controller
+receipts remain private, outside Git. Public commands use repository-relative
+inputs and existing build tools. No Bash driver, raw evidence bundle or private
+absolute path is added to the repository.
+
+
+** Final eligibility-driven handoff
+
+Source review after the first capture identifies a redundant native yield: a
+worker with no eligible successor yields once, resumes to publish idle, then
+blocks on receive. The final protocol publishes idle in the completion critical
+section and blocks directly. An eligible successor still requires a handoff
+before class selection, preserving the actual late-arrival contract. This is an
+eligibility rule, not a changed budget, spin interval, timeout or yield threshold.
+The existing model already separates ready completion, successor selection and
+blocked/idle scheduling; its source and gate are unchanged for this implementation
+refinement. Native acceptance and the changed capture are separate gates.
+
+Final native acceptance passes all four tests in 21.26 seconds, including both
+completion modes, actual late short admission, natural idle receive, close drain
+and the captured watchdog failure control. Warnings-denied Clippy and the final
+release benchmark build pass. The existing finite-model source is unchanged.
+
+The changed capture completes 40 samples in 6.70 seconds with exit 0. Both arms
+retain ProgressFair supply, Selective short routing and identical live VMs. Every
+sample conserves offers and has no pending offer at its boundary; four owners
+join, roots are zero, services quiesce and copied image files are removed.
+
+| Workload | Metric | Snapshot control | Eligibility-driven handoff | Change |
+|----------+--------+------------------+---------------------------+--------|
+| CPU | Orders/s | 327594.825345 | 309091.252099 | -5.65% |
+| CPU | Bulk service p99, ms | 0.733917 | 0.865541 | +17.93% |
+| CPU | Native-completion short p99, ms | 0.444084 | 0.509708 | +14.78% |
+| CPU | Short admission p99, ms | 0.148750 | 0.215334 | +44.76% |
+| CPU | Short pending p99, ms | 0.435709 | 0.496208 | +13.89% |
+| CPU | Scheduled-probe p99, ms | 1.937542 | 2.163834 | +11.68% |
+| CPU | Maximum owner finish spread, ms | 0.481375 | 0.519333 | +7.89% |
+| Mixed | Orders/s | 65220.615020 | 64888.370972 | -0.51% |
+| Mixed | Bulk service p99, ms | 1.829875 | 1.888250 | +3.19% |
+| Mixed | Native-completion short p99, ms | 0.455333 | 0.486959 | +6.95% |
+| Mixed | Short admission p99, ms | 0.069541 | 0.067541 | -2.88% |
+| Mixed | Short pending p99, ms | 0.440333 | 0.475000 | +7.87% |
+| Mixed | Scheduled-probe p99, ms | 2.045709 | 1.860042 | -9.08% |
+| Mixed | Maximum owner finish spread, ms | 1.527625 | 1.587083 | +3.89% |
+
+No performance promotion. CPU throughput regresses 5.65%, native short p99
+regresses 14.78%, bulk p99 regresses 17.93%, and finish spread increases 7.89%.
+Mixed throughput regresses 0.51%, short p99 regresses 6.95%, bulk p99 regresses
+3.19%, and finish spread increases 3.89%. Mixed scheduled-probe p99 improves
+9.08%, which does not override the native-completion regression. CPU admission
+p99 regresses 44.76% and pending p99 13.89%; mixed admission p99 improves 2.88%
+but pending p99 regresses 7.87%. These are separate measured distributions.
+
+The revised eligibility rule removes a real redundant scheduling opportunity,
+but its complete candidate still fails the matched control. It does not justify
+asserting that the earlier performance loss was entirely the extra yield.
+Absolute control throughput and tails differ across captures; no cross-capture
+causal comparison or quiet-host claim is admitted. The first negative remains
+above. Defaults stay unchanged, and the explicit policy remains experimental.
+
+Minimum owner progress remains about 98.8% in both loads/arms; minimum Actor
+peers remain CPU 1 / 1 and mixed 0 / 0. This is no new fairness or latency bound.
+The next architectural obligation is an outstanding completion-opportunity
+protocol that retains the demonstrated late-admission selection boundary while
+coalescing completed bulk graphs without a mandatory host crossing per graph.
+Its ownership, ready-token and class-fairness rules need to precede implementation;
+no additional unchanged performance sampling is performed in this round.
+
+Final capture identities (the same Rust executable loads a changed native image):
+
+- Binary SHA-256: =3dce7e20c0fb6331a5d6d3afbd233f1398553a5d9042e70da042766ec551723e=.
+- Native image SHA-256: =f7a02c860a1bd77a426c05ce7a7c683224717c1128e12da47d41710401377c25=.
+- Source archive SHA-256: =1a5b3bc3f7ce1d61017d890b6a5ef84f337e367f0c7159f6420c03e4a7a04918=.
+

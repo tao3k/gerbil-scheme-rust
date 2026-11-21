@@ -1,0 +1,148 @@
+#+TITLE: Scheme service checkpoints follow actual first-execution debt
+#+OPTIONS: toc:2
+
+* Evidence and status
+
+Unpublished ABI25 candidate, with unchanged defaults and ABI23 as the matched
+control. The rejected private-notification ABI24 experiment remains frozen;
+see [[file:30.80-scheme-directed-grant-wake.org]]. ABI25 uses the existing shared
+broadcast policy rather than combining that experiment with this change.
+
+Source review found a remaining progress-contract split. ABI23 retains work
+execution debt through runnable/registration until the first receiving grant,
+but =service-checkpoint!= only consults the separate dispatch ledger. A worker
+can acknowledge dispatch before registering for execution. At that point the
+service cycle stops offering a dispatch checkpoint even while execution debt
+is still outstanding. This is a source-established guarantee gap, not a unique
+attribution of every measured tail.
+
+* Unified service progress contract
+
+| Event | Dispatch ledger | First-execution ledger | Checkpoint eligibility |
+|-------+-----------------+------------------------+------------------------|
+| Accepted native short | Pending | Pending | Eligible |
+| Scheme worker starts | Acknowledged | Still pending | Remains eligible |
+| Worker registers | Unchanged | Still pending | Remains eligible |
+| Receiving first managed grant | Unchanged | Acknowledged exactly once | No longer eligible on this debt |
+| Validation/terminal exception without grant | Unchanged | Distinct ungranted terminal receipt | No longer eligible on this debt |
+| Later handler computation or suspension | Unchanged | Already settled | Does not hold this checkpoint open |
+
+The Scheme service boundary yields once when joint progress is enabled, either
+ledger owes progress, and there is no ready short result to collect. This
+leaves completion collection ahead of more scheduling opportunities. Each
+native boundary has at most one such opportunity. It does not synchronously
+wait for a handler or first grant, acquire an outer execution lease, block all
+bulk input, or turn a batch into an uninterruptible unit. A later boundary can
+offer another opportunity if debt remains. Actual service call and cooperative
+work durations are not wall-clock preemption guarantees for arbitrary Scheme.
+
+The execution-debt predicate is opt-in. It observes the same Scheme work epoch
+under the existing budget mutex. Policy reconfiguration requires an idle native
+service, so the epoch cannot change during active work. No service callback
+runs while holding that mutex. Checkpoints remain outside the service mutex,
+preserving service-to-budget lock order. The checkpoint flag is immutable epoch metadata; both arms normalize to the
+same registered layout mode. There is no new handler-level check, lease, event
+registry or replay allocation. Uncontended service boundaries still
+pay the policy predicate's branch cost; performance admission must measure it.
+
+Receiving-thread acknowledgement and exception/ungranted settlement retain
+ABI23 ownership. Continuation replay does not issue another first-execution
+receipt. Rust owns cross-instance dispatch; Scheme retains Actors, green
+threads, continuation and GC execution. Observer cancellation/timeout cannot
+settle accepted native execution or release its roots early. Close retains
+progress debt until normal completion or ungranted terminal drain.
+
+* Reused Runtime model and actual API
+
+The existing joint service-cycle model now has an execution-checkpoint policy:
+its opportunity predicate consults dispatch or actual execution debt. Legacy
+controls retain dispatch-only behavior. New directed controls cover the gap
+after dispatch acknowledgement, a repeated opportunity that cannot consume
+debt, eligibility ending at grant before handler completion, abandoned/closing
+ungranted drain, and a mutation that skips the opportunity before collecting a
+ready bulk result. Native qualification reuses the existing registered grant,
+GC, continuation replay, exception and Actor controls, with the new predicate
+checked before and after actual first grant.
+
+The Rust owner API is
+=configure_scheme_service_execution_checkpoint_plan_on=; native ABI25 configures
+Scheme's policy. Both arms retain native type projection, specialized layout
+plans, class fairness and identical logical work bounds. No JSON or Rust
+implementation replaces Scheme computation.
+
+* Targeted performance gate
+
+Use the existing same-four-live-VM/image O2 workload: Tokio two workers,
+window four, work capacity32, batch eight, Actor quantum one, class/feed budget
+one, work quantum four/maximum48, five AB/BA blocks each for CPU and mixed
+load, observation off. Compare ABI23 dispatch-only checkpoints with ABI25
+execution-aware checkpoints. Validate exact work/results/first-grant counts,
+independent roots/capacity and final cleanup. Retain five-second native progress
+and120-second capture limits, negative samples and historical watchdog records.
+No expanded matrix, default change or publication follows from model safety.
+
+* Concurrent PR repair observed
+
+PR head =c4b95dfaa116bd67b110d94826535fd27f227b85= independently refreshed
+the same four generated files after the build recipe change. Both whole-file
+and build-input receipts were verified against that remote commit. Ubuntu
+Bazel CI passed; macOS Bazel was still running at this observation. The local
+isolated regeneration is superseded and will not be published as a duplicate.
+The unpublished normal-Cargo CI receipt-check addition remains separate.
+No Runtime performance candidate was included in that remote regeneration.
+
+* Final qualification and performance: not admitted
+
+The unchanged formal source passed94 directed witnesses across the two existing
+finite domains and400 randomized sequences of at most64 steps. Strict Rust
+Clippy passed. The initial Scheme representation passed native qualification;
+then the service-cycle policy was normalized into immutable epoch metadata,
+leaving both arms' handler dispatch identical. Final-source native qualification
+passed3 tests in44.37s, with four owners joined, zero roots, temporary files
+removed, FD return and close1.328791ms. Final O2 build freshness, formatting and
+tracked-SCM checks passed. Earlier gate logs remain separate from final-source
+native evidence; no performance sample used the superseded representation.
+
+Forty matched samples completed in9.099s, exit0 with empty stderr, unchanged
+host/image identities, empty compiler boundaries, exact work/result/plan/grant
+conservation and full four-owner cleanup. These boundary checks do not prove
+absence of every possible mid-window host disturbance. Each arm/window had64
+issued/runnable/registered/first-grant receipts and zero pending or ungranted
+short work. No watchdog timeout occurred.
+
+| Paired-window median change | CPU | Mixed |
+|-----------------------------+-----+-------|
+| Throughput | +2.87% (6/10 improved) | -0.07% (5/10 improved) |
+| Actual short p99 | -14.11% (6/10 improved) | -8.56% (6/10 improved) |
+| Scheduled short p99 | -3.08% (7/10 improved) | +4.58% (3/10 improved) |
+| Bulk p99 | -4.95% (6/10 improved) | -1.09% (7/10 improved) |
+| Owner finish spread | +1.24% (5/10 improved) | +3.81% (4/10 improved) |
+
+Pooled throughput changes were CPU+1.32%, mixed+1.24%. Pooled actual short
+p99 fell11.97%/11.47%; pooled bulk p99 fell31.53%/3.31%. CPU maximum owner
+finish spread fell57.38%, while the paired-window median did not improve;
+mixed maximum spread rose8.15%. Selecting only the pooled maximum would hide
+this distinction. Three CPU windows in each arm and all mixed windows had
+zero minimum peer-at-start overlap; every owner nevertheless progressed and
+all work drained. This is a limited start-overlap observation, not a claim of
+permanent starvation or proof of whole-run fairness.
+
+The existing counters show CPU checkpoint totals640 to639 and mixed638 to640,
+with640 worker starts in every arm/load aggregate. This establishes nearly
+unchanged opportunity counts, not how often the new post-dispatch predicate
+was uniquely responsible for a checkpoint. The native predicate and model
+phase controls establish the boundary contract, but this natural workload
+does not independently isolate the incremental phase's performance effect.
+No new hot-path observation was added to manufacture such attribution.
+
+The candidate is not admitted for publication: actual short tails improved in
+this capture, but owner completion fairness and mixed scheduled short tails
+remain open. Neither statistical significance nor release-wide improvement is
+claimed from these small matched windows. The full unpublished-stack versus
+published-control gate is not promoted. Preserve the positive and negative
+results, keep defaults unchanged and do not rerun an unchanged candidate to
+seek a favorable window. Further protocol work must distinguish opportunity,
+actual useful execution and completion progress rather than equating extra
+checkpoint eligibility with useful progress. The original historical watchdog
+failure still lacks same-failure attribution; successful current runs do not
+close it.

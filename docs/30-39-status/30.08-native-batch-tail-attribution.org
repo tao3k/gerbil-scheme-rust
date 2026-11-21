@@ -1,0 +1,191 @@
+#+title: Native Batch Tail Attribution and Minimal Scheme Scheduling Repair
+#+date: 2026-10-19
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Scope and decision
+
+Local working-tree qualification on =codex/typed-fold-aot=, base
+=bb71bbb5ad91bbaef2035979319514c7ced4c4ca=. Rust still routes owned native
+values across fixed owners; Scheme runs the application, actors, green threads,
+collector, continuations and exceptions. The existing Gerbil-to-C / Cargo / Just
+build graph is retained. No SDK, processor configuration or SMP change is made.
+Unrelated Python/compiler work is preserved. This is not remote CI or a release.
+
+The retained runtime repair is limited to =scheme/actor-batch.ss=:
+
+- Wake only workers with assigned items. Preserve the original service-worker
+  stride and input/result ordering; wait for exactly those active workers.
+- Yield at an item boundary only when that worker has more assigned work.
+  After its final item, send the acknowledgement and return to mailbox waiting.
+
+For a one-item batch in a four-worker service, this removes three empty turns
+and acknowledgements. For 32 items / four workers / quantum one, it removes
+four terminal yields, retaining the 28 yields between actual work items.
+These counts follow the bounded loop protocol; wall-clock gains are measured
+separately. Handlers may still yield or wait internally and use full Scheme
+execution. A Scheme yield still cannot drain the next Rust queue entry before
+the active foreign call returns.
+
+* Opt-in attribution on the real API
+
+=submit_numeric_batch_profiled_on= uses the same native construction, Scheme
+entry and result projection as =submit_numeric_batch_on=. It returns
+=ProfiledBatch<T>= with =BatchTimeline=. Normal calls do not read these extra
+phase clocks or GC counters. =wait_completed= provides the final root-balanced
+owner timestamp, before reply publication. All successful traced spans assert
+monotonic markers and an exact nanosecond sum to end-to-end delivery latency.
+
+| Span | Included work |
+|------+---------------|
+| Cohort release to dispatched | Producer cloning, validation and preceding submissions |
+| Dispatched to entered | Admission/channel setup, queue residence and owner dispatch/wakeup |
+| Entered to constructed | Existing native numeric-vector and envelope construction |
+| Constructed to executed | Full synchronous Scheme entry, actor work, waits, GC and foreign-call overhead |
+| Executed to projected | Native result slot lookup and typed numeric copies |
+| Projected to completed | Root release, balance check and owned input capture retirement |
+
+All spans are elapsed wall time and can include OS descheduling. GC snapshots
+at entered/constructed/executed/projected read the already-exported native
+collection counter. They identify collection events, not precise GC pause time.
+Projection here includes all typed extraction, not merely a host memcpy.
+
+The trace harness also clocks return from admission. If entered is later,
+=entered - admission_return= is a lower bound on queue/dispatch wait; the
+submission duration is an upper bound on admission overhead. This handles
+owners that start before submission returns without reversing time markers.
+
+Do not add marginal stage p99 values. Attribution uses the same requests in
+the end-to-end upper one-percent cohort, plus their individual stage durations.
+
+* What the traces establish
+
+The former ordering of batch versus single-item p99 does not reproduce
+consistently across fresh processes. Independent runs can place CPU tails in
+owner dispatch/wakeup or in native construction. A 32-item cohort has exactly
+one request per owner: long dispatch spans in that case cannot be explained
+by a backlog of other accepted batch jobs. Admission itself was measured in
+fractions of a microsecond to a few microseconds, while observed dispatch waits
+can be milliseconds. This bounds the issue to owner dispatch/wakeup and host
+scheduling, not a proven FIFO backlog or Scheme actor starvation.
+
+In the GC-instrumented control, all 12 CPU batch construction spans over 500 us
+coincided with a native collection. This is correlation within the construction
+span, not proof that its entire elapsed time was GC. CPU batches recorded 40
+collections in construction and zero in Scheme entry/projection in that run.
+Required native allocation remains part of the timed workload; GC policy and
+heap sizing are unchanged.
+
+For one control trace's upper-one-percent batches, conditional mean spans were:
+
+| Load | Total us | Dispatch us | Construction us | Scheme us | Projection us | Other us |
+|------+----------+-------------+-----------------+-----------+---------------+----------|
+| CPU | 1247.53 | 194.77 | 853.55 | 149.59 | 28.85 | 20.76 |
+| Mixed Scheme waits | 7910.18 | 1081.74 | 20.49 | 6709.61 | 45.55 | 52.78 |
+
+These are tail-cohort means, not additive marginal percentiles or universal
+stage shares. Other runs and slow requests remain in the receipts. Result
+projection is not the principal observed tail source. Mixed waits primarily
+accumulate inside Scheme, including actual one-millisecond timer waits and
+scheduler/OS delays. Single-item controls additionally show true queued work:
+32 separate requests per owner per cohort, so earlier work delays later items.
+
+* Rejected coordinator-reuse experiment
+
+A persistent coordinator with Gerbil's existing =:std/sync/completion= passed
+native correctness, exception recovery and cleanup. It reduced the observed
+single-item GC counts in one diagnostic run, but did not improve batched GC
+counts consistently. It was rejected and completely removed from the runtime.
+
+A same-binary, frozen-image ABBA comparison measured four-owner batch 32 / yield
+one CPU p99 4.507 -> 12.557 ms and mixed p99 7.751 -> 12.063 ms; median sample
+throughput also declined. A separate eight-process block had external native
+compilers in surveys and is retained as loaded-host evidence, not performance
+acceptance. Fewer allocations alone did not establish a faster scheduling path.
+
+The frozen rejected source and measurements remain in receipts. The production
+module retains its original per-turn private coordinator; no Completion-based
+runtime protocol or new standard-module dependency is shipped.
+
+* Paired same-image, same-VM qualification
+
+Because whole-process observations drifted substantially even on unchanged
+controls, the final focused experiment embeds a frozen pre-repair scheduler
+only in the qualification fixture, with alpha-renamed private identifiers.
+It is not installed as a library and is not a public compatibility path.
+Both arms call the identical =orders-handler= and use identical native records,
+projection, oracle, owner queues and four native owners in the same image.
+
+The fixture selects the Scheme service through a qualification-only command
+before each sample. Four selector calls are outside the sample clocks in both
+arms; this administrative step can warm the first cohort. Both services are
+warmed, and eight green workers per VM remain resident across both arms. These
+conditions are constant for the paired arms but differ from ordinary cold
+process admission. Consequently, paired absolute latencies are not production
+SLOs and cannot be silently substituted for the earlier process comparisons.
+The ordinary public batch API still performs every measured request.
+
+Each sample has 1,024 orders, 48 native order lines each, released in cohorts
+of 128 with queue capacity 128. Owner assignment and deterministic payloads
+are unchanged from 30.07. Each run uses ten ABBA blocks, 20 samples per arm
+and scenario. Two runs produce 40 samples / 40,960 validated orders per cell,
+320 timed samples and 327,680 validated orders in total. Throughput uses the
+lower sample median. p95/p99 pool the full per-order latency records, never
+an average of per-run percentiles. Raw records are emitted after each clock
+stops; all slow observations are retained. No forced pre-sample GC is used.
+
+| Load | Batch / quantum | Arm | Orders/s | p95 ms | p99 ms | Peer minimum |
+|------+-----------------+-----+----------+--------+--------+--------------|
+| CPU | 1 / 0 | control | 133,543 | 1.446 | 3.045 | 0 |
+| CPU | 1 / 0 | repair | 152,186 | 1.174 | 1.959 | 0 |
+| CPU | 32 / 1 | control | 329,322 | 0.827 | 1.271 | 6 |
+| CPU | 32 / 1 | repair | 350,820 | 0.763 | 1.295 | 7 |
+| Mixed waits | 1 / 0 | control | 18,620 | 6.942 | 12.793 | 0 |
+| Mixed waits | 1 / 0 | repair | 18,650 | 7.707 | 14.912 | 0 |
+| Mixed waits | 32 / 1 | control | 45,732 | 5.284 | 11.207 | 2 |
+| Mixed waits | 32 / 1 | repair | 45,890 | 4.504 | 10.178 | 2 |
+
+The one-item CPU case improves median throughput by 14.0% and pooled p99 from
+3.045 to 1.959 ms. The 32-item CPU case improves throughput by 6.5% and p95 by
+7.7%; p99 is effectively flat but numerically worse, 1.271 -> 1.295 ms (1.8%).
+The minimum peer progress is seven of eight items in the repaired CPU batches,
+versus six in the control. This is observed local progress, not a fairness proof.
+
+Mixed 32-item throughput changes by only +0.35%, which is not a meaningful
+speedup claim on this host. Pooled p99 improves 11.207 -> 10.178 ms, but per-run
+p99 differs substantially: control 9.471/17.546 ms, repair 11.802/3.450 ms. The
+mixed one-item p99 regresses 12.793 -> 14.912 ms. Zero/low peer progress during
+an actual wait is not evidence of CPU starvation.
+
+The small work-conserving repair is retained with semantic/resource validation.
+There is no all-workload p99 improvement or strict p99 non-regression pass.
+GC/construction and owner-dispatch tails remain open, and arrival/batch-fill
+latency is not modeled by preconstructed cohorts. No automatic batching policy,
+new timeout or weakened semantic/fairness assertion is introduced.
+
+* Validation and evidence
+
+Current-source strict Clippy passes for the library and qualification all-targets.
+The native batch contracts cover transfer rejection, all four actor failure
+lanes and reuse, a 256-item batch, output-budget failure before excess allocation,
+root balance and joined cleanup. The current image also passes the existing
+native type, multi-shot continuation/GC, exception/panic, heap-retention positive
+control and shutdown smoke. Its 720 successes, 42 Scheme failures and six Rust
+panics complete naturally; retained-heap growth and release both measure
+134,219,264 bytes. FD/thread counts return to baseline and native roots are zero.
+Initialized image mappings retain their previously documented lifecycle boundary.
+
+See receipt inventory for frozen controls, rejected experiments, full latency
+records, phase/GC traces, source/image digests and command outcomes. The existing
+five-second startup/response/shutdown/progress gates are retained. No compiler
+process was present in the final paired before/after surveys; this remains a
+shared laptop and the surveys do not prove isolation throughout the run.
+
+#+begin_src sh
+env -u SDKROOT \
+  just bridge-instance-resources --scheduler-ab
+env -u SDKROOT \
+  just bridge-instance-resources --orders-profile
+#+end_src

@@ -1,0 +1,153 @@
+#+TITLE: UTF-8 entry costs, allocation policies and bounded evidence
+
+* Frozen production and scenario scope
+
+Production policy remains the caller-owned encoder qualified at =f48bd8d7=;
+the existing PR #18 audit head is =91e4f1e15550740f22d76bfd57ba8ff7bab1c5fc=.
+No kernel or SDK installation/build changes are made. These receipts qualify
+owner-local bridge transfers, not Org parsing or parallel Scheme execution.
+The unavailable intra-VM SMP capability remains a separate failed gate.
+
+An independently retained String and a streaming consumer have different
+lifetimes. A consumer that needs every result after the next request cannot
+reuse one destination. A consumer that finishes each text before the next
+request can retain a scratch buffer instead of allocating every time.
+Both paths must freshly encode the current text and validate every byte.
+
+Official =lib/c_intf.c:1254= accepts bounded caller-owned character/byte buffers.
+Rust's [[https://doc.rust-lang.org/std/vec/struct.Vec.html#method.clear][Vec::clear contract]] preserves capacity rather than releasing it.
+That reuse avoids repeated allocation but retains the largest admitted
+buffer. Memory budgets and buffer lifetimes belong to the caller; this audit
+does not impose an unmeasured worker-count or request-count threshold.
+Returned capacity is not allocator metadata, committed pages or peak RSS.
+
+* Rejected streaming controls
+
+The qualification-only =--reuse= route keeps one exclusive buffer per sample,
+including its first allocation inside timing, but still queries the current
+Scheme string length before every encoding. Every result is checked and
+consumed before the next request. ABBA has twenty complete samples per variant
+at 1,000, 10,000 and 100,000 requests, with the same four changing texts.
+
+| Requests | Baseline wall ms | Reuse wall ms | Paired ratio | Baseline CPU ms | Reuse CPU ms |
+|----------+------------------+---------------+--------------+-----------------+--------------|
+|     1000 |           17.980 |        17.564 |     0.991014 |           7.233 |        6.906 |
+|    10000 |          188.876 |       188.939 |     1.054227 |          70.730 |       71.785 |
+|   100000 |         3059.407 |      2508.579 |     0.960097 |         730.485 |      726.190 |
+
+The process rejects after all loads complete; 10,000 regresses. The raw 120
+rows are in =benchmarks/20261011-utf8-reuse-query-abba.log=. No safe public
+API or production replacement is introduced on this evidence.
+
+The =--reuse-direct= route first supplies existing capacity to the checked
+encoding ABI. Scheme already checks current length and capacity. Only a
+rejection accompanied by a demonstrably larger required capacity causes
+one length query, growth and one retry. A Unicode failure with sufficient
+capacity is not retried or suppressed; partial bytes never admit a length.
+
+| Requests | Baseline wall ms | Direct wall ms | Paired ratio | Baseline CPU ms | Direct CPU ms |
+|----------+------------------+----------------+--------------+-----------------+---------------|
+|     1000 |           22.011 |         28.911 |     1.221034 |           7.428 |         7.172 |
+|    10000 |          384.528 |        411.564 |     1.069519 |          75.534 |        73.120 |
+|   100000 |         3567.650 |       3135.115 |     1.019687 |         746.393 |       720.108 |
+
+All three paired ratios reject despite lower CPU medians. GC counts at
+100,000 are 1,237 / 1,177, with median GC CPU 17.552 / 15.608 ms.
+The raw 120 rows are in =benchmarks/20261011-utf8-reuse-direct-abba.log=.
+This remains a negative control, not a production policy. Lower allocation
+frequency or CPU cost alone does not establish accepted wall-time improvement
+on the non-isolated host.
+
+* Official-source entry algorithm
+
+=lib/_thread.scm:4543-4556= implements =with-exception-catcher= with
+=##continuation-capture= and a dynamic exception-handler binding. The existing
+raw encoding entry enters that machinery even for successful conversions.
+This is a source-level cost hypothesis, not an allocation-profiler receipt.
+
+The status-driver candidate expresses expected type/capacity/scalar failures
+as negative fixnums rather than raising/catching exceptions. It uses the
+same production C scalar codec, unchanged leaf guards and 256-character
+bound, with Scheme polling between leaves and no Scheme body view escaping.
+Capacity admission compares length with =capacity / 4=, avoiding an
+overflowing four-times-length intermediate. Pointer marshalling remains at
+the foreign entry; the candidate is not an unchecked pointer API for Scheme
+users. Complete UTF-8 validation remains mandatory before Rust text admission.
+
+Normal error and partial-write contracts must pass independently of timing.
+Any measured wall-time regression rejects default promotion. No shrinking,
+cached text, changed SDK or relaxed correctness rule substitutes for that
+algorithmic qualification.
+
+* Complete status-driver receipt and rollback
+
+| Requests | Baseline wall ms | Status wall ms | Paired ratio | Baseline CPU ms | Status CPU ms |
+|----------+------------------+----------------+--------------+-----------------+---------------|
+|     1000 |           13.563 |         14.165 |     0.970014 |           7.297 |         7.054 |
+|    10000 |          231.013 |        170.921 |     0.830344 |          72.942 |        69.457 |
+|   100000 |         3515.269 |       3734.501 |     1.166125 |         720.767 |       710.471 |
+
+At 100,000, GC totals are 1,230 / 240 and GC CPU medians 16.624 / 7.545 ms.
+This reduces observed GC work but fails the wall-time gate. At 1,000 the
+unpaired wall median is also higher; neither the lower CPU values nor the
+10,000-request improvement establishes universal performance improvement.
+All 120 rows are in =benchmarks/20261011-utf8-status-entry-abba.log=.
+
+This is a prototype receipt: baseline mode 5 uses the actual checked ABI,
+while candidate mode 9 calls a qualification-only raw status entry. The
+shared scalar leaf and full Rust validation are unchanged, but the outer
+Rust ABI framing differs. It is therefore not a qualification of a changed
+production ABI, and cannot isolate continuation-capture cost from every
+other entry-framing effect. Production was never switched to this candidate.
+Unicode parity, all surrogate rejections, mutation, type and capacity controls
+ran before timing; no GC benefit bypassed the performance failure.
+
+All candidate source edits have been reverted, including the status driver
+and its production-module export. No new safe public API, allocation policy,
+exception behavior or generated SCM change remains in the production tree.
+The replay patch =benchmarks/20261011-utf8-entry-candidates.patch= applies
+to audit head =91e4f1e15550740f22d76bfd57ba8ff7bab1c5fc= and reproduces all
+three qualification-only experiments. =git apply --check= confirms that
+the archived patch applies after rollback. It is evidence, not an enabled
+runtime path. Raw rejected results are retained rather than overwritten.
+
+* Cost and memory balance
+
+GC count/CPU are measured; allocation event counts, bytes allocated by Scheme,
+resident memory and allocator relocation are not measured by this receipt.
+Source inspection identifies exception machinery and redundant FFI entry as
+hypotheses, not complete allocation attribution. The observed GC reduction
+does not explain all encoding CPU or wall delay. The host remains non-isolated;
+ABBA balances chronology but does not remove external scheduling interference.
+
+The reusable controls retain one logical 13,660-byte scratch destination per
+sample on this allocator, rather than producing a separately allocated
+13,660-byte String on each request. The per-transfer capacity sum is the same;
+it must not be presented as concurrently retained memory. A worker retaining
+an unusually large scratch buffer needs a caller-chosen lifecycle/budget,
+not mandatory shrinking after every transfer. Independently retained output
+can still be compacted when that caller explicitly accepts allocator/copy cost.
+No automatic threshold is introduced or admitted by these failed timings.
+
+The next attribution boundary is per-entry allocation/continuation evidence
+separate from an uninstrumented matched throughput run. A GC-targeted policy
+and a throughput-targeted policy should have explicit resource objectives;
+neither may silently replace the frozen default after failing its gate.
+
+* Exact-head remote CI
+
+At audit head =91e4f1e15550740f22d76bfd57ba8ff7bab1c5fc=, Linux run
+=38101302928= completes its Cargo gates, then fails the unchanged Scheme
+actor capability gate with =requested=4 active=1=. The linked SDK also reports
+=multiple-vms=false thread-local-entry=false max-processors=1=.
+This is an SDK capability failure, not admission of parsing parallelism.
+The exact-head run subsequently completes with both platforms failing that
+same unchanged gate. macOS observes =requested=3 active=1= and linked
+=multiple-vms=true thread-local-entry=false max-processors=1=. Its Cargo
+gates pass before the capability failure as well. Encoding experiments
+neither fix nor skip that SMP gate, and no Org parsing acceptance is claimed.
+
+After rollback, actor-AOT all-target Clippy passes with warnings denied;
+formatting, the filename gate, exact staged whitespace checks and replay-patch
+admission pass. The source diff is empty. Unrelated =MODULE.bazel.lock= churn
+is preserved and excluded from this documentation-only commit.

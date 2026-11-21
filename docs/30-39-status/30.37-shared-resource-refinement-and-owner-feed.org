@@ -1,0 +1,198 @@
+#+TITLE: Shared-Resource Refinement and Bounded Owner Input Feeding
+#+DATE: 2026-10-21
+
+* Starting state and exact-head CI
+
+This continues =316dae5171a6614778bba182608b3c35e6242189= on PR #18.
+[[file:30.36-scheme-short-queues-and-whole-file-digests.org][30.36]] retains the CPU throughput regression of 36.2% in its second capture,
+inconsistent short p99 and the earlier constructor spike. Separate class queues,
+quotas and short layouts did not establish end-to-end latency isolation.
+
+The exact-head [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39599937056][CI run 39599937056]] completed cancelled: five active jobs passed;
+the macOS bindings job reached its 30-minute deadline. Its Cargo gates and three
+Actor smoke controls had passed; the final Actor all-target lint was rebuilding
+when cancelled. This is incomplete acceptance, not a native assertion failure or
+an all-green result. The same macOS Actor controls/lint move to the existing
+native-owner job, without adding a job/matrix or widening a timeout. Exact-head
+remote acceptance of this change remains independent of local checks.
+
+* Reuse the lifecycle model
+
+=specs/owner_lifecycle.qnt= adds =service_sharing=, importing the existing lifecycle
+as =life=. Admission, assigned owners, work/slot credits, native roots, completion,
+timeout, close and join retain one authority. No duplicate lifetime model is added.
+The two finite domains use two single-processor VMs, two persistent Scheme workers
+per VM, and four/five requests; these are exploration parameters.
+
+The refinement separates host inbox/native entry, class queues, assigned workers,
+one VM execution resource, cooperative work, blocked/woken tasks, VM-wide GC, OS
+pause/resume, completion projection and draining. Abstract delay ticks are not
+milliseconds. OS and collector progress are external assumptions; arbitrary
+Scheme handlers need not yield.
+
+** Executable counterexamples and candidate rules
+
+- Queue separation can leave a short request behind an executing native turn.
+- A reserved short worker still shares the VM CPU with a runnable bulk worker.
+- GC blocks both classes on the same VM. A stateless short request assigned to a
+  different VM can complete while the bulk VM is collecting.
+- An OS pause defeats a deadline derived only from queue state.
+- Bounded eager feeding removes a modeled avoidable entry gap without discarding
+  accepted roots. Abandonment and close still retain them until completion.
+- A separate candidate cooperative CPU lease bounds one abstract work unit, then
+  uses class debt so eligible bulk work follows short execution. With one short
+  reservation per modeled owner, an eligible short worker is overtaken by at most
+  one new bulk lease. This is not a wall-clock or starvation-freedom theorem.
+
+The candidate CPU lease/class debt is model-only. It is not implemented as a
+preemptor, nor silently attributed to the existing Scheme worker algorithm.
+Current-policy checks explicitly omit those assumptions and cover cooperating
+class-routed callers with opt-in feed two in the finite domain, not the default
+feed-one configuration or arbitrary independent producers. Fixed Actor/session
+ownership cannot be migrated to get the stateless routing benefit.
+
+The complete existing Rust gate passed in 355.76 seconds: 79 scenario runs,
+6,000 sampled traces of at most 64 steps and 12 deliberate mutation controls.
+Each mutation requires exit 1 and an actual invariant violation; parser/tool
+failures do not count. Both current and candidate shared-resource policies were
+sampled on both domains. Finite simulation is not an unbounded proof, a GC
+implementation check, a scheduler fairness proof or a performance result.
+
+See [[file:../../specs/owner_lifecycle.md][the model contract]] for commands, policy boundaries and the model-to-code map.
+
+* Observed resource sharing
+
+Optional owner instrumentation records advance, native wait, submit and retire
+wall time plus existing SDK thread CPU/GC counter deltas. Observation is disabled
+by default. The short constructor snapshots are diagnostic metadata; application
+input/output still crosses native Scheme/Rust numeric types, not JSON execution.
+
+The separate observed =--short-service-ab= capture has 40 validated samples and
+four clean joins, zero roots, removed copied files and service quiescence.
+Illustrative individual short-request observations:
+
+| Workload/arm | Constructor wall ms | Thread CPU ms | GC collections | GC wall ms |
+|-------------+---------------------+---------------+----------------+------------|
+| CPU / explicit short | 26.763 | 0.037 | 0 | 0 |
+| CPU / general | 0.757 | 0.696 | 1 | 0.748 |
+| Mixed / general | 15.131 | 0.541 | 1 | 15.090 |
+| Mixed / explicit short | 6.206 | 0.028 | 0 | 0 |
+
+Thus constructor wall spikes cannot all be called type-conversion CPU or GC.
+A GC wall span can itself contain descheduling/wait. The earlier 56.410 ms spike
+had no corresponding counters and is not retroactively assigned a cause.
+Across all four owners and ten observed samples per arm, native-wait wall totals
+were 6.947/5.257 seconds for CPU general/short and 18.296/13.369 seconds for mixed.
+These are summed owner spans, not workload wall time. They include Scheme work,
+blocked select and OS scheduling; no pure OS cost is inferred by subtraction.
+
+A separate two-second stack sample found native select and collector paths on
+owners, with Tokio workers mostly parked. That diagnostic capture overlapped our
+own qualifier compilation and is excluded from performance admission. Stack
+presence does not quantify which source dominates the p99 population.
+
+* Actual opt-in algorithm change
+
+=configure_scheme_service_feed_on(owner, maximum)= validates open service,
+configured slots/work/producer state and an idle capacity boundary. The bound
+must be positive and fit native slots. The default stays one.
+
+The owner publishes up to that many immediately available FIFO service inputs
+before advancing Scheme. It never waits to fill a batch. Non-service input ends
+the feed at the existing FIFO boundary. Scheme alone chooses Actor/green-thread
+execution; accepted permits stay held through native projection/root retirement.
+This targets a host-entry gap, not VM-wide GC, arbitrary handler preemption or a
+pool-wide isolated short lane.
+
+* Native and tool checks
+
+- Core and qualification strict Clippy passed, including combined Actor/instance
+  all-target checking. An initial 106-line test-helper lint failed and was repaired
+  by extraction; the failure remains in private evidence.
+- The actual single-worker fixture validates the explicit feed API, rejection of
+  zero/oversized/active reconfiguration, the existing =90,1,2,91,4= Scheme order,
+  =raise #f= recovery and exact five submit/five retire observation counts.
+- The existing four-VM service fixture opts into feed four and passed real GC,
+  multishot continuations, exceptions, admission/abandonment, wake and shutdown.
+  Four owners joined; roots/files/descriptors returned. Close was 3.721 ms in this
+  run. It does not establish long-term RSS reclamation or loader-wide safety.
+- No SDK/compiler optimization downgrade, default promotion, timeout relaxation,
+  SMP change, Bash runner or Scheme capability removal is introduced.
+
+* Directed A/B and source identity
+
+=just bridge-scheme-service-benchmark --feed-ab= keeps both arms on explicit short
+service, identical class routing/native layout/FIFO observation, four VMs, two
+Tokio workers, slots/work 4/32, batch eight, the same native image and workload.
+Only the per-owner feed bound changes from one to four. Full captures alternate
+AB/BA for ten samples per arm/load: 8,192 48-line orders plus 64 short probes.
+Five-second actual-progress gates remain unchanged. Startup is outside samples.
+The observed variant adds =--phase-observation= and is diagnostic only.
+
+The local toolchain was Rust 1.95.0, Quint 0.33.0 and the admitted Gerbil SDK
+=0.19.20261009110849.1cfb032.patch618d76f9eb72= (Gambit =ea114fc=).
+The release Rust bench retains its existing optimized profile; the unchanged
+native dynamic image is compiled at =-O2=.
+
+Private raw captures, binaries and source archives remain outside Git. Reproduce
+from the repository commands with the identified SDK and retain a local manifest;
+no private absolute path is a reproducibility input. The frozen unobserved pair
+uses binary SHA-256 =2c3b6c460930462344b5cc943797486dd687a23b9e6e149cf933c148bc179dc7=,
+native image =b761e818060c8f3727a14dc60d1cad332c80d795a33e30daa6a01fef40820d0e=,
+and source archive =df780cc7c14bdfabe5dc0b9289bfbdbc0ac143f3177b8c723097b60f064839a9=
+with 1,248 source inputs including the QNT model. The archive binds code at capture;
+later documentation-only edits are outside that manifest.
+
+** Unobserved results
+
+Each capture completed 40 validated samples and clean native teardown: four joins,
+zero roots, copied files removed and service quiescence. No sampler or our compiler/
+model checks ran alongside these captures. This does not prove machine-wide
+absence of unrelated load.
+
+| Capture/load | Orders/s feed 1 -> 4 | Short actual p99 ms | Batch service p99 ms | Minimum normalized owner progress % |
+|--------------+----------------------+---------------------+----------------------+-------------------------------------|
+| A / CPU | 39,348 -> 39,616 | 42.649 -> 24.934 | 13.495 -> 18.159 | 97.0 -> 97.6 |
+| B / CPU | 40,382 -> 26,314 | 37.024 -> 47.706 | 16.445 -> 20.097 | 97.1 -> 98.0 |
+| A / mixed | 16,114 -> 12,567 | 14.659 -> 23.550 | 29.793 -> 41.699 | 98.4 -> 98.6 |
+| B / mixed | 15,132 -> 15,961 | 21.440 -> 13.139 | 29.787 -> 26.738 | 98.7 -> 98.4 |
+
+CPU throughput changes were +0.7% and -34.8%; mixed changes were -22.0% and +5.5%.
+This candidate is not performance-admitted. Higher normalized owner progress in
+some rows does not establish fairness or offset a throughput/tail regression.
+These counters are observed progress at first owner finish, not starvation bounds.
+
+For the slowest 1% of individual probes, pre-construction spans account for
+94.4%/98.8% of control CPU latency and 98.7%/99.8% of control mixed latency.
+In candidate mixed captures the fraction shifts to 60.8%/58.5%, while pending
+native spans account for 39.2%/41.4%. These paired per-request fractions are not
+subtractions of aggregate p99. They show that feeding changes where delay appears;
+they do not isolate pure OS wake time or establish a single root cause.
+
+** Independent observed feed capture
+
+The separate instrumented feed pair also completed 40 samples and clean teardown.
+Across ten samples per arm and all owners, CPU advance calls fell from 20,482 to
+11,621; mixed fell from 18,921 to 13,518. Both arms submitted and retired exactly
+10,880 jobs per load. This confirms fewer host advancement boundaries, not higher
+throughput admission. Mixed native-wait wall totals rose from 18.845 to 20.896
+seconds, while submit wall totals rose from 1.158 to 1.682 seconds. Spans overlap
+CPU/GC and sum across owners; they cannot isolate pure wait or OS cost. The model's
+entry-gap rule removes one transition cost but leaves VM execution/GC sharing.
+
+* Next decision boundary
+
+Bounded feeding must earn its own throughput/p99/fairness result. Even a positive
+capture cannot establish the stronger cooperative Scheme CPU rule. Implementing
+that rule requires a real Scheme yield/service boundary and native validation
+without weakening arbitrary macros, continuations, exceptions or GC. Stateless
+owner partitioning is another explicit capacity trade-off; it cannot move live
+Actor/session state. Defaults remain unchanged pending reproducible evidence.
+
+
+* Native policy follow-up
+
+[[file:30.38-cooperative-scheme-units-and-class-fairness.org][30.38]] connects the cooperative unit/class policy to the native Scheme service
+API and real order workload. This report's model-only boundary and negative
+feed captures remain the historical checkpoint; they are not rewritten as
+acceptance of the later implementation.

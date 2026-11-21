@@ -1,0 +1,53 @@
+#+title: Mailbox research publication and frozen runtime rollback
+
+* Runtime boundary
+
+This research revision is based directly on 7f915df. All tracked runtime,
+benchmark and build-code files retain that revision's bytes. Only QNT models,
+English research records, curated evidence and the existing Justfile's model
+check recipe differ. The three local build experiments were backed up and
+restored. No unfinished launcher implementation or withdrawn runtime candidate
+is included; PR #18 and the original checkpoint are unchanged.
+
+* References remain separate
+
+| Revision | Offered/s | Offering | Completed | Successful/s | p99 ms | p99.9 ms | Peak | Full admission |
+|----------+-----------+----------+-----------+--------------+--------+----------+------+----------------|
+| 6d4ec27 | 500,000 | 10 s | 5,000,000 | 500,000.02 | 0.317 | 0.431 | 351 | Failed |
+| 7f915df | 1,000,000 | 1 s | 1,000,000 | 995,244.02 | 6.393 | 6.740 | 6,746 | Failed |
+
+These are retained observations under different workload and startup cohorts,
+not fresh performance claims. Both exceed the unchanged 128 backlog limit.
+Original 7F image/reader bytes were verified; original 6D bytes were not verified
+in this audit. Restoring source does not guarantee a particular measured p99.
+
+* Knowledge preserved, failed execution removed
+
+[[file:10.43-mailbox-counterexample-coverage.org][Counterexample coverage]] maps retained failure families to executable checks.
+[[file:10.44-mailbox-layout-entry-trial.org][Withdrawn complete trial]] retains the 344.430 ms control and 662.645 ms
+prototype instead of presenting them as a new baseline or optimization.
+[[file:single-vm-audit/mailbox-counterexample-publication.json][Curated evidence]] contains unchanged reference rows, exact failed main
+receipts, raw input hashes and the model verification receipt. It contains no
+host-specific absolute paths, binary archives, generated C, patches or bulk logs.
+
+The research model preserves the union of learned failures across rollbacks.
+Zero rejection, clean shutdown and correctness do not waive tails or backlog.
+An anomalous current control must stop candidate execution, not qualify an
+improvement against a slow baseline. That launcher enforcement remains an open
+implementation obligation: this publication does not claim it is wired in.
+
+* Verification and next decision
+
+=just mailbox-research-gate-check= passes the focused measurement (17), resource
+(9), cost (3), research (28), layout (11) and aggregate (295) cases. Counts
+overlap and are not a count of distinct native failures. Earlier isolated
+mutation checks caught 28 weakened guards plus two layout protocol mutations.
+No business benchmark is rerun for this publication. Model checks do not prove
+the cause of historical stalls or certify native performance.
+
+Further runtime research starts from 7F and the original Mailbox supply,
+Actor execution and verified frame-return cycle. Each change must account for
+the complete cycle, preserve immediate refill and per-result ownership, and
+pass actual-VM correctness before a targeted original-workload comparison.
+Confirmed regression removes that runtime change while preserving its evidence
+and model witness. SDK, defaults, memory cap and acceptance limits stay fixed.

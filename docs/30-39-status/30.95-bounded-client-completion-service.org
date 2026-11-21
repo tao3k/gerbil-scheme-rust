@@ -1,0 +1,708 @@
+#+TITLE: Bounded client completion service across native retirement and bulk progress
+#+STARTUP: overview
+
+* Current publication status
+
+BLOCKED_BY_NATIVE_WATCHDOG. The refined registration/source version exited
+with the unchanged 5 s watchdog after 32 completed windows. Cleanup is
+UNVERIFIED, performance acceptance failed, and no commit or push is authorized.
+Four retained owner image copies and the exact source/binary/image identities
+are preserved privately. Previous negative captures remain rejected. Defaults
+are unchanged. Further captures and failure replays are stopped for architecture
+review of Gerbil Scheme's Actor/green-thread and Rust executor relationship.
+The architecture comparison and next implementation boundaries are recorded in
+[[file:../10-19-design/10.03-gerbil-actor-executor-architecture.org][10.03 Gerbil Scheme Actor and Rust executor architecture]].
+
+* Resident producer progress correctness follow-up
+
+The actual API audit found duplicate resident producer scheduling through both
+=Work::Wake= mailbox entries and the native wake pipe. Resident owners now use
+a durable producer duty with transport rearm/recheck; ordinary blocking owners
+keep mailbox wakes. Seven descriptor unit controls, three native service tests,
+forty architecture model checks and strict Clippy passed on this follow-up.
+See [[file:../10-19-design/10.03-gerbil-actor-executor-architecture.org][the source audit and protocol qualification]]. No internal capacity wait cycle
+was established by this audit, and the historical watchdog remains unassigned.
+No A/B was run, defaults are unchanged, and publication remains blocked pending
+performance acceptance. The old failed capture is not relabeled as a pass.
+
+* Historical watchdog diagnostic boundary
+
+The last validated historical window and expected successor both use whole-chunk
+preparation, so the capture does not isolate an incremental-source defect.
+A new single-policy protocol check reused the actual mixed workload and passed
+32 windows with four joined owners, zero roots and removed image files. It did
+not repeat an A/B or reproduce the old failure, and no failure stack exists.
+Failure-only phase/stack collection is now connected to the existing watchdog;
+its deadline and progress rules are unchanged. See [[file:../10-19-design/10.03-gerbil-actor-executor-architecture.org][the diagnostic scope and limits]].
+The historical root cause remains UNATTRIBUTED and cleanup for that failed run
+remains UNVERIFIED. This pass is neither retrospective acceptance nor a reason
+to push. Original binary/source archive hashes were verified unchanged.
+
+* Archived-runtime ordered replay
+
+The failed source archive was restored in a temporary diagnostic workspace with
+its original Rust runtime files and retained native image. The replay followed
+four warmups and all 33 windows through the historical first-unvalidated call;
+its window sequence was checked independently. This one run completed with four
+joined owners, zero roots and removed files, so it yielded no failure stack.
+It is not root-cause closure and does not supersede the original failure.
+Only replay/phase/failure-collection diagnostics were overlaid; the current
+producer repair was not included. See [[file:../10-19-design/10.03-gerbil-actor-executor-architecture.org][the archived replay identities and limitations]].
+The native failure deadline remains 5 seconds. A separate post-failure stack
+collector budget was repaired after a cold-tool timeout; it cannot turn a stall
+into a pass. No performance comparison, default change or push was performed.
+
+* Evidence and remaining protocol gap
+
+The kernel-arrival-only candidate remains rejected: mixed planned-to-client
+p99 improves 84.38%, but CPU total-work/time throughput falls 20.57%, CPU
+native p99 grows 45.07% and CPU client p99 grows 416.98%. Its worst CPU window
+contains a native-ready-to-client interval of 3.378 ms for request 35, whose
+own deadline-resume interval is only 3.625 us. Serial backlog accounts for
+95.43% of the top-ten CPU client tails' summed latency. Backlog is propagated
+delay, not a cause or an excuse to remove those requests from the metric.
+
+The previous generic client-turn driver already offers a signalled short
+future a poll before each bulk wait. That opportunity does not guarantee
+consumption of a published result: Tokio's pinned oneshot Future polls its
+cooperative task budget before reading readiness. Bulk and short sub-futures
+in one task share that budget. A ready transport and a cooperative deferral
+are different from an unfinished native job. This mechanism is verifiable in
+local Tokio 1.53.1 source and a real exhausted-budget control. It is a possible
+protocol gap, not proof that it caused the previous OS/client tail.
+
+* Joint protocol at the actual API
+
+ProgressSchemeTicket::wait_observed_ready is an explicit alternative to the
+unchanged wait_observed method. A poll first tries to take exactly one final
+Rust oneshot value. A successfully published value can complete before
+cooperative deferral. This is a bounded transport operation, not an unbounded
+Future or handler running under unconstrained. Empty/closed transport follows
+the normal receiver poll, registration and error path. The claim event still
+provides an early wake and a single recheck; claim is not a final task value.
+
+The existing InstanceClientProgressDriver provides the service opportunity
+before each bulk registration/receive. It drives the same serial short source,
+including each original timer and the following native wait. Only the final
+receiver's ready read has the new treatment. Timers, bounded admission, bulk
+MPSC receive and arbitrary application work retain normal cooperation. A
+native completion arriving during one ready bulk turn remains due at the
+next service boundary; an indivisible user poll and actual OS scheduling are
+still outside the logical opportunity guarantee. No periodic yield or new
+threshold is introduced, and no native owner waits for a client acknowledgement.
+
+The diagnostic ready_without_budget bit means an actual already-published
+value was taken when the current task had no cooperative budget. It does not
+restore the task budget or count an OS resumption. False does not prove that
+cooperation was irrelevant elsewhere. A capture with zero such events cannot
+claim that this particular fast path explains its performance improvement.
+The bit is captured only in the explicit observed ready receive; conventional
+receive remains false. Claim and publication traces keep their existing clocks.
+
+Native ownership remains owner-local: before claim, dropping the pending guard
+cancels bounded Rust input; after claim, timeout or dropped observation cannot
+release native credit or roots. Projection/retirement and owner refill remain
+independent of client consumption. Exceptions are task values, and successful
+Rust results are not discarded due to separate timing errors. Scheme retains
+its complete Actor, green-thread, continuation, GC and exception semantics;
+Rust only distributes across the fixed independent instances.
+
+* Reused joint model and native controls
+
+The existing delivery/client-turn section gains a client cooperative-availability
+state and explicit completion-service selection. It reuses the same replies,
+claim wake debt, ready bulk queues, producer ownership and native capacity.
+A ready final result can be observed with exhausted cooperation while bulk
+receive remains deferred. Claim-only progress cannot fabricate completion.
+Cancel/close still drains the registered producers and native roots. The
+model is finite safety/opportunity evidence, not an OS latency guarantee.
+
+The first mutation witness lacked its accepted-claim prerequisite; its failed
+run is retained. The correction adds that prerequisite, not a weaker safety
+invariant. The first Rust focused-test filter matched zero tests; it is not
+counted as a test pass. The final filter targets the actual progress_wait
+module and must execute all six controls.
+
+The new real Tokio control exhausts the task budget, verifies that conventional
+ready receive defers, consumes exactly one published result through the new
+API without replenishing that budget, keeps a missing result pending, then
+checks normal registration, claim wake and exception delivery after resumption.
+Actual Scheme controls use the new API for native success/exception, preclaim
+cancel/timeout and claimed timeout; the last still holds owner capacity until
+projection is released. The unchanged lifecycle suite covers multishot
+continuations, native GC and shutdown with zero roots/FD return. The meaningful
+progress watchdog remains five seconds. Historical first-port watchdog
+attribution remains open; no fresh pass explains its missing failed image,
+phase or stack, and original cleanup remains unverified.
+
+* Directed net-cost comparison
+
+Use the existing O2 native build and Rust release bench with the arrival-clock
+feature and =--progress-fair-ab --fixed-short-selective --completion-service-ab=.
+Control retains original unconditional Tokio timers and independent bulk/short
+tasks. Candidate uses the corrected unconditional kernel clock, the existing
+composite client progress driver and bounded ready final receive together.
+Both use ready-owner bulk delivery, unified claim/final transport,
+retirement-before-send and NativeBudget. The control is intentionally the same
+legacy comparison as the rejected clock-only run: net CPU recovery and mixed
+benefit must be measured in this run, not inferred across historical captures.
+This is a joint-protocol comparison, not an isolated try_recv microbenchmark.
+
+The four native VMs are shared by both arms in one process, with two Tokio
+workers, 8192 bulk orders and 64 original 500 us short plans per window, batch
+eight, work 32, slots four, Actor quantum one. Source ordering, serial backlog,
+original timing partitions, work oracle and request counts are unchanged.
+Candidate arms every timer even when overdue. Five ordered/reversed CPU/mixed
+blocks remain the only matrix. All added setup, receiver and driver costs are
+inside the window. No source, default, timeout or workload change can turn a
+regression into acceptance. Keep all failed/negative receipts and require
+native correctness and performance separately before committing or pushing.
+
+* Completed correctness gates before capture
+
+Model SHA256 is
+=27b578cbfdf6dc840d194ab3982fbab4361708e2c64eb48a4df5a6be3013b25c=.
+All 233 directed regressions pass (115 small, 118 wide), including ten new
+completion-service cases. The same hash passes typecheck and 400 random traces.
+Six actual progress-receiver controls and three kernel-clock controls pass.
+Default-feature-path, benchmark/native and model-harness strict lints pass;
+existing client-driver/ready/short-pool suites pass 3 + 6 + 14 controls.
+
+All three native lifecycle cases pass in 32.84 seconds with the unchanged
+meaningful-progress watchdog. Main native shutdown joins four owners, releases
+all roots, removes image files and returns FD count; close is 2.639833 ms.
+These are correctness receipts only. PR18 remote head remains
+=c4b95dfaa116bd67b110d94826535fd27f227b85= with six effective successful CI
+checks; those checks do not attest this local candidate. Historical watchdog
+status remains unattributed, original cleanup unverified.
+
+* Qualified net-protocol capture and limits
+
+Receipt service-completion-service-v32-r1 completes one qualified 40-window
+capture in 7.743 seconds. Compiler preflights that failed ran no samples;
+other tasks continued naturally and no automation was created. The qualified
+run has no compiler at either boundary, no benchmark stderr/controller timeout,
+unchanged frozen sources/binary/image and clean four-owner zero-root shutdown.
+Native image SHA256 remains
+=7c8f25b95db8d6ce8c9665a88bc1c761644b07cc902b73c5cd59cb7989b14d56=.
+All windows pass original native-work, request-identity and additive timing
+checks. All 1280 candidate arrivals have real matching armed timer generations.
+
+| Metric | CPU control | CPU candidate | Mixed control | Mixed candidate |
+|--------+-------------+---------------+---------------+-----------------|
+| Total work / sum elapsed, orders/s | 244914 | 276570 (+12.93%) | 53635 | 60470 (+12.74%) |
+| Native short p99, ms | 0.612250 | 0.622458 (+1.67%) | 0.791125 | 0.597167 (-24.52%) |
+| Planned-to-client p99, ms | 10.645208 | 3.162833 (-70.29%) | 2.554167 | 0.838291 (-67.18%) |
+| Bulk native p99, ms | 1.375500 | 0.992375 (-27.85%) | 4.934291 | 3.030541 (-38.58%) |
+| Maximum owner finish spread, ms | 1.153833 | 0.785166 (-31.95%) | 1.588167 | 1.618291 (+1.90%) |
+
+Paired throughput medians improve 8.23% CPU and 3.59% mixed, with 8/10 pairs
+improving in each class. The two negative throughput pairs in each class remain
+in the capture: CPU worst -2.19%, mixed worst -23.01%. Emitted median-window
+throughput changes +7.92% and +4.73%; this is distinct from total-work/time.
+Paired planned-to-client p99 medians improve 63.15% CPU and 65.55% mixed,
+with all ten pairs improving in each class. CPU native short p99 paired median
+improves 4.12% but its pooled value worsens 1.67%; neither is omitted.
+Mixed owner spread paired median worsens 0.37%, with only five pairs improving.
+Fairness remains unresolved; no universal per-window speedup is claimed.
+
+The capture records ZERO ready_without_budget events in both classes.
+Therefore the exhausted-budget mechanism is a proven transport/control case,
+but is not observed as this run's bottleneck and cannot be credited for the
+measured gains. The actual comparison qualifies the complete kernel-clock plus
+structured client-service protocol, including all ready-receive costs. It does
+not isolate whether co-location, saved ordinary receive-budget charges, timer
+precision or their interaction explains the gain. Do not claim that the
+historical CPU regression or OS scheduling cause is fully explained.
+
+Status is ACCEPTED_SCOPED_NET_PROTOCOL for explicit opt-in integration: the
+requested CPU and mixed throughput/client-tail objectives pass in matched
+controls, including the mixed-load benefit. Keep the small CPU native-p99 and
+mixed-fairness negatives visible. Public defaults remain unchanged. The native
+image and workload are shared within this run; historical controls have
+materially different timing, so no cross-capture improvement ratio is valid.
+Earlier rejected clock-only/client-turn/ready-owner captures and their explicit
+comparison modes remain reproducible negative controls, not promoted defaults.
+Historical first-port watchdog attribution and original cleanup remain open.
+
+* Integration boundary
+
+The tested working tree contains the accumulated joint-runtime/type/producer
+and publication prerequisites for these APIs and models. Commit the coherent
+source/test/model closure together with its English qualification documents;
+do not publish private capture files, logs, patches or machine-specific paths.
+The existing macOS native CI job selects the arrival-clock feature and exercises
+the joint protocol in a functional smoke check. No additional performance matrix
+or timeout increase is introduced. Shared CI smoke is correctness evidence,
+not a substitute for the qualified local performance capture.
+
+* Upstream integration and rejected steady-throughput check
+
+Before publication, the PR branch was found to contain three commits beyond the
+local capture predecessor: resource lifetime through actual joins, deferred
+compiler-owned metadata carriers and regenerated bridge artifacts. The local
+integration commit was replayed on top of those commits without overwriting
+them. Generated-only conflicts were resolved through the standard
+bridge-regenerate target, including full-file sidecar validation; no private
+compiler or alternate build path was introduced.
+
+The merged resource lease controls pass all three cases. The merged native
+lifecycle suite passes all three cases in 32.67 s, with four joined owners,
+zero roots, removed files and FD return. The joint model source hash remains
+unchanged, so its existing 233-case and 400-trace receipts are reused.
+
+Native image changes to
+=d813f33b03b085c944162982abb8b7113fcf28f5de81f1c21d27bb3d15f01411=,
+so service-completion-service-v32-r2 is a necessary different-build acceptance
+run, not an unchanged-version recapture. It completes 40 windows in 7.263 s,
+with no compiler at either boundary, unchanged captured identities, clean
+shutdown and all original workload/timing identities. Its planned-to-client
+p99 improves in all ten pairs for each workload. However, emitted
+median-window throughput is -2.14% CPU and -0.39% mixed. Total-work/time changes
++63.93% and +10.20% are dominated by slow control windows and cannot erase those
+negative typical-window results. CPU paired native-p99 median worsens 13.57%
+and owner-spread median worsens 14.14%. Exhausted-ready events remain zero.
+
+R2 is REJECTED_STEADY_THROUGHPUT for publication. Keep the pre-integration R1
+positive result as a fact about its own build, not acceptance of R2. The local
+source commit remains unpublished while this gate is unresolved.
+
+* Idle client-service activation refinement
+
+Source inspection identifies mandatory hot-path work in the existing driver:
+every bulk wait locks parent registration and atomically swaps a false ready
+level, even with no client event. That is implementation work, not a native
+execution grant. The next implementation publishes parent registration only
+when the actual parent waker identity changes. A cached owned waker prevents
+identity reuse while registered. Replacement is published before testing the
+ready level. Unsignalled boundaries perform an acquire load and do not write
+the sender-shared line; a true level is still atomically consumed before the
+future poll. Events during that poll remain owed for the next boundary.
+Completion/drop retires registration and cached parent ownership.
+
+The abstract opportunity/wake-debt protocol and model are unchanged. Existing
+real controls check replacement parent wakes, cancellation/drop, no repoll
+without an event and an event arriving during a ready bulk turn. The change
+introduces no lease, periodic yield, execution-budget bypass or new threshold.
+It preserves one client-service check per existing bulk boundary. Source
+inspection motivates the cost hypothesis; no cache-coherence or OS cause has
+been measured and no speedup is inferred before A/B.
+
+The new-version acceptance gate is stated before capture: both workload classes
+must improve total-work/time and paired-median throughput, must not regress
+emitted median-window throughput, and must improve pooled and paired-median
+planned-to-client p99. Retain negative native-p99/fairness results and all pair
+ranges. Do not qualify a default promotion, universal speedup, fairness closure
+or exhausted-budget causal explanation from this scoped net-protocol gate.
+
+* Idle-activation qualified capture rejected
+
+The first idle-activation capture (service-completion-idle-v32-r1) is
+ENVIRONMENT_UNQUALIFIED because compiler processes resumed before its end
+boundary. Its raw samples are retained and its performance metrics were not
+reviewed to select a favorable outcome. A replacement used the identical
+binary, source protocol, workload and performance criteria, with three empty
+compiler preflight snapshots over fifteen seconds before starting.
+
+The qualified replacement service-completion-idle-v32-r2 completes 40 windows
+in 9.089 seconds, has empty compiler boundaries, stable frozen identities,
+no benchmark stderr/timeout, correct work/timing/timer-generation identities and
+clean four-owner shutdown with zero roots. Native image remains
+=d813f33b03b085c944162982abb8b7113fcf28f5de81f1c21d27bb3d15f01411=.
+A clear compiler boundary is not proof of no other host scheduling load; no
+post-hoc environmental exclusion is used to discard this valid negative run.
+
+| Candidate relative to matched control | CPU | Mixed |
+|--------------------------------------+-----+-------|
+| Total work / sum elapsed throughput | -5.56% | +7.84% |
+| Emitted median-window throughput | +37.47% | -4.65% |
+| Paired throughput median | +5.04% | +2.39% |
+| Pooled native short p99 | -19.24% | -87.48% |
+| Paired native short p99 median | +16.20% | -3.01% |
+| Pooled planned-to-client p99 | -49.41% | -88.25% |
+| Paired planned-to-client p99 median | -39.86% | -67.64% |
+| Pooled bulk p99 | +21.32% | -16.33% |
+| Maximum owner spread | -8.26% | -65.46% |
+| Paired owner spread median | -41.70% | +6.19% |
+
+Client p99 improves in only seven of ten pairs per class. Worst client-p99
+pairs regress 1101.66% CPU and 1547.99% mixed; worst throughput pairs regress
+65.55% CPU and 54.90% mixed. Neither favorable pooled latency nor the favorable
+CPU median-window throughput erases the failed total-work/time CPU gate or
+negative mixed median-window throughput. All 2560 short observations have
+ready_without_budget false, so no exhausted-budget cause was observed.
+
+Status is REJECTED_PREDECLARED_THROUGHPUT_GATE. Keep all samples, negative pairs
+and the earlier environment failure. Do not repeat the unchanged candidate.
+Strict lint, three driver controls, six receiver controls, three clock controls
+and the complete three-case native lifecycle suite pass for this version; those
+correctness passes do not admit performance. The joint model remains unchanged
+at the recorded 233-case/400-trace hash. No default or remote PR promotion occurs.
+
+* Remaining protocol boundary
+
+The final experiment removes redundant idle registration/shared writes but does
+not close throughput/fairness. Existing source already sends short placement
+and rejection wakes outside the source queue and admission locks; adding another
+notification layer or claiming such an existing lock bug would be unsupported.
+
+The actual bulk client still constructs a whole root-free Rust input chunk
+before entering the driver's registration wait. That preparation is outside
+client service boundaries and is not bounded by Scheme execution fuel. The
+current opportunity model covers bulk registration/result turns; it does not
+prove a time bound for this intervening Rust preparation. This is a source-level
+coverage gap, not a measured attribution for the captured OS/native tails.
+Further architectural work should bring this preparation and producer progress
+inside the existing bounded service-cycle contract, reusing the producer/input
+ownership model, before another optimization candidate. Preserve the same
+native workload, per-result root retirement and independent Scheme execution.
+Historical first-port watchdog attribution and original cleanup remain open.
+
+* Bounded Rust input preparation service
+
+The previous qualified idle-activation capture remains rejected. Its results
+are not replaced or excluded. The next experiment addresses a concrete API
+coverage gap, not a proven attribution of the entire tail to input cloning.
+
+=InstanceDispatcher::prepare_scheme_service_pool_ready_stream= accepts a lazy
+exact-size iterator. =InstanceClientProgressDriver::prepare_bounded= checks the
+existing pool count bound before invoking it, services signalled client progress
+before each request preparation and after the last one, and passes the result
+to the existing pool staging/registration transaction. Registration waits also
+remain inside the driver. No second source queue, lease or native permit is
+introduced. The existing declared-work, affinity and owner-entry checks remain
+in effect. Preparation and producer registration share one absolute deadline;
+preparation does not restart the timeout budget.
+
+One iterator step is a non-preemptible Rust preparation unit. This API cannot
+preempt arbitrary application CPU work or bound application-owned bytes: callers
+must bound both per step and must not enter Scheme there. Preparation is not
+Scheme construction, native admission, Scheme execution fuel or completion
+progress. Partially prepared Rust values drop on failure/expiry. Native roots
+are first acquired later on the selected owner. A dropped registered stream
+uses the existing cancellation/drain protocol; consumed results are never an
+acknowledgement authorizing native capacity release. Native producer progress
+continues independently of client result consumption. All registrations still
+complete before a new source starts supplying, as in the existing API; this is
+not a new streaming registration protocol.
+
+The benchmark passes the same lazy groups of eight native-typed requests to
+this actual API. =--completion-service-ab --input-preparation-ab= isolates the
+preparation change: both arms use the same kernel arrival clock, client progress
+driver, ready receive, native image, producer and capacities. Control prepares
+one whole existing chunk before registration; candidate offers client progress
+at each request preparation boundary. Four VMs, two Tokio workers, 8192 bulk
+orders, 64 serial short requests at the original 500 us plan, work, batch, slots
+and ordered/reversed windows are unchanged. No counters redefine arrival or
+native completion. This isolates the preparation net cost; a pass alone would
+not erase previously rejected whole-protocol comparisons or authorize promotion
+of their defaults.
+
+The existing joint Runtime model reuses client turn checks for the bounded
+root-free preparation count, and keeps it separate from owner-side constructed
+input, native roots, execution grants and capacity. Directed controls cover an
+event between preparation units, an event at the final handoff, cancellation
+with close/drain and a mutation skipping the service opportunity. The same
+scenarios are wired into the existing model qualification selector.
+
+The first native run failed during configuration of an idle owner, before the
+new ready-delivery contract. A control result was received before its outer
+admission guard retired; the next configuration correctly rejected non-idle
+capacity. The fixture now waits through the existing idle-credit helper before
+requiring idle configuration. This failure and the initial model scenario's
+missing short-request cancellation are retained separately. Neither is evidence
+resolving the historical unattributed watchdog. Its original cleanup remains
+unverified; the unchanged watchdog is retained.
+
+Performance acceptance is declared before capture: both classes must improve
+aggregate total-work/time and paired-median throughput, avoid a decrease in the
+emitted median-window throughput, and improve pooled and paired-median client
+p99 without increasing paired-median owner finish spread. All negative pairs
+remain in the evidence. Publication remains blocked pending this experiment
+and overall performance acceptance. No defaults change.
+
+Reproduce the preparation-only comparison with the standard Cargo bench entry:
+
+#+begin_src text
+cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --completion-service-ab --input-preparation-ab
+#+end_src
+
+** Preparation-only result and retained failures
+
+The final build passes five client-driver unit controls, six ready-receive
+controls, three arrival-clock controls, strict benchmark lint and three native
+qualification tests. Native input preparation failure leaves no registered
+producer; ready-owner delivery still bypasses a held result, and native roots
+and credits retire independently of consumption. The native suite preserves
+GC, continuation affinity, multi-shot reentry, exceptions, backpressure and
+shutdown. The 5 s meaningful-progress watchdog is unchanged. The joint model
+passes 241 directed regressions (119 small, 122 wide), including the new eight
+preparation cases. Another 400 random traces cover the existing joint protocol;
+the preparation boundaries themselves are established by directed controls,
+not a claim that those random traces exercise new preparation actions.
+
+The first capture attempt was rejected by the benchmark's argument allow-list
+before any VM initialization or measured window. The missing supplemental flag
+was registered, its required joint-control combination was checked, and a
+functional smoke passed before the corrected build's capture. This entrypoint
+failure remains separate from performance and watchdog evidence.
+
+The corrected capture preserves all 40 original ordered/reversed windows,
+unique four-VM identity, identical native image, original work counts and
+arrival plan, and additive timing identities. Source/binary/image identity is
+unchanged during capture. Compiler pre/post boundaries and three preceding
+checks were clear; this is the declared environment gate, not proof that every
+other host process was idle. No profiler, timer removal, workload change,
+post-hoc sample exclusion or threshold relaxation was used. All owners joined,
+all roots reached zero and temporary files were removed.
+
+| Metric, candidate versus control | CPU | Mixed |
+|----------------------------------+-----+-------|
+| Total work / total time throughput | -18.57% | +29.51% |
+| Paired-median throughput | -4.55% | +3.43% |
+| Emitted median-window throughput | +1.29% | +0.25% |
+| Paired-median client p99 | +18.91% | -12.57% |
+| Pooled client p99 | +1001.35% | -95.20% |
+| Paired-median owner finish spread | +139.41% | -6.09% |
+| Paired-median native short p99 | +27.18% | -1.87% |
+| Paired-median bulk p99 | +3.51% | -12.08% |
+
+The CPU gate fails, so this version is not committed or pushed. Mixed pooled
+p99 and aggregate throughput gains coexist with much smaller paired-median
+gains and negative pairs; the pooled gains do not establish a stable magnitude.
+CPU client p99 improves in only two of ten pairs; owner spread improves in only
+one. All these pairs and both error attempts remain in private evidence, not
+as raw logs or machine-specific paths in the repository.
+
+Offering client progress between preparation units is insufficient to establish
+joint native-supply fairness. Both arms still prepare an entire bounded source
+before registering its producers. That shared barrier is a static protocol
+limitation, not an attributed cause of the measured difference between arms.
+A follow-up must distinguish root-free preparation opportunity, bounded source
+publication and owner claim opportunity, while preserving the existing native
+entry fence and drain ownership. Simply adding more per-item checks or yields
+would not establish this contract. No unchanged rerun or broader matrix is
+justified by this result. The historical watchdog remains unattributed and its
+original cleanup unverified; new successful shutdowns do not close it.
+
+* Incremental source publication without the preparation/registration barrier
+
+** Joint progress and ownership contract
+
+=pipeline_scheme_service_pool_ready_stream= is an explicit opt-in API. It reuses
+the existing =Shared= source, =ServiceProducer=, ready-owner channels, capacity
+reservation and first-native-entry fence. There is no new task, OS thread,
+Scheme scheduler, native lease or source queue. Existing whole-source APIs keep
+their registration barrier; their semantics and defaults are unchanged.
+
+The source has two monotonic states: open input and sealed input. Temporarily
+empty open input cannot retire a producer registration. Sealed input may still
+contain valid published requests; producers leave only after its requests and
+offers are depleted and their accepted work retires. Failure seals the source,
+preserves the first error, drains unentered requests and prevents late
+publication. Publication and failure serialize under the existing request lock;
+notifications and application rejection run outside that lock. Publishing wakes
+on an empty-to-nonempty transition; sealing and rejecting also wake installed
+producers so terminal progress cannot depend on another payload publication.
+
+A preparation window derives from the aggregate configured active count, capped
+by source input count. The benchmark therefore uses twelve request envelopes
+(four owners times three active slots), with the original eight orders per
+envelope. This is an existing capacity boundary, not a new tuning threshold.
+Client recovery is offered at a window boundary, not at every item. Declared
+work is checked cumulatively across all windows, independent of native work
+credits; the existing queue-count limit bounds the entire source and its result
+transport. Caller-owned payload bytes and CPU cost still require application
+bounds. No callback is preempted or allowed to enter Scheme during preparation.
+
+The existing structured progress driver services producer registration alongside
+window preparation, and the caller's existing driver services client recovery.
+A blocked later registration cannot prevent publishing to installed producers.
+Every bounded window is validated, indexed with its stable global positions and
+atomically appended before notification. The final window is followed by seal
+and a client-recovery opportunity while outstanding registration completes.
+Native progress and root/credit retirement remain independent of bulk result
+consumption. This is source preparation/supply overlap, not a guarantee of OS
+resumption latency or Scheme handler preemption.
+
+This changes the failure contract of this new API: valid prefixes can enter
+Scheme before later input validation or registration completes. Later errors
+can therefore follow native side effects. There is no all-or-nothing batch
+promise. Cancellation, unwind or partial registration failure uses an armed
+source guard created before registration is polled; it cancels, seals, rejects
+unentered work and wakes installed producers even before the returned stream
+has their weak signal list. Already accepted Scheme work keeps its owner and
+drains normally. A single absolute deadline covers all phases.
+
+** Runtime model and native witnesses
+
+The existing lifecycle model carries the opt-in input mode, seal/failure state
+and cumulative published work separately from native per-owner capacity. The
+legacy all-registration invariant still applies to the original mode. Open
+input forbids early producer retirement; failed input forbids late publication.
+Directed witnesses cover partial-registration acceptance, empty/open retention,
+accepted-prefix abort/drain, independent source/native budgets, and mutations
+that publish after failure or finish an open source. The existing Tokio,
+Actor/green-thread joint model reuses client turn checks at window publication
+and final seal; native execution progress remains distinct from those checks.
+The existing model qualification selectors include the new cases.
+
+Actual native witnesses wait for the first Scheme construction before allowing
+a later preparation window to be constructed, including when another owner's
+producer registration is deliberately occupied. They verify indexed result
+identity, owner affinity, cancellation and deadline cleanup, and a later Rust
+input error or cumulative work overflow after a real accepted prefix. The
+full native suite additionally preserves GC, continuations, exceptions and
+shutdown. These are native witnesses, not conclusions inferred from model
+success. The original unexplained watchdog remains separate and unresolved.
+
+** Matched preparation/supply comparison
+
+#+begin_src text
+cargo bench -p gerbil-scheme-qualification --features arrival-clock --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --completion-service-ab --supply-cycle-ab
+#+end_src
+
+Both arms retain the same unique four VMs, native image, two Tokio workers,
+kernel arrival clock, joint client progress, ready receive, native budgets and
+original load. The control prepares the whole existing source before registering
+all producers. The candidate publishes capacity-derived windows while producer
+registration progresses. No item-level progress checks are added. The original
+8192 bulk orders, 64 serial short arrivals, 500 us plan, batch, slots, work and
+ordered/reversed windows are unchanged. This is a targeted protocol comparison,
+not an additional workload matrix or a claim that either whole stack is already
+qualified against the earlier independent-client baseline.
+
+Before capture, acceptance requires both classes to improve total-work/time
+and paired-median throughput, preserve emitted median-window throughput,
+improve pooled and paired-median client p99, and avoid worse paired-median
+owner finish spread. All pairs, including regressions, remain in evidence.
+Passing this net-cost comparison alone cannot erase the earlier whole-stack
+failures or authorize pushing a stack without overall performance acceptance.
+No unchanged recapture is justified by an unfavorable outcome.
+
+** First incremental capture and registration readiness refinement
+
+The first qualified incremental-source capture is retained as rejected. CPU
+aggregate throughput falls 28.20%, paired-median throughput falls 4.99%, client
+p99 rises 17.25% and owner finish spread rises 135.21% by paired medians. Mixed
+aggregate throughput rises 21.52% and paired-median throughput rises 2.13%, but
+paired-median client p99 rises 3.92% (pooled client p99 rises 321.46%). These
+results do not justify publication or a claimed cause in OS scheduling or GC.
+
+A focused implementation control then distinguishes native registration
+availability from Tokio task cooperation. With the task budget deliberately
+exhausted, the old =acquire_owned= future is pending while the semaphore still
+has its available permit. The registration transaction now tries the existing
+owned permit first and uses the original FIFO asynchronous waiter only for
+real contention. It checks the same absolute deadline before and after
+acquisition, retains capacity identity and close checks, and does not change
+active/native bounds. A ready registration is a bounded control-plane
+transaction, not an unbounded work loop. Tests cover the exhausted-budget
+negative control, queued FIFO reservation/cancellation, timeout and close.
+
+This control establishes a real readiness contract gap. The first performance
+capture did not observe registration budget exhaustion, so that gap is not an
+attributed explanation of its measured throughput or fairness regressions.
+The refinement applies to both arms of the next comparison. The existing
+model already separates native producer registration from client cooperation;
+its unchanged source/hash and regression receipts are reused. No unchanged
+performance recapture or workload adjustment is performed.
+
+** Watchdog failure and architecture-review boundary
+
+The refined registration build passes three focused registration controls,
+four source controls, the existing driver/receiver/clock controls, strict lint
+and the complete native suite. Its qualified capture then exits 70 after 32
+validated windows, with the native image and source/binary identities unchanged
+and no compilers at the declared capture boundaries. The terminal message is
+=SERVICE-BENCH-STALL last=service same-load sample validated cleanup=UNVERIFIED=.
+Those partial windows are not a performance acceptance result. Four matching
+owner image copies are retained as private failure evidence. The failure has
+no captured owner stack and is not attributed to the historical watchdog.
+
+An opt-in, post-failure-only sampling helper was prepared and compiled. The
+5 s failure decision and exit 70 remain unchanged; terminal diagnostics are
+separate from a pass. No diagnostic replay was executed. The user requested
+fundamental architecture discussion, so additional performance captures and
+failure replays are stopped. No automation was created. One proposed retry
+loop was rejected by automatic approval; subsequent checks were single read-only
+checks, and only one deliberate capture ran after quiet status was verified.
+
+The current model covers ownership, capacities, Actor/green-thread execution,
+client cooperation and input publication. It does not yet establish the best
+executor topology or a calibrated cost model for shared physical CPU, Rust
+preparation, memory traffic and completion recovery. Those architectural choices
+must be compared before another runtime candidate is selected. In particular,
+Rayon preparation or dispatch must not be equated with scheduling Scheme green
+threads, and a synchronous Actor batch barrier must not be equated with the
+existing asynchronous Scheme service boundary.
+
+** Directed watchdog investigation update
+
+The earlier statement that no diagnostic replay ran describes the initial
+architecture-review boundary. Subsequent correctness-only diagnostics are
+recorded in =10.03-gerbil-actor-executor-architecture.org=: a frozen-source
+historical-order replay and a controlled projection/producer-retirement
+interleaving. Neither produced a watchdog or a failure stack. A missing idle
+fence caused one fixture to exit 101; that fixture failure is retained separately
+and is not historical watchdog attribution. Restoring the fence changed no
+production protocol. The historical exit-70 capture remains UNATTRIBUTED and
+its cleanup remains UNVERIFIED. No performance acceptance, default change or
+PR publication follows from these non-reproductions.
+
+A subsequent H2 capacity-to-short-claim witness exhausts all four work budgets,
+publishes four valid dedicated short requests, then releases native projections
+without new ordinary submissions. It completes against the archived failed
+runtime and original image. This covers running-owner capacity handoff, not a
+sleeping-owner arm/park race. The initial 48-line short-layout fixture rejection
+is retained as exit 101; it is not watchdog evidence. No watchdog stack or
+production root-cause repair resulted. Existing retained benchmark metrics were
+exported for review without a new A/B run; rejected candidates remain rejected.
+
+The next private H3 witness forces short publication between every owner's last
+scan and wait registration, with two explicit callbacks in the isolated archived
+Rust copy. Both gates are released before native progress is observed; all four
+short results complete. This does not reproduce the historical watchdog and
+introduces no maintained runtime hooks. Existing capture analysis independently
+confirms pooled CPU client p99 12.798333 -> 91.323792 ms (+613.56%). The quantile
+request inherits 91.219500 ms serial backlog; an earlier request starts the spike
+with 49.798625 ms issue-to-native completion. Four owners have no bulk completion
+records during its 21.211833 ms pre-construction interval. OS/GC/notification
+causes remain unassigned; the rejected candidate is not promoted. Detailed
+request identities, decomposition and private diagnostic overlay hashes are
+retained outside the repository. No new performance comparison or push ran.
+
+H4 now tests open-source/native-progress independence through the actual typed
+pipeline API: four distinct owners complete native eight-item tasks and return
+slot/work credits while later Rust preparation is deliberately paused, producers
+remain registered, and the caller has not obtained the result stream. One
+archived-runtime witness completes; it produces no watchdog or failure stack.
+The new existing-model open execution/retirement case passes in both finite
+domains. Neither a shared-supply wait, Scheme execution stall nor recovery stall
+is attributed to the original 49.798625 ms request from this result. Its capture
+lacks instantaneous queue/lock/Scheme-ready state. Historical causes remain open;
+no new A/B, default change, production repair or PR push is admitted.
+
+** Shared-supply progress implementation candidate
+
+The producer now defers contended source/offer access through registered futures
+and returns to the existing owner/Gerbil service cycle. Pending entry returns
+speculative credits; nested supply guards release before notifications. Owner
+claims retain one persistent waiter, optional peer routing skips busy metadata
+and failed unpublished offers roll back without waiting for the target slot.
+Source signal fanout uses fixed weak slots and the wake writer mutex is removed
+using the existing nonblocking byte-write transport. No Scheme execution feature
+or native owner affinity changes.
+
+Final correctness gates: 57 related Rust controls and strict lint; 14 new cases
+in the existing joint architecture model; three real native qualification tests.
+The native gate covers types, GC, continuations, exceptions, backpressure, close,
+FD return, four joined owners, zero roots and image removal. These gates qualify
+this changed implementation's correctness scope, not its performance. Original
+watchdog causes remain unassigned, the prior 613.56% pooled CPU client p99
+regression remains rejected, and no new A/B, default change, commit or push ran.
+The full protocol, residual scope and evidence are in design document 10.03.
+
+The standalone =isolated-instances= library check passes after restoring missing
+Tokio module/re-export guards already absent in the historical source. The initial
+feature-check failure is retained separately; default features are unchanged.

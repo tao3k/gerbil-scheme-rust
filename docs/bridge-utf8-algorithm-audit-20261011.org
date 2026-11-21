@@ -1,0 +1,121 @@
+#+TITLE: Current-head UTF-8 algorithm audit and conservative rollback
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Baselines and source boundary
+
+Production entering and leaving this audit is unchanged from
+=345b172765e5607b09049614d10520c2439dcac3=. The historical frozen baseline
+=6ad680c6311957eadf2529765ab1efd751132554= and its test-only control are retained.
+The caller-buffer control is refreshed to the current checked-inline algorithm;
+comparing against the older c-lambda control would mix the previous framing
+optimization into this audit's algorithm comparison. Only the caller-owned
+route and its checked C leaf are copied, not unused bytevector machinery.
+
+Official source read from the matching local Gerbil/Gambit checkout:
+
+- =gambit/lib/gambit/string/string.scm:560-669=: exact-length counting,
+  ASCII-only copying, and fixed-offset multibyte emission with one cursor
+  advance per scalar. Its two-pass allocation strategy is not automatically
+  a better tradeoff for the caller-owned capacity API.
+- =gambit/lib/c_intf.c:398-443=: pointer-based UTF-8 emission. The earlier
+  shared-suffix trial remains rejected; no historical five/six-byte encoding
+  is reintroduced.
+- =gambit/lib/c_intf.c:5156-5193=: non-null C pointers allocate a Scheme foreign
+  object; null pointers map to false. The reverse conversion at 2825-2855 does
+  not allocate. These are distinct directions and costs.
+
+No SDK download/rebuild, kernel change, snapshot cache, extra counting pass,
+default capacity shrink, or processor-activation workaround is introduced.
+
+* Complete candidate tests
+
+Both actual production-source candidates ran the same-process ABBA harness
+with twenty samples per variant at each of 1,000, 10,000, and 100,000 requests.
+Each receipt contains all 120 rows, complete current-text content checks and
+full UTF-8 validation. All Unicode, surrogate, mutable-text, pointer, bounds,
+and root contracts passed before timing. All loads finish before rejection.
+
+| Candidate | Requests | Control wall ms | Candidate wall ms | Paired ratio | Decision |
+|-----------+----------+-----------------+-------------------+--------------+----------|
+| Fixed offsets | 1000 | 5.980 | 5.953 | 1.000322 | Reject |
+| Fixed offsets | 10000 | 60.070 | 60.014 | 0.999718 | No regression |
+| Fixed offsets | 100000 | 597.161 | 598.736 | 1.002154 | Reject |
+| ASCII pair | 1000 | 6.076 | 7.047 | 1.160305 | Reject |
+| ASCII pair | 10000 | 60.278 | 70.909 | 1.172818 | Reject |
+| ASCII pair | 100000 | 610.848 | 712.660 | 1.168290 | Reject |
+
+The fixed-offset candidate follows the official per-scalar output advancement;
+it produces no admitted gain. The paired ratio, not the ratio of independent
+medians, is the unchanged admission statistic. Even the small thousand-load
+regression is rejected without adding a tolerance.
+
+The ASCII-pair candidate adapts the official ASCII-copy specialization locally
+inside each 256-character leaf. It reads current adjacent characters, not an
+encoded snapshot. On the changing mixed-text fixture, the additional lookahead
+and control flow increase CPU: at 100,000, 607.079 versus 709.663 ms. GC CPU
+slightly decreases, 12.232 versus 12.122 ms, with 1,237 collections for each
+variant across twenty samples. Thus lower GC is insufficient: non-GC CPU work
+dominates this regression. This does not establish the same effect on all-ASCII
+corpora and is not justification for a default scenario-specific fast path.
+
+Both candidates return exit 101 after completing all loads and are rolled back
+exactly. Their source-only patches and raw receipts remain available:
+
+- fixed-offset patch and
+  complete rejected receipt.
+- ASCII-pair patch and
+  complete rejected receipt.
+
+* Restored production cost matrix
+
+After rollback, the unchanged producer ran all seven diagnostic phases, three
+loads, twenty samples: 420 complete rows, exit zero, no major page faults.
+Raw restored receipt.
+
+| Requests | Owned wall ms | Owned CPU ms | GC CPU ms | Median per-row non-CPU ms |
+|----------+---------------+--------------+-----------+---------------------------|
+| 1000 | 6.015 | 6.010 | 0.133 | 0.020 |
+| 10000 | 59.944 | 59.783 | 1.064 | 0.144 |
+| 100000 | 605.584 | 602.868 | 11.119 | 2.524 |
+
+At 100,000, diagnostic encoding CPU is 518.536 ms, full validation CPU
+96.110 ms, allocation request/release CPU 2.709 ms, empty-entry CPU 15.663 ms,
+and empty-leaf dispatch CPU 32.243 ms. These independently measured phases
+have different GC/allocator state and must not be added or subtracted into a
+manufactured decomposition. Total CPU already includes GC CPU.
+
+Compared with the earlier contested-host diagnostic, non-CPU residual is now
+small while production source is identical. This is evidence of changed host
+conditions, not an admitted code speedup. In this run, CPU scales approximately
+linearly with load; it does not demonstrate a superlinear encoding algorithm.
+These bridge transfers are not Org parsing benchmarks or SMP admission.
+
+Rust still reserves 13,660 bytes for 8,196 output bytes. Spare capacity is 5,464
+bytes, not RSS; only one result is live in this fixture. The measured allocator
+request/release is small relative to encoding. Reducing that number by an extra
+counting pass or shrinking cannot be admitted without full wall-time benefit.
+The foreign wrapper allocation and exception/stack accounting remain possible
+targets, but eliminating them must preserve owner, tag, lifetime, and error
+contracts. The observed GC share does not justify unsafe pointer integers or
+a blanket removal of exception handling.
+
+* Scope retained
+
+The SMP job remains explicitly skipped, not passed. The existing supported
+FFI, AOT, Rust concurrency, and Bazel CI gates remain unchanged. No production
+encoder change is admitted by this audit; only the current-head control and
+complete positive/negative qualification evidence are retained.
+
+* Final local qualification
+
+After simplifying the refreshed test-only control, =just bridge-utf8-matched
+--contracts= and =just bridge-actor-lint= completed successfully. The path
+policy and =cargo fmt --all -- --check= passed. Production UTF-8 and generated
+Scheme sources match the entering commit exactly. Both rejected source-only
+patches pass =git apply --check= against that unchanged production baseline.
+Raw-row accounting confirms 20 samples per load/variant in each trial and
+20 per load/phase in the restored matrix: 660 sample rows in total.
+These are local receipts; any subsequent commit requires its own remote CI.

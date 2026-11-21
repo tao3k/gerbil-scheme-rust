@@ -1,0 +1,252 @@
+#+TITLE: Scheme execution-plan specialization
+#+STARTUP: overview
+
+* Status and admission boundary
+The ABI19 Actor-turn experiment remains rejected. At Actor quantum one, each
+window required 4096 outer grants and 4096 Actor regrants for 8192 bulk items.
+It did not amortize grants and added turn/suspension state. Its negative matched
+capture remains intact in the preceding report. ABI20 is an explicit research
+API; the completed VM-hook capture below is rejected for performance. Defaults
+remain unchanged. No performance admission or publication is
+implied by source, finite-model, generated-C or native correctness controls.
+
+PR #18 was observed at =6fb831e4528ab21d15c27f5e6723e35be2b90929=,
+with six successful checks and the unsupported SDK SMP lane skipped. That
+separate Rust resource-retirement commit follows local base =9015091=; the dirty
+research checkout was not reset or rebased over it. Published-head CI does not
+qualify this candidate, and any future publication must preserve that commit.
+
+* Execution protocol
+Rust distributes native typed jobs to fixed owner threads. Complete Scheme
+execution, Actor scheduling, suspension, continuations and exceptions stay in
+Scheme. ABI20 uses the existing item ownership protocol without an outer turn
+lease. It specializes the execution plan, rather than changing fairness bounds.
+
+A VM budget stores three shared class-specific acquire/release hooks. A bounded
+latest layout-cache entry stores immutable whole/sliced plans. Hooks capture only
+the budget, never a handler, normal-return flag, invocation record or Scheme root.
+The existing acquisition mutex copies permission into the current owner's grant
+state. Initial entry reads that permission once inside the wind body, constructs
+cold metadata under that existing ownership, selects and reports a plan, then
+executes application Scheme code. VM setup includes the shared three-hook vector;
+it is not an allocation-free initialization claim. Both arms share that setup. The selected plan is
+a lexical binding in the captured continuation. Replay reacquires ownership in
+the shared before hook and resumes the retained suffix without selecting or
+reporting again. Successful whole returns accrue their declaration; exceptions
+reach no terminal credit site. Release/suspension settles existing work exactly
+once. Sliced checkpoints retain their class, epoch and owner checks.
+
+The fixed-shape =with-gerbil-rs-service-work-layout= macro puts known Scheme
+application code directly in the wind body. It removes an intermediate handler
+wrapper closure and indirect callback from the specialized path. The ordinary
+function API remains valid and uses the same plan protocol. Public lexical entry
+validates the layout before typed cache access. Other policies reuse already-read
+context through the existing dispatch body, avoiding duplicate validation/context
+reads in the matched control. A forged-layout control must reject before grants. Necessary wind entry/exit callbacks remain: they
+protect arbitrary continuation exits, reentry and exceptions.
+
+* Ownership and invalidation
+- Permission is current-owner grant state, not a transferable invocation lease.
+- Selected immutable plans survive nested execution, suspension and multishot
+  replay. Later class obligations affect future selections, not retained spans.
+- Policy replacement invalidates accounting through identity fences. Old
+  continuations retain Scheme execution but cannot credit the new epoch.
+- The cache retains one latest entry; saved continuations intentionally retain
+  their old metadata. No per-thread unbounded callback table is introduced.
+- Logical-work credit cannot release a native root, result token or admission
+  capacity. Cancellation, timeout and accepted-close draining keep those existing
+  independent authorities and owner-local retirement rules.
+- A selected span bounds cooperative declared work, not arbitrary instruction
+  time. Scheme handlers must honor their declarations/checkpoints; foreign or
+  noncooperative code cannot be preempted by this protocol.
+
+* Reused verification contract
+The existing Runtime model is reused unchanged. Activation records there are
+ghost ownership history, not an instruction to allocate runtime records.
+Both finite domains check cycle settlement, successful replay, exceptional
+replay, nested isolation, close, epoch fencing and required mutation witnesses.
+Native controls reuse the existing adversarial layout suite under the actual
+specialized mode, plus a lexical-macro multishot success/exception control and
+an actual Rust service configuration/submission/retirement check.
+
+The first function-path native gate passed three tests. It is preliminary:
+the subsequent lexical expansion must pass its own current-source gate before
+performance capture. Historical watchdog failures remain unattributed; a later
+passing run is not their root-cause explanation. Five-second meaningful-progress
+and 120-second benchmark-controller limits remain unchanged.
+
+* Targeted performance plan
+Use =--progress-fair-ab --fixed-short-selective --specialized-plan-ab= in the
+existing Rust =scheme_service= bench. Control is ABI18 item activation; candidate
+is ABI20 shared hooks and lexical application code. Both use the same four live
+VMs and O2 native image, Tokio two threads, window four, work 32, batch eight,
+Actor quantum one, class/feed budget one, declared quantum four and maximum 48.
+Use five AB/BA blocks for each existing CPU and mixed load. No profiler, matrix
+expansion, scheduling pause or default change is introduced. Cold cache building
+is timed. Inspect generated C before claiming any allocation/callback reduction.
+
+Require exact typed-result/work/plan/grant conservation and final joined owners,
+zero roots and removed files. Assess throughput, actual and scheduled short p99,
+bulk p99 and owner completion spread; preserve paired instability and all failed
+captures. Incremental improvement does not admit the complete unpublished stack
+against published defaults. Only admitted source may be committed or pushed.
+
+* First layout-owned-hook verification and generated representation
+Final R4 verification passed strict Clippy, canonical generated-source update,
+three native tests, release compilation, generated-source check and formatting.
+Native execution took 31.71 seconds, with the unchanged five-second progress
+watchdog. The native drain joined four owners with zero roots, removed files and
+FD return; observed close was 2.629 ms. Compilation time is separate from native
+progress or benchmark timing. No historical watchdog attribution follows.
+
+The unchanged Runtime model SHA is
+=3da38c19bbdb37b2360809a85b06ee93dd3e30a118c04f9cfa96e518cc71c60f=.
+Ten activation/cycle and four grant/cache witnesses passed in each of two domains
+(28 directed runs, including the existing mutation witnesses). This is focused
+reuse, not a new full-state-space proof or a substitute for native validation.
+
+Optimized C confirms the valid orders control branch constructs a three-slot
+handler wrapper plus the cycle unit's five-, four- and one-slot wind closures
+and one activation record. The specialized branch constructs one seven-slot
+wind body and no activation record. Its before/after hooks are shared from the
+cold layout entry, and its body directly calls the orders computation. The
+ordinary specialized function API constructs one five-slot wind-body closure.
+Three shared hooks are built per cold layout epoch. Necessary dynamic-wind
+calls remain; these are static construction counts, not measured allocation
+bytes or a claim that all callbacks disappeared.
+
+Generated C identities:
+- Budget: =a945b166058da43725da29c6db4206bb6a6f0baf7e2b0a1fb9127bee1786c78a=.
+- Application: =759220c2f83429fb411853bbe1a52c8d9e8ee1baf20d81bdbd1e09cac2d7cc15=.
+
+Preliminary failures remain preserved. R2 release construction failed on one
+excess macro delimiter introduced while factoring the shared context; the
+identified delimiter was corrected. R3 then rejected a literal forged layout
+at compile time through Gerbil's signature checker. The negative runtime fixture
+now receives the same forged value through a Scheme message and verifies runtime
+rejection without weakening production validation. These compiler failures
+(Cargo 101, compiler 70) were not runtime watchdog stalls. No performance samples
+or cleanup attestations are inferred from failed builds.
+
+* First matched candidate: rejected
+The first valid capture completed 40 samples in 6.561 seconds, with compiler-free
+boundary checks, unchanged host/image identities and clean four-owner shutdown.
+Exact work, plans, per-owner grants, native results and cleanup all passed.
+
+| Metric | CPU change | Mixed change |
+|--------+------------+--------------|
+| Aggregate throughput | +5.74% | -1.77% |
+| Pooled actual short p99 | -2.98% | +5.44% |
+| Pooled bulk p99 | +10.26% | +12.89% |
+| Maximum owner finish spread | +0.27% | -5.49% |
+
+Paired CPU throughput improved 3.27% at the median (7/10 pairs), but short p99
+regressed 14.00% and owner spread regressed 16.08% at paired medians. Mixed paired
+throughput fell 2.14% (only 2/10 improved), short p99 rose 3.86% (3/10 improved),
+and bulk p99 rose 1.32%. These negative results remain preserved. This candidate
+is not admitted, committed or pushed. A preceding capture exited 101 before VM
+creation and before any JSONL row because the new flag was missing from the
+bench's top-level argument list. That wiring error was fixed; its original frozen
+host, source, image and stderr remain separate from the valid capture.
+
+* VM-owned hook refinement
+Code inspection identified unnecessary cold allocation and ownership coupling,
+without establishing that it caused the measured regression. Hooks capture only
+the VM budget, so they now live once on that budget instead of being rebuilt for
+every layout/epoch. Both arms share this VM setup. Cold layout metadata is built
+inside the existing acquired unit, preventing pre-lease duplicate builders.
+The body reads the grant snapshot before cold allocation; subsequent arrivals
+cannot replace it. No new lease, wider span, scheduling threshold or default is
+introduced. Continuations still retain lexical immutable plans, and callbacks
+retain no mutable invocation state. Current-source native and targeted matched
+validation must qualify this refinement separately from the rejected capture.
+
+* VM-hook verification before the matched capture
+The VM-budget-owned hook refinement passed the final canonical generated-source
+update/check, strict Clippy, three native tests, release build and formatting.
+Native execution completed in 31.42 seconds. Four owners joined with zero roots,
+removed files and FD return. Continuation/exception and dynamic forged-layout
+controls passed under the actual API. No new runtime watchdog failure occurred;
+the historical watchdog remains unattributed.
+
+Final optimized C preserves four-to-one execution-wrapper closure construction,
+one-to-zero item activation records and the direct Scheme computation target.
+Budget construction creates exactly three one-slot hook closures once per VM.
+- Budget C: =7432e2a4f92b5de4f641167e05e827a8607119eb342acb34fe1c9ec0f5e24182=.
+- Application C: =61aa6ce6187d57303870a1ca316034c8ae2969fac9c1ad1eb3116d79315d618d=.
+
+The first matched candidate's negative percentages above do not describe this
+refinement. At that point its capture was pending while concurrent compilers
+prevented the compiler-free precondition. The completed capture below supersedes
+that pending status. Precondition deferrals create no VM,
+performance sample or capture manifest. Other tasks remain running; no scheduled
+automation was created. No source is staged, committed or pushed, and defaults
+remain unchanged. Continue with the fixed configuration and a fresh exact-source
+capture; do not treat static representation or native/model success as admission.
+
+* Completed VM-hook matched capture: not admitted
+The concurrent compilers finished. The fixed same-image, same-four-VM capture
+completed 40 samples in 13.124 seconds, exit zero, without controller timeout.
+Compiler boundary checks before and after were empty. Host and native image
+hashes stayed unchanged across the run. These observations do not prove an
+otherwise idle host or exclude other scheduling interference during the windows.
+No other task was paused, no automation created, and no profiler enabled.
+Failure-only =RUST_BACKTRACE=1= was equal for both arms; stderr remained empty.
+
+The configuration stayed O2, Tokio two workers, four VMs, window four, work 32,
+batch eight, Actor quantum one, class/feed budgets one, declared quantum four
+and maximum 48. There were five AB/BA blocks for each existing CPU/mixed load.
+Both arms used real native S64 input, complete Scheme computation and native
+projection. Each sample conserved 8192 orders, 64 short replies, 1088 projected
+results, 8192*48 bulk work, 256 short work, 8256 plan selections, pending zero,
+and per-owner grants minus suspensions equal to owner item totals. Class bypass
+bounds remained at most one. Shutdown quiesced and joined four owners with roots
+=[0,0,0,0]= and removed files. All source hashes matched the frozen manifest
+before this outcome was appended.
+
+| Mixed-load metric | Control | VM hooks | Change |
+|-------------------+---------+----------+--------|
+| Aggregate orders/s | 36720.42 | 35975.10 | -2.03% |
+| Pooled actual short p99 (ms) | 2.017500 | 1.485666 | -26.36% |
+| Pooled bulk p99 (ms) | 10.484708 | 13.169000 | +25.60% |
+| Maximum owner finish spread (ms) | 2.455958 | 2.258958 | -8.02% |
+| Pooled scheduled short p99 (ms) | 20.263667 | 23.018916 | +13.60% |
+
+The paired view fails to establish consistent short latency or fairness benefit:
+
+| Paired median change | CPU | Mixed |
+|----------------------+-----+-------|
+| Throughput | -11.10% (3/10 improved) | -2.68% (5/10 improved) |
+| Actual short p99 | -3.71% (5/10 improved) | +16.92% (5/10 improved) |
+| Bulk p99 | +63.27% (2/10 improved) | +24.27% (3/10 improved) |
+| Owner finish spread | -38.79% (6/10 improved) | +35.08% (4/10 improved) |
+
+Pooled p99 combines 640 requests per arm/load; a 64-request window's p99 is its
+maximum. A median of paired window ratios is a different estimator, so the
+apparently better pooled short p99 cannot be reported as a stable paired gain.
+Worst paired actual-short changes were +287.40% for CPU and +575.55% for mixed.
+CPU aggregate throughput rose 3.00%, but its paired median fell 11.10%, and its
+maximum owner spread rose from 3.555 to 24.301 ms (+583.63%). All owners still
+progressed and drained; this spread is not evidence of permanent starvation.
+
+No metric is omitted to turn the candidate into a pass. The structural reduction
+in wrapper construction is confirmed but does not qualify the scheduling/service
+protocol. Stage wall times and quantiles overlap: this run does not identify GC,
+OS runnable waiting, or another stage as the cause. No unchanged rerun, expanded
+matrix, threshold adjustment, default change, commit or push follows this failure.
+The unpublished complete-protocol comparison is not run after this failed
+increment. Scheme retains execution/continuations/exceptions; Rust remains the
+cross-instance dispatcher.
+
+No new watchdog failure occurred. Empty stderr and a successful current run do
+not explain the historical watchdog; it remains unattributed. Future actual
+failures must retain their own matching source, image, phase and available stack
+evidence. The five-second progress and 120-second controller limits stay fixed.
+
+Frozen capture identities:
+- Host: =bfdfe8dfac22bb4e4b3359c91e03f4f3f1502b6deb09edffb4042edec7567394=.
+- Native image: =f91c2920c5f93e015013846dce9f905441024677c225c965376d8e950ce3fc7e=.
+- Pre-outcome source archive: =c9eba831dfe936a16f2be4c991d150f87c15bbed9c22098f4b42adcb8830aaee=.
+
+Raw captures and failed builds remain private evidence. Maintained documentation
+contains no private host paths, logs, patches, binary images or source archives.

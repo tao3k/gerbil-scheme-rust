@@ -1,0 +1,224 @@
+#+TITLE: Native Scheme Cooperative Units and Class Fairness
+#+DATE: 2026-10-21
+
+* Starting state and CI
+
+This continues =9704da487a31dff6973fdf7073c745deec28d2a5= on PR #18.
+[[file:30.37-shared-resource-refinement-and-owner-feed.org][30.37]] retains the shared-resource counterexamples and negative bounded-feed
+captures. Its stronger cooperative CPU rule was model-only at that checkpoint.
+This report connects that rule to actual Scheme execution; it does not transfer
+model success into native or performance acceptance.
+
+The predecessor [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39608647782][CI run 39608647782]] reports completed/success through the run API.
+At the last detailed check, five active jobs were completed/success, including
+Quint, both Bazel jobs, Ubuntu bindings and the fixed-owner native job with Mac
+Actor controls. The separate Mac bindings job still reported in-progress through
+both jobs and exact-head check-runs APIs. This inconsistent job status is retained;
+complete six-job acceptance is not inferred from the aggregate field. SMP remains
+explicitly skipped. New exact-head CI is a separate gate after publication.
+
+* Actual API, not another model
+
+ABI v3 adds native control commands 8 (configure) and 9 (observe).
+=InstanceDispatcher::configure_scheme_service_budget_on(owner, maximum)= returns
+a fixed-owner ticket confirming actual Scheme configuration. Zero disables the
+policy and remains the default; 1..=256 bounds consecutive unit grants while
+both classes wait. Accepted Scheme jobs or active leases/waiters reject changes.
+Older ABI v1/v2 endpoints retain their ordinary execution and reject unsupported
+cooperative configuration before native entry.
+
+The Scheme module =:gerbil-scheme-rust/scheme/service-budget= owns the policy:
+
+- =call-with-gerbil-rs-service-unit= surrounds an application-defined unit.
+- =call-with-gerbil-rs-service-suspension= releases a held unit during blocking
+  work and reacquires through the same class policy on return.
+- Persistent Actor children receive the request's Scheme context through the
+  existing turn envelope. An enclosing unit releases across the coordinator join.
+- The real order handler defines one complete order as a unit. Its existing real
+  one-ms wait releases the unit; input, arithmetic, ranks and output stay native.
+
+Rust configures and observes through native numeric values. It dispatches across
+instances; Scheme chooses leases, Actors, green threads, waits and continuations.
+No Scheme evaluator or application algorithm is translated into Rust or JSON.
+
+* Scheme selection and lifecycle protocol
+
+One service-owned lease represents participating execution on the single-CPU VM.
+Two FIFO waiter queues represent short and general units. When both classes wait,
+a bounded streak switches classes; when one class is runnable it can proceed.
+The selector and counters remain under the existing Scheme mutex discipline.
+No host clock, Tokio timer or Rust thread chooses the next green thread.
+
+The final uncontended path directly grants under the same mutex when no owner or
+waiter exists. It avoids allocating/reversing a queue node and broadcasting an
+empty condition variable on every unit. Contended selection uses the same
+record/grant function; it does not skip class debt or FIFO waiters. Streak state
+saturates at the configured limit. Dynamic-wind guards remain on all unit paths.
+
+Exceptions and continuation exits release the lease. Reentry reacquires it;
+reentrant extents on the same Scheme thread preserve depth rather than deadlock
+against themselves. Suspension releases the full reentrant depth and restores it
+on return. Retained continuations remain usable after policy disable/re-enable.
+Close drains accepted jobs and joins workers, then verifies no unit lease or
+waiter remains before closing wake ports and allowing native cleanup.
+
+These are cooperative boundaries. An arbitrary unwrapped handler remains valid
+Scheme and is not preempted. A unit may do arbitrarily much work or omit a proper
+suspension boundary. GC still pauses the VM; OS descheduling still pauses its
+owner. No item count becomes a wall-clock guarantee, and no live Actor migrates.
+
+* Model correspondence and its limits
+
+The unchanged =owner_lifecycle.qnt= is reused. Its =sharedInit= budget-one/class-debt
+transition now has a participating native implementation. Native scopes map to
+abstract units; child Actors share the original request context, rather than
+creating new root/credit authorities. Its current-policy and GC/OS/entry-gap
+counterexamples remain applicable outside the cooperative region.
+
+This is not a mechanically proved refinement of every production thread. The
+finite model does not prove arbitrary handler termination, GC correctness,
+elapsed-time SLOs or all configurations up to 256. The directed qualification
+uses budget one. Host entry and fixed session routing retain their separate APIs.
+
+* Independent native controls
+
+- The actual service API rejects invalid bounds and configuration while accepted
+  work remains. Explicit feed, request slots and work credits retain their
+  existing independent accounting.
+- A latched bulk unit plus queued short/general workers must execute =0,1,2,3=.
+  The actual selector chooses the order; both class bypass maxima are one.
+- The repeated contention control runs 256 real native orders per policy on the
+  same VM, with the same explicit in-unit Scheme yield in both arms. It verifies
+  every result and requires at least 32 contended candidate grants. This forced
+  contention is a functional stress control, not the natural throughput workload.
+- The real single-worker service verifies =90,1,2,91,4=, =raise #f=, five submits/
+  retirements, wait-release/reacquisition and empty final unit queues/lease.
+- The four-VM fixture uses budget one during native types, forced GC,
+  continuation execution, exception/projection-panic recovery, class routing,
+  abandonment, host wake, backpressure and close. A captured continuation resumes
+  with the policy disabled, then resumes again after re-enable on the same Actor.
+- Final close requires four joins, zero external roots, removed copied files and
+  descriptor return. This does not newly qualify long-term RSS or loader-wide
+  reclamation. Five-second actual-progress gates and native O2 are unchanged.
+
+An initial in-progress interface build failed with missing counter fields; raw
+output is retained. Strict lint rejected the ABI OR-pattern and an oversized test
+function; both were repaired without suppressions. The first repeated-contention
+assertion incorrectly required exactly one short bypass; native output showed
+zero. The repaired assertion checks the modeled at-most-one property and retains
+an explicit contention requirement. That failed test is not a native pass or a
+throughput sample, and its teardown was not accepted. Raw failures remain private.
+
+* Directed throughput, p99 and fairness
+
+=just bridge-scheme-service-benchmark --budget-ab= compares disabled policy with
+budget one. Both arms use identical live VM identities, the same native O2 image,
+four VMs, two Tokio workers, native feed one, slots/work 4/32, batch eight, Scheme
+quantum one, explicit short class/router/layout and FIFO client collection.
+Each full capture has ten AB/BA samples per arm/load: 8,192 48-line orders and
+64 four-line probes on the existing nominal 500-us serial schedule. Correct
+outputs, returned credits, native grants and quiescence are asserted.
+
+Grant counts are not completed-order counts: a real wait releases and reacquires.
+CPU candidate samples require exactly 8,192 bulk and 64 short grants; mixed samples
+require 9,363 bulk and 64 short grants, with 1,171 suspensions. Disabled counters
+must stay zero. The native class bypass maxima must not exceed one; final queued
+counts and active leases must be zero. These are registered-unit class counters,
+not a per-request wall-clock bound or an open-loop offered-load certification.
+
+** First implementation: retained negative captures
+
+Before the uncontended fast path, the original implementation enqueued every
+unit. Two complete captures each validated 40 samples and clean four-owner
+teardown. No compiler or model check of ours ran concurrently with these captures;
+other tasks were not paused and this is shared-host evidence, not quiet-host
+certification.
+
+| Capture/load | Orders/s disabled -> one | Short actual p99 ms | Batch service p99 ms | Minimum normalized owner progress % |
+|--------------+--------------------------+---------------------+----------------------+-------------------------------------|
+| A / CPU | 54,777 -> 58,103 | 30.152 -> 35.157 | 5.280 -> 11.321 | 97.8 -> 97.8 |
+| B / CPU | 46,251 -> 42,918 | 32.954 -> 40.486 | 8.114 -> 11.855 | 95.9 -> 97.8 |
+| A / mixed | 16,126 -> 14,528 | 24.691 -> 14.783 | 33.769 -> 31.344 | 98.4 -> 98.4 |
+| B / mixed | 22,053 -> 18,821 | 23.373 -> 16.277 | 24.092 -> 24.470 | 98.3 -> 98.5 |
+
+CPU throughput changes were +6.1%/-7.2%, with worse short p99 in both runs. Mixed
+throughput changes were -9.9%/-14.7%, with short p99 improvements of 40.1%/30.4%.
+The trade-off is retained; this is not uniform performance admission.
+
+Natural two-class contention was sparse: candidate CPU/mixed contended grants
+summed to 1/2 in capture A and 0/0 in B across ten samples and all owners. Thus
+these captures cannot certify sustained-contention fairness. They motivated both
+the separate repeated-contention native control and removal of unnecessary
+uncontended queue/broadcast work. No data is relabeled as a pure mutex/OS cost.
+
+Per-request analysis places 99.9% and 81.0% of the slowest candidate CPU probe
+latency before native construction in A/B. Candidate mixed fractions are
+99.7%/97.6%. These are sums of paired spans from seven tail observations per row,
+not differences of p99 values. They leave host admission/owner wake/OS costs
+combined and do not identify a single root cause. Normalized owner progress is
+observed completion progress, not a proof of starvation freedom.
+
+The first implementation's frozen binary SHA-256 is
+=a40735e5ea12e27aff31dd797230bf8322038c43f26625c1cf71bf734d22b8b8=;
+image =1a8c13cc70995cfa3a2e0a3fdae10d0fdec943ee8d83ebd80bd888fda21532c7=;
+source archive =1e732dfbd6e5309d0c49e33e53bf4e739da8d9be06c5eae6fd39a2ba5fb0b554=.
+These are preserved separately from the final fast-path artifact.
+
+** Final direct-grant implementation
+
+The final native test passed repeated class contention, GC, exception and
+continuation controls, and clean shutdown (four joins, zero roots, files and
+descriptors returned; native close 1.407 ms). Focused strict qualification and core
+library Clippy passed. A full natural capture still has only sparse class
+contention, so the separate forced-contention native control remains necessary.
+
+Two final captures each validated all 40 samples and native teardown, with our
+compilers/model checks finished beforehand. The source native image hash was
+unchanged through measurement. Other tasks were not interrupted; no quiet-host
+claim or cross-version subtraction is made.
+
+| Capture/load | Orders/s disabled -> one | Short actual p99 ms | Batch service p99 ms | Minimum normalized owner progress % |
+|--------------+--------------------------+---------------------+----------------------+-------------------------------------|
+| A / CPU | 42,423 -> 31,401 | 38.306 -> 30.658 | 14.303 -> 21.321 | 95.6 -> 97.0 |
+| B / CPU | 18,086 -> 14,348 | 31.974 -> 34.282 | 25.405 -> 28.735 | 98.4 -> 92.3 |
+| A / mixed | 16,174 -> 15,809 | 12.038 -> 20.967 | 24.582 -> 27.513 | 98.5 -> 98.3 |
+| B / mixed | 10,241 -> 10,722 | 20.605 -> 29.588 | 30.509 -> 39.105 | 98.8 -> 98.2 |
+
+CPU throughput regresses 26.0%/20.7%; mixed changes -2.3%/+4.7%. Mixed short p99
+regresses 74.2%/43.6%, and CPU B normalized owner progress also regresses. The
+candidate is not performance-admitted and remains disabled by default. Removing
+unnecessary queue work is a source-level change, not demonstrated end-to-end
+speedup. Results from separate native image versions are not pooled into one
+performance estimate or attributed to an isolated fast-path benefit.
+
+Candidate CPU/mixed contended grants total 2/0 in A and 4/4 in B; maximum short/
+bulk bypasses are 0/1 when contention occurs. Tail pre-construction fractions
+remain 79.9%/99.8% for CPU and 92.8%/88.8% for mixed. Before-entry delays remain
+combined admission/owner/wake/OS costs, not isolated scheduler time. This Rust
+bench does not include Python/GIL costs. A participating-unit fairness property
+has been exercised; an end-to-end p99 or throughput repair has not.
+
+The final Rust binary remains
+=a40735e5ea12e27aff31dd797230bf8322038c43f26625c1cf71bf734d22b8b8=;
+Scheme changes reside in the native image
+=d0bd34c8ae6d583b2fa4f0e0d03d379e70294f330ca06b96945c54e1b8adfa43=.
+The separate source archive is
+=4157ebed58d1996e5fc923f9adc7f48cf52028f52e53f894c4cd25489d37ae4a=
+with 1,252 source/model inputs. Binary and native image are separately retained;
+reproduction rebuilds the identified source/SDK graph, not a machine-specific
+embedded build path. The manifests bind code at capture; later documentation
+edits are outside those code identities.
+
+* Reproducibility and acceptance boundary
+
+Use the admitted Gerbil SDK =0.19.20261009110849.1cfb032.patch618d76f9eb72=,
+Gambit =ea114fc=, Rust 1.95.0 and Quint 0.33.0. The existing release Rust profile
+and native dynamic =-O2= remain in use. The canonical =build.ss= includes the new
+Scheme module; external whole-file SCM receipts are refreshed for that build
+input change, without embedding a hash comment in generated artifacts.
+
+Raw logs, frozen images/binaries, manifests and source archives remain outside
+Git. Repository commands, versioned inputs and source digests are reproducibility
+inputs; no private absolute directory is required. No default, timeout or
+scheduler/thread matrix is changed. No Bash driver, SMP patch, Scheme-to-Rust
+compiler or loss of Scheme execution capability is introduced.

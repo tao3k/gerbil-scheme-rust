@@ -1,0 +1,277 @@
+#+title: Native Policy Readback and Owner Wake Boundaries
+#+startup: overview
+
+* Predecessor and scope
+
+PR #18 predecessor =d81933ba2c8bc7742bcc675f5d38afa44de51e30= has a successful
+exact-head CI run =39718154788=. All six supported jobs passed; the separate
+unsupported SMP job was skipped. This investigation remains the Rust library's
+fixed native Scheme VM path. Rust distributes independent work across instances;
+Scheme retains compilation at O2, native types, GC, Actors, green threads,
+continuations, exceptions and dynamic bindings. Defaults remain unchanged.
+
+* A material benchmark configuration defect
+
+The old =configure= and =append_policy= functions had outer matches ending at
+=Resident=. Adding =Pooled= to nested matches did not make those outer branches
+execute. Consequently historical =--pooled-ab= captures and the local active-route
+pilot ran with default Watcher wake and cooperative budget zero. The original
+report described NativePort/budget one incorrectly. Missing policy fields in the
+raw records were not treated as a failed gate.
+
+| Historical comparison | Source-applied wake / budget | Evidence boundary |
+|-----------------------+------------------------------+-------------------|
+| Resident | NativePort / 1 | Existing outer branch applied configuration |
+| Pooled, before this repair | Watcher / 0 | Source-inferred defaults; no native readback |
+| Rejected active-route pilot | Watcher / 0 | Same omission; not the advertised configuration |
+
+The historical source archives, raw samples, failures and numeric results are
+retained. Relative comparisons within a capture still share that implicit
+configuration, but do not qualify the originally declared policy. Report 30.45
+now carries an explicit correction. New readback-qualified captures constitute a
+separate baseline: do not splice them into older results or multiply speedups.
+
+* Native truth and executable policy contracts
+
+=SchemeServiceSettings= contains the applied native cooperative budget and wake
+mode. =scheme_service_settings_on= reads both from Scheme on the fixed owner,
+using the ordinary typed native control path and resource boundaries. Service
+capability v5 adds command 11; older service capabilities remain accepted for
+existing operations and explicitly reject the new query. Parsing rejects invalid
+length, budget outside 0..256 and invalid wake tags. No host-side requested-policy
+cache stands in for native state.
+
+The Rust bench now has one exhaustive comparison-to-policy mapping. Every sample:
+
+1. Applies the budget, wake and notification settings through existing APIs.
+2. Reads all four owners' native settings and asserts equality with the request.
+3. Waits for native credits and producer registrations to retire before timing.
+4. Emits =native_policy_receipts= from actual readback, together with explicit
+   budget/wake fields and the existing native unit counters.
+
+Adding a new comparison now requires an explicit policy match arm. Omitting an
+application branch cannot silently produce a labeled benchmark pass. Native
+controls verify zero/max budgets, both wake modes, restoration and unchanged
+initial defaults. This closes a type/evidence gap; it changes neither the
+application payload format nor Scheme execution authority.
+
+* Native wait versus OS-boundary evidence
+
+The bounded qualification-only select observer now records six fields:
+=kind, start_ns, end_ns, requested_ns, thread_cpu_ns, wake_flags=. The pipe's read
+endpoint is registered at native service open, and its Scheme duplicate is
+identified by =fstat= identity. Flag bits indicate inclusion in the read set,
+readability before entry, returned readiness, and unread bytes after return.
+Probes consume no bytes, create no descriptors, and preserve syscall arguments
+and errno. They run only with observation enabled. Owner history also exposes
+full phase start/end boundaries to match enclosing wall/CPU counters correctly.
+
+The rejected pilot's diagnostic captured two distinct cases:
+
+- A CPU request's host notification returned approximately 101.832 ms before a
+  select returned readiness for that same registered pipe. The entire select
+  lasted 101.889 ms but used only 5.250 microseconds of owner thread CPU. Flags 13
+  confirmed a watched pipe, returned pipe readiness and unread bytes after return.
+  The enclosing Wait had zero recorded GC. This is substantial non-CPU delay at
+  the native OS syscall boundary, not Scheme computation in that interval.
+- Another CPU tail had a 114.697 ms Wait phase with zero select time, 225.084
+  microseconds of thread CPU and zero recorded GC. Other blocking/descheduling
+  outside the observed syscall remains possible; it cannot be labeled pure
+  Scheme execution or exact OS wake cost from these counters alone.
+
+Across that diagnostic, already-readable-at-entry selects were much shorter:
+maximum wall times were 0.199/0.021 ms CPU control/candidate and 0.574/0.713 ms
+mixed. Native select and outside-select delays coexist. The largest fresh
+notification-to-ready-return intervals were 76.325/101.832 ms CPU and
+17.272/72.764 ms mixed. These are upper bounds that include kernel waiting and
+scheduling, not exact runnable-to-running timestamps. Full-phase CPU encloses an
+overlap and must not be treated as clipped per-request CPU. SDK GC CPU remains
+process-scoped and must not be summed as per-VM CPU or subtracted to infer OS cost.
+
+A three-second stack sample of the earlier frozen benchmark confirms native
+=select= stacks and other owner work, but is aggregate, perturbs execution and
+does not identify the stack at every specific tail event. It is not independent
+proof that a particular delay came from the OS run queue.
+
+* Rejected routing hypothesis
+
+An opt-in pilot preferred occupied owners whose native phase counter changed
+since the previous scan. It retained capacity, short quotas and every wake duty;
+no wait-phase boolean or notification omission was introduced. Native and finite
+controls passed, but two unobserved captures were inconsistent. In A, CPU p99 and
+mixed throughput/p99 regressed; B improved several tails while mixed throughput
+still declined. The instrumented capture also had a CPU throughput regression.
+
+The candidate source, binary/image identities and all three captures remain in
+private recoverable evidence. Candidate-only changes were hash-verified against
+the frozen source and archived before reversing that experimental patch. The
+new public routing mode is not retained. Passing a native or finite protocol
+check did not turn an unstable policy into an admitted optimization.
+
+* Directed, readback-qualified wake comparison
+
+=just bridge-scheme-service-benchmark --pooled-wake-ab= reuses the same four VMs
+and native image within each capture, two Tokio workers, the original native
+batch-eight workload, three active callbacks/owner, slots four/work 32 and a
+bounded shared source of 128 callbacks/1024 declared work units. Short requests
+use the existing capacity/progress reselection and native dedicated short queue.
+Both arms apply and read back cooperative budget one, feed one and coalescing.
+Control uses NativePort; candidate uses the existing Watcher API. No new runtime
+scheduler, OS priority, polling timer or production default is introduced.
+
+This comparison is motivated by the source protocol difference: NativePort
+notifies internal Scheme completions through the pipe; Watcher signals those
+completions through Scheme's condition variable while a Scheme-owned reader
+handles external host bytes. That distinction did not apply to the old Pooled
+captures, which were already using Watcher. It must be tested under the newly
+verified configuration rather than used to explain those historical samples.
+
+Each load has 8192 orders with 48 lines, 64 serial short probes at nominal
+500-microsecond release, ten samples per arm/load in alternating ABBA order.
+Setup, readback, warmup and compilation are outside timing. Native payloads and
+FIFO result positions are unchanged. Phase-observed captures are separate
+instrumented diagnostics; all negative rows, overlap and unused-owner records
+are retained. Other tasks are not paused, and no quiet-host or portable latency
+claim follows from local observations.
+
+* Results and remaining gates
+
+Two unobserved captures each completed 40 samples with all four native settings
+receipts checked per sample and clean shutdown. Each row is NativePort control
+-> Watcher candidate, both with actual budget one.
+
+| Capture / load | Orders/s | Throughput delta | Actual short p99 ms | Scheduled p99 ms | Batch service p99 ms |
+|----------------+----------+------------------+---------------------+------------------+----------------------|
+| A / CPU | 47322.11 -> 50947.07 | +7.66% | 71.330 -> 43.752 | 685.498 -> 411.685 | 20.030 -> 10.218 |
+| A / mixed | 21910.52 -> 20171.63 | -7.94% | 11.488 -> 26.025 | 157.579 -> 197.647 | 56.475 -> 52.824 |
+| B / CPU | 91469.92 -> 41320.95 | -54.83% | 38.325 -> 64.815 | 231.795 -> 287.645 | 6.893 -> 14.471 |
+| B / mixed | 24520.97 -> 18172.31 | -25.89% | 24.098 -> 18.216 | 282.364 -> 102.965 | 36.161 -> 36.237 |
+
+| Capture / load | Minimum normalized owner progress % | Maximum finish spread ms | Minimum overlapping probes |
+|----------------+-------------------------------------+--------------------------+----------------------------|
+| A / CPU | 93.046 -> 52.083 | 160.352 -> 188.839 | 22 -> 17 |
+| A / mixed | 98.592 -> 98.605 | 11.284 -> 45.047 | 64 -> 64 |
+| B / CPU | 55.593 -> 10.026 | 27.614 -> 200.747 | 37 -> 32 |
+| B / mixed | 98.684 -> 98.701 | 2.072 -> 107.142 | 64 -> 64 |
+
+Watcher mixed throughput declines 7.94% and 25.89%. Its mixed short p99 regresses
+126.55% in A and improves 24.41% in B. CPU throughput changes +7.66%/-54.83% and
+CPU short p99 -38.66%/+69.12%. The protocol switch is not admitted as a general
+optimization. NativePort remains the explicit performance control; production
+Watcher/budget-zero defaults remain unchanged. Both source algorithms still use
+the bounded shared pool supply. Mixed normalized progress stays approximately
+98.6%-98.7%, but finish spread can still be large. Normalized progress does not
+bound final stragglers. Actor peer minimum is zero in all unobserved rows.
+
+Batch-service p99 excludes staged admission and is not end-to-end bulk latency.
+CPU probes do not all overlap bulk work; all 64 remain in the result. No rows or
+slow samples are filtered, and capture-specific negatives are not hidden by a
+cross-run average. Absolute rates differ between captures and are not portable
+host-independent capacity claims.
+
+* Readback-qualified phase diagnostic
+
+A separate 40-sample instrumented capture completed cleanly. CPU rates are
+89315.79 -> 113118.90 orders/s, but short p99 is 20.474 -> 24.737 ms; mixed rates
+are 19652.94 -> 17499.49 and short p99 13.695 -> 16.231 ms. Scheduled p99 is
+185.915 -> 245.593 ms CPU and 204.239 -> 130.658 ms mixed. These instrumented
+results retain both positive and negative values and do not replace the
+unobserved decision above.
+
+For the seven largest actual latencies among each arm/load's 640 probes,
+matched-request median queue/actual fractions are 99.59%/99.62% CPU and
+99.05%/99.79% mixed (control/candidate). Median select-overlap/queue fractions are
+0.005%/81.89% CPU and 98.48%/89.48% mixed. There is no history loss or trace
+overflow. This is not a single uniform tail mechanism.
+
+Concrete cases distinguish the boundaries:
+
+- NativePort/budget-one mixed: a select with a pipe already readable at entry and
+  ready at return takes 15.862 ms, using 17.333 microseconds of thread CPU. Thus
+  about 15.845 ms is non-CPU time within that syscall boundary despite readiness.
+  Scheme computation does not explain that interval. There is still no exact
+  kernel runnable timestamp, so it is not isolated runnable-to-running latency.
+- NativePort/budget-one CPU: an Advance enclosing a tail spans 139.567 ms, uses
+  177.500 microseconds of thread CPU, and records neither select nor GC time.
+  Blocking/descheduling outside the observed syscall remains unclassified.
+- Watcher/budget-one CPU: an Advance spans 110.646 ms, with 110.598 ms recorded
+  GC wall time but only 0.601 ms of enclosing owner CPU. A mixed Wait similarly
+  has 45.695 ms wall, 45.577 ms GC wall and 0.686 ms CPU. These are GC-associated
+  wall intervals, not evidence of 110/45 ms of collector CPU work. OS delay or
+  blocking within a GC interval is not separated by the GC wall counter.
+- The worst CPU request is not purely an ingress problem: NativePort actual
+  latency 125.330 ms includes 22.253 ms after admission, 0.007 ms construction,
+  103.046 ms after construction before projection, and 0.006 ms projection.
+  Its construction-to-projection counters show zero GC and 0.130 ms of owner CPU.
+  Watcher's worst CPU request similarly has 119.116 ms pending with zero GC and
+  0.200 ms enclosing owner CPU. Queue, pending and OS/non-CPU costs must remain
+  separate; optimizing type conversion cannot explain these particular tails.
+
+Largest fresh notification-to-ready-return intervals are 26.185/68.485 ms CPU
+and 13.851/31.002 ms mixed. Already-readable select maximum wall intervals are
+3.667/0.015 ms CPU and 15.862/2.715 ms mixed. The readiness flags verify a live
+pipe in the actual read set; a timeout followed by readable bytes can reflect
+arrival after timeout or delayed return, not a proved lost wake. No polling,
+phase-dependent notification suppression or wider watchdog is introduced.
+
+The remaining measurement gap is the exact blocking or descheduling cause of
+outside-select non-CPU intervals, including GC-associated intervals. Kernel
+runnable/dispatch and blocking-stack evidence at those particular events would
+be required for a finer attribution. Neither a warm-owner hint nor switching
+internal completion transport demonstrated a stable closure. Preserve the pool
+supply and its capacity protocol; do not promote a replacement algorithm from
+these captures.
+
+* Gates and frozen evidence
+
+Root conservation, code/file/FD retirement, finite-model safety and performance
+remain distinct evidence. Focused local results: ten unit controls passed; native
+producer acceptance 4.20 seconds and expanded native service/settings acceptance
+7.26 seconds passed (build times excluded); warnings-denied test/bench Clippy
+passed. The unchanged reselection model passed 1000 traces of 64 steps with seed
+one. Native settings tests cover initial defaults, zero/max values, both modes and
+restoration. Service capability readback is metadata, not a new scheduling model.
+
+The frozen runtime has 1005 input hashes. Runtime inputs and the actual image
+were unchanged after both unobserved captures and the diagnostic. Final report
+prose is appended after the freeze. Raw logs, failures, source archives, stack
+samples and binaries remain private; no personal absolute path is published.
+
+- Release binary SHA-256: =18c26083ed6a5171f812d6cbe58cfd45ae94356c3fa572ec64efb4882ff64074=.
+- Native image SHA-256: =dbecadc5617173c15cead81ebda74e67466dcc246f132707263d21ddb457680c=.
+- Frozen source archive SHA-256: =bf2fcef554051a5a36074eb271383d71d090e928ce795b067f812470fa9c2e16=.
+- QNT source SHA-256: =7e7ca8a67f58f27f4fea0e8ac7f5a8c0c0593483522ced6755603d07faf1b8dc=.
+
+None of these gates establishes universal image unloading, long-run RSS
+convergence, hard short-request bounds or unconditional scheduling fairness.
+All request/progress watchdogs retain their original limits. No default, Scheme
+execution capability, VM affinity or accepted-root lifetime is weakened.
+
+* Rebuilt fixed-versus-pooled baseline
+
+A separate existing =--pooled-ab= capture uses the same frozen binary and image,
+four owners, two Tokio workers and the same workload. Both arms now verify
+NativePort/budget-one on every VM before timing. Ten samples per arm/load
+complete, with four joins, zero native roots and removed temporary files.
+
+| Load | Fixed orders/s | Pooled orders/s | Throughput change | Actual short p99 ms, fixed -> pooled | Scheduled short p99 ms, fixed -> pooled |
+|------+----------------+-----------------+-------------------+-------------------------------------+----------------------------------------|
+| CPU | 25193.70 | 75656.96 | +200.30% | 75.259 -> 46.713 | 744.372 -> 352.675 |
+| Mixed | 15994.71 | 17707.73 | +10.71% | 42.763 -> 17.364 | 599.595 -> 430.165 |
+
+Normalized owner progress minimum rises from 2.34% to 13.82% for CPU and
+70.70% to 98.71% for mixed; maximum finish spread falls from 263.467 to
+18.834 ms and 147.012 to 8.611 ms respectively. CPU overlap minimum is only
+17/32 of 64 probes; mixed overlap is 64 in both arms. All probes remain in
+latency summaries. Actor peer minimum remains zero. CPU progress is still
+unbalanced, so this is not unconditional fairness admission.
+
+This single rebuilt capture supports retaining pool-level supply under the
+intended verified policy. It does not establish cross-run stability, stack
+historical multipliers, or close the CPU and diagnostic tail mechanisms.
+The new wake comparison rejects a general Watcher switch; the production
+Watcher/budget-zero defaults remain unchanged.
+
+Both exact CI development smokes (=--test --pooled-ab= and
+=--test --pooled-wake-ab=) also complete eight samples with verified native
+settings and clean retirement. No thread-count matrix is expanded.

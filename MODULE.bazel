@@ -17,6 +17,7 @@ gerbil.host(
     name = "shared_gerbil",
     expected_version_prefixes = [
         "Gerbil 2591dcd",
+        "Gerbil 1cfb032",
     ],
 )
 use_repo(gerbil, "shared_gerbil")

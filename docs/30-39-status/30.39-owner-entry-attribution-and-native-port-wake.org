@@ -1,0 +1,193 @@
+#+TITLE: Owner Entry Attribution and Native Port Wake
+#+DATE: 2026-10-21
+
+* Starting state and CI
+
+This continues =d49ac5668131c4e31422b763b4bd72626f283cfc= on PR #18.
+The predecessor [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39616005448][CI run 39616005448]] failed Ubuntu Bazel: the native FFI benchmark
+truncated each 250-call batch into integer nanoseconds per call before computing
+ratios. A valid subnanosecond control became zero. The repair retains original
+batch durations for ratios and compares batch totals with the unchanged per-call
+budget multiplied by 250. Receipts explicitly name batch nanoseconds. Zero batch
+durations and overflow still fail; no artificial one-nanosecond floor is used.
+The failed receipt is retained separately from the repair and native acceptance.
+At inspection, Quint, Mac bindings, Mac Bazel and the fixed-owner native job
+passed. Ubuntu bindings had successful steps but an inconsistent in-progress job
+status. This is not six-job green acceptance. New-head CI remains a separate gate.
+
+* Paired entry evidence
+
+Three separate frozen diagnostic builds extend the same predecessor, with the
+same native image SHA-256
+=d0bd34c8ae6d583b2fa4f0e0d03d379e70294f330ca06b96945c54e1b8adfa43=.
+Each completed 40 same-VM samples with native cleanup. Their controls and candidate
+retain the prior disabled/one cooperative-budget comparison. They diagnose the
+previous regression; they are not the new ingress performance comparison.
+
+- Entry timestamps: in candidate slowest-one-percent probe observations,
+  publication-to-dequeue occupied 95.2% of CPU-load actual latency and 91.5% of
+  mixed-load actual latency. Class/native capacity readiness, publication and
+  owner-turn-to-construction were small. Written notifications typically took
+  about one to two microseconds; coalescing alone does not imply a lost wake.
+- Bounded owner history: candidate tail overlap was wait 64.0%, submit 15.2% on
+  CPU load; wait 83.8%, advance 14.1% on mixed load. These are overlaps of actual
+  latency, not isolated CPU costs or sums of independently measured p99 values.
+  An observed 43.920-ms queue interval intersected a 70.809-ms native wait with
+  only 0.070-ms enclosing thread CPU. Analyzed tails had no history loss.
+- Existing native select trace: candidate tail select overlap was 39.3% on CPU
+  and 63.6% on mixed load; control was 48.0% and 75.5%. A mixed notification
+  reached a select requesting approximately 0.937 ms that returned about 38.1 ms
+  after publication. Another timeout requested 0.777 ms and returned about
+  16.1 ms after publication. Monotonic-clock calibration uncertainty is retained
+  with every probe; example uncertainty was 41--417 ns.
+
+The SDK wait/OS boundary is a material source of tails. This does not attribute
+all delay to the OS or prove that a successful write was immediately consumed.
+A CPU tail instead overlapped submit for 133.482 ms with 0.754-ms thread CPU and
+133.390-ms GC wall time. GC wall time includes blocking/descheduling; it is not
+133 ms of collector CPU. A mixed tail spent 23.802 ms in retirement with only
+0.034-ms thread CPU and no GC/select overlap. Therefore global lock removal,
+GC replacement or more Rust workers is not justified by these samples alone.
+
+The optional public request observer pairs readiness, publication, wake,
+dequeue, owner turn and construction clocks. A 256-record ring bounds history;
+lost history is flagged. Full enclosing phase CPU/GC counters are not clipped
+to overlap. Native select tracing and clock calibration are diagnostic only.
+Unobserved requests read no entry clocks. Raw logs and frozen source/binary
+archives remain private; no host-specific paths are required to reproduce.
+
+* Actual protocol candidate
+
+ABI v4 adds =configure_scheme_service_wake_on(owner, SchemeServiceWake::NativePort)=.
+Its fixed-owner ticket confirms actual Scheme configuration. The default remains
+=Watcher=. Mode changes require drained Scheme jobs and cooperative leases.
+Switching to the candidate wakes and joins the old watcher before the root
+Scheme thread reads its port; switching back drains notifications and creates
+one watcher. A native receipt precedes the Rust-side mode flag.
+
+Scheme directly waits on the existing native input port. Rust publication and
+Scheme completion both notify that port through nonblocking writes. Full-pipe
+notification is already readable; IO failure is not reported as successful work.
+The bounded drain and ready-queue check preserve level-triggered work visibility.
+Dynamic-wind restores port timeout settings after timeout, exception or return.
+Gambit still schedules green threads, Actors, native IO, timers and continuations.
+Rust does not choose which Scheme thread executes or move a live Actor.
+
+The candidate also avoids an empty native completion-collection call when no
+host service job remains. This is a coupled protocol candidate: measurements do
+not separately attribute gains to reader transfer or empty-call removal. Feed,
+class routing, work/slot budgets, result layout and application algorithm remain
+the same. The watcher and disabled cooperation remain production defaults.
+
+* Native correctness and evidence boundaries
+
+The real four-VM service fixture passed in 6.93 seconds total, with the existing
+five-second per-progress gate unchanged. It switches NativePort/Watcher/NativePort
+on every owner, checks an actual host wait deadline, and retains class fairness,
+real-order contention, native types, forced GC, same-Actor multishot continuation
+reuse, construction/projection panics, Scheme exceptions, abandonment,
+backpressure, wake and close controls. Four owners joined; external roots were
+zero; copied files were removed. The single-worker default-watcher control also
+checks paired request-entry marks and rejects active configuration changes.
+The first candidate build failed on a missing Gerbil foreign declaration; adding
+the explicit module namespace/extern fixed it. This failure is retained.
+
+The unchanged Quint publish/recheck/wake and root-conservation model is reused.
+It does not prove buffered-port reader transfer, elapsed deadlines or OS
+scheduling. Native controls and unobserved performance results are independent
+gates. No SMP runtime or SDK source is modified.
+
+* Directed performance results
+
+Two unobserved release captures each completed 40 samples and clean native
+shutdown. Both arms use the same four VMs, two Tokio workers, budget one, feed
+one, class router, native short layout and FIFO client collection. Each load
+alternates AB/BA, ten samples per arm, with 8,192 native orders and 64 short
+probes. Our compiler jobs had finished before capture. Other host tasks were
+not stopped: these are shared-host observations, not exclusive-machine claims.
+
+| Capture/load | Watcher orders/s | Port orders/s | Change | Short actual p99, ms | Short scheduled p99, ms | Batch service p99, ms |
+|--------------+------------------+---------------+--------+----------------------+-------------------------+----------------------|
+| A CPU        | 39,156           | 57,126        | +45.90% | 26.302 -> 20.751     | 357.379 -> 195.939       | 14.277 -> 14.870      |
+| A mixed      | 16,174           | 17,483        | +8.09%  | 19.802 -> 11.326     | 219.452 -> 106.265       | 29.368 -> 33.527      |
+| B CPU        | 31,475           | 36,617        | +16.33% | 21.240 -> 35.949     | 246.771 -> 501.999       | 13.686 -> 16.929      |
+| B mixed      | 18,016           | 21,814        | +21.08% | 8.845 -> 16.231      | 196.882 -> 104.338       | 36.524 -> 28.873      |
+
+| Capture/load | Minimum normalized owner progress | Maximum owner finish spread, ms | Actor peer minimum |
+|--------------+-----------------------------------+---------------------------------+--------------------|
+| A CPU        | 98.406% -> 98.347%                 | 9.661 -> 22.592                  | 0 -> 0             |
+| A mixed      | 98.374% -> 98.718%                 | 16.781 -> 51.451                 | 0 -> 0             |
+| B CPU        | 97.419% -> 98.298%                 | 3.368 -> 55.523                  | 0 -> 0             |
+| B mixed      | 98.507% -> 98.492%                 | 11.193 -> 9.264                  | 0 -> 0             |
+
+Throughput improves in all four matched rows. This is not a comparison against
+the older disabled-budget default or an isolated micro-optimization speedup.
+Actual short p99 regresses in capture B by 69.25% on CPU and 83.51% on mixed
+load. Batch p99 regresses in three rows; owner finish spread regresses in three.
+Actor peer minima remain zero, so the workload does not establish a positive
+Actor progress lower bound. Tail/fairness acceptance is incomplete. Defaults
+are unchanged and this candidate remains explicitly selected.
+
+* Follow-up on the remaining tail
+
+One further same-configuration observed pair completed all 40 samples and native
+cleanup. It is diagnostic evidence, not a third unobserved speedup result.
+In candidate slowest-one-percent observations, publication-to-dequeue occupied
+91.4% of CPU-load actual latency and 63.2% of mixed-load actual latency. Native
+select overlapped 54.7% and 25.0%, respectively. Owner phase overlap on CPU was
+wait 55.6%, advance 26.1%, submit 7.4%, retirement 2.2%; on mixed load it was
+wait 31.2%, submit 31.9%, advance 0.1%. Analyzed tails had no lost history.
+
+A candidate CPU probe waited about 131.8 ms before dequeue inside a native wait
+whose full enclosing CPU was only 0.058 ms and GC wall was zero; the corresponding
+select returned descriptor-ready. Another advance phase took 101.845-ms wall
+with 0.141-ms CPU and no GC. A mixed probe intersected 60.633 ms of submit, with
+0.750-ms enclosing CPU and 59.990-ms GC wall. A different written notification
+completed its producer wake in about two microseconds, but the native select
+requesting 0.936 ms returned approximately 10.306 ms after publication. Neither
+case supports blaming type arithmetic or merely increasing Rust worker count.
+Coalesced notifications do not prove which producer wrote the outstanding byte.
+
+The direct port removes a Scheme notification handoff and improves observed
+throughput, but cannot establish a p99 bound across OS/native blocking, VM GC
+and later Scheme execution. These observations do not prove a lost wake or
+identify a particular kernel scheduler policy. No speculative GC/SMP patch or
+unmeasured routing change is promoted. Subsequent optimization must preserve
+this paired evidence and distinguish runnable-owner resumption from native
+collector wall time and post-construction service waiting.
+
+* Source and verification receipts
+
+Frozen release binary SHA-256:
+=9f2817220c7a309c6d421fadfd5f4105684f43c8def82126e0905db14fcd9ae1=.
+Native image SHA-256:
+=62f7da10280b9ad65fa54d5181de2bf0e1ac3a119b25cb4d3b55dee0db197083=.
+Private final source archive SHA-256:
+=1b4ec610e6c9e40d9af27e38dce7db3d0f3f44a774f817e69bd6161ed3fcc01d=.
+These identify captured artifacts; they do not replace reproducible build inputs.
+
+The admitted immutable Gerbil 0.19 SDK and native O2 build are unchanged. To
+reproduce, use the repository's SDK setup and Cargo/Just build entrypoints:
+
+#+begin_src text
+just bridge-scheme-service-benchmark --ingress-ab
+just bridge-scheme-service-benchmark --ingress-ab --phase-observation
+cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+cargo test -p gerbil-scheme --test ffi_benchmark --locked -- --nocapture
+cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --test scheme_service --locked -- -D warnings
+cargo clippy -p gerbil-scheme --features tokio-dispatch --test ffi_benchmark --locked -- -D warnings
+#+end_src
+
+Focused native service and two real FFI tests passed. Strict core and focused
+qualification lint, canonical generated-Scheme update/check, formatting and diff
+checks passed. The generated Scheme file bytes stayed unchanged; only external
+input fingerprints changed with the build dependency declaration. Initial build
+and strict-lint failures remain private. New exact-head remote CI is required
+after publication; local checks are not remote CI acceptance.
+
+* Follow-up clock-scope correction
+
+[[file:30.40-independent-notification-and-mixed-tail.org][30.40]] verifies that SDK GC CPU uses process time, while owner CPU uses a
+thread clock. GC CPU is not isolated collector CPU and must not be subtracted
+from GC wall or summed across owners. The original observations above remain
+unchanged; the new report retains the process/owner distinction and all negatives.

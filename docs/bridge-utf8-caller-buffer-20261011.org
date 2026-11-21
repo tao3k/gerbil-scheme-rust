@@ -1,0 +1,111 @@
+#+TITLE: Caller-owned UTF-8 encoding qualification, 2026-10-11
+
+* Frozen baseline and evidence boundary
+
+Baseline: =6ad680c6311957eadf2529765ab1efd751132554=, existing PR #18.
+The qualification-only =utf8-baseline-control.ss= freezes its checked,
+filled-bytevector encoder rather than comparing a candidate with itself.
+No SDK/kernel changes, longer deadlines, new skips or weaker checks are used.
+All results below are owner-local bridge conversions, not Org parsing,
+Scheme SMP throughput or independent-VM qualification.
+
+* Official-source algorithm and ownership
+
+The installed SDK's matching source, =lib/c_intf.c:1254=, implements bounded
+character-to-byte conversion into caller-supplied storage. Its extended UTF-8
+and newline normalization are not suitable for Rust strings verbatim. This
+bridge keeps strict Unicode scalars, NUL preservation and four-byte UTF-8.
+=gambit/string/string.scm:560= documents the count/allocate/fill alternative;
+the earlier complete negative measurements in =bridge-value-conversions.md=
+remain rejected, not replaced by this report.
+
+The production owned-string path now reserves Rust capacity, queries current
+Scheme character length, and encodes directly into that stable allocation.
+It removes the temporary Scheme bytevector payload, result-root insertion/
+release and subsequent bulk copy. It still performs encoding and complete
+SIMD UTF-8 validation; this is not literal zero-copy or cached text.
+
+The two destination routes share one production strict scalar codec. A leaf
+admits at most 256 characters and cannot allocate, callback or poll. Scheme
+body pointers are reacquired at each leaf and never retained across polls.
+The caller-owned Rust allocation remains stable throughout the synchronous
+call. The source remains rooted and owner-affine. Only successful completion
+admits the initialized prefix; an error may write a prefix but never publishes
+its length or an unchecked String. Explicit Scheme bytevector snapshots keep
+their independent root lifetime and existing behavior.
+
+Capacity tradeoff: the fixture requests 13,660 Rust bytes for an 8,196-byte
+result, instead of a compact 8,196-byte owned destination. The allocator may
+reserve more than requested. Long-lived retained Strings can therefore cost
+more memory; no peak-RSS or universal workload improvement is claimed.
+Pointer-wrapper allocation remains possible; this is not zero Scheme allocation.
+
+* Complete matched controls
+
+Command: =just bridge-utf8-matched --buffer=.
+One AOT image, owner, fixture and validation policy; ABBA chronology, twenty
+complete samples per variant per load. Four alternating current strings,
+3,415 characters and 8,196 UTF-8 bytes, are freshly encoded per request and
+checked byte-for-byte. No snapshot substitutes for changing text.
+
+The prototype first completed all three loads with paired candidate/baseline
+ratios 0.866128 / 0.851784 / 0.783963. Only then was the actual ABI integrated
+and independently compared with frozen baseline mode 3 (production mode 5):
+
+| Requests | Baseline wall median ms | Candidate wall median ms | Paired ratio | Baseline CPU ms | Candidate CPU ms |
+|----------+-------------------------+--------------------------+--------------+-----------------+------------------|
+|     1000 |                  21.567 |                   14.074 |     0.729444 |           9.666 |            6.617 |
+|    10000 |                 407.671 |                  400.664 |     0.945993 |          92.972 |           72.632 |
+|   100000 |                3034.640 |                 2499.714 |     0.721383 |         936.606 |          727.141 |
+
+At 100,000 requests, twenty-sample collection totals fall from 18,518 to
+1,232; median GC CPU falls from 135.531 to 16.209 ms. Wall-clock variation
+remains substantial. These are matched local diagnostic results, not a
+comparison of absolute medians with the earlier independent 167-ms run.
+The gate collects every load before rejecting any paired median above 1.0.
+The raw 120 sample rows are retained in
+=benchmarks/20261011-utf8-caller-buffer-abba.log=.
+
+Full scalar parity covers 1,112,064 Unicode scalars. All 2,048 surrogates are
+rejected. Same-root mutation, NUL/empty/large text, malformed capacities,
+wrong/released roots and null spans are checked. Late-invalid input tests
+partial writes without length publication. Existing full UTF-8 validation
+and negative per-character-FFI regression controls remain mandatory.
+
+* Actual owned-string and local contracts
+
+Independent actual =RootedSchemeString::to_string()= receipt:
+=just bridge-benchmark buffers::utf8_fresh=, full twenty samples each.
+Medians are 15.21 ms / 156.3 ms / 2.498 s, with ranges 6.507--79.87 ms /
+99.49--421 ms / 1.216--5.343 s. This is another 2,220,000 fresh transfers,
+not a matched acceleration claim against earlier independent runs.
+
+The normal archive's root/span contracts, eight runtime unit checks, forty
+safe-surface gates, twenty-one AOT unit checks and twenty AOT contracts pass.
+Existing one runtime and five AOT ignored controls are unchanged. The new
+root-span fixture initially used a nonexistent typed-string token accessor;
+it was corrected to acquire/release its own raw roots through the existing
+ABI, without adding a public accessor or suppressing a test.
+The final Clippy pass also rejected a 109-line test helper; root acquisition
+was factored into a named helper rather than allowing the lint.
+Final workspace and actor-AOT all-target Clippy pass with warnings denied.
+Production Scheme Unicode/mutation/bounds/root-GC conformance, frozen-control
+conformance, generated SCM provenance, all-target check, formatting and the
+filename gate pass. The released-root regression passes after the helper
+refactor. No correctness, build or lint failure remains locally.
+
+* Remote CI boundary
+
+Frozen-head run =38098338484= fails Linux's unchanged Scheme SMP gate:
+=requested=4 active=1=. Its SDK also reports =max-processors=1=.
+The published Linux archive is revision =2591dcd9=; the release inventory
+queried on 2026-10-11 contains no newer Linux SMP archive. This requires a
+qualified upstream Linux release, not relaxing the consumer assertion.
+macOS subsequently fails the same unchanged gate: =requested=3 active=1=,
+despite its newer =1cfb032c= multiple-VM release. Multiple-VM support alone
+does not admit multiple processors inside a VM. The official =gambit.h=
+default sets =___MAX_PROCESSORS= to one when no override is supplied.
+=_thread.scm= =##cvmr= delegates to the SDK's =##current-vm-resize=;
+neither adding Rust callers nor retrying encoding changes that SDK capacity.
+Local encoding measurements
+do not qualify either remote job; follow exact-head CI after any push.

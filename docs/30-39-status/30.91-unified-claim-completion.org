@@ -1,0 +1,231 @@
+#+TITLE: Unified claim progress and native completion observation
+#+STARTUP: overview
+
+* Existing boundaries and the new protocol
+
+The rejected completion-only experiment removes an observable claim event and
+changes receiver scheduling. Fewer events do not establish lower latency or
+better owner fairness. Reuse the existing bounded unassigned queue, placement
+channel, final result channel, pending-input cancellation guard and fixed native
+owners. No new scheduler, coordinator task, execution lease or queue is added.
+
+=SchemeShortPool::submit_progress= returns =ProgressSchemeTicket= after bounded
+Rust queue publication. It does not promise that an owner is selected. A running
+owner still acquires all native/active/work credits at actual claim, with the
+original affinity and capacity checks. The ticket uses a single observer for
+claim and final-result events. =submit= and =submit_queued= keep their existing
+contracts; all defaults remain unchanged.
+
+One poll first checks the final receiver. If ready, it returns that typed value
+without requiring a placement observation. Otherwise it polls the placement
+receiver with the same task waker. A newly observed claim causes one immediate
+recheck of final readiness, closing the claim/completion race within that poll.
+If still pending, the already registered final receiver owns the next wake
+obligation. It never self-wakes to spin, adds a yield, or repeats claim checks
+once the intermediate receiver has been consumed.
+
+Claim and completion published before the next task poll can share one runnable
+opportunity. This is not a promise of exactly one waker invocation, OS wakeup
+or scheduler resumption. The actual Tokio scheduler owns that deduplication.
+Claim alone can never return a task value, acknowledge execution completion,
+or release a Scheme root/native credit. Owner refill remains independent of
+client observation, through the existing per-result service cycle.
+
+* Types, clocks and cancellation
+
+=InstanceProgressResult= retains independent task/timing results in =observed=
+and bounded =InstanceClaimProgress= metadata. Claim owner and observation time
+are optional: a ready final result can win before the claim receiver is polled.
+That observation time is a client poll timestamp, not the physical owner-claim
+timestamp or a Tokio-private runnable timestamp. =final_without_claim= records
+that particular observation path, not a count of coalesced OS notifications.
+
+The ordinary =AsyncInstanceTicket= layout and =wait_completed= remain unchanged.
+The opt-in observation implementation is shared through a monomorphized receive
+helper. Native-only callers still poll their original receiver; progress tickets
+poll the combined receive future. Bench metadata labels these intervals as
+=native-final= or =combined-claim-final=. The latter can include the one-time
+claim poll and final recheck, so it is not an isolated raw-oneshot instruction
+measurement. The planned/issued/native-ready/client-consumed partition remains
+additive and is checked per request. A timing error must never discard an
+otherwise successfully owned result.
+
+=wait_completed= specializes the combined future with claim diagnostic recording
+disabled at compile time. =wait_observed= explicitly records bounded claim
+metadata. Neither adds a per-Scheme-handler callback or changes Scheme budgets.
+Both retain the existing pending-input guard throughout the wait. Before claim,
+timeout/drop can remove only the Rust payload and return its pending slot.
+After claim, that guard is a queue no-op: native graphs, retained rollback and
+credits drain on their owner regardless of the client. Close/error uses the
+existing final channel, including when the placement sender has already failed.
+
+Queue admission retains its existing deadline, checked at the owner claim fence.
+Observation has its own finite result-wait budget. As with the explicit queued
+API, no separate timer is added solely to remove an unpolled queued receipt;
+owner inspection, observer timeout/drop or close resolves it. The original
+placement-returning API retains its prompt placement-wait deadline contract.
+
+* Joint model refinement
+
+The existing Tokio/owner/Actor/green-thread model reuses the same unassigned
+source, root/credit ownership, claim transition and final publication. It adds
+one receive-registration set and a coalesced client-wake obligation set, distinct
+from native-owner notification duties. Multiple ready events for one registered
+observer can owe one runnable opportunity. No second Tokio polling slot or
+native reservation is created. Registration checks already-visible claim/final
+state, so notification before registration cannot strand a ready result.
+
+Directed witnesses cover early claim then pending final output, both events
+ready before resumption, final ready before receiver registration, final during
+an active poll, cancellation, post-claim observer drop, owner refill before
+client consumption, lost-wake mutation and premature-success mutation. Existing
+Scheme lifecycle, continuation and ownership cases remain in the same model.
+Finite safety checks cannot prove OS fairness, p99 or unconditional liveness.
+
+* Actual native and transport checks
+
+Real oneshot/waker controls check early claim without a result, already-ready
+final output, failed claim, receiver closure and waker replacement on repoll.
+Native fixed-owner tests exercise unclaimed cancellation/expiry, claimed
+projection timeout with retained native credit, typed Scheme output, Scheme
+exception and progress-ticket close drain. Existing GC, continuations and full
+runtime tests remain enabled. Rust only dispatches across owners; complete
+Scheme execution is preserved and this work is independent of SMP.
+
+One native run exposes a separate qualification race: the prior publication
+fixture treated returned work/request quotas as proof that its stream producer
+registration had retired. The subsequent idle-only progress configuration
+correctly rejects non-idle state. The failure has no simultaneous full capacity
+snapshot, so the exact rejected capacity bit is not established. The fixture
+omitted producer retirement from its quiescence predicate and now reuses the
+existing bounded producer-retirement check before reconfiguration. The runtime
+idle check, timeout and five-second meaningful-progress watchdog are unchanged.
+This observed configuration rejection is not a watchdog attribution; preserve
+its failed binary/image/source receipt and do not infer cleanup without a receipt.
+
+* Targeted performance admission
+
+Build with the existing Cargo/Gerbil graph at
+=GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2= and run the actual Rust bench with
+=--progress-fair-ab --fixed-short-selective --claim-progress-ab=.
+The control waits for placement and then result; the candidate uses unified
+claim/final waiting. Both arms keep the same four live VMs/image, =NativeBudget=,
+=AfterRetirement=, original timers and short completion observations. Bulk input,
+window four, Tokio two workers, batch eight, work 32, Actor quantum one and five
+ordered/reversed CPU/mixed blocks remain unchanged. No matrix expansion occurs.
+
+=probe_submission_ack= distinguishes =owner-claim= from
+=bounded-queue-publication=. =probe_claim_progress= retains optional claim owner,
+client-relative observation, poll count and final-without-claim path. These are
+observations, not native execution grants. Validate all logical work, native and
+client partitions, independent result retirement and actual owner identities
+before comparing throughput, p99 and fairness. Preserve every negative window.
+This is an observed-workload comparison, not an unobserved production claim.
+Performance acceptance precedes commit/push; no default is promoted.
+
+* Historical watchdog boundary
+
+The original first-port watchdog remains UNATTRIBUTED and its original cleanup
+UNVERIFIED because a matching failed image/phase/stack is unavailable. Current
+native tests freeze binary, native image and source identity before execution.
+Neither a passing new run nor the separately identified producer-registration
+race explains that historical failure. Raw logs and host-local paths remain in
+private receipts, outside maintained documents.
+
+* Executed gates
+
+Both existing domains pass 188 directed cases in total and 400 random samples
+of up to 64 steps, seed 42. Model SHA256:
+=36faf8719278eec86c5ad646d9e49d5fbf73b40a9ebc2cd28e1b12182b19565b=.
+One failed scenario requested a new poll after an observer had already suspended
+without a new event. Its corrected witness publishes completion during the
+initial active poll. The wake guard remains intact; the failed receipt is
+retained. Channel/waker semantics and Tokio-internal cooperative-budget wakes
+remain trusted transport behavior, exercised by unit and native controls; this
+finite model is not a full simulation of Tokio internals or OS scheduling.
+
+Thirteen real transport/notification/close controls pass, including the five
+new shared-waker controls. Strict Clippy passes for actual bench/native source
+and existing model integration harness. The final native suite passes three
+cases in 29.64 seconds: four owners joined, roots zero, files removed, FD
+returned, native close 3.90 ms. The intermediate producer-registration failure
+and its pre-execution frozen identity remain recorded; its cleanup is not
+inferred from the later pass. Final O2 release bench builds through the standard
+graph. No timeout or production default is changed.
+
+Exact remote PR18 head =c4b95dfaa116bd67b110d94826535fd27f227b85= has six
+effective successful CI checks. This is a remote-head fact, not attestation of
+the local unpushed candidate. The SDK-unavailable SMP check is unrelated to this
+fixed-owner Scheme VM claim.
+
+
+* Executed A/B: performance rejected
+
+The first capture completes with correct native work and cleanup, but compiler
+processes are present at its final boundary. It is ENVIRONMENT_NOT_QUALIFIED,
+not a performance acceptance. Preserve all 40 windows: total-work/time throughput
+changes CPU -6.61%, mixed +9.00%; pooled native short p99 -59.85%/+0.57%;
+maximum owner completion spread +134.17%/+119.91%; client total p99
+-53.41%/-38.08%. Those positive and negative diagnostics remain excluded from
+qualified performance claims.
+
+Exactly one environmental replacement uses the identical frozen binary and
+release native image. Its initial and final compiler checks are empty; this is
+boundary qualification, not proof of continuous host isolation. No other task
+is paused. All 40 windows complete in 6.389 seconds with unchanged source/image,
+no stderr, unchanged watchdog/controller limits and correct workload/clock
+partitions. Four owners join, native roots are zero, files are removed and
+service quiesces. No further unchanged-candidate capture is performed.
+
+| Measure, candidate relative to control | CPU | Mixed |
+|----------------------------------------+-----+-------|
+| Total work / sum of window elapsed time | +8.55% | +13.40% |
+| Paired throughput change, median | -0.003% | +0.67% |
+| Emitted median-window throughput | +1.00% | -0.39% |
+| Pooled native short p99 | -7.00% | +0.53% |
+| Pooled client total p99 | -47.60% | +28.59% |
+| Pooled bulk p99 | -32.92% | -69.40% |
+| Maximum owner completion spread | +6.82% | -21.08% |
+
+These are different estimands: total-work/time gains do not mean that a typical
+paired window improves by that amount. Throughput improves in only five of ten
+pairs for each load; mixed paired changes span -3.42% to +130.49%. Paired mixed
+native short p99 worsens by a median 4.75% (only four pairs improve). Paired
+owner spread improves by 15.48% CPU and 12.80% mixed (seven pairs each), but CPU
+maximum spread still increases from 0.428 to 0.457 ms. Mixed maximum spread falls
+from 1.773 to 1.399 ms. Mixed client total p99 rises from 2.364 to 3.040 ms even
+though native short p99 is nearly unchanged, 0.480 to 0.483 ms. This candidate
+is REJECTED_PERFORMANCE; no commit, push or default change is permitted.
+
+* Attribution from the same capture and remaining boundary
+
+Of 640 candidate short requests per load, claim is observed before native-ready
+for 630 CPU and 605 mixed requests. Final readiness bypasses the intermediate
+claim observation for ten CPU and 35 mixed requests. These path counts prove
+that early observation remains possible; they do not count actual Tokio wakes.
+All candidate requests initially suspend on the final receiver, while 35 CPU
+and eleven mixed control requests find it immediately ready after placement.
+Unified observation preserves a useful event but does not preserve the old
+receiver scheduling history.
+
+Mixed send duration p99 changes only from 5.791 to 6.375 microseconds. The
+send-end to ready-poll-start lower-bound p99 increases from 149.250 to 336.542
+microseconds; corresponding send-start upper bounds are 149.458 and 340.000
+microseconds. Client-delivery p99 rises from 151.416 to 341.167 microseconds.
+These intervals include transport and scheduler effects; they cannot distinguish
+OS runnable wait from blocking and cannot establish GC CPU cost. The ten largest
+candidate mixed client-total requests spend 81.95% of their summed elapsed time
+in serial probe backlog and 9.93% in post-native delivery. These are sums over
+those same tail requests, not a decomposition obtained by adding unrelated
+percentiles. A late consumer also delays the next serial issue.
+
+The native pending interval remains distinct from client consumption. Coalescing
+claim and result readiness in one client observer is correct, but does not grant
+an owner a bounded refill opportunity or ensure the client is promptly polled.
+The next architectural boundary is the interaction between independent
+capacity/owner-refill notifications and client runnable opportunities. Any
+further protocol must preserve early claim observation and independently owed
+native-owner opportunity, and use the existing joint state rather than treating
+client consumption as native completion. The present data does not identify an
+OS cause or justify another notification deletion, threshold change or favorable
+repeat. The current observed-workload experiment is not production acceptance.

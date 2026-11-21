@@ -1,0 +1,157 @@
+#+title: Retirement-bounded refill and owner completion fairness
+#+options: toc:nil num:nil
+
+* Evidence and causal boundary
+
+Report 30.54 improves short placement but leaves CPU completion p99 and bulk
+owner finish spread worse. These are distinct fairness questions: waking an
+eligible short claimant does not balance already accepted bulk work or remove
+native execution/GC and OS variability. No repeated profiler capture or wider
+thread matrix is required to inspect the next protocol boundary.
+
+The owner pump currently advances Scheme, projects its completion snapshot,
+releases each job's native/root/active credits, then performs one producer step.
+A later iteration advances Scheme again before the next producer step. Thus
+multiple newly available slots are replenished across separate advance turns.
+This is a concrete supply/retirement ordering, not proof that it caused every
+historical long tail. Pending wall spans include execution, native waits and
+host scheduling; they are not isolated CPU or GC measurements.
+
+* Ownership and algorithm
+
+The explicit =RetirementRefill= policy keeps the existing registered owner,
+FIFO source, lifecycle fences and native work/slot/active guards. Defaults stay
+=Queued=, and existing =OwnerLocal= behavior is retained.
+
+1. Advance once and copy the finite completion-ID snapshot. Results remain
+   rooted in the Scheme job table until their own projection takes them.
+2. Project all IDs. Publish each result's returned credits immediately, before
+   the next arbitrary callback. Never defer notifications across projectors.
+3. Attempt at most =min(retired_count, registered_active_limit)= publications.
+   Prefer an eligible shared short request; otherwise use the existing producer.
+   Stop on unavailable capacity or no committed progress. Genuine acquisition
+   waits retain their existing FIFO future. Do not spin or enter a native wait.
+4. Return to the ordinary owner loop. Scheme chooses execution, green-thread
+   turns and class budgets. Accepted Scheme state never moves across owners.
+
+This separates retirement fairness from supply work conservation. New type
+construction cannot delay an already copied ready result's projection within
+that snapshot. Short priority has a finite publication budget; ordinary loop
+turns still feed bulk. This is not hard time isolation from arbitrary user
+callbacks, non-yielding Scheme code, GC or OS scheduling. Faster owners may claim
+more stateless work; equal assignment would not itself prove equal finish time.
+
+* Rejected interleaved candidate
+
+The first candidate attempted one publication immediately after each result's
+projection and release, before projecting the next ready ID. Existing credits
+and roots remained safe, but it introduced new constructors on the critical path
+of already completed results. Its frozen capture =service-retirement-refill=
+completed all 40 samples with four clean joins, zero roots and removed image files.
+
+| Workload | Metric | Control | Interleaved | Change |
+|----------+--------+---------+-------------+--------|
+| CPU | Orders/s | 420,682 | 432,425 | +2.79% |
+| CPU | Native-completion short p99, ms | 0.370250 | 0.399375 | +7.87% |
+| CPU | Maximum owner finish spread, ms | 0.353417 | 0.408792 | +15.67% |
+| Mixed | Orders/s | 67,659 | 66,667 | -1.47% |
+| Mixed | Native-completion short p99, ms | 0.462833 | 0.455625 | -1.56% |
+| Mixed | Maximum owner finish spread, ms | 1.300250 | 1.623042 | +24.83% |
+
+CPU scheduled-probe p99 was 2.077459 / 2.201708 ms; mixed was 1.885958 /
+1.910292 ms. The native-completion clock precedes caller resumption and must not
+be called complete caller response latency. This capture rejects general
+promotion of interleaved refill; it does not isolate an OS or GC cause.
+
+* Verification boundary
+
+The existing model is extended with deterministic ordering scenarios, rather
+than a second scheduling model. They conserve roots and capacity across refill,
+exceptions and close; model safety does not admit native correctness or speed.
+The native service contract runs the new mode alongside both existing policies,
+including heterogeneous charges, construct/project panics, Scheme exceptions,
+registration cancellation/timeout, accepted-work drain and resource retirement.
+
+Raw captures, frozen sources and binaries stay outside Git. Source identity uses
+whole-file SHA-256 in private manifests; no generated comment hash is added.
+All comparisons use one local shared host with other tasks untouched, no profiler
+or diagnostic counter polling during timing, and the unchanged five-second native
+progress watchdog. No quiet-host, default promotion or general latency guarantee
+is claimed.
+
+* Snapshot-first candidate: measured result
+
+Capture =service-retirement-snapshot-refill= uses the final ordering above. It
+completes 40 samples, stable VM identities, four joined owners, zero external
+roots, quiescent Scheme services and removed copied image files. Both arms use
+selective short wake; only =OwnerLocal= versus =RetirementRefill= differs.
+
+| Workload | Metric | Control | Snapshot-first | Change |
+|----------+--------+---------+----------------+--------|
+| CPU | Orders/s | 369708.457442 | 359873.048105 | -2.66% |
+| CPU | Bulk service p99, ms | 0.721167 | 0.899209 | +24.69% |
+| CPU | Native-completion short p99, ms | 0.354417 | 0.462250 | +30.43% |
+| CPU | Maximum owner finish spread, ms | 0.621250 | 0.469542 | -24.42% |
+| Mixed | Orders/s | 67098.843723 | 65563.121103 | -2.29% |
+| Mixed | Bulk service p99, ms | 1.846375 | 1.842208 | -0.23% |
+| Mixed | Native-completion short p99, ms | 0.492375 | 0.513042 | +4.20% |
+| Mixed | Maximum owner finish spread, ms | 1.405875 | 1.506209 | +7.14% |
+
+CPU scheduled-probe p99 is 2.071000 / 2.186000 ms; mixed is 2.043792 /
+1.957958 ms. CPU minimum owner progress is 98.6842% / 98.6425%; mixed is
+98.7952% / 98.8142%. These measures do not establish uniform fairness improvement.
+Both candidates fail the combined throughput/tail objective. The final policy
+remains explicitly experimental and is not recommended as a performance default.
+The negative capture remains reproducible through the Rust bench; no additional
+parameter search or unchanged recapture is used to obtain a favorable result.
+
+The final binary SHA-256 is
+=fab26503b32c0e485697ddd82428a1d51aa7bd696e03e8d60fe8c2108320f187=.
+The rejected interleaved binary is
+=2d96c460e24c8d95d486dd8a449c18f0f79f62618006b3c7c88a4841d4d5cbe4=.
+Both use native image SHA-256
+=0e79bb79f9686fc36e13e1be76deda04ae1877e370a081a096f32a61e53c3d16=.
+The private frozen manifests contain complete source hashes and relative image
+identities, not hashes embedded into generated source comments.
+
+* What this changes in the optimization plan
+
+The result rejects replenishment order alone as a sufficient fix for this load.
+It does not establish that every observed regression originates in that order,
+nor that all OS/GC costs have been identified. Keep these boundaries separate:
+
+| Boundary | Current contract | Remaining algorithm gap |
+|----------+------------------+-------------------------|
+| Short claim | Eligible FIFO wake duties, actual owner selected at credit acquisition | Fair wake duties do not balance accepted bulk service |
+| Bulk supply | FIFO uncommitted source, native active limit, progress-driven owner claims | Fixed active count does not represent residual Scheme service or final-wave imbalance |
+| Retirement | Native roots and credits retained through each projector | New constructors must not be hidden inside the retirement path of other ready results |
+| Scheme scheduling | Cooperative class budget and native Actor/green-thread execution | Declared work units alone are not a wall-time guarantee for arbitrary handlers |
+
+The next protocol should use Scheme-owned progress to account for residual
+service per owner, rather than treating three accepted callbacks as equal work.
+Any progress receipt should travel with existing native turn/completion metadata;
+periodic diagnostic polling would introduce a new scheduling intervention. Rust
+can use this receipt to choose a destination for uncommitted stateless messages;
+it must not schedule Scheme continuations or move accepted native graphs.
+
+A candidate must specify: when residual work is charged and decremented, how
+short publication limits bound work ahead, what happens near the final bulk wave,
+and how an unavailable owner relinquishes a claim opportunity. Do not reserve
+native capacity for a sleeping owner or impose a global finish barrier just to
+equalize counts. Stateful Actor affinity remains fixed. Reuse =claimPool=,
+=complete= and capacity conservation in the existing model; add only the missing
+progress/accounting state if that protocol is implemented. These are the next
+design obligations, not claims that progress-aware fairness has been delivered.
+
+* Local gates and predecessor CI
+
+The final snapshot-first ordering passes warnings-denied focused Clippy and all
+three native Scheme service tests (10.11 s). Credit/wake unit coverage passed
+28 tests; all four new deterministic model/domain combinations passed. The
+aggregate model gate discovers the new scenarios; unchanged randomized controls
+were not rerun locally solely to duplicate earlier evidence.
+
+Predecessor =9455ac5ca4e4f7c1c9b4d97aa003c472eca89cb1= CI run
+=39778525998= completed successfully: six supported jobs passed, the unsupported
+SMP lane was explicitly skipped. New-commit CI is independent and must be checked
+after publication. Scheme retains the full native execution boundary throughout.

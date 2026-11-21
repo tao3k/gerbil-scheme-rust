@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-29",
+  "scope": "Restored-source wait coverage audit and cold report interpretation; no native performance experiment",
+  "baseline": {
+    "revision": "6d4ec27ccf166b89279999cce66e33ce1e34c643",
+    "remote_branch": "research/single-vm-service-cost",
+    "historical_p99_ns": 317000,
+    "historical_outstanding_peak": 351,
+    "guard": 128,
+    "performance_admitted": false
+  },
+  "custody": {
+    "remote_revision_verified": true,
+    "source_checkout_restored": true,
+    "previous_temporary_checkout_available": false,
+    "previous_uncommitted_observation_source_recovered": false,
+    "previous_frozen_diagnostic_binary_available": false,
+    "previous_frozen_diagnostic_image_available": false,
+    "previous_raw_logs_available": false,
+    "reconstructed_from_conversation": false,
+    "primary_dirty_checkout_modified": false
+  },
+  "sdk_authority": {
+    "source_revision": "1cfb032c7a1612637da6205f5f8a15683eba3ba0",
+    "gambit_base": "ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f",
+    "patchset_sha": "618d76f9eb725e27ce13194514ce5b8ca5489038",
+    "build_receipt_sha256": "8147a073dc9d4ba27df3589a45a7f9e70683e4b1fdce6c79d6526c6eafcaa910",
+    "base_source_is_complete_patchset": false,
+    "archive_sha256": "a416eff818d9a0deac88c6037bbcb839ba35fe28c31ee262b700940314483874",
+    "bounded_undefined_symbol_query": {
+      "member": "os_io.o",
+      "found": [
+        "_select"
+      ],
+      "not_found": [
+        "_poll",
+        "_ppoll",
+        "_nanosleep",
+        "_pthread_cond_wait",
+        "_pthread_cond_timedwait"
+      ],
+      "is_runtime_trace": false,
+      "proves_frozen_image_binding": false,
+      "proves_all_wait_coverage": false
+    }
+  },
+  "upstream_read_only_sources": {
+    "revision": "ea114fc3d2f120abbe20393c1f9aeafdd3f8c89f",
+    "files": {
+      "lib/_thread.scm": "810f58f679d745826dd18f81f39c84dc3c6e4bb3dd7c6f505a453ca5331e4515",
+      "lib/os_io.c": "c0e7dc077c7dd6b6a2ee39028506c8a6d5313d29f881bda22d056cd6fce7d93f"
+    },
+    "sdk_or_gambit_modified": false
+  },
+  "unchanged_runtime_source_sha256": {
+    "crates/gerbil-scheme-qualification/ffi/owner_wait.h": "1791a51e62c3564be8d5a7e4e39f8c705d83c56079ff6851d02a2a44eeb008dd",
+    "crates/gerbil-scheme-qualification/scheme/instance-owner-watch.ss": "254fd45205e8aa4ad6540a42d5baeeb5c5dd5afa725eec34a2f80a6cd047849c",
+    "crates/gerbil-scheme-qualification/scheme/instance-mailbox-backpressure.ss": "d02c136d74f02fa8cd3b30538ded6c33b38e744faea4291721bc2df4476da3fd",
+    "crates/gerbil-scheme-qualification/build/instances.rs": "1838c683d41d53f6b4e3d2ddbfb8403204865fbf27a6d990286a8d98c3f672fe"
+  },
+  "analysis_source_sha256": {
+    "crates/gerbil-scheme-qualification/Cargo.toml": "e7c8336a0ac14e717ded32ed4db37d3b8652d22e7e745524d9672235ba0f7042",
+    "crates/gerbil-scheme-qualification/benches/gerbil_actor_arrival.rs": "7ebc4c917960db962c63c9c0fb365a1e9150659407adcb8da336ede93e6f39ab",
+    "crates/gerbil-scheme-qualification/benches/gerbil_actor_arrival/wait_evidence.rs": "85f6de434e73a9dbb8b8891ec2b475ab8786d5c02d1a418263d079ff41e011e8",
+    "crates/gerbil-scheme-qualification/tests/owner_wait_evidence.rs": "1a2b4d560f96d2f00973cd95920c71d6136a408ca3e8bf247058792d339324e9",
+    "specs/scheduling/native_owner_watch.qnt": "89018249f32f51cd3ad4a5eb087049a97f89efafb587637dfff1a9400f57ed54",
+    "specs/scheduling/owner_wait_coverage.md": "6b1614c37b98558f01b464d718a33db24bd094f64a756c3f43e0a2f9aa3f2bd5"
+  },
+  "implementation": {
+    "path": "existing Gerbil Actor arrival bench, after native return",
+    "same_closed_owner_report": true,
+    "new_field": "wait_evidence",
+    "raw_fields_retained": true,
+    "invalid_or_missing_input": "null",
+    "kernel_blocked_ns": null,
+    "os_scheduling_wait_ns": null,
+    "native_clock_reads_added": 0,
+    "native_notifications_added": 0,
+    "native_calls_added": 0,
+    "does_not_enable_remote_sampler": true,
+    "production_api_changed": false
+  },
+  "validation": {
+    "qnt": {
+      "typecheck_passed": true,
+      "module": "owner_wait_coverage",
+      "backend": "typescript",
+      "seed": 1,
+      "new_directed_cases": 10,
+      "inherited_cases": 7,
+      "passed": 17
+    },
+    "rust": {
+      "command": "cargo test --offline -p gerbil-scheme-qualification --no-default-features --test owner_wait_evidence",
+      "passed": 8,
+      "vm_initialized": false,
+      "strict_clippy_passed": true,
+      "format_passed": true
+    },
+    "feature_enabled_bench_executable_built": false,
+    "native_image_built": false,
+    "load_runs": 0
+  },
+  "retained_validation_failures": [
+    {
+      "stage": "QNT parsing",
+      "cause": "enabled is a reserved builtin name",
+      "correction": "parameter renamed recording"
+    },
+    {
+      "stage": "first Cargo invocation",
+      "cause": "manifest was read before serde_json test dependency was added; compilation observed the later report source",
+      "correction": "final invocation used updated manifest and passed all eight tests"
+    }
+  ],
+  "interpretation": {
+    "green_receive_is_not_os_owner_block": true,
+    "wrapper_span_is_not_exact_kernel_blocked_time": true,
+    "no_select_record_is_not_all_wait_coverage": true,
+    "missing_capture_is_not_zero_delay": true,
+    "unconditional_native_liveness_proven": false
+  },
+  "next_contract": {
+    "question": "Does the same verified-progress gap overlap a completed native wait envelope in the same owner generation and arm?",
+    "required": [
+      "verified image binding",
+      "closed generation-scoped capture",
+      "owner-local entry/exit pairing",
+      "bounded retention with explicit loss",
+      "original timeout, errno and readiness preservation",
+      "same-gap CPU and overlap bounds"
+    ],
+    "implemented_native_capture": false
+  },
+  "boundaries": {
+    "defaults_changed": false,
+    "wait_protocol_changed": false,
+    "frame_return_order_changed": false,
+    "queue_capacity_changed": false,
+    "rust_scheduling_integration": false,
+    "scheme_capabilities_reduced": false,
+    "performance_accepted": false,
+    "committed": false,
+    "pushed": false,
+    "pr_18_merged": false
+  }
+}

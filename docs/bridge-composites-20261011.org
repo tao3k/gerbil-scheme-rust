@@ -1,0 +1,193 @@
+#+title: Exact numeric and strong-table bulk ownership qualification
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Scope
+
+Parent baseline: =4d71a126bfbce7c0ce5d4d840fb96a5be73d653d=.
+The admitted UTF-8 encoder is unchanged. Generated SCM includes the new
+composite module through the existing canonical build owner and fingerprint.
+No kernel/installed SDK changes, independent-VM/SMP admission, Org parsing
+qualification or unconditional scheduler improvement are claimed.
+
+* Library protocol, not benchmark-only support
+
+=number_batch= takes a whole span of rooted component pairs. Scheme uses
+official =/= or =make-rectangular=; rational construction requires exact
+integers and nonzero denominators. Reduction, sign normalization, exactness
+and real/complex collapse remain Scheme semantics. No text or f64 coercion
+implements the number tower. Both batch construction and snapshot use one
+whole-span foreign entry, not per-component Rust FFI.
+
+=copy_number_components= retains alternating numerator/denominator or
+real/imaginary references in one strong vector snapshot. It selects official
+accessors once, writes directly into the destination vector, and avoids one
+temporary two-element vector per input number. Exact bignums and rationals
+remain Scheme objects and can use existing canonical binary integer APIs.
+These references are NOT detached Rust integers or recursively serialized
+values. Borrowed parts cannot outlive the snapshot; strongly rooted
+=root_element= can survive snapshot release within the runtime lifetime.
+
+=hash_table= constructs strong Gambit tables using explicit =eq?=, =eqv?=
+or =equal?=. Duplicate keys follow that equality and last value wins.
+Weak keys/values are deliberately excluded from this ownership protocol.
+=copy_table_entries= preallocates one vector and uses official
+=table-for-each proc table=, whose callback takes key and value. It does not
+materialize an alist or sort the table. Ordering is unspecified; snapshots
+are shallow and preserve identity and nested reachability, not deep-copy
+semantics. This does not claim all Gerbil HashTable implementations or
+arbitrary downstream POO objects have a serialized Rust representation.
+
+Installed official source: =src/gerbil/runtime/hash.ss:75-76= delegates
+Gambit table traversal to =table-for-each proc table=.
+=src/gerbil/runtime/c3.ss:79-83= uses the three equality choices with
+=make-table=. The existing registry uses the same official strong table
+contract. Native SDK execution separately confirmed rational reduction,
+complex components and callback arity.
+
+Snapshot output is replaced only after a positive root, checked length
+and complete even component count. Errors preserve the prior root. The
+owner-local raw ABI requires valid readable root-ID spans and writable
+metadata; it never retains Rust pointers. Positive tokens, not Scheme
+word zero, identify registry roots. One output root retains all components
+after releasing the source and forcing GC. Rust handles remain non-Send
+and bounded by the runtime lifetime.
+
+* Complete matched conversion matrix
+
+Three families, loads 1,000/10,000/100,000, 20 batches per variant, ten ABBA
+groups: 360 batches, 13,320,000 requests, eight objects or entries/request.
+Five changing rows rotate each request. Numerical fixtures use exact
+fixnum components; inexact and arbitrary-precision correctness is tested
+separately, not inferred as their performance from these fixtures.
+
+Both variants snapshot the SAME complete source first and validate the
+same 16 fields, with no per-request Rust validation allocation. Control
+then independently roots each field using the public element-root API;
+bulk borrows the single rooted snapshot. This measures avoiding repeated
+root registration/release, not an old rational/table implementation that
+did not exist. Constructor setup and root-pair Vec allocations are outside
+timing. Therefore these numbers do not qualify fresh-table construction or
+a detached Rust serialization workload.
+
+All nine gates passed total wall, pooled individual-request P95 and P99.
+Exact nearest-rank percentiles pool all requests across 20 batches; timer
+and scalar validation calls are included. They are not percentiles of
+20 batch means, nor queue/response latency.
+
+| Family | Requests/batch | Mean wall control / bulk (ms) | P95 control / bulk (µs) | P99 control / bulk (µs) | Throughput control / bulk (requests/s) |
+|---+---+---+---+---+---|
+| rational8 | 1000 | 8.879373 / 2.806983 | 10.958 / 2.667 | 13.875 / 3.584 | 112620.566 / 356254.365 |
+| rational8 | 10000 | 89.431529 / 28.189577 | 11.000 / 2.666 | 16.958 / 4.583 | 111817.388 / 354741.045 |
+| rational8 | 100000 | 900.846060 / 286.653267 | 11.000 / 2.667 | 16.584 / 4.625 | 111006.757 / 348853.516 |
+| complex8 | 1000 | 9.166325 / 2.743617 | 11.709 / 2.750 | 17.042 / 4.625 | 109094.975 / 364482.394 |
+| complex8 | 10000 | 92.367223 / 28.016012 | 11.625 / 2.667 | 17.375 / 4.541 | 108263.513 / 356938.734 |
+| complex8 | 100000 | 1134.205902 / 317.618517 | 12.667 / 2.750 | 21.958 / 4.708 | 88167.413 / 314843.105 |
+| table8 | 1000 | 9.103325 / 2.698231 | 11.416 / 2.667 | 15.125 / 3.708 | 109849.974 / 370613.156 |
+| table8 | 10000 | 94.050337 / 28.319367 | 12.000 / 2.833 | 20.000 / 4.750 | 106326.041 / 353115.242 |
+| table8 | 100000 | 934.893840 / 279.999561 | 11.750 / 2.709 | 18.041 / 4.542 | 106964.016 / 357143.418 |
+
+On this host, control reserves 176 Rust bytes: 24-byte snapshot descriptor,
+24-byte Vec header and 128 bytes of independent element owners. Bulk
+retains one 24-byte descriptor. Scheme heap and registry storage are NOT
+zero and are not included in these Rust capacity figures. Construction
+uses a temporary 128-byte root-ID span for eight pairs, before allocator
+headers, on both public constructor paths; this cost is not hidden in
+the timed copy result.
+
+Observer capacities total 328,000 / 3,280,000 / 32,800,000 bytes for the
+three loads, identical per variant. Raw receipts report GC count/CPU/wall,
+process CPU, context switches, Scheme heap capacity and shared peak RSS.
+Shared RSS is not isolated per-mode memory. GC reductions alone are not
+a wall-time admission criterion; all wall/tail gates must also pass.
+
+Raw receipt: =20261011-composites-abba.log= (local diagnostic archive).
+Final native contracts are part of the final workspace receipt below.
+
+* Scheduling and final qualification
+
+A separate candidate reserves one CPU budget for the synchronous owner
+using =max(1, available_parallelism - 1)= Tokio workers. It is explicitly a
+testable policy, not official proof of an optimum. Official Tokio 1.53.1
+=runtime/builder.rs:477-519= documents that worker count defaults to available
+cores and is configurable. Remote injection and lock paths are unchanged;
+this candidate tests competition/runnable delays without replacing channels
+or claiming measured mutex duration. Admission capacity and closed-loop
+callers remain matched, with one Scheme owner and no parsing parallelism.
+The complete seven-corpus matrix ran 840 batches, 31,080,000 requests and
+20 batches per variant/load, with matched admission capacity and callers.
+It failed 121 of 189 paired-median metric gates. The candidate is rejected;
+the scheduling source is restored exactly to the parent. A zero diagnostic
+exit means completion, not acceptance; =candidate_all_gates_pass=false=.
+
+| Corpus | Requests/batch | Mean wall default / candidate (ms) | End-to-end P95 default / candidate (µs) | End-to-end P99 default / candidate (µs) | Throughput default / candidate (requests/s) |
+|---+---+---+---+---+---|
+| mixed | 1000 | 7.067 / 8.475 | 260.042 / 305.167 | 378.125 / 1316.334 | 141492.499 / 117993.492 |
+| mixed | 10000 | 77.191 / 69.490 | 334.583 / 270.417 | 718.458 / 434.917 | 129548.100 / 143906.357 |
+| mixed | 100000 | 689.657 / 725.983 | 275.333 / 290.292 | 397.417 / 478.167 | 144999.674 / 137744.361 |
+| ascii | 1000 | 3.053 / 2.916 | 113.625 / 109.417 | 232.750 / 221.541 | 327549.352 / 342961.744 |
+| ascii | 10000 | 39.156 / 40.097 | 209.375 / 197.292 | 434.541 / 442.166 | 255386.826 / 249397.808 |
+| ascii | 100000 | 354.854 / 371.227 | 164.667 / 174.791 | 297.458 / 360.791 | 281806.273 / 269376.937 |
+| two-byte | 1000 | 5.352 / 5.435 | 159.166 / 164.916 | 287.542 / 300.667 | 186855.640 / 183989.043 |
+| two-byte | 10000 | 58.840 / 59.243 | 228.959 / 224.125 | 318.708 / 321.375 | 169953.148 / 168796.717 |
+| two-byte | 100000 | 648.939 / 613.901 | 244.208 / 226.000 | 424.250 / 359.166 | 154097.616 / 162892.831 |
+| bmp | 1000 | 6.508 / 6.915 | 219.500 / 235.584 | 407.625 / 430.958 | 153668.546 / 144604.315 |
+| bmp | 10000 | 62.588 / 66.704 | 218.000 / 265.084 | 363.583 / 401.750 | 159776.116 / 149915.350 |
+| bmp | 100000 | 653.460 / 701.184 | 278.500 / 296.375 | 427.958 / 548.375 | 153031.592 / 142615.956 |
+| supplementary | 1000 | 7.675 / 7.872 | 315.875 / 316.708 | 396.667 / 398.541 | 130294.149 / 127035.346 |
+| supplementary | 10000 | 76.270 / 71.453 | 314.583 / 268.250 | 441.375 / 379.250 | 131112.839 / 139951.141 |
+| supplementary | 100000 | 884.642 / 915.242 | 351.167 / 360.417 | 777.375 / 813.542 | 113040.082 / 109260.726 |
+| ascii-wide-prefix | 1000 | 3.453 / 3.366 | 121.458 / 117.375 | 234.958 / 235.166 | 289624.217 / 297068.322 |
+| ascii-wide-prefix | 10000 | 69.709 / 70.290 | 383.083 / 352.334 | 1344.333 / 1444.791 | 143454.216 / 142268.224 |
+| ascii-wide-prefix | 100000 | 501.851 / 466.998 | 216.500 / 202.959 | 538.333 / 413.916 | 199262.312 / 214133.478 |
+| wide-ascii-prefix | 1000 | 7.818 / 7.906 | 251.958 / 241.750 | 379.500 / 383.084 | 127903.545 / 126487.680 |
+| wide-ascii-prefix | 10000 | 104.291 / 102.510 | 390.250 / 356.292 | 1132.417 / 1024.125 | 95885.727 / 97551.790 |
+| wide-ascii-prefix | 100000 | 943.636 / 1108.944 | 374.250 / 442.333 | 722.917 / 1168.792 | 105973.058 / 90175.918 |
+
+Both runtimes coexist; the host uses 12 versus 11 Tokio workers, with
+24 closed-loop callers, capacity 12 and one shared Scheme owner. Rust queue
+concurrency is not Scheme parsing parallelism. The 16-u64 observation rows
+retain 2,560,000 / 25,600,000 / 256,000,000 bytes per variant at the three loads.
+At 100,000 requests, the two variants retain 512 MB decimal before scratch.
+Shared peak RSS is about 634.5 MB, not isolated per-variant memory. This
+method tests worker scheduling, not a lower deployment-memory guarantee.
+
+Per-service CPU/GC wake observers were disabled identically. Zero fields
+therefore mean not collected, not zero owner CPU/GC. Process CPU, handoff,
+parks, context-switch and high-water RSS counters remain in the raw log.
+Wake-to-resume duration still combines synchronization, injection and
+runnable delay; no exact mutex-wait duration is inferred from it.
+
+At wide-ascii-prefix/100,000, candidate mean wall grew from 943.636 to
+1,108.944 ms, pooled response P99 from 722.917 to 1,168.792 µs, and throughput
+fell from 105,973 to 90,176 requests/s. A smaller worker pool did not give a
+uniformly better owner/response scheduling balance. Default Tokio policy
+remains intact; no admitted scheduling speedup is claimed.
+
+Raw result: =20261011-owner-budget-abba.log= (local diagnostic archive).
+Rejected reproducibility patch:
+=20261011-owner-budget-rejected.patch= (local diagnostic archive).
+
+* Final verification
+
+Final workspace: 659 passed, zero failed, eight existing ignored.
+Workspace and Actor/AOT clippy passed with warnings denied after rollback.
+Compile-fail lifetime/non-Send diagnostics are expected test successes,
+not failed runtime tests. SMP remains explicitly skipped/unqualified.
+
+Native correctness includes exact big components, fractional components of
+complex numbers, IEEE special values, zero/false table keys, key equality,
+duplicate overwrite, parent/snapshot release followed by GC, unsupported
+types and failure-preserving output. Independent element roots remain alive
+after clearing their snapshot, without extending the runtime lifetime.
+AST mutation controls reject foreign calls in explicit and iterator loops
+and scalar replacement of the composite snapshot entry.
+
+Final workspace:
+=20261011-composites-final-workspace.log= (local diagnostic archive).
+Workspace lint:
+=20261011-composites-final-lint.log= (local diagnostic archive).
+Actor/AOT lint after scheduler rollback:
+=20261011-composites-final-actor-lint.log= (local diagnostic archive).

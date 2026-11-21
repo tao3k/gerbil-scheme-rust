@@ -1,0 +1,209 @@
+#+title: Signed vectors and identifier ownership qualification
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Scope and baseline
+
+Parent commit: =0a034f0958c4bc839f10c5ee123d9889958a7afa=.
+The admitted =scheme/utf8.ss= encoder is unchanged. Generated SCM is
+regenerated through the existing build owner; byte identity is not claimed.
+This is bridge conversion qualification, not Org parsing performance,
+Scheme parsing parallelism, or SMP admission. No kernel or installed SDK
+changes are included.
+
+* Official-source implementation and ownership
+
+Signed =s8/s16/s32/s64vector= use the existing sealed native-element
+whole-span protocol with the official Gambit representation macros.
+Negative values are not converted through unsigned arithmetic or text.
+Rust initializes staging, validates type and extent, and publishes only
+after successful whole-copy. Old output remains usable on errors.
+
+Identifier packets use the installed Gerbil runtime exports
+=string->symbol=, =string->keyword=, =string->uninterned-symbol=,
+=symbol->string= and =keyword->string=. The last constructor is important:
+=make-symbol= is not used to infer fresh identity. Name equality is not
+Scheme identity. An owner-bound =is_identical= operation delegates to
+official =eq?=, including references into rooted snapshots.
+
+A private strongly rooted packet holds a complete set of name snapshots,
+family tags and a conservative four-byte-per-character capacity bound.
+One bulk transfer encodes all selected names into caller-owned storage.
+There is no per-name Rust-to-Scheme entry, retained Scheme heap pointer,
+JSON conversion, or stable-text cache. Changing rows are encoded on every
+request. The existing SIMD UTF-8 validator admits the combined Rust String;
+offsets and tags are validated before replacing published output.
+Names remain owned and usable after source/packet release and Scheme GC.
+Identity remains in rooted Scheme objects, never in copied spellings.
+
+There are two preparation/transfer entries per complete name packet, plus
+its one root release. The eight-single-name control performs each sequence
+eight times. At source level, a vector input creates three packet containers
+(names vector, tag bytevector, packet vector); the eight single-name calls
+create those three plus a wrapping vector each time: 32 containers versus
+three. Both still perform eight official name conversions and encode all
+eight names. This explains the eliminated entry/registry/container work,
+not measured allocator bytes or a causal GC duration. No forced GC or
+capacity shrink is added to the timed path.
+
+The capacity bound intentionally avoids a second encoding/counting pass.
+It can reserve more than the resulting UTF-8 byte length. Both published
+and staging capacity are reported, not hidden by shrinking after timing.
+ASCII eight-name control/bulk retain 2,776 / 1,264 Rust bytes; reverse-prefix
+retain 3,032 / 1,520 bytes. These include storage headers. Signed s64 spans
+retain 256 / 512 payload bytes: the bulk protocol costs one additional
+transactional span rather than pretending zero-copy ownership.
+These are explicit capacity counts, not allocator metadata or per-mode RSS.
+
+* Correctness and regression guards
+
+Signed tests exercise empty, singleton, three-element and 1,024-element
+vectors, MIN/-1/0/1/MAX, reused capacity, indexed snapshots, parent release,
+GC, and transactional failure. Identifier tests cover empty names, NUL,
+ASCII/BMP/supplementary/combining text, mixed kinds, changing shape,
+unsupported elements, root release, short capacity, wrong count and
+unchanged published output. Repeated interned symbols compare identical;
+two equally named uninterned symbols compare distinct after parent release
+and GC. The missing-root gensym sentinel must never become a legal symbol.
+
+The dev-only AST guard rejects foreign entries inside Rust element loops
+and scalar substitution. It permits owned-data validation loops.
+Uninterned construction and identity checks were added after timed matrices;
+they do not change timed copy paths and receive final correctness checks.
+Rational, complex and hash-table serialization remain explicit open
+representation/ownership work, not inferred from these results.
+
+* Complete matched matrices
+
+Each variant runs 20 batches at 1,000, 10,000 and 100,000 requests, in ten
+ABBA groups. Signed coverage: four widths, 32 changing values/request.
+Identifier coverage: four character distributions, eight changing
+names/request. Five rows rotate in each scenario. Both matrices together
+contain 960 batches and 35,520,000 requests. All 24 family/load gates
+passed total wall, pooled individual-request P95 and pooled P99.
+Timers and validation are included. P95/P99 use exact nearest rank over
+all individual requests, not over 20 batch averages.
+
+| Family | Requests/batch | Mean wall control / bulk (ms) | P95 control / bulk (ns) | P99 control / bulk (ns) | Throughput control / bulk (requests/s) |
+|---+---+---+---+---+---|
+| identifiers-ascii | 1000 | 6.074852 / 1.378627 | 5791 / 1291 | 8250 / 2000 | 164613.067 / 725359.440 |
+| identifiers-ascii | 10000 | 74.931883 / 13.804569 | 5917 / 1250 | 14250 / 2000 | 133454.540 / 724397.856 |
+| identifiers-ascii | 100000 | 660.717308 / 148.394879 | 5875 / 1292 | 13083 / 2375 | 151350.659 / 673877.701 |
+| identifiers-bmp | 1000 | 6.093254 / 1.320590 | 5792 / 1250 | 8083 / 1958 | 164115.916 / 757237.467 |
+| identifiers-bmp | 10000 | 86.770779 / 16.629723 | 10083 / 1250 | 21333 / 2000 | 115246.171 / 601332.932 |
+| identifiers-bmp | 100000 | 1484.899150 / 327.929854 | 6625 / 1625 | 29250 / 2708 | 67344.641 / 304943.264 |
+| identifiers-supplementary | 1000 | 52.838823 / 11.468065 | 11959 / 2500 | 300666 / 4417 | 18925.478 / 87198.672 |
+| identifiers-supplementary | 10000 | 274.961498 / 40.689463 | 11000 / 2417 | 172916 / 3000 | 36368.728 / 245763.875 |
+| identifiers-supplementary | 100000 | 1840.486092 / 410.591067 | 10917 / 2458 | 73750 / 3000 | 54333.472 / 243551.329 |
+| identifiers-reverse-prefix | 1000 | 6.599910 / 1.413421 | 6000 / 1292 | 13875 / 2500 | 151517.211 / 707503.360 |
+| identifiers-reverse-prefix | 10000 | 79.197138 / 14.186942 | 6000 / 1291 | 15209 / 1959 | 126267.190 / 704873.548 |
+| identifiers-reverse-prefix | 100000 | 655.316798 / 142.587142 | 5958 / 1291 | 13666 / 2333 | 152597.950 / 701325.511 |
+| s8vector32 | 1000 | 4.458544 / 0.261942 | 3375 / 250 | 4125 / 292 | 224288.480 / 3817644.849 |
+| s8vector32 | 10000 | 44.232592 / 2.792771 | 3458 / 250 | 6917 / 333 | 226077.642 / 3580673.294 |
+| s8vector32 | 100000 | 458.921375 / 29.331740 | 3417 / 250 | 6750 / 416 | 217902.250 / 3409276.147 |
+| s16vector32 | 1000 | 4.276060 / 0.266175 | 3375 / 250 | 6667 / 292 | 233860.120 / 3756927.540 |
+| s16vector32 | 10000 | 48.954502 / 2.795042 | 3416 / 250 | 6750 / 292 | 204271.304 / 3577764.281 |
+| s16vector32 | 100000 | 460.793652 / 29.244896 | 3417 / 250 | 6667 / 375 | 217016.879 / 3419400.113 |
+| s32vector32 | 1000 | 4.659542 / 0.240492 | 3459 / 250 | 6917 / 334 | 214613.381 / 4158144.204 |
+| s32vector32 | 10000 | 62.332960 / 4.436389 | 6709 / 250 | 7417 / 333 | 160428.767 / 2254085.220 |
+| s32vector32 | 100000 | 456.792264 / 42.009427 | 3459 / 292 | 6917 / 459 | 218917.893 / 2380418.079 |
+| s64vector32 | 1000 | 4.353017 / 0.252883 | 3625 / 250 | 4416 / 333 | 229725.747 / 3954390.065 |
+| s64vector32 | 10000 | 50.776125 / 3.174596 | 3625 / 250 | 6750 / 375 | 196942.953 / 3150007.268 |
+| s64vector32 | 100000 | 466.862962 / 35.768856 | 3625 / 292 | 6833 / 500 | 214195.616 / 2795728.197 |
+
+Observer capacity is 328,000 / 3,280,000 / 32,800,000 bytes per variant for
+the three loads, identically for controls and bulk variants. Shared process
+RSS and OS/GC counters are retained in raw logs; they are not attributed
+as isolated per-variant memory or causal GC speedup. Compile/setup and
+interning are outside timed copy requests. Wall/throughput therefore do
+not qualify an ingestion workload that constructs a fresh name each time.
+
+Raw signed receipt: =20261011-signed-abba.log= (local diagnostic archive).
+Raw identifier receipt: =20261011-identifiers-abba.log= (local diagnostic archive).
+
+* Scheduling experiment
+
+The separate full Tokio experiment compares default self-tuning global
+queue polling with a CPU-budget interval, using identical adaptive host
+thread counts, bounded admission and a single Scheme owner. It changes
+poll frequency, not channels, Scheme concurrency, or the kernel.
+
+Official Tokio 1.53.1 =runtime/builder.rs:1154-1189= documents the
+fairness/synchronization tradeoff and the self-tuning multithread default.
+=runtime/scheduler/multi_thread/worker.rs:1341-1368= routes external wakes
+through remote injection, while =worker.rs:1420-1427= locks shared state
+and pushes a task. A combined wake-to-resume duration does not isolate
+mutex wait. This candidate tests the scheduler polling mechanism; no
+specific lock-duration reduction is claimed.
+
+The complete seven-corpus, three-load matrix ran 840 batches, 31,080,000
+requests, with 20 batches per variant/scenario. The candidate failed
+86 of 189 paired-median metric gates. It is rejected and the scheduler
+source is restored exactly to the parent version. The benchmark's zero exit
+is diagnostic completion, NOT acceptance: its explicit completion marker
+is =candidate_all_gates_pass=false=.
+
+Both variants use 12 threads on this host (selected from machine capacity),
+24 closed-loop callers, a 12-request bounded queue and one Scheme owner.
+Both runtimes coexist and share one owner; this controls setup but is not
+a deployment-RSS comparison. Observer rows alone retain 2,560,000 /
+25,600,000 / 256,000,000 bytes PER variant across the three loads. At
+100,000 requests the two retained variants cost 512 MB decimal before
+scratch and runtime memory. Shared peak RSS reached about 634.5 MB;
+it is neither isolated candidate RSS nor production queue memory.
+CPU/GC per-service observers were disabled identically in both variants;
+their zero fields do NOT establish zero GC or zero owner CPU cost.
+
+| Corpus | Requests/batch | Mean wall default / candidate (ms) | End-to-end P95 default / candidate (µs) | End-to-end P99 default / candidate (µs) | Throughput default / candidate (requests/s) |
+|---+---+---+---+---+---|
+| mixed | 1000 | 7.794 / 7.545 | 318.625 / 319.167 | 423.500 / 479.583 | 128298.439 / 132532.398 |
+| mixed | 10000 | 66.563 / 64.398 | 227.042 / 207.208 | 357.833 / 339.125 | 150234.008 / 155285.090 |
+| mixed | 100000 | 817.107 / 771.894 | 301.500 / 281.375 | 644.542 / 476.292 | 122383.059 / 129551.458 |
+| ascii | 1000 | 18.154 / 9.644 | 980.250 / 827.083 | 8493.750 / 1662.917 | 55083.337 / 103692.557 |
+| ascii | 10000 | 45.065 / 34.230 | 192.875 / 180.209 | 600.625 / 330.750 | 221901.153 / 292137.468 |
+| ascii | 100000 | 377.535 / 404.352 | 157.000 / 159.083 | 275.083 / 315.042 | 264875.802 / 247309.219 |
+| two-byte | 1000 | 9.787 / 7.580 | 368.000 / 322.709 | 953.875 / 544.583 | 102173.182 / 131923.402 |
+| two-byte | 10000 | 61.477 / 60.738 | 197.625 / 212.625 | 321.125 / 333.042 | 162663.065 / 164641.750 |
+| two-byte | 100000 | 718.110 / 689.136 | 257.959 / 245.625 | 542.833 / 460.125 | 139254.348 / 145109.154 |
+| bmp | 1000 | 6.922 / 8.473 | 286.250 / 307.208 | 385.917 / 1809.167 | 144457.138 / 118024.361 |
+| bmp | 10000 | 75.057 / 75.995 | 302.500 / 290.542 | 496.584 / 514.333 | 133232.890 / 131587.979 |
+| bmp | 100000 | 914.330 / 988.165 | 383.292 / 406.834 | 996.042 / 1440.041 | 109369.733 / 101197.645 |
+| supplementary | 1000 | 7.558 / 7.413 | 235.625 / 228.291 | 340.458 / 357.333 | 132309.152 / 134900.122 |
+| supplementary | 10000 | 83.195 / 93.946 | 331.584 / 344.542 | 506.292 / 770.416 | 120198.962 / 106444.035 |
+| supplementary | 100000 | 929.241 / 935.725 | 333.583 / 334.708 | 657.416 / 652.917 | 107614.703 / 106868.987 |
+| ascii-wide-prefix | 1000 | 3.393 / 3.623 | 123.208 / 142.625 | 243.959 / 255.417 | 294704.521 / 276016.421 |
+| ascii-wide-prefix | 10000 | 38.366 / 42.717 | 159.375 / 177.125 | 259.166 / 303.625 | 260648.340 / 234100.058 |
+| ascii-wide-prefix | 100000 | 614.033 / 668.413 | 245.791 / 256.791 | 639.458 / 833.583 | 162857.664 / 149608.024 |
+| wide-ascii-prefix | 1000 | 7.662 / 7.851 | 249.041 / 259.916 | 365.584 / 357.167 | 130520.152 / 127375.417 |
+| wide-ascii-prefix | 10000 | 83.361 / 89.664 | 277.583 / 374.292 | 405.042 / 714.583 | 119959.682 / 111527.934 |
+| wide-ascii-prefix | 100000 | 937.548 / 898.788 | 357.791 / 356.708 | 739.333 / 598.625 | 106661.183 / 111260.968 |
+
+The candidate's first BMP scenario reduced pooled service P95 from
+9.583 to 6.833 µs, yet response P99 grew from 385.917 to 1,809.167 µs
+and mean wall grew from 6.922 to 8.473 ms. Faster service alone therefore
+does not establish better admission/response scheduling. Poll frequency
+does not isolate synchronization wait from runnable-task delay. The
+official self-tuning policy remains unchanged; there is no admitted
+scheduler speedup or Scheme parsing parallelism claim.
+
+Complete raw receipt:
+=20261011-injection-interval-abba.log= (local diagnostic archive).
+Rejected candidate for reproducibility only:
+=20261011-injection-interval-rejected.patch= (local diagnostic archive).
+
+* Final verification
+
+Final workspace result: 658 passed, zero failed, eight existing ignored.
+Workspace and Actor/AOT clippy passed with warnings denied after rollback.
+Expected compile-fail diagnostics remain part of lifetime/non-Send tests;
+they are not failed runtime tests. SMP remains explicitly unqualified.
+
+Final workspace:
+=20261011-signed-identifiers-final-workspace.log= (local diagnostic archive).
+Workspace lint:
+=20261011-signed-identifiers-final-lint.log= (local diagnostic archive).
+Actor/AOT lint after scheduler rollback:
+=20261011-signed-identifiers-final-actor-lint.log= (local diagnostic archive).
+

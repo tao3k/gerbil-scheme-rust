@@ -1,0 +1,133 @@
+#+TITLE: Checked UTF-8 output cursor: matched bridge qualification
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Source, baseline, and algorithm
+
+Entering production is =4d0fc584c8f2eb87b19333edfa52ab3c14693c5a=;
+the current checked-inline control remains frozen at =345b172=.
+Historical baseline =6ad680c6311957eadf2529765ab1efd751132554= is retained.
+The only production algorithm change replaces repeated output-base indexing
+with a local advancing output cursor. Matching official Gambit source uses
+this convention in =lib/c_intf.c:398-443= (=___UTF_8_put=) and
+=lib/c_intf.c:3250-3290= (Scheme-to-UTF-8 conversion).
+The source was read locally under the Gerbil SDK source checkout; no download
+or kernel change was needed.
+
+The adaptation does not adopt the SDK's historical five/six-byte encodings,
+NUL-terminated conversion, extra size pass, or reference-counted allocation.
+Unicode scalar rules, all type/capacity/range checks, pointer tag conversion,
+256-character polling bound, and exception containment remain unchanged.
+Empty spans return before any arithmetic on a potentially null destination.
+Pointers remain local to a synchronous allocation-free leaf; no Scheme body
+pointer survives polling. Rust output and Scheme source are distinct objects.
+
+Both leaf functions in the same ARM64 benchmark binary
+show different addressing: the cursor enables post-indexed/fixed-offset stores;
+the frozen control retains output-base plus running-index stores. This confirms
+the tested source change reaches machine code under unchanged =-O2= flags.
+It is consistent with the reduced CPU cost, not a claim of an identical gain
+on other CPUs or corpora.
+
+* Same-process changing-text admission
+
+Every timed request reads one of four alternating current rooted texts, with
+complete content comparison and full UTF-8 validation. Separate preflight
+also mutates a live string across encoding boundaries and rejects every
+surrogate. No encoded snapshots are used for these comparisons.
+ABBA retains twenty samples per variant at 1,000, 10,000, and 100,000 requests.
+The unchanged strict paired wall-time ratio must not exceed one at any load.
+
+| Requests | Frozen control ms | Checked public ABI ms | Paired ratio | Decision |
+|----------+-------------------+-----------------------+--------------+----------|
+| 1000 | 6.091 | 4.646 | 0.762058 | Admit |
+| 10000 | 60.316 | 46.144 | 0.765051 | Admit |
+| 100000 | 604.759 | 463.893 | 0.767514 | Admit |
+
+Complete public-ABI receipt.
+The =--owned= option compares the current frozen caller-buffer control (mode 4)
+against the actual checked public ABI (mode 5); it does not remove public-entry
+overhead to manufacture the improvement. Both reserve the same four bytes per
+character and admit only fully validated initialized output.
+
+The independently repeated leaf-isolation comparison (mode 4 versus raw
+current entry mode 7) also passes all loads, paired ratios 0.749298, 0.767744,
+and 0.764936. Complete leaf receipt.
+An earlier exploratory run completed successfully but its first output capture
+was truncated; the complete repeat, not that capture, is the authoritative
+leaf receipt. No negative sample or rejected decision was discarded.
+
+Historical-to-public comparison
+also passes, but its mode-3 Scheme-bytevector baseline predates caller-owned
+output. It must not be used to attribute all of that gain to this cursor change.
+
+* Allocation, GC, and non-CPU time
+
+At 100,000, the matched public run has 1,237 collections for each variant.
+CPU medians are 602.638 versus 462.360 ms; GC CPU medians are 11.627 versus
+11.325 ms. The large improvement is in CPU computation, not a GC policy change.
+The same allocation and complete validation remain in both sides.
+
+Complete seven-phase diagnostic
+contains 420 rows: seven phases, three loads, twenty samples per phase/load.
+At 100,000, owned wall/CPU medians are 466.091/464.157 ms; encoding CPU
+377.332 ms, validation 96.110 ms, allocation request/release 2.711 ms,
+empty public entry 15.639 ms, and empty leaf dispatch 32.414 ms.
+These independent diagnostic phases are not additive. CPU already includes
+GC. Their inter-run comparison against the previous cost receipt is diagnostic,
+not a replacement for the contemporaneous ABBA admission above.
+
+Rust reserves 13,660 bytes for 8,196 encoded bytes, unchanged. The 5,464-byte
+spare capacity is not RSS and only one output is live in this fixture. This
+change neither increases that reserve nor adds shrink/counting overhead.
+GC and allocation remain targets for subsequent separately qualified changes;
+they are not claimed to be solved by changing the output cursor.
+
+* Evidence boundary
+
+These are single-owner bridge transfers, not Org parsing, independent-VM
+parallelism, or SMP acceptance. SMP remains explicitly skipped, not passed.
+The existing supported FFI, AOT, Rust concurrency and Bazel CI gates are not
+relaxed. Any committed new head needs its own remote CI result.
+
+* Local correctness and test-control repair
+
+=bridge-regenerate= refreshed generated SCM and its input/body provenance.
+=scheme-contracts= passed full production Unicode parity (1,112,064 scalars),
+surrogate/type rejection, mutable-string independence, and root GC/release
+isolation. The matched Scheme conformance now includes the actual production
+Scheme-bytevector route, not only historical comparison implementations.
+
+An initial Darwin dynamic-module link failed on =getrusage= and =clock_gettime=;
+adding =-lSystem= alone did not resolve it. The test recipe now requests hosted
+dynamic symbol lookup only on Darwin, through Gerbil's compiler options.
+The new conformance probe actually executes both snapshots and checks valid
+OS-counter results, so a successful deferred link alone cannot count as a pass.
+The final Scheme run passes four encoding routes and reports
+=UTF8-OS-COUNTERS dynamic-resolution=OK=. Production AOT linkage is unchanged.
+
+=just bridge-workspace bridge-actor-lint= completed with exit zero; the full
+workspace tests and actor-AOT all-target warning-denying lint passed.
+Formatting, filename policy, and diff whitespace checks also passed.
+=just bridge-bench-smoke= passed FFI and Tokio transport smoke coverage,
+including machine-sized/oversubscribed callers, pipelining, and clean draining.
+Smoke output is correctness evidence, not a 20-sample performance receipt or
+proof of parallel Scheme parsing.
+
+The final public-ABI repeat, after all test-control changes, also completes
+all 120 rows and passes the additional direct empty/null leaf regression:
+Final matched receipt.
+
+| Requests | Frozen control ms | Checked public ABI ms | Paired ratio |
+|----------+-------------------+-----------------------+--------------|
+| 1000 | 6.144 | 4.666 | 0.759831 |
+| 10000 | 60.494 | 46.279 | 0.773558 |
+| 100000 | 622.806 | 472.311 | 0.754945 |
+
+At 100,000 both variants still have 1,237 collections; CPU medians are
+611.399 and 466.695 ms. Host timing varies between runs. Admission continues
+to use each contemporaneous paired comparison, not select the fastest
+standalone number across runs. The retained complete receipts comprise
+480 matched sample rows and 420 cost rows; all groups contain twenty samples.

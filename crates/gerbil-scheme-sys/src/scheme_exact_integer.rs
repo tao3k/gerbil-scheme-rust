@@ -73,6 +73,12 @@ pub unsafe extern "C" fn gerbil_scheme_rust_scheme_object_is_exact_integer(
     value: GerbilValueHandle,
     out: *mut GerbilBoolean,
 ) -> GerbilStatus {
+    if value == 0 && !out.is_null() {
+        unsafe {
+            *out = GerbilBoolean::TRUE;
+        }
+        return GerbilStatus::Ok;
+    }
     unsafe {
         checked_scheme_object_predicate(
             value,
@@ -202,14 +208,20 @@ pub unsafe extern "C" fn gerbil_scheme_rust_root_exact_integer_to_u64(
     }
 }
 
-unsafe fn checked_scheme_exact_integer_projection<T: Copy>(
+unsafe fn checked_scheme_exact_integer_projection<T: Copy + Default>(
     value: GerbilValueHandle,
     out: *mut T,
     fits: unsafe extern "C" fn(GerbilValueHandle) -> i32,
     project: unsafe extern "C" fn(GerbilValueHandle) -> T,
 ) -> GerbilStatus {
-    if value == 0 || out.is_null() {
+    if out.is_null() {
         return GerbilStatus::NullPointer;
+    }
+    if value == 0 {
+        unsafe {
+            *out = T::default();
+        }
+        return GerbilStatus::Ok;
     }
     if unsafe { gerbil_scheme_rust_scheme_object_is_exact_integer_raw(value) } == 0
         || unsafe { fits(value) } == 0

@@ -1,0 +1,100 @@
+#+title: Frozen 7F single-VM control: 4.513 ms p99
+#+date: 2026-11-05
+
+* Frozen research reference
+
+This record preserves the previous original-byte 7F control selected for
+continued research. The runtime source revision is
+7f915dfdc70c4b346fac912a62f9551ac7ea3926. No runtime, SDK, defaults, queue/window sizes or
+acceptance gates are changed by this record. No later candidate is included.
+The record is a working point, not full production/performance admission.
+
+[[file:single-vm-audit/mailbox-frozen-control-4513.json][Structured metrics and provenance]] retain the exact main/warmup rows,
+original acceptance failures, artifact hashes, startup details and limits.
+Original binaries and raw logs remain in persistent ignored local storage;
+they are not uploaded as source files or patches. This document has no
+machine-specific absolute paths. Relative source links resolve in this commit.
+
+* Workload and measurement
+
+One fixed-owner Scheme VM runs the original Mailbox business path with four
+existing Scheme workers and three transfer frames. The load is one million
+planned messages at 1,000,000 messages/s for one second. A separate 1,000/s,
+one-second warmup is excluded. A message is the original four-line typed
+order, real handler execution and independent result verification. It is
+neither an empty ring hop nor an HTTP request. Rust enters the native service
+once per measured arm, not once per message.
+
+Latency is the ORIGINAL planned timestamp to real source consumption, including
+source debt and worker verification. Histogram buckets report the upper bound
+at 1 microsecond resolution. Throughput equals completed messages divided by
+elapsed source-cycle seconds. Whole native-call time is reported separately.
+Peak backlog is planned-due minus really consumed; it is not Mailbox depth or
+an Actor-count limit. Independent maxima must not be treated as one request.
+
+| Main metric | Frozen observation |
+|-------------+--------------------|
+| Offered rate / planned duration | 1,000,000 messages/s / 1 s |
+| Planned / accepted / completed | 1,000,000 / 1,000,000 / 1,000,000 |
+| Rejected / failed / accepted timeouts | 0 / 0 / 0 |
+| Completed messages/s | 999,944.8780385981 |
+| Planned-to-consumed p99 | 4.513 ms |
+| Planned-to-consumed p99.9 | 4.819 ms |
+| Measured source-cycle time | 1.000055125 s |
+| Whole native main-call time | 1.009152667 s |
+| Last publication, relative to epoch | 1.000052709 s |
+| Maximum publication lag | 4.851167 ms |
+| Peak due-unconsumed | 4,853 |
+| Peak unpublished source debt | 4,851 |
+| Samples over original 128 limit | 664,696 |
+| Remaining native / staged | 0 / 0 |
+| Clean owner shutdown | true |
+| Original executable exit | 101: unchanged performance assertion |
+
+Backlog percentiles and request p50/p95 were not collected. Peak uncertainty
+between sampled progress points is unknown. No missing percentile is replaced
+by the peak. The CPU/GC envelope encloses startup and terminal capture rather
+than isolated phases: owner CPU upper envelope is about 998.904 ms, with
+39 collections and about 17.989 ms GC CPU / 17.894 ms GC wall time. These
+numbers do not identify an individual pause or prove leak-free long reuse.
+
+* Comparison and unresolved acceptance
+
+| Record | Offered rate | p99 ms | p99.9 ms | Completed/s | Peak |
+|--------+--------------+--------+----------+-------------+------|
+| Historical 7F | 1,000,000/s | 6.393 | 6.740 | 995,244.02 | 6,746 |
+| This frozen control | 1,000,000/s | 4.513 | 4.819 | 999,944.88 | 4,853 |
+| Later same-byte control | 1,000,000/s | 18.018 | 18.210 | 988,600.53 | 18,218 |
+| Separate historical 6D | 500,000/s | 0.317 | 0.431 | separate cohort | 351 |
+
+The first three rows retain the same 7F source basis. The two retained control
+runs use the same image and reader hashes. Their timing difference is not a
+code-optimization gain or regression and has no established machine/GC cause.
+The 6D duration/startup/workload differs and is not a direct scaling comparison.
+The 12-VM 10.141 ms workload is also a different profile and is not a direct
+competitor to this single-VM record.
+
+Zero rejection and clean shutdown do not waive 4,853 > 128. The original native
+receipt explicitly fails historical p99 and outstanding-window checks; these
+literal failures remain in the structured record. Publishing the record does
+not promote defaults, relax acceptance or assert that all future runs reproduce
+4.513 ms. At the total peak, at least 4,850 requests are unpublished because
+only three existing frames can be materialized; this does not prove which
+phase caused the debt. Ring saturation results cannot replace this population.
+
+* Source and replay boundary
+
+- [[file:../../crates/gerbil-scheme-qualification/scheme/instance-mailbox-backpressure.ss][Original Mailbox supply, consumption and immediate refill]].
+- [[file:../../crates/gerbil-scheme-qualification/scheme/instance-actor-arrival.ss][Original fixed input and independent oracle]].
+- [[file:../../crates/gerbil-scheme-qualification/benches/gerbil_actor_arrival.rs][Existing Rust native benchmark entry]].
+
+The original reader and image are pinned in the receipt. The current and
+retained Rust benchmark source hashes match. Verify original binary identities
+before replaying the recorded argv with GERBIL_SERVICE_BENCH_IMAGE selecting
+the retained image. Launch used Node spawnSync, ignored stdin and ordinary
+stdout/stderr files, with inherited environment plus the image selection. The
+complete inherited environment was not recorded, so full historical environment
+identity is not claimed. No new launcher or diagnostic layer is introduced.
+A Cargo rebuild through the existing bench is a new artifact cohort, not a
+replacement for the original frozen bytes. No performance rerun was needed to
+publish this already-recorded observation.

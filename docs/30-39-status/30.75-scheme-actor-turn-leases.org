@@ -1,0 +1,333 @@
+#+title: Scheme Actor turn leases and invocation-owned execution reservations
+#+startup: overview
+
+* Status and prior evidence
+
+Uncommitted ABI19 candidate. Directed performance gate not accepted; defaults unchanged.
+[[file:30.74-scheme-lease-cycle-accounting.org][ABI18]] retained semantic accrual/settlement correctness but failed performance:
+CPU aggregate throughput +5.238%, paired short p99 +16.195%; mixed throughput
+-0.602%, bulk p99 +6.208%, maximum owner finish spread +35.227%. That capture,
+its paired negatives and all historical failures remain retained. No candidate
+was committed or pushed. Rust only distributes across independent VM owners.
+
+* Ownership protocol
+
+An Actor worker selects turn behavior once, using the existing Scheme policy.
+ABI19 parameterizes a private turn record and obtains one outer execution lease.
+The record contains its budget, policy identity, creator Scheme thread, active
+invocation span sum, consumed reservation and mutex-copied class permission.
+Only the private constructor publishes a record to that parameter. Typed reads
+rely on this module-owned invariant; public layouts/configuration remain checked.
+
+An item retains its dynamic-wind callbacks and frozen plan. When its Scheme
+thread already owns the same-class lease, entry/exit adjust existing lease depth
+without another mutex/queue transaction. Otherwise entry uses normal acquisition
+and final exit uses normal locked release. Retaining item winds is necessary:
+continuation reentry/escape can cross item boundaries independently of the turn.
+No invocation-normal flag, mutable activation pool, global thread registry or
+Rust green-thread executor is introduced.
+
+| Boundary | Scheme authority | Independent obligations |
+|----------+------------------+-------------------------|
+| Turn entry / reentry | Acquire outer lease; restore this thread's reservation from active spans | Does not select an item plan or retire a result |
+| First item entry | Select immutable plan once; reserve selected span | Selection is not successful execution |
+| Item reentry | Retain original plan; reserve another dynamic execution opportunity | No duplicate plan-selection report |
+| Successful whole return | Accrue declaration through ABI18 epoch-fenced accounting | Not a root/capacity acknowledgement |
+| Sliced checkpoint | Existing owner/class/span validation and bounded accounting | Does not claim the unreported suffix |
+| Item exception / escape | Decrease borrowed depth and active span; consumed reservation remains | No whole-success credit, no quota refund |
+| Existing Actor quantum yield | Suspend complete lease, let Scheme schedule, reacquire | Does not settle dispatch or native completion merely by yielding |
+| Internal await / work handoff | Same suspension protocol; active declarations survive the new grant | Pending suffix cannot be counted as a new empty grant |
+| Turn exit / exception | Locked outer release settles accumulated work and grants queued peers | Each result still independently owns root/capacity retirement |
+
+* Remaining work and short execution opportunities
+
+Remaining execution permission is distinct from admission charges and successful
+work totals. Each entry consumes its selected span, including a failed item.
+Before a following item would exceed permission, Scheme creates an execution
+opportunity. This applies even when Actor quantum is zero. First selection after
+that opportunity observes the new grant permission; an existing continuation
+keeps its original immutable bound. There is one opportunity, not a retry loop
+waiting for a smaller policy to permit an old larger span.
+
+The receiving Scheme thread publishes its permission/reservation only after
+acquisition confirms it owns the lease, while still under the acquire mutex.
+A releaser may select another thread, so grant selection cannot use the
+releaser's parameter context to update the receiver. Each turn has independent
+state. During suspension its active item span sum is retained; reacquisition
+conservatively reserves that sum. An exceptional suffix therefore cannot refund
+its opportunity and allow another whole item without a boundary.
+
+The existing Actor quantum and class arbitration are unchanged. Original Actor
+yields now suspend the outer lease; holding it across thread-yield would prevent
+a competing short thread from acquiring it. Direct short requests retain their
+own item extent and do not enter an Actor batch barrier. Fresh items cannot turn
+8 x 48 declarations into a single uninterrupted batch grant.
+
+An old retained span can exceed a newly contended permission. Nested arbitrary
+Scheme handlers can also contain additional declared work. These remain explicit
+cooperative bounds, not hard wall-time or arbitrary-code preemption guarantees.
+No language feature is disabled to recover performance. A continuation transferred
+to another Scheme thread cannot mutate the original thread's reservation record;
+it uses a conservative yielding acquisition path. Inherited or stale contexts
+cannot authorize borrowing a different thread/policy. No VM/root travels across
+Rust owners. Native completion/progress identity remains governed by the existing
+completion model and idempotent progress ledger, not by a turn's CPU reservation.
+
+At quantum1 the current workload still releases between every pair of items.
+Consequently fewer grants cannot be assumed. This candidate tests whether the
+remaining depth/mutex/extent rearrangement helps; it does not claim batch-wide
+amortization. The extra turn state and suspension winds are real candidate costs.
+
+* Actual API and reused Runtime model
+
+=configure_scheme_service_actor_turn_on= configures idle ABI19 operation30 with
+exact mode4 receipt and existing =SchemeWorkExecutionPolicy=. ABI18 operation29
+remains the same-image control. =call-with-gerbil-rs-service-turn= is the actual
+Scheme API used by Actor workers; its callback receives a nullary yield operation.
+The diagnostic =gerbil-rs-service-turn-snapshot= reports reservation, active span,
+permission and depth; it grants no execution, native root or capacity authority.
+Canonical std/build includes the new file in extra-inputs. No Bash or independent
+Python build path is introduced.
+
+The existing Runtime activation state adds turn ownership, consumed reservations,
+permission and suspension. Its prior successful-work and root/completion state
+remains authoritative. Reservation accounting is independent from actual success.
+Witnesses cover failed item then another item, suspension with an outstanding
+span, repeated turn reentry and exceptional replay, real short dispatch/start /
+execution while the turn is released, and accepted close/drain. A suspended turn
+must not own the CPU; a different short worker may own it. Mutations must reject
+refunding a failed execution reservation and declaring a yield while retaining
+CPU ownership. The existing seeded bounded domains are reused, not replaced by
+a new unrelated model. Finite success is not native or performance acceptance.
+
+Native controls invoke the same public turn/work APIs inside the actual image:
+
+- Zero explicit Actor yields, with a queued short peer between two bulk items.
+- The same opportunity after an intentionally failing bulk item.
+- Active span/reservation/depth before and after internal suspension.
+- Failed whole work leaves no successful credit and does not refund permission.
+- Successful and exceptional multishot turn reentry after the original extent exits.
+- A parked bulk48 invocation, short peer holding the lease, and actual queued
+  handoff back to bulk with new permission4; the receiver publishes its own state.
+- Existing class/epoch/nested/GC/root/cancel/timeout/drain controls remain in the
+  native suite, using the new Rust policy endpoint for actual Actor workloads.
+
+The full Scheme runtime remains responsible for execution, Actor scheduling,
+continuations, exceptions and GC. Rust only distributes across instances.
+
+* Directed performance gate
+
+From the repository root with Cargo and the native SDK on PATH:
+
+#+begin_src text
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --locked -- --progress-fair-ab --fixed-short-selective --actor-turn-ab
+#+end_src
+
+The increment compares ABI18 versus ABI19, both joint dispatch and native S64
+entry/arithmetic/projection, same four live VMs/image, O2, Tokio2, window4/work32,
+batch8, Actor quantum1, four/48 bounds and unchanged feed/class budgets. Five
+AB/BA blocks provide ten paired windows per load. Both arms must conserve exact
+logical work, selections, starts and 1088 independent results. Cold metadata
+remains timed. No broader matrix or repeated unchanged capture follows a negative.
+
+Wait for compiler-free conditions without pausing other tasks. No profiler attaches
+to timed work. Keep pooled and paired tails, owner fairness and all negatives.
+An accepted increment alone cannot admit the entire unpublished protocol stack;
+that requires a distinct same-image whole-protocol control. No default changes,
+commit or push occur before performance admission. Historical watchdog failures
+remain open without attribution; the meaningful-progress deadline stays five
+seconds and phase chatter cannot renew it.
+
+* Development failures retained
+
+Strict Clippy rejected the expanded benchmark label function at 102/100 lines.
+The label family was factored without suppression or changing measurement policy.
+The first model run failed its new real-short witness because dispatch
+acknowledgement was missing before compute. That existing transition was added;
+the model now also explicitly checks the short peer owning CPU while the turn is
+suspended. The suspended-turn invariant excludes that turn's ownership, rather
+than incorrectly excluding all peer execution. The held-CPU-yield mutation must
+still be rejected. No performance samples came from these failed gates.
+
+* Final correctness and actual O2 receipts
+
+The final native gate passed all three tests in 30.62 s, including the queued
+peer-to-receiver grant control and the final private type boundary. Four owners
+joined, roots were zero, files removed and descriptors returned. The prior
+intermediate native gate passed in 37.33 s; the final gate supersedes it.
+Strict Clippy, final generated-artifact verification and formatting passed.
+The final O2 release bench build passed in 62.735 s. No progress deadline changed.
+
+The full reused Runtime gate passed in 726.80 s (772.848 s including controller /
+artifact wait), both domains and all 28 required counterexamples. Its stable
+source SHA-256 is:
+=0c94b54dd4b44cbe316408bb2f3d139ec1c0d018541775f530f43050df0e4848=.
+
+After that full run, only turn resume arbitration was strengthened: it now uses
+the existing allowedCpu predicate and updates the chosen class debt. A new
+witness forbids bulk taking the lease back while a runnable short has priority,
+then executes that short before bulk resumes. Final-source typecheck, all turn
+witnesses/mutations and 1000 x 64 seeded turn traces in each existing domain are
+run separately. The earlier whole-model source identity is not relabeled as the
+final source; unchanged non-turn controls are retained from that full receipt.
+Native Scheme acquisition already uses the existing class arbiter. This is a
+model refinement to match it, not a new runtime algorithm after native testing.
+
+Actual same-image O2 C includes the ABI18 and ABI19 execution units. Both retain
+three item wind callbacks and no mutable boxes. Captured item environment slots
+increase from 5+4+1 to 6+4+4; the additional turn record / outer winds also remain.
+These are real costs, not a claim of smaller allocation representation. C SHA-256:
+=985de02de7bdd5bc04f46f94fcf6a19be78c2e3325c88aae5145dab4d861d69c=.
+Only the directed A/B can admit their trade-off. Successful correctness exits
+still do not attribute historical watchdog failures.
+
+The final targeted model gate passed in 54.549 s: typecheck, seven turn witnesses
+(including the two mutation controls) in each domain and 1000 x 64 seeded turn
+traces per domain. Final source SHA-256:
+=3da38c19bbdb37b2360809a85b06ee93dd3e30a118c04f9cfa96e518cc71c60f=.
+All own correctness/model/build controllers finished before performance capture.
+
+* Initial capture rejected by an obsolete observer, not a performance result
+
+The first compiler-free capture exited101 in 2.940 s before any service_sample.
+The warmup observer required suspensions = I/O waits + work handoffs; ABI19 also
+suspends at the existing Actor quantum boundaries. It observed128 versus0.
+No cleanup was attested on this assertion-failed run. Its configuration, source,
+image and stderr remain retained; this was not a watchdog70 or controller timeout.
+
+New native type SchemeActorTurnObservation reads operation31: enabled flag, actual
+outer grants, held-lease Actor quantum yields and held-lease budget-boundary yields.
+Only real owned transitions increment these counters; a yield without ownership
+is not a counted suspension. Both grant counters and successful-work counters
+are independent of roots/capacity. The native eight-item/four-Actor control must
+read exactly4 outer grants,4 Actor yields and0 budget yields through the Rust API.
+The strict observer now requires suspensions = I/O + work handoffs + Actor yields
++ budget yields, and bulk grants = actual outer grants + those suspensions for
+turn mode. Control mode retains input-count + I/O + work-handoff conservation.
+Short grants, actual work, selection, ready/dispatch and root/capacity assertions
+are unchanged. No count is ignored and no deadline is widened. Native counters
+are incremented in timed ownership transitions; observation reads are outside
+the timing window. Their recording cost belongs to this candidate. The model's
+lease/reservation semantics did not change for these diagnostics.
+
+Failed capture host SHA-256:
+=fc6e6037621dd945b1088bacc777f2b99bc8a84b0dd2d84e5ee9cdbafe057b3c=.
+Failed capture native SHA-256:
+=455c67aa39375fd0d86c2b3fe10e63381d5082f88becebd2429cc8e2ba7a7204=.
+Failed pre-result source archive SHA-256:
+=19e63a198b5af8e0afb11d24764ad6e34d0bfa4392343e412b6528fa40d436c3=.
+
+* Explicit producer contract and general Scheme handlers
+
+The declared-layout requirement is now explicit in the Scheme API:
+=make-gerbil-rs-declared-work-actor-batch= selects this producer contract.
+=make-gerbil-rs-actor-batch= keeps general handler behavior; setting a VM policy
+cannot silently assume an arbitrary handler uses work layouts. Turn metadata
+carries this cold factory declaration, not a source-name or payload-size heuristic.
+Only the real order Actor factory opts in. Its malformed-input rejection is
+inside a declared four-record validation layout, and its fixture latch waits
+through service suspension inside the owned unit. Valid arithmetic is unchanged.
+
+New native controls execute a general Actor under the configured policy and
+require its original zero turn-context observation and exact output. They also
+require two malformed-input exceptions to consume8 execution reservation units,
+credit0 successful work, leave active0/depth1 within the outer scope and release
+that scope afterwards. This closes a producer/type-contract gap rather than
+changing Actor quantum or restricting Scheme execution. The model's turn init
+assumes this declared producer contract; general actors follow its existing
+non-turn paths. Lease/reservation semantics did not change for this registration.
+
+A later Clippy gate also rejected the expanded qualification function at105/100
+lines; the exact receipt assertion was factored, with no suppression. The typed
+receipt native gate then passed all three tests in40.17 s before the final explicit
+producer registration controls; it is not substituted for their final gate.
+
+* Final producer/receipt native gate
+
+The final gate passed all three native tests in42.91 s, including explicit declared
+factory selection, general Actor preservation, malformed validation reservation,
+recipient-owned grant publication and the typed4/4/0 observation. Four owners
+joined, roots0, files removed and descriptors returned. Strict Clippy passed; O2
+release built in42.751 s. The model receipts above remain the safety evidence for
+unchanged lease/reservation semantics; new diagnostics are not completion authority.
+
+Current O2 C SHA-256:
+=1e177c7fa417e0817188a5d867e8c2d82c19d9be60f0311b79dd17d2f6df864f=.
+The old pre-observer C hash is retained only as historical intermediate evidence.
+Both current item paths have three winds/no boxes; capture slots remain10 versus14.
+At the fixed quantum1, native4 outer grants +4 Actor regrants equals8 original
+item grants. This limits the possible amortization before performance is known.
+No quantum, admission capacity, work bound, default or watchdog deadline changed.
+
+* Directed outcome: not accepted
+
+The valid40-sample capture completed in7.127 s after two compiler-free checks;
+compiler boundary observations before/after were empty. All own model/build /
+correctness controllers had completed. No other task was paused and no profiler
+attached. Boundary absence is bounded observation, not continuous OS tracing.
+The first assertion-failed capture remains retained and is not a data window.
+
+Exact work,8256 plan selections,64 short starts and1088 results per window passed
+in both arms. Independent auditing also checked each owner's bulk grants minus
+suspensions equals actual outer grants for the candidate, and item count for the
+control. Every one of the20 candidate windows reported4096 outer grants,4096
+Actor quantum yields and0 reservation-boundary yields. Thus Actor quantum1
+provides8192 total ordinary bulk grants in either arm before I/O/work handoffs.
+No lease-grant amortization was achieved for this fixed workload.
+
+| Load / metric | ABI18 control | ABI19 candidate | Change |
+|---------------+---------------+-----------------+--------|
+| CPU orders/s | 363010.602 | 332121.016 | -8.509% |
+| CPU pooled short p99, us | 387.083 | 380.917 | -1.593% |
+| CPU pooled bulk p99, us | 587.666 | 620.667 | +5.616% |
+| CPU maximum owner finish spread, us | 474.333 | 468.250 | -1.282% |
+| Mixed orders/s | 56361.236 | 56715.591 | +0.629% |
+| Mixed pooled short p99, us | 444.958 | 434.500 | -2.350% |
+| Mixed pooled bulk p99, us | 2072.084 | 2075.167 | +0.149% |
+| Mixed maximum owner finish spread, us | 1699.666 | 1925.542 | +13.289% |
+
+Paired CPU medians: throughput -9.007% (1/10 improved), short p99 +3.592%
+(4/10 improved), bulk p99 +6.727% (3/10 improved), finish spread +23.026%
+(4/10 improved). Mixed: throughput +0.826% (8/10 improved), short p99 -1.488%
+(6/10 improved), bulk p99 -0.297% (5/10 improved), finish spread +0.316%
+(5/10 improved). Scheduled short latency worsened in the mixed load: pooled
++4.159%, paired median +12.933% (3/10 improved). These are distinct estimators;
+per-window short p99 is the maximum of64 probes and pooled p99 uses640 probes.
+
+Worst short pairs are +469.419% CPU and +328.966% mixed. CPU Actor peer minimum
+falls1 to0; all work still drains, so this is an overlap/fairness negative, not
+proof of permanent starvation. CPU minimum probe overlap increases9.302% as bulk
+execution lasts longer. Observed work handoffs are577 to693 CPU and731 to642 mixed.
+Those differences are not causal attribution of GC, OS scheduling or construction.
+No stage quantiles are added/subtracted to infer a cause. CPU utilization was not
+measured. The aggregate short-tail improvements cannot admit the overall result.
+
+The interpretation is structural and bounded: this implementation retains the
+same number of lease grants at quantum1 and adds outer turn state, item capture
+slots and suspension winds. The observed CPU loss is consistent with additional
+cost, but this run does not assign a percentage of it to one allocation/counter /
+wakeup source, or rule out every possible Actor-turn design under other loads.
+Native recording overhead is included. No thread/quantum/window matrix is added.
+
+The candidate is not admitted. No unchanged repeat, full-stack gate, commit,
+push or default change follows. Next work must avoid unconditional extra turn
+ownership layers at already-required per-item handoffs. A Scheme execution-plan
+specialization must demonstrate that it removes a real boundary/callback cost;
+reservation accounting or reordered counters alone are not evidence of that.
+Continuations, exceptions, short opportunities and independent result retirement
+remain mandatory. Rust must continue to distribute only across instances.
+
+Final cleanup quiesced service, joined4 owners, reported roots[0,0,0,0] and removed
+files. The failed first capture's cleanup remains unattested. No new watchdog70
+occurred; successful cleanup is not attribution of historical watchdog incidents,
+and the five-second meaningful-progress deadline is unchanged.
+
+Host SHA-256:
+=0db918ab21e3ab62995af08799d4e0e29ceeca6d50ac4dc446c1f0d6a0b37507=.
+Native image SHA-256:
+=738079680e5ef8bdeaa25e231d3e8f84310a3a5073fdac7b19209f5c06585a12=.
+Pre-result source archive SHA-256:
+=41037e593c77e66f79f227e75ce32455b1106562c313af486ab6eb9e20d7f7a3=.
+All frozen source-file hashes matched the checkout immediately before adding
+this outcome section. Raw samples, failed attempt, native/model receipts and
+source/image snapshots remain private. No logs, binaries or patches are tracked.

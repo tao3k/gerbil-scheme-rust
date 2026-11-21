@@ -41,7 +41,7 @@ pub(crate) fn parse_rust_file(path: &Path) -> ParsedRustModule {
     let source_metrics = super::source_metrics::rust_source_metrics(&source);
     match parse_rust_source_syntax(&source) {
         Ok(syntax) => {
-            let syntax_facts = super::native_syntax::rust_native_syntax_facts(&syntax, path);
+            let syntax_facts = super::syntax::rust_syntax_facts(&syntax, path);
             ParsedRustModule {
                 report: RustModuleReport {
                     path: path.to_path_buf(),

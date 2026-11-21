@@ -1,0 +1,82 @@
+#+title: PR 18 frozen fast-path migration audit
+
+* Scope
+The predecessor commit 73280277cdf5b5affa23a3a5d2dc40f2c1decc66 retained
+the 4.513 ms evidence documents. This migration carries the corresponding
+Scheme/FFI implementation into PR 18.
+
+The migrated source contains the 7F typed input and
+21-field result constructors, checked fallback, and initialization-time system
+mask resolution with provider ownership. The original Mailbox handoff, Actor
+execution, independent oracle, frame retirement and immediate refill remain.
+The PR's later package/lifecycle fixes are preserved. No SDK source was edited.
+
+* Missing native lowering contract
+The frozen Actor compilation used:
+#+begin_example
+-O2 -U___SINGLE_HOST -U___INLINE_JUMPS -D___MULTIPLE_HOSTS -D___DONT_INLINE_JUMPS
+#+end_example
+The initial migration used SINGLE_HOST_LIMIT=1 and retained inline jumps.
+Compiling the SAME generated C with the frozen lowering reduced the static
+instruction counts for input construction, native business unit, and service
+handler to the frozen counts (696, 2174, 480). The scheduled driver is 5268
+instructions versus 5620 frozen and 7534 under the partial lowering.
+These counts include cold paths and are not executed-cycle measurements.
+The repair is limited to explicitly declared SeparateProcedures modules;
+normal-module GCC safeguards and O2 remain unchanged.
+
+* Validation
+The canonical Cargo build completed under the unchanged 8 GiB sampled
+process-tree guard: peak 936198144 bytes, monitor healthy, zero remaining RSS.
+The newly linked real VM passed all 21 construction/GC/multishot continuation/
+exception checks plus before-start, after-start and callback retirement cases.
+Correctness does not establish latency, throughput or backlog admission.
+
+* Earlier original-byte replay
+Both original reader and image SHA-256 values matched the retained record.
+The original Node spawnSync launch, regular output files, inherited environment,
+1000/s one-second warmup and unobserved 1000000/s one-second main were retained.
+Historical full environment identity was not captured, so complete environment
+identity cannot be asserted. The frozen original keeps its ten-second watchdog;
+the current PR still keeps its original five-second limit.
+
+| Metric | Retained original observation | Earlier original-byte replay |
+|--------+-------------------------------+------------------------------|
+| Planned/completed | 1000000/1000000 | 1000000/1000000 |
+| Completed messages/s | 999944.878 | 775358.963 |
+| Planned-to-consumed p99 | 4.513 ms | 287.943 ms |
+| Planned-to-consumed p99.9 | 4.819 ms | 289.094 ms |
+| Rejected/errors/timeouts | 0/0/0 | 0/0/0 |
+| Due-unconsumed peak | 4853 | 237002 |
+| Source-not-published peak | retained in original record | 237000 |
+| Main elapsed | 1.000055125 s | 1.289725209 s |
+| Full native main call | retained in original record | 1.305758750 s |
+| Clean shutdown | yes | yes |
+
+That run's native main CPU envelope is 1.260004875 s and GC wall envelope
+22.134781 ms. These enclose the native call; they are not per-phase CPU costs
+and do not identify the cause of the tail. Independently sampled maxima must
+not be subtracted to infer a simultaneous in-flight count.
+
+* Decision and retained counterexamples
+The original control was anomalous, so the migrated image's performance arm
+was STOPPED. No candidate gain or recovered 4.513 ms is claimed. The earlier
+41.023 ms partial-lowering result is retained as failed evidence, not a new
+baseline. The original 4.513 ms itself did not pass the 128 backlog gate.
+
+Metadata-only commits do not migrate a measured implementation. Static source
+or code-size parity and passing semantics cannot waive an anomalous control.
+These obligations are added to the existing construction-contract QNT gate.
+The cause of the earlier same-byte timing variation remains unknown.
+
+* Four-round replay on the persistent 7F checkout
+The original reader and VM image produced 8.331, 7.817, 5.951 and 3.927 ms
+p99 in execution order. Each round completed all one million messages with
+zero rejections, errors or timeouts and a clean shutdown. The fourth round
+reached the 4.513 ms research reference. Its p99.9 was 4.265 ms and peak
+backlog was 4,329. All four rounds exceeded the original 128 backlog gate.
+The freshly linked PR image has functional validation. The four performance
+observations belong to the original frozen artifacts and keep their original
+native acceptance failures.
+
+[[file:single-vm-audit/mailbox-frozen-replay-3927.json][Four complete structured replay receipts]]

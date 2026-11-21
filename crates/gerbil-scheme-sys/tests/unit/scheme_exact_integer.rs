@@ -27,15 +27,15 @@ fn exact_integer_checked_abi_rejects_null_boundaries_before_raw_ffi() {
         );
         assert_eq!(
             gerbil_scheme_rust_scheme_object_is_exact_integer(0, &raw mut boolean),
-            GerbilStatus::NullPointer
+            GerbilStatus::Ok
         );
         assert_eq!(
             gerbil_scheme_rust_scheme_object_exact_integer_to_i64(0, &raw mut signed),
-            GerbilStatus::NullPointer
+            GerbilStatus::Ok
         );
         assert_eq!(
             gerbil_scheme_rust_scheme_object_exact_integer_to_u64(0, &raw mut unsigned),
-            GerbilStatus::NullPointer
+            GerbilStatus::Ok
         );
         assert_eq!(
             gerbil_scheme_rust_i64_to_exact_integer_root(0, core::ptr::null_mut()),

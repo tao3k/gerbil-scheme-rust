@@ -1,0 +1,227 @@
+#+title: Pooled Resident Supply and Producer-Aware Short Routing
+#+startup: overview
+
+* Configuration correction (supersedes the original policy description)
+
+The later source audit found that =Pooled= was absent from the outer configuration
+match. These captures therefore used the source defaults, Watcher wake and
+cooperative budget zero, in both arms. The original report incorrectly described
+NativePort and budget one. Native settings were not read back in these historical
+runs. The source archive, raw results, image identities and negative rows are
+retained unchanged; the relative fixed-versus-pooled observations apply only to
+that implicit configuration and do not validate the originally declared policy.
+
+See [[file:30.46-native-policy-readback-and-wake-boundaries.org][the configuration repair and new qualification]]. New captures require native
+settings receipts and start a distinct baseline. They must not be spliced into
+these historical results or used to multiply their speedup claims.
+
+* Scope and predecessor
+
+The exact predecessor is =f9bf56c372def683ace7fd6da93e55a0c561df23=.
+Its GitHub Actions run =39715463473= completed successfully: supported Cargo,
+Bazel, Quint and fixed-owner native jobs passed; the separate unsupported SMP
+job remains explicitly skipped. This report concerns the Rust library's fixed
+native Scheme owners, not SMP.
+
+The previous resident-source pair improved throughput, but fixed-owner staged
+backlogs left idle owners unable to help, and the short router could not see
+resident work outside its own ledger. The new opt-in algorithm addresses these
+two concrete gaps. No defaults change. Scheme retains native compilation at O2,
+native typed construction/projection, GC, Actors, green threads, exceptions,
+continuations and dynamic bindings. Rust supplies and distributes independent
+requests across native instances.
+
+* Actual library protocol
+
+=submit_scheme_service_pool_stream= takes a count/work-bounded set of explicitly
+independent stateless Rust messages and =SchemeServicePoolStreamConfig=:
+
+- Unique owner indices are sorted before acquiring the existing one-producer
+  registrations, avoiding registration-order cycles between competing streams.
+- Declarations are frozen once and all destination capabilities, native capacity
+  epochs, work bounds and active limits are validated before publication.
+- A readiness barrier prevents partial registration from executing any input.
+  The result handle doubles as the registration-future cancellation guard.
+- Requests retain input-order result positions in one shared Rust FIFO. An owner
+  obtains private active and ordinary work/slot credits before claiming work
+  through the existing final owner/close/capacity fence. Native values never move.
+- If a competing owner changes the head's declared charge, speculative credits
+  are refunded before repricing. Empty/head-charge transitions notify producers;
+  equal-charge claims avoid an unconditional wake-all per request.
+- Cancellation, absolute deadline or participating-owner failure/close rejects
+  remaining uncommitted work. Accepted tasks drain through the original native
+  service, projection, root balance and capacity retirement.
+- Fully consumed handles retain weak cancellation signals. Unconsumed application
+  outputs retain their normal resource ownership. Count/work limits do not claim
+  an exact bound on arbitrary generic Rust payload bytes.
+
+=ReselectProgress= retains short-class pending-count priority, then considers
+native occupied request slots before the router's total/batch ledger. It sees
+resident producer reservations and retirement without maintaining a second load
+ledger. These approximate observations do not prove that an owner is OS-runnable
+or predict its task duration. Class quotas remain per router. Existing =Pinned=
+and =Reselect= behavior and every native wake/feed/budget default are preserved.
+
+* Native and finite protocol checks
+
+The existing four-VM fixture now exercises:
+
+- Busy-owner bypass with heterogeneous native work charges, exact result identity
+  and fixed construct/project owner identity.
+- A direct resident producer invisible to the old short ledger: the old router
+  selects owner zero while progress-aware reselection selects the empty peer.
+- Partial registration cancellation and timeout: no input enters Scheme before
+  the readiness barrier, and already-acquired registrations are returned.
+- Multi-owner active bounds, cancellation and expiry; accepted graphs drain and
+  uncommitted messages receive typed errors without leaking work/slot credits.
+- Native GC, Scheme exceptions, constructor/project panic and independent recovery
+  through the pooled path, plus existing multishot continuation and reuse cases.
+- Pool-source close with accepted and staged work; four joins, zero roots,
+  successful finalization, removed copied images and the existing FD checks.
+
+The original observer test failed once because its returned observation preceded
+its own capacity-guard retirement. It now waits for the same exact expected
+credits under the unchanged five-second gate. A new busy-owner fixture initially
+tried releasing a Scheme latch through a request after filling every request
+slot; that correctly returned =QueueFull=. It now reuses the existing externally
+released owner-block fixture. Both failed runs are retained privately.
+
+=poolStep= extends the existing QNT lifecycle model, with bounded =poolStaged=,
+a registration barrier and atomic owner claim. Accepted ownership, roots, work,
+slots, active-window and close invariants remain. Unregistered application-owned
+Rust inputs may outlive native join while their host future is unpolled; they
+hold no native credits or Scheme roots and cannot be claimed after close. The
+first new random run exposed an assertion that incorrectly conflated those inputs
+with native resources. Its counterexample is retained and the distinction has an
+explicit scenario. The missing-barrier mutation remains a required failing
+control. Finite safety is separate from native acceptance and performance.
+
+* Directed comparison
+
+=just bridge-scheme-service-benchmark --pooled-ab= is one exclusive pair:
+
+| Parameter | Both arms |
+|-----------+-----------|
+| Native instances / Tokio workers | 4 / 2 |
+| Input / batch | 8192 original orders, 48 lines, batch 8 |
+| Short probes | 64 serial probes, nominal 500 microsecond release |
+| Active bulk / native slots / native work per owner | 3 / 4 / 32 |
+| Shared aggregate staged count / declared work | 128 / 1024 |
+| Short route | =ReselectProgress=, native dedicated short execution |
+| Actual wake / budget / feed / notification | Watcher / 0 / 1 / coalesced (source-inferred) |
+| Samples | 10 per arm and load, alternating ABBA |
+
+Control retains four fixed groups of 32 callbacks and 256 work units per owner.
+Candidate uses one shared group of 128 callbacks and 1024 work units. Both
+retain each original Scheme constructor, handler, projection and FIFO result
+position. Control refills each fixed owner after its own group drains; candidate
+refills after the shared group drains. This measures the complete supply
+algorithm, not an isolated mutex improvement or an equal peak-memory claim.
+
+Setup/warmup and compilation are outside timed samples. Each capture reuses the
+same native VMs/image across arms. No other task is paused. Host activity is not
+controlled, so these are matched local observations, not a quiet-host or portable
+latency certificate. No Python/GIL throughput claim follows from this Rust bench.
+
+A short opportunistic sample need not use all four owners. The initial smoke
+failed an older all-owners-used assertion; that binary/source and failed output
+are retained. =unused_owners= is now explicit, with zero normalized minimum
+progress for any unused owner. Finish spread covers participating owners and
+must be interpreted with that list. This keeps missing participation visible
+rather than treating it as equal distribution. A subsequent smoke completed
+with four clean joins, zero roots and removed files.
+
+* Performance results
+
+Two unobserved captures each completed 40 samples and clean native shutdown.
+No samples were filtered. Each row shows control -> pooled candidate.
+
+| Capture / load | Orders/s | Throughput delta | Actual short p99 ms | Scheduled p99 ms | Batch service p99 ms |
+|----------------+----------+------------------+---------------------+------------------+----------------------|
+
+| A / CPU | 36982.82 -> 41077.77 | +11.07% | 41.809 -> 39.171 | 367.333 -> 355.650 | 18.164 -> 15.920 |
+| A / mixed | 16640.05 -> 17317.59 | +4.07% | 20.671 -> 14.355 | 214.570 -> 176.168 | 38.517 -> 33.303 |
+| B / CPU | 37278.19 -> 42564.28 | +14.18% | 42.695 -> 47.767 | 348.861 -> 461.961 | 19.695 -> 15.833 |
+| B / mixed | 13862.54 -> 16708.90 | +20.53% | 22.591 -> 15.196 | 214.470 -> 212.819 | 36.222 -> 32.330 |
+
+| Capture / load | Minimum normalized owner progress % | Maximum owner finish spread ms | Minimum overlapping probes |
+|----------------+-------------------------------------+--------------------------------+----------------------------|
+| A / CPU | 5.859 -> 44.498 | 366.295 -> 142.476 | 12 -> 30 |
+| A / mixed | 70.703 -> 98.690 | 143.712 -> 6.179 | 64 -> 64 |
+| B / CPU | 0.000 -> 39.948 | 305.731 -> 70.528 | 17 -> 23 |
+| B / mixed | 71.875 -> 98.655 | 236.179 -> 22.002 | 64 -> 64 |
+
+Both loads gain throughput in both captures. Mixed short p99 improves 30.55% and
+32.74%, with normalized owner progress reaching 98.690% and 98.655%. CPU actual
+short p99 improves 6.31% in A but regresses 11.88% in B; B scheduled p99 regresses
+32.42%. All four batch-service p99 values improve, but that clock excludes staged
+admission wait and is not end-to-end bulk latency. CPU probe overlap is incomplete;
+keep all 64 probes, rather than comparing selectively overlapping subsets.
+
+Normalized progress is the least completed fraction of each owner's eventual
+assignment when the first owner finishes. Shared assignment totals need not be
+equal: A candidate totals span 800 to 4480 orders across owner/sample combinations.
+All owners participated in both full captures. B control minimum progress is zero
+because one owner finished before another produced its first completion, despite
+all final totals being 2048. Actor peer minimum remains zero throughout; these
+results do not establish intra-VM Actor fairness or uniform OS scheduling.
+
+* Residual tail diagnostic and decision
+
+A separate instrumented 40-sample capture also closed cleanly. CPU throughput is
+32708.45 -> 44018.77 orders/s and actual short p99 is 53.162 -> 41.383 ms. Mixed
+throughput is 15218.36 -> 16906.21, but short p99 regresses 8.193 -> 21.519 ms and
+scheduled p99 regresses 98.691 -> 237.914 ms. The diagnostic's mixed finish spread
+improves 148.718 -> 55.528 ms and minimum owner progress 79.688% -> 98.718%.
+Instrumentation changes execution; this capture neither replaces the unobserved
+negatives nor proves an unobserved mixed-tail regression.
+
+For the seven largest actual short latencies among each arm/load's 640 probes,
+matched-request median publication-to-dequeue/actual fractions are 98.01%/99.85%
+for CPU control/candidate and 99.49%/99.85% for mixed. The corresponding median
+Wait-overlap/queue fractions exceed 99.90% in every group. Median post-construction
+pending times in these same tail groups are 2.555/0.048 ms CPU and 0.035/0.034 ms
+mixed. No entry history was lost. This locates a substantial residual before owner
+entry, not predominantly in these requests' own construction or projection.
+
+Summed Wait wall time over four owners and ten samples is 9360.40 -> 7661.42 ms
+CPU and 18020.26 -> 17990.39 ms mixed. Those overlapping phase sums are not elapsed
+time or isolated OS delay: native green execution, waiting, GC and descheduling
+can occur inside the phase. SDK GC CPU remains process-scoped; do not sum it as
+per-VM CPU or subtract it from owner wall time to infer OS overhead. Capacity
+progress cannot by itself distinguish a promptly runnable owner from a delayed
+native wait boundary. That remaining distinction needs native wake/readiness and
+scheduling evidence, not a phase boolean, wider watchdog or Scheme replacement.
+
+The pool-level supply algorithm is qualified as an explicit throughput/balance
+option. Short p99 stability, universal fairness and industrial latency acceptance
+remain open. Defaults are not promoted. No additional thread/load matrix is added.
+
+* Frozen evidence and reproducibility
+
+Use the existing just/Cargo Rust bench entry point and the exclusive =--pooled-ab=
+flag; =--test --pooled-ab= is a correctness smoke, not a performance result. The
+same native image identity is retained from the predecessor. Private receipts
+include the binary/image/source snapshots, 1001 input hashes, both unobserved
+captures, the separate diagnostic, smoke outputs and all failed attempts. Raw
+logs, binary images, source archives and personal absolute paths are not committed.
+Final report prose was added after the runtime/source freeze.
+
+- Release binary SHA-256: =b4ed67c563674e3d849889995913a8f5fd6d8d070e0922bf4c34776ee9c859f5=.
+- Native image SHA-256: =306ac7a148bc4e444ae210ee1f734150beba352bca4789d32c8f629d97b22f46=.
+- Frozen source archive SHA-256: =575eb4a21b7eaf79e19cfbbb282e0f7545cf6160c2b54c22f1c118da75eefea3=.
+- QNT source SHA-256: =7e7ca8a67f58f27f4fea0e8ac7f5a8c0c0593483522ced6755603d07faf1b8dc=.
+
+Focused QNT evidence comprises 41 scenarios, 1000 pool traces of 64 transitions
+(seed one), a safe mutation initial state, and the required missing-barrier
+counterexample. Full local symbolic/aggregate qualification is not substituted
+for native checks; the existing CI model driver includes the new directed gate.
+
+Final focused local gates passed: nine capacity/wake/deadline unit controls;
+existing native producer acceptance (2.72 seconds); expanded native Scheme service
+acceptance (5.87 seconds); qualification test/bench Clippy with warnings denied;
+and the exact new CI dev-profile pooled smoke with eight samples and clean native
+shutdown. Build times are excluded from these native execution durations. No
+request/progress watchdog was widened. Failed style/lint attempts are retained
+privately; no suppression was added. These gates do not claim long-run RSS
+convergence, hard short-request latency bounds or universal safe image unloading.

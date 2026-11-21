@@ -1,0 +1,247 @@
+#+TITLE: Capacity-Reserved Stateless Owner Reselection
+#+DATE: 2026-10-22
+
+* Starting source and CI
+
+Continue =000980f53067f16f5fce4f112ea236ffe8f50255= on PR #18.
+Its [[https://github.com/tao3k/gerbil-scheme-rust/actions/runs/39703748134][exact-head CI]] completed successfully: native fixed-owner lifecycle,
+Quint, both platform bindings and both Bazel jobs. Unsupported SMP remained
+explicitly skipped. This does not admit this follow-up or establish performance.
+
+This implements the admission portion of [[file:30.41-targeted-routing-and-scheme-queue-audit.org][30.41]]. Scheme queue representation,
+cooperative service units and wake transport algorithms are unchanged. Rust
+only distributes unpublished stateless work across existing native owners.
+Scheme retains execution, Actors, continuations, IO/timers, exceptions and GC.
+No Scheme/SDK source, native O2 level, default strategy or timeout changes.
+
+* Actual optional API and types
+
+#+begin_src rust
+let router = SchemeServiceRouter::with_admission(
+    dispatch,
+    config,
+    SchemeRoutingAdmission::Reselect,
+)?;
+let selected = router.submit_short(request, timeout).await?;
+// selected.owner is committed for this accepted request.
+// selected.route_class and selected.execution_class are distinct declarations.
+#+end_src
+
+=SchemeServiceRouter::new= and =SchemeRoutingAdmission::default()= retain
+=Pinned=. The existing short/batch scoring and rotating tie order are shared
+by both strategies. The optional strategy re-evaluates eligible owners until
+one can provide the class quota, native work credits and native request slot.
+It never reserves every owner concurrently or migrates accepted Scheme values.
+Constructor validation captures the exact native capacity objects under one
+admission fence. Reconfiguration invalidates old routers, including unassigned
+waiters; old class quotas cannot silently cross into a new native budget epoch.
+This applies even to equal numeric limits. A fresh router validates the new scope.
+
+Returned types distinguish =SchemeRouteClass::{Short,Batch}= from
+=SchemeServiceExecution::{General,Short}=. A short host route can intentionally
+use general execution for the existing matched control. No payload-size heuristic
+replaces the application's class declaration. Work, lane, execution and optional
+trace declarations are sampled once before asynchronous admission; nonzero work
+and the existing one-unit/stateless native-short constraint are validated.
+Affine lanes still require explicit fixed-owner submission.
+
+Per-owner =loads()= have explicit scope: pinned routing includes owner-specific
+admission waiters; reselection charges an owner only after complete reservation.
+Unassigned FIFO waiters are not attributed to any owner. Declared work is not
+remaining CPU, elapsed service time, or a guarantee of short wall-clock latency.
+
+* Reservation and wake protocol
+
+1. Join one FIFO admission turn for the requested class. Short and batch classes
+   have separate turns; newly arriving work cannot repeatedly overtake an older
+   waiter in that same router/class.
+2. Subscribe to the pool's versioned capacity-change channel before scanning.
+   Mark the observed version, then rank live owners with the existing score.
+3. Try one owner's class quota and native work/slot pair. If any credit is
+   unavailable, release every temporary acquisition before another candidate or
+   an asynchronous wait. Failed speculative scans do not notify themselves.
+4. Once all credits are held, charge that owner and publish through the actual
+   native Scheme service API. The existing exact Capacity Arc fence rejects a
+   stale reservation after reconfiguration or pool close. Reserved work units
+   are checked and preserved in native request metadata.
+5. Native projection/root balance retires accepted work, then releases the
+   work/slot guard and publishes usable-capacity change. Class/load retirement
+   precedes that release, avoiding an early duplicate event while native credits
+   are still unavailable. A rejected pre-publication path retains its FIFO turn
+   until its guards have unwound.
+
+The change channel is initialized only by the optional strategy and remains
+active for that pool's lifetime. Direct native dispatcher completion, fixed-owner
+reservation cancellation, reconfiguration, owner failure and pool close all
+participate. A release between scan and wait cannot vanish into a transient
+Notify event: the watch version records it. No Rust polling timer is introduced.
+No Rust waker is invoked under the admission/close lock; legacy pipe failure also
+releases its writer lock before notifying capacity waiters.
+
+Cancellation while acquiring work needs particular care: Tokio can allocate
+partial work internally before returning a complete owned permit. The RAII
+guard exists before that await and notifies on cancellation even when its
+explicit work field is still empty. The speculative nonblocking helper never
+holds such a partial acquisition across an await.
+
+Close wakes both class-turn and capacity waiters. Unpublished cancellation or
+admission timeout unwinds reservations. Caller timeout/drop after publication
+continues to retain native work and class charges through projection; it cannot
+revoke a running Scheme task or release its roots early.
+
+FIFO fairness is scoped to one router/class. An older large request can still
+hold the class turn while a smaller follower would fit. Independent routers have
+independent class quotas under shared native limits. OS/GC progress and arbitrary
+uninstrumented Scheme computation remain outside any latency-bound claim.
+
+* Reused model boundary
+
+The existing =owner_lifecycle= model adds =selected= and =committed= owner maps.
+Selection can change only before work reservation, producer staging or acceptance;
+publication commits the owner. Existing per-owner credit, root and close safety
+invariants remain in force. The original fixed-assignment =step= is retained;
+=reselectionStep= adds pre-reservation selection, and an unsafe accepted-owner
+move is a required negative control. No second lifecycle or Scheme scheduler
+model is introduced.
+
+Local typecheck, all 32 small-domain scenarios and 1,000 reselection traces at
+64 steps passed. The post-publication owner-move mutation produced the expected
+invariant violation. These finite checks do not prove Tokio FIFO internals,
+watch-channel implementation, native correctness or unconditional progress.
+The aggregate Rust model gate remains in the existing CI job. Router capacity
+identity/epoch and watch internals are separate native/type refinement
+obligations, not claims added to this abstract lifecycle state.
+
+* Directed validation and performance receipts
+
+Receipts below distinguish native acceptance, compile/lint checks and matched
+performance. Cold-compiling optional aggregate/model or combined all-target lint
+attempts were stopped before completion and are not counted as passes; their
+transcripts are retained privately. Existing focused lint and native commands,
+and the unchanged CI aggregate model command, remain the required gates.
+
+** Native and local checks
+
+The final local admitted Darwin fixture passed in 6.13 seconds of test execution
+with the original per-progress guard. It includes initialization failures, native
+types, GC and same-Actor multishot continuations; Scheme exceptions, construction
+and projection panics; direct-owner capacity release on B while A remains
+blocked; a FIFO follower, cancellation and admission timeout; router/pool close;
+and same-limit capacity reconfiguration invalidating old routers/waiters while
+a fresh router succeeds. All four final owners joined, external roots were zero,
+copied files were removed and the process descriptor count returned.
+
+All seven focused semaphore/real-pipe controls passed in 0.03 seconds. They cover
+partial internal acquire_many cancellation, work acquired while waiting for a
+slot, failed speculative acquisition without self-notification, durable releases,
+independent pipe delivery, concurrent writers, full pipe, failed reader and owner
+close. Application declaration counters verify one original read per declaration
+through both admission paths; native short-handler errors return every credit.
+Final focused core and qualification strict lints passed. Release smoke completed
+eight timed smoke rows and clean four-owner shutdown; smoke is not a performance
+qualification. The exact added Cargo dev-profile CI smoke also passed locally
+with eight samples, four joins, zero roots and removed files. The added CI
+commands stay in existing jobs, with no matrix or timeout change.
+
+Initial syntax, external-test placement/deep-import, constructor-order and similar
+variable-name diagnostics were repaired in the source without suppressions. Their
+failed receipts remain private. The first frozen pre-epoch prototype passed smoke
+but was superseded before any full timed capture: review found that validating
+native capacity only at construction/publication let old class quotas cross an
+unassigned waiter's capacity reconfiguration. The final exact-object scope and
+native reconfiguration control close that protocol gap. Prototype receipts are
+not relabeled as final qualification.
+
+** Full same-VM/load A/B
+
+Two complete unobserved captures each retain 40 samples: ten per arm/load in
+AB/BA order, with 8,192 native orders and 64 serial nominal 500-us probes.
+Each capture reuses its same four VMs and image for both arms, with two Tokio
+workers, batch eight, native short execution, class quotas, FIFO result
+observation, native port wake, feed one, cooperative budget one and coalesced
+notification. Only Pinned versus Reselect admission changes. The pool change
+channel is enabled during warmup and stays enabled in both timed arms.
+Our build work ended before capture; no other task was paused. These are local
+observations, not an exclusive-host or cross-capture absolute speed guarantee.
+Both captures ended with four joins, zero external roots and removed files.
+
+| Capture/load | Orders/s pinned -> reselect | Change | Actual short p99, ms | Scheduled short p99, ms | Batch service p99, ms | Minimum normalized owner progress |
+|--------------+----------------------------+--------+---------------------+------------------------+----------------------+-----------------------------------|
+| A compute | 37,294 -> 39,831 | +6.80% | 13.337 -> 33.054 | 173.765 -> 378.844 | 4.374 -> 7.143 | 98.425 -> 98.266% |
+| A mixed | 13,746 -> 13,415 | -2.41% | 14.453 -> 20.036 | 232.243 -> 194.440 | 22.950 -> 27.443 | 98.312 -> 98.696% |
+| B compute | 33,905 -> 45,507 | +34.22% | 24.727 -> 28.581 | 221.379 -> 585.987 | 13.403 -> 14.027 | 98.238 -> 98.500% |
+| B mixed | 18,453 -> 20,934 | +13.44% | 9.044 -> 9.753 | 118.002 -> 125.814 | 21.190 -> 17.722 | 98.206 -> 98.696% |
+
+Compute throughput improves in both captures (+6.80%, +34.22%). Mixed throughput
+is inconsistent (-2.41%, +13.44%). Actual short p99 worsens in all four comparisons
+(+147.83%, +38.63%, +15.59%, +7.85%). Three batch service tails worsen; only B
+mixed improves. Scheduled probe tails worsen in three comparisons. No negative
+row is dropped, and no general throughput/tail acceptance or default promotion
+follows from the compute gain.
+
+Maximum owner finish spread improves in all four rows: 20.432 -> 19.533,
+33.394 -> 13.110, 8.773 -> 3.172 and 23.976 -> 10.489 ms. Minimum normalized
+progress worsens slightly in A compute and improves in the other three rows.
+Actor peer minima are 1 -> 0 in A compute and zero in all other rows. This is
+finite progress evidence, not an Actor starvation-freedom proof. Probe overlap
+minimum is 64 except A compute candidate, which is 61; the serial probe policy
+and all original observations remain retained. This is not a fixed-rate open-loop
+arrival claim.
+
+** Existing timing boundary and remaining algorithm gap
+
+| Capture/load | Admission p99, ms | Post-admission / before-construction p99, ms | Own construction p99, ms | Projection/retirement p99, ms |
+|--------------+-------------------+--------------------------------------------+-------------------------+------------------------------|
+| A compute | 0.444 -> 0.235 | 12.775 -> 33.006 | 0.028 -> 0.029 | 0.005 -> 0.023 |
+| A mixed | 0.591 -> 0.637 | 13.027 -> 17.153 | 0.043 -> 0.091 | 0.005 -> 0.005 |
+| B compute | 0.267 -> 0.155 | 22.831 -> 26.402 | 0.061 -> 0.057 | 0.011 -> 0.005 |
+| B mixed | 0.256 -> 0.320 | 8.709 -> 9.493 | 0.024 -> 0.118 | 0.008 -> 0.005 |
+
+Compute admission p99 decreases in both captures, but the post-admission owner
+entry tail worsens in all four. Own construction and projection tails are much
+smaller in these observations. Marginal percentiles describe different requests
+and cannot be added or used as an exact percentage decomposition.
+
+Capacity availability is not an owner-runnable or prompt-wakeup acknowledgement.
+The remaining gap is after admission and before this probe's native construction.
+It can include queued bulk construction/execution/GC, Scheme wait handling,
+capacity-event synchronization and OS scheduling. These unobserved captures do
+not isolate those causes. They do not establish that Scheme GC or the OS alone
+caused the regression, and SDK process GC CPU must not be subtracted from owner
+thread CPU. The failed wait-phase hint from 30.40 remains rejected.
+
+The optional route closes demonstrated pinned-owner admission and quota-scope
+problems, but it is not admitted as the final short-latency algorithm. Existing
+native types and Scheme capabilities stay complete; defaults stay Pinned.
+
+* Frozen identity and reproduction
+
+Final release binary SHA-256:
+=f2455567e589e7552f4c05a487f865859d6d60016e93d01aad3cc95df2e76ce0=.
+Native O2 image SHA-256:
+=306ac7a148bc4e444ae210ee1f734150beba352bca4789d32c8f629d97b22f46=.
+Private source archive SHA-256:
+=7a4faac97d371f9d7efae12942fa6b59deefddf60f4575b8afa01f8ba5d014a8=.
+
+The native image is identical to the prior short-notification image. All 1,423
+frozen input files and the executed image were checked unchanged after both full
+captures. Only qualification prose is subsequently updated; runtime input bytes
+remain matched. Raw captures, build/failure logs, binaries, images and archives
+remain outside Git. No embedded generated-file hash comment is introduced.
+
+Use the repository's admitted immutable SDK and build environment:
+
+#+begin_src text
+GERBIL_DYNAMIC_MODULE_OPT_LEVEL=2 just bridge-scheme-service-benchmark --reselection-ab
+cargo test -p gerbil-scheme --features tokio-dispatch --lib instances:: --locked
+cargo test -p gerbil-scheme-qualification --features instance-dispatch --test scheme_service --locked -- --nocapture
+cargo bench -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --profile dev --locked -- --test --reselection-ab
+cargo clippy -p gerbil-scheme --features tokio-dispatch --lib --tests --locked -- -D warnings
+cargo clippy -p gerbil-scheme-qualification --features instance-dispatch --bench scheme_service --test scheme_service --locked -- -D warnings
+quint test specs/owner_lifecycle.qnt --main owner_lifecycle_small --seed 1
+quint run specs/owner_lifecycle.qnt --main owner_lifecycle_small --step reselectionStep --invariant safety --seed 1 --max-samples 1000 --max-steps 64 --verbosity 1
+#+end_src
+
+Full native, model and CI outcomes remain separate evidence classes. New-head CI
+must be inspected after publication; the successful starting-head run does not
+admit this follow-up.

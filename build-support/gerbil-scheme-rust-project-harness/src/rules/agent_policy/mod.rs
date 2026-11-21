@@ -1,11 +1,11 @@
 //! Agent-oriented Rust policy rules.
 
+mod abi;
 mod algorithm_shape;
 mod api_shape;
 mod data_shape;
 pub(crate) mod dependency_graph;
 mod doc_boundary;
-mod native_abi;
 mod pack;
 mod process_command;
 mod scenario_requirements;

@@ -1,0 +1,116 @@
+#+TITLE: Temporary CI SMP capability gap
+
+* Status
+
+The pinned Gerbil SDK does not support multiple-threaded VMs. Multiple VMs are
+not evidence of multiple active processors inside one VM. PR #18 therefore
+keeps the =scheme-smp= job explicitly skipped with =if: ${{ false }}=, rather
+than converting its processor-activation assertions into passing controls.
+The bindings job records this gap in its notice and job summary. A green
+bindings job is not an SMP or Org parsing acceptance receipt.
+
+* Required gates retained
+
+Both Linux and macOS continue running the complete workspace Cargo checks,
+tests, FFI and Tokio transport smoke tests, and strict lint. The full-program
+actor AOT image remains tested using all nine single-processor load/fanout
+cases. Both Tokio controls remain tested, including machine-adaptive worker
+counts. Bazel query, build, and the complete =//:ci= test suite remain required.
+No failure is swallowed with =continue-on-error= or a successful fallback.
+
+The actor filters select =one_processor_control=, =tokio_one_worker_control=,
+and =tokio_machine_workers=. Only Scheme =machine_processors= and
+=scheme/runtime-smp-test.ss= are reserved for the skipped job. The underlying
+benchmark and processor-activation contract are unchanged.
+
+* Local validation
+
+YAML parsing, retained-gate/filter scope assertions, every workflow shell
+block's syntax, and diff whitespace checks passed. Using the installed SDK,
+=just bridge-actor-benchmark --test= passed all nine cases for each of the
+three retained filters (27 smoke cases, not twenty-sample performance runs).
+The machine-adaptive Tokio control observed 12 workers and up to 768 tasks.
+The Scheme control reported one active processor, recovered after injected
+worker failures, and emitted =ACTOR-AOT-CLEANUP finalized=OK=.
+The first local attempt lacked Cargo on PATH; a subsequent attempt could not
+write the sandboxed default harness cache. Selecting the existing Rust path
+and a checkout-local cache resolved these environment failures. The installed
+SDK was not downloaded, rebuilt, or changed. Complete remote gates still
+require the exact pushed head's GitHub run; these local checks are not CI green.
+
+* Finite protocol scheduling
+
+The canonical owner protocol retains 95 checks, including scenarios, sampled
+traces and deliberate safety counterexamples. CI partitions that unchanged
+inventory into the original two shards of 48 and 47 checks. A regression checks
+exact-once coverage of the actual collected checklist. No additional shard-count
+or source-selection environment variable is required.
+
+This changes scheduling, not the model, sample counts, seeds or step bounds.
+Each job retains its fifteen-minute limit. Workers still use executing-host
+parallelism with the existing minimum of four; the number of CI shards is not
+the number of compiler cores. Every shard must finish its selected checklist
+and the union must remain complete. A successful sibling does not admit a
+timed-out shard. The previous shard-zero cancellation remains failure evidence.
+
+* Repeated preparation and expensive scenarios
+
+The executing-host local baseline runs all 95 checks without partitioning,
+using 12 workers, and naturally completes in 827.86 seconds. It preserves the
+existing fifteen-minute bound, sample counts, step bounds, seeds and deliberate
+counterexamples. This is not acceptance of either remote CI shard.
+
+One-time observations of the pinned official Quint CLI separate loading,
+parsing, typechecking, evaluator-bridge residence and process exit. The probe
+and raw observations live in the ignored cache; no diagnostic adapter or
+profiling environment-variable API is shipped. Node CPU excludes child CPU;
+child residence includes startup, input, exploration and output. Nested spans
+are not additive and child residence is not pure exploration time.
+
+The candidate selects Quint's already-installed official TypeScript interpreter
+for scenario assertions and keeps the official Rust evaluator for sampled
+exploration and deliberate temporal counterexamples. The original frontend,
+canonical source closures, official scenario selector, seeds, samples and step
+bounds remain unchanged. Backend choice is explicit in the existing argument
+preparer, not selected by a new environment variable.
+
+A single observed Rust scenario sends 32,509,245 bytes containing 11,011 lookup
+table entries. The Rust test command repeats serialization/startup per selected
+scenario. Existing CLI source selects the scenario list before its backend
+branch, so both backends use the same selector and model. Complete differential
+acceptance must compare every selected scenario count and all expected results.
+This does not qualify actual Gerbil runtime execution or replace the separate
+Rust exploration obligations.
+
+The complete instrumented pair matches all 96 semantic CLI invocations
+(95 planned checks plus the initial canonical typecheck), 578 selected scenario
+executions and 44 expected failing counterexamples. The official-backend cohort
+naturally completes in 593.85 seconds. Evaluator subprocesses fall from 661 to
+83. For the wide completion case, the scenario phase falls from 754.96 seconds
+to 15.40 seconds, and Node CPU from 138.96 seconds to 6.75 seconds. These are
+observed local paired costs, not a controlled fleet speedup. Parsing and type
+checking still repeat at the official CLI boundary; no undocumented mutable
+stage reuse is assumed.
+
+Cold installation must remain serialized. Interpreter scenarios no longer
+trigger the lazy Rust evaluator installation. Before parallel workers start,
+the scheduler executes one real Rust simulation selected from that shard's
+original checklist. Typed check classification and exact-once coverage verify
+that each original shard contains such a simulation. No extra model check,
+external downloader or installation switch is introduced. The final ordinary
+entry reruns this ordering without the diagnostic probe under the same bound.
+
+A parser-based scenario-declaration filtering experiment completed the full
+95-check inventory in 740.90 seconds. It was withdrawn instead of shipping extra
+reference analysis/source transformation. The patch and measurements remain in
+the ignored cache. No new preparation cache, evaluator, source-selection switch
+or additional CI shard is introduced.
+
+* Processor capability restoration
+
+After both platform SDK releases qualify multiple-threaded VMs, update the
+immutable release identity/checksum and restore the =scheme-smp= job condition.
+Remove the temporary skip notice and rename the job to its ordinary SMP name.
+The restored job must run the original exact activation test and all nine
+machine-processor actor AOT cases. Do not count this temporary skip as prior
+SMP evidence or substitute Rust queue concurrency for processor activation.

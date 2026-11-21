@@ -1,0 +1,403 @@
+#+TITLE: Owner lifecycle model and native OS boundary repairs
+#+STARTUP: overview
+
+* Current status and historical receipt boundary
+
+The current lifecycle baseline is =8c23217= (six active CI jobs passed; SMP explicitly skipped). The dated artifacts, failures, ratios and model bounds below retain their original identities; they are not measurements of every later source revision. In particular, 10.10x / 21.18x data-placement ratios are not VM scaling factors, and the old eight-transition symbolic receipt does not qualify the extended lifecycle model.
+
+Use [[file:30.24-current-baseline-and-cost-attribution.org][the current baseline and attribution record]] for the rebuilt artifact, optional diagnostics and longer reuse observations. That record separates completed results from pending work. Raw historical temporary captures are currently unavailable on this host; their committed summaries are preserved without fabricating replacement logs.
+
+* Original decision and initial repair receipt
+
+Add a narrow Quint protocol extension to the existing handoff model, and keep native acceptance independent. The new model covers late publication, lazy executor recreation, owner-bound handles, observation timeout and close/drain/retirement. It does not reimplement Tokio, Rayon, Scheme GC, Actors, green threads or SMP scheduling.
+
+The original two native blockers are diagnosed and repaired at the OS directory boundary. A separately reproduced host-signal crash is repaired at native setup/cleanup. The identical 600-second reuse and eight-cycle lifecycle targets now complete on the repaired O2 artifact. This is finite native acceptance, not industrial endurance or complete memory-reclamation certification. Historical failures remain below. No dispatcher/window/owner default or native optimization setting changes.
+
+* Original model scope and source boundary
+
+=specs/owner_lifecycle.qnt= complements =bridge_handoff.qnt= instead of copying its queue and receiver machinery. =specs/owner_lifecycle.md= maps transitions to the actual Rust source and records lock linearization assumptions. Initialization and correct native owner execution are external preconditions; the model cannot explain an SDK setup failure or zero native root.
+
+The host closes admission, drains native tasks, clears registry metadata and retires its executor slot and files. Initialized images remain retained. An overlapping operation may linearize before close even when it returns later. A late reply copy is not authorization to use or republish a destroyed native value. The executor slot is not every outstanding Arc or OS thread; the native test joins client threads before counting retirement.
+
+The model checks immutable owner association at handle-use admission, no late registry publication or lazy pool recreation, accepted-work drain before join, and closed-state root/registry/file retirement. Timeout does not cancel accepted work. Closed images cannot reopen in this model. Stuttering is allowed: no eventual completion, fairness, arbitrary-native-hang recovery or unbounded leak-freedom theorem is claimed.
+
+* Original executed protocol gates
+
+Quint 0.33.0 executes two finite domains: three requests/two owners and five requests/two owners. Each has eight deterministic scenarios, including deliberately unsafe transitions whose violations are asserted. Both pass. Two sets of 1,000 sampled traces, each at most 64 transitions, report no safety violation. These are bounded samples, not exhaustive state exploration.
+
+All four missing-guard mutations produce real =Invariant violated= counterexamples: late registry publication, late lazy executor creation, premature join and foreign-owner handle use. The Rust integration test requires exit 1 and that exact invariant diagnostic; parser or dependency errors cannot pass a negative control.
+
+The composed =just native-model-check= runs the existing handoff checks plus this new gate. A new independent CI job uses pinned Quint and the same existing Cargo test harness entrypoint. No native/latency pass is inferred from that CI job.
+
+The unchanged model SHA-256 is =fb131a8acf589fed9b6b1490e553a595862465b6934163e835531bed29906e13=. A separate eight-transition symbolic check completes with =NoError= using Apalache 0.62.1 and the existing invariant-mode configuration (65.902 seconds). The earlier external-output wrapper repeated that bound with =NoError= (50.012 seconds). The replacement Rust/Just entrypoint also completes the unchanged eight-transition target with =NoError= (56.66 test seconds), keeping output outside the checkout. This establishes bounded safety only for that finite domain and depth.
+
+The twelve-transition attempt becomes expensive in later SMT queries and is deliberately stopped incomplete. Its partial state checks are not a pass. =owner-model-verify= retains the twelve-transition target; =owner-model-verify-smoke= explicitly selects eight. The smaller result does not replace or close the larger target. The model, safety predicate and transitions are unchanged between them. Symbolic output now runs in a temporary directory outside the checkout.
+
+* Native artifact and observation method
+
+The original failure captures use O2 wheel SHA-256 =6af7f691dbd3a09c89d24c7a40e65372b278f766747da3aba6d309320f9a8b15=. Runtime sources were unchanged in that model-only stage; the native repairs and their separately identified artifact are described below. Gerbil/Gambit/C native compilation and full Scheme execution remain in place. Python only drives the actual library API and observes its process; native lists/vectors, binary integers/bytes, rooted procedures and continuations carry work. JSON is diagnostic output.
+
+=qualify_dispatch_memory.py= warms full hygienic expansion on each owner, retains three native handles per owner, rotates direct/Tokio/Rayon/Rayon-blocking, validates real Actor results and worker distribution, applies retained procedures/continuations, exercises expected Scheme exceptions and repeats DSL recovery. Periodic GC checks an exact external-root baseline. A four-MiB retained allocation is an extra-root/collector diagnostic control. Releasing handles does not imply RSS must decrease.
+
+The observer records current Darwin RSS, OS thread rows, loaded images in this process's owner/module namespaces and whether their files still exist. Namespace image counts include runtime/module images, not extra VMs. SDK heap capacity is not live data; the SDK post-GC live value is retained in its raw units. These are resource observations, not throughput A/B or dedicated-host latency certification. A two-GiB sampled RSS guard remains in place; it did not trigger these failures.
+
+* Preserved native failures before repair
+
+| Case | Observation | Admission |
+|------+-------------+-----------|
+| First mixed reuse pilot | Repeated DSL recovery returned zero native root | FAIL |
+| Ten-minute fixed-four-VM target | Failed after 119.505 process seconds, owner 3, zero-based turn 1344, direct arm | FAIL; target did not complete |
+| Continuation-resumption control | Continuation stays rooted but ordinary procedure replaces resumption; same DSL failure at 32.772 seconds, owner 0, turn 528 | FAIL; continuation resumption is not necessary for the bug |
+| Eight create/use/close cycles target | Three cycles close cleanly; fourth startup rejects owner 0 with status 4, phase 1, no cleanup receipt | FAIL; target did not complete |
+
+The DSL error is =Native { operation: "native root", code: 0 }=. At that stage, the ABI collapsed the caught Scheme exception to zero and its cause was unresolved. Sequential repeated DSL, concurrent DSL, continuation-plus-DSL, Actor-plus-DSL, Actor-plus-continuation and Actor-plus-exception controls pass 32 or 40 rounds. Later short original-path one- and four-owner captures also pass. None of these cancels the reproduced sustained failure.
+
+Diagnostic Scheme wrappers can execute many rounds successfully, but one variant imports another application module and changes image population; neither wrapper substitutes for the normal entry path. They are not admitted as fixes or equivalent acceptance controls.
+
+The startup error is =Initialization { owner: 0, status: 4, phase: 1, cleanup: None }=. This code combines several setup/host-I/O/processor-validation failures; the exact branch was unresolved at that stage. The backend poisons further admission. The setup-attempted image is deliberately quarantined rather than unloaded without a successful cleanup receipt. There is one remaining mapped image file in that failed process; do not classify it as a successful retirement or silently remove it to green the test.
+
+* Memory classification evidence
+
+| Completed lifecycle | Post-close RSS MiB | Owner-namespace images | Existing image files | OS threads |
+|---------------------+--------------------+------------------------+----------------------+------------|
+| First | 249.8 | 4 | 0 | 1 |
+| Second | 352.8 | 8 | 0 | 1 |
+| Third | 399.4 | 12 | 0 | 1 |
+
+External roots are zero on all three successful closes. The fourth startup failure leaves 13 mapped images, one with a retained file. Thus fixed-VM reuse and repeatedly constructing fresh VM images are materially different resource regimes.
+
+A separate short native control closes four VMs with zero roots, removed files and one OS thread. Current RSS remains 263.1 MiB and four initialized images remain mapped. The opt-in diagnostic =malloc_zone_pressure_relief(NULL, 0)= reports zero bytes released and RSS does not drop. Darwin's installed malloc header specifies maximal best-effort relief across all zones for those arguments. This is a post-close diagnostic only, not a production cleanup change or performance optimization.
+
+A later descriptor-instrumented eight-cycle capture completes successfully. Every close has zero external roots, no remaining image files, one OS thread and three open descriptors, against a soft limit of 1,048,575. Owner-namespace image counts reach 32. Post-close RSS spans 263.3--623.9 MiB and then falls to 365.0 MiB in the final cycle; it is not monotonic with mapped-image count. This control does not reproduce the earlier startup rejection, establish its cause or erase it. It supplies no evidence of cumulative descriptor exhaustion in those cycles. Those captures did not resolve the setup or sustained DSL cause; the later native diagnosis below does.
+
+Known intentional retention: initialized code mappings, required by the current loader/hook lifetime policy. Not demonstrated: that all residual RSS is necessary or that it is ordinary reclaimable malloc cache. The zero relief result does not prove absence of every cache or establish a real allocation leak. SDK permanent allocations, other mapped data and native cleanup behavior still require attribution. Do not force dlclose, reuse finalized SDK state, remove continuation coverage or weaken Scheme execution to mask the result.
+
+* Native diagnosis and directory repair
+
+The optional diagnostic ABI preserves the caught Scheme exception on the original rooted-call path. It retains at most 4,096 characters, transfers the UTF-8 diagnostic as an ordinary temporary native root exactly once, and clears it before a subsequent rooted call. Successful calls keep the original native value protocol. Diagnostic encoding failures remain caught. Older images without these optional exports retain the generic rejected-root error. Initialization diagnostics separately record the failed branch, original decoded SDK status, host errno and active processor observation; unavailable diagnostics are not invented as zeroes.
+
+The diagnostic O2 wheel reproduces the mixed-reuse failure after 16.192 seconds, owner 1, turn 288, direct mode. The actual exception is a module-read syntax error: it attempts to read a nonexistent =owner-2-modules/.../gerbil-python-ledger/scheme/core.ssi=. The same wheel rejects the fourth lifecycle startup with SDK status =-515899390=. The paired SDK header decodes facility 320, code 2: =ENOENT=. Host capture/restore and processor validation are not the failing branch in that capture.
+
+A directory-only native control reproduces the host cwd changing into a temporary owner directory. A separate lifecycle observer records the host cwd in owner 2's module directory after work, then =getcwd= returning =ENOENT= after resource retirement, followed by SDK setup returning the same error. These are independent failures in the original execution path, not wrapper-based passes.
+
+Inspection of the paired native image establishes the mechanism: =___os_path_normalize_directory= calls =getcwd=, =chdir= and restore =chdir= while holding an image-local pthread mutex. Each copied SDK owns a different mutex, while the process cwd is shared. Concurrent normalizers can therefore save, read and restore another owner's directory. Removing retired files then leaves a deleted process cwd, which also prevents a later SDK setup. Native root correctness alone cannot prevent this OS-global interaction.
+
+The minimal Darwin instance adapter binds its statically linked SDK's =chdir=/=fchdir= calls to owner-thread directory operations. The minimal export list keeps those bindings local to the private image; host libc calls are not interposed. Each owner captures its initial directory before setup, and cleanup clears the private directory reference after SDK retirement. Setup failures also clear it before the owner exits. Linked single-VM execution is unchanged. No global Scheme execution lock, alternate evaluator, reduced expander, timeout relaxation or scheduler default change is introduced.
+
+This uses Darwin's =pthread_chdir_np=/=pthread_fchdir_np= private SPI. Apple's [[https://github.com/apple-oss-distributions/libpthread/blob/main/private/pthread/private.h][maintained declaration]] describes per-thread cwd, errno behavior and clearing with descriptor -1, available since macOS 10.12. The existing private-image backend is Darwin-only; this is an explicit platform dependency, not a portable or public-POSIX guarantee. The loader must resolve those symbols; there is no fallback to process-global chdir. A native C control verifies per-thread getcwd, relative reads, failed chdir, descriptor-based restore and unchanged host cwd. Mach-O inspection confirms SDK calls bind to the image-local implementation, which is absent from the public export table.
+
+The maintained Python backend regression uses four real owners, 1,000 directory normalizations each, Scheme current-directory parameterization and relative file reads. The independently captured unfixed control leaves the host cwd invalid even though native shutdown reports zero roots. The same control and the original 600-second reuse/eight-cycle lifecycle targets must pass on the repaired O2 artifact before admitting this repair.
+
+The three model shell wrappers and duplicate Bash SDK-environment wrapper are removed. Quint runs through the existing Cargo test harness and Just/CI entrypoints; existing Rust native-build tests own the SDK environment boundary. No new test dependency or alternate build system is added.
+
+* Host process-control signal regression
+
+An early repaired-artifact reuse attempt is deliberately interrupted while advancing the source to preserve POSIX =fchdir(-1) -> EBADF= semantics. It does not finish the 600-second target. The requested SIGINT is followed by SIGSEGV (exit -11) at 209.862 process seconds, without a clean-shutdown receipt. This result is retained as a separate native failure, not relabeled as a normal stop or sustained pass.
+
+Independent one-owner controls establish the host-signal regression: no VM produces Python =KeyboardInterrupt= and exits 0; an active VM terminates with SIGSEGV (-11); after close, SIGINT terminates the process (-2) instead of reaching Python. No Actor work or GC pressure is required. A read-only sigaction/dladdr observer finds SIGINT/SIGTERM pointing into the last private SDK image while active, and SIGINT reset to default after cleanup rather than restored to Python.
+
+The common native boundary now saves and restores host SIGINT/SIGTERM alongside the already preserved SIGCHLD during setup, and preserves current host handlers across cleanup too. Cleanup captures the current host handler, including changes made after open. SDK-internal timer signals are unchanged: this does not disable Scheme green-thread scheduling, translate Scheme execution into Rust, cancel accepted native work or remove native Scheme exception/continuation capability.
+
+The existing actual API suite now checks SIGINT and a custom SIGTERM handler with four live VMs, native-call recovery after delivery, a handler changed during VM lifetime, and delivery after clean close. Fresh-process baseline/live/closed controls and the original sustained workloads are separate required receipts on the final artifact. Delivery inside the SDK setup/cleanup transition and arbitrary user-installed OS signal handlers are not certified by these finite post-open/post-close tests. OS timer signal ownership and other process-global resources still require an embedding contract; same-process VM images are not crash containment.
+
+* Repaired artifact and completed focused gates
+
+The repaired O2 wheel SHA-256 is =95af584758152d71e2574915f69c992bdf15fe9d62eed18cfecfb5f043892ff7=. It is built by the normal Cargo/maturin/Gerbil/Gambit/C chain with dynamic module optimization level 2. A captured source identity matches every changed executable input after build; no source substitution or fallback evaluator is used. Native external-library packaging remains host-dependent, as before; this local artifact is not a self-contained portable release.
+
+| Gate on repaired source/artifact | Result |
+|----------------------------------+--------|
+| Actual Python Rust-backend API suite, including GC/continuations/exception details, directory and host signals | 12 PASS |
+| Independent four-owner directory normalization control that fails before repair | PASS |
+| Fresh-process SIGINT controls: no VM, one active VM, after close | All exit 0 with Python KeyboardInterrupt |
+| Read-only signal observer | SIGINT remains bound to Python before, during and after VM lifetime |
+| Original mixed workload interrupted after its first sample | Host exception; clean close; roots [0,0,0,0]; files removed; one thread/three FDs |
+| Native fault before SDK setup | Status 61, phase 0; two joins; initialized peer cleaned; zero remaining files; retry rejected |
+| Native fault after SDK setup | Status 62, phase 2; explicit rollback status 0 and zero roots; two joins; zero remaining files; retry rejected |
+| Linked native/source unit gate after the common C lifecycle repair | 45 PASS |
+| Strict Clippy for both real instance-feature runtime crates | PASS |
+| Rust-harness replacement for owner Quint scenarios/samples/mutation controls | PASS; native evidence remains separate |
+
+The interrupted mixed workload deliberately emits a =KeyboardInterrupt= failure observation before its outer control checks the shutdown receipt and exits 0. It is an exception/cleanup control, not a 600-second sustained pass. Earlier missing-export diagnostics and intermediate Clippy failures are retained outside Git as well.
+
+* Completed original sustained targets
+
+The unchanged 600-second four-owner workload completes in 609.244 process seconds with 910,368 validated batch requests across 18,966 turns. It rotates the same four dispatch modes, keeps the same native payloads, procedures, saved continuation, expected exceptions, full DSL recovery and GC checks. Every sampled live owner has exactly three external roots. All roots are then released; close reports [0,0,0,0], one OS thread, three FDs and no remaining image files. Sampled RSS spans 279.3--392.4 MiB; post-close RSS is 375.7 MiB with four initialized base images still mapped. No throughput, p99 or leak-freedom claim is inferred from these resource observations.
+
+The unchanged eight-cycle create/use/close target completes in 82.885 process seconds, 1,536 validated batch requests. All eight closes report zero external roots, one OS thread, three FDs and removed files. The intermittent SDK ENOENT is not reproduced after the directory repair. Post-close observations are:
+
+| Completed cycle | RSS MiB | Retained owner images | Existing image files | Roots |
+|-----------------+---------+-----------------------+----------------------+-------|
+| 1 | 263.1 | 4 | 0 | [0,0,0,0] |
+| 2 | 384.9 | 8 | 0 | [0,0,0,0] |
+| 3 | 491.9 | 12 | 0 | [0,0,0,0] |
+| 4 | 555.0 | 16 | 0 | [0,0,0,0] |
+| 5 | 607.2 | 20 | 0 | [0,0,0,0] |
+| 6 | 650.5 | 24 | 0 | [0,0,0,0] |
+| 7 | 693.4 | 28 | 0 | [0,0,0,0] |
+| 8 | 731.2 | 32 | 0 | [0,0,0,0] |
+
+The rising 263.1--731.2 MiB RSS in this final lifecycle capture is retained as a negative resource finding. The code-image population intentionally rises to 32, but not every residual byte is attributed. This result neither proves full reclamation nor establishes an allocation leak. The earlier nonmonotonic capture and zero allocator-relief result remain separate observations. Do not force dlclose or reinitialize retired images to make RSS appear green.
+
+* Attribution follow-up on the same O2 artifact
+
+The follow-up starts from PR #18 head =150dd6c052c24a9a089a0aeecb4ae92d42be37ab=, with a clean runtime source tree and the same installed wheel identified above. All four Cargo/Bazel platform CI jobs fail the same project-harness self-policy test: the new =tests/owner_model.rs= is a root test implementation without a declared harness role. Quint succeeds; SMP is explicitly skipped. The repair moves its implementation under =tests/integration/owner_model.rs= and mounts it from the standard thin =integration_test.rs= aggregate. Just/CI select the exact qualified test name. No rule suppression or model weakening is added. The local project-harness suite now passes all 47 tests. The replacement exact selector executes one test (not zero), including the scenarios, sampled traces and four expected mutation counterexamples; it passes in 47.36 seconds.
+
+The memory qualifier now records Darwin =malloc_statistics_t= live bytes, reserved capacity and block count through the existing Python observer. This is test glue, not a new execution or build path. The original Scheme workloads, four owners, mode rotation, GC checks, exceptions, continuations, timeouts and two-GiB guard are unchanged. An external diagnostic reuses =owner_memory.h= to observe mappings and allocator regions; its code and raw captures stay outside Git.
+
+** Eight-cycle classification capture
+
+The same lifecycle workload completes all eight cycles and 1,536 validated batch requests. All closes retain zero external roots, one thread, three FDs and zero existing image files. Its post-close observations are:
+
+| Cycle | RSS MiB | Malloc live bytes | Malloc blocks | Retained images | Image virtual MiB |
+|-------+---------+-------------------+---------------+-----------------+-------------------|
+| 1 | 263.422 | 4552208 | 8399 | 4 | 44.875 |
+| 2 | 394.188 | 4563600 | 8411 | 8 | 89.750 |
+| 3 | 462.000 | 4564752 | 8419 | 12 | 134.625 |
+| 4 | 532.766 | 4566160 | 8427 | 16 | 179.500 |
+| 5 | 578.469 | 4567312 | 8435 | 20 | 224.375 |
+| 6 | 625.938 | 4569488 | 8443 | 24 | 269.250 |
+| 7 | 633.047 | 4570640 | 8451 | 28 | 314.125 |
+| 8 | 684.000 | 4571792 | 8459 | 32 | 359.000 |
+
+The earlier 731.2 MiB result remains a separate negative capture. The lower 684.0 MiB rerun is not a repair or a latency/throughput improvement. These are resource captures on the local host, with other work allowed; they are not dedicated-host performance comparisons.
+
+| Class | Evidence | Conclusion and limit |
+|-------+----------+----------------------|
+| Intentionally retained images | Exactly four additional initialized base images per completed pool; 11.21875 MiB virtual mapping per image | 32 is eight pools times four owners, not 32 running VMs. =Image::finish= cleans the VM and removes the file; =Preflight= only closes the dlopen reference when setup was never attempted. Initialized references remain held. |
+| Allocator retention | Live malloc stays about 4.34--4.36 MiB after close, while reserved capacity reaches 488 MiB and malloc-region resident pages reach about 404.6 MiB | Most allocator residency is not outstanding Scheme heap allocation. A live-phase =vmmap= capture independently reports 303.1 MiB in empty MALLOC_SMALL regions and 12 MiB in empty MALLOC_LARGE regions. That snapshot is not the final close snapshot. |
+| Small residual live allocations | Live bytes increase by 19,584 and block count by 60 between closes one and eight | These process-level counters include loader/Python bookkeeping. They do not attribute every remaining allocation or prove absence of a small terminal leak. |
+| Files, roots and threads | All eight successful closes remove files and return to zero external roots, one thread and three FDs | Those specific resources retire. Zero external roots alone does not measure all Scheme heap/global state. |
+
+Image virtual size, =mincore= in-core pages, malloc-region resident pages, allocator live/reserved bytes and task RSS have different meanings. In-core file-backed pages must not be added to allocator residency as an exact RSS decomposition. The classification attributes the dominant sources without pretending to account for every byte of the original 731.2 MiB sample.
+
+** Independent allocator control and retained negative result
+
+The existing native =instance_resources --allocator= target initializes no Scheme VM. Each wave touches 128 MiB across four Rust workers and then frees the blocks and joins. In this capture, live allocation falls to 23,232 bytes after the first wave while RSS remains 137.8 MiB; after the second wave, live allocation is 32,416 bytes while RSS remains 218.1 MiB. The second wave reuses 192 of 512 exact addresses. This is lower reuse than the earlier 496-address capture and remains recorded, not relabeled as identical reuse.
+
+Both this control and the lifecycle diagnostic report zero bytes released by =malloc_zone_pressure_relief(NULL, 0)=. The [[https://github.com/apple-oss-distributions/libmalloc/blob/main/include/malloc/malloc.h][allocator API]] promises best-effort relief, not a guaranteed RSS return. Adding an unconditional pressure-relief call to production would have no demonstrated benefit here and would affect host allocation policy.
+
+** Maintained-observer repeat and allocator-policy control
+
+A second eight-cycle run uses the maintained Python telemetry directly, without the external mapping observer. It completes in 123.926 process seconds with all 1,536 validated batch requests. Every close reports zero roots, one thread, three FDs and removed files. Final RSS is 768.531 MiB, malloc live is 5,221,376 bytes, reserved capacity is 599,785,472 bytes, and 32 images remain. This higher RSS is another preserved negative result; observer/process baselines differ, so absolute live-byte totals are not pooled across captures.
+
+An additional diagnostic-only fresh process sets =MallocAggressiveMadvise=1= and runs the same eight-cycle workload. It also completes, with final RSS 741.203 MiB, live bytes 5,221,376, reserved capacity 553,648,128 and 32 retained images. It does not solve mapping accumulation or produce a reliable RSS-return policy. These local resource captures do not constitute a controlled allocator performance A/B; the setting is not adopted or added to production. The [[https://github.com/apple-oss-distributions/libmalloc/blob/main/src/malloc.c][allocator source]] makes these policies host-process options, not Scheme semantic controls.
+
+The existing native-only =instance_resources --retirement= control also completes eight one-owner cleanups under an external allocation-reference observer. Each retires 2,048 bytes of native I/O scratch; after dropping bookkeeping its live malloc observation is 15,344 bytes. The final reference tree contains host/runtime/loader allocations and no =___gstate= allocation root. This simpler qualification program has a different image size and workload from the Python library; it is a supporting cleanup control, not a replacement for the original tests or proof that every Python residual allocation is benign.
+
+** Same 600-second fixed-pool repeat
+
+The maintained observer completes the original 600-second reuse workload in 617.090 process seconds, with 690,384 validated batch requests across 14,383 turns. It retains the same four owners and validates native types, saved continuations/procedures, Actor distribution, expected exceptions, DSL recovery and GC root baselines. Live samples retain eight namespace images (four base images plus the program modules), with RSS 279.344--400.516 MiB; the population does not grow during reuse. After release and close, roots are [0,0,0,0], one thread and three FDs remain, image files are gone, and only the four base images remain mapped. Final RSS is 370.938 MiB, malloc live is 5,202,320 bytes and reserved capacity is 486,539,264 bytes.
+
+This is finite resource acceptance on the unchanged O2 native wheel, not a new speedup or p99 claim. The different request count from the earlier 910,368-request capture is not normalized into a performance result; local concurrent work and extra observations are not controlled performance conditions. Reusing one fixed pool and repeatedly creating fresh pools remain distinct resource regimes.
+
+** Repair boundary
+
+No large outstanding native heap leak is established by these captures, so this follow-up does not invent a native free or force-unload initialized code. The current no-unload policy is conservative backend policy, not proof that Gambit intrinsically requires every mapping forever. Full Scheme permits native callbacks, dynamic modules and TLS destructor paths; retirement of all such references is not yet qualified. Preserving that capability rules out silently disabling those paths to make unloading appear safe.
+
+The concrete changes are the failing CI suite layout and reproducible allocator telemetry. Repeated creation of fresh pools remains unbounded in retained mappings. Reusing a fixed pool bounds image population in the tested route; it does not authorize reinitializing a finalized SDK image or prove indefinite leak freedom. A general unload protocol and attribution of the small residual live allocation remain open.
+
+* Callback, TLS and module retirement follow-up
+
+The exact published head =418adc8e25c38481c25dde26fdb62e02fa961d8c= completes all four Cargo/Bazel platform CI jobs and the owner-protocol job successfully. SMP is explicitly skipped. The following native lifecycle repair has separate local receipts; the earlier remote success does not certify a later commit.
+
+** Concrete unload boundaries
+
+The paired installed ledger binary's =___cleanup_os= calls =___cleanup_dyn_module=. That function walks the dynamic-module list, calls =dlclose= on each handle, frees the list nodes and clears the list. The full Python DSL workload has four program-module images while live and none after clean shutdown. These module images are distinct from the four retained base images.
+
+The actual ledger binary contains an emulated-TLS descriptor, but its thread setup/cleanup path does not register a pthread TLS destructor. A descriptor alone is not evidence of an outstanding destructor. This observation is specific to the inspected artifact; it is not a source-name/symbol heuristic authorizing arbitrary image unload.
+
+| Population / condition | Native evidence | Admission boundary |
+|------------------------+-----------------+--------------------|
+| Trusted image rejected before native setup | Existing preflight control repeatedly closes the copied image and removes its path without growing the loaded-image population | Constructors must not initialize a VM or leave callback/TLS references that cannot retire during preflight dlclose |
+| SDK-managed modules in the actual DSL workload | SDK cleanup closes module handles; program-module mappings disappear after close | Observed for the packaged Scheme modules; arbitrary native module exit hooks are not certified |
+| Initialized image after owner join, TLS retirement and callback revocation | Qualification runs real Scheme GC, multi-shot continuation/dynamic-wind and exception work; owner TLS destructor runs once, its key is deleted, the foreign callback is revoked, and diagnostic dlclose actually removes the image | Finite native proof for this controlled program; production retention policy remains unchanged |
+| Code unmapped before a registered TLS destructor executes | Owned negative child receives SIGSEGV on thread exit, with no Scheme VM setup | A successful SDK cleanup alone cannot authorize unload before owner exit |
+| Unknown foreign callbacks, TLS on other threads or native module hooks | No complete registration/retirement authority is established | Keep initialized mappings; do not disable Scheme/native features to manufacture unload safety |
+
+The positive callback control deliberately calls a plain native callback after SDK cleanup while its code mapping is still retained. That callback does not enter a finalized Scheme VM. It demonstrates why host callback revocation is a separate condition from SDK heap cleanup. A destructor that accesses Scheme must be quiesced before heap destruction, not merely before code unmapping. TLS on unrelated threads and callbacks registered outside this test's protocol remain outside its proof.
+
+** Small allocation attribution
+
+A same-process allocation-reference capture compares the first and eighth completed four-owner closes. Live malloc rises from 4,488,928 to 4,508,000 bytes: 19,072 bytes and 60 net blocks. The system =__atexit= reference tree gains exactly 28 XPC dictionaries plus their 28 storage blocks. Each pair is 288 bytes, totaling 8,064 bytes. A correctly typed native Blocks observer inspects only dictionary keys: the new keys are the per-owner =gerbil/core/expander~1.o1= paths, increasing from four such keys to 32. These program modules are already absent from the loaded-image population at close.
+
+Thus this portion is process-reachable image-path metadata retained across module unload, not a live Scheme object graph. The owning system/private cache is not mutated or freed by the library. Its eventual eviction policy is not established. The allocation tree also shows four additional nodes (about ten KiB) reachable from the Rust Crossbeam epoch collector; Python/observer roots change too. Those observations distinguish process/runtime retention from Scheme heap ownership without asserting that every residual byte is benign or indefinitely bounded.
+
+The allocation tool reports no unreachable leaks for the captured processes, but this is not a terminal-ownership or leak-freedom proof. Earlier native I/O scratch retention was reachable too. Here the root paths and module-path keys supply the attribution; a zero leak count alone does not.
+
+The first stack-logging attempt aborts in the allocator tracer's =uniquing_table_node_release_internal= before any workload configuration/setup observation. Disabling compaction reproduces that tracer assertion. Separate no-VM interpreter/import controls exit normally, so the exact tracer abort cause remains unassigned. The uninstrumented reference-graph route completes the original workload. Failed external observer attempts (a variable collision and an incorrect raw-function/Blocks callback binding) are also preserved separately; neither is Scheme native acceptance. The corrected native Blocks bridge completes all eight cycles.
+
+** Minimal repair: failed quiescence is not destruction permission
+
+A new actual-owner failure control installs a rooted finalizer that rejects its call while one native root remains retained. Before repair, shutdown reports finalizer status -71 but still releases that root, destroys the SDK (adapter state 2) and retires 2,048 I/O scratch bytes. The native assertion fails: this is the preserved pre-repair counterexample.
+
+A second control abandons a typed Rust reply whose destructor panics after the native job returns. Before repair, owner unwind reaches =Image::drop= and destroys the SDK without an application-finalizer receipt. The owner is reported panicked, but adapter state is already 2. This is a separate preserved counterexample.
+
+The repair gates destruction on successful application quiescence and zero external roots. A rejected finalizer preserves its retained roots. Nonzero roots after an otherwise successful finalizer also prevent SDK destruction. Unwinding does not re-enter Scheme or attempt emergency destruction. These paths retain heap, base mapping and copied image for process-terminal quarantine and poison further image admission. They are failures, not successful resource reclamation or crash containment.
+
+=OwnerShutdown.native_cleanup_attempted= distinguishes an attempted SDK cleanup from quarantine. =is_clean()= requires it to be true in addition to status zero, zero roots, removed files and joined owners. Host status -71 means rejected finalizer; -72 means a root-balance barrier prevented cleanup. A panicked owner has no successful cleanup receipt. The existing Python service already retains its resource directory on an unclean receipt.
+
+The repaired finalizer control observes adapter state 1, one retained root, =native_cleanup_attempted=false=, zero I/O scratch retirement and an existing copied image; retry is rejected. Native unwind and intentionally forgotten-root controls exercise the other two barriers. Known initialized startup rollback remains a separate tested path; this repair does not claim quiescence for arbitrary custom initialization hooks.
+
+** Artifact and evidence boundaries
+
+The repaired O2 wheel has SHA-256 =4d00b42e51c77459b4d526a0486d7c62245edce5fe8f50bd3d61f488d775eb84=. Its complete native Scheme image is byte-identical to the preceding wheel: SHA-256 =a7cba177966cb74eeedb136c1e79a09fb309e1b86957377e6b595889eaefd353=. The changed production path is Rust's terminal lifecycle guard; Scheme sources, native compilation, native types, scheduler defaults and execution capabilities are unchanged. Rust still dispatches across fixed owners; Scheme owns Actor/green-thread execution.
+
+A diagnostic override on the preceding O2 artifact completes eight full Python lifecycle cycles with all base images physically unmapped after each clean owner join. It ends with zero owner/module images and RSS 468.5 MiB: allocator residency and small path metadata remain even when the images are gone. This override is outside the library API and outside Git; it does not promote general hot unload or establish a performance improvement.
+
+The same diagnostic override on the repaired wheel completes all eight cycles in 126.024 process seconds, with 1,536 validated batch requests and zero base/module images after every close. Paired observations immediately before/after releasing the four base images show RSS reductions of 32.25--33.125 MiB per close. Final RSS remains 420.188 MiB, live malloc 4,501,200 bytes and reserved capacity 503,316,480 bytes. This is an observed resource effect in one controlled process, not general unload admission or a throughput/p99 result.
+
+The repaired wheel also completes the original production-policy targets:
+
+| Native gate | Result |
+|-------------+--------|
+| Same 600-second fixed-pool workload | PASS; 610.429 process seconds; 924,720 validated batch requests; RSS samples 278.813--407.688 MiB |
+| Same eight create/use/close cycles | PASS; 135.374 process seconds; 1,536 validated batch requests |
+| Actual Python native backend API suite | 12 PASS; GC, continuations, full DSL, errors, native graphs/types, Actor distribution, cwd and host-signal controls |
+| Rejected finalizer with retained root | PASS; SDK not destroyed, root retained, copied image kept, cleanup not attempted, further admission rejected |
+| Abandoned Rust reply destructor panic | PASS; owner marked panicked, SDK not destroyed, copied image kept, further admission rejected |
+| Intentionally forgotten native root | PASS; host status -72; SDK/root/image retained; cleanup not attempted |
+| Startup faults before/after known SDK initialization | PASS; existing bounded phase/rollback semantics and cleanup receipts preserved |
+| Foreign callback / TLS / actual unload | PASS; TLS destructor exactly once, key capacity 509 restored, callback revoked, actual mapping population restored |
+| Early code-unload sensitivity control | Owned child SIGSEGV as expected; no Scheme VM setup; parent gate passes only when that signal is observed |
+| Preflight reject/unload and later valid initialization | 136 rejections complete; mapped-image/FD/thread baselines stable; later native setup and cleanup pass |
+| Existing retained-root/abandoned reply/stale-generation control | PASS after the focused responsibility split |
+| Strict qualification-bench Clippy | PASS without suppressions |
+
+All production-policy closes have zero external roots, one process thread, three FDs and removed files. Fixed-pool reuse ends at 372.422 MiB RSS with four retained base images, malloc live 5,201,280 bytes and reserved 499,122,176 bytes. The eight-cycle default-policy run still ends at 764.531 MiB RSS with 32 base images, malloc live 5,219,936 bytes and reserved 578,813,952 bytes. That rising-RSS negative remains open; the correctness repair does not claim to reduce normal-path memory.
+
+The first preflight wrapper stops incomplete at its 60-second outer budget after the snapshot covering 80 rejections; it is not a native pass or native five-second stall. The complete rerun uses a 180-second outer budget and finishes in 121.569 seconds, preserving the existing five-second progress gate. Earlier lint/compiler diagnostics and all observer failures remain outside Git. No Scheme execution/admission deadline is widened.
+
+The native tests use the existing Cargo/Gerbil qualification graph, including its watched C header. Strict lint also required a small responsibility split in the existing retained-root control; its exact zero-root assertion is preserved as an integer bit comparison, without tolerance or suppression. No Bash, alternative Scheme build pipeline, scheduler reimplementation or duplicate model is added. Raw logs, graphs, disassembly, failed attempts, diagnostic overrides and receipts remain outside Git.
+
+* Native TLS retirement and bounded shutdown
+
+A new native counterexample separates Rust closure completion from operating-system thread retirement. The qualification image registers a real pthread TLS destructor on its fixed Scheme owner. The destructor reports entry and waits for a test-owned release flag. The test holds that flag for 750 ms and calls =shutdown(20 ms)= while the destructor is known to be active. Before repair, =JoinHandle::is_finished()= is already true; the subsequent synchronous =join()= blocks the shutdown caller for 761.479 ms. It returns only after the destructor finishes. This violates the advertised shared wait budget. An independent Rust thread-local destructor control also observes =is_finished=true= before thread exit and a 754 ms blocking join.
+
+The minimal repair moves blocking owner joins to one temporary Rust coordinator, created only during shutdown. It does not execute Scheme, dispatch requests or change running-owner topology. A completed join report is the only source of the joined count. Native cleanup receipts may arrive earlier; they cannot make =is_clean()= true while native TLS still owns the thread. A coordinator spawn failure leaves all owner handles with the pool for a later retry. Pool drop closes admission; a coordinator that already owns handles continues joining accepted owners even if its receipt receiver is dropped.
+
+The final lint-clean source returns from the same native control in 21.703 ms with =pending=1= and =joined=0=. After releasing the destructor, the repeated shutdown reports one actually joined owner and clean native cleanup. A separate fresh-process route drops the pool after the timed-out call; it also returns to the observed FD/thread baseline after the destructor is released. Both routes restore TLS key capacity to 509. The baseline includes the existing qualification watchdog; it is compared exactly before and after, without relabeling a live native destructor as retired. These are finite OS-scheduled observations, not a hard-real-time guarantee or proof that an arbitrary destructor will terminate.
+
+The callback/unload, rejected-finalizer, unwinding-owner, forgotten-root, initialized startup rollback and retained-root controls also pass with this join path. The original preflight target completes 136 reject/unload cycles and a later valid initialization in 105.392 seconds, with FD/thread/image baselines restored and zero roots after the valid owner closes. Its native five-second progress gate and 180-second outer wrapper are unchanged. Intentional failure quarantine remains an unclean terminal outcome. The coordinator cannot safely cancel an arbitrary native destructor, free a VM with live roots, or grant permission to unload an image with unknown callbacks.
+
+The O2 wheel has SHA-256 =6f5562e99861d0efded1847b07a8631553aba3c405a8b586f44fb3d9bba81176=. Its native Scheme image remains byte-identical, SHA-256 =a7cba177966cb74eeedb136c1e79a09fb309e1b86957377e6b595889eaefd353=. Native type interfaces, Scheme Actor/green scheduling, continuations, GC, optimizer settings and Rust dispatch defaults are unchanged. This lifecycle change makes no throughput or p99 improvement claim. The existing model's join transition assumes an actual native join; this control qualifies that boundary without adding a duplicate model.
+
+The exact preceding published head =7d7614962e03a919d5212170a7a273e95c0a5d0e= completes all four platform Cargo/Bazel jobs plus Quint successfully; SMP is explicitly skipped. This revision adds a separate =Fixed-owner native lifecycle (macos-latest)= CI job using the same immutable SDK installer and existing Cargo/Gerbil qualification graph. It runs the blocking-destructor/repeated-close and pending-pool-drop controls, callback/unload sensitivity, quiescence/root/unwind barriers, initialized startup rollback, retained-root control and repeated preflight rejection/unload, followed by strict native Rust lint. Local results do not stand in for completion of that new remote job. No new Bash file or shell implementation is introduced.
+
+The initial candidate completes the original 600-second reuse target (616.505 outer process seconds, 784,992 validated batch requests), eight lifecycle cycles (106.332 seconds, 1,536 requests), and all 12 Python API tests. Its close boundaries have zero roots, one process thread, three FDs and removed files. Reuse ends at 373.391 MiB RSS with four retained images; eight cycles end at 729.469 MiB RSS with 32 retained images. This preserves the default retention negative. Two strict Clippy parameter-ownership findings are then fixed by borrowing the coordinator's channels within its owning thread closure. The final wheel has SHA-256 =2309b7a9813996d4e63854e17201d98c42974bc257beacfee24dc83d98de9719=. Its Rust extension differs; the complete original acceptance is rerun on that final wheel instead of transferring the earlier artifact's pass. The native Scheme image remains identical.
+
+Final-wheel acceptance is complete, separately from the initial candidate:
+
+| Final O2 artifact gate | Result |
+|------------------------+--------|
+| Original 600-second fixed-pool reuse | PASS; 619.917 outer process seconds; 586,752 validated batch requests; sampled RSS 199.719--375.719 MiB |
+| Original eight create/use/close cycles | PASS; 91.552 outer process seconds; 1,536 validated batch requests |
+| Actual Python backend API suite | 12 PASS; 9.700 test seconds |
+| Every normal close in both resource tests | Zero external roots, one process thread, three FDs and removed files |
+| Final-source native controls | Blocking TLS/repeated close, pending-pool drop, callback/unload sensitivity, rejected finalizer, owner unwind, root barrier, both startup faults and retained-root control PASS |
+| Original 136-cycle preflight rejection/unload | PASS; 105.392 seconds; later valid native setup/cleanup PASS; FD/thread/image population restored |
+| Final-source production and qualification Clippy | PASS with =-D warnings=; no suppression |
+| Format, whitespace and workflow syntax | PASS; workflow YAML parsed locally; remote native job remains a separate gate |
+
+Final fixed-pool reuse ends at 362.984 MiB RSS, malloc live 5,201,312 bytes, reserved 490,733,568 bytes and four retained base images. Eight lifecycle cycles end at 710.703 MiB RSS, malloc live 5,219,968 bytes, reserved 507,510,784 bytes and 32 retained base images. The new join coordinator is absent at observed post-close thread baselines. These finite resource captures are not matched throughput/p99 A/B measurements; differing work totals or RSS across artifacts are not promoted to performance gains. Retained base mappings, process metadata and complete residual-allocation ownership remain open. Failure quarantine is explicitly not clean reclamation. The native TLS deadline defect is closed; general zero-residue retirement is not claimed.
+
+Raw receipts belong to the historical =gerbil-tls-shutdown-20261020= evidence set retained outside Git. The pre-repair native failure, independent control, initial build-policy finding and sandbox resource-observer rejection are retained separately. The build-policy finding was repaired by extracting named join and handle-restoration operations, without suppression. An empty task-local offline maturin cache miss is preserved; the existing cached builder then produces the wheel through the original build graph.
+
+* Explicit code leases and SDK module retirement
+
+The published =29e99ab486ca72f2ea63a27de4abaf97262e25e9= head completes all six active CI jobs, including native lifecycle and Quint; SMP remains explicitly skipped. Those results do not admit the subsequent working-tree adapter.
+
+** Preserved counterexample and minimal ownership repair
+
+A base-image code lease is insufficient: the SDK closes its dynamic module references during cleanup, before native owner TLS destruction. A real Python test loads the full expander on four owners, holds two code leases on owner zero and closes the library. The first O2 candidate retains only the base image (one observed image versus the required base plus expander pair). That primary assertion fails without calling a stale function pointer. The second test's negative image delta follows guard retirement from the failed first test and is preserved as a dependent failure, not an independent root cause.
+
+The ABI-v4 adapter binds the system loader close operation during preflight. The image-local SDK close wrapper transfers its owned close references into a FIFO during cleanup or while code leases exist. Actual owner join and zero leases permit draining those references outside Rust and adapter locks, followed by the base reference only when the unsafe provider descriptor authorizes it. Capture failure, cleanup failure, owner unwind or loader failure never authorizes early unload. Provider callbacks that enter Scheme must quiesce before SDK cleanup; code leases preserve executable code, not a finalized VM heap.
+
+Default retention and opt-in release are separate factories in one qualification wheel, using the identical Scheme image and original Gerbil/Gambit C O2 chain. Production defaults, the four-owner topology and scheduler policy are unchanged. Typed Rust/Python receipts report owner/generation, code leases, observed pending module closes and retention/quarantine/release state. An unobserved module count is absent, not zero. Raw build logs, diagnostic scripts, wheels and allocation graphs remain outside Git.
+
+The existing lifecycle model is extended with code leases, provider authorization, quarantine and guarded code release rather than duplicating the scheduler. Twelve deterministic scenarios per domain, two 1,000-sample runs and five invariant-violation mutation controls complete through the existing harness (72.20 seconds). Native cleanup and actual join remain assumptions; the historical eight-step symbolic smoke result is not transferred to this extended model, and the twelve-step target remains incomplete.
+
+The foreign-thread TLS control is strengthened by closing its observer's extra =dlopen= reference before owner shutdown. Its saved native function pointers must then be protected solely by explicit code leases. The earlier positive with the extra observer reference remains a diagnostic receipt, not acceptance of lease ownership.
+
+** Process identity is part of code ownership
+
+The initial Python code-lease type lacked the existing runtime's fork rejection boundary. An actual fork control fails on that wheel because inherited mapping access succeeds instead of rejecting (child exit 3, without invoking stale native code). The corrected wrapper validates its creating PID before locks or release and retains inherited child copies without acquiring inherited mutexes or running unload hooks. A maintainer-owned lease is transferable between threads in its process, not between processes. This does not enable VM reinitialization after fork.
+
+** Residual allocation classification
+
+On the published artifact the original mixed-mode eight-cycle workload completes 1,536 requests in 98.872 seconds. Its first-to-last close delta is 19,072 malloc-live bytes and 60 blocks. The same Scheme workload and request count with all four dispatch modes set to direct completes in 93.040 seconds, leaving 8,832 bytes and 56 blocks. These diagnostic timings are not a throughput A/B claim. The 10,240-byte mixed/direct difference equals four 2,560-byte Crossbeam epoch nodes. No such collector root occurs in the direct graphs; this is deferred Rust/Rayon reclamation, with an indefinite bound still unproved.
+
+The direct allocation graph has 28 new 96-byte XPC dictionaries and 28 new 192-byte backing stores (8,064 bytes), plus an array growing from 256 to 512 bytes. Both the root-reachability and all-allocation address/size comparisons account for 8,320 bytes and 56 blocks. Reachability from a pointer into Kernel Alloc Once storage is not exact attribution to an owning function. The initial 512-byte telemetry/graph difference is preserved as an unassigned result. A subsequent independent control on the same published artifact repeats the identical eight-cycle direct workload without graph capture: the original function-internal sample grows 8,832 bytes, while a second allocator sample immediately after the function returns grows 8,320 bytes. The observer-local difference changes from 3,584 to 4,096 bytes, always one block. The additional 512 bytes are therefore live temporary dyld-list storage during measurement, not retained Scheme heap. The post-return delta exactly matches the allocation graph. Offline =leaks --noContent= on that direct final graph reports zero unreachable leaks. Reachable XPC metadata may still grow with fresh module paths; no indefinite cache bound or private-object release authority is inferred.
+
+The graph observer costs 128 bytes and one block per capture, disproving the hypothesis that it creates the entire retained metadata tail. A malloc/XPC interposer crashes before workload configuration (exit 139), so it provides no native attribution. A corrected LLDB follow-exec run completes one owned lifecycle cycle but captures no matching public XPC setter stack. Both negatives remain outside Git. No attempt frees private OS metadata or flushes a shared Crossbeam collector blindly.
+
+** Avoidable native exit-registration tail
+
+The first ABI-v4 native repeat has an additional 1,280-byte block at cycle seven, including after pool/receipt destruction. The strengthened host-drop observation separately frees 7,296 bytes and 24 blocks of live Rust pool/receipt metadata. It does not explain that remaining block. A complete, post-acceptance allocation graph with stack logging identifies the block as =malloc in atexit_register=, rooted by libc's =__atexit=. Its stack is =atexit_register -> __cxa_atexit -> dyld initializer registration -> dlopen -> Image::load=. There are zero unreachable leaks in that capture. The adapter's per-image pthread-mutex destructor creates this avoidable process metadata.
+
+The minimal repair uses a statically initialized Darwin =os_unfair_lock= with the same critical sections, FIFO ownership transfer and quiescence conditions. It requires no per-image destructor registration. The rebuilt image imports the two unfair-lock operations and no longer imports =__cxa_atexit= or contains the old lock-retirement destructor. Actual 32-image retirement then keeps malloc live at 21,072 bytes while the pool/receipt are alive and 13,776 bytes after their destruction, with no first-to-last growth. The post-acceptance allocation graph has zero unreachable leaks and no 1,280-byte exit-registration block. No default policy or Scheme evaluator changes are involved.
+
+The first stack-logging capture inside the native loop exceeds the unchanged five-second progress watchdog and is preserved as =cleanup=UNVERIFIED=. The optional capture is moved after =watchdog.join()=, with an explicit =NATIVE-GATES-COMPLETE= marker. The native workload still passes every original deadline before profiling starts. An at-exit capture through an intermediate launcher yields no graph; a direct injected at-exit capture omits the full native completion marker and is also excluded. Profiler success/exit zero is not native acceptance.
+
+** Static-lock validation artifact and RSS classification
+
+The static-lock validation wheel has SHA-256 =e8f71c1cd367c87269b91ddf4905006d7565290bbe59b5c7690410d21a16330c=; its private Scheme image is =a12bd1972062f3c129ab27dbfe64c9200a4d4a4f18a986629d37499ccb0b3ba0=. Both retention policies use this same wheel and image. The earlier process-identity wheel =969dcbee3ab4ec04ac41cc5a466450317cf307052452f85a58f44d61d2cecbda= independently passes API, lease/fork, both eight-cycle and both 600-second gates before the exit-registration repair. Those receipts remain intermediate results rather than being transferred to the static-lock image.
+
+The static-lock validation eight-cycle workloads each execute exactly 1,536 batch requests. At the last close, default retention reports 32 base images, 5,294,480 malloc-live bytes and 805,208,064 bytes of ps RSS. Qualified release reports zero owner/SDK images, 5,294,448 malloc-live bytes and 530,677,760 bytes of ps RSS. Both have zero external roots, one process thread, three FDs and removed resource files. Endurance gates run in independent concurrent processes; work totals and wall times are not a matched throughput/p99 benchmark.
+
+A read-only post-workload =vmmap -summary= identifies the qualified process's dominant residual region as =MALLOC_SMALL (empty)=: 528 MiB virtual, 444.1 MiB resident and 221.5 MiB dirty. Its DefaultMallocZone reports 574.8 MiB virtual, 472.4 MiB resident, 246.0 MiB dirty, approximately 5,295 KiB allocated, 240.8 MiB dirty/swap fragmentation and 98% fragmentation. The vmmap snapshot occurs while the observer's subprocess buffers are live, so its small live-byte count is not the same sampling point as the preceding malloc counter. ps RSS and vmmap physical footprint (267.6 MiB) are distinct metrics.
+
+The existing diagnostic =malloc_zone_pressure_relief(NULL, 0)= reports zero released bytes; live bytes and RSS remain unchanged. This negative is preserved. Zero code mappings therefore does not imply zero RSS, and no claim is made that best-effort relief completely reclaims allocator-owned empty regions. The library does not deallocate regions owned by the shared default allocator. Neither allocator fragmentation nor reachable OS loader metadata is reported as a live Scheme-heap leak. Unbounded cache/fragmentation growth remains outside these finite gates.
+
+** Failure accounting and actual startup progress
+
+Final review puts the module-capture failure-counter read under the same static lock as its foreign pure-C writers. A separate compiler-owned fault image injects failure only into the adapter's retirement-node allocation. A leased foreign C callback repeatedly acquires/closes real loader references concurrently with SDK cleanup. Native execution observes zero Scheme roots, cleanup status -3, nonzero uncaptured-reference accounting and =Quarantined= after foreign join and final lease retirement. The receipt remains unclean: a balanced Scheme heap does not authorize losing native code ownership. This control is wired into the existing native CI job; production has no runtime fault flag.
+
+An original native 32-image repeat then hits the unchanged five-second progress watchdog after one pool has closed, while the next four-owner pool is starting. The failure is retained as =cleanup=UNVERIFIED=. The SDK startup bound is five seconds per owner, but this fixture previously emitted no event until all four were ready. An instrumented diagnostic reproduces the failure under concurrent actual Python initialization load; its sampler returns an empty call graph, so no blocked native function is inferred from it.
+
+The additive =InstancePool::start_observed= API delivers immutable, validated =OwnerReceipt= metadata on the caller after each successful SDK initialization, processor-count check and distinct-state admission. Ordinary =start= forwards with a no-op observer; scheduler and startup defaults are unchanged. The native fixture reports these real events to its watchdog. Under the same concurrent initialization load, all 32 native admissions and releases complete: the slowest individual setup is 2.0033 seconds, while complete four-owner starts take up to 5.7866 seconds (including an earlier 5.5555-second start). Both exceed the old event-observation gap while continuing real work. No per-owner startup, Scheme execution, GC or join deadline is widened, and no periodic synthetic event is added.
+
+The synchronized final native image has SHA-256 =b06f69bade2143b5482e8b63c55bc3eeae4cb871a4d2be29957fa89ee1a598ac=. The final wheel including startup observation has SHA-256 =9e1e8ebc6c0bc425e5c7d15dd9f2b22b6f1ebcf7c24c57ee8ccf87a42d68e9e4=. The preceding accounting wheel =c7cd016d7a417efd030d94ac6f53924bf8f723f7645e22d7ca07ff2b71540528= uses the identical native image and independently completes both 600-second resource gates. The final Rust extension receives its own actual-API and resource qualification rather than inheriting that earlier wheel's result.
+
+** Completed final-source acceptance
+
+| Final gate | Retained policy | Qualified release |
+|------------+-----------------+-------------------|
+| Eight lifecycle cycles | PASS; 1,536 requests; 122.344 outer seconds; 32 images | PASS; 1,536 requests; 123.303 outer seconds; 0 images |
+| 600-second fixed-pool reuse | PASS; 865,392 requests; 618.050 outer seconds; 4 images | PASS; 858,960 requests; 618.821 outer seconds; 0 images |
+
+Actual default Python API: 12 tests PASS (10.608 outer seconds). Real SDK module lease, idempotent close, Python GC and inherited-fork rejection: three tests PASS per policy. Every normal close has zero external roots, one process thread, three FDs, zero pending SDK module closes and removed resource files. Authorized code retirement has zero physical owner/SDK mappings; default image retention remains an explicit policy result.
+
+All thirteen native controls pass on the final source, including concurrent retirement-node allocation failure, 32-image release, strengthened foreign TLS/code leases, blocking-destructor/repeated close, pending-pool drop, callback/unload sensitivity, finalizer/root/unwind barriers, both native startup faults, retained-root control and all 136 preflight rejection/unload cycles. Native Scheme numeric/scalar families, GC, continuations/dynamic-wind and exceptions remain exercised. Production, Python and native qualification strict lint, formatting and workflow syntax are separate gates. The existing model's sampled/mutation results remain separate from these native results.
+
+Both finite endurance lanes execute in independent concurrent processes on the local host. Their differing completed work totals and wall times do not establish a throughput, p99 or fairness improvement. No scheduler/topology/allocator default, native optimization level or execution deadline is changed. Raw failures, profiles, wheels and receipts belong to the historical =gerbil-mapping-leases-20261020= evidence set retained outside Git.
+
+* Exact-head CI documentation correction
+
+On =a662218=, the native owner lifecycle job and Quint job passed independently. Ubuntu Cargo and Bazel rejected the newly public =PythonImageMappingState= because its declaration lacked a Rust doc comment (=RUST-AGENT-DOCS-PUBLIC-002=). Preserve that failed run; it is not a native lifecycle failure or a successful aggregate CI result.
+
+Add English documentation to the enum and its seven states without changing execution logic, type representation, provider authorization or native deadlines. The exact failing local =cargo test -p gerbil-scheme-python --lib enforce_asp_rust_gate= now passes. Original native/artifact receipts above retain their source identities; exact-head remote CI for the documentation follow-up is checked separately.
+
+* Remaining native scope
+
+The directory/SDK-ENOENT and post-open/post-close host-signal regressions have actual native controls. The current implementation adds explicit code leases, SDK module retirement and unsafe provider authorization after clean actual joins. Qualification of arbitrary extension callback/TLS ownership graphs remains open; the protocol is not absent, and the default still retains base images. Multi-hour fixed-VM reuse, longer image churn, complete residual-allocation attribution, signal delivery inside lifecycle transitions, timer/other process-global ownership and separately instrumented sanitizer builds remain separate gates. Current longer-reuse observations are tracked in 30.24. The twelve-transition symbolic target remains incomplete; the historical eight-transition smoke result does not replace it or qualify the extended source.
+
+* Reproduction
+
+#+begin_src sh
+just native-model-check
+just owner-model-verify-smoke
+just owner-model-verify
+just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 600 --sample-seconds 10
+just bridge-python-dispatch-memory /path/to/venv/bin/python --case lifecycle --cycles 8
+just bridge-python-dispatch-memory /path/to/venv/bin/python --case reuse --seconds 0 --allocator-relief
+just bridge-instance-resources --callbacks
+just bridge-instance-resources --blocking-tls
+just bridge-instance-resources --blocking-tls-drop
+just bridge-instance-resources --finalizer-failure
+just bridge-instance-resources --owner-unwind
+just bridge-instance-resources --root-quarantine
+just bridge-instance-resources --preflight
+just bridge-instance-resources --retained
+#+end_src
+
+All raw captures, failed attempts, diagnostic wrappers, checker output and source identities stay outside Git. Only maintained models, tests, CI wiring and English summaries are committed. The preceding commit =0126e6c= completed all four platform Cargo/Bazel jobs and the owner-protocol CI job successfully; SMP was explicitly skipped. Those checks did not cover the sustained failures found locally. Exact-head checks after publishing this repair remain separate from the completed local native receipts.

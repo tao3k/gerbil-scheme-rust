@@ -1,0 +1,121 @@
+#+TITLE: Scheme completion opportunities in the execution grant protocol
+#+OPTIONS: toc:2
+
+* Status and evidence boundary
+
+This is an unpublished, opt-in ABI21 candidate. Defaults are unchanged.
+The preceding ABI20 VM-hook candidate was rejected: mixed paired medians
+were throughput -2.68%, actual short p99 +16.92%, bulk p99 +24.27%, and
+owner finish spread +35.08%. Its pooled short p99 improvement does not
+establish consistent per-window improvement. See [[file:30.76-scheme-specialized-execution.org]].
+
+Those samples establish a regression, not its unique causal explanation.
+The source and existing Runtime model expose a protocol gap: a worker yield
+can acknowledge the work-ready generation without an actual host harvest.
+The class grant selector independently chooses another execution worker.
+Thus execution fairness and completion custody have different authorities,
+and a short result can lose its execution-budget pressure before reclamation.
+Static closure counts cannot establish or repair this ordering guarantee.
+
+* Protocol and ownership
+
+The candidate adds completion custody as a participant in the existing Scheme
+grant protocol. It adds no Rust execution scheduler and no outer Actor lease.
+
+| Event | Authority and effect |
+|-------+----------------------|
+| Admission | Existing Rust slot/work reservations; no Scheme execution credit |
+| First native entry | Existing fixed owner and native roots |
+| Execution grant | Existing Scheme class arbitration and declared-span permission |
+| Short result ready | Scheme increments ready generation; subsequent worker grants wait |
+| Worker checkpoint/yield | Releases execution ownership; does not acknowledge a ready generation |
+| Actual ready harvest | Scheme acknowledges the generation after the short queue drains; existing waiter selection resumes |
+| Projection/retirement | Each result independently releases its roots and native/work permits |
+| Close/stop | Revokes the completion grant fence before native drain; does not discard live execution or root obligations |
+
+A harvest may resume execution before projection, because harvested custody
+and result retirement are separate. A ready token still cannot acknowledge
+claimed graphs early. This avoids making arbitrary Rust projectors the holder
+of a Scheme execution grant. The lock order remains service mutex then budget
+mutex; release never acquires the service mutex.
+
+No short result pending means the existing plan and native work path remains.
+A new short result cannot revoke an already-issued grant or interrupt a
+selected span. A worker can receive a grant before the previous worker
+publishes its completed result, then resume after that publication. For the matched
+fixture that span is at most 48 declared bulk records; the short layout declares
+four. This is a cooperative work bound, not a wall-clock preemption guarantee.
+Arbitrary Scheme code, native blocking, GC and OS descheduling retain their
+semantics. Progress requires a runnable host continuation to be scheduled.
+
+The close exception is essential: native close can wait for workers without
+issuing another harvest. Keeping the fence active during that wait would
+create a cycle between worker completion and host reclamation. Close revokes
+only the fence; existing class queues and continuation reacquisition remain.
+
+* Actual API and model
+
+=InstanceDispatcher::configure_scheme_service_reclamation_plan_on= configures
+the idle owner using native op33 and a typed =SchemeWorkExecutionPolicy=.
+ABI21 acknowledges mode6. Both lexical and callable Scheme layout APIs use the
+same specialized continuation protocol as ABI20. Existing immutable plan
+metadata, multishot successful-return accounting, exception unwind and stale
+epoch fences remain. Rust prepares bounded native inputs and distributes
+across instances; Scheme owns execution, waits and continuations.
+
+The existing =specs/owner_lifecycle.qnt= is refined rather than duplicated:
+ready generations survive yield, new grants require harvest while open,
+and close permits drain without settling roots. Directed harvest-before-grant,
+close and unsafe-yield mutation witnesses join the existing continuation,
+cache, joint-dispatch and cancellation witnesses in both finite domains.
+Finite model acceptance is distinct from native and performance acceptance.
+
+Native controls exercise actual typed order calls, short success and Scheme
+exception, abandoned caller tickets, independent capacity refund, and a
+queued worker that can resume only after harvest or close revocation.
+
+* Matched performance admission
+
+The targeted comparison is ABI20 specialized plans versus ABI21 reclamation
+participation, within the same four live VMs and native image. Both arms use
+O2, Tokio2, window4, work32, batch8, Actor quantum1, class/feed budgets1,
+and executed-work quantum4/maximum48. Five AB/BA blocks cover CPU and mixed
+loads. No profiler, additional matrix, threshold or default change is used.
+
+Preserve pooled and paired estimators separately, every negative window,
+exact source/image identities, native cleanup and watchdog failures in private
+receipts. Do not publish raw logs, native artifacts or host-specific paths.
+An incremental improvement still needs admission against the full unpublished
+protocol's published control before any performance-qualified submission.
+
+Historical watchdog attribution remains open. Failure-only panic stacks and
+unchanged native/controller watchdogs remain enabled; no failure-free capture
+can explain the historical failure.
+
+* Captured outcome: rejected
+
+Forty same-live-VM samples completed in 7.044 seconds, exit0, with unchanged
+host/image identity, exact work/result/grant conservation, joined4, roots0,
+files removed and no new watchdog failure. This is not quiet-host acceptance:
+the boundary detector omitted a =gsc-boot= compiler still executing a bootstrap
+compilation before and after capture. Its observed CPU use does not quantify
+interference and cannot explain away the negative results.
+
+| Paired-window median change | CPU | Mixed |
+|-----------------------------+-----+-------|
+| Throughput | +2.32% (6/10 improved) | -2.64% (1/10 improved) |
+| Actual short p99 | -14.58% (6/10 improved) | +7.79% (4/10 improved) |
+| Bulk p99 | -4.24% (6/10 improved) | +23.46% (2/10 improved) |
+| Owner finish spread | +8.78% (5/10 improved) | +12.55% (4/10 improved) |
+
+Pooled mixed short p99 worsened149.71%, aggregate throughput fell4.06%, and
+maximum owner spread worsened35.28%. Paired and pooled estimates are distinct.
+No promotion, default change, commit or push follows. Raw negative receipts,
+initial model/Clippy failures and exact source identities remain private.
+
+The hard grant fence reserves a future host opportunity even when no Scheme
+host receiver is currently servicing completions. This can couple new execution
+to a later native entry. The capture does not isolate that mechanism as the
+unique measured cause. The next protocol refinement must distinguish an
+actual Scheme completion receiver from a promised future host turn; it must
+retain ready custody when the receiver departs without blocking execution.

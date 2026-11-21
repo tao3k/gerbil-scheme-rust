@@ -1,0 +1,226 @@
+#+TITLE: Bounded queue receipt and native result progress
+#+STARTUP: overview
+
+* Protocol gap and actual API
+
+The previous pooled-short API waits for two owner-to-client events: placement
+acknowledgement and then the native result. The intermediate acknowledgement
+can resume the Tokio caller before it begins polling the result receiver. Two
+observable events do not necessarily mean two actual scheduler resumptions: a
+receiver can already be ready when first polled.
+That dependency is required when a caller needs placement immediately, but not
+when it only needs the final typed value. Owner execution and completion may
+advance while the client is still waiting to resume from placement.
+
+The explicit =SchemeShortPool::submit_queued= path acknowledges publication into
+the existing bounded Rust queue. It returns =QueuedSchemeTicket= around the existing final result receiver;
+it does not return or promise a selected owner. Only a running native owner
+claims the payload and acquires active/request/work credits. It then executes
+the complete Scheme VM using the existing service protocol. There is no extra
+queue, coordinator task, poll loop, execution lease or Rust-side Scheme runtime.
+The original =submit= placement contract remains available and unchanged.
+
+Only the queued result ticket carries the existing pending-input cancellation
+guard. Ordinary =AsyncInstanceTicket= retains its original layout and path.
+Dropping an unclaimed ticket removes its Rust payload and returns its pending
+slot, with no Scheme root or native credit to release. After actual claim, the
+guard can no longer find/retract the input; caller timeout/drop cannot return
+native credit or abandon Scheme roots early. Both =wait_completed= and
+=wait_observed= retain that guard for their whole observation lifetime.
+Close drains queued inputs through the same result channel without requiring a
+placement receiver. The original queue deadline is checked before claim;
+expiry is resolved by owner inspection, client observation timeout/drop, or
+close, not by adding an independent per-input timer. The result wait still has
+its own explicit finite observation budget.
+
+* Notification and refill ownership
+
+The old pending guard invokes queue cancellation after placement has already
+claimed and removed its input. Previously that unsuccessful cancellation still
+called =capacity_available=, reevaluating other requests' notification duties
+from a stale client acknowledgement. The cancellation path now publishes only
+when it actually removed a queued payload. An empty source is checked using
+its existing length publication; no second completion/claim flag is introduced.
+
+Actual native credit return still publishes through =CapacityEvents=, and the
+owner retains its existing bounded refill opportunity. No completed result is
+held behind another projector, no client acknowledgement owns native capacity,
+and no capacity notification is deferred across arbitrary Scheme work. The
+queued API removes the intermediate placement wake itself rather than merely
+reordering result send and credit return. These source dependencies motivate
+the experiment; they are not a claim that every observed tail has this cause.
+
+* Reused joint model
+
+Reuse the existing unassigned =poolStaged= queue, owner claim, capacity/root
+ownership, selective notification and Tokio final-reply actions. The refinement
+distinguishes optional placement polling from awaiting the final result. Queue
+receipt creates no native root/credit and holds no Tokio polling slot. A native
+owner can claim/run before a placement observer resumes; the queued path has
+no placement-observation dependency. A stale cancellation after claim is a
+stutter for queue/capacity ownership. Existing native publication and Scheme
+Actor/green-thread progress remain independent of client consumption.
+
+Directed cases cover bounded root-free queue receipt, full native reply without
+placement polling, legacy placement acknowledgement, pre-claim cancellation,
+post-claim timeout, close and a required premature-native-credit mutation.
+These refine the existing model, not a second scheduler model. Finite safety
+checks cannot establish OS fairness, wall-clock p99 or native correctness.
+
+* Native and performance admission
+
+The native late-binding fixture adds queue receipt while all owners are busy,
+slot backpressure, dropped/expired unclaimed tickets, claimed projection timeout
+with retained native credit, actual typed output/observation, Scheme error and
+queued close drain. Existing GC, continuations and full-runtime tests remain.
+A pipe-based protocol control verifies that a stale cancellation cannot publish
+another request's eligibility event; actual capacity publication still wakes it.
+
+Use the existing Rust bench with
+=--progress-fair-ab --fixed-short-selective --completion-await-ab=.
+Both arms use the same four live VMs/image, =NativeBudget= and per-result
+retirement before publication, keeping the previous throughput opportunity in
+the control rather than comparing unrelated captures. Both retain legacy
+client timers and identical short-result publication/receiver observations.
+The control awaits owner placement then result; the candidate acknowledges the
+bounded queue and directly awaits the final result. This is an observed-workload
+A/B, not an unobserved production qualification.
+
+=probe_submission_ack= labels the changed meaning of the submission return:
+=owner-claim= versus =bounded-queue-publication=. Neither timestamp substitutes
+for actual native entry. The legacy placement-observed field is a submission
+return observation and must be read with that label. Native-ready and client
+consumption remain separate. Original work, scheduling and capacity bounds,
+Tokio two workers, window four, batch eight and five ordered/reversed CPU/mixed
+blocks remain unchanged. No expanded matrix or default change is authorized.
+Performance acceptance must precede commit/push; retain negative results.
+
+* Watchdog and CI boundary
+
+The historical first-port failure remains UNATTRIBUTED and its cleanup
+UNVERIFIED because its failed image/phase/stack is unavailable. New native runs
+freeze binary/image/source identity before executing the unchanged five-second
+meaningful-progress gate. Passing new work does not retrospectively explain
+the old failure. Exact remote PR18 head
+=c4b95dfaa116bd67b110d94826535fd27f227b85= has six effective successful CI checks;
+that result does not attest this local candidate. Rust dispatches only across
+fixed owners; Scheme execution, Actor/green threads, continuations, GC and
+exceptions remain native and complete. This work is independent of SMP.
+
+* Executed model and notification controls
+
+Both existing domains pass 170 directed cases in total and 400 random samples
+of up to 64 steps, seed 42. Model SHA256:
+=df13e6a41e49642ede95872913ff6dbadf6afa218a180751c7b843252cb59d29=.
+The initial added witnesses accessed non-exported model internals; the repair
+exports narrow existing facts/transitions. Two subsequent close traces omitted
+retiring the installed claim endpoints. The correction explicitly finishes those
+endpoints before join; it does not weaken join or safety. Both failed receipts
+are retained. All existing model integration selectors include the new cases.
+
+Eight actual notification/close unit controls pass, including the stale-guard
+notification counterexample. Strict Clippy passes for the actual bench/native
+source and model integration harness. Source hashes also confirm that ordinary
+async dispatch, batch stream, native service and client-observation files are
+byte-identical to this iteration's starting versions: cancellation authority is
+confined to the dedicated queued ticket. No general ticket-layout tax is added.
+
+The final dedicated queued-ticket plus =AfterRetirement= native combination
+passes all three cases in 28.28 seconds: four owners joined, roots zero, files
+removed, FD returned, native close 1.32 ms. Identity is frozen before execution.
+The debug native-test image and release performance image are different build
+artifacts and must not be compared as a source-level runtime change. The release
+image remains identical to the previous release image, and all Scheme source
+input hashes match that previous capture. Interpret each run only as its own
+matched same-image A/B; do not add relative gains across independent captures. O2 release
+bench builds through the existing Cargo/Gerbil graph. No new watchdog stall
+occurs; historical attribution remains open.
+
+* First capture: environment not qualified
+
+=service-completion-await-v32-r1= completes all 40 windows in 6.83 seconds,
+exit zero, empty stderr, no timeout, unchanged frozen source/host/release image,
+and full per-window work/partition/publication/cleanup checks. However, its
+preflight compiler boundary is empty while its final boundary contains a GSC
+process. This violates the predeclared empty-compiler-boundary gate. It cannot
+qualify performance, regardless of favorable or unfavorable measured values.
+The process later exits; no task is interrupted. Keep this entire receipt.
+
+Diagnostic total-work/time throughput changes are CPU +3.21%, mixed -0.61%;
+pooled native short p99 +0.10%/+16.90%; maximum owner spread -48.43%/-18.99%;
+pooled client total p99 +147.92%/-67.54%. These observations remain in the
+negative record; they are not quietly discarded or described as accepted.
+One replacement capture is justified only by the failed environment gate,
+using the unchanged compiled candidate and the same protocol/workload. No
+favorable unchanged-candidate repeats or expanded matrix are admitted.
+
+* Environment-qualified replacement: rejected
+
+=service-completion-await-v32-r2= passes preflight after a blocked preflight was
+retained and external compilation ends naturally. All 40 windows complete in
+6.24 seconds, exit zero, empty stderr, no watchdog/controller timeout, empty
+compiler boundaries and unchanged frozen host/source/release-image identity.
+No task is paused. This is the sole executed replacement of the contaminated
+capture. The release image remains
+=ba8125c6df45516c836e00eef990492df41ff64237222816184db0bf3edfa51e=.
+All per-window work/plans/grants, 1088 independent results, native/client
+partitions, publication order and receiver bounds pass. Cleanup joins four
+owners, roots zero, files removed and service quiescent. The compiled candidate
+is identical between the two captures; only the English adjudication document
+changes before the replacement source archive is frozen.
+
+The control and candidate both use =AfterRetirement= and =NativeBudget=. Both
+also include the successful-cancellation-only notification repair, so this A/B
+does not separately estimate that common repair's performance contribution.
+Positive and negative relative changes below are candidate against this exact
+control. Tail increases are worse. Paired results are the median of ten matched
+ordered/reversed pair changes per load; pooled tails combine request samples.
+
+| Measure | CPU | Mixed |
+|---------+-----+-------|
+| Total-work / total-time throughput | +1.21% | -3.76% |
+| Paired-window throughput | +2.21% | -2.15% |
+| Emitted median-window throughput | -0.94% | -1.49% |
+| Paired native short p99 | -1.14% | +10.62% |
+| Pooled native short p99 | -4.72% | +1.09% |
+| Paired bulk p99 | -6.58% | +11.03% |
+| Pooled bulk p99 | -2.08% | +28.60% |
+| Paired owner finish spread | +20.05% | +9.36% |
+| Maximum owner finish spread | +233.40% | +34.70% |
+| Paired client total p99 | -4.78% | +8.90% |
+| Pooled client total p99 | -33.32% | +24.29% |
+
+CPU maximum owner spread increases from 0.469 to 1.565 ms; mixed increases from
+1.371 to 1.847 ms. Mixed client total p99 increases from 2.088 to 2.595 ms.
+Mixed throughput worsens in eight of ten pairs, as does client delivery p99;
+paired mixed bulk p99 worsens in nine. CPU throughput improves in five pairs.
+The candidate fails the throughput/fairness/tail objective despite a modest CPU
+aggregate throughput gain. Do not commit, push, change defaults or repeat the
+unchanged candidate to select a favorable run. The queued API remains a local
+experimental candidate, not an accepted production recommendation.
+
+* What this negative result changes
+
+Final-result polling starts before completion for all 640 candidate requests in
+each load. The control has 68 CPU and four mixed results already ready on its
+first final-result poll. This verifies that the protocol change actually reaches
+the receiver, but does not measure the exact number of Tokio/OS resumptions.
+
+Candidate send p99 is 7.21 microseconds (CPU) and 6.63 (mixed). Mixed pooled
+send-to-final-ready-poll delay bounds increase from 46.08--49.42 microseconds to
+388.04--390.92. Mixed native short p99 moves only from 494.83 to 500.25
+microseconds. The larger client tail cannot be equated with a comparable
+increase in native Scheme execution. The sender interval alone does not explain
+that receiver wait. These timestamps do not isolate OS runnable/blocking time.
+
+The experiment rejects the assumption that removing placement acknowledgement
+alone yields a better joint progress protocol. A claim event is observable
+progress before native completion, distinct from capacity availability. Its
+notification can precede final-result readiness. Whether that earlier wake
+provides useful scheduler lead time remains a hypothesis, not a proven OS
+explanation. Preserve that progress distinction when considering a combined
+claim/completion wait that can coalesce notifications; do not replace it with
+client-held native capacity, a second execution lease, repeated yields or timer
+threshold changes. Owner refill fairness still needs an independently valid
+opportunity rule. The existing model and the new typed queue boundary provide
+those ownership distinctions; native performance acceptance remains open.

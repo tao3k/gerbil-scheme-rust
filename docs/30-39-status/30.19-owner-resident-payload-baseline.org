@@ -1,0 +1,86 @@
+#+TITLE: Owner-resident Scheme payload baseline and projection attribution
+#+STARTUP: overview
+
+* Current status and historical receipt boundary
+
+The current lifecycle baseline is =8c23217= (six active CI jobs passed; SMP explicitly skipped). The dated artifacts, failures, ratios and model bounds below retain their original identities; they are not measurements of every later source revision. In particular, 10.10x / 21.18x data-placement ratios are not VM scaling factors, and the old eight-transition symbolic receipt does not qualify the extended lifecycle model.
+
+Use [[file:30.24-current-baseline-and-cost-attribution.org][the current baseline and attribution record]] for the rebuilt artifact, optional diagnostics and longer reuse observations. That record separates completed results from pending work. Raw historical temporary captures are currently unavailable on this host; their committed summaries are preserved without fabricating replacement logs.
+
+#+begin_quote
+Raw logs, diagnostic captures, rejected patches and source snapshots are retained outside this repository. Historical capture names below identify local experiments, not committed files.
+#+end_quote
+
+* Adopted execution path
+
+Reusable application data stays in the complete Scheme runtime of its fixed owner thread. Rust routes native typed requests; Scheme retains execution, Actors, green threads, GC, closures and continuations. The native O2 compiler chain and dispatcher defaults are unchanged. This work changes the maintained benchmark and documentation, not native execution code.
+
+#+begin_src python
+sessions = [library.session(owner) for owner in range(4)]
+payloads = [session.value(read_only_items) for session in sessions]
+roots = sessions[owner].call_many([("actors", payloads[owner], 1)] * 32)
+rows = library.project_many(roots, release=True)
+# After all users finish:
+for payload in payloads:
+    payload.close()
+#+end_src
+
+Each payload belongs to one owner and one library. A session shares its owner's Scheme state. Handles do not migrate to another VM or enter stateless routing. Reusing a handle preserves actual Scheme object identity; it does not provide an immutable snapshot. This fixture reads its payload without mutation. Stateful/mutable application workloads need their own ownership and ordering contracts.
+
+* Frozen historical observation and current replication
+
+The accepted historical observation remains 21.18x Actor-item throughput and 79.402 ms scheduled short-request p99. These are separate metrics, not a multiplied quantity or fixed performance gate. The original capture remains unchanged in 30.18's receipts.
+
+Both captures below use the same installed O2 wheel, four live VMs within each A/B, 128 requests per arm, 32 Actor items per request, 48 pairs per item, quantum one, no cooperative sleep, four pinned clients, and bulk projection/release. Each primary run has two warmup pairs and 16 balanced measured pairs. All 32 scheduled short requests drain before the next arm. Input preparation and initialization are excluded from warm throughput and reported separately.
+
+| Capture | Fresh Actor items/s | Native Actor items/s | Ratio | Native short p99 ms |
+|---------+---------------------+----------------------+-------+---------------------|
+| Historical 30.18 | 5768.28 | 122175.92 | 21.18x | 79.402 |
+| Current untraced replication | 9069.53 | 91644.53 | 10.10x | 72.045 |
+
+The replication does not reproduce the 21.18x magnitude. Both the faster control and slower candidate are retained. Host process observations are included; this is not a certified quiet-host run. The wheel and extension bytes are identified, and no production optimization occurred between these two observations. Do not attribute variation to a code change or to one specific background process without additional evidence.
+
+Native throughput in this replication is approximately 2863.89 requests/s because each request has 32 Actor work items. Short completion counts are [128,128,128,128] per arm over the measured rounds. Exact result values, ranks and worker distribution pass. Fair completion counts in a finite run do not prove starvation freedom.
+
+Only 149 of 512 native-arm probes completed before the main batch finished, versus 499 of 512 in the fresh arm. Identical offered arrivals do not imply identical periods of saturation. Short latency includes planned-arrival lateness, call, projection and retirement; main response includes output projection and retirement.
+
+* Remaining cost on the adopted path
+
+Primary untraced native-arm medians:
+
+| Observed interval | Median ms |
+|-------------------+-----------|
+| Wake through all four client batch returns | 5.731 |
+| Combined batch projection and release API | 36.186 |
+
+These are medians of separate intervals; they must not be added to reconstruct the median of the total or interpreted as CPU time.
+
+A separate diagnostic capture uses four measured pairs with owner profiling enabled. It is not a throughput qualification run. No spans were dropped or marked failed. Native-arm observations:
+
+| Trace interval | Median ms |
+|----------------+-----------|
+| Batch-call wall per request | 0.0189 |
+| Batch-call preparation through owner start | 5.7233 |
+| Four-owner projection: first enqueue through last completion | 23.5619 |
+| Last projection completion through first release enqueue | 6.0891 |
+| Four-owner release: first enqueue through last completion | 0.7686 |
+
+The gap between projection and release includes host collection, Python materialization and scheduling. It is not a pure Python conversion CPU timer. The projection envelope includes owner waiting, native recursive projection and OS scheduling. Trace timing overhead means these intervals cannot be subtracted from a different untraced run. GC diagnostics remain in raw spans; this report does not assert GC is eliminated or infer a per-arm GC saving from final cumulative counts.
+
+Existing projection recursively inspects native graphs and constructs owned scalar descriptions before Python materialization. The next optimization candidate is reducing native result traversal and boundary crossings while retaining the generic fallback and exact native-type semantics. A fused API or specialized result format is not implemented or qualified here.
+
+Any such change must preserve cycles/procedures/continuations as native values on projection failure, materialize every Python result before optional root retirement, preserve exception recovery, and keep all Scheme objects on their owners. Do not obtain a speedup by skipping results, replacing Scheme execution, lowering optimization, or changing defaults.
+
+* Reproduction and evidence
+
+#+begin_src sh
+just bridge-python-native-payload-ab /path/to/installed/venv/bin/python
+just bridge-python-native-payload-ab /path/to/installed/venv/bin/python --owner-trace --rounds 4
+just bridge-python-owner-routing-tests /path/to/installed/venv/bin/python
+#+end_src
+
+The benchmark records schema, harness/installed-extension SHA-256, Python version, host observations, cold initialization, native payload preparation, stage timings, offered/completed probes, result checks, post-GC reuse and cleanup. The native library's original five-second observation gate is unchanged; the Python future observation limit is unchanged. Warm results are not universal numerical acceptance thresholds.
+
+Both captures exit zero, preserve VM identities, reuse payloads after explicit GC, retire every root to [0,0,0,0] and remove runtime files. These checks do not establish full RSS return or indefinite leak freedom. Owner routing/native capability regression results are retained separately.
+
+Evidence: baseline contract, untraced paired replication, diagnostic spans, phase summary, owner routing regression, and receipt hashes.

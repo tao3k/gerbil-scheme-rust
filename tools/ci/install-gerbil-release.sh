@@ -8,13 +8,13 @@ release_root="${1:?usage: install-gerbil-release.sh RELEASE_ROOT}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
-    # Native four-worker indexing and streaming compilation; Gambit is unchanged.
-    revision=2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb
+    # Use the published continuation-ownership fix already qualified upstream.
+    revision=1cfb032c7a1612637da6205f5f8a15683eba3ba0
     release_os=linux
     release_arch=x86_64
-    tag=gerbil-v0.19-2591dcd9b7c6d2c4e9dd8611a17c5b1a5d82bbdb-linux-x86_64-portable-full-single-host-unlimited-patcha379bb244bfa
-    sha256=3b345b1af68dfbbc0e73bae64941e4c8910d0ca192d81432ce699c5af385b565
-    asset_id=690615494
+    tag=gerbil-v0.19-1cfb032c7a1612637da6205f5f8a15683eba3ba0-linux-x86_64-portable-full-single-host-unlimited-multiple-vms-patch9599b09b82f8
+    sha256=143c691fee5af4f9f631fd339f69a66f562e42e0bfc1d4ee2cda5fa8d35c35ee
+    asset_id=642547571
     ;;
   Darwin-arm64)
     revision=1cfb032c7a1612637da6205f5f8a15683eba3ba0

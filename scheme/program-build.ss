@@ -139,38 +139,94 @@
       (lambda (port)
         (write `(define builtin-modules ',modules) port)
         (newline port)
-        ;; Keep the SDK loader's state/error/load-order handling. Only replace
-        ;; its raw carrier read while an exact linked library module is loading.
-        ;; Gambit registers these descriptors with preload disabled; their
-        ;; top-level expressions execute in the original expander context.
-        (write
-          `(let ((original-module load-module)
-                 (original-load load)
-                 (active (make-parameter #f))
-                 (linked ',(map (lambda (module)
-                                 (cons (hash-ref module "module")
-                                       (string->symbol
-                                         (path-strip-directory
-                                           (path-strip-extension (hash-ref module "scm"))))))
-                               ;; Empty runtime reexports have no Gambit
-                               ;; descriptor; retain the SDK's empty-file load.
-                               (filter (lambda (module)
-                                         (> (file-info-size (file-info (hash-ref module "scm"))) 0))
-                                       metadata))))
-             (set! load-module
-               (lambda (module)
+        ;; Keep the SDK loader's mutex, state, error and load-order protocol
+        ;; without probing GERBIL_LOADPATH on disk for statically linked
+        ;; deferred modules. Compiled callers specialize (load-module string)
+        ;; directly to __load-module, so install the hook on both entrypoints
+        ;; and initialize each deferred module's deferred runtime dependencies
+        ;; in topological order before invoking ##load-module on it.
+        (let* ((non-empty
+                ;; Empty runtime reexports have no Gambit descriptor; retain
+                ;; the SDK's empty-file load.
+                (filter (lambda (module)
+                          (> (file-info-size (file-info (hash-ref module "scm"))) 0))
+                        metadata))
+               (linked-set
+                (list->hash-table
+                  (map (lambda (module) (cons (hash-ref module "module") #t)) non-empty)))
+               (deferred-deps
+                (lambda (id)
+                  (with-catch (lambda (_) '())
+                    (lambda ()
+                      (let ((ctx (import-module (string->symbol (string-append ":" id)))))
+                        (delete-duplicates/hash
+                          (filter (lambda (dep-id)
+                                    (and (not (equal? dep-id id))
+                                         (hash-get linked-set dep-id)))
+                                  (map (lambda (c) (symbol->string (expander-context-id c)))
+                                       (find-runtime-module-deps ctx)))))))))
+               (linked-entries
+                (map (lambda (module)
+                       (let ((id (hash-ref module "module"))
+                             (unit (string->symbol
+                                     (path-strip-directory
+                                       (path-strip-extension (hash-ref module "scm"))))))
+                         (cons id (cons unit (deferred-deps id)))))
+                     non-empty)))
+          (write
+            `(let ((original-module load-module)
+                   (original-unchecked __load-module)
+                   (linked ',linked-entries))
+               (define (load-linked module fallback)
                  (let ((entry (assoc module linked)))
                    (if entry
-                     (parameterize ((active (cdr entry))) (original-module module))
-                     (parameterize ((active #f)) (original-module module))))))
-             (set! load
-               (lambda (path . options)
-                 (if (and (active) (null? options))
-                   (let ((module (active)))
-                     (parameterize ((active #f)) (##load-module module))
-                     path)
-                   (apply original-load path options)))))
-          port)
+                     (begin
+                       (mutex-lock! __load-mx)
+                       (let ((state (hash-get __modules module)))
+                         (cond
+                           ((or (eq? 'builtin state) (string? state))
+                            (mutex-unlock! __load-mx)
+                            state)
+                           ((eq? 'loading state)
+                            (mutex-unlock! __load-mx __load-cv)
+                            (load-linked module fallback))
+                           ((and (pair? state) (eq? (car state) 'error))
+                            (mutex-unlock! __load-mx)
+                            (raise (cadr state)))
+                           ((not state)
+                            (hash-put! __modules module 'loading)
+                            (mutex-unlock! __load-mx)
+                            (with-catch
+                              (lambda (exn)
+                                (mutex-lock! __load-mx)
+                                (hash-put! __modules module (list 'error exn))
+                                (condition-variable-broadcast! __load-cv)
+                                (mutex-unlock! __load-mx)
+                                (raise exn))
+                              (lambda ()
+                                (for-each (lambda (dep) (load-linked dep fallback))
+                                          (cddr entry))
+                                (##load-module (cadr entry))
+                                (mutex-lock! __load-mx)
+                                (hash-put! __modules module module)
+                                (unless (hash-get __load-order module)
+                                  (hash-put! __load-order module __load-order-next)
+                                  (set! __load-order-next (##fx+ __load-order-next 1)))
+                                (condition-variable-broadcast! __load-cv)
+                                (mutex-unlock! __load-mx)
+                                module)))
+                           (else
+                            (mutex-unlock! __load-mx)
+                            (error "internal error; unexpected loading state" state)))))
+                     (fallback module))))
+               (set! __load-module
+                 (lambda (module) (load-linked module original-unchecked)))
+               (set! load-module
+                 (lambda (module)
+                   (if (string? module)
+                     (load-linked module original-unchecked)
+                     (original-module module)))))
+            port))
         (newline port)
         (for-each (lambda (form) (write form port) (newline port)) forms)))))
 

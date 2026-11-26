@@ -34,6 +34,20 @@
       (def runtime-role (find (lambda (row) (equal? (hash-ref row "module") "std/iter")) modules))
       (unless (and role (hash-ref role "deferred" #f) runtime-role)
         (error "template or explicit runtime code is absent, or template eagerly initialized"))
+      ;; The generated load-module hook must initialize linked deferred modules
+      ;; directly without probing GERBIL_LOADPATH on disk.
+      (let* ((forms (call-with-input-file (path-expand "program__exe.scm" target)
+                      (lambda (port)
+                        (let loop ((acc []))
+                          (let (form (read port))
+                            (if (eof-object? form) (reverse acc) (loop (cons form acc))))))))
+             (hook (cadr forms))
+             (bindings (cadr hook))
+             (linked (cadr (cadr (assoc 'linked bindings)))))
+        (unless (and (assoc "std/func" linked)
+                     (assoc 'original-unchecked bindings)
+                     (not (assoc 'original-load bindings)))
+          (error "deferred linked module hook must dispatch both load-module and __load-module without disk probe")))
       (displayln "PROGRAM-TEMPLATE-RUNTIME-OK deferred=true"))
     (gerbil-rs-stage-program source expanded '(:gerbil/compiler/base))
     ;; Standard compiler options must reach both compile-exe and its link plan.
